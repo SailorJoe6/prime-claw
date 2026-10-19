@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 15:49'
+updated_date: '2026-10-19 16:09'
 labels: []
 dependencies: []
 references:
@@ -27,6 +27,11 @@ documentation:
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/I-episode-finalization.md
   - docs/user-stories/traceability.md
+modified_files:
+  - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+  - tests/task_history_workspace.test.mjs
+  - tests/test_task_history_workspace.py
+  - docs/backlog.md
 priority: p1
 type: epic
 ordinal: 125000
@@ -483,4 +488,22 @@ Prevent silent overwrite:
 Representative real-Git tests, not a matrix: successful exact native mutation/commit/direct-head publication; pre-read remote fast-forward; unrelated-task remote advance during publication preserved by ordinary Git; same-task advance blocks with exact evidence and no overwrite; stale/non-force push failure and remote-unavailable failure preserve local evidence. Prove unrelated task advances do not block and owner-authored iterative updates can publish sequentially. Use the repo-built managed Backlog executable on host and Docker bridge coverage.
 
 Explicitly out of scope: actual lifecycle/admission/finalization/cleanup wiring; ownership/receipt schema changes; provider-neutral UX routing; managed semantic decisions; Beads/Dolt transport; legacy inventory/transition; migration/cutover; PRIMECLAW-43.1; any framework or persistent state. Update task notes/docs truthfully, run focused + full Node + Docker tier 1, make one clean candidate, push, and stop for review. Keep PRIMECLAW-43 In Progress.
+
+2026-10-19 Episode — Backlog sub-slice 2C implementation in progress (scope checkpoint 9044015; slice 2B accepted at 759a5bb). Added one provider-specific `publishEpisodeTaskHistoryMutation` seam only. It re-proves exact linked/clone/remote/folder authority, strictly clean state, direct/fetched task ref, and autoCommit=false; fast-forwards a clean stale clone; resolves one exact task ID/path natively before and after structured `backlog task edit`; permits only that tracked path to change; makes an ordinary commit; pushes without force; and proves the direct remote head. Results carry raw native before/after JSON and exact task-path Git diff.
+
+Publication rejection handling now fetches exact remote evidence. Same-task or ambiguous ID/path changes block with exact heads, native views, and local/remote Git diffs. An advance is auto-reconciled only when both the exact task path is unchanged and native remote resolution still returns the same ID/path; an ordinary merge preserves both histories before another non-force push. All mutation/commit/fetch/merge/push failure paths retain recoverable local work and never claim publication.
+
+Six representative real-Git 2C regressions currently pass with the repo-built managed Backlog executable: success plus sequential owner updates; clean stale pre-read fast-forward; unrelated-task publication race preserved by ordinary merge; same-task race blocks with exact evidence/no overwrite; rejected non-force publication retains the clean local commit; remote loss retains the clean local commit/evidence. Docs updated. No Episode admission/finalization/cleanup or lifecycle wiring, schema/receipt fields, provider-neutral UX, semantic classifier, custom patch, lock/checkpoint/coordinator, Beads/Dolt, legacy transition, migration/cutover, PRIMECLAW-43.1, framework, or persistent state added. Status remains In Progress. Full focused/host/Docker verification remains before candidate commit.
+
+2026-10-19 Episode — Backlog sub-slice 2C completed for review. Final behavior remains exactly the approved direct Backlog-specific seam: one exact native task edit with autoCommit=false, ordinary Git commit, non-force publication, direct remote-head proof, and raw native before/after plus exact Git-diff evidence. Clean stale clones fast-forward and re-read. Publication races auto-reconcile only when both Git proves the exact task path unchanged and a native remote-head read resolves the same exact canonical ID/path; ordinary merge preserves both histories and the final native after-view is re-proved. Same-task or ambiguous races block with exact heads/native views/diffs. Mutation, commit, fetch, merge, push, and direct-proof failures preserve recoverable local evidence.
+
+Final verification used the repository-built managed `deps/backlog/dist/backlog` candidate: focused `node --experimental-strip-types --test tests/task_history_workspace.test.mjs` 48/48; full host `ls tests/*.test.mjs | xargs node --experimental-strip-types --test` 343/343; Docker tier-1 bridge `env -u PYTEST_ADDOPTS python3 -m pytest tests/test_task_history_workspace.py -q -m container` 1 passed, 1 deselected; `git diff --check` clean. Representative 2C evidence covers success and sequential owner updates, pre-read remote fast-forward, unrelated-task publication race preservation, same-task exact-evidence block/no overwrite, rejected non-force publication preserving the clean local commit, and remote-unavailable publication preserving the clean local commit/evidence.
+
+Modified implementation/test/docs: `src/prime-agent-plugin/extension-support/task-history-workspace.ts`, `tests/task_history_workspace.test.mjs`, `tests/test_task_history_workspace.py`, and `docs/backlog.md`; this task record was updated only through supported Backlog CLI. Status remains In Progress. Accepted slices 1/2A/2B and all least-technology/scope guardrails remain unchanged. No admission/finalization/cleanup or lifecycle wiring, ownership/receipt schema, provider-neutral UX, managed semantic decision, normalized task model, custom patch/format, lock/checkpoint/coordinator, Beads/Dolt, legacy transition, migration/cutover, PRIMECLAW-43.1, framework, or persistent state was added; live task-history store untouched.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Slice 2C review candidate implements the direct exact-task Backlog mutation → ordinary commit → non-force publication seam with direct-head proof and bounded factual race evidence. Clean stale clones fast-forward; unrelated races merge only after exact path plus native ID/path proof; same-task/ambiguous races block without overwrite; failures retain recoverable local work. Verified 48/48 focused, 343/343 full Node, and Docker tier 1 (1 passed, 1 deselected). PRIMECLAW-43 remains In Progress; lifecycle integration and all later provider/migration scope remain deferred.
+<!-- SECTION:FINAL_SUMMARY:END -->

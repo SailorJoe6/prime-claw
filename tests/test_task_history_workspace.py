@@ -1,4 +1,4 @@
-"""Task-history workspace foundation regression bridge.
+"""Task-history workspace regression bridge.
 
 The behavioral Node suite is tier 1: it runs INSIDE the session's tier-1
 container via the `tier1_container` fixture (auto-marked `container`; see
@@ -16,7 +16,7 @@ WS_NODE_SUITE = "/workspace/tests/task_history_workspace.test.mjs"
 def test_task_history_workspace_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
-        timeout=240,
+        timeout=420,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

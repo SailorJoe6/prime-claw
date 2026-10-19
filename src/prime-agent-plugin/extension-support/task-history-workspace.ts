@@ -23,12 +23,13 @@
  * custom Git work trees, no separate hosted repository, and no coordinator
  * or service. Slice 2B adds Episode-worktree preparation and guarded
  * nested-store cleanup (see `prepareEpisodeTaskHistoryWorkspace` and
- * `cleanupEpisodeTaskHistoryStore`). The per-task fetch/reconcile/commit/push
- * mutation loop, Beads transport, ownership and receipt fields, and task-data
- * migration remain later slices.
+ * `cleanupEpisodeTaskHistoryStore`). Slice 2C adds one exact Backlog-native
+ * task edit with ordinary commit/non-force publication and bounded factual
+ * race evidence. Beads transport, lifecycle wiring, ownership/receipt fields,
+ * and task-data migration remain later slices.
  */
 
-import { appendFileSync, existsSync, lstatSync, mkdtempSync, readdirSync, realpathSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
@@ -884,6 +885,65 @@ export type EpisodeTaskHistoryCleanup =
       remediation: string;
     };
 
+/** One exact native Backlog edit to publish on the disconnected task-history branch. */
+export interface EpisodeTaskHistoryMutationInput extends EpisodeTaskHistoryWorkspaceInput {
+  /** Exact canonical task ID to resolve before and after the native mutation. */
+  taskId: string;
+  /** Native `backlog task edit` option/value pairs; positional IDs are impossible. */
+  edits: Array<{ option: string; value?: string }>;
+  /** Ordinary Git commit message; defaults to `prime-claw: update <taskId>`. */
+  commitMessage?: string;
+}
+
+export type EpisodeTaskHistoryMutation =
+  | {
+      status: "published";
+      storeDir: string;
+      remote: string;
+      branch: typeof TASK_HISTORY_BRANCH;
+      baseHead: string;
+      publishedHead: string;
+      taskId: string;
+      taskPath: string;
+      nativeBefore: string;
+      nativeAfter: string;
+      diff: string;
+    }
+  | {
+      status: "blocked";
+      code:
+        | "invalid-mutation"
+        | "identity-mismatch"
+        | "unsafe-store-location"
+        | "remote-unavailable"
+        | "remote-advanced"
+        | "local-ahead"
+        | "uncommitted-task-content"
+        | "native-read-failed"
+        | "native-mutation-failed"
+        | "unexpected-task-change"
+        | "commit-failed"
+        | "push-failed"
+        | "same-task-advanced"
+        | "ambiguous-remote-advance"
+        | "reconcile-failed"
+        | "unreadable";
+      detail: string;
+      remediation: string;
+      storeDir?: string;
+      remote?: string;
+      baseHead?: string;
+      localHead?: string;
+      remoteHead?: string;
+      taskId: string;
+      taskPath?: string;
+      nativeBefore?: string;
+      nativeAfter?: string;
+      nativeRemote?: string;
+      localDiff?: string;
+      remoteDiff?: string;
+    };
+
 /**
  * Prove the primary checkout and the target worktree share the exact same Git
  * common repository and that the target is a REGISTERED linked worktree of it
@@ -1451,6 +1511,529 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
   }
 
   return { status: "prepared", primaryRoot: input.primaryRoot, targetWorktree: input.targetWorktree, storeDir, remote, remoteUrl, branch: TASK_HISTORY_BRANCH, head };
+}
+
+
+// ---------------------------------------------------------------------------
+// Slice 2C: one exact native Backlog mutation + ordinary Git publication
+//
+// This stays provider-specific and deliberately has no lifecycle/ownership
+// wiring, normalized task model, receipt, lock, checkpoint, or coordinator.
+// ---------------------------------------------------------------------------
+
+type NativeTaskView = { raw: string; id: string; path: string };
+type MutationClone = {
+  primaryRoot: string;
+  targetWorktree: string;
+  storeDir: string;
+  storeName: (typeof BUILT_IN_TASK_STORE_DIRS)[number];
+  remote: string;
+  remoteUrl: string;
+};
+
+type MutationBlocked = Extract<EpisodeTaskHistoryMutation, { status: "blocked" }>;
+
+function mutationBlocked(
+  taskId: string,
+  code: MutationBlocked["code"],
+  detail: string,
+  remediation: string,
+  evidence: Omit<Partial<MutationBlocked>, "status" | "code" | "detail" | "remediation" | "taskId"> = {},
+): MutationBlocked {
+  return { status: "blocked", code, detail, remediation, taskId, ...evidence };
+}
+
+function strictCleanStatus(storeDir: string, runner: CommandRunner) {
+  return runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain", "--ignored", "--untracked-files=all"]);
+}
+
+function readNativeTask(
+  cwd: string,
+  taskId: string,
+  runner: CommandRunner,
+): NativeTaskView | { error: string } {
+  const result = runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd, allowFailure: true });
+  if (result.status !== 0) {
+    return { error: result.stderr.trim() || result.stdout.trim() || `backlog task view exited ${result.status}` };
+  }
+  try {
+    const parsed = JSON.parse(result.stdout) as { task?: { id?: unknown; path?: unknown } };
+    if (typeof parsed.task?.id !== "string" || typeof parsed.task?.path !== "string" || parsed.task.path.trim() === "") {
+      return { error: `native task view returned no exact string id/path: ${result.stdout.trim()}` };
+    }
+    return { raw: result.stdout, id: parsed.task.id, path: parsed.task.path };
+  } catch (error) {
+    return { error: `native task view was not valid JSON: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+function storeRelativeTaskPath(
+  targetWorktree: string,
+  storeDir: string,
+  nativePath: string,
+): string | null {
+  const absolute = resolve(targetWorktree, nativePath);
+  const rel = relative(realpathSync(storeDir), absolute);
+  if (isAbsolute(rel) || rel === "" || rel === ".." || rel.startsWith(`..${sep}`)) return null;
+  return rel.split(sep).join("/");
+}
+
+/**
+ * Inspect the already-prepared nested clone without creating/replacing it.
+ * The direct remote ref is read by `inspectPrimaryTaskAuthority`; later sync
+ * steps fetch and re-read it before native task reads or writes.
+ */
+function inspectMutationClone(
+  input: EpisodeTaskHistoryMutationInput,
+  runner: CommandRunner,
+): MutationClone | MutationBlocked {
+  const identity = verifyLinkedWorktree(input.primaryRoot, input.targetWorktree, runner);
+  if (identity) {
+    return mutationBlocked(input.taskId, "identity-mismatch", identity.detail, identity.remediation);
+  }
+  const authority = inspectPrimaryTaskAuthority(input.primaryRoot, runner);
+  if (authority.status === "blocked") {
+    const code: MutationBlocked["code"] = authority.code === "remote-unavailable"
+      ? "remote-unavailable"
+      : authority.code === "uncommitted-task-content"
+        ? "uncommitted-task-content"
+        : authority.code === "local-ahead"
+          ? "local-ahead"
+          : authority.code === "remote-advanced"
+            ? "remote-advanced"
+            : authority.code === "unsafe-store-location" || authority.code === "config-not-preserved"
+              ? "unsafe-store-location"
+              : "identity-mismatch";
+    return mutationBlocked(input.taskId, code, authority.detail, authority.remediation);
+  }
+  const storeDir = join(input.targetWorktree, authority.storeName);
+  const storeEntry = lstatIfPresent(storeDir);
+  if (!storeEntry || storeEntry.isSymbolicLink()) {
+    return mutationBlocked(
+      input.taskId,
+      "unsafe-store-location",
+      `the required prepared nested clone ${storeDir} is ${storeEntry ? "a symlink" : "absent"}`,
+      "prepare the exact independent Episode task-history clone before attempting a mutation",
+      { storeDir, remote: authority.remote },
+    );
+  }
+  const targetAuthority = verifyTargetBacklogAuthority(input.targetWorktree, storeDir, runner, false);
+  if (targetAuthority) {
+    return mutationBlocked(input.taskId, "identity-mismatch", targetAuthority.detail, targetAuthority.remediation, { storeDir, remote: authority.remote });
+  }
+  const cloneIdentity = verifyIndependentTaskClone(storeDir, runner);
+  if (cloneIdentity.status === "blocked") {
+    return mutationBlocked(input.taskId, "identity-mismatch", cloneIdentity.detail, cloneIdentity.remediation, { storeDir, remote: authority.remote });
+  }
+  const remotes = runGit(runner, storeDir, ["remote"]);
+  const names = remotes.stdout.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+  if (remotes.status !== 0 || names.length !== 1 || names[0] !== authority.remote) {
+    return mutationBlocked(
+      input.taskId,
+      remotes.status === 0 ? "identity-mismatch" : "unreadable",
+      `the nested clone remote proof is ${remotes.status === 0 ? JSON.stringify(names) : `unreadable (exit ${remotes.status})`}, not exactly ${JSON.stringify(authority.remote)}`,
+      "repair or re-prepare the exact selected-remote clone before mutation",
+      { storeDir, remote: authority.remote },
+    );
+  }
+  const urlsResult = runGit(runner, storeDir, ["remote", "get-url", "--all", authority.remote]);
+  const urls = urlsResult.stdout.split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
+  if (urlsResult.status !== 0 || urls.length !== 1 || urls[0] !== authority.remoteUrl) {
+    return mutationBlocked(
+      input.taskId,
+      urlsResult.status === 0 ? "identity-mismatch" : "unreadable",
+      `the nested clone URL proof is ${urlsResult.status === 0 ? JSON.stringify(urls) : `unreadable (exit ${urlsResult.status})`}, not exactly ${JSON.stringify(authority.remoteUrl)}`,
+      "repair or re-prepare the exact selected-remote clone before mutation",
+      { storeDir, remote: authority.remote },
+    );
+  }
+  const branch = runGit(runner, storeDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (branch.status !== 0 || branch.stdout.trim() !== TASK_HISTORY_BRANCH) {
+    return mutationBlocked(
+      input.taskId,
+      branch.status === 0 ? "identity-mismatch" : "unreadable",
+      `the nested clone branch proof is ${branch.status === 0 ? JSON.stringify(branch.stdout.trim()) : `unreadable (exit ${branch.status})`}, not ${TASK_HISTORY_BRANCH}`,
+      "restore the exact prepared task-history branch before mutation",
+      { storeDir, remote: authority.remote },
+    );
+  }
+  const ignore = runGit(runner, input.targetWorktree, ["check-ignore", "-q", "--", `${authority.storeName}/x`]);
+  if (ignore.status !== 0) {
+    return mutationBlocked(
+      input.taskId,
+      "identity-mismatch",
+      `the prepared nested store ${storeDir} is no longer ignored by the target code worktree (git check-ignore exit ${ignore.status})`,
+      "restore the accepted target ignore rule before mutation",
+      { storeDir, remote: authority.remote },
+    );
+  }
+  const clean = strictCleanStatus(storeDir, runner);
+  if (clean.status !== 0 || clean.stdout.trim() !== "") {
+    return mutationBlocked(
+      input.taskId,
+      clean.status === 0 ? "uncommitted-task-content" : "unreadable",
+      clean.status === 0
+        ? `the nested clone has unpublished content before mutation: ${clean.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}`
+        : `the nested clone cleanliness proof failed: ${clean.stderr.trim() || clean.stdout.trim() || `exit ${clean.status}`}`,
+      "preserve and inspect the existing content; mutation starts only from an exact clean published clone",
+      { storeDir, remote: authority.remote },
+    );
+  }
+  return {
+    primaryRoot: input.primaryRoot,
+    targetWorktree: input.targetWorktree,
+    storeDir,
+    storeName: authority.storeName,
+    remote: authority.remote,
+    remoteUrl: authority.remoteUrl,
+  };
+}
+
+type FetchedHead = { status: "fetched"; head: string; trackingRef: string } | MutationBlocked;
+
+/** Fresh direct-read + ordinary fetch, stable only when both name one head. */
+function fetchDirectMutationHead(
+  clone: MutationClone,
+  taskId: string,
+  runner: CommandRunner,
+): FetchedHead {
+  const trackingRef = `refs/remotes/${clone.remote}/${TASK_HISTORY_BRANCH}`;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const before = readDirectTaskHead(clone.primaryRoot, clone.remote, clone.remoteUrl, runner);
+    if (before.status === "blocked") {
+      return mutationBlocked(taskId, before.code === "remote-unavailable" ? "remote-unavailable" : "unreadable", before.detail, before.remediation, { storeDir: clone.storeDir, remote: clone.remote });
+    }
+    const fetch = runGit(runner, clone.storeDir, ["fetch", "--no-tags", clone.remote, `${TASK_HISTORY_REF}:${trackingRef}`]);
+    if (fetch.status !== 0) {
+      return mutationBlocked(
+        taskId,
+        "remote-unavailable",
+        `fetching the exact task-history ref from ${clone.remote} failed: ${fetch.stderr.trim() || fetch.stdout.trim() || `exit ${fetch.status}`}`,
+        "restore remote access or inspect a non-fast-forward tracking-ref refusal; existing local work is retained",
+        { storeDir: clone.storeDir, remote: clone.remote, remoteHead: before.head },
+      );
+    }
+    const after = readDirectTaskHead(clone.primaryRoot, clone.remote, clone.remoteUrl, runner);
+    if (after.status === "blocked") {
+      return mutationBlocked(taskId, after.code === "remote-unavailable" ? "remote-unavailable" : "unreadable", after.detail, after.remediation, { storeDir: clone.storeDir, remote: clone.remote });
+    }
+    const tracking = runGit(runner, clone.storeDir, ["rev-parse", "--verify", trackingRef]);
+    const trackingHead = tracking.stdout.trim();
+    if (tracking.status !== 0 || !/^[0-9a-f]{40}$/.test(trackingHead)) {
+      return mutationBlocked(
+        taskId,
+        "unreadable",
+        `the fetched tracking-head proof failed: ${tracking.stderr.trim() || tracking.stdout.trim() || `exit ${tracking.status}`}`,
+        "repair the nested repository; no native mutation was attempted",
+        { storeDir: clone.storeDir, remote: clone.remote },
+      );
+    }
+    if (before.head === after.head && trackingHead === after.head) return { status: "fetched", head: after.head, trackingRef };
+  }
+  return mutationBlocked(
+    taskId,
+    "remote-advanced",
+    `the direct ${TASK_HISTORY_REF} head kept changing while it was read and fetched`,
+    "retry after concurrent task-history publishers quiesce; no native mutation was attempted",
+    { storeDir: clone.storeDir, remote: clone.remote },
+  );
+}
+
+/** Fast-forward one clean stale clone to the freshly fetched direct head. */
+function synchronizeCleanMutationClone(
+  clone: MutationClone,
+  taskId: string,
+  runner: CommandRunner,
+): { status: "synchronized"; head: string } | MutationBlocked {
+  const clean = strictCleanStatus(clone.storeDir, runner);
+  if (clean.status !== 0 || clean.stdout.trim() !== "") {
+    return mutationBlocked(
+      taskId,
+      clean.status === 0 ? "uncommitted-task-content" : "unreadable",
+      clean.status === 0
+        ? `the nested clone has unpublished content before remote synchronization: ${clean.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}`
+        : `the nested clone cleanliness proof failed before synchronization: ${clean.stderr.trim() || clean.stdout.trim() || `exit ${clean.status}`}`,
+      "preserve and inspect the existing content; synchronization never overwrites it",
+      { storeDir: clone.storeDir, remote: clone.remote },
+    );
+  }
+  const fetched = fetchDirectMutationHead(clone, taskId, runner);
+  if (fetched.status === "blocked") return fetched;
+  const localResult = runGit(runner, clone.storeDir, ["rev-parse", "--verify", "HEAD"]);
+  const localHead = localResult.stdout.trim();
+  if (localResult.status !== 0 || !/^[0-9a-f]{40}$/.test(localHead)) {
+    return mutationBlocked(taskId, "unreadable", "the nested clone HEAD could not be proved before synchronization", "repair the nested clone before mutation", { storeDir: clone.storeDir, remote: clone.remote });
+  }
+  if (localHead !== fetched.head) {
+    if (!isAncestor(runner, clone.storeDir, localHead, fetched.head)) {
+      return mutationBlocked(
+        taskId,
+        isAncestor(runner, clone.storeDir, fetched.head, localHead) ? "local-ahead" : "remote-advanced",
+        `the nested clone HEAD ${localHead} cannot be cleanly fast-forwarded to direct remote head ${fetched.head}`,
+        "publish/reconcile the retained local history through managed review; this seam never resets or overwrites it",
+        { storeDir: clone.storeDir, remote: clone.remote, localHead, remoteHead: fetched.head },
+      );
+    }
+    const ff = runGit(runner, clone.storeDir, ["merge", "--ff-only", fetched.trackingRef]);
+    if (ff.status !== 0) {
+      return mutationBlocked(
+        taskId,
+        "reconcile-failed",
+        `ordinary fast-forward to direct remote head ${fetched.head} failed: ${ff.stderr.trim() || ff.stdout.trim() || `exit ${ff.status}`}`,
+        "inspect the retained nested clone and retry only after its clean fast-forward state is understood",
+        { storeDir: clone.storeDir, remote: clone.remote, localHead, remoteHead: fetched.head },
+      );
+    }
+  }
+  const finalHead = runGit(runner, clone.storeDir, ["rev-parse", "--verify", "HEAD"]);
+  const finalClean = strictCleanStatus(clone.storeDir, runner);
+  if (finalHead.status !== 0 || finalHead.stdout.trim() !== fetched.head || finalClean.status !== 0 || finalClean.stdout.trim() !== "") {
+    return mutationBlocked(
+      taskId,
+      "reconcile-failed",
+      `post-fast-forward proof failed (HEAD ${JSON.stringify(finalHead.stdout.trim())}, direct ${fetched.head}, clean exit ${finalClean.status}, status ${JSON.stringify(finalClean.stdout.trim())})`,
+      "inspect the retained clone; native mutation was not started from an unproved state",
+      { storeDir: clone.storeDir, remote: clone.remote, localHead: finalHead.stdout.trim() || localHead, remoteHead: fetched.head },
+    );
+  }
+  return { status: "synchronized", head: fetched.head };
+}
+
+/** Read a remote task natively from a disposable exact-head clone for conflict evidence. */
+function readNativeRemoteTask(
+  clone: MutationClone,
+  head: string,
+  taskId: string,
+  runner: CommandRunner,
+): NativeTaskView | { error: string } {
+  const temp = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-task-view-")));
+  const projectRoot = join(temp, "project");
+  const evidenceStore = join(projectRoot, clone.storeName);
+  try {
+    mkdirSync(projectRoot);
+    const copied = runner.run("git", ["clone", "--quiet", "--origin", clone.remote, "--branch", TASK_HISTORY_BRANCH, "--", clone.remoteUrl, evidenceStore], { allowFailure: true });
+    if (copied.status !== 0) return { error: copied.stderr.trim() || copied.stdout.trim() || `git clone exited ${copied.status}` };
+    const checkout = runGit(runner, evidenceStore, ["checkout", "--quiet", "--detach", head]);
+    if (checkout.status !== 0) return { error: checkout.stderr.trim() || checkout.stdout.trim() || `git checkout exited ${checkout.status}` };
+    return readNativeTask(projectRoot, taskId, runner);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+}
+
+function changedPaths(storeDir: string, runner: CommandRunner): { paths: string[] } | { error: string } {
+  const commands = [
+    ["diff", "--name-only", "-z"],
+    ["diff", "--cached", "--name-only", "-z"],
+    ["ls-files", "--others", "--exclude-standard", "-z"],
+    ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
+  ];
+  const paths = new Set<string>();
+  for (const args of commands) {
+    const result = runGit(runner, storeDir, args);
+    if (result.status !== 0) return { error: result.stderr.trim() || result.stdout.trim() || `git ${args[0]} exited ${result.status}` };
+    for (const path of result.stdout.split("\0").filter(Boolean)) paths.add(path);
+  }
+  return { paths: [...paths].sort() };
+}
+
+/**
+ * Publish one exact task edit through native Backlog and ordinary Git only.
+ * Remote races are retried only when Git proves the exact task path unchanged.
+ */
+export function publishEpisodeTaskHistoryMutation(input: EpisodeTaskHistoryMutationInput): EpisodeTaskHistoryMutation {
+  const runner = input.runner ?? new ProcessCommandRunner();
+  const validEdits = input.edits.length > 0 && input.edits.every(({ option }) => /^--?[A-Za-z][A-Za-z-]*$/.test(option) && option !== "--help" && option !== "-h" && option !== "--plain");
+  if (input.taskId.trim() === "" || !validEdits) {
+    return mutationBlocked(
+      input.taskId,
+      "invalid-mutation",
+      "the mutation requires one exact non-empty task ID and non-empty native `backlog task edit` option/value pairs without help/plain/positional arguments",
+      "pass supported native edit options as `{ option, value? }` pairs; this seam appends `--plain -- <taskId>` itself",
+    );
+  }
+
+  let clone: MutationClone | MutationBlocked;
+  try {
+    clone = inspectMutationClone(input, runner);
+  } catch (error) {
+    return mutationBlocked(input.taskId, "unreadable", `mutation preflight failed: ${error instanceof Error ? error.message : String(error)}`, "repair the exact clone/authority evidence and retry; no native mutation was attempted");
+  }
+  if ("status" in clone) return clone;
+
+  // A native read is accepted only when a second fresh direct-read/fetch says
+  // the same head still governs. A clean pre-read advance is fast-forwarded
+  // and the exact task is re-read; moving authority blocks after three rounds.
+  let baseHead = "";
+  let before: NativeTaskView | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const synchronized = synchronizeCleanMutationClone(clone, input.taskId, runner);
+    if (synchronized.status === "blocked") return synchronized;
+    try {
+      checkBacklogCapabilities(clone.targetWorktree, runner);
+    } catch (error) {
+      return mutationBlocked(input.taskId, "native-read-failed", `native Backlog capability proof failed: ${error instanceof Error ? error.message : String(error)}`, "repair the published native Backlog configuration; no mutation was attempted", { storeDir: clone.storeDir, remote: clone.remote, baseHead: synchronized.head });
+    }
+    const autoCommit = runner.run("backlog", ["config", "get", "autoCommit"], { cwd: clone.targetWorktree, allowFailure: true });
+    if (autoCommit.status !== 0 || autoCommit.stdout.trim() !== "false") {
+      return mutationBlocked(input.taskId, "native-read-failed", `native Backlog autoCommit is ${JSON.stringify(autoCommit.stdout.trim())} (exit ${autoCommit.status}), not exactly false`, "publish auto_commit: false before using this seam; it never disables auto-commit ad hoc", { storeDir: clone.storeDir, remote: clone.remote, baseHead: synchronized.head });
+    }
+    const viewed = readNativeTask(clone.targetWorktree, input.taskId, runner);
+    if ("error" in viewed) {
+      return mutationBlocked(input.taskId, "native-read-failed", `native resolution of ${input.taskId} failed: ${viewed.error}`, "repair the exact canonical task identity in the published store; no mutation was attempted", { storeDir: clone.storeDir, remote: clone.remote, baseHead: synchronized.head });
+    }
+    if (viewed.id !== input.taskId) {
+      return mutationBlocked(input.taskId, "identity-mismatch", `native resolution returned canonical ID ${JSON.stringify(viewed.id)}, not exact requested ID ${JSON.stringify(input.taskId)}`, "use the exact canonical task ID; no mutation was attempted", { storeDir: clone.storeDir, remote: clone.remote, baseHead: synchronized.head, nativeBefore: viewed.raw });
+    }
+    const confirmed = synchronizeCleanMutationClone(clone, input.taskId, runner);
+    if (confirmed.status === "blocked") return confirmed;
+    if (confirmed.head === synchronized.head) {
+      baseHead = confirmed.head;
+      before = viewed;
+      break;
+    }
+  }
+  if (!before) {
+    return mutationBlocked(input.taskId, "remote-advanced", `the exact task-history remote advanced during every native pre-mutation read`, "retry after concurrent publishers quiesce; no native mutation was attempted", { storeDir: clone.storeDir, remote: clone.remote });
+  }
+
+  let storeTaskPath: string | null;
+  try {
+    storeTaskPath = storeRelativeTaskPath(clone.targetWorktree, clone.storeDir, before.path);
+  } catch (error) {
+    return mutationBlocked(input.taskId, "identity-mismatch", `the native task path could not be resolved inside the exact store: ${error instanceof Error ? error.message : String(error)}`, "repair the canonical task path before mutation", { storeDir: clone.storeDir, remote: clone.remote, baseHead, nativeBefore: before.raw });
+  }
+  if (!storeTaskPath) {
+    return mutationBlocked(input.taskId, "identity-mismatch", `native task path ${JSON.stringify(before.path)} is not contained in exact store ${clone.storeDir}`, "repair the canonical native task path before mutation", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw });
+  }
+  const tracked = runGit(runner, clone.storeDir, ["ls-files", "--error-unmatch", "--", storeTaskPath]);
+  if (tracked.status !== 0) {
+    return mutationBlocked(input.taskId, "identity-mismatch", `native task path ${before.path} is not one tracked file at base head ${baseHead}`, "repair the exact canonical task file before mutation", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw });
+  }
+
+  const nativeEditArgs = input.edits.flatMap(({ option, value }) => value === undefined ? [option] : [option, value]);
+  const mutated = runner.run("backlog", ["task", "edit", ...nativeEditArgs, "--plain", "--", input.taskId], { cwd: clone.targetWorktree, allowFailure: true });
+  if (mutated.status !== 0) {
+    const localDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", "--", storeTaskPath]);
+    return mutationBlocked(
+      input.taskId,
+      "native-mutation-failed",
+      `native Backlog mutation failed: ${mutated.stderr.trim() || mutated.stdout.trim() || `exit ${mutated.status}`}`,
+      "inspect and retain any partial local task change before retrying; this seam never deletes failed mutation evidence",
+      { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw, localDiff: localDiff.stdout },
+    );
+  }
+  let after = readNativeTask(clone.targetWorktree, input.taskId, runner);
+  if ("error" in after) {
+    const localDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", "--", storeTaskPath]);
+    return mutationBlocked(input.taskId, "native-read-failed", `post-mutation native resolution failed: ${after.error}`, "inspect and retain the local task change; do not publish without exact post-mutation identity", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw, localDiff: localDiff.stdout });
+  }
+  if (after.id !== input.taskId || after.path !== before.path) {
+    const localDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", "--", storeTaskPath]);
+    return mutationBlocked(input.taskId, "identity-mismatch", `post-mutation native identity changed from ${before.id} at ${before.path} to ${after.id} at ${after.path}`, "retain and inspect the local mutation; only the same exact canonical task may be committed", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiff.stdout });
+  }
+
+  const changed = changedPaths(clone.storeDir, runner);
+  if ("error" in changed) {
+    return mutationBlocked(input.taskId, "unreadable", `post-mutation changed-path proof failed: ${changed.error}`, "retain and inspect the local mutation; no commit was attempted", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw });
+  }
+  if (changed.paths.length !== 1 || changed.paths[0] !== storeTaskPath) {
+    const allDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff"]);
+    return mutationBlocked(input.taskId, "unexpected-task-change", `native mutation changed ${JSON.stringify(changed.paths)}, not exactly ${JSON.stringify(storeTaskPath)}`, "retain and inspect every local change; this seam commits only the exact resolved task file", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: allDiff.stdout });
+  }
+  const localDiffBeforeCommit = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", "--", storeTaskPath]);
+  if (localDiffBeforeCommit.status !== 0 || localDiffBeforeCommit.stdout.trim() === "") {
+    return mutationBlocked(input.taskId, "unexpected-task-change", "native mutation produced no exact ordinary Git diff for the resolved task file", "retain and inspect the local task state; no empty or unproved change is committed", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
+  }
+
+  const add = runGit(runner, clone.storeDir, ["add", "--", storeTaskPath]);
+  if (add.status !== 0) {
+    return mutationBlocked(input.taskId, "commit-failed", `staging the exact task file failed: ${add.stderr.trim() || add.stdout.trim() || `exit ${add.status}`}`, "retain the local task change and repair Git before retrying", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
+  }
+  const commit = runGit(runner, clone.storeDir, ["commit", "-m", input.commitMessage ?? `prime-claw: update ${input.taskId}`, "--", storeTaskPath]);
+  if (commit.status !== 0) {
+    return mutationBlocked(input.taskId, "commit-failed", `ordinary Git commit failed: ${commit.stderr.trim() || commit.stdout.trim() || `exit ${commit.status}`}`, "retain the staged task change and repair Git identity/hooks before retrying", { storeDir: clone.storeDir, remote: clone.remote, baseHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
+  }
+  const committedHead = runGit(runner, clone.storeDir, ["rev-parse", "--verify", "HEAD"]);
+  let localHead = committedHead.stdout.trim();
+  const parent = runGit(runner, clone.storeDir, ["rev-parse", "--verify", "HEAD^"]);
+  const committedClean = strictCleanStatus(clone.storeDir, runner);
+  if (committedHead.status !== 0 || !/^[0-9a-f]{40}$/.test(localHead) || parent.status !== 0 || parent.stdout.trim() !== baseHead || committedClean.status !== 0 || committedClean.stdout.trim() !== "") {
+    return mutationBlocked(input.taskId, "commit-failed", `post-commit proof failed (HEAD ${JSON.stringify(localHead)}, parent ${JSON.stringify(parent.stdout.trim())}, base ${baseHead}, clean ${JSON.stringify(committedClean.stdout.trim())})`, "retain the local commit/worktree and inspect it before any publication retry", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
+  }
+
+  let integratedRemoteHead = baseHead;
+  for (let pushAttempt = 0; pushAttempt < 3; pushAttempt += 1) {
+    const pushed = runGit(runner, clone.storeDir, ["push", "--porcelain", clone.remote, `HEAD:${TASK_HISTORY_REF}`]);
+    if (pushed.status === 0) {
+      const direct = readDirectTaskHead(clone.primaryRoot, clone.remote, clone.remoteUrl, runner);
+      if (direct.status === "blocked") {
+        return mutationBlocked(input.taskId, direct.code === "remote-unavailable" ? "remote-unavailable" : "unreadable", `push returned success but direct publication proof failed: ${direct.detail}`, "do not repush blindly; retain the local commit and verify the direct remote head before retrying", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
+      }
+      if (direct.head !== localHead) {
+        return mutationBlocked(input.taskId, "remote-advanced", `push returned success but direct remote head ${direct.head} does not equal local published candidate ${localHead}`, "retain the local commit and inspect the exact remote advance; never force-push", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead: direct.head, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
+      }
+      const diff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", baseHead, localHead, "--", storeTaskPath]);
+      if (diff.status !== 0) {
+        return mutationBlocked(input.taskId, "unreadable", `publication succeeded but exact task diff proof failed: ${diff.stderr.trim() || diff.stdout.trim() || `exit ${diff.status}`}`, "retain the published clone and re-read exact Git evidence before managed reconciliation", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead: direct.head, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw });
+      }
+      return { status: "published", storeDir: clone.storeDir, remote: clone.remote, branch: TASK_HISTORY_BRANCH, baseHead, publishedHead: localHead, taskId: input.taskId, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, diff: diff.stdout };
+    }
+
+    const fetched = fetchDirectMutationHead(clone, input.taskId, runner);
+    if (fetched.status === "blocked") {
+      return mutationBlocked(input.taskId, fetched.code === "remote-unavailable" ? "remote-unavailable" : "push-failed", `non-force push failed and fresh remote evidence is unavailable: ${pushed.stderr.trim() || pushed.stdout.trim() || `exit ${pushed.status}`}; ${fetched.detail}`, "retain the local commit and restore remote evidence before retrying; it was not called published", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
+    }
+    const remoteHead = fetched.head;
+    if (remoteHead === integratedRemoteHead) {
+      return mutationBlocked(input.taskId, "push-failed", `ordinary non-force push failed without a remote-head advance: ${pushed.stderr.trim() || pushed.stdout.trim() || `exit ${pushed.status}`}`, "retain the local commit and repair remote permissions/hooks/connectivity before retrying; never force-push", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
+    }
+    if (!isAncestor(runner, clone.storeDir, integratedRemoteHead, remoteHead)) {
+      const remoteDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", integratedRemoteHead, remoteHead, "--", storeTaskPath]);
+      return mutationBlocked(input.taskId, "ambiguous-remote-advance", `remote head changed from ${integratedRemoteHead} to non-descendant ${remoteHead}`, "retain the local commit and exact divergence evidence for managed judgment; never rewrite remote history", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout, remoteDiff: remoteDiff.stdout });
+    }
+    const taskChange = runGit(runner, clone.storeDir, ["diff", "--quiet", integratedRemoteHead, remoteHead, "--", storeTaskPath]);
+    const remoteDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", integratedRemoteHead, remoteHead, "--", storeTaskPath]);
+    const localDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", integratedRemoteHead, localHead, "--", storeTaskPath]);
+    // Path-level Git evidence is necessary but not sufficient: a remote commit
+    // could add a duplicate ID or otherwise make native ID/path resolution
+    // ambiguous without touching the old file. Resolve the exact task at the
+    // fetched remote head before either blocking or auto-reconciling.
+    const nativeRemote = readNativeRemoteTask(clone, remoteHead, input.taskId, runner);
+    const nativeRemoteEvidence = "error" in nativeRemote ? `ERROR: ${nativeRemote.error}` : nativeRemote.raw;
+    if (taskChange.status === 1) {
+      return mutationBlocked(
+        input.taskId,
+        "same-task-advanced",
+        `ordinary push rejected because remote head advanced from ${integratedRemoteHead} to ${remoteHead} and changed exact task path ${before.path}`,
+        "retain the local commit plus exact native/Git evidence for later managed judgment; do not classify compatibility or force-push",
+        { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, nativeRemote: nativeRemoteEvidence, localDiff: localDiff.stdout, remoteDiff: remoteDiff.stdout },
+      );
+    }
+    const exactRemoteIdentity = !("error" in nativeRemote) && nativeRemote.id === input.taskId && nativeRemote.path === before.path;
+    if (taskChange.status !== 0 || remoteDiff.status !== 0 || localDiff.status !== 0 || !exactRemoteIdentity) {
+      return mutationBlocked(input.taskId, "ambiguous-remote-advance", `the remote advance from ${integratedRemoteHead} to ${remoteHead} could not be proved unrelated to exact native task ${input.taskId} at ${before.path}`, "retain the local commit and exact heads/native views/diffs for managed judgment; never auto-reconcile ambiguous evidence", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, nativeRemote: nativeRemoteEvidence, localDiff: localDiff.stdout, remoteDiff: remoteDiff.stdout });
+    }
+
+    const merge = runGit(runner, clone.storeDir, ["merge", "--no-edit", fetched.trackingRef]);
+    if (merge.status !== 0) {
+      return mutationBlocked(input.taskId, "reconcile-failed", `ordinary merge of proven unrelated remote head ${remoteHead} failed: ${merge.stderr.trim() || merge.stdout.trim() || `exit ${merge.status}`}`, "retain the local commit and any merge evidence/conflict for inspection; do not reset, delete, or force-push", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiff.stdout, remoteDiff: remoteDiff.stdout });
+    }
+    const mergedHead = runGit(runner, clone.storeDir, ["rev-parse", "--verify", "HEAD"]);
+    const mergedClean = strictCleanStatus(clone.storeDir, runner);
+    if (mergedHead.status !== 0 || !/^[0-9a-f]{40}$/.test(mergedHead.stdout.trim()) || mergedClean.status !== 0 || mergedClean.stdout.trim() !== "") {
+      return mutationBlocked(input.taskId, "reconcile-failed", `post-merge proof failed after unrelated remote advance (HEAD ${JSON.stringify(mergedHead.stdout.trim())}, status ${JSON.stringify(mergedClean.stdout.trim())})`, "retain the reconciled/local evidence and inspect it before retrying publication", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead: mergedHead.stdout.trim() || localHead, remoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiff.stdout, remoteDiff: remoteDiff.stdout });
+    }
+    const reconciledView = readNativeTask(clone.targetWorktree, input.taskId, runner);
+    if ("error" in reconciledView || reconciledView.id !== input.taskId || reconciledView.path !== before.path) {
+      return mutationBlocked(input.taskId, "reconcile-failed", `post-merge native task identity could not be re-proved: ${"error" in reconciledView ? reconciledView.error : `${reconciledView.id} at ${reconciledView.path}`}`, "retain the ordinary merged history and exact evidence for inspection; do not publish an unproved task identity", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead: mergedHead.stdout.trim(), remoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: "error" in reconciledView ? after.raw : reconciledView.raw, nativeRemote: nativeRemoteEvidence, localDiff: localDiff.stdout, remoteDiff: remoteDiff.stdout });
+    }
+    after = reconciledView;
+    localHead = mergedHead.stdout.trim();
+    integratedRemoteHead = remoteHead;
+  }
+
+  return mutationBlocked(input.taskId, "push-failed", "ordinary non-force publication lost three consecutive proven-unrelated races", "retain the reconciled local history and retry after concurrent publishers quiesce; never force-push", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead: integratedRemoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, localDiff: localDiffBeforeCommit.stdout });
 }
 
 /**

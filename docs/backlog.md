@@ -388,3 +388,42 @@ loop, actual Episode admission/finalization/cleanup wiring, Beads server/Dolt
 transport, provider-neutral framework, ownership/receipt fields, lifecycle UX
 routing, migration/cutover, PRIMECLAW-43.1, and changes to the accepted
 non-empty-folder-store ordering.
+
+
+## Backlog sub-slice 2C: exact task mutation and publication
+
+`publishEpisodeTaskHistoryMutation({ primaryRoot, targetWorktree, taskId,
+edits, commitMessage? })` is the direct Backlog-specific write seam for one
+already-prepared Episode clone. `edits` contains native `backlog task edit`
+option/value pairs; the seam supplies the sole positional task ID itself.
+It does not expose a normalized task model or implement lifecycle routing.
+
+Before the native read and write, the seam re-proves the linked-worktree,
+folder-native authority, independent clone, one exact remote name/URL, task
+branch, ignored store, and strict clean/no-unpublished state. It directly reads
+and ordinarily fetches `refs/heads/prime-claw/tasks`; a clean stale clone moves
+only by `git merge --ff-only`, followed by another direct-head and cleanliness
+proof. Native Backlog must resolve the exact requested canonical ID and a path
+inside the store before and after the edit, with effective `autoCommit` exactly
+`false`. Only that tracked task path may change. The seam then makes one
+ordinary Git commit and pushes `HEAD:refs/heads/prime-claw/tasks` without a
+force option or force refspec. A successful result is returned only after a
+fresh `git ls-remote` proves the direct remote head equals the published commit.
+It includes base/published heads, exact ID/path, unmodified native JSON views,
+and the exact task-path Git diff.
+
+A non-force rejection triggers fresh direct-read/fetch evidence. Automatic
+retry is allowed only when ordinary Git shows the exact task path unchanged
+AND a disposable native read of the fetched remote head resolves the same
+exact ID/path. That proven-unrelated history is preserved by an ordinary merge
+before another non-force push. A same-task change or ambiguous native identity
+blocks with local/remote heads, native before/after/remote views, and local and
+remote task-path diffs for later managed judgment. The seam never decides
+semantic compatibility or forces/rewrites remote history. Native mutation,
+commit, fetch, merge, push, or direct-proof failure leaves recoverable local
+work in the nested clone and never calls it published.
+
+Still out of scope: Episode admission/finalization/cleanup wiring,
+ownership/receipt fields, provider-neutral UX, managed semantic decisions,
+Beads/Dolt transport, legacy transition, migration/cutover, PRIMECLAW-43.1,
+and any coordinator, lock, checkpoint, framework, or persistent state.
