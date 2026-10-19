@@ -19,7 +19,7 @@
  * never live authority.
  */
 
-import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import {
@@ -299,39 +299,155 @@ function scanBacklog(projectRoot: string): ScanResult {
 
 function scanBeads(projectRoot: string, runner: CommandRunner): ScanResult {
   const beadsPath = join(projectRoot, BEADS_DIR);
-  if (!isDirectory(beadsPath)) {
-    try {
-      if (!statSync(beadsPath)) return null;
-    } catch {
-      return null;
-    }
+  let canonicalProjectRoot: string;
+  let storeEntry: ReturnType<typeof lstatSync>;
+  let canonicalStore: string;
+  try {
+    canonicalProjectRoot = realpathSync(projectRoot);
+  } catch {
     return {
       blocked: {
         code: "malformed-evidence",
-        detail: `${BEADS_DIR} exists but is not a directory`,
-        remediation: `Remove the stray ${BEADS_DIR} entry or restore a real Beads store`,
+        detail: "the selected project root has unreadable or ambiguous filesystem identity",
+        remediation: "Restore a readable real project directory, then retry before running any native Beads command",
       },
     };
   }
-  const configPath = join(beadsPath, "config.yaml");
-  const metadataPath = join(beadsPath, "metadata.json");
-  if (!isFile(configPath) && !isFile(metadataPath)) {
+  try {
+    storeEntry = lstatSync(beadsPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    return {
+      blocked: {
+        code: "malformed-evidence",
+        detail: `${BEADS_DIR} has unreadable or ambiguous filesystem identity`,
+        remediation: `Restore a readable real non-symlink ${BEADS_DIR} directory inside the selected project, then retry`,
+      },
+    };
+  }
+  try {
+    canonicalStore = realpathSync(beadsPath);
+  } catch {
+    return {
+      blocked: {
+        code: "malformed-evidence",
+        detail: `${BEADS_DIR} has unreadable or ambiguous canonical identity`,
+        remediation: `Restore a readable real non-symlink ${BEADS_DIR} directory inside the selected project, then retry`,
+      },
+    };
+  }
+  const expectedCanonicalStore = join(canonicalProjectRoot, BEADS_DIR);
+  if (storeEntry.isSymbolicLink() || !storeEntry.isDirectory()
+      || canonicalStore !== expectedCanonicalStore || !containedBy(canonicalProjectRoot, canonicalStore)) {
+    return {
+      blocked: {
+        code: "malformed-evidence",
+        detail: `${BEADS_DIR} is not the selected project's real non-symlink Beads directory`,
+        remediation: `Replace ${BEADS_DIR} with a real directory canonically contained in the selected project; do not link task authority to an external store`,
+      },
+    };
+  }
+
+  const authorityFiles = [
+    { name: "metadata.json", path: join(beadsPath, "metadata.json") },
+    { name: "config.yaml", path: join(beadsPath, "config.yaml") },
+  ];
+  const authorityIdentities: Array<{
+    name: string;
+    path: string;
+    entry: ReturnType<typeof lstatSync>;
+    canonicalPath: string;
+  }> = [];
+  const missingAuthorityFiles: string[] = [];
+  for (const authorityFile of authorityFiles) {
+    let entry: ReturnType<typeof lstatSync>;
+    try {
+      entry = lstatSync(authorityFile.path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        missingAuthorityFiles.push(authorityFile.name);
+        continue;
+      }
+      return {
+        blocked: {
+          code: "malformed-evidence",
+          detail: `${BEADS_DIR}/${authorityFile.name} has unreadable or ambiguous filesystem identity`,
+          remediation: `Restore a readable real non-symlink ${authorityFile.name} file inside ${BEADS_DIR}, then retry`,
+        },
+      };
+    }
+    let canonicalPath: string;
+    try {
+      canonicalPath = realpathSync(authorityFile.path);
+    } catch {
+      return {
+        blocked: {
+          code: "malformed-evidence",
+          detail: `${BEADS_DIR}/${authorityFile.name} has unreadable or ambiguous canonical identity`,
+          remediation: `Restore a readable real non-symlink ${authorityFile.name} file inside ${BEADS_DIR}, then retry`,
+        },
+      };
+    }
+    authorityIdentities.push({ ...authorityFile, entry, canonicalPath });
+  }
+  if (missingAuthorityFiles.length === authorityFiles.length) {
     // Export residue (for example only issues.jsonl) or an empty directory is
     // not live evidence and not partial initialization: ignore it.
     return null;
   }
-  if (!isFile(configPath) || !isFile(metadataPath)) {
+  const unsafeAuthority = authorityIdentities.find((identity) =>
+    identity.entry.isSymbolicLink() || !identity.entry.isFile()
+      || identity.canonicalPath !== join(canonicalStore, identity.name)
+      || !containedBy(canonicalStore, identity.canonicalPath)
+      || !containedBy(canonicalProjectRoot, identity.canonicalPath));
+  if (unsafeAuthority) {
     return {
       blocked: {
         code: "malformed-evidence",
-        detail: `${BEADS_DIR} is missing ${!isFile(configPath) ? "config.yaml" : "metadata.json"}`,
+        detail: `${BEADS_DIR}/${unsafeAuthority.name} is not a real regular non-symlink file canonically contained in the selected Beads store`,
+        remediation: `Replace ${unsafeAuthority.name} with a real readable regular file inside the selected ${BEADS_DIR} directory; do not link task authority to external content`,
+      },
+    };
+  }
+  if (missingAuthorityFiles.length !== 0) {
+    return {
+      blocked: {
+        code: "malformed-evidence",
+        detail: `${BEADS_DIR} is missing ${missingAuthorityFiles.join(" and ")}`,
         remediation: `Run the supported \`bd bootstrap\` recovery or remove the incomplete ${BEADS_DIR} store`,
+      },
+    };
+  }
+  const configPath = authorityFiles[1].path;
+  const metadataPath = authorityFiles[0].path;
+  try {
+    // Prove both selected authority files are readable only after their exact
+    // in-project identities are safe; config semantics remain native to bd.
+    readFileSync(configPath);
+  } catch {
+    return {
+      blocked: {
+        code: "malformed-evidence",
+        detail: `${BEADS_DIR}/config.yaml is not readable as selected Beads authority`,
+        remediation: `Restore a readable real config.yaml file inside ${BEADS_DIR}, then retry before running any native Beads command`,
+      },
+    };
+  }
+  let metadataText: string;
+  try {
+    metadataText = readFileSync(metadataPath, "utf8");
+  } catch {
+    return {
+      blocked: {
+        code: "malformed-evidence",
+        detail: `${BEADS_DIR}/metadata.json is not readable as selected Beads authority`,
+        remediation: `Restore a readable real metadata.json file inside ${BEADS_DIR}, then retry before running any native Beads command`,
       },
     };
   }
   let metadata: Record<string, unknown>;
   try {
-    const parsed: unknown = JSON.parse(readFileSync(metadataPath, "utf8"));
+    const parsed: unknown = JSON.parse(metadataText);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not a JSON object");
     metadata = parsed as Record<string, unknown>;
   } catch (error) {

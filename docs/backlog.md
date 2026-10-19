@@ -443,6 +443,13 @@ recoverable local work in the nested clone and never calls it published.
 It prepares no shadow state and performs no task mutation or publication. It
 uses supported native reads in one fail-closed sequence:
 
+- before any native Beads capability, server, or remote proof, filesystem
+  identity checks require the selected `.beads` path to be a real non-symlink
+  directory at the canonical project root and require `metadata.json` plus
+  `config.yaml` to be readable real regular non-symlink files at their exact
+  canonical paths inside that store. Unsafe, external, unreadable, incomplete,
+  or ambiguous authority blocks without reading external content or making a
+  native Beads/Dolt call;
 - provider discovery and the existing `bd` capability/status gate select the
   sole live Beads authority;
 - `bd context --json` must bind the exact repository, `.beads` store, installed

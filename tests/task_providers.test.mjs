@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -520,6 +520,61 @@ test("the dispatcher capability-checks the selected provider", () => {
   assert.equal(detection.kind, "selected");
   const caps = checkSelectedProviderCapabilities(detection, fakeRunner({ ...BACKLOG_OK }));
   assert.equal(caps.provider, "backlog");
+});
+
+test("Beads workspace transport rejects symlinked store authority before native proof without exposing external content", () => {
+  for (const kind of ["store", "metadata", "config"]) {
+    const root = fixtureRoot();
+    const localStore = writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+    const externalRoot = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-external-beads-")));
+    const metadataSentinel = `EXTERNAL_METADATA_SENTINEL_${kind}`;
+    const configSentinel = `EXTERNAL_CONFIG_SENTINEL_${kind}`;
+    const externalStore = writeBeadsStore(externalRoot, {
+      metadataOverrides: { dolt_mode: "server", sentinel: metadataSentinel },
+      configText: `# ${configSentinel}\n`,
+    });
+    const externalSentinelPath = join(externalRoot, `external-${kind}.sentinel`);
+    writeFileSync(externalSentinelPath, `EXTERNAL_FILE_SENTINEL_${kind}\n`);
+    const watchedExternalPaths = [
+      join(externalStore, "metadata.json"),
+      join(externalStore, "config.yaml"),
+      externalSentinelPath,
+    ];
+    const before = watchedExternalPaths.map((path) => readFileSync(path));
+
+    if (kind === "store") {
+      rmSync(localStore, { recursive: true, force: true });
+      symlinkSync(externalStore, localStore, "dir");
+    } else if (kind === "metadata") {
+      rmSync(join(localStore, "metadata.json"), { force: true });
+      symlinkSync(join(externalStore, "metadata.json"), join(localStore, "metadata.json"), "file");
+    } else {
+      rmSync(join(localStore, "config.yaml"), { force: true });
+      symlinkSync(join(externalStore, "config.yaml"), join(localStore, "config.yaml"), "file");
+    }
+
+    const runner = recordedDetectionRunner(beadsWorkspaceResponses(root));
+    const result = prepareBeadsWorkspaceTransport(root, runner);
+    assert.equal(result.status, "blocked", kind);
+    assert.equal(result.code, "provider-authority", kind);
+    assert.match(result.detail, /real.*non-symlink/, kind);
+    assert.match(result.remediation, /real|non-symlink/, kind);
+    assert.deepEqual(
+      runner.calls.filter(([command]) => command === "bd" || command === "dolt"),
+      [],
+      `${kind}: unsafe authority must block before any native Beads or Dolt call`,
+    );
+    assert.equal(
+      runner.calls.some(([command, subcommand]) => command === "git" && subcommand === "ls-remote"),
+      false,
+      `${kind}: unsafe authority must block before remote publication proof`,
+    );
+    watchedExternalPaths.forEach((path, index) => assert.deepEqual(readFileSync(path), before[index], `${kind}: ${path} changed`));
+    const exposed = JSON.stringify(result);
+    assert.equal(exposed.includes(externalRoot), false, `${kind}: external path leaked`);
+    assert.equal(exposed.includes(metadataSentinel), false, `${kind}: external metadata leaked`);
+    assert.equal(exposed.includes(configSentinel), false, `${kind}: external config leaked`);
+  }
 });
 
 test("Beads workspace transport proves bd-managed server, native revision, remote, and refs/dolt/data", () => {
