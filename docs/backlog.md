@@ -344,9 +344,12 @@ fields, no lifecycle wiring, no per-task mutation loop.
   `.gitignore` (a worktree-creation/operator responsibility, not this seam's).
 - **Exact target-native authority:** before the clone write, target provider
   discovery may be absent or may select only the exact derived Backlog store;
-  another provider, root configuration, or store blocks. After creation or
-  reuse, discovery must select that exact store before the existing native
-  lifecycle/default/autoCommit reads are trusted.
+  another provider or store blocks. Any target root configuration blocks even
+  when it selects that same derived store: root-authority relocation remains
+  deferred to PRIMECLAW-43.1, and no native reads may normalize the tracked
+  code-worktree file. After creation or reuse, discovery must select the exact
+  folder-configured store before native lifecycle/default/autoCommit reads are
+  trusted.
 - **Independent nested clone:** an ordinary-Git clone uses both the selected
   remote name (`--origin <selected>`) and exact URL on `prime-claw/tasks` at
   the exact remote head — never a nested linked worktree, submodule,
@@ -354,8 +357,10 @@ fields, no lifecycle wiring, no per-task mutation loop.
   clone, or force update. Fresh and reused clones must have a real,
   non-symlink `.git` directory; canonical top level equal to the store; and
   Git/common directories equal to the contained `<store>/.git`. Reuse also
-  verifies the exact sole remote name+URL, branch/head, clean status, native
-  lifecycle/default/autoCommit, and no unpublished commits.
+  verifies the exact sole remote name+URL, branch/head, native
+  lifecycle/default/autoCommit, and no unpublished commits or files. Its
+  result-checked clean-status proofs include ordinary and ignored untracked
+  entries, so an ignored local sentinel is still unpublished content.
 
 ### `cleanupEpisodeTaskHistoryStore({ primaryRoot, targetWorktree })`
 
@@ -364,9 +369,10 @@ calls primary preparation: it non-mutatingly derives primary store authority,
 selects the exact remote name+URL, and reads the fresh direct task ref with
 `git ls-remote`. It then proves target-native authority, strict independent
 clone identity, exact sole remote/URL/branch, successful read-only clean
-status, and HEAD equal to the authoritative remote head. Every Git inspection
-must exit zero before its output is interpreted; an empty stdout from a failed
-status/read is never accepted. Dirty/untracked, clean local-ahead,
+status (including ordinary and ignored untracked entries), and HEAD equal to
+the authoritative remote head. Every Git inspection must exit zero before its
+output is interpreted; an empty stdout from a failed status/read is never
+accepted. Dirty, ordinary-untracked, ignored-untracked, clean local-ahead,
 remote-advanced/diverged, unavailable remote, wrong identity, a dangling
 store symlink, symlinked `.git`, and external nested or primary
 `core.worktree` cases refuse unchanged. No primary store, ignore rule, fetch,

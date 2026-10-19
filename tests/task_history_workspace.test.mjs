@@ -583,10 +583,10 @@ test("canonical statuses with a wrong effective default status blocks", (t) => {
  * roots and the remote. The target worktree's store ignore is controlled by
  * `ignoreTarget` (a committed .gitignore on the target branch).
  */
-function episodeFixture({ ignoreTarget = true, publishConfig = true, storeName = ".backlog", remoteName = "origin" } = {}) {
+function episodeFixture({ ignoreTarget = true, publishConfig = true, storeName = ".backlog", remoteName = "origin", taskFiles = {} } = {}) {
   const { dir, root, remote } = fixtureRepo();
   if (remoteName !== "origin") git(root, "remote", "rename", "origin", remoteName);
-  if (publishConfig) publishTaskBranch(remote, { "TASKS.md": "history\n", "config.yml": FULL_CANONICAL_CONFIG });
+  if (publishConfig) publishTaskBranch(remote, { "TASKS.md": "history\n", "config.yml": FULL_CANONICAL_CONFIG, ...taskFiles });
   let ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
   if (ws.status !== "prepared") throw new Error(`fixture primary not prepared: ${ws.detail}`);
   if (storeName === "backlog") {
@@ -724,7 +724,7 @@ test("conflicting target root authority blocks before clone and blocks later reu
   const blocked = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
   assert.equal(blocked.status, "blocked");
   assert.equal(blocked.code, "unsafe-store-location");
-  assert.match(blocked.detail, /not the exact derived store|authority resolves/i);
+  assert.match(blocked.detail, /root configuration|not the exact derived store|authority resolves/i);
   assert.ok(!existsSync(storeDir), "conflict blocks before nested clone write");
   assert.deepEqual(primarySnapshot(root), before);
 
@@ -739,6 +739,56 @@ test("conflicting target root authority blocks before clone and blocks later reu
   const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
   assert.equal(cleanup.status, "refused");
   assert.ok(existsSync(storeDir), "authority conflict leaves clone unchanged");
+});
+
+test("same-store target root Backlog config refuses reuse and cleanup without touching tracked bytes", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = episodeFixture();
+  assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+
+  const rootConfig = join(target, "backlog.config.yml");
+  const rootBytes = 'project_name: "episode"\ndefault_status: "In Design"\nstatuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\nbacklog_directory: ".backlog"\nauto_commit: false\n';
+  writeFileSync(rootConfig, rootBytes);
+  git(target, "add", "backlog.config.yml");
+  git(target, "-c", "user.email=t@e.st", "-c", "user.name=t", "commit", "-qm", "add same-store root config");
+  const statusBefore = git(target, "status", "--porcelain", "--untracked-files=all");
+  assert.equal(statusBefore, "");
+
+  const reuse = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(reuse.status, "blocked");
+  assert.equal(reuse.code, "unsafe-store-location");
+  assert.match(reuse.remediation, /deferred.*PRIMECLAW-43\.1/i);
+  assert.equal(readFileSync(rootConfig, "utf8"), rootBytes);
+  assert.equal(git(target, "status", "--porcelain", "--untracked-files=all"), statusBefore);
+
+  const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.equal(cleanup.status, "refused");
+  assert.match(cleanup.remediation, /deferred.*PRIMECLAW-43\.1/i);
+  assert.equal(readFileSync(rootConfig, "utf8"), rootBytes);
+  assert.equal(git(target, "status", "--porcelain", "--untracked-files=all"), statusBefore);
+  assert.ok(existsSync(storeDir), "root-config refusal retains the exact nested store");
+});
+
+test("ignored untracked task content blocks final preparation and cleanup", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = episodeFixture({ taskFiles: { ".gitignore": "ignored-sentinel.tmp\n" } });
+  const prepared = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(prepared.status, "prepared");
+
+  const sentinel = join(storeDir, "ignored-sentinel.tmp");
+  writeFileSync(sentinel, "unpublished and ignored\n");
+  assert.equal(git(storeDir, "status", "--porcelain"), "", "ordinary porcelain hides the ignored sentinel");
+  assert.match(git(storeDir, "status", "--porcelain", "--ignored", "--untracked-files=all"), /^!! ignored-sentinel\.tmp$/m);
+
+  const reuse = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(reuse.status, "blocked");
+  assert.equal(reuse.code, "uncommitted-task-content");
+  assert.match(reuse.detail, /unpublished|ignored-sentinel/i);
+  const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.equal(cleanup.status, "refused");
+  assert.equal(cleanup.code, "uncommitted-task-content");
+  assert.ok(existsSync(sentinel), "ignored unpublished content survives refusal");
+  assert.ok(existsSync(storeDir), "the nested store survives refusal");
 });
 
 test("cleanup treats a failed cleanliness proof as unreadable and retains all content", (t) => {

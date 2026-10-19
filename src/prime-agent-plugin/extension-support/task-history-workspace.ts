@@ -1047,6 +1047,13 @@ function verifyTargetBacklogAuthority(
       remediation: "complete or remove the conflicting target provider evidence before preparing the Backlog Episode workspace",
     };
   }
+  if (detection.evidence.configSource === "root") {
+    return {
+      status: "blocked", code: "unsafe-store-location",
+      detail: `the target Backlog authority is root configuration ${detection.evidence.configPath}; native reads could normalize tracked code-worktree configuration even when it selects the derived nested store`,
+      remediation: "root-config authority relocation remains deferred to PRIMECLAW-43.1",
+    };
+  }
   const selectedStore = detection.evidence.storeDir;
   let exactStore = false;
   if (selectedStore) {
@@ -1364,7 +1371,7 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
       remediation: "publish the clone's commits (the deferred mutation loop) or remove the clone and re-run preparation",
     };
   }
-  const dirty = runGit(runner, storeDir, ["status", "--porcelain"]);
+  const dirty = runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain", "--ignored", "--untracked-files=all"]);
   if (dirty.status !== 0) {
     return {
       status: "blocked", code: "unreadable",
@@ -1375,7 +1382,7 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
   if (dirty.stdout.trim() !== "") {
     return {
       status: "blocked", code: "uncommitted-task-content",
-      detail: `the nested clone ${storeDir} has uncommitted changes: ${dirty.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
+      detail: `the nested clone ${storeDir} has uncommitted or unpublished content: ${dirty.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
       remediation: "the nested clone must be clean; inspect it and re-run preparation",
     };
   }
@@ -1411,7 +1418,7 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
   }
 
   // Re-prove clean/published after native reads; every Git proof must succeed.
-  const finalDirty = runGit(runner, storeDir, ["status", "--porcelain"]);
+  const finalDirty = runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain", "--ignored", "--untracked-files=all"]);
   if (finalDirty.status !== 0) {
     return {
       status: "blocked", code: "unreadable",
@@ -1422,7 +1429,7 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
   if (finalDirty.stdout.trim() !== "") {
     return {
       status: "blocked", code: "uncommitted-task-content",
-      detail: `the nested clone ${storeDir} has uncommitted changes after native reads: ${finalDirty.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
+      detail: `the nested clone ${storeDir} has uncommitted or unpublished content after native reads: ${finalDirty.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}`,
       remediation: "the nested clone must be clean; inspect it and re-run preparation",
     };
   }
@@ -1550,7 +1557,7 @@ export function cleanupEpisodeTaskHistoryStore(input: EpisodeTaskHistoryWorkspac
       };
     }
 
-    const dirty = runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain"]);
+    const dirty = runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain", "--ignored", "--untracked-files=all"]);
     if (dirty.status !== 0) {
       return {
         status: "refused", code: "unreadable",
