@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 18:20'
+updated_date: '2026-10-19 18:22'
 labels: []
 dependencies: []
 references:
@@ -586,6 +586,12 @@ Repair 1 binds bd-managed `bd dolt status --json` `data_dir` to the selected sto
 Repair 2 re-runs the supported live read-only native identity and `dolt_status` queries after the disposable isolated remote identity proof. Before ready, database, branch, revision, and Dolt version must exactly equal the original evidence and the working set must still be clean. The reproduced `a…a` to `c…c` live revision advance now blocks as `revision`, with both identity and working-set reads proven to occur twice and after isolated proof. The final stable direct `refs/dolt/data` object-ID recheck remains after live revalidation.
 
 Final verification: focused task-provider Node suite 52/52; static bridge 2 passed/1 container deselected; TypeScript import passed; full host Node suite 352/352; Docker tier-1 probe passed with immutable image, network absent, teardown verified, and manifest published; `git diff --check` clean. Changed only the task record through the supported CLI, `task-providers.ts`, its focused Node contracts, and `docs/backlog.md`. The intentional Beads 1.1.2 dirty-config fail-closed behavior, JSONL non-authority, no raw Dolt access to the live store, accepted slices 1/2A/2B/2C, least technology, and all deferred scope remain unchanged. PRIMECLAW-43 stays In Progress.
+
+2026-10-19 Conversation review: REVISE replacement `2ba92f15d3eac11dc92b05838a8ace69578f03da`; it is not accepted. Preserve its accepted closures for exact bd-managed `.beads/dolt` identity and post-clone live identity/cleanliness reproof. Repair exactly one residual Beads authority-containment defect.
+
+`scanBeads` still follows authority symlinks through `statSync`/`readFileSync`, while `bd context` is checked only lexically. Reproduction: replace the selected store's `metadata.json` with a symlink to an external valid metadata file; `prepareBeadsWorkspaceTransport` still returns ready for the selected repository/store. Before any native Beads capability/server/remote proof, lstat and realpath the selected `.beads` directory, `metadata.json`, and `config.yaml`. Require a real non-symlink directory and real regular non-symlink files whose canonical identities remain inside the canonical selected store and project root. Unsafe, external, unreadable, or ambiguous authority identity must block with exact remediation and without exposing or mutating external content.
+
+Add one focused zero-native-authority regression covering `.beads`, `metadata.json`, and `config.yaml` symlink cases and prove external sentinels remain unchanged. Preserve the Beads 1.1.2 dirty-config fail-closed product constraint, operator-managed behavior, JSONL non-authority, no raw Dolt access to the live store, accepted slices 1/2A/2B/2C, least technology, and all deferred scope. Run focused/full host validation and Docker tier 1, keep PRIMECLAW-43 exactly In Progress, then push one clean candidate and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
