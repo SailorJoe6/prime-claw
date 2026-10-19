@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 17:56'
+updated_date: '2026-10-19 18:06'
 labels: []
 dependencies: []
 references:
@@ -563,6 +563,14 @@ Focused representative contracts cover bd-managed and operator-managed readiness
 The final seam additionally re-reads the exact direct `refs/dolt/data` Git object after isolated clone/revision proof and blocks if publication moved or became unavailable during proof, retaining the distinct Git ref head and native Dolt revision as evidence. The dirty-config remediation now records the observed Beads 1.1.2 constraint: use the supported native commit first, but if Beads rehydrates required config outside HEAD, upgrade or repair Beads rather than bypassing the live server with raw Dolt.
 
 Final verification: focused task-provider Node suite 50/50; task-provider static bridge 2 passed/1 container deselected; TypeScript import passed; full host Node suite 350/350; Docker tier-1 probe passed with immutable image, network absent, teardown verified, and manifest published; `git diff --check` clean. Exact active version-2 ownership, Episode/worktree/branch binding, and PRIMECLAW-43 In Progress status were revalidated. Changed only the task record through the supported CLI, `task-providers.ts`, its focused Node/static contracts, and `docs/backlog.md`. No Beads per-task mutation/publication/reconciliation, Backlog behavior change, lifecycle wiring, schema, provider-neutral UX, legacy transition, migration/cutover, PRIMECLAW-43.1, daemon, coordinator, lock, sidecar, mirror, registry, protocol, or persistent state was added.
+
+2026-10-19 Conversation review: REVISE candidate `30c9cbd457d982d83b4c8291ca9c69dd60f0350c`; it is not accepted. Preserve accepted slices 1/2A/2B/2C, the intentional Beads 1.1.2 dirty-config product-constraint block, operator-managed behavior, JSONL non-authority, no raw Dolt access to the live store, least technology, and all deferred scope. Repair exactly two reproduced Beads foundation defects.
+
+1. The bd-managed branch currently accepts any non-empty `bd dolt status --json` `data_dir`; a fixture changed it to `/tmp/foreign-shared-dolt-data` and preparation still returned ready. Bind bd-managed status to the selected store's exact real per-project server data directory (default `.beads/dolt`, or a natively proved supported configuration). Reject foreign, symlinked, or ambiguous identity and add the exact regression.
+
+2. Live database/branch/HEAD/version and `dolt_status` are read only before isolated remote proof. A runner advanced the live revision from `a…a` to `c…c` during `dolt clone`, but preparation returned ready with stale `a…a` evidence after only one live identity read. After isolated clone proof, re-read native live identity and working set. Require the original exact database, branch, revision, Dolt version, and clean state before ready, while preserving the stable final `refs/dolt/data` check. Add the exact race regression.
+
+Run focused and full host validation plus Docker tier 1. Update only relevant code/tests/docs/task evidence, keep PRIMECLAW-43 exactly In Progress, commit and push one clean candidate, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
