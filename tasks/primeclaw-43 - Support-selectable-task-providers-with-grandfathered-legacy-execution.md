@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 17:09'
+updated_date: '2026-10-19 17:24'
 labels: []
 dependencies: []
 references:
@@ -545,6 +545,12 @@ Remote advance classification now parses the full no-rename Git name/status set.
 The real-Git/native regression rewrites `tasks/task-2 - Other.md` in place from TASK-2 to TASK-3 during TASK-1 publication. It proves ambiguous-remote-advance block, exact prior/new head and both canonical identity views, no merge/overwrite, clean recoverable local TASK-1 commit, unchanged prior TASK-2 in the local clone, and authoritative TASK-3 at the direct remote head. The successful unrelated race now combines one unchanged-identity M and one valid A and still ordinary-merges/publishes, preserving both changes.
 
 Final verification with repository-built managed `deps/backlog/dist/backlog`: targeted slice-2C scenarios 9/9; focused task-history suite 51/51; full host Node suite 346/346; Docker tier-1 bridge 1 passed, 1 deselected; TypeScript import passed; `git diff --check` clean. Changed only the task record via supported CLI, `task-history-workspace.ts`, direct real-Git/native tests, and `docs/backlog.md`. Accepted slices 1/2A/2B and the two accepted 9c49703 closures remain unchanged. No YAML semantic engine, persistent state/framework, lifecycle/admission/finalization/cleanup wiring, hooks, Beads/Dolt, migration/cutover, PRIMECLAW-43.1, receipts/ownership schema, provider UX, or coordinator was added. PRIMECLAW-43 stays In Progress.
+
+2026-10-19 Conversation review: ACCEPT Backlog slice 2C at exact candidate `2c75a03a896cb874ab48f01734a0218f15b635f0`. Preserve accepted slices 1, 2A, 2B, and all slice-2C task-file identity, exact-head race-classification, shared-config refusal, evidence, recoverability, and post-merge reproof closures unchanged.
+
+Advance only to the first bounded Beads workspace/transport foundation sub-slice under implementation-plan slice 2. Use the supported installed/pinned `bd` and Dolt interfaces first. Add only narrow direct Beads-specific proof/preparation functions needed to: (1) validate selected live Beads authority and required per-project server mode; (2) distinguish supported auto-start from explicitly operator-managed server configuration; (3) identify and prove the exact native Dolt database/revision, configured remote transport, and `refs/dolt/data` publication authority; and (4) fail closed with exact remediation when server, revision, remote, or capability evidence is unavailable or ambiguous. Keep JSONL strictly non-authoritative and never race raw Dolt writes against a live server.
+
+If supported native interfaces cannot prove a required invariant, stop and report the product constraint. Do not invent a daemon, lock, coordinator, sidecar, mirror, registry, universal task model, custom Dolt protocol, or persistent state. This foundation slice must not implement Beads per-task mutation/publication/reconciliation, Backlog changes, Episode admission/finalization/cleanup wiring, ownership/receipt schema, provider-neutral lifecycle UX, legacy transition, migration/cutover, or PRIMECLAW-43.1. Add one focused representative contract fixture per new seam, update only relevant docs and task evidence, run Docker-only plugin validation plus relevant host suites, keep PRIMECLAW-43 exactly In Progress, commit/push one clean candidate, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -559,4 +565,6 @@ Slice-2C repair candidate supersedes rejected d6c88e4 and fixes only the two con
 Slice-2C repair candidate 9c49703 is REVISE/not accepted due one residual race-classification defect: an M path can change canonical task identity in place and still be auto-merged. Next work is limited to prior/new exact-head native identity proof per M path and prior-absence/new-identity proof per A path, with a TASK-2→TASK-3 same-path blocking regression. Preserve accepted symlink/config closures and slices 1/2A/2B; PRIMECLAW-43 remains In Progress.
 
 Exact-head slice-2C residual repair supersedes rejected 9c49703. Remote A/M reconciliation is now status-aware: M requires the same safe native canonical ID/path at prior and new remote heads; A requires prior absence and one safe different-task identity at the new head. The TASK-2→TASK-3 same-path race blocks with exact safe evidence and recoverable local work, while valid unchanged-identity M plus valid A still ordinary-merge. Verified targeted 9/9, focused 51/51, full Node 346/346, Docker tier 1 1 passed/1 deselected. PRIMECLAW-43 remains In Progress; all accepted earlier closures and deferred boundaries remain unchanged.
+
+Backlog slice 2C is accepted at 2c75a03 with all earlier slices and identity/race closures preserved. Next work is only the first Beads workspace/transport foundation sub-slice: direct supported bd/Dolt proofs for live Beads authority, per-project server mode and auto-start vs operator-managed configuration, exact Dolt database/revision, configured remote transport, and refs/dolt/data publication authority, with fail-closed remediation. No Beads task mutation/publication/reconciliation or broader lifecycle/state/framework work yet; PRIMECLAW-43 remains In Progress.
 <!-- SECTION:FINAL_SUMMARY:END -->
