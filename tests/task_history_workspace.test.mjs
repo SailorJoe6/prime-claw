@@ -995,6 +995,30 @@ function nativeTask(root, id) {
   return JSON.parse(execFileSync("backlog", ["task", "view", "--json", "--", id], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })).task;
 }
 
+test("a tracked native task symlink blocks before mutation without exposing or changing an external sentinel", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { dir, root, remote, target, storeDir } = mutationFixture();
+  const sentinel = join(dir, "external-task-sentinel.md");
+  const sentinelBytes = taskMarkdown("TASK-1", "Owner", "EXTERNAL_SENTINEL_SECRET_MUST_NOT_ESCAPE");
+  writeFileSync(sentinel, sentinelBytes);
+  rmSync(join(storeDir, OWNER_TASK_PATH));
+  symlinkSync(sentinel, join(storeDir, OWNER_TASK_PATH));
+  git(storeDir, "add", OWNER_TASK_PATH);
+  git(storeDir, "-c", "user.email=t@e.st", "-c", "user.name=t", "commit", "-qm", "unsafe task symlink fixture");
+  git(storeDir, "push", "-q", "origin", `${TASK_HISTORY_REF}:${TASK_HISTORY_REF}`);
+  const unsafeHead = git(storeDir, "rev-parse", "HEAD");
+
+  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "must never be written" }] });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "identity-mismatch");
+  assert.match(result.detail, /symlink|tracked real regular/i);
+  assert.equal(readFileSync(sentinel, "utf8"), sentinelBytes, "external sentinel bytes stay unchanged");
+  assert.ok(!JSON.stringify(result).includes("EXTERNAL_SENTINEL_SECRET_MUST_NOT_ESCAPE"), "unsafe external content is not exposed as evidence");
+  assert.equal(git(storeDir, "rev-parse", "HEAD"), unsafeHead, "no local mutation commit was made");
+  assert.equal(git(storeDir, "status", "--porcelain", "--ignored", "--untracked-files=all"), "");
+  assert.match(git(storeDir, "ls-remote", "--heads", remote, TASK_HISTORY_REF), new RegExp(`^${unsafeHead}\\s`));
+});
+
 test("exact native task edits commit, publish to the direct head, and publish sequentially", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, remote, target, storeDir } = mutationFixture();
@@ -1049,6 +1073,29 @@ test("an unrelated-task publication race is merged and preserved by ordinary Git
   assert.match(result.nativeAfter, /owner raced update/);
   assert.match(git(storeDir, "show", "-s", "--format=%P", result.publishedHead), /^[0-9a-f]{40} [0-9a-f]{40}$/);
   assert.match(git(storeDir, "ls-remote", "--heads", remote, TASK_HISTORY_REF), new RegExp(`^${result.publishedHead}\\s`));
+});
+
+test("a shared config publication race blocks with full evidence and retains local work", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote, target, storeDir } = mutationFixture();
+  let racedHead = "";
+  const runner = realRunnerWithPushAction(() => {
+    racedHead = publishTaskBranch(remote, { "config.yml": FULL_CANONICAL_CONFIG.replace("auto_commit: false", "auto_commit: true") });
+  });
+  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "local work retained after config race" }], runner });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "ambiguous-remote-advance");
+  assert.equal(result.remoteHead, racedHead);
+  assert.equal(result.localHead, git(storeDir, "rev-parse", "HEAD"));
+  assert.match(result.nativeBefore, /"id":\s*"TASK-1"/);
+  assert.match(result.nativeAfter, /local work retained after config race/);
+  assert.match(result.nativeRemote, /"id":\s*"TASK-1"/);
+  assert.match(result.localDiff, /local work retained after config race/);
+  assert.match(result.remoteDiff, /auto_commit: false/);
+  assert.match(result.remoteDiff, /auto_commit: true/);
+  assert.equal(git(storeDir, "status", "--porcelain", "--ignored", "--untracked-files=all"), "", "local mutation remains a clean recoverable commit");
+  assert.equal(readFileSync(join(storeDir, "config.yml"), "utf8"), FULL_CANONICAL_CONFIG, "unsafe remote config was not merged locally");
+  assert.match(git(storeDir, "ls-remote", "--heads", remote, TASK_HISTORY_REF), new RegExp(`^${racedHead}\\s`));
 });
 
 test("a same-task publication race blocks with exact native and Git evidence without overwrite", (t) => {
