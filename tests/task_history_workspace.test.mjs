@@ -929,6 +929,7 @@ test("cleanup refuses dangling target-store symlinks and external primary work-t
 
 const OWNER_TASK_PATH = "tasks/task-1 - Owner.md";
 const OTHER_TASK_PATH = "tasks/task-2 - Other.md";
+const ADDED_TASK_PATH = "tasks/task-3 - Added.md";
 
 function taskMarkdown(id, title, notes = "initial") {
   return [
@@ -1061,7 +1062,10 @@ test("an unrelated-task publication race is merged and preserved by ordinary Git
   const { root, remote, target, storeDir } = mutationFixture();
   let racedHead = "";
   const runner = realRunnerWithPushAction(() => {
-    racedHead = publishTaskBranch(remote, { [OTHER_TASK_PATH]: taskMarkdown("TASK-2", "Other", "concurrent unrelated update") });
+    racedHead = publishTaskBranch(remote, {
+      [OTHER_TASK_PATH]: taskMarkdown("TASK-2", "Other", "concurrent unrelated update"),
+      [ADDED_TASK_PATH]: taskMarkdown("TASK-3", "Added", "concurrent unrelated addition"),
+    });
   });
   const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "owner raced update" }], runner });
   assert.equal(result.status, "published");
@@ -1070,9 +1074,41 @@ test("an unrelated-task publication race is merged and preserved by ordinary Git
   assert.ok(runner.firstPushArgs.includes(`HEAD:${TASK_HISTORY_REF}`));
   assert.equal(git(storeDir, "merge-base", "--is-ancestor", racedHead, result.publishedHead), "");
   assert.match(readFileSync(join(storeDir, OTHER_TASK_PATH), "utf8"), /concurrent unrelated update/);
+  assert.match(readFileSync(join(storeDir, ADDED_TASK_PATH), "utf8"), /concurrent unrelated addition/);
   assert.match(result.nativeAfter, /owner raced update/);
   assert.match(git(storeDir, "show", "-s", "--format=%P", result.publishedHead), /^[0-9a-f]{40} [0-9a-f]{40}$/);
   assert.match(git(storeDir, "ls-remote", "--heads", remote, TASK_HISTORY_REF), new RegExp(`^${result.publishedHead}\\s`));
+});
+
+test("a same-path canonical ID rewrite race blocks with exact two-head native evidence", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote, target, storeDir } = mutationFixture();
+  const priorHead = git(storeDir, "rev-parse", "HEAD");
+  let racedHead = "";
+  const runner = realRunnerWithPushAction(() => {
+    racedHead = publishTaskBranch(remote, { [OTHER_TASK_PATH]: taskMarkdown("TASK-3", "Other rewritten", "remote canonical identity rewrite") });
+  });
+  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "local TASK-1 work remains recoverable" }], runner });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "ambiguous-remote-advance");
+  assert.equal(result.baseHead, priorHead);
+  assert.equal(result.remoteHead, racedHead);
+  assert.equal(result.localHead, git(storeDir, "rev-parse", "HEAD"));
+  assert.match(result.detail, /changed canonical identity/);
+  assert.match(result.nativeBefore, /"id":\s*"TASK-1"/);
+  assert.match(result.nativeAfter, /local TASK-1 work remains recoverable/);
+  assert.match(result.nativeRemote, new RegExp(priorHead));
+  assert.match(result.nativeRemote, new RegExp(racedHead));
+  assert.match(result.nativeRemote, /TASK-2/);
+  assert.match(result.nativeRemote, /TASK-3/);
+  assert.match(result.localDiff, /local TASK-1 work remains recoverable/);
+  assert.match(result.remoteDiff, /-id: TASK-2/);
+  assert.match(result.remoteDiff, /\+id: TASK-3/);
+  assert.equal(gitAllow(storeDir, "merge-base", "--is-ancestor", racedHead, result.localHead).status, 1, "remote rewrite was not merged locally");
+  assert.match(readFileSync(join(storeDir, OTHER_TASK_PATH), "utf8"), /^id: TASK-2$/m, "local clone retains the prior canonical identity");
+  assert.match(git(storeDir, "show", `${racedHead}:${OTHER_TASK_PATH}`), /^id: TASK-3$/m, "remote rewrite remains authoritative");
+  assert.equal(git(storeDir, "status", "--porcelain", "--ignored", "--untracked-files=all"), "", "local TASK-1 mutation remains a clean recoverable commit");
+  assert.match(git(storeDir, "ls-remote", "--heads", remote, TASK_HISTORY_REF), new RegExp(`^${racedHead}\\s`));
 });
 
 test("a shared config publication race blocks with full evidence and retains local work", (t) => {

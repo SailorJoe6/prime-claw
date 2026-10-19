@@ -417,20 +417,25 @@ base/published heads, exact ID/path, unmodified safe native JSON views, and the
 exact task-path Git diff.
 
 A non-force rejection triggers fresh direct-read/fetch evidence. Automatic
-retry requires the complete ordinary-Git remote path set to contain only added
-or modified files and a disposable exact-head native proof to map every one of
-those paths to a valid task other than the owner's exact task. Shared
+retry requires a complete status-aware ordinary-Git remote path set containing
+only added or modified files. In one disposable clone, native Backlog indexes
+safe task identities at both the prior integrated remote head and the candidate
+remote head. Every modified path must resolve to the same exact canonical ID
+and native path at both heads, and that identity must differ from the owner.
+Every added path must be absent at the prior head and resolve to exactly one
+safe different-task identity at the candidate head. This rejects an in-place
+canonical-ID rewrite even when its file path is unchanged. Shared
 configuration/authority, non-task, malformed, deleted/renamed/type-changed,
-same-task, non-descendant, or otherwise ambiguous advances block with exact
-local/remote heads, native before/after/remote views, the local task diff, and
-the full remote Git diff for managed judgment. A proven other-task-file-only
-advance is preserved by an ordinary merge. Before another non-force push, the
-seam re-proves target authority, independent-clone identity, native
-capabilities, effective `autoCommit=false`, strict cleanliness, and the same
-exact canonical ID plus safe task path. The seam never decides semantic
-compatibility or forces/rewrites remote history. Native mutation, commit,
-fetch, merge, push, or direct-proof failure leaves recoverable local work in
-the nested clone and never calls it published.
+same-task, non-descendant, unreadable, or otherwise ambiguous advances block
+with exact prior/new remote heads, safe native identity views, the retained
+local task diff, and the full remote Git diff for managed judgment. A proven
+other-task-file-only A/M advance is preserved by an ordinary merge. Before
+another non-force push, the seam re-proves target authority, independent-clone
+identity, native capabilities, effective `autoCommit=false`, strict
+cleanliness, and the same exact canonical ID plus safe task path. The seam
+never decides semantic compatibility or forces/rewrites remote history. Native
+mutation, commit, fetch, merge, push, or direct-proof failure leaves
+recoverable local work in the nested clone and never calls it published.
 
 Still out of scope: Episode admission/finalization/cleanup wiring,
 ownership/receipt fields, provider-neutral UX, managed semantic decisions,

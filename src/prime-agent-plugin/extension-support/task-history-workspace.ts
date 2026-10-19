@@ -1894,103 +1894,205 @@ function synchronizeCleanMutationClone(
 }
 
 /** Exact ordinary-Git path evidence for one remote advance. */
+type RemoteAdvanceChange = { status: string; path: string };
+
 function remoteAdvancePaths(
   storeDir: string,
   fromHead: string,
   toHead: string,
   runner: CommandRunner,
-): { paths: string[]; onlyAddedOrModified: boolean } | { error: string } {
-  const all = runGit(runner, storeDir, ["diff", "--name-only", "-z", "--no-renames", fromHead, toHead]);
-  const eligible = runGit(runner, storeDir, ["diff", "--name-only", "-z", "--no-renames", "--diff-filter=AM", fromHead, toHead]);
-  if (all.status !== 0 || eligible.status !== 0) {
-    return { error: all.stderr.trim() || eligible.stderr.trim() || `git diff path proof exited ${all.status}/${eligible.status}` };
+): { changes: RemoteAdvanceChange[]; onlyAddedOrModified: boolean } | { error: string } {
+  const changed = runGit(runner, storeDir, ["diff", "--name-status", "-z", "--no-renames", fromHead, toHead]);
+  if (changed.status !== 0) {
+    return { error: changed.stderr.trim() || `git diff status/path proof exited ${changed.status}` };
   }
-  const paths = all.stdout.split("\0").filter(Boolean);
-  const eligiblePaths = eligible.stdout.split("\0").filter(Boolean);
-  return { paths, onlyAddedOrModified: paths.length > 0 && paths.length === eligiblePaths.length && paths.every((path, index) => path === eligiblePaths[index]) };
+  const fields = changed.stdout.split("\0");
+  if (fields.at(-1) === "") fields.pop();
+  if (fields.length % 2 !== 0) return { error: "git diff returned malformed status/path evidence" };
+  const changes: RemoteAdvanceChange[] = [];
+  for (let index = 0; index < fields.length; index += 2) {
+    const status = fields[index];
+    const path = fields[index + 1];
+    if (!status || !path) return { error: "git diff returned an empty status or path" };
+    changes.push({ status, path });
+  }
+  return {
+    changes,
+    onlyAddedOrModified: changes.length > 0 && changes.every(({ status }) => status === "A" || status === "M"),
+  };
+}
+
+type SafeNativeTaskIndex = {
+  target: NativeTaskView;
+  byStorePath: Map<string, NativeTaskView>;
+};
+
+type SafeNativeTaskIndexResult =
+  | { status: "verified"; index: SafeNativeTaskIndex }
+  | { status: "blocked"; detail: string };
+
+/** Read an exact-head native task index only after the entire tracked task tree is safe. */
+function readSafeNativeTaskIndex(
+  projectRoot: string,
+  evidenceStore: string,
+  taskId: string,
+  taskPath: string,
+  runner: CommandRunner,
+): SafeNativeTaskIndexResult {
+  const treeSafety = proveTrackedTaskTreeSafety(evidenceStore, runner);
+  if (treeSafety.status === "blocked") {
+    return { status: "blocked", detail: `tracked task tree is unsafe: ${treeSafety.detail}` };
+  }
+
+  const target = readNativeTask(projectRoot, taskId, runner);
+  if ("error" in target) return { status: "blocked", detail: `exact native target ${taskId} could not be read` };
+  if (target.id !== taskId || target.path !== taskPath) {
+    return { status: "blocked", detail: `native target identity is ${target.id} at ${target.path}, not ${taskId} at ${taskPath}` };
+  }
+  const targetIdentity = proveNativeTaskFileIdentity(projectRoot, evidenceStore, target.path, runner);
+  if (targetIdentity.status === "blocked") {
+    return { status: "blocked", detail: `native target path is unsafe: ${targetIdentity.detail}` };
+  }
+
+  const listed = runner.run("backlog", ["task", "list", "--json"], { cwd: projectRoot, allowFailure: true });
+  if (listed.status !== 0) return { status: "blocked", detail: "native task listing failed" };
+  let taskIds: string[];
+  try {
+    const parsed = JSON.parse(listed.stdout) as { tasks?: Array<{ id?: unknown }> };
+    if (!Array.isArray(parsed.tasks) || parsed.tasks.some((task) => typeof task?.id !== "string" || task.id.trim() === "")) {
+      return { status: "blocked", detail: "native task listing returned malformed task identities" };
+    }
+    taskIds = parsed.tasks.map((task) => task.id as string);
+  } catch {
+    return { status: "blocked", detail: "native task listing was not valid JSON" };
+  }
+  if (new Set(taskIds).size !== taskIds.length) {
+    return { status: "blocked", detail: "native task listing returned duplicate canonical IDs" };
+  }
+
+  const byStorePath = new Map<string, NativeTaskView>();
+  for (const candidateId of taskIds) {
+    const view = readNativeTask(projectRoot, candidateId, runner);
+    if ("error" in view || view.id !== candidateId) {
+      return { status: "blocked", detail: `native task ${candidateId} could not be resolved exactly` };
+    }
+    const identity = proveNativeTaskFileIdentity(projectRoot, evidenceStore, view.path, runner);
+    if (identity.status === "blocked") {
+      return { status: "blocked", detail: `native task ${candidateId} path is unsafe: ${identity.detail}` };
+    }
+    if (byStorePath.has(identity.storePath)) {
+      return { status: "blocked", detail: `multiple canonical tasks resolve to ${JSON.stringify(identity.storePath)}` };
+    }
+    byStorePath.set(identity.storePath, view);
+  }
+  const indexedTarget = byStorePath.get(targetIdentity.storePath);
+  if (!indexedTarget || indexedTarget.id !== taskId || indexedTarget.path !== taskPath) {
+    return { status: "blocked", detail: "native target is absent or ambiguous in the exact task index" };
+  }
+  return { status: "verified", index: { target, byStorePath } };
 }
 
 type RemoteAdvanceNativeProof =
-  | { status: "verified"; nativeTarget: NativeTaskView }
-  | { status: "blocked"; detail: string; nativeTarget: string };
+  | { status: "verified"; evidence: string }
+  | { status: "blocked"; detail: string; evidence: string };
 
 /**
- * Prove every changed remote path is a native Backlog task other than the
- * owner's exact task. The proof runs at the exact fetched head in a disposable
- * clone. Git first rejects unsafe path identities before any native task read.
+ * Prove each A/M remote path against safe native task identities at both exact
+ * heads. Modified paths must retain one canonical ID/path; added paths must be
+ * absent before and resolve to one different-task identity after.
  */
 function proveNativeRemoteAdvance(
   clone: MutationClone,
-  head: string,
+  priorHead: string,
+  newHead: string,
   taskId: string,
   taskPath: string,
-  changedStorePaths: string[],
+  changes: RemoteAdvanceChange[],
   runner: CommandRunner,
 ): RemoteAdvanceNativeProof {
   const temp = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-task-view-")));
   const projectRoot = join(temp, "project");
   const evidenceStore = join(projectRoot, clone.storeName);
-  let nativeTarget = "ERROR: remote native target view was not available";
+  const safeEvidence: {
+    priorHead: string;
+    newHead: string;
+    target?: { prior: string; next: string };
+    changes: Array<{ status: string; path: string; prior: string | null; next: string }>;
+  } = { priorHead, newHead, changes: [] };
+  const evidence = () => [
+    `priorHead: ${safeEvidence.priorHead}`,
+    `newHead: ${safeEvidence.newHead}`,
+    safeEvidence.target ? `prior target:
+${safeEvidence.target.prior}
+new target:
+${safeEvidence.target.next}` : "",
+    ...safeEvidence.changes.map((change) => [
+      `${change.status} ${change.path}`,
+      change.prior === null ? "prior: absent" : `prior:
+${change.prior}`,
+      `new:
+${change.next}`,
+    ].join("\n")),
+  ].filter(Boolean).join("\n");
   try {
     mkdirSync(projectRoot);
     const copied = runner.run("git", ["clone", "--quiet", "--origin", clone.remote, "--branch", TASK_HISTORY_BRANCH, "--", clone.remoteUrl, evidenceStore], { allowFailure: true });
-    if (copied.status !== 0) return { status: "blocked", detail: "the exact remote evidence clone could not be created", nativeTarget };
-    const checkout = runGit(runner, evidenceStore, ["checkout", "--quiet", "--detach", head]);
-    if (checkout.status !== 0) return { status: "blocked", detail: `the exact fetched remote head ${head} could not be checked out for native evidence`, nativeTarget };
+    if (copied.status !== 0) return { status: "blocked", detail: "the exact remote evidence clone could not be created", evidence: evidence() };
 
-    for (const changedPath of changedStorePaths) {
-      const identity = proveTrackedRegularStorePath(evidenceStore, changedPath, runner);
-      if (identity.status === "blocked") {
-        return { status: "blocked", detail: `changed remote path ${JSON.stringify(changedPath)} is not a safe tracked regular file: ${identity.detail}`, nativeTarget };
-      }
+    const priorCheckout = runGit(runner, evidenceStore, ["checkout", "--quiet", "--detach", priorHead]);
+    if (priorCheckout.status !== 0) {
+      return { status: "blocked", detail: `prior remote head ${priorHead} could not be checked out for native evidence`, evidence: evidence() };
     }
-
-    const target = readNativeTask(projectRoot, taskId, runner);
-    if ("error" in target) return { status: "blocked", detail: `the exact remote native target ${taskId} could not be read`, nativeTarget };
-    nativeTarget = target.raw;
-    if (target.id !== taskId || target.path !== taskPath) {
-      return { status: "blocked", detail: `remote native target identity is ${target.id} at ${target.path}, not ${taskId} at ${taskPath}`, nativeTarget };
+    const prior = readSafeNativeTaskIndex(projectRoot, evidenceStore, taskId, taskPath, runner);
+    if (prior.status === "blocked") {
+      return { status: "blocked", detail: `prior remote native identity is unsafe or ambiguous: ${prior.detail}`, evidence: evidence() };
     }
 
-    const listed = runner.run("backlog", ["task", "list", "--json"], { cwd: projectRoot, allowFailure: true });
-    if (listed.status !== 0) return { status: "blocked", detail: "remote native task listing failed", nativeTarget };
-    let taskIds: string[];
-    try {
-      const parsed = JSON.parse(listed.stdout) as { tasks?: Array<{ id?: unknown }> };
-      if (!Array.isArray(parsed.tasks) || parsed.tasks.some((task) => typeof task?.id !== "string" || task.id.trim() === "")) {
-        return { status: "blocked", detail: "remote native task listing returned malformed task identities", nativeTarget };
-      }
-      taskIds = parsed.tasks.map((task) => task.id as string);
-    } catch {
-      return { status: "blocked", detail: "remote native task listing was not valid JSON", nativeTarget };
+    const newCheckout = runGit(runner, evidenceStore, ["checkout", "--quiet", "--detach", newHead]);
+    if (newCheckout.status !== 0) {
+      return { status: "blocked", detail: `new remote head ${newHead} could not be checked out for native evidence`, evidence: evidence() };
     }
-    if (new Set(taskIds).size !== taskIds.length) {
-      return { status: "blocked", detail: "remote native task listing returned duplicate canonical IDs", nativeTarget };
+    const next = readSafeNativeTaskIndex(projectRoot, evidenceStore, taskId, taskPath, runner);
+    if (next.status === "blocked") {
+      return { status: "blocked", detail: `new remote native identity is unsafe or ambiguous: ${next.detail}`, evidence: evidence() };
     }
+    safeEvidence.target = { prior: prior.index.target.raw, next: next.index.target.raw };
 
-    const remaining = new Set(changedStorePaths);
-    for (const candidateId of taskIds) {
-      const view = readNativeTask(projectRoot, candidateId, runner);
-      if ("error" in view || view.id !== candidateId) {
-        return { status: "blocked", detail: `remote native task ${candidateId} could not be resolved exactly`, nativeTarget };
+    for (const change of changes) {
+      if (change.status !== "A" && change.status !== "M") {
+        return { status: "blocked", detail: `remote path ${JSON.stringify(change.path)} has disallowed Git status ${change.status}`, evidence: evidence() };
       }
-      const candidatePath = storeRelativeTaskPath(projectRoot, evidenceStore, view.path);
-      if (!candidatePath || !remaining.has(candidatePath)) continue;
-      if (candidateId === taskId || view.path === taskPath) {
-        return { status: "blocked", detail: `remote changed the exact owner task ${taskId} at ${taskPath}`, nativeTarget };
+      const priorView = prior.index.byStorePath.get(change.path);
+      const nextView = next.index.byStorePath.get(change.path);
+      if (change.status === "A") {
+        const priorTree = runGit(runner, evidenceStore, ["ls-tree", "-z", "--full-tree", priorHead, "--", change.path]);
+        if (priorTree.status !== 0 || priorTree.stdout !== "" || priorView) {
+          return { status: "blocked", detail: `added remote path ${JSON.stringify(change.path)} is not proved absent at prior head ${priorHead}`, evidence: evidence() };
+        }
+        if (!nextView) {
+          return { status: "blocked", detail: `added remote path ${JSON.stringify(change.path)} does not resolve to exactly one safe native task at new head ${newHead}`, evidence: evidence() };
+        }
+        safeEvidence.changes.push({ status: change.status, path: change.path, prior: null, next: nextView.raw });
+        if (nextView.id === taskId || nextView.path === taskPath) {
+          return { status: "blocked", detail: `added remote path ${JSON.stringify(change.path)} resolves to owner task ${taskId}`, evidence: evidence() };
+        }
+        continue;
       }
-      const identity = proveNativeTaskFileIdentity(projectRoot, evidenceStore, view.path, runner);
-      if (identity.status === "blocked" || identity.storePath !== candidatePath) {
-        return { status: "blocked", detail: `remote native task ${candidateId} does not resolve to one safe changed task file`, nativeTarget };
+
+      if (!priorView || !nextView) {
+        return { status: "blocked", detail: `modified remote path ${JSON.stringify(change.path)} does not resolve safely and natively at both exact heads`, evidence: evidence() };
       }
-      remaining.delete(candidatePath);
+      safeEvidence.changes.push({ status: change.status, path: change.path, prior: priorView.raw, next: nextView.raw });
+      if (priorView.id !== nextView.id || priorView.path !== nextView.path) {
+        return { status: "blocked", detail: `modified remote path ${JSON.stringify(change.path)} changed canonical identity from ${priorView.id} at ${priorView.path} to ${nextView.id} at ${nextView.path}`, evidence: evidence() };
+      }
+      if (nextView.id === taskId || nextView.path === taskPath) {
+        return { status: "blocked", detail: `modified remote path ${JSON.stringify(change.path)} resolves to owner task ${taskId}`, evidence: evidence() };
+      }
     }
-    if (remaining.size !== 0) {
-      return { status: "blocked", detail: `remote changed paths are not all native other-task files: ${JSON.stringify([...remaining].sort())}`, nativeTarget };
-    }
-    return { status: "verified", nativeTarget: target };
+    return { status: "verified", evidence: evidence() };
   } catch (error) {
-    return { status: "blocked", detail: `remote native evidence proof failed safely: ${error instanceof Error ? error.message : String(error)}`, nativeTarget };
+    return { status: "blocked", detail: `remote native evidence proof failed safely: ${error instanceof Error ? error.message : String(error)}`, evidence: evidence() };
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
@@ -2213,9 +2315,10 @@ export function publishEpisodeTaskHistoryMutation(input: EpisodeTaskHistoryMutat
     const remoteDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", integratedRemoteHead, remoteHead]);
     const localDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", integratedRemoteHead, localHead, "--", storeTaskPath]);
     const advancePaths = remoteAdvancePaths(clone.storeDir, integratedRemoteHead, remoteHead, runner);
-    const changedRemotePaths = "error" in advancePaths ? [] : advancePaths.paths;
-    const nativeRemote = proveNativeRemoteAdvance(clone, remoteHead, input.taskId, before.path, changedRemotePaths, runner);
-    const nativeRemoteEvidence = nativeRemote.status === "verified" ? nativeRemote.nativeTarget.raw : nativeRemote.nativeTarget;
+    const nativeRemote: RemoteAdvanceNativeProof = "error" in advancePaths
+      ? { status: "blocked", detail: advancePaths.error, evidence: JSON.stringify({ priorHead: integratedRemoteHead, newHead: remoteHead, changes: [] }) }
+      : proveNativeRemoteAdvance(clone, integratedRemoteHead, remoteHead, input.taskId, before.path, advancePaths.changes, runner);
+    const nativeRemoteEvidence = nativeRemote.evidence;
 
     if (!isAncestor(runner, clone.storeDir, integratedRemoteHead, remoteHead)) {
       return mutationBlocked(input.taskId, "ambiguous-remote-advance", `remote head changed from ${integratedRemoteHead} to non-descendant ${remoteHead}`, "retain the local commit and exact divergence evidence for managed judgment; never rewrite remote history", { storeDir: clone.storeDir, remote: clone.remote, baseHead, localHead, remoteHead, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, nativeRemote: nativeRemoteEvidence, localDiff: localDiff.stdout, remoteDiff: remoteDiff.stdout });
