@@ -1327,7 +1327,7 @@ test("production cleanup adapter removes six daemon-proven inactive direct desce
   for (const path of childFiles) writeFileSync(path, "{}\n");
   let rows = [
     { activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, lifecycle: "live", activity: "idle", runtimeKind: "top-level", isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } },
-    ...childFiles.map((path, index) => ({ sessionId: `child-${index + 1}`, sessionFile: path, cwd: worktree, lifecycle: index === 5 ? "archived" : "live", activity: "idle", runtimeKind: "subagent", rlmDepth: 1, isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] }, parentActiveSessionId: "route", parentSessionId: "episode", parentSessionPath: sessionFile, rlmChildId: `sub-${index + 1}`, workerState: "ready" })),
+    ...childFiles.map((path, index) => ({ sessionId: `child-${index + 1}`, sessionFile: path, cwd: worktree, lifecycle: index === 5 ? "archived" : "live", activity: "idle", runtimeKind: "subagent", rlmDepth: 1, isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] }, parentActiveSessionId: "route", parentSessionPath: sessionFile, rlmChildId: `sub-${index + 1}`, workerState: "ready" })),
   ];
   const calls = [];
   const sessions = {
@@ -1363,7 +1363,7 @@ test("production cleanup adapter removes nested descendants deepest-first and re
   const idle = { lifecycle: "live", activity: "idle", isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } };
   let rows = [
     { ...idle, activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, runtimeKind: "top-level", rlmDepth: 0 },
-    { ...idle, sessionId: "child", sessionFile: childFile, cwd: worktree, runtimeKind: "subagent", rlmDepth: 1, parentSessionId: "episode", parentSessionPath: sessionFile, rlmChildId: "sub-child" },
+    { ...idle, sessionId: "child", sessionFile: childFile, cwd: worktree, runtimeKind: "subagent", rlmDepth: 1, parentSessionPath: sessionFile, rlmChildId: "sub-child" },
     { ...idle, sessionId: "grandchild", sessionFile: grandchildFile, cwd: worktree, runtimeKind: "subagent", rlmDepth: 2, parentSessionId: "child", parentSessionPath: childFile, rlmChildId: "sub-grandchild" },
   ];
   const calls = []; let childDeleteAttempts = 0;
@@ -1398,9 +1398,12 @@ test("production cleanup adapter blocks busy, foreign, and ambiguous descendants
   const idle = { lifecycle: "live", activity: "idle", isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } };
   const rootRow = { ...idle, activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, runtimeKind: "top-level", rlmDepth: 0 };
   const childRow = { ...idle, sessionId: "child", sessionFile: childFile, cwd: worktree, runtimeKind: "subagent", rlmDepth: 1, parentSessionId: "episode", parentSessionPath: sessionFile, rlmChildId: "sub-child" };
-  let rows = []; const mutations = [];
+  let rows = []; const mutations = []; let listOverride;
   const sessions = {
-    async list() { return rows.map((row) => structuredClone(row)); },
+    async list() {
+      const listed = rows.map((row) => structuredClone(row));
+      return listOverride ? listOverride(listed) : listed;
+    },
     async getState(activeSessionId) {
       const row = rows.find((entry) => entry.activeSessionId === activeSessionId);
       const state = Object.fromEntries(Object.entries(structuredClone(row)).filter(([key]) => !["hasActiveHeartbeat", "hasRegisteredHeartbeat", "hasRegisteredCronJob"].includes(key)));
@@ -1434,6 +1437,30 @@ test("production cleanup adapter blocks busy, foreign, and ambiguous descendants
   await t.test("partial parent identity", async () => {
     rows = [rootRow, { ...childRow, parentSessionPath: foreignFile }];
     await assert.rejects(adapter.inspect(record), /ambiguous Prime Agent descendant parent chain/);
+  });
+  await t.test("present mismatched parent ID cannot be overridden by an exact path", async () => {
+    rows = [rootRow, { ...childRow, parentSessionId: "wrong-parent" }];
+    await assert.rejects(adapter.inspect(record), /ambiguous Prime Agent descendant parent chain/);
+  });
+  await t.test("routed descendant cannot omit its parent ID", async () => {
+    rows = [rootRow, { ...childRow, activeSessionId: "child-route", parentSessionId: undefined }];
+    await assert.rejects(adapter.inspect(record), /malformed Prime Agent descendant identity/);
+  });
+  await t.test("path-only descendant requires the exact next RLM depth", async () => {
+    rows = [rootRow, { ...childRow, parentSessionId: undefined, rlmDepth: 2 }];
+    await assert.rejects(adapter.inspect(record), /malformed Prime Agent descendant identity/);
+  });
+  await t.test("path-only descendant identity is revalidated immediately before deletion", async () => {
+    rows = [rootRow, { ...childRow, parentSessionId: undefined }];
+    let listCalls = 0;
+    listOverride = (listed) => {
+      listCalls += 1;
+      return listCalls === 4
+        ? listed.map((row) => row.sessionId === "child" ? { ...row, activeSessionId: "late-route" } : row)
+        : listed;
+    };
+    await assert.rejects(adapter.removeRuntime(record), /changed or busy Prime Agent session/);
+    listOverride = undefined;
   });
   assert.deepEqual(mutations, []);
 });
