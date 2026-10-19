@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 16:09'
+updated_date: '2026-10-19 16:19'
 labels: []
 dependencies: []
 references:
@@ -500,10 +500,19 @@ Six representative real-Git 2C regressions currently pass with the repo-built ma
 Final verification used the repository-built managed `deps/backlog/dist/backlog` candidate: focused `node --experimental-strip-types --test tests/task_history_workspace.test.mjs` 48/48; full host `ls tests/*.test.mjs | xargs node --experimental-strip-types --test` 343/343; Docker tier-1 bridge `env -u PYTEST_ADDOPTS python3 -m pytest tests/test_task_history_workspace.py -q -m container` 1 passed, 1 deselected; `git diff --check` clean. Representative 2C evidence covers success and sequential owner updates, pre-read remote fast-forward, unrelated-task publication race preservation, same-task exact-evidence block/no overwrite, rejected non-force publication preserving the clean local commit, and remote-unavailable publication preserving the clean local commit/evidence.
 
 Modified implementation/test/docs: `src/prime-agent-plugin/extension-support/task-history-workspace.ts`, `tests/task_history_workspace.test.mjs`, `tests/test_task_history_workspace.py`, and `docs/backlog.md`; this task record was updated only through supported Backlog CLI. Status remains In Progress. Accepted slices 1/2A/2B and all least-technology/scope guardrails remain unchanged. No admission/finalization/cleanup or lifecycle wiring, ownership/receipt schema, provider-neutral UX, managed semantic decision, normalized task model, custom patch/format, lock/checkpoint/coordinator, Beads/Dolt, legacy transition, migration/cutover, PRIMECLAW-43.1, framework, or persistent state was added; live task-history store untouched.
+
+2026-10-19 Conversation review: REVISE slice-2C candidate `d6c88e40a30f1fdbb441ffe134fa0870ee7d2363`; it is not accepted. Repair only these two confirmed defects. Preserve accepted slices 1, 2A, and 2B and every existing least-technology/scope guardrail.
+
+1. Before any native mutation, prove the exact native task path is a tracked REAL regular non-symlink file whose real path remains inside the exact independent nested store. Unsafe task-file identity or any parent-directory symlink identity must block with zero writes and must not expose arbitrary external content. Add one real-Git/native regression using an external sentinel and prove it remains byte-for-byte unchanged.
+2. On a push race, auto-reconcile only when ordinary Git path evidence plus native evidence proves ALL remote changes are valid other-task-file changes. Any shared config/authority change, non-task change, malformed change, same-task change, or ambiguous change must block with exact local/remote heads, native views, and Git diff evidence for later managed judgment. After every allowed merge, re-prove target authority, native capabilities, effective autoCommit=false, strict cleanliness, and exact task ID/path before retrying the ordinary non-force push. Add a `config.yml` race changing `auto_commit: false` to `auto_commit: true`; it must block while retaining recoverable local work. Preserve the existing successful unrelated-task race.
+
+No hook repair is required. Do not broaden to lifecycle/admission/finalization/cleanup wiring, receipt/ownership schema or persistent state, provider frameworks/UX, semantic reconciliation engines, Beads/Dolt transport, legacy transition, migration/cutover, or PRIMECLAW-43.1. Keep PRIMECLAW-43 exactly In Progress. Update only in-scope production code, direct real-Git/native tests, docs, and task evidence; run focused/full Node plus Docker tier 1; commit and push one clean repair candidate; stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Slice 2C review candidate implements the direct exact-task Backlog mutation → ordinary commit → non-force publication seam with direct-head proof and bounded factual race evidence. Clean stale clones fast-forward; unrelated races merge only after exact path plus native ID/path proof; same-task/ambiguous races block without overwrite; failures retain recoverable local work. Verified 48/48 focused, 343/343 full Node, and Docker tier 1 (1 passed, 1 deselected). PRIMECLAW-43 remains In Progress; lifecycle integration and all later provider/migration scope remain deferred.
+
+Slice 2C candidate d6c88e4 is REVISE/not accepted. Next work is limited to two confirmed safety repairs: real regular in-store task-file identity before mutation, and push-race reconciliation restricted to proven valid other-task-file-only remote changes with full post-merge authority/capability/cleanliness/identity revalidation. Accepted slices 1/2A/2B remain unchanged; PRIMECLAW-43 remains In Progress.
 <!-- SECTION:FINAL_SUMMARY:END -->
