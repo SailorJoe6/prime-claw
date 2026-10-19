@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 15:16'
+updated_date: '2026-10-19 15:26'
 labels: []
 dependencies: []
 references:
@@ -447,4 +447,12 @@ Add bounded representative real-Git regressions (no framework or Cartesian matri
 Bounded real-Git regressions added: retained `backlog/` + selected `upstream` through prepare/reuse/cleanup; conflicting target root authority before and after materialization; failed status proof with truncated index + unpublished sentinel; symlinked `.git`; nested and primary external `core.worktree`; dangling target-store symlink; absent-primary-store cleanup with unchanged `.gitignore`/code/index/refs; and clean local-ahead, remote-advanced, unavailable-remote refusals. Existing positive clean deletion and prior linked-worktree/ignore/native-config tests remain. Documentation updated in `docs/backlog.md`.
 
 Evidence: focused task-history suite 40/40. Full host Node 335/335. Docker tier-1 bridge 1 passed, 1 deselected.. Modified files: `src/prime-agent-plugin/extension-support/task-history-workspace.ts`, `tests/task_history_workspace.test.mjs`, `docs/backlog.md`, and this task via supported CLI. Status remains In Progress. Boundaries preserved: no per-task mutation loop, Episode admission/finalization/lifecycle cleanup wiring, Beads/Dolt transport, provider-neutral framework, ownership/receipt fields, lifecycle UX routing, migration/cutover, PRIMECLAW-43.1, or accepted non-empty-folder-store ordering; live store untouched.
+
+2026-10-19 Conversation review of residual slice-2B candidate e8f4bf0: REVISE, not accepted. Preserve all six repaired behaviors, every passing regression, accepted slice 2A, and every existing scope exclusion. Fix EXACTLY these two independently reproduced blockers with direct checks only:
+
+1. Reject target root Backlog configuration even when it selects the SAME derived nested store. `verifyTargetBacklogAuthority` currently checks project/store equality but not `detection.evidence.configSource === "root"`. After ordinary target preparation, a committed lifecycle-ready root `backlog.config.yml` selecting `.backlog/` makes preparation return `prepared`; native Backlog reads use and can normalize that tracked code-branch file while the nested clone remains clean. This bypasses the preserved root-layout/cutover block, certifies the wrong configuration authority, and violates zero target-code mutation. In the shared target-authority pre/post-materialization path, block root-config authority before any native reads (and cleanup) with exact deferred-cutover remediation. Add one bounded real-Git regression: add a same-store root config after normal preparation, capture exact root bytes/status, prove prepare/reuse and cleanup refuse, root bytes/status stay unchanged, and the nested store remains.
+
+2. Treat ignored untracked files as unpublished content. Current result-checked `git status --porcelain` is empty for a file ignored by the published task-store `.gitignore`; with authoritative HEAD and otherwise exact identity, cleanup returns `cleaned` and deletes the ignored unpublished file. Strengthen the existing read-only cleanliness proofs to include ordinary and ignored untracked entries (for reuse/final preparation as well as cleanup), while still requiring command success. Refuse any such entry as uncommitted/unpublished and preserve the store. Add one bounded real-Git regression with a published ignore rule and ignored sentinel: ordinary status is empty, the seam detects it, preparation does not return prepared, cleanup refuses, and sentinel/store remain.
+
+The fetched-but-remote-behind diagnostic was reviewed and is NON-BLOCKING; do not broaden this pass for it. Do not add a framework, persistent state, lifecycle wiring, or unrelated hardening. Update task notes/docs truthfully; run focused + full Node + Docker tier 1; make one clean residual repair commit, push, and stop for review. Keep PRIMECLAW-43 In Progress. All deferred mutation/Beads/ownership/lifecycle/migration work and PRIMECLAW-43.1 remain out of scope.
 <!-- SECTION:NOTES:END -->
