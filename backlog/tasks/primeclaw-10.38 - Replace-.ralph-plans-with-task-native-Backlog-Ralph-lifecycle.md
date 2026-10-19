@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.38
 title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
-status: Done
+status: Ready for Merge
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-18 17:57'
+updated_date: '2026-10-19 14:52'
 labels:
   - backlog-md
   - episode-loop
@@ -2206,6 +2206,19 @@ Implement the least-technology registry repair:
 7. Update managed skills and docs from “one repository record” wording to “this Conversation's exact record in the registry.”
 8. Add focused behavioral tests for concurrent different-Conversation reservation/creation, same-Conversation second-Episode rejection, duplicate task/source collision across Conversations, direct-record migration, owner-specific compaction/handoff/cleanup/transition, serialized mutation/no lost update, and multi-record worktree activity.
 9. Run focused validation and Docker Tier 1 after plugin-source changes. Produce one clean, independently reviewed, pushed correction candidate. Do not touch or message either blocked UAT Conversation/session, and do not perform a live lifecycle transition, merge, cleanup, or global activation.
+
+## Step 11 — clean up the exact inactive Episode session tree
+
+Repair the cleanup-only `finalize_task_episode` host boundary without changing its public parameters or lifecycle role.
+
+1. Model the exact Prime Agent session tree rooted at the bound Episode session using daemon-reported `sessionId` plus canonical `sessionFile` parent pairs. A shared worktree or other colliding field alone never grants ownership.
+2. Before mutation, require the root and every proven descendant to be inactive and quiescent, with complete unique identity, an unambiguous parent chain, no queued/streaming/compacting/tool/child work, and no foreign or partial collision. Preserve all existing worktree, branch, terminal, head, push, ownership, and terminal-state guards.
+3. Remove verified descendants deepest-first through supported Prime Agent kill and saved-session deletion operations, then remove the parent runtime and continue the existing worktree → branch → ownership-close sequence. Revalidate exact identity and idleness during deletion.
+4. Keep same-terminal-head retry safe after partial descendant deletion. Never broaden retry to an unrelated session, ownership record, worktree, or branch.
+5. Add focused coverage for the observed six inactive direct descendants, nested descendants, busy and foreign/ambiguous collisions, partial deletion and retry, exact absence verification, and preservation of another Conversation-owned Episode.
+6. Update living finalization/oversight documentation and task evidence. Run focused tests plus required Docker Tier 1, produce one independently reviewed pushed candidate, and stop without attempting live Episode cleanup.
+
+Do not add a child-session registry, receipt, reconciliation engine, new lifecycle state machine, manual session-file deletion, or Prime Agent source change.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -2988,6 +3001,45 @@ Red/green evidence on the same supported Linux arm64 image and repository-built 
 - Full focused Docker suite with explicit project Backlog CLI on `PATH`: 146 passed, 0 failed or cancelled.
 
 This closes only the accepted deterministic-test gap. Production recovery locks, direct-record bootstrap policy, task lifecycle state, ownership, and blocked UAT sessions remain unchanged.
+
+## Accepted post-merge cleanup repair — exact Episode session tree (2026-10-18)
+
+The owning Conversation accepted this repair inside `PRIMECLAW-10.38` after the merged task-native cleanup safely failed on legitimate RLM descendants. Read-only `prime-agent list --all --json` reproduction against this bound Episode found exactly six inactive direct subagent sessions. Each reports the Episode's exact `sessionId` and canonical `sessionFile` as its `parentSessionId` and `parentSessionPath`, the exact Episode worktree, idle activity, no active route, no streaming or compaction, zero attached clients and unfinished actions, and empty queued/steering/follow-up actions. The current cleanup adapter nevertheless classifies every additional same-worktree row as foreign because it recognizes only the root session.
+
+Step 11 is the sole repair scope. Keep `finalize_task_episode` cleanup-only and stable; derive descendant ownership only from the exact daemon parent chain, fail closed on any busy/foreign/ambiguous/changed identity, delete proven descendants before the parent runtime, preserve same-head retry and other Conversation-owned Episodes, and do not attempt live cleanup during implementation.
+
+## Step 11 cleanup-session-tree repair evidence (2026-10-18)
+
+Root cause and reproduction:
+- `CliTaskEpisodeCleanupAdapter` treated every additional daemon session sharing the Episode worktree as foreign because its exact-session set contained only the bound root.
+- Read-only `prime-agent list --all --json` inventory for this Episode proved exactly six inactive direct RLM descendants. Every child carried the exact root `sessionId` and canonical `sessionFile` as its `parentSessionId` and `parentSessionPath`, plus the exact Episode worktree and idle action state.
+- The focused six-child regression failed before the repair with `Task Episode cleanup found a foreign or duplicate Prime Agent session identity` and passes after it.
+
+Implementation:
+- Kept `finalize_task_episode(taskId, episodeHead, outcome, confirmed)` unchanged as the cleanup-only stable host boundary.
+- Extended the existing daemon summary type with the Prime Agent session-tree and quiescence fields already returned by supported `list`/`get_state` operations.
+- Cleanup now derives ownership only from a complete, unique `parentSessionId` plus canonical `parentSessionPath` chain rooted at the exact bound Episode. Every owned node must retain complete session/file/worktree identity. Shared worktree, route, ID, or file fields never establish ownership and still block as foreign collisions.
+- The full tree is preflighted before mutation. Root and descendants must be inactive and have no streaming, compaction, bash/tool/child work, heartbeat/cron work, clients, unfinished or queued actions, draft/recovery/failure state, or identity drift.
+- Proven descendants are revalidated and deleted deepest-first through supported Prime Agent `kill` and `delete_saved_session` operations. The exact root is removed only after descendant absence is proven. Worktree, branch, and ownership-close ordering remains unchanged.
+- A partial descendant deletion leaves the durable cleanup head and ownership active. Exact same-head retry rebuilds the remaining tree and resumes without broadening to unrelated resources. No child registry, receipt, reconciliation engine, lifecycle state machine, manual file deletion, or Prime Agent source change was added.
+
+Focused evidence:
+- Cleanup regression group: 9 passed, including the six direct-child reproduction, nested deepest-first removal, busy descendant, foreign same-worktree session, partial parent ambiguity, partial deletion/retry, and exact absence.
+- Wider Episode lifecycle/ownership/finalization suites: 150 passed, 0 failed or cancelled. The multi-owner cleanup assertion preserves the other Conversation's complete ownership record byte-for-byte at the structured-record level.
+- Host policy checks: 15 passed, 5 environment-only cases skipped.
+- Docker Tier 1 source mode with offline RPC probe passed immutable-image launch, network absence, checks, teardown, and manifest publication at `.test-results/20261018T213417Z-24212-48fdabf2/tier1`. An immediately prior attempt stopped only in the isolated upstream source builder; the controlled retry used the identical clean Prime Agent source identity and passed.
+- Broad non-container baseline: 665 passed, 1 skipped, 65 deselected, and 75 subtests passed; only the four previously recorded unrelated topology/template/vendor-pin failures remained.
+- `git diff --check` passed.
+
+No live Episode cleanup, lifecycle transition, ownership closure, worktree/branch removal, global activation, protected-archive mutation, or Prime Agent source change occurred.
+
+## Step 11 independent-review repair (2026-10-18)
+
+Independent exact-commit review of `5f9273aa13ae032e22bf4fcf06933048b877557f` found one material quiescence defect. Prime Agent's list inventory reports `hasActiveHeartbeat`, `hasRegisteredHeartbeat`, and `hasRegisteredCronJob`, while routed `get_state` responses on the supported source revision omit those scheduler-registration fields. Replacing the list row with routed state could therefore classify a loaded session with scheduled work as idle.
+
+The accepted bounded repair preserves the fresh list row's three schedule flags while also requiring the routed `get_state` identity and quiescence checks. Deletion-time revalidation now obtains another exact list row, rejects duplicate or changed identity and any listed schedule work, then validates live state before supported kill/delete operations. This does not add lifecycle state or change descendant ownership.
+
+Regression coverage exercises all three list-only flags for both a routed root and a routed descendant while `get_state` deliberately omits them. Each case proves inspection is non-idle, runtime removal refuses before mutation, and the mutation log remains empty. The focused cleanup group passes 15 tests/subtests; the wider selected Node lifecycle/ownership/finalization suites pass 156 with no failures; related host policy checks pass 40 with 5 environment-only skips. `git diff --check` passes.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -2998,4 +3050,8 @@ Steps 1–10 are implemented. Step 10 replaces repository-singleton Episode owne
 The final approved repairs are complete. Execute/handoff can bootstrap only from a fully matching pre-upgrade direct ownership record when the owner tag is absent; registry form remains exact-tag-only. Normal admission and both automatic recovery task mutations use the same short cross-process admission lock, while slow pushes remain outside. Deterministic separate-process coverage proves both Blocked publication and clean rollback cannot interrupt another owner's status-commit-to-reservation boundary.
 
 Focused suites, the broad baseline apart from four documented unrelated failures, Docker Tier 1 with offline RPC probe, and `git diff --check` validate the candidate. The task remains `In Progress` for exact-candidate independent rereview and the owning Conversation's later lifecycle decision. No live transition, merge, abandonment, cleanup, user-global activation, protected-archive mutation, blocked-UAT-session contact, or Prime Agent source change occurred.
+
+Post-merge cleanup repair complete: `finalize_task_episode` retains its cleanup-only public boundary and now treats only the daemon-proven inactive, quiescent session tree rooted at the bound Episode as owned runtime. It deletes verified descendants deepest-first through supported Prime Agent operations, preserves all foreign/ambiguous/busy fail-closed guards, safely resumes same-head partial deletion, and leaves other Conversation-owned Episodes unchanged. The real six-descendant defect is reproduced by a red-before/green-after regression; focused lifecycle tests and Docker Tier 1 pass. No live cleanup was attempted.
+
+Independent review correction: routed `get_state` cannot erase list-reported active/registered heartbeat or cron evidence. Cleanup now preserves those roster flags at preflight and revalidates a fresh exact list row before deletion; routed-root and routed-descendant regressions cover all three supported scheduler flags and prove zero mutation.
 <!-- SECTION:FINAL_SUMMARY:END -->
