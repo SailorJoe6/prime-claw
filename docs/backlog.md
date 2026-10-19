@@ -449,8 +449,11 @@ uses supported native reads in one fail-closed sequence:
   `bd` version, Dolt database, and native `server` mode;
 - `bd config get dolt.auto-start --json`, `bd dolt show --json`, and
   `bd dolt status --json` distinguish a running bd-managed per-project server
-  from an explicitly operator-managed external server. Embedded, proxied,
-  machine-global shared, unreachable, or ambiguous server evidence blocks;
+  from an explicitly operator-managed external server. A bd-managed server's
+  reported data directory must be the selected store's exact real `.beads/dolt`
+  directory; foreign, symlinked, unreadable, or ambiguous path identity blocks.
+  Embedded, proxied, machine-global shared, unreachable, or ambiguous server
+  evidence also blocks;
 - read-only SQL through `bd` proves the exact database, active branch, 32-character
   Dolt revision, installed/server Dolt version parity, and an empty
   `dolt_status` working set. A dirty working set has no complete revision
@@ -459,10 +462,13 @@ uses supported native reads in one fail-closed sequence:
   one healthy Git-backed Dolt remote matching one repository Git remote.
   Direct `git ls-remote --refs` must expose exactly one `refs/dolt/data` ref;
   then a disposable isolated `dolt clone --ref refs/dolt/data` must report the
-  same native branch and revision as the live server. A final direct ref read
-  must equal the initial Git object ID so a concurrent publication cannot be
-  called ready. The Git object ID for the ref and the Dolt revision are retained
-  as different evidence; neither is mistaken for the other.
+  same native branch and revision as the live server. After that isolated proof,
+  the live native database, branch, revision, Dolt version, and clean
+  `dolt_status` working set are read again and must exactly match the initial
+  evidence. A final direct ref read must equal the initial Git object ID so
+  neither a concurrent live advance nor a concurrent publication can be called
+  ready. The Git object ID for the ref and the Dolt revision are retained as
+  different evidence; neither is mistaken for the other.
 
 The only direct `dolt` operations are executable version discovery and
 read-only inspection of the disposable remote clone. They never point at the

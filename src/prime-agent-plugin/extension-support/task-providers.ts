@@ -19,7 +19,7 @@
  * never live authority.
  */
 
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import {
@@ -784,6 +784,34 @@ export function prepareBeadsWorkspaceTransport(
       remediation: "Repair bd auto-start or run `bd dolt start`, then retry without starting a raw Dolt process",
     };
   }
+  if (!autoStartDisabled) {
+    const expectedDataDir = join(selected.storeDir, "dolt");
+    const reportedDataDir = (serverStatus.data_dir as string).trim();
+    let realStoreDir: string;
+    let realExpectedDataDir: string;
+    let realReportedDataDir: string;
+    try {
+      realStoreDir = realpathSync(selected.storeDir);
+      realExpectedDataDir = realpathSync(expectedDataDir);
+      realReportedDataDir = realpathSync(reportedDataDir);
+    } catch (error) {
+      return {
+        status: "blocked",
+        code: "server-unavailable",
+        detail: `bd-managed server data-directory identity is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        remediation: "Stop any foreign server, restore the selected store's real `.beads/dolt` directory through supported `bd dolt start`, and retry",
+      };
+    }
+    if (realStoreDir !== selected.storeDir || realExpectedDataDir !== expectedDataDir
+        || reportedDataDir !== expectedDataDir || realReportedDataDir !== realExpectedDataDir) {
+      return {
+        status: "blocked",
+        code: "server-unavailable",
+        detail: `bd-managed server data directory ${JSON.stringify(reportedDataDir)} is not the selected store's exact real per-project directory ${JSON.stringify(expectedDataDir)}`,
+        remediation: "Stop the foreign or symlinked server, restore the selected store's real `.beads/dolt` directory, and start it through supported `bd dolt start`",
+      };
+    }
+  }
 
   const doltVersionResult = runner.run("dolt", ["version"], { cwd: projectRoot, allowFailure: true });
   const installedDoltVersion = /^dolt version (\d+\.\d+\.\d+)\b/m.exec(doltVersionResult.stdout)?.[1] ?? null;
@@ -1012,6 +1040,64 @@ export function prepareBeadsWorkspaceTransport(
     }
   } finally {
     rmSync(proofRoot, { recursive: true, force: true });
+  }
+
+  const liveIdentityCommand = runner.run("bd", ["--readonly", "sql", "--json", identityQuery], { cwd: projectRoot, allowFailure: true });
+  let liveIdentityRows: unknown;
+  try {
+    liveIdentityRows = JSON.parse(liveIdentityCommand.stdout);
+  } catch (error) {
+    return {
+      status: "blocked",
+      code: "revision",
+      detail: `native Dolt identity recheck returned invalid JSON after isolated remote proof: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "Repair the selected server, then rerun preparation so the live database/branch/revision/version can be proved stable",
+    };
+  }
+  const liveIdentity = Array.isArray(liveIdentityRows) && liveIdentityRows.length === 1 ? liveIdentityRows[0] as JsonRecord : null;
+  const liveIdentityStable = liveIdentityCommand.status === 0 && liveIdentity !== null
+    && liveIdentity.database_name === identity.database_name
+    && liveIdentity.branch === branch && liveIdentity.revision === revision
+    && liveIdentity.dolt_version === installedDoltVersion;
+  const observedLiveRevision = liveIdentity && typeof liveIdentity.revision === "string"
+    ? liveIdentity.revision
+    : "unavailable";
+
+  const liveDirtyCommand = runner.run("bd", ["--readonly", "sql", "--json", dirtyQuery], { cwd: projectRoot, allowFailure: true });
+  let liveDirtyRows: unknown;
+  try {
+    liveDirtyRows = JSON.parse(liveDirtyCommand.stdout);
+  } catch (error) {
+    return {
+      status: "blocked",
+      code: "revision",
+      detail: `native Dolt working-set recheck returned invalid JSON after isolated remote proof: ${error instanceof Error ? error.message : String(error)}`,
+      remediation: "Repair the selected database until the read-only `dolt_status` query is available and stable",
+    };
+  }
+  if (liveDirtyCommand.status !== 0 || !Array.isArray(liveDirtyRows)) {
+    return {
+      status: "blocked",
+      code: "revision",
+      detail: `native Dolt working-set recheck is unavailable after isolated remote proof: ${commandFailure("bd --readonly sql dolt_status", liveDirtyCommand)}`,
+      remediation: "Repair the selected database until the read-only `dolt_status` query is available and stable",
+    };
+  }
+  if (liveDirtyRows.length !== 0) {
+    return {
+      status: "blocked",
+      code: "revision",
+      detail: `the selected Dolt working set became dirty during isolated remote proof with ${liveDirtyRows.length} uncommitted table change(s)`,
+      remediation: "Inspect `dolt_status`; after review, commit intended changes with `bd dolt commit -m <message>`. If the supported command rehydrates required config outside HEAD, upgrade or repair Beads before retrying; do not bypass the live server with raw Dolt",
+    };
+  }
+  if (!liveIdentityStable) {
+    return {
+      status: "blocked",
+      code: "revision",
+      detail: `the live native database/branch/revision/version changed or became unavailable during isolated remote proof; prior revision ${revision}, observed ${observedLiveRevision}`,
+      remediation: "Reconcile the live selected database with its configured remote through supported `bd dolt pull`/`bd dolt push`, then retry against one stable clean revision; never force automatically",
+    };
   }
 
   const publicationRecheck = runner.run("git", ["ls-remote", "--exit-code", "--refs", remoteName, BEADS_DOLT_DATA_REF], { cwd: projectRoot, allowFailure: true });

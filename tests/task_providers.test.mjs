@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -43,7 +43,7 @@ function writeRootConfig(root, extra = "") {
 
 function writeBeadsStore(root, { metadataOverrides = {}, configText = "# beads config\n" } = {}) {
   const dir = join(root, ".beads");
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(join(dir, "dolt"), { recursive: true });
   writeFileSync(join(dir, "config.yaml"), configText);
   writeFileSync(join(dir, "metadata.json"), JSON.stringify({
     database: "dolt", backend: "dolt", dolt_mode: "embedded", dolt_database: "fixture_db", ...metadataOverrides,
@@ -554,6 +554,33 @@ test("Beads workspace transport proves bd-managed server, native revision, remot
   assert.match(doltCalls[1].at(-1), /prime-claw-beads-remote-proof-/, "the raw clone target is disposable, not the live store");
   assert.notEqual(doltCalls[1].at(-1), storeDir);
   assert.equal(runner.calls.some((call) => call.join(" ").includes("issues.jsonl")), false, "JSONL is never authority");
+  assert.equal(runner.calls.filter((call) => call.join("\0") === ["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")).length, 2);
+  assert.equal(runner.calls.filter((call) => call.join("\0") === ["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")).length, 2);
+  assert.equal(runner.calls.filter(([command, subcommand]) => command === "git" && subcommand === "ls-remote").length, 2);
+});
+
+test("Beads workspace transport rejects foreign, symlinked, and ambiguous bd-managed data directories", () => {
+  for (const kind of ["foreign", "symlink", "ambiguous"]) {
+    const root = fixtureRoot();
+    const storeDir = writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+    const responses = beadsWorkspaceResponses(root);
+    const status = JSON.parse(responses["bd\0dolt\0status\0--json"].stdout);
+    if (kind === "foreign") {
+      status.data_dir = "/tmp/foreign-shared-dolt-data";
+    } else if (kind === "symlink") {
+      const alias = join(root, "dolt-data-alias");
+      symlinkSync(join(storeDir, "dolt"), alias, "dir");
+      status.data_dir = alias;
+    } else {
+      status.data_dir = `${join(storeDir, "dolt")}/.`;
+    }
+    responses["bd\0dolt\0status\0--json"] = { stdout: JSON.stringify(status) + "\n", stderr: "", status: 0 };
+    const result = prepareBeadsWorkspaceTransport(root, beadsTransportRunner(responses));
+    assert.equal(result.status, "blocked", kind);
+    assert.equal(result.code, "server-unavailable", kind);
+    assert.match(result.detail, /data-directory identity is unavailable|not the selected store's exact real per-project directory/, kind);
+    assert.match(result.remediation, /foreign|symlinked/, kind);
+  }
 });
 
 test("Beads workspace transport distinguishes an explicitly operator-managed server", () => {
@@ -664,6 +691,47 @@ test("Beads workspace transport refuses a refs/dolt/data race during isolated pr
   assert.match(result.detail, new RegExp(`${DOLT_DATA_HEAD}.*${"c".repeat(40)}`));
   assert.match(result.remediation, /bd dolt pull --remote origin/);
   assert.equal(publicationReads, 2);
+});
+
+test("Beads workspace transport refuses a live revision race during isolated proof", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const delegate = beadsTransportRunner(beadsWorkspaceResponses(root));
+  let remoteProofCompleted = false;
+  let identityReads = 0;
+  let workingSetReads = 0;
+  const runner = {
+    run(command, args, options = {}) {
+      if (command === "dolt" && args[0] === "sql" && args.at(-1) === DOLT_REMOTE_IDENTITY_QUERY) {
+        const result = delegate.run(command, args, options);
+        remoteProofCompleted = true;
+        return result;
+      }
+      if (command === "bd" && args.at(-1) === DOLT_IDENTITY_QUERY) {
+        identityReads += 1;
+        if (identityReads === 2) {
+          assert.equal(remoteProofCompleted, true, "the live identity recheck must follow isolated remote identity proof");
+          return { stdout: JSON.stringify([{
+            database_name: "fixture_db", branch: "main", revision: "c".repeat(32), dolt_version: "2.2.3",
+          }]) + "\n", stderr: "", status: 0 };
+        }
+      }
+      if (command === "bd" && args.at(-1) === DOLT_DIRTY_QUERY) {
+        workingSetReads += 1;
+        if (workingSetReads === 2) {
+          assert.equal(remoteProofCompleted, true, "the live working-set recheck must follow isolated remote identity proof");
+        }
+      }
+      return delegate.run(command, args, options);
+    },
+  };
+  const result = prepareBeadsWorkspaceTransport(root, runner);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "revision");
+  assert.match(result.detail, new RegExp(`${DOLT_REVISION}.*${"c".repeat(32)}`));
+  assert.match(result.remediation, /stable clean revision/);
+  assert.equal(identityReads, 2);
+  assert.equal(workingSetReads, 2);
 });
 
 
