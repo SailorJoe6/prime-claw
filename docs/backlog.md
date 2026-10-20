@@ -648,7 +648,39 @@ resources. Provider review/block results, failed recovery publication,
 ownership drift, or unreadable ownership fail closed with raw evidence preserved.
 
 This is only the direct internal admission/allocation seam. Reviewed-plan
-`/implement-task` and `create_task_episode` tool gating, managed execute-skill
-activation, and provider-aware Episode worktree routing remain deferred. No
-provider matrix, normalized task model, sidecar receipt, workspace-copy
-machinery, raw Dolt write, force, or automatic retry is introduced.
+`/implement-task` and `create_task_episode` tool gating and provider-aware
+Episode worktree routing remain deferred. No provider matrix, normalized task
+model, sidecar receipt, workspace-copy machinery, raw Dolt write, force, or
+automatic retry is introduced.
+
+The managed `execute` skill is now provider-aware without activating any new
+lifecycle path. It still selects the exact Conversation-keyed owner before task
+interpretation. Provider-absent and explicit Backlog version-2 owners retain the
+same exact task path, structured `backlog task view`/`backlog task edit`, status,
+plan, content, commit, and reporting contract. A Beads owner instead has no task
+path and binds the exact task ID, provider revision, complete raw task evidence,
+code base, worktree, branch, and Episode session identity.
+
+Beads execution runs from the recorded linked worktree. It synchronizes and
+reads the exact task natively with `bd show TASK-ID --json --long
+--include-comments`, requires native `in_progress`/canonical `In Progress` and
+meaningful raw `design`, and treats every raw task field as durable contract.
+The LLM compares the persisted and synchronized raw views field-for-field. An
+unrelated-task revision advance is allowed; every outside same-task difference
+is shown exactly and reasoned about. Compatible in-scope changes may become the
+working basis, while semantic, scope, or authority conflicts stop for
+Conversation review. No normalized model or deterministic semantic classifier
+is introduced.
+
+The Episode may update only owner-authored description, design, acceptance, or
+notes through supported `bd update` fields and never changes status or other
+provider/lifecycle metadata. It synchronizes and rereads immediately before the
+single intended write, proves the exact owner fields, expected provider-generated
+revision/timestamp changes, every other raw field, and clean native revision/ref
+state, then publishes once with `bd dolt push --no-adopt`. It does
+not retry, force, reset, adopt, overwrite, write raw Dolt SQL, or mutate the
+ownership registry. Candidate and blocker reports carry the exact persisted,
+pre-write, post-write, and published raw views plus the published revision/ref
+and code head so the owning Conversation can later advance the existing
+receipt. Admission activation, other lifecycle prompts, provider-aware
+allocation, migration, and receipt mutation remain deferred.

@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -56,6 +57,104 @@ def test_agent_execute_skill_uses_canonical_definition() -> None:
     assert (AGENT_SKILL / "SKILL.md").read_bytes() == EXECUTE_SKILL.read_bytes()
 
 
+def test_managed_execute_asset_is_reconciled_to_the_canonical_source() -> None:
+    source = EXECUTE_SKILL.read_bytes()
+    assert (AGENT_SKILL / "SKILL.md").read_bytes() == source
+
+    manifest = json.loads((ROOT / ".prime-claw" / "templates.json").read_text())
+    entry = manifest["assets"]["project-skill-execute"]
+    digest = hashlib.sha256(source).hexdigest()
+    assert entry == {
+        "source": "skills/project-templates/execute.md",
+        "destination": ".agents/skills/execute/SKILL.md",
+        "baselineSha256": digest,
+        "installedSha256": digest,
+        "acceptedOverrideSha256": None,
+        "availableUpstreamSha256": digest,
+        "state": "managed",
+        "provenance": {
+            "scope": "project",
+            "exposure": "discoverable",
+            "customization": "project-customizable",
+            "lifecycleTrigger": "project-reconcile",
+        },
+    }
+
+
+def test_task_native_execute_selects_only_the_persisted_provider() -> None:
+    text = " ".join(EXECUTE_SKILL.read_text().split())
+
+    for fragment in (
+        "Select its provider only from that exact record",
+        'A provider-absent record or `provider: "backlog"` must retain its exact `taskPath`',
+        'A `provider: "beads"` record must have no `taskPath`',
+        "exact non-empty `providerRevision`, complete raw `taskEvidence`, `baseRef`, worktree, branch, and Episode session identity",
+        "Any mixed or missing binding stops for ownership recovery",
+        "Do not redetect, replace, or infer it from repository files",
+        'Only `provider: "beads"` selects the Beads branch',
+        "Never mix commands, content, commits, or evidence between the two branches",
+    ):
+        assert fragment in text
+
+
+def test_beads_execute_preserves_raw_contract_and_guards_native_publication() -> None:
+    text = " ".join(EXECUTE_SKILL.read_text().split())
+    beads = text.split("### Beads task authority", 1)[1].split("## Retained folder-plan mode", 1)[0]
+
+    for fragment in (
+        "Run every Beads command from the exact recorded current linked worktree",
+        "bd dolt pull",
+        "bd show TASK-ID --json --long --include-comments",
+        "native status is exactly `in_progress` and maps to canonical `In Progress`",
+        "raw `design` is meaningful rather than blank or placeholder text",
+        "exact current Dolt database, branch, revision, publication ref, and a clean working set",
+        "description, design, acceptance criteria, notes, comments, labels, dependencies, and every other provider field",
+        "provider-native names, shapes, values, and absence",
+        "Compare the persisted raw `taskEvidence` with the synchronized raw view field for field",
+        "provider revision advance or unrelated-task change alone does not block",
+        "present the exact raw before and current values and reason about their meaning",
+        "compatible change that is inside the approved scope may become the new working basis",
+        "genuine semantic conflict, scope expansion, or authority change must be escalated without a write",
+        "Do not use a deterministic semantic classifier and never silently overwrite either view",
+        "`bd update TASK-ID` content fields: description, design, acceptance criteria, and notes",
+        "It must not change status, title, type, priority, assignee, parent, dependencies, labels, comments, metadata, task identity, or lifecycle fields",
+        "without `--status`, `--force`, raw Dolt SQL writes, or retry",
+        "only the exact provider-generated revision/timestamp changes caused by that write",
+        "every other raw task field unchanged, and a clean working set",
+        "bd dolt push --no-adopt",
+        "perform one native post-publication pull/read cycle",
+        "remote publication to contain the intended published revision",
+        "unrelated-task descendant may advance the final revision",
+        "Route any outside same-task change through the reconciliation rule above",
+        "not permission to pull again, retry, reset, force, adopt, or overwrite",
+        "exact persisted task view, synchronized pre-write view, post-write view, final published view",
+        "published provider revision/ref, code `HEAD`, and command failures",
+        "never mutates that receipt directly and never publishes lifecycle status",
+    ):
+        assert fragment in beads
+
+    for forbidden in ("backlog task view", "backlog task edit"):
+        assert forbidden not in beads.lower()
+
+
+def test_backlog_execute_branch_retains_its_structured_contract() -> None:
+    text = " ".join(EXECUTE_SKILL.read_text().split())
+    backlog = text.split("### Provider-absent or Backlog task authority", 1)[1].split("### Beads task authority", 1)[0]
+
+    for fragment in (
+        "Use the exact task ID and path selected above",
+        "backlog task view --json -- TASK-ID",
+        "returned canonical ID to match the bound ID",
+        "status to be exactly `In Progress`",
+        "supported `backlog task edit` operations",
+        "canonical ID, task path, parent identity, and lifecycle status are unchanged",
+        "single-purpose commit containing that exact task update",
+        "Leave its status unchanged",
+    ):
+        assert fragment in backlog
+    assert "bd " not in backlog
+
+
 def test_execute_skill_bootstraps_only_an_exact_pre_upgrade_direct_owner() -> None:
     text = " ".join(EXECUTE_SKILL.read_text().split())
 
@@ -81,7 +180,8 @@ def test_task_native_execute_binds_exact_task_and_preserves_status_authority() -
 
     for fragment in (
         "<operator-episode-task>",
-        "version-2 ownership record selects **task-native Episode mode** and binds its exact task ID and path",
+        "version-2 ownership record selects **task-native Episode mode** and binds its exact task ID",
+        'A provider-absent record or `provider: "backlog"` must retain its exact `taskPath`',
         "backlog task view --json -- TASK-ID",
         "returned canonical ID to match the bound ID",
         "status to be exactly `In Progress`",

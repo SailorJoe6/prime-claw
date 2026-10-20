@@ -40,10 +40,15 @@ version-1 Episode requires that record plus readable, non-empty active
 worktree; also accept the retained `EXECUTION_PLAN.md` spelling used by this
 project. If those active files are missing, stop for exact ownership recovery
 instead of switching modes. A valid version-2 ownership record selects
-**task-native Episode mode** and binds its exact task ID and path. If an
-`<operator-episode-task>` block is also present, require its entire trimmed
-value to match the persisted version-2 task ID. A prompt tag never overrides
-persisted ownership.
+**task-native Episode mode** and binds its exact task ID. Select its provider
+only from that exact record. A provider-absent record or `provider: "backlog"`
+must retain its exact `taskPath`; it must not carry Beads revision or task
+evidence. A `provider: "beads"` record must have no `taskPath` and must retain
+its exact non-empty `providerRevision`, complete raw `taskEvidence`, `baseRef`,
+worktree, branch, and Episode session identity. Any mixed or missing binding
+stops for ownership recovery. If an `<operator-episode-task>` block is also
+present, require its entire trimmed value to match the persisted version-2 task
+ID. A prompt tag never overrides persisted ownership.
 
 With no ownership, active legacy `SPECIFICATION.md` and
 `IMPLEMENTATION_PLAN.md` files on canonical main select valid old in-place
@@ -57,6 +62,15 @@ operator-provided legacy instructions. Never guess, search for, or substitute
 another task, mix the two modes, or copy content between their authorities.
 
 ## Task-native Episode mode
+
+Use the provider selected from the exact version-2 owner. Do not redetect,
+replace, or infer it from repository files. Do not use `.ralph/plans` as
+authority in this mode. A provider-absent record or `provider: "backlog"`
+continues through the Backlog branch below. Only `provider: "beads"` selects
+the Beads branch. Never mix commands, content, commits, or evidence between the
+two branches.
+
+### Provider-absent or Backlog task authority
 
 Use the exact task ID and path selected above. Do not use `.ralph/plans` as
 authority in this mode. Reload the exact task through the supported structured
@@ -109,6 +123,84 @@ Final Summary. Leave its status unchanged, commit the task with the implemented
 code and documentation in the same bounded slice, push the Episode branch, and
 report the exact candidate and evidence to the owning Conversation. Do not
 merge, mark `Ready for Merge` or `Done`, finalize ownership, or clean resources.
+
+### Beads task authority
+
+Use the exact task ID, raw task evidence, provider revision, code `baseRef`,
+worktree, branch, and Episode session identity selected above. Run every Beads
+command from the exact recorded current linked worktree. Do not use Backlog,
+edit task Markdown, copy a task store, redirect Beads, or write the ownership
+registry.
+
+Before interpreting or changing the task, perform one native synchronization
+and read cycle. Run the configured native pull and exact raw task read:
+
+```sh
+bd dolt pull
+bd show TASK-ID --json --long --include-comments
+```
+
+Require one raw task whose exact canonical ID equals the bound task ID, whose
+native status is exactly `in_progress` and maps to canonical `In Progress`, and
+whose raw `design` is meaningful rather than blank or placeholder text. Also
+require native evidence for the exact current Dolt database, branch, revision,
+publication ref, and a clean working set. If synchronization or any identity,
+status, design, revision, ref, worktree, or session proof fails, do not mutate
+anything. Report the exact provider evidence to the owning Conversation and
+stop.
+
+Treat the complete raw Beads view as the durable work contract: description,
+design, acceptance criteria, notes, comments, labels, dependencies, and every
+other provider field all retain their provider-native names, shapes, values,
+and absence. Do not translate them into a normalized task model. Compare the
+persisted raw `taskEvidence` with the synchronized raw view field for field.
+A provider revision advance or unrelated-task change alone does not block this
+Episode. For every outside change to the same task, present the exact raw before
+and current values and reason about their meaning. A compatible change that is
+inside the approved scope may become the new working basis. A genuine semantic
+conflict, scope expansion, or authority change must be escalated without a
+write. Do not use a deterministic semantic classifier and never silently
+overwrite either view.
+
+The Episode may change only owner-authored task content through supported
+`bd update TASK-ID` content fields: description, design, acceptance criteria,
+and notes. It must not change status, title, type, priority, assignee, parent,
+dependencies, labels, comments, metadata, task identity, or lifecycle fields.
+Immediately before any write, synchronize once more, reread the complete raw
+task, and repeat the same-task comparison. Apply at most the intended in-scope
+content update without `--status`, `--force`, raw Dolt SQL writes, or retry.
+Immediately after the write, reread the complete raw task and native revision,
+branch, ref, and working-set state. Require the exact intended owner-authored
+field changes, only the exact provider-generated revision/timestamp changes
+caused by that write, every other raw task field unchanged, and a clean working
+set.
+
+Publish the verified native task update exactly once and without force:
+
+```sh
+bd dolt push --no-adopt
+```
+
+After publication, perform one native post-publication pull/read cycle and
+capture the exact raw task plus revision/ref evidence again. Require the remote
+publication to contain the intended published revision, the published task to
+equal the verified post-write view, and the local working set to remain clean.
+An unrelated-task descendant may advance the final revision; report both exact
+revisions and require the same target-task view. Route any outside same-task
+change through the reconciliation rule above. A rejected or uncertain
+synchronization, update, or push is evidence, not permission to pull again,
+retry, reset, force, adopt, or overwrite. Preserve and report the exact raw
+state instead.
+
+On a candidate or blocker, keep the Beads design/notes and Episode code evidence
+current through the same guarded native flow. Commit and push only the approved
+Episode code-branch changes when appropriate. Report the exact persisted task
+view, synchronized pre-write view, post-write view, final published view,
+published provider revision/ref, code `HEAD`, and command failures to the owning
+Conversation so it can later advance the existing ownership receipt. The
+Episode never mutates that receipt directly and never publishes lifecycle
+status. The Conversation alone decides status, merge, abandonment,
+finalization, and cleanup.
 
 ## Retained folder-plan mode
 
