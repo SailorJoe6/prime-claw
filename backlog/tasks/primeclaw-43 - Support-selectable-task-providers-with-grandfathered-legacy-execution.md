@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 18:05'
+updated_date: '2026-10-20 18:07'
 labels: []
 dependencies: []
 references:
@@ -940,6 +940,14 @@ A fresh disposable Beads 1.3.1 production `createTaskEpisode` UAT passed the rep
 The two exact tracked-drift recovery repros pass: after published In Progress but before reservation, tracked drift produces exactly one verified In Planning rollback, zero reservation/owner/resources, and no Git mutation; after reservation plus allocation failure, tracked drift still produces exactly one Blocked publication and advances only the exact same provider-native owner evidence while preserving provider/task/owner/status/base/resource fields. The raw same-task drift repro passes with a >1000-character meaningful replacement design: zero reservation, both complete untruncated published/live raw views (including the live tail marker) are surfaced without field classification, the target rolls back exactly once, and a concurrent unrelated native task revision/comment remains byte-for-byte preserved.
 
 Fresh Beads 1.3.1 production UAT also passes the new pre-reservation raw equality proof and active allocation, with exact native revision `fd3pl61m8kcnkn8qjnbn1sc783bfc7l5`, raw design, code base/head `d51f526f2878bc62a452de9721ae39038248dca2`, empty native working set, empty tracked Git state, and exact upstream equality; its server and fixture were removed. Scope stayed exact: Git safety proof remains at initial admission and immediately before reservation only; recovery requires exact provider/task/status plus unchanged ownership and captured base where present, and never retries or mutates code/base/resources. Managed `/implement-task`, `create_task_episode` gating, execute activation, and provider-aware worktree routing remain deferred. No workspace copy, classifier, normalized model, lock/state/framework/receipt/sidecar/version 3, force/raw Dolt, lifecycle expansion, migration, legacy, cleanup, or PRIMECLAW-43.1 was added.
+
+2026-10-20 Conversation ACCEPTED repaired direct internal Beads admission/allocation head `4c556b296fc965244982655edce36c98a7117e93`, including `38a982ce880b0a893d24db0f575139a76df2b3fe`. Preserve it unchanged. Parent verified exact owner/task, clean pushed remote-equal ancestry, `git diff --check`, both recovery repairs, complete raw pre-reservation comparison with untruncated evidence, unrelated-task preservation, and direct 14/14.
+
+Advance only one bounded prerequisite slice: native Beads provider discovery/resolution from one exact registered Git linked worktree. Use supported provider-native behavior first. Run/read `bd context --json` from the linked worktree and ordinary safe Git common-directory/worktree evidence to prove Beads auto-discovers the canonical primary repository's existing authority. Require exact canonical linked-worktree cwd/repository root; exact primary repository root derived from safe Git metadata; exact context schema/backend/worktree/redirect identity; the exact real primary `.beads` directory; and the same readable, real, non-symlink, contained `metadata.json`/`config.yaml`, database/server/no-db/capability evidence already required for primary detection. Only after that proof may native `bd show`/`bd statuses` run from the linked worktree against the one proven store. Missing, foreign, ambiguous, or mismatched context must block before task mutation with exact remediation.
+
+Preserve primary-checkout Beads detection and every Backlog branch byte-for-byte. Add one direct helper/branch only. Do not add a provider framework, registry, universal workspace model, copied/symlinked/initialized store, redirect file, environment override, persisted state, or workspace cleanup. Prove the slice with bounded real disposable Git-worktree plus Beads 1.3.1 read-only context/task-resolution coverage and representative forged, foreign, and missing context failures; no Cartesian matrix.
+
+Keep reviewed-plan `/implement-task` and `create_task_episode` tool gating, managed execute skill, admission activation, handoff/oversight/finalization/cleanup, legacy/migration/cutover, PRIMECLAW-43.1, and version 3/sidecar/receipt deferred. Run focused/full host and Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1002,4 +1010,6 @@ Implemented only direct Beads task Episode admission/allocation through existing
 Revision requested for `38a982ce880b0a893d24db0f575139a76df2b3fe`: remove fresh-admission Git cleanliness/upstream checks only from both deterministic recovery branches, and require exact full raw target-task equality between published In Progress evidence and the pre-reservation re-read. Add tracked-drift rollback/Blocked regressions plus raw same-task drift rollback. Preserve all other behavior and keep managed-tool/worktree routing deferred.
 
 Repaired direct internal Beads admission candidate `38a982ce880b0a893d24db0f575139a76df2b3fe`: recovery no longer reapplies fresh-admission Git operation/clean/head/upstream checks and instead proves exact provider/task/status plus unchanged owner/base before its sole rollback or Blocked evidence advance. Before reservation, the complete live target `nativeView` must exactly equal published raw evidence; drift reserves nothing, surfaces both full raw views, preserves unrelated advances, and rolls back once. Direct 14/14, focused 133/133, full Node 384/384, real Beads 1.3.1 UAT, and Docker tier 1 pass.
+
+Accepted direct internal Beads admission through `4c556b296fc965244982655edce36c98a7117e93`. Next bounded slice: prove native Beads discovery/resolution from one exact registered Git linked worktree using `bd context --json`, safe Git common-directory metadata, and the existing primary-store evidence; preserve primary and Backlog behavior, block mismatches before mutation, test with real disposable Beads 1.3.1 worktree coverage, and keep managed routing/lifecycle deferred.
 <!-- SECTION:FINAL_SUMMARY:END -->
