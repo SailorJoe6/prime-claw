@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-10.40
-title: Remove untraceable Episode cleanup machinery
+title: Make task-native Episode cleanup complete and owner-safe
 status: In Design
 assignee: []
 created_date: '2026-10-20 04:32'
+updated_date: '2026-10-20 14:55'
 labels: []
 dependencies: []
 references:
@@ -21,32 +22,45 @@ ordinal: 127000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 ## Outcome
 
-Remove the custom task-Episode cleanup protocol that was not directly required by the operator. Cleanup must perform the smallest supported provider-native deletion after explicit operator approval, delete only the exact completed Episode, and preserve every unrelated Episode.
+Keep `finalize_task_episode` as the version-2 task-native cleanup boundary, but make it complete, owner-safe, and direct. After an operator-authorized merge or abandonment is committed and pushed and the owning Conversation verifies the terminal result, cleanup continues automatically without a second cleanup confirmation.
+
+Cleanup removes all and only the resources created for that exact owned Episode. It must not alter another Conversation, another Episode, or any unrelated session or Git resource.
+
+## Exact owned resources
+
+The cleanup boundary contains:
+
+- the exact Prime Agent Episode session recorded when the owning Conversation created it;
+- every recursive child session connected to that Episode by a clear Prime Agent parent-child chain, where each edge is explicit through either `parentSessionId` or the canonical parent session-file path;
+- the exact provider-managed worktree;
+- the exact local Episode branch and its exact upstream remote branch; and
+- that Conversation's exact ownership-registry entry.
+
+A shared worktree is not session ownership. Do not search for, infer, or delete possible sibling sessions. Sessions outside the explicit descendant tree are out of scope.
 
 ## Required behavior
 
-- Bind cleanup to this Conversation's exact active ownership record and the operator-confirmed task.
-- Before deletion, require the task's truthful terminal outcome and an exact clean pushed Episode candidate that is merged for a merged outcome or excluded for an abandoned outcome.
-- Use the owning provider's supported worktree-removal operation. For Orca, use its supported force option after the exact target is proven clean so initialized submodules do not block deletion.
-- Remove the exact target worktree and local branch, then close only its ownership record.
-- Leave unrelated ownership records, sessions, worktrees, and branches unchanged.
-- Complete the currently partial PRIMECLAW-10.38 cleanup whose session is already absent and whose exact clean worktree and branch remain at `0106fe790f3c2b00617f32245930e41e9006f8bd`.
+- Merge readiness must establish that the Episode and its proven descendants have completed their work and are idle. Cleanup rechecks this. If any owned session is active, cleanup performs no destructive mutation and reports that the Episode has not completed its work.
+- Verify the truthful terminal merge or abandonment state, the exact terminal Episode head, and a clean exact worktree before deleting resources.
+- Remove the explicit owned session tree through supported Prime Agent operations.
+- Remove the worktree through the owning provider's supported operation. For Orca, use its supported force option after the exact worktree is proven clean so initialized submodules do not block cleanup.
+- Delete both the exact local branch and its exact upstream remote branch only while they still identify the terminal Episode head.
+- Delete the exact ownership entry only after every owned runtime and Git resource is absent. Do not retain an inactive record or tombstone.
+- If cleanup is interrupted or a provider operation fails, re-read the ordinary ownership record and actual Prime Agent, provider, and Git state, then keep making safe progress. Already absent exact resources count as cleaned. Retry recoverable operations and ask the operator for help only when safe autonomous progress is no longer possible.
+- Do not persist `cleanupHead`, a cleanup stage, or another cleanup-progress marker. Do not replace them with a receipt, registry, replay engine, coordinator, or background reconciliation protocol.
 
-## Remove
+## Scope and non-goals
 
-Delete the unrequired `cleanupHead`, custom staged runtime/worktree/branch state machine, descendant session-tree ownership algorithm, cleanup replay protocol, immediate post-step settlement checks, and cleanup heartbeat/reconciliation behavior. Prime Agent and Orca own their ordinary session and worktree lifecycle. Do not replace the removed machinery with another coordinator, receipt, registry, retry engine, or background monitor.
-
-## Traceability rule
-
-Every retained or new cleanup behavior must cite one of the required behaviors above. If it cannot, remove it.
+This task changes only version-2 task-native cleanup. It does not change version-1 `finalize_spec_episode` behavior. Unifying the duplicated legacy `*spec*` and task-native `*task*` command surfaces is separate future work. Prime Agent remains an upstream dependency.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After explicit cleanup approval, one exact clean and terminal task Episode is removed through supported provider-native operations; initialized submodules do not block an Orca cleanup.
-- [ ] #2 Cleanup selects only the current Conversation owner and exact task/worktree identity, refuses a dirty, nonterminal, unpushed, unmerged-for-merge, or mismatched target, and leaves unrelated Episode resources unchanged.
-- [ ] #3 The exact target worktree and local branch are absent and only its ownership record is closed after provider-native removal succeeds.
-- [ ] #4 `cleanupHead`, the custom multi-stage cleanup state machine, descendant session-tree deletion/validation, cleanup replay/settlement logic, and cleanup heartbeats are removed rather than replaced.
-- [ ] #5 Focused tests prove the direct success path and the minimum refusal cases without receipts, registries, staged recovery, or background coordination.
-- [ ] #6 Living finalization documentation states the direct requirement-to-behavior mapping and no longer describes the deleted protocol.
+- [ ] #1 After an operator-authorized merge or abandonment is committed and pushed and its terminal result is verified, task-native Episode cleanup runs without requiring a second cleanup confirmation.
+- [ ] #2 Before destructive cleanup, the exact root Episode and every explicitly related descendant are idle. Any active owned session causes zero destructive mutation and a clear report that the Episode has not completed its work.
+- [ ] #3 Cleanup recursively selects only sessions connected to the exact Episode by explicit Prime Agent parent ID or canonical parent session-file path edges; shared-worktree sessions, possible siblings, and unrelated sessions are never selected.
+- [ ] #4 Cleanup removes the exact owned session tree, provider worktree, local branch, exact upstream remote branch, and ownership entry. Initialized submodules do not block removal of a proven-clean Orca worktree, and unrelated ownership records and resources remain unchanged.
+- [ ] #5 Terminal outcome, exact terminal head, clean worktree, branch identity, and remote identity are verified before deletion; dirty, changed, ambiguous, foreign, or mismatched evidence blocks unsafe mutation.
+- [ ] #6 After partial or transient failure, cleanup re-reads ordinary ownership plus actual Prime Agent, provider, and Git state and continues safe remaining work. It stores no `cleanupHead`, cleanup stage, tombstone, receipt, or background reconciliation state and asks for help only when safe autonomous progress is impossible.
+- [ ] #7 Focused tests and living finalization documentation prove the direct version-2 behavior while version-1 `finalize_spec_episode` remains unchanged; command-surface unification remains out of scope.
 <!-- AC:END -->
