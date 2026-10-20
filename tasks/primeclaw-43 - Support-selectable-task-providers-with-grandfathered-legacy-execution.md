@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 21:26'
+updated_date: '2026-10-20 21:50'
 labels: []
 dependencies: []
 references:
@@ -14,11 +14,26 @@ references:
   - 'https://www.dolthub.com/docs/concepts/dolt/git/remotes/'
 documentation:
   - docs/backlog.md
+  - docs/handoff-chain.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/traceability.md
 modified_files:
-  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
-  - src/prime-agent-plugin/extension-support/task-providers.ts
-  - tests/task_episode_ownership_extension.test.mjs
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - .prime-claw/workflows/handoff.md
+  - .prime-claw/templates.json
+  - tests/spec_episode_extension.test.mjs
+  - tests/reviewed_plan_extension.test.mjs
+  - tests/test_handoff_chain_extension.py
+  - tests/test_oversee_episode_skill.py
   - docs/backlog.md
+  - docs/handoff-chain.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/traceability.md
 priority: p1
 type: epic
 ordinal: 125000
@@ -1087,6 +1102,16 @@ Select the exact requesting owner first. Require its active version-2 `provider:
 On exact receipt-matching continuation, reuse the existing canonical handoff plus its sole queued execute follow-up on the exact same Episode/resources and preserve one-handoff/one-execute ordering. Uncertain transport remains no-retry. Update only required handoff/oversight managed guidance, focused tests/docs, and ordinary asset reconciliation needed to expose unchanged-task Beads continuation. Public acceptance/receipt advancement for newly reviewed same-task content remains explicitly deferred; do not add another tool, parameter, protocol, authority, schema, state, framework, sidecar, version 3, classifier, retry, force, or raw Dolt write.
 
 Do not activate Blocked/resume/status, ReadyForMerge/Done, terminal/finalization/cleanup, planning/design UX, legacy transition/inventory/migration/cutover, or PRIMECLAW-43.1. Add representative actual registered-tool success proving exact one-handoff/one-execute order and unchanged resources/evidence advance, raw mismatch zero delivery, and foreign/busy/dirty failure; do not build a Cartesian matrix. Run focused/full host, Docker tier 1, and native UAT where practical; push one clean candidate, notify the owner, and stop for review.
+
+Implemented the bounded active-Beads branch inside existing `handoff_task_episode(taskId, guidance?)` on handoff baseline `5e7b052`. Exact owner selection and public signature remain unchanged. Provider-absent/Backlog still follows its existing committed task-path/status/plan branch. An active provider-specific Beads owner now requires persisted `in_progress` evidence with meaningful raw design, the existing clean worktree/resource/durable-session/quiescence preflight, and then calls accepted `advancePublishedBeadsTaskEpisodeEvidence` with only the owner's persisted provider revision/raw task evidence plus current Episode code HEAD. Review-required raw/publication mismatch returns exact evidence with explicit no-delivery result. A successful advance is checked to differ only in the accepted four receipt fields, receives a second full resource/quiescence proof, and uses the same canonical one-handoff/sole-execute delivery. Guidance is absent from advancement input. Registered-tool success and registered-tool mismatch regressions cover exact ordering, unchanged resources, evidence/head advance, raw mismatch zero delivery, and foreign/busy/dirty failures. Focused Node spec/reviewed-plan tests pass 119/119. Updated managed tool guidance, oversight guidance, handoff workflow source/project asset, user story, traceability, and architecture docs; reconciled the managed project handoff asset hash. Newly reviewed same-task content acceptance and all Beads lifecycle/status/terminal/cleanup boundaries remain deferred.
+
+Real native active-Beads handoff UAT PASS with Beads 1.3.1/Dolt 2.5.0. A disposable canonical primary `main` project and linked Episode worktree published exact target `UAT-handoff` at reviewed provider revision `4qksn9bp5i1cehsc58i55g5o7oc2cphu`; the code owner retained main base `2f7a2541fe9e74e1073f48f43e15f26c59d420a4`, while the clean pushed Episode candidate was `039873f01239e36c3c75b7f1ecb94ac6016fba2e`. A supported native create/push then advanced only an unrelated task to published descendant `igbim1av9k09usfoiitqa9k15rb1k8ir`. The production `handoffTaskEpisode` branch used its real provider detection, linked-worktree raw read, two native transport/publication proofs, ancestry proof, Git local/upstream/direct-remote proof, and atomic registry update. It advanced the target owner to the descendant provider revision and current Episode head with raw target evidence unchanged, preserved every resource identity field, then emitted exactly one canonical handoff carrying bounded guidance and the sole execute follow-up without guidance. The disposable Dolt server stopped cleanly and all resources were removed; the live registry was untouched.
+
+Full-host validation for the active-Beads handoff slice: Node passes 399/399, including actual registered-tool success, registered mismatch/no-delivery, foreign/busy/dirty rejection, the accepted paired evidence primitive, and all preserved Backlog/version-1 lifecycle tests. Python passes 676 with 69 skips and 75 subtests; the same four independently proven pre-existing failures remain unchanged (runtime-connect host-safe marker, unbridged admission Node suite, project-skill-design manifest/source hash mismatch, and local managed Backlog source-pin mismatch). This slice changes none of those surfaces. Focused lifecycle/reviewed-plan tests pass 119/119; broader focused Node asset/lifecycle tests pass 165/165; managed-guidance static tests pass 13/13; real native active-Beads handoff UAT remains green.
+
+Correction to the immediately preceding full-host note: the authoritative full Node result is 402/402 passed (not 399/399), zero failures, duration 357549 ms. All other evidence in that note is unchanged.
+
+Docker tier 1/offline RPC PASS for the active-Beads handoff slice: immutable image launched, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261020T214838Z-11098-d63484bd/tier1`. Final evidence: focused lifecycle/reviewed-plan 119/119; broader focused Node 165/165; managed-guidance static 13/13; real Beads 1.3.1/Dolt 2.5.0 unchanged-target/unrelated-descendant handoff UAT PASS; full Node 402/402; full Python 676 passed/69 skipped/75 subtests plus the same four unrelated baselines; Docker tier 1 PASS; diff check PASS; managed handoff source/project bytes and manifest hashes exact.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1175,4 +1200,6 @@ Candidate `4379335df13be2887667dd7f6fd19aa9b88c90b6` requires one narrow revisio
 Publication/read pairing repair completed on accepted evidence candidate `4379335df13be2887667dd7f6fd19aa9b88c90b6` and handoff `cb0c3db41486095e65ec4dda4a99f4277e5eca0b`. The internal, still-uncalled same-owner Beads evidence-advancement primitive retains its original full native transport/publication proof, exact raw long task read, raw mismatch ordering, provider ancestry, Git/owner/collision proof, and four-field atomic mutation. It now obtains a separate fresh production transport/publication proof immediately after the raw read rather than reusing the injectable initial proof. Only an exact same project/database/branch/remote/ref/clean published revision pair can reach ancestry or ownership mutation. A provider advance, dirty working set, transport/ref drift, or unavailable pairing proof returns managed `provider-evidence-mismatch` with complete accepted/current raw task evidence, last published revision, exact observed native revision when identity was available, and bounded proof detail; it performs no owner write. Every post-identity blocked transport result now carries its observed revision. An unrelated descendant already clean and published before the paired read remains accepted when the complete target raw view is unchanged; no preselected reviewed revision must remain current. One representative interleaving regression proves advance+dirty evidence, independent fresh proof, zero atomic-store entry, and unchanged exact/unrelated owners. No mutation/transport retry, loop, lock, classifier, field/table diff, registry, mutable state, framework, schema/version 3, sidecar, redesign, public caller, extension route, task/provider mutation, admission, handoff, status, terminal, finalization, cleanup, Backlog/version-1, or live-registry behavior changed.
 
 Accepted evidence foundation `029c2a388550adc4617a30baa92bc581e461bf17`. Next slice only: extend existing `handoff_task_episode(taskId, guidance?)` with one exact-owner-first active-Beads unchanged-task branch. Reuse persisted evidence plus `advancePublishedBeadsTaskEpisodeEvidence`; mismatch returns raw review evidence and delivers nothing. Valid clean/idle/pushed continuation reuses the same canonical handoff and sole execute follow-up on unchanged resources. Keep public signature, Backlog/version1 behavior, all lifecycle boundaries, and newly reviewed same-task-content acceptance deferred.
+
+Active-Beads continuation is now available through the existing `handoff_task_episode(taskId, guidance?)` tool without a new public surface. The function still selects the exact requesting owner and preserves the entire provider-absent/Backlog branch. For an active `provider: "beads"` owner it requires persisted `in_progress` raw evidence with meaningful design, a clean recorded worktree, canonical-primary top-level Conversation context, exact worktree/branch/session/optional Orca identity, and the existing complete idle/quiescent preflight before advancing evidence. It passes only the owner's persisted `providerRevision`/complete raw `taskEvidence` and current Episode code head to accepted `advancePublishedBeadsTaskEpisodeEvidence`; guidance is not included. The accepted primitive proves the current code head clean and pushed, pairs fresh clean native publication proof after the raw read, admits an unrelated published descendant only when the target raw view is unchanged, and performs the existing four-field atomic update. The route rejects any returned resource drift or unexpected receipt. A task/publication mismatch returns exact managed-review evidence with explicit `handoffDelivery: "none"`/`executeDelivery: "none"`. Valid advancement receives a second resource/quiescence proof and reuses the existing canonical delivery exactly once: one task/owner-bound handoff prompt and its sole execute follow-up on the same Episode/resources. Registered-tool tests cover success/order/resource preservation, raw mismatch/no-delivery, and foreign/busy/dirty failures. Managed tool, oversight, and handoff guidance plus architecture/user-story/traceability docs describe the provider boundary; the exact project handoff asset was normally reconciled. Public acceptance/receipt advancement for newly reviewed same-task content remains deferred. No public signature/tool/parameter/protocol, classifier, retry, force/raw Dolt write, provider task mutation, lifecycle/status, blocked/resume, terminal/finalization/cleanup, planning/design, migration/cutover, version-3 state, or PRIMECLAW-43.1 behavior was added.
 <!-- SECTION:FINAL_SUMMARY:END -->
