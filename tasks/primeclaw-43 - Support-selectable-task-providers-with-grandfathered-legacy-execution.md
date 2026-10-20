@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 05:08'
+updated_date: '2026-10-20 13:09'
 labels: []
 dependencies: []
 references:
@@ -683,6 +683,14 @@ Exact unblock requires one explicit reviewed product decision before another exe
 - relax the absolute guarantee so a foreign descendant detected after commit/push may be retained/published with exact evidence and managed reconciliation.
 
 Do not retry the same proof-then-command sequence: it can narrow but never close the race. PRIMECLAW-43 remains exactly In Progress on the Episode branch; the owning Conversation decides whether to publish Blocked on main or obtain an operator scope decision.
+
+2026-10-20 Conversation correction: the atomicity blocker recorded at `851b5f6c31209237c0a1bc754eff76b34ad9d060` is rejected as an overengineered invariant, not an implementation blocker. Canonical main restored PRIMECLAW-43 to In Progress at pushed remote-equal `b6c962601e928a625d67b93c4f3ed86c30c9b8b6`. Resume from this clean Episode checkpoint; accepted foundation `c691ae297e8ce0bd506948c2ab1f949b67f7abf3` remains unchanged. No new operator product decision is needed.
+
+Apply the task's actual concurrency contract. Unrelated task advances must not block. Concurrent same-task changes must be detected and returned with exact provider-native revision/task/diff evidence for managed reconciliation. Only force, silent overwrite, and false exact-success claims are forbidden. There is no requirement to atomically publish only one preselected local Dolt revision.
+
+Continue exactly the first bounded Beads native task mutation/publication slice. Use supported native synchronization/read, guarded mutation, supported commit, and non-force push. Immediately after push, compare exact native revision, task views, and provider-native diff evidence. If a concurrent descendant was published, preserve it: treat proven unrelated task changes as compatible and report success with exact final evidence; return same-task mismatch as reconciliation-required with exact evidence, without rollback, force, overwrite, or a false exact-success claim.
+
+Do not add maintenance locking, exact-revision publication emulation, raw live-store Dolt access, automatic semantic reconciliation, lifecycle/admission/finalization/cleanup wiring, ownership/receipt schema or state, provider-neutral UX, frameworks, coordinators, mirrors, registries, migration/cutover, legacy transition, or PRIMECLAW-43.1. Reuse only the minimum prior investigated code that satisfies this corrected contract. Add focused representative Beads 1.3.1/native fixtures and relevant docs/task evidence, run focused/full host and Docker tier 1, keep PRIMECLAW-43 exactly In Progress, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
