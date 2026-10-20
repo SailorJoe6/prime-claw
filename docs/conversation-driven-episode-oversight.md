@@ -13,39 +13,48 @@ abandonment, destructive cleanup, and any future remote transport. The
 Conversation may review evidence, accept an in-scope candidate, record a bounded
 revision, pause, or consult the operator. It does not implement Episode work.
 A retained version-1 Episode implements only its promoted specification and
-execution plan. A version-2 Episode implements only its exact Backlog task,
-whose supported specification, plan, execution, and outcome fields replace the
-folder authority without changing role authority. Persisted ownership decides
-the mode before prompt tags: version 1 selects folder authority and version 2
-selects task authority. A live version-1 Episode additionally requires readable,
-non-empty active specification and implementation-plan files in its recorded
-worktree. With no ownership, equivalent files on canonical main remain valid
-old in-place legacy work but do not create Episode identity.
+execution plan. A version-2 Episode implements only the exact provider-native
+task selected by its owner record. Provider-absent or `provider: "backlog"`
+retains the canonical ID, project-relative task path, and supported Backlog
+contract. `provider: "beads"` instead has no task path and binds the canonical
+ID, published provider revision, complete raw task evidence, code base, and
+Episode identity. Persisted ownership decides the mode and provider before
+prompt tags; no universal normalized task replaces either native contract. A
+live version-1 Episode additionally requires readable, non-empty active
+specification and implementation-plan files in its recorded worktree. With no
+ownership, equivalent files on canonical main remain valid old in-place legacy
+work but do not create Episode identity.
 
 ## Planning and implementation admission
 
 ### Primary task-native path
 
 Use `/plan TASK-ID` or `plan_task({"taskId":"TASK-ID"})` to plan one exact
-`In Design` or `In Planning` task. The compact-first chain writes the native
-Implementation Plan, retains or publishes `In Planning`, and stops for separate
-operator approval without creating implementation resources.
+Backlog `In Design` or `In Planning` task. Planning remains Backlog-only. The
+compact-first chain writes the native Implementation Plan, retains or publishes
+`In Planning`, and stops for separate operator approval without creating
+implementation resources.
 
 After approval, use `/implement-task TASK-ID`. Before either workflow message,
-it resolves the exact `In Planning` task and one exact ready local Orca setup,
-or uses direct local fallback only when the production Orca command is absent
-and no explicit setup was requested. Cancellation, ambiguity, zero ready setups,
+it resolves one exact selected live provider and one exact ready local Orca
+setup, or uses direct local fallback only when the production Orca command is
+absent and no explicit setup was requested. Backlog keeps its ID/path and
+structured task contract. Beads uses its exact canonical ID, raw native design
+and task view, `in_planning` status, and project root without inventing a path or
+normalized task. Cancellation, ambiguity, provider drift, zero ready setups,
 remote selection, malformed or negative inventory, and other inventory failures
 grant no approval and queue no workflow. Placement performs no task, Git,
 ownership, or resource mutation.
 
 After both messages are admitted, the ephemeral approval binds the owner
-session, canonical task ID/path and project root, and exact placement. The first
-phase boundary exposes it to the semantic turn; one exact consume removes it. A
-completed phase without creation, session start, or shutdown clears it. The
-complete ordinary `prime-claw-oversee-episode` guidance precedes task semantic
-readiness. `create_task_episode` then consumes this approval exactly once;
-callers cannot override its placement or resource identity.
+session, provider, canonical task ID and project root, exact placement, and a
+task path only for Backlog. The first phase boundary exposes it to the semantic
+turn; one exact consume removes it. A completed phase without creation, session
+start, or shutdown clears it. The complete ordinary
+`prime-claw-oversee-episode` guidance precedes provider-native semantic
+readiness. `create_task_episode` then re-resolves provider evidence and consumes
+this approval exactly once; callers cannot override its placement or resource
+identity.
 
 ### Retained version-1 compatibility path
 
@@ -89,9 +98,11 @@ record remains valid migration input and is converted on the next mutation:
 
 Each entry uses one of two strict, disjoint schemas:
 
-- primary version 2 binds the owner Conversation, canonical Backlog task ID and
-  project-relative path, project root, exact task-only `In Progress` `baseRef`,
-  and placement;
+- primary version 2 binds the owner Conversation and one provider-native task:
+  provider-absent/Backlog retains canonical ID and project-relative path, while
+  Beads retains canonical ID with no path plus published provider revision and
+  complete raw task evidence; both retain project root, exact `baseRef`, and
+  placement;
 - retained version-1 compatibility binds the owner Conversation, approved
   future-folder location and slug, and a digest of the exact bundle bytes; and
 - both bind the creation operation and engine, selected Orca setup and routing
@@ -273,14 +284,21 @@ one post hook for one saved compaction. The guide references
 
 ## Supervision and continuation
 
-The Conversation selects the authority mode from exact ownership before it
-reviews a report. Version 1 retains its approved specification/plan folder.
-Version 2 binds the exact Backlog task ID/path in main and the Episode worktree;
-the task's supported fields are the sole durable contract, `.ralph/plans` is not
-consulted, and the Conversation never copies or mirrors Episode-owned task
-content. It checks the exact candidate, tree, diff, tests, documentation,
-durable authority, chronology, and push state, then chooses one bounded
-disposition from the managed oversight skill. Retained version-1 compatibility folder Episodes use
+The Conversation selects the authority mode and provider from exact ownership
+before it reviews a report. Version 1 retains its approved specification/plan
+folder. Provider-absent/Backlog version 2 binds the exact task ID/path in main
+and the Episode worktree and keeps its supported fields as the sole durable
+contract. Beads version 2 has no task path: review binds the persisted raw task,
+provider revision and publication ref, code base/head, and exact Episode
+identity, then compares synchronized exact raw task reads from the correct
+contexts. Unrelated-task revision descendants alone do not block. Compatible
+same-task clarifications and living-plan changes require LLM judgment over exact
+before/current fields; genuine semantic conflicts, authority changes, scope
+expansion, and product decisions are escalated. Neither provider consults
+`.ralph/plans` or becomes a normalized task model. The Conversation checks the
+exact candidate, tree, diff, tests, documentation, durable authority, chronology,
+and push state, then chooses one bounded disposition from the managed oversight
+skill. Retained version-1 compatibility folder Episodes use
 `handoff_spec_episode` for the exact idle owner record. Handoff resolves strict
 source-location syntax and exact persisted ownership before consulting bundle
 storage, so the obsolete promoted future folder may be absent after merge. The
@@ -290,13 +308,20 @@ through. The tool admits ordinary canonical handoff and queues canonical
 execute as its sole follow-up. Admission is not completion and uncertain
 transport is never retried blindly.
 
-Version-2 blocker and resume publication are prompt-led Conversation work. After accepting an exact pushed blocker report, the Conversation runs supported `backlog task edit` on canonical main, verifies the bound ID/path and a one-path diff, commits only that task as `Blocked`, and pushes. After the operator accepts the unblock condition, it performs the same exact-task operation to restore `In Progress`, then uses `handoff_task_episode`. The dual-mode blocked skill still selects durable ownership before prompt text; active version-2 ownership forces task mode and never falls back to `.ralph/plans`.
+Provider-absent/Backlog version-2 blocker and resume publication are prompt-led Conversation work. After accepting an exact pushed blocker report, the Conversation runs supported `backlog task edit` on canonical main, verifies the bound ID/path and a one-path diff, commits only that task as `Blocked`, and pushes. After the operator accepts the unblock condition, it performs the same exact-task operation to restore `In Progress`, then uses `handoff_task_episode`. The dual-mode blocked skill still selects durable ownership before prompt text; active version-2 ownership forces task mode and never falls back to `.ralph/plans`.
+
+Beads review guidance is deliberately ahead of Beads lifecycle activation. A
+Beads report or EXPERT conclusion is evidence, not approval. Handoff, blocked
+publication, status/terminal transitions, finalization, cleanup, and ownership
+evidence advancement remain unavailable. At any such boundary the Conversation
+reports the exact accepted evidence and stops; it does not route through
+Backlog-only commands or write the ownership registry directly.
 
 Persisted active version-1 ownership keeps its specification/plan pair active while blocked and throughout candidate review or revision. An older blocked snapshot with no active pair is not live: only after an explicit operator unblock decision may the blocked skill call `restore_blocked_spec_episode` for the exact owned future folder. The tool restores the exact readable pair without clobber or mode fallback and revalidates the same active identity. No-ownership old in-place blocking remains separate.
 
-`handoff_task_episode` proves canonical primary-main caller context, exact owner/task/path in main and the Episode worktree, committed `In Progress` status, meaningful plans, clean owned worktree, exact Git/Orca and durable-session CWD identity, and quiescence. It binds both prompts to the exact task and reuses the same resources. It does not perform status, review, or terminal work.
+For provider-absent/Backlog ownership, `handoff_task_episode` proves canonical primary-main caller context, exact owner/task/path in main and the Episode worktree, committed `In Progress` status, meaningful plans, clean owned worktree, exact Git/Orca and durable-session CWD identity, and quiescence. It binds both prompts to the exact task and reuses the same resources. It does not perform status, review, or terminal work.
 
-Candidate review is evidence-led. After accepting an exact pushed candidate with no fixes remaining, the Conversation uses the supported Backlog CLI on canonical main to set only the bound task to `Ready for Merge`, reloads its exact ID/path/parent/status, verifies a one-path diff, commits only that task path, pushes, and records `mainHead`. In the exact idle Episode worktree, it runs ordinary `git merge --no-edit mainHead`; if the task conflicts, it restores the pre-merge Episode task content and applies only the Conversation-authorized `Ready for Merge` status through Backlog, while Git blocks other conflicts. It completes the merge, pushes, and verifies the refreshed `candidateHead`, upstream, task identity/path/parent/status, and clean worktree. It then shows the operator `(taskId, mainHead, candidateHead)`. There is no custom Ready publisher, two-parent reconciliation transaction, content digest, progress receipt, or replay protocol.
+Provider-absent/Backlog candidate review is evidence-led. After accepting an exact pushed candidate with no fixes remaining, the Conversation uses the supported Backlog CLI on canonical main to set only the bound task to `Ready for Merge`, reloads its exact ID/path/parent/status, verifies a one-path diff, commits only that task path, pushes, and records `mainHead`. In the exact idle Episode worktree, it runs ordinary `git merge --no-edit mainHead`; if the task conflicts, it restores the pre-merge Episode task content and applies only the Conversation-authorized `Ready for Merge` status through Backlog, while Git blocks other conflicts. It completes the merge, pushes, and verifies the refreshed `candidateHead`, upstream, task identity/path/parent/status, and clean worktree. It then shows the operator `(taskId, mainHead, candidateHead)`. There is no custom Ready publisher, two-parent reconciliation transaction, content digest, progress receipt, or replay protocol.
 
 Delay changes nothing. Request Changes requires an explicit operator decision and a concrete accepted in-scope finding. The Conversation uses Backlog on canonical main to return only the bound task to `In Progress`, verifies and commits only that path, and pushes. The same idle Episode then integrates current main with ordinary Git as needed, preserves Episode-owned task content while applying only the authorized `In Progress` status, pushes any refreshed candidate, and resumes through `handoff_task_episode`.
 
@@ -309,19 +334,20 @@ Cleanup alone remains a native destructive resource boundary. After the terminal
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
 worktree identities remain authoritative across restarts. Expert review follows
-the same disjoint authority selection: an exact
-task-native candidate uses only the bound task fields at its candidate commit,
-while a retained version-1 compatibility candidate uses its approved
-specification/plan folder. It is a
-normal review of the approved contract, not adversarial red teaming unless the
-operator explicitly requests it. Speculative hardening and reviewer-invented
-requirements are non-blocking. Expert review, bounded goals, and one heartbeat
-while waiting remain available; none becomes workspace scheduling or product
-authority.
+the same disjoint authority selection. Backlog uses the exact bound task fields
+at its candidate commit. Beads uses exact persisted/current raw task,
+revision/ref, code base/head, and Episode identity evidence without normalizing
+it. Retained version-1 compatibility uses its approved specification/plan
+folder. It is a normal review of the approved contract, not adversarial red
+teaming unless the operator explicitly requests it. Every material finding must
+show evidence, realistic impact, violated approved behavior, and a proportionate
+repair direction. Speculative hardening and reviewer-invented requirements are
+non-blocking. Expert review, bounded goals, and one heartbeat while waiting
+remain available; none becomes workspace scheduling or product authority.
 
 ## Task-native terminal outcomes and cleanup
 
-Version-2 review, Blocked/Resume, Delay, Request Changes, Merge, and Abandonment are Conversation instructions implemented with ordinary Git and the supported Backlog CLI. The only native terminal tool is cleanup-only `finalize_task_episode`, because exact session/worktree/branch removal and ownership closure require a stable host boundary. Cleanup remains a separate explicit operator decision and closes ownership only after every bound resource is absent.
+Provider-absent/Backlog version-2 review, Blocked/Resume, Delay, Request Changes, Merge, and Abandonment are Conversation instructions implemented with ordinary Git and the supported Backlog CLI. The only native terminal tool is cleanup-only `finalize_task_episode`, because exact session/worktree/branch removal and ownership closure require a stable host boundary. Cleanup remains a separate explicit operator decision and closes ownership only after every bound resource is absent.
 
 ## Retained version-1 compatibility finalization
 

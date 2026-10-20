@@ -5,20 +5,25 @@
 **As an owning Conversation, I want to verify an Episode's evidence and choose
 its next disposition without writing the implementation myself.**
 
-The Conversation first selects the authority mode from exact ownership. A
-version-2 Episode is reviewed only against its exact Backlog task ID/path and
-supported task fields; `.ralph/plans` is not consulted and the Conversation does
-not copy or mirror Episode-owned task content. A retained version-1 Episode
-continues to use its exact active specification/plan pair through blockers,
-candidate review, and bounded revision; it is not archived while ownership is
-active. In either mode the
+The Conversation first selects the authority mode and provider from the exact
+owner record. Provider-absent/Backlog version 2 is reviewed against its exact
+task ID/path and supported fields. Beads version 2 has no task path and is
+reviewed against its exact persisted/current raw task, provider revision and
+publication ref, code base/head, and Episode/worktree/session identity.
+Unrelated-task revision descendants alone do not block. Compatible same-task
+clarifications and living plans require LLM judgment over exact before/current
+fields; genuine semantic, authority, scope, and product conflicts are escalated.
+Neither branch consults `.ralph/plans`, normalizes the native task, or copies
+Episode-owned content. A retained version-1 Episode continues to use its exact
+active specification/plan pair through blockers, candidate review, and bounded
+revision; it is not archived while ownership is active. In every mode the
 Conversation reconciles the report against ownership, branch, tree, diff, tests,
-documentation, push state, and worktree identity. It may accept and advance,
+documentation, push state, and worktree identity. It may accept review evidence,
 request an in-scope revision, pause, or consult the operator. Repeated
 speculative or adversarial review must stop rather than grow new requirements or
 implementation machinery.
 
-When a task-native candidate is accepted with no fixes remaining, the Conversation revalidates the exact ownership, task ID/path, idle clean Episode worktree, pushed branch/head, diff, tests, and review. It then uses the supported Backlog CLI on canonical main to set only the bound task to `Ready for Merge`, verifies and commits only that task path, pushes, and records `mainHead`. In the idle Episode it uses ordinary Git to integrate `mainHead`, preserves Episode-owned task content while applying only the authorized `Ready for Merge` status, commits if needed, pushes, and verifies the refreshed `candidateHead`. It then shows the operator `(taskId, mainHead, candidateHead)`. This uses no custom status publisher, receipt, digest, or replay protocol.
+When a provider-absent/Backlog task-native candidate is accepted with no fixes remaining, the Conversation revalidates the exact ownership, task ID/path, idle clean Episode worktree, pushed branch/head, diff, tests, and review. It then uses the supported Backlog CLI on canonical main to set only the bound task to `Ready for Merge`, verifies and commits only that task path, pushes, and records `mainHead`. In the idle Episode it uses ordinary Git to integrate `mainHead`, preserves Episode-owned task content while applying only the authorized `Ready for Merge` status, commits if needed, pushes, and verifies the refreshed `candidateHead`. It then shows the operator `(taskId, mainHead, candidateHead)`. This uses no custom status publisher, receipt, digest, or replay protocol.
 
 Delay is a no-op. Request Changes requires an explicit operator decision and a concrete in-scope finding. The Conversation returns only the bound main task to `In Progress`, verifies and commits only that path, pushes, then uses ordinary Git in the same Episode to integrate current main as needed while preserving its task content and applying the authorized status before continuing through `handoff_task_episode`.
 
@@ -30,6 +35,12 @@ If the operator explicitly confirms abandonment, the Conversation works from cle
 
 Cleanup is independently explicit. The cleanup-only `finalize_task_episode` call binds the exact task, owner, terminal Episode head, and truthful merged/abandoned outcome; verifies pushed terminal main plus clean idle bound resources; removes only runtime, worktree, and branch; verifies absence; and closes ownership last. It performs no review, status change, merge, abandonment, archive, or push. The durable cleanup head makes same-argument retry idempotent without caller-held receipts.
 
+Beads review conclusions remain evidence, not lifecycle approval. Beads
+handoff, blocker/status publication, terminal transitions, finalization,
+cleanup, and ownership-evidence advancement are not active yet. At those
+boundaries the Conversation reports exact accepted evidence and stops rather
+than use a Backlog-only route or write the ownership registry.
+
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.
 
@@ -39,12 +50,15 @@ remain operator decisions.
 review of an exact candidate, so that implementation claims receive
 evidence-based challenge without granting the reviewer product authority.**
 
-The EXPERT reviews an exact candidate against its approved contract. A
-task-native review binds the exact task ID/path at the candidate commit and uses
-only supported task fields as its contract; a retained-folder review keeps the
+The EXPERT reviews an exact candidate against its approved native contract.
+Backlog binds exact task ID/path and supported fields at the candidate commit.
+Beads binds exact raw persisted/current task values, revisions/refs, code
+base/head, and Episode identity; it preserves provider-native shapes and uses
+semantic judgment for same-task changes. A retained-folder review keeps the
 exact approved specification and plan. The EXPERT reports concrete reproducible
-material defects, answers bounded clarification, identifies its model, and is
-cleaned up afterward. Normal review is not adversarial red
+material defects with realistic impact, violated approved behavior, and a
+proportionate repair direction, answers bounded clarification, identifies its
+model, and is cleaned up afterward. Normal review is not adversarial red
 teaming unless the operator explicitly requests it. Speculative hardening and
 reviewer-invented requirements are non-blocking. Its report is evidence, not
 authority.

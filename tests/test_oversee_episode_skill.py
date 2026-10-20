@@ -13,14 +13,14 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 950
+    assert 300 <= len(words) <= 1300
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
         "this Conversation's active Episode",
         "select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`",
         "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
-        "For version 2 task-native ownership",
+        "For version 2, select the provider only from that exact owner",
         "exact Backlog task ID and project-relative task path",
         "sole durable product and execution contract",
         "Never consult `.ralph/plans` in this mode",
@@ -38,7 +38,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Pause",
         "Consult the operator",
         "canonical handoff",
-        "remaining lifecycle and cleanup flow applies only to version 2 task-native ownership",
+        "remaining lifecycle and cleanup flow applies only to provider-absent or `provider: \"backlog\"` version 2 ownership",
         "ordinary Git and the supported Backlog CLI",
         "Do not create lifecycle receipts",
         "set only the bound main task to `Ready for Merge` through the supported Backlog CLI",
@@ -84,6 +84,42 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     ]:
         assert forbidden not in raw
 
+
+
+def test_managed_conversation_guide_qualifies_version2_review_by_provider():
+    raw = GUIDE.read_text()
+    text = " ".join(raw.split())
+    for phrase in (
+        "select the provider only from that exact owner",
+        'provider-absent record or `provider: "backlog"`',
+        "exact Backlog task ID and project-relative task path",
+        'A `provider: "beads"` record has no `taskPath`',
+        "published `providerRevision`",
+        "complete raw `taskEvidence`",
+        "code `baseRef`",
+        "use `bd context --json`, one supported `bd dolt pull`",
+        "exact `bd show TASK-ID --json --long --include-comments` reads",
+        "never force, retry uncertain transport, or use raw Dolt writes",
+        "never invent a normalized task, path, digest, receipt, or alternate authority",
+        "persisted raw task and revision",
+        "synchronized current raw task, publication ref, candidate code base/head",
+        "An unrelated-task revision descendant alone is compatible",
+        "surface the exact persisted and current fields",
+        "compatible in-scope clarification or living-plan update",
+        "genuine semantic conflict, authority change, scope expansion, or product decision",
+        "Never replace this judgment with a classifier",
+        "For Beads this accepts review evidence only and reaches the stop boundary below",
+        "For provider-absent/Backlog, record it and use canonical handoff",
+        "For Beads, record the exact accepted finding and use the stop boundary below",
+        "findings, and Review conclusions are evidence, not approval",
+        "Beads handoff, blocker publication, status and terminal transitions, finalization, cleanup, and ownership-evidence advancement are not active",
+        "report the exact accepted evidence and stop",
+        "Do not call a Backlog-only route",
+        'provider-absent or `provider: "backlog"` version 2 ownership',
+    ):
+        assert phrase in text
+    assert text.index("select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`") < text.index("select the provider only from that exact owner")
+    assert text.index("For retained version 1 folder ownership") < text.index("Review one reported slice at a time")
 
 def test_managed_conversation_guide_has_no_authentication_metadata_or_policy_copy():
     assert not (REPO / "src/prime-agent-plugin/extension-support/conversation-guide-metadata.ts").exists()

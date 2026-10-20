@@ -6,22 +6,28 @@ description: Supervise one exact owned Prime Claw episode through evidence-based
 
 Use only for this Conversation's active Episode. From the canonical primary checkout, select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`; accept a direct record as migration input and ignore other owners for oversight. Version 1 selects retained folder oversight; version 2 selects task-native oversight. Prompt tags never override the selected record.
 
-For version 2 task-native ownership, bind the exact Backlog task ID and project-relative task path. Reload it on main and in the Episode through the structured interface. Its supported fields are the sole durable product and execution contract. Never consult `.ralph/plans` in this mode. The Episode owns task content on its branch; the Conversation owns lifecycle status on main.
+For version 2, select the provider only from that exact owner. A provider-absent record or `provider: "backlog"` retains its exact Backlog task ID and project-relative task path and must not carry Beads evidence. Reload it on main and in the Episode through the structured interface. Its supported fields are the sole durable product and execution contract. Never consult `.ralph/plans` in this mode. The Episode owns task content on its branch; the Conversation owns lifecycle status on main.
+
+A `provider: "beads"` record has no `taskPath`. Bind its exact canonical task ID, published `providerRevision`, complete raw `taskEvidence`, code `baseRef`, worktree, branch, and Episode session identity. From the correct canonical-main and recorded Episode contexts, use `bd context --json`, one supported `bd dolt pull`, and exact `bd show TASK-ID --json --long --include-comments` reads; never force, retry uncertain transport, or use raw Dolt writes. Preserve every native field name, shape, value, and absence; never invent a normalized task, path, digest, receipt, or alternate authority.
 
 For retained version 1 folder ownership, require the readable non-empty active specification and implementation plan in its worktree, accepting `EXECUTION_PLAN.md`. Keep that pair active through blocking, candidate review, and revision. A missing pair uses only exact operator-authorized version-1 recovery; it is never live and never switches modes. Use only legacy `handoff_spec_episode` and `finalize_spec_episode` paths. Never claim task-native status or cleanup authority. With no ownership, old in-place work is not an Episode, so stop.
 
 A retained Episode may cross schemas only through the exceptional `transition_spec_episode_to_task` cutover surface. Require separate review, merge to canonical `main`, global activation, full restart, and proven UAT. Require explicit readiness and exact heads; drift, ambiguity, dirt, or unavailable evidence blocks. An exact same-binding replay is the only idempotent replay. The transition preserves the same Episode and resources; plan deletion remains a separate reviewed step.
 
-Review one reported slice at a time. Check ownership, pushed head, diff, tests, docs, authority, and worktree. A report and Review conclusions are evidence, not approval. Choose one disposition:
+Review one reported slice at a time. Check ownership, pushed head, diff, tests, docs, authority, and worktree. For Beads, compare the persisted raw task and revision with the synchronized current raw task, publication ref, candidate code base/head, tests, and documentation. An unrelated-task revision descendant alone is compatible. For a same-task change, surface the exact persisted and current fields. Use bounded LLM judgment to decide whether it is a compatible in-scope clarification or living-plan update; escalate a genuine semantic conflict, authority change, scope expansion, or product decision. Never replace this judgment with a classifier.
 
-- **Accept and advance** only when scope and evidence are sound.
-- **Request an in-scope revision** only for a concrete material contract defect. Record it, then use canonical handoff to the same idle Episode. In task mode, do not edit, copy, or mirror Episode-owned task content.
+A report, findings, and Review conclusions are evidence, not approval. Choose one disposition:
+
+- **Accept and advance** only when scope and evidence are sound. For Beads this accepts review evidence only and reaches the stop boundary below.
+- **Request an in-scope revision** only for a concrete material contract defect. For provider-absent/Backlog, record it and use canonical handoff to the same idle Episode. For Beads, record the exact accepted finding and use the stop boundary below. In task mode, do not edit, copy, or mirror Episode-owned task content.
 - **Pause** without a product decision.
 - **Consult the operator** for scope, product, merge, abandonment, cleanup, conflicting evidence, or blockers.
 
 Never steer through chat or retry uncertain transport.
 
-The remaining lifecycle and cleanup flow applies only to version 2 task-native ownership. Use ordinary Git and the supported Backlog CLI. Do not create lifecycle receipts, progress objects, task-content digests, or custom replay protocols.
+For Beads, those dispositions record review evidence only. Beads handoff, blocker publication, status and terminal transitions, finalization, cleanup, and ownership-evidence advancement are not active in this slice. When the next step reaches one of those boundaries, report the exact accepted evidence and stop. Do not call a Backlog-only route, edit Backlog task Markdown, or write `ownership.json` directly.
+
+The remaining lifecycle and cleanup flow applies only to provider-absent or `provider: "backlog"` version 2 ownership. Use ordinary Git and the supported Backlog CLI. Do not create lifecycle receipts, progress objects, task-content digests, or custom replay protocols.
 
 For an accepted pushed blocker, set the exact main task to `Blocked` with Backlog, commit only its path, and push. After accepted unblock, set it to `In Progress` the same way and call `handoff_task_episode`.
 

@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 19:56'
+updated_date: '2026-10-20 20:15'
 labels: []
 dependencies: []
 references:
@@ -13,20 +13,15 @@ references:
     https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md
   - 'https://www.dolthub.com/docs/concepts/dolt/git/remotes/'
 documentation:
-  - docs/backlog.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/G-oversight-and-review.md
 modified_files:
-  - src/prime-agent-plugin/extension-support/prep-chain.ts
-  - src/prime-agent-plugin/extensions/reviewed-plan.ts
-  - src/prime-agent-plugin/workflows/implement-task-prep.md
-  - .prime-claw/workflows/implement-task-prep.md
-  - src/prime-agent-plugin/workflows/implement-task.md
-  - .prime-claw/workflows/implement-task.md
-  - .prime-claw/templates.json
-  - tests/reviewed_plan_extension.test.mjs
-  - tests/test_future_plan_skills.py
-  - tests/beads_task_episode_admission_extension.test.mjs
-  - tests/task_providers.test.mjs
-  - docs/backlog.md
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
+  - tests/test_oversee_episode_skill.py
+  - tests/test_expert_review_skill.py
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/G-oversight-and-review.md
 priority: p1
 type: epic
 ordinal: 125000
@@ -1035,6 +1030,16 @@ Use supported provider-native context, synchronization, and exact `bd show <id> 
 Keep this slice truthful and bounded. Provider-aware review guidance does not activate Beads handoff, blocked workflow, status/terminal/finalization/cleanup, or ownership-evidence advancement. At those unavailable Beads boundaries, report exact accepted evidence and stop rather than calling Backlog-only routes or writing ownership.json. Preserve all existing Backlog and legacy lifecycle/cleanup prose inside an explicit branch.
 
 Do not change TypeScript/routing, tool schemas, mutable state/frameworks/sidecars, global apply, other managed workflows/templates, migration/cutover, legacy expansion, PRIMECLAW-43.1, classifiers, retries, force, or raw Dolt writes. Add focused content/asset checks and representative prompt review; do not fake semantic judgment in unit tests. Run relevant and full host validation plus Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
+
+Started the accepted prompt-only provider-qualified review slice from handoff `f3352eb` while preserving implementation gate `e56ebd6a85c31a36734e1c4bad979036ab08b5dc`. Draft changes are limited to canonical `prime-claw-oversee-episode` and `prime-claw-expert-review` source skills, their focused static/content/asset tests, and oversight/user-story docs. The exact owner is selected before provider. Provider-absent/Backlog keeps ID/path/structured contract and existing lifecycle. Beads has no taskPath and binds raw taskEvidence/providerRevision plus code/Episode identity, exact native raw comparisons, unrelated-task descendant compatibility, and managed same-task semantic judgment. All unavailable Beads lifecycle boundaries explicitly stop without Backlog fallback or ownership writes. Version 1 remains explicit. No runtime TypeScript, routing, tools, state, other workflows, or installed assets are changed.
+
+Independent read-only review of the exact uncommitted diff from `f3352eb` found no concrete material contract defect. It confirmed exact-owner-before-provider selection, unchanged version-1 and provider-absent/Backlog branches, Beads no-taskPath raw authority, native context/pull/show evidence, provider-native shapes, unrelated-descendant compatibility, same-task semantic judgment, and hard stops at every unavailable Beads lifecycle/evidence boundary. It also confirmed no out-of-scope TypeScript, routing, tool, state, workflow, or template changes. Reviewer independently ran the two focused skill tests (11 passed) and `git diff --check f3352eb` (passed).
+
+Full host Python for the prompt-only review slice completed with 676 passed, 69 skipped, and 75 subtests passed. The same four independently proven pre-existing failures from the accepted implementation-gate baseline remain unchanged: runtime-connect static host-safe marker, pre-existing unbridged task_episode_admission Node suite, unchanged project-skill-design manifest/source hash mismatch, and unchanged local Backlog source pin mismatch. This slice changes none of those files or runtime/dependency surfaces and does not mask them. Full Node remains active.
+
+Full-host Node validation passes all 392/392 tests for the exact prompt-only review candidate, including unchanged lifecycle/admission/ownership/runtime behavior and managed protocol injection. Combined with focused content/asset coverage and independent prompt review, Docker tier 1 remains the final validation gate.
+
+Docker tier 1/offline RPC passes for the final prompt-only provider-qualified review candidate: immutable image launched, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261020T201309Z-10595-71b316ad/tier1`. Final evidence: focused skill tests 11/11; broader focused Python 14 passed/34 environment skips; managed protocol Node 15/15; independent prompt review found no material defect; full Node 392/392; full Python 676 passed/69 skipped/75 subtests plus the same four proven pre-existing unrelated failures; Docker tier 1 PASS; `git diff --check` PASS. Exact diff contains only the two canonical review skills, their two focused static/content/asset test files, two oversight docs, and this task.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1111,4 +1116,6 @@ Accepted provider-aware execute through `a6c69837cb6d4d35285a5f2048e8cb73eaa88a0
 Accepted execute `a6c69837cb6d4d35285a5f2048e8cb73eaa88a04` and all earlier provider/admission seams remain unchanged. `/implement-task` alone now resolves the selected live provider while `/plan` and `plan_task` remain Backlog-only. Its compact-first two-message path retains one-turn expiry and single use; approval binds exact owner/provider/task/root/preselected placement and Backlog task path only. Beads requires the exact operator ID, project root, complete raw native view/design, native `in_planning` and canonical `In Planning`, with semantic readiness in managed prose. At tool use provider/task/root/status/plan evidence and placement are re-resolved, drift rejects, approval consumes once, and accepted createTaskEpisode dispatches once. Managed implement-task prep/readiness now branches directly by native provider, skips the Backlog-only prepare queue in Beads, preserves the full Backlog transaction, and explains exact Beads publication/code-base/recovery evidence. No snapshots, content digests, normalized task model, new protocol/state, planning activation, execute change, or deferred lifecycle/migration path was added. Focused/live/full/Docker validation passes subject only to four documented pre-existing Python baseline failures.
 
 Accepted provider-aware implementation gate through `e56ebd6a85c31a36734e1c4bad979036ab08b5dc`. Next bounded slice is prompt-only provider qualification for canonical `prime-claw-oversee-episode` and `prime-claw-expert-review`: preserve version-1 and Backlog behavior, add exact raw Beads owner/task/revision/code review evidence and managed same-task judgment, and stop at all still-unavailable Beads lifecycle boundaries. No TypeScript, routing, tool, state, other workflow, migration, or execute changes.
+
+Accepted implementation gate `e56ebd6a85c31a36734e1c4bad979036ab08b5dc` and all runtime/provider/admission seams remain unchanged. Canonical `prime-claw-oversee-episode` and `prime-claw-expert-review` now select exact owner before provider. Version 1 stays intact. Provider-absent/Backlog retains exact ID/path/structured contract and all existing Git/lifecycle guidance. Beads has no taskPath and binds exact canonical ID, published providerRevision, complete raw taskEvidence, code base/head, and Episode/worktree/branch/session identity. Review uses native context, one supported pull, and exact long raw task reads in the correct contexts; preserves native shapes; accepts unrelated-task revision descendants only as nonblocking evidence; and puts compatible same-task clarification/living-plan handling in bounded LLM semantic judgment with exact before/current fields. Genuine semantic, authority, scope, and product conflicts escalate. Every review and Expert finding remains evidence rather than approval; material findings retain impact/violated-contract/proportionate-repair requirements and speculative review remains nonblocking. Beads handoff, blocked/status/terminal/finalization/cleanup, and ownership-evidence advancement remain explicitly unavailable: report exact accepted evidence and stop without Backlog fallback or registry writes. No TypeScript, routing, tool schema, mutable state, sidecar, other workflow/template, global apply, migration/cutover, execute, classifier, retry, force, or raw Dolt path changed.
 <!-- SECTION:FINAL_SUMMARY:END -->
