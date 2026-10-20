@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 04:26'
+updated_date: '2026-10-20 04:43'
 labels: []
 dependencies: []
 references:
@@ -616,6 +616,26 @@ Advance with exactly one narrow Beads 1.3.1 foundation compatibility repair foun
 Normalize supported native configured and listed Git-backed transport forms to one exact identity before comparison. Ordinary HTTPS, SSH, and file forms plus safe absolute filesystem paths must normalize to their exact `git+...` identity. Continue to require exactly one healthy native remote and exactly one same repository Git remote. Preserve direct `refs/dolt/data` proof, disposable isolated clone proof, clean revision, server identity/lifecycle, authority-file containment, post-clone live reproof, and final race reread. Add focused fixtures and a real disposable Beads 1.3.1 readiness path if practical.
 
 Do not broaden into Beads per-task mutation/publication/reconciliation, lifecycle/admission/finalization/cleanup wiring, ownership/receipt schema, provider UX, migration/cutover, PRIMECLAW-43.1, frameworks, or persistent state. Run focused/full host and Docker tier 1, keep PRIMECLAW-43 exactly In Progress, push one clean candidate, notify the owning Conversation, and stop for review.
+
+2026-10-19 Beads 1.3.1 compatibility slice in progress from pushed checkpoint `9678b601ad7fcb2d7048766f21492594d07fed40`.
+
+The remote-identity seam now maps supported ordinary HTTPS, SSH, and file URLs plus safe absolute filesystem paths to one exact `git+...` transport identity before comparing `sync.remote`, both native listed URL fields, and the one same-named repository Git remote. Unsupported relative filesystem paths still fail closed. Native cardinality remains exact: two healthy rows that normalize to the same identity block rather than selecting one. Repository Git cardinality, direct `refs/dolt/data`, disposable clone, clean revision, server, authority containment, post-clone live reproof, and final race checks are unchanged.
+
+Focused Beads 1.3.1/Dolt 2.5.0 fixtures cover ordinary/configured and native/listed HTTPS, SSH, file URL, and absolute-path combinations, normalized clone/evidence identity, duplicate native rows, and rejected relative paths. Focused verification passes: task-provider Node 55/55, static bridge 2 passed/1 container deselected, TypeScript import, and `git diff --check`.
+
+A real disposable native proof also passes. `bd init --server` recorded `sync.remote` as the ordinary absolute bare-Git path while `bd dolt remote list --json` reported its `git+file://` identity. After category-aware lifecycle configuration and native `bd dolt push`, `prepareBeadsWorkspaceTransport` returned ready twice with bd 1.3.1, Dolt 2.5.0, bd-auto-start authority, the exact database/branch/revision, the normalized remote, and stable direct `refs/dolt/data`; the following live `dolt_status` was `[]`. The managed server was stopped and the disposable project/remote removed. Full host and Docker tier 1 remain before a candidate.
+
+2026-10-20 Episode — Beads 1.3.1 remote-identity compatibility slice completed for review from checkpoint `9678b601ad7fcb2d7048766f21492594d07fed40`.
+
+Supported configured, native-listed, and repository Git remote forms now normalize through one deterministic identity before comparison. Existing `git+https://`, `git+ssh://`, and `git+file://` forms remain exact. Ordinary HTTPS, SSH, and file URLs gain the `git+` transport prefix; existing SCP-style SSH remains mapped to its exact `git+ssh://` identity; and safe absolute filesystem paths become the corresponding encoded `git+file://` identity. Empty values, line breaks, NULs, relative paths, and unsupported transports fail closed. The normalized identity drives exact native row selection, the same-named one-URL repository Git proof, disposable clone, and returned evidence.
+
+Cardinality is unchanged: exactly one healthy native row must have both URL fields normalize to the configured identity, and exactly one repository Git URL must normalize to that same identity. Two syntactically different healthy native rows that normalize alike block. Direct and final `refs/dolt/data` reads, isolated clone revision, clean working set, server authority/path, pre-native authority containment, post-clone live identity/cleanliness reproof, and all accepted earlier slices are unchanged.
+
+Focused fixtures run the full transport preparation with Beads 1.3.1/Dolt 2.5.0 evidence across HTTPS, SSH, file-URL, and absolute-path combinations, and cover duplicate normalized native rows plus rejected relative paths. A real disposable native path also passed twice: `bd init --server` persisted an ordinary absolute Git path, native listing returned its `git+file://` form, category-aware lifecycle config committed, `bd dolt push` published, preparation returned ready with exact 1.3.1/2.5.0/server/database/branch/revision/normalized-remote/ref evidence, the following `dolt_status` was `[]`, and the direct ref remained stable. The server was stopped and all disposable resources removed.
+
+Final verification: focused task-provider Node 55/55; static bridge 2 passed/1 container deselected; TypeScript import passed; full host Node 355/355; `git diff --check` clean. Docker tier 1 passed with immutable image, network absent, checks passed, teardown verified, and manifest published. Its first attempt stopped in the isolated upstream source builder before candidate checks with clean teardown and unchanged source/checkout inventory; one bounded retry passed completely.
+
+Changed only the task record through supported Backlog CLI, `task-providers.ts`, focused provider contracts, and `docs/backlog.md`. No per-task mutation/publication/reconciliation, Episode lifecycle wiring, schema, provider UX, migration/cutover, PRIMECLAW-43.1, framework, or persistent state was added. PRIMECLAW-43 remains In Progress.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -638,4 +658,6 @@ Bounded Beads workspace/transport foundation proves the selected live Beads auth
 Beads foundation revision supersedes rejected candidate 30c9cbd and fixes only the two reproduced defects: bd-managed server `data_dir` must be the selected store's exact real `.beads/dolt` directory, and live database/branch/revision/Dolt-version plus clean `dolt_status` are re-proved after isolated remote proof before the final stable `refs/dolt/data` reread. Foreign/symlink/ambiguous paths and an in-flight live revision advance now block. Verified focused 52/52, static 2 passed/1 deselected, full Node 352/352, and Docker tier 1. PRIMECLAW-43 remains In Progress; accepted slices and all deferred boundaries are unchanged.
 
 Residual Beads authority-containment revision supersedes REVISE candidate 2ba92f1. Before native proof, `.beads`, `metadata.json`, and `config.yaml` must now have readable exact canonical real non-symlink identities inside the selected project/store. The three-case symlink regression proves zero native authority/remote calls, no external content exposure, and unchanged external sentinels. Existing exact `.beads/dolt` and post-clone live reproof closures remain intact. Verified focused 53/53, static 2 passed/1 deselected, full Node 353/353, and Docker tier 1. PRIMECLAW-43 remains In Progress; accepted slices and deferred scope are unchanged.
+
+Beads 1.3.1 foundation compatibility now normalizes configured, native-listed, and repository Git HTTPS/SSH/file/absolute-path forms to one exact `git+...` identity before comparison while preserving strict one-native/one-Git cardinality and every publication, clean-revision, server, containment, post-clone, and final-race proof. Focused fixtures pass 55/55 and a real disposable Beads 1.3.1/Dolt 2.5.0 absolute-path→`git+file://` readiness flow passed twice with clean status and stable `refs/dolt/data`. Full Node passes 355/355 and Docker tier 1 passes. Scope and PRIMECLAW-43 In Progress status are unchanged.
 <!-- SECTION:FINAL_SUMMARY:END -->
