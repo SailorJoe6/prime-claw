@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 16:56'
+updated_date: '2026-10-20 16:59'
 labels: []
 dependencies: []
 references:
@@ -907,6 +907,16 @@ Representative tests preserve arbitrary description/design/acceptance/dependency
 Representative coverage proves exact arguments; preservation of raw description, design, acceptance, labels, dependencies, comments, nested extension fields; simultaneous native/canonical status; raw mutation re-read; shorthand rejection before any `bd update`; and the unchanged exact Backlog resolution object. Static coverage pins the exact native command and raw-view return without introducing a provider framework.
 
 Validation after final source: focused provider Node 63/63; provider/schema static 3 passed with 1 container bridge deselected; full-host Node 370/370; Docker tier 1/offline RPC passes with immutable image launch, network absence, checks, teardown verification, and manifest publication at `.test-results/20261020T165501Z-7653-4bd3b5bc/tier1`; `git diff --check` passes. No status-publication change, reservation callsite, admission, allocation, lifecycle activation, managed skill/template rewrite, migration/cutover, legacy transition, cleanup/finalization, PRIMECLAW-43.1, normalized semantic model, framework, registry, state, or sidecar work was added.
+
+2026-10-20 Conversation ACCEPTED raw Beads task-view candidate `4eb3e519dac366ba67b7a7388a079aff4c14a271`. Parent verified exact owner/task state, clean pushed remote-equal ancestry, `git diff --check`, raw-object/minimal-validation design, exact long/comments native command, native and canonical status, identity-before-write, unchanged Backlog behavior, and focused provider 63/63. Preserve that candidate unchanged.
+
+Advance only one bounded slice: Beads task Episode admission/allocation through the existing public `createTaskEpisode` path. Keep the Backlog branch behavior and tests byte-for-byte. Add one direct Beads branch, not a provider framework. Exact provider resolution must prove the requested canonical ID, canonical `In Planning` plus native `in_planning`, and a meaningful provider-native `nativeView.design` string using the existing plan placeholder guard. If real supported Beads 1.3.1 long view does not expose and round-trip `design`, stop and report rather than inventing another mapping.
+
+Require canonical primary main, no active Git operation, tracked-clean and upstream-equal exact Git code HEAD. Under existing admission serialization, re-prove exact task/plan/owner state; call accepted `commitConversationTaskStatus` Beads publication for `In Progress`; require its `published` branch without classifying or retrying `review-required`/`blocked` evidence; reserve through accepted `reservePublishedBeadsTaskEpisodeOwnership`; then reuse existing placement/allocation and prove exact active provider:`beads` ownership, code `baseRef`, published revision/evidence, canonical task ID, and worktree/session identity. Preserve raw publication evidence in every surfaced review/block error.
+
+Use only the existing deterministic recovery boundaries. If `In Progress` was published but no durable reservation/resources exist, publish `In Planning` rollback and verify it. After durable or uncertain reservation/resource mutation, publish `Blocked` and advance the same owned `providerRevision`/`taskEvidence` to the exact Blocked publication without changing provider/task/base/resource identity. If recovery publication returns `review-required`/`blocked` or exact ownership cannot be proven, fail closed with raw evidence and preserve everything; never retry or start a fresh admission.
+
+Do not route handoff, oversight, finalization, cleanup, Ready for Merge/Done, managed skills/templates, legacy transition, migration/cutover, PRIMECLAW-43.1, version 3, sidecar/receipt, generalized state/framework, semantic classifier, raw Dolt writes, force, or automatic retry. Add one representative Beads happy path plus preflight, review-required, rollback, and post-reservation Blocked recovery contracts without a provider-by-lifecycle matrix. Run focused/full host, relevant real disposable Beads UAT if feasible, and Docker tier 1; push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -961,4 +971,6 @@ Added one isolated provider-specific Beads ownership-reservation primitive besid
 Accepted Beads reservation candidate `74b46067348773f573fa01da6861fff49e76f4e9`. Next bounded slice is only the raw Beads task-view prerequisite: resolve an exact ID through `bd show <id> --json --long --include-comments`, validate only object/exact-ID/nonblank-title/status, expose the full raw object as Beads-only `nativeView`, and preserve current identity/status/root behavior plus unchanged Backlog behavior. No normalized semantic model or lifecycle activation.
 
 Added only the raw Beads task-view prerequisite: the Beads resolver now calls exact `bd show <id> --json --long --include-comments`, validates the minimal stable task shape, retains canonical ID/title/native+canonical status/project root, and returns the complete raw object as Beads-only `nativeView`. Mutation keeps its pre-write exact-identity rejection, and Backlog behavior is unchanged. Focused 63/63, full host 370/370, static checks, and Docker tier 1 pass.
+
+Accepted raw Beads view candidate `4eb3e519dac366ba67b7a7388a079aff4c14a271`. Next bounded slice is only direct Beads admission/allocation through existing `createTaskEpisode`: exact In Planning native design preflight, canonical-main/upstream code proof, published In Progress result, accepted Beads reservation, existing allocation, exact active ownership proof, and deterministic In Planning rollback or same-owner Blocked recovery. Backlog branch remains unchanged; no provider framework or later lifecycle routes.
 <!-- SECTION:FINAL_SUMMARY:END -->
