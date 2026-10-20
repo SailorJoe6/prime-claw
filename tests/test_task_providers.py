@@ -46,9 +46,7 @@ def test_task_providers_module_keeps_the_narrow_deterministic_boundary() -> None
         "checkSelectedProviderCapabilities",
         "prepareBeadsWorkspaceTransport",
         "mutateAndPublishBeadsTaskStatus",
-        "BeadsSameTaskReconciliationEvidence",
-        "reconciliation-required",
-        "dolt_diff_summary",
+        "--dolt-auto-commit=on",
         "--no-adopt",
         "BEADS_DOLT_DATA_REF",
         "--readonly",
@@ -63,6 +61,8 @@ def test_task_providers_module_keeps_the_narrow_deterministic_boundary() -> None
         "class AbstractTaskProvider",
         "registerProvider",
         "semanticMerge",
+        "BEADS_TASK_RELATED_DIFF_COLUMNS",
+        "dolt_diff_summary",
     ):
         assert forbidden not in source
     # Discovery must not create or mutate anything: no write APIs.
