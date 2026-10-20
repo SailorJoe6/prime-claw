@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-19 18:35'
+updated_date: '2026-10-20 04:26'
 labels: []
 dependencies: []
 references:
@@ -608,6 +608,14 @@ Before its first native Beads/Dolt authority call, provider discovery now realpa
 The single focused regression covers `.beads`, metadata, and config symlinks to otherwise valid external Beads authority. Every case blocks `prepareBeadsWorkspaceTransport` before any `bd`, `dolt`, or `git ls-remote` call, returns no external path or sentinel content, and preserves external metadata, config, and independent sentinel bytes exactly. Final verification: focused task-provider Node 53/53; static bridge 2 passed/1 container deselected; TypeScript import passed; full host Node 353/353; Docker tier-1 passed with immutable image, network absent, checks passed, teardown verified, and manifest published; `git diff --check` clean.
 
 Changed only the task record through supported Backlog CLI, `task-providers.ts`, its focused Node contract, and `docs/backlog.md`. Exact bd-managed `.beads/dolt` identity, post-clone live identity/cleanliness reproof, Beads 1.1.2 dirty-config fail-closed behavior, operator-managed behavior, JSONL non-authority, no raw Dolt access to the live store, accepted slices 1/2A/2B/2C, least technology, and every deferred boundary remain unchanged. PRIMECLAW-43 stays In Progress.
+
+2026-10-19 operator-authorized upgrade and blocker clearance: Beads is now 1.3.1 and Dolt 2.5.0. Fresh disposable native UAT proved the original dirty-config blocker gone: required custom lifecycle status configuration commits successfully; repeated `dolt_status` reads remain `[]`, including after native push; and `refs/dolt/data` publishes. Canonical main restored PRIMECLAW-43 to In Progress and pushed commit `3349a6afd692669ac1d4ea86eb3193b1cbbcdce9`.
+
+Advance with exactly one narrow Beads 1.3.1 foundation compatibility repair found by UAT. `bd init --server` stores `sync.remote` as the ordinary repository Git URL/path (the local UAT used an absolute path), while `bd dolt remote list --json` reports the equivalent normalized `git+file://` URL. The current raw-string equality incorrectly blocks `remote-transport`.
+
+Normalize supported native configured and listed Git-backed transport forms to one exact identity before comparison. Ordinary HTTPS, SSH, and file forms plus safe absolute filesystem paths must normalize to their exact `git+...` identity. Continue to require exactly one healthy native remote and exactly one same repository Git remote. Preserve direct `refs/dolt/data` proof, disposable isolated clone proof, clean revision, server identity/lifecycle, authority-file containment, post-clone live reproof, and final race reread. Add focused fixtures and a real disposable Beads 1.3.1 readiness path if practical.
+
+Do not broaden into Beads per-task mutation/publication/reconciliation, lifecycle/admission/finalization/cleanup wiring, ownership/receipt schema, provider UX, migration/cutover, PRIMECLAW-43.1, frameworks, or persistent state. Run focused/full host and Docker tier 1, keep PRIMECLAW-43 exactly In Progress, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
