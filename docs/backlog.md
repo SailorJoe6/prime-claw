@@ -722,8 +722,16 @@ native task view and published Dolt revision, and the reviewed pushed Episode
 code head. Existing native transport preparation from the canonical primary checkout
 proves the selected Beads database, clean published revision, remote publication
 ref, and supported provider authority. Exact native `bd show --json --long
---include-comments` from the recorded linked Episode worktree then proves the
-target remains `in_progress`/`In Progress`.
+--include-comments` from the recorded linked Episode worktree then reads the
+complete raw target. A second fresh native transport proof immediately after
+that read must match the same database, branch, transport, clean published
+revision, and publication ref before the evidence can be accepted. A provider
+advance, dirty working set, or proof drift in that pairing window returns the
+exact observed revision and raw task evidence for managed review and writes
+nothing. This does not require the reviewed revision itself to remain current:
+an unrelated descendant already clean and published before the paired read is
+accepted when the complete target view remains unchanged. The paired target
+must remain `in_progress`/`In Progress` before any write.
 When the published revision has advanced since review, one read-only native
 Dolt merge-base query must prove the reviewed revision is its ancestor. The
 advance remains valid when the complete raw target view is unchanged, including

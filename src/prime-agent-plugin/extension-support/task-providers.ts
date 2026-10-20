@@ -909,6 +909,8 @@ export type BeadsWorkspaceTransportPreparation =
       code: "provider-authority" | "capability" | "server-mode" | "server-unavailable" | "revision" | "remote-transport" | "publication-authority";
       detail: string;
       remediation: string;
+      /** Exact native revision observed before a later proof step failed. */
+      observedRevision?: string;
     };
 
 type JsonRecord = Record<string, unknown>;
@@ -1176,6 +1178,8 @@ export function prepareBeadsWorkspaceTransport(
     };
   }
 
+  const branch = identity.branch.trim();
+  const revision = identity.revision;
   const dirtyQuery = "SELECT table_name, staged, status FROM dolt_status ORDER BY table_name";
   const dirtyCommand = runner.run("bd", ["--readonly", "sql", "--json", dirtyQuery], { cwd: projectRoot, allowFailure: true });
   let dirtyRows: unknown;
@@ -1187,6 +1191,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "revision",
       detail: `native Dolt working-set query returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
       remediation: "Repair the selected database until the read-only `dolt_status` query is available",
+      observedRevision: revision,
     };
   }
   if (dirtyCommand.status !== 0 || !Array.isArray(dirtyRows)) {
@@ -1195,6 +1200,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "revision",
       detail: `native Dolt working-set evidence is unavailable: ${commandFailure("bd --readonly sql dolt_status", dirtyCommand)}`,
       remediation: "Repair the selected database until the read-only `dolt_status` query is available",
+      observedRevision: revision,
     };
   }
   if (dirtyRows.length !== 0) {
@@ -1203,10 +1209,9 @@ export function prepareBeadsWorkspaceTransport(
       code: "revision",
       detail: `the selected Dolt working set has ${dirtyRows.length} uncommitted table change(s), so HEAD is not complete publication evidence`,
       remediation: "Inspect `dolt_status`; after review, commit intended changes with `bd dolt commit -m <message>`. If the supported command rehydrates required config outside HEAD, upgrade or repair Beads before retrying; do not bypass the live server with raw Dolt",
+      observedRevision: revision,
     };
   }
-  const branch = identity.branch.trim();
-  const revision = identity.revision;
 
   const configuredRemoteCommand = runner.run("bd", ["config", "get", "sync.remote", "--json"], { cwd: projectRoot, allowFailure: true });
   const configuredRemoteResult = parseJSONRecordCommand("bd config get sync.remote --json", configuredRemoteCommand);
@@ -1216,6 +1221,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "remote-transport",
       detail: `no exact native Dolt sync remote is available: ${configuredRemoteResult.error}`,
       remediation: "Add the repository remote with `bd dolt remote add origin <git+https-or-git+ssh-url>`, commit `.beads/config.yaml`, and publish once with `bd dolt push --remote origin`",
+      observedRevision: revision,
     };
   }
   const configuredRemoteView = configuredRemoteResult.value;
@@ -1228,6 +1234,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "remote-transport",
       detail: "`bd config get sync.remote --json` did not prove one supported config.yaml-backed Git remote URL or absolute path",
       remediation: "Add the intended Git-backed remote with `bd dolt remote add <name> <url>` so native config and remote evidence agree",
+      observedRevision: revision,
     };
   }
 
@@ -1238,6 +1245,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "remote-transport",
       detail: `native Dolt remote evidence is unavailable: ${commandFailure("bd dolt remote list --json", remotesCommand)}`,
       remediation: "Repair the selected database until `bd dolt remote list --json` returns its configured remotes",
+      observedRevision: revision,
     };
   }
   let remotes: unknown;
@@ -1249,6 +1257,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "remote-transport",
       detail: `bd dolt remote list --json returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
       remediation: "Repair the pinned bd installation and rerun `bd dolt remote list --json`",
+      observedRevision: revision,
     };
   }
   if (!Array.isArray(remotes)) {
@@ -1257,6 +1266,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "remote-transport",
       detail: "bd dolt remote list --json returned a non-list schema",
       remediation: "Repair the pinned bd installation and rerun `bd dolt remote list --json`",
+      observedRevision: revision,
     };
   }
   const remoteRows = remotes as JsonRecord[];
@@ -1267,6 +1277,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "remote-transport",
       detail: "bd dolt remote list --json returned a malformed remote entry",
       remediation: "Repair the pinned bd installation and native remote configuration before retrying",
+      observedRevision: revision,
     };
   }
   const matches = remoteRows.filter((row) =>
@@ -1279,6 +1290,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "remote-transport",
       detail: `the configured sync remote ${JSON.stringify(configuredRemote)} does not resolve to exactly one healthy native Dolt remote`,
       remediation: "Use `bd dolt remote list --json` and `bd dolt remote add/remove` so `sync.remote` selects exactly one healthy remote",
+      observedRevision: revision,
     };
   }
   const remoteName = matches[0].name as string;
@@ -1291,6 +1303,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "publication-authority",
       detail: `Dolt remote ${JSON.stringify(remoteName)} is not proved to be the same exact transport as one repository Git remote`,
       remediation: `Configure Git remote ${JSON.stringify(remoteName)} and the native Dolt remote to the same repository URL, then rerun preparation`,
+      observedRevision: revision,
     };
   }
 
@@ -1302,6 +1315,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "publication-authority",
       detail: `repository remote ${JSON.stringify(remoteName)} does not expose one exact ${BEADS_DOLT_DATA_REF} authority: ${commandFailure(`git ls-remote ${remoteName} ${BEADS_DOLT_DATA_REF}`, publicationResult)}`,
       remediation: `Publish the native Dolt history with \`bd dolt push --remote ${remoteName}\` (never force), then verify \`git ls-remote ${remoteName} ${BEADS_DOLT_DATA_REF}\``,
+      observedRevision: revision,
     };
   }
   const publicationHead = publicationMatch[1];
@@ -1312,6 +1326,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "publication-authority",
       detail: `the selected database name ${JSON.stringify(selected.doltDatabase)} cannot be materialized safely for isolated remote proof`,
       remediation: "Rename or reconfigure the Beads database through supported bd procedures, then retry",
+      observedRevision: revision,
     };
   }
   const proofRoot = mkdtempSync(join(tmpdir(), "prime-claw-beads-remote-proof-"));
@@ -1331,6 +1346,7 @@ export function prepareBeadsWorkspaceTransport(
         code: "publication-authority",
         detail: `the exact ${BEADS_DOLT_DATA_REF} authority could not be cloned in isolation: ${commandFailure("dolt clone", cloned)}`,
         remediation: `Make native Git/Dolt credentials available, verify ${BEADS_DOLT_DATA_REF}, and retry; never copy credentials into project files or use a raw live-store clone`,
+      observedRevision: revision,
       };
     }
     const remoteIdentityQuery = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision";
@@ -1344,6 +1360,7 @@ export function prepareBeadsWorkspaceTransport(
         code: "publication-authority",
         detail: `isolated remote Dolt identity returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
         remediation: "Repair the configured remote and rerun the isolated native publication proof",
+      observedRevision: revision,
       };
     }
     const remoteRows = remoteIdentityOutput && typeof remoteIdentityOutput === "object" && !Array.isArray(remoteIdentityOutput)
@@ -1358,6 +1375,7 @@ export function prepareBeadsWorkspaceTransport(
         code: "publication-authority",
         detail: `the configured ${BEADS_DOLT_DATA_REF} authority does not publish exact local Dolt revision ${revision} on ${branch}`,
         remediation: `Run \`bd dolt pull --remote ${remoteName}\`, resolve any native conflict, then \`bd dolt push --remote ${remoteName}\`; never force automatically`,
+      observedRevision: revision,
       };
     }
   } finally {
@@ -1374,6 +1392,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "revision",
       detail: `native Dolt identity recheck returned invalid JSON after isolated remote proof: ${error instanceof Error ? error.message : String(error)}`,
       remediation: "Repair the selected server, then rerun preparation so the live database/branch/revision/version can be proved stable",
+      observedRevision: revision,
     };
   }
   const liveIdentity = Array.isArray(liveIdentityRows) && liveIdentityRows.length === 1 ? liveIdentityRows[0] as JsonRecord : null;
@@ -1395,6 +1414,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "revision",
       detail: `native Dolt working-set recheck returned invalid JSON after isolated remote proof: ${error instanceof Error ? error.message : String(error)}`,
       remediation: "Repair the selected database until the read-only `dolt_status` query is available and stable",
+      observedRevision: revision,
     };
   }
   if (liveDirtyCommand.status !== 0 || !Array.isArray(liveDirtyRows)) {
@@ -1403,6 +1423,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "revision",
       detail: `native Dolt working-set recheck is unavailable after isolated remote proof: ${commandFailure("bd --readonly sql dolt_status", liveDirtyCommand)}`,
       remediation: "Repair the selected database until the read-only `dolt_status` query is available and stable",
+      observedRevision: revision,
     };
   }
   if (liveDirtyRows.length !== 0) {
@@ -1411,6 +1432,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "revision",
       detail: `the selected Dolt working set became dirty during isolated remote proof with ${liveDirtyRows.length} uncommitted table change(s)`,
       remediation: "Inspect `dolt_status`; after review, commit intended changes with `bd dolt commit -m <message>`. If the supported command rehydrates required config outside HEAD, upgrade or repair Beads before retrying; do not bypass the live server with raw Dolt",
+      observedRevision: revision,
     };
   }
   if (!liveIdentityStable) {
@@ -1419,6 +1441,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "revision",
       detail: `the live native database/branch/revision/version changed or became unavailable during isolated remote proof; prior revision ${revision}, observed ${observedLiveRevision}`,
       remediation: "Reconcile the live selected database with its configured remote through supported `bd dolt pull`/`bd dolt push`, then retry against one stable clean revision; never force automatically",
+      observedRevision: /^[0-9a-v]{32}$/.test(observedLiveRevision) ? observedLiveRevision : revision,
     };
   }
 
@@ -1432,6 +1455,7 @@ export function prepareBeadsWorkspaceTransport(
       code: "publication-authority",
       detail: `repository remote ${JSON.stringify(remoteName)} changed or became unavailable while proving ${BEADS_DOLT_DATA_REF}; prior Git head ${publicationHead}, observed ${observedPublication}`,
       remediation: `Fetch and reconcile with \`bd dolt pull --remote ${remoteName}\`, then rerun preparation against a stable remote; never force automatically`,
+      observedRevision: revision,
     };
   }
 

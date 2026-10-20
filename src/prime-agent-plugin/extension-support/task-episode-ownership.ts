@@ -135,6 +135,7 @@ export interface BeadsTaskEvidenceAdvancementDependencies {
   ownership?: BeadsTaskEvidenceAdvancementStore;
   runner?: CommandRunner;
   prepareTransport?: (cwd: string, runner: CommandRunner) => BeadsWorkspaceTransportPreparation;
+  pairTransport?: (cwd: string, runner: CommandRunner) => BeadsWorkspaceTransportPreparation;
   resolveTask?: (cwd: string, taskId: string, runner: CommandRunner) => ProviderTaskResolution | null;
   providerRevisionIsAncestor?: (
     cwd: string, ancestor: string, descendant: string, runner: CommandRunner,
@@ -156,6 +157,16 @@ export type BeadsTaskEvidenceAdvancementResult =
       publishedProviderRevision: string;
       acceptedTaskEvidence: Record<string, unknown>;
       currentTaskEvidence: Record<string, unknown>;
+    }
+  | {
+      status: "review-required";
+      code: "provider-evidence-mismatch";
+      reviewedProviderRevision: string;
+      publishedProviderRevision: string;
+      observedProviderRevision: string;
+      acceptedTaskEvidence: Record<string, unknown>;
+      currentTaskEvidence: Record<string, unknown>;
+      providerProof: { status: "ready" } | { status: "blocked"; code: string; detail: string };
     };
 
 export interface LegacyTaskOwnershipTransitionInput {
@@ -915,22 +926,61 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
       || !BEADS_RESERVATION_REVISION.test(prepared.publishedRevision)) {
     throw new Error("Beads evidence advancement publication proof does not match the exact recorded Episode project");
   }
-  const revisionIsAncestor = dependencies.providerRevisionIsAncestor ?? exactBeadsProviderRevisionAncestor;
-  if (!revisionIsAncestor(episodeRoot, input.reviewedProviderRevision, prepared.publishedRevision, runner)) {
-    throw new Error("Beads evidence advancement reviewed provider revision is not an ancestor of the current published revision");
-  }
-
   const currentTask = (dependencies.resolveTask ?? resolveProviderTask)(episodeRoot, input.taskId, runner);
   if (!currentTask || currentTask.provider !== "beads" || currentTask.taskId !== input.taskId
       || realpathSync(currentTask.projectRoot) !== episodeRoot) {
     throw new Error("Beads evidence advancement could not prove the exact native task identity and project");
+  }
+
+  // Pair the long raw task read with a second fresh native publication proof.
+  // A writer that advances or dirties the store after the first proof must
+  // produce managed-review evidence rather than a stale revision receipt.
+  const pairedPreparation = (dependencies.pairTransport ?? prepareBeadsWorkspaceTransport)(ownershipRoot, runner);
+  if (pairedPreparation.status !== "ready") {
+    return {
+      status: "review-required",
+      code: "provider-evidence-mismatch",
+      reviewedProviderRevision: input.reviewedProviderRevision,
+      publishedProviderRevision: prepared.publishedRevision,
+      observedProviderRevision: pairedPreparation.observedRevision ?? prepared.publishedRevision,
+      acceptedTaskEvidence: input.reviewedTaskEvidence,
+      currentTaskEvidence: currentTask.nativeView,
+      providerProof: {
+        status: "blocked",
+        code: pairedPreparation.code,
+        detail: pairedPreparation.detail,
+      },
+    };
+  }
+  const paired = pairedPreparation.evidence;
+  const pairedIdentityMatches = realpathSync(paired.projectRoot) === ownershipRoot
+    && paired.provider === "beads"
+    && paired.publishedRevision === paired.revision
+    && BEADS_RESERVATION_REVISION.test(paired.publishedRevision)
+    && paired.database === prepared.database
+    && paired.branch === prepared.branch
+    && paired.remoteName === prepared.remoteName
+    && paired.remoteUrl === prepared.remoteUrl
+    && paired.publicationRef === prepared.publicationRef
+    && paired.publishedRevision === prepared.publishedRevision;
+  if (!pairedIdentityMatches) {
+    return {
+      status: "review-required",
+      code: "provider-evidence-mismatch",
+      reviewedProviderRevision: input.reviewedProviderRevision,
+      publishedProviderRevision: prepared.publishedRevision,
+      observedProviderRevision: paired.publishedRevision,
+      acceptedTaskEvidence: input.reviewedTaskEvidence,
+      currentTaskEvidence: currentTask.nativeView,
+      providerProof: { status: "ready" },
+    };
   }
   if (JSON.stringify(currentTask.nativeView) !== JSON.stringify(input.reviewedTaskEvidence)) {
     return {
       status: "review-required",
       code: "task-evidence-mismatch",
       reviewedProviderRevision: input.reviewedProviderRevision,
-      publishedProviderRevision: prepared.publishedRevision,
+      publishedProviderRevision: paired.publishedRevision,
       acceptedTaskEvidence: input.reviewedTaskEvidence,
       currentTaskEvidence: currentTask.nativeView,
     };
@@ -938,11 +988,15 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
   if (currentTask.nativeStatus !== BEADS_IN_PROGRESS_STATUS || currentTask.status !== "In Progress") {
     throw new Error("Beads evidence advancement requires the exact unchanged native In Progress task before ownership mutation");
   }
+  const revisionIsAncestor = dependencies.providerRevisionIsAncestor ?? exactBeadsProviderRevisionAncestor;
+  if (!revisionIsAncestor(episodeRoot, input.reviewedProviderRevision, paired.publishedRevision, runner)) {
+    throw new Error("Beads evidence advancement reviewed provider revision is not an ancestor of the current published revision");
+  }
 
   const git = dependencies.git ?? new CliBeadsTaskEvidenceAdvancementGit();
   const target = parseEpisodeOwnership({
     ...selected,
-    providerRevision: prepared.publishedRevision,
+    providerRevision: paired.publishedRevision,
     taskEvidence: input.reviewedTaskEvidence,
     head: input.reviewedEpisodeHead,
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
@@ -981,6 +1035,6 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
     status: "advanced",
     record: target,
     reviewedProviderRevision: input.reviewedProviderRevision,
-    publishedProviderRevision: prepared.publishedRevision,
+    publishedProviderRevision: paired.publishedRevision,
   };
 }

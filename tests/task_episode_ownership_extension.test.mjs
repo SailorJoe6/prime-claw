@@ -228,6 +228,14 @@ function evidenceAdvancementProvider(f, overrides = {}) {
         publishedRevision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
       },
     }),
+    pairTransport: () => ({
+      status: "ready",
+      evidence: {
+        provider: "beads", projectRoot: f.root,
+        revision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
+        publishedRevision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
+      },
+    }),
     resolveTask: () => ({
       provider: "beads", taskId: f.taskId, title: currentTaskEvidence.title,
       nativeStatus: currentTaskEvidence.status, status: overrides.canonicalStatus ?? "In Progress",
@@ -824,6 +832,62 @@ test("reviewed Beads evidence advances only the same active owner's four evidenc
   assert.deepEqual(result.record.taskEvidence, f.reviewedTaskEvidence);
   assert.equal(result.record.updatedAt, "2026-10-20T22:00:00.000Z");
   assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), result.record);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
+});
+
+test("post-preparation Beads advance and dirty state returns exact review evidence with zero owner writes", () => {
+  const f = evidenceAdvancementFixture();
+  const provider = evidenceAdvancementProvider(f);
+  const initialResolve = provider.resolveTask;
+  let liveRevision = f.publishedProviderRevision;
+  let dirty = false;
+  let pairingProofCalls = 0;
+  let ownerWrites = 0;
+
+  const result = advanceEvidence(f, {}, {
+    ...provider,
+    pairTransport: () => {
+      pairingProofCalls += 1;
+      assert.equal(dirty, true);
+      return {
+        status: "blocked",
+        code: "revision",
+        detail: "the selected Dolt working set has 1 uncommitted table change(s)",
+        remediation: "Review the exact native writer before continuing",
+        observedRevision: liveRevision,
+      };
+    },
+    resolveTask: (...args) => {
+      liveRevision = "d".repeat(32);
+      dirty = true;
+      return initialResolve(...args);
+    },
+    ownership: {
+      read: (root, ownerSessionId) => readEpisodeOwnership(root, ownerSessionId),
+      mutate: () => {
+        ownerWrites += 1;
+        throw new Error("ownership mutation must not run for unpaired evidence");
+      },
+    },
+  });
+
+  assert.deepEqual(result, {
+    status: "review-required",
+    code: "provider-evidence-mismatch",
+    reviewedProviderRevision: f.reviewedProviderRevision,
+    publishedProviderRevision: f.publishedProviderRevision,
+    observedProviderRevision: "d".repeat(32),
+    acceptedTaskEvidence: f.reviewedTaskEvidence,
+    currentTaskEvidence: f.reviewedTaskEvidence,
+    providerProof: {
+      status: "blocked",
+      code: "revision",
+      detail: "the selected Dolt working set has 1 uncommitted table change(s)",
+    },
+  });
+  assert.equal(pairingProofCalls, 1);
+  assert.equal(ownerWrites, 0);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
   assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
 });
 
