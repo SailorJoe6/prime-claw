@@ -195,7 +195,8 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
       && safeTaskPath(item.taskPath)
       && hasOnlyFields(item, BACKLOG_TASK_RECORD_FIELDS);
     const beadsTask = item.provider === "beads"
-      && DOLT_REVISION.test(String(item.providerRevision))
+      && typeof item.providerRevision === "string"
+      && DOLT_REVISION.test(item.providerRevision)
       && exactBeadsTaskEvidence(item.taskEvidence, item.taskId)
       && hasOnlyFields(item, BEADS_TASK_RECORD_FIELDS);
     if (!commonTask || (!backlogTask && !beadsTask)) {

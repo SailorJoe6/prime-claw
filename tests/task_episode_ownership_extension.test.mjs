@@ -551,6 +551,7 @@ test("version-2 ownership rejects mixed provider fields, ambiguous identity, and
     { ...beads, providerRevision: "a".repeat(31) },
     { ...beads, providerRevision: "z".repeat(32) },
     { ...beads, providerRevision: "A".repeat(32) },
+    { ...beads, providerRevision: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] },
     { ...beads, taskEvidence: { ...beads.taskEvidence, id: "PRIMECLAW-44" } },
     { ...beads, taskEvidence: { ...beads.taskEvidence, title: "   " } },
     { ...beads, taskEvidence: [{ id: "PRIMECLAW-43" }] },

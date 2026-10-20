@@ -83,7 +83,8 @@ def test_version_two_ownership_keeps_one_discriminated_provider_native_shape() -
         'providerRevision: string',
         'taskEvidence: Record<string, unknown>',
         'record.provider ?? "backlog"',
-        'DOLT_REVISION.test(String(item.providerRevision))',
+        'typeof item.providerRevision === "string"',
+        'DOLT_REVISION.test(item.providerRevision)',
         'exactBeadsTaskEvidence(item.taskEvidence, item.taskId)',
     ):
         assert sentinel in ownership
