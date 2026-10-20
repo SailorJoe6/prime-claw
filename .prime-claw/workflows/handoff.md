@@ -36,10 +36,13 @@ recorded Episode worktree for live version-1 Episode identity, accepting the
 retained `EXECUTION_PLAN.md` spelling used by this project. If they are absent, stop for
 exact version-1 blocked-pair recovery through the `blocked` workflow; missing
 files are never live identity and never fall through to task-native mode.
-Version-2 ownership selects task-native handoff and
-binds its exact task ID and path. If an `<operator-episode-task>` block is also
-present, require its entire trimmed value to match that persisted task ID. A
-prompt tag never overrides persisted ownership.
+Version-2 ownership selects task-native handoff and binds its exact task ID and
+provider. A provider-absent record or `provider: "backlog"` also binds its exact
+task path. A `provider: "beads"` record instead binds its exact provider
+revision and complete raw task evidence and must not carry a task path. If an
+`<operator-episode-task>` block is also present, require its entire trimmed
+value to match that persisted task ID. A prompt tag never overrides persisted
+ownership, and task-native handoff never redetects or substitutes the provider.
 
 With no ownership, active legacy `SPECIFICATION.md` and
 `IMPLEMENTATION_PLAN.md` files on canonical main (or the retained
@@ -49,8 +52,8 @@ files decides may `<operator-episode-task>` become a candidate task binding.
 The tag alone cannot establish a live Episode or authorize task handoff; stop
 for exact version-2 ownership recovery before task-native continuation.
 
-For task-native handoff, reload the bound candidate through the supported
-structured interface:
+For provider-absent/Backlog task-native handoff, reload the bound candidate
+through the supported structured interface:
 
 ```sh
 backlog task view --json -- TASK-ID
@@ -58,15 +61,28 @@ backlog task view --json -- TASK-ID
 
 Require the returned canonical ID and task path to match the binding, and
 require status to remain exactly `In Progress`. The task is the sole durable
-handoff authority in this mode. Ensure its Implementation Plan, Implementation
-Notes, acceptance evidence, references, documentation, modified files, and
-Final Summary contain the current resumable context. If an in-scope update is
-needed, use supported `backlog task edit` operations only in this Episode
-worktree, reload and verify identity/path/parent/status, then commit and push the
-single-purpose checkpoint before compacting. Never pass `--status`, complete or
-archive the task, select replacement work, consult `.ralph/plans`, or copy task
-content across checkouts. The owning Conversation alone publishes lifecycle
-status on main.
+handoff authority in this branch. Ensure its Implementation Plan,
+Implementation Notes, acceptance evidence, references, documentation, modified
+files, and Final Summary contain the current resumable context. If an in-scope
+update is needed, use supported `backlog task edit` operations only in this
+Episode worktree, reload and verify identity/path/parent/status, then commit and
+push the single-purpose checkpoint before compacting.
+
+For Beads task-native handoff, use only the exact active owner's persisted
+`providerRevision` and complete raw `taskEvidence`. The public handoff boundary
+has already required a fresh clean published native proof after the raw task
+read and advanced only that receipt plus the current clean pushed Episode code
+head. Require the persisted raw task to remain exact `in_progress` with a
+meaningful `design`. Treat the raw provider fields as the durable task authority.
+Do not use Backlog, translate the task, or mutate Beads during handoff. If task
+content needs an in-scope update, leave it for the execute workflow's guarded
+native pull/read/update/push cycle. A same-task raw mismatch was not accepted by
+handoff and must never be reconstructed from guidance.
+
+In either task-native branch, guidance is bounded compaction focus only. It
+never accepts task content or supplies provider revision or raw evidence. Never pass `--status`, complete or archive the task, select replacement work,
+consult `.ralph/plans`, or copy task content across checkouts. The owning
+Conversation alone publishes lifecycle status on main.
 
 In retained folder-plan handoff, ensure the active specification and plan
 contain the context needed to resume cleanly. Persisted active version-1

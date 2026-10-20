@@ -310,16 +310,23 @@ transport is never retried blindly.
 
 Provider-absent/Backlog version-2 blocker and resume publication are prompt-led Conversation work. After accepting an exact pushed blocker report, the Conversation runs supported `backlog task edit` on canonical main, verifies the bound ID/path and a one-path diff, commits only that task as `Blocked`, and pushes. After the operator accepts the unblock condition, it performs the same exact-task operation to restore `In Progress`, then uses `handoff_task_episode`. The dual-mode blocked skill still selects durable ownership before prompt text; active version-2 ownership forces task mode and never falls back to `.ralph/plans`.
 
-Beads review guidance is deliberately ahead of Beads lifecycle activation. A
-Beads report or EXPERT conclusion is evidence, not approval. Handoff, blocked
-publication, status/terminal transitions, finalization, cleanup, and ownership
-evidence advancement remain unavailable. At any such boundary the Conversation
-reports the exact accepted evidence and stops; it does not route through
-Backlog-only commands or write the ownership registry directly.
+A Beads report or EXPERT conclusion is evidence, not approval. One narrow
+handoff path is active for unchanged-task continuation: `handoff_task_episode`
+selects the exact owner first, preflights the same idle Episode/resources, and
+uses the existing published-evidence advancement boundary with only the owner's
+persisted raw evidence/revision and current clean pushed code head. An unrelated
+published descendant may advance the receipt when the target raw view is
+unchanged. A same-task raw mismatch returns exact review evidence and delivers
+neither handoff nor execute; guidance never accepts the changed task or supplies
+native authority. Newly reviewed same-task content acceptance remains deferred.
+Blocked publication, status/terminal transitions, finalization, and cleanup
+remain unavailable for Beads. At those boundaries the Conversation reports the
+exact accepted evidence and stops; it does not route through Backlog-only
+commands or write the ownership registry directly.
 
 Persisted active version-1 ownership keeps its specification/plan pair active while blocked and throughout candidate review or revision. An older blocked snapshot with no active pair is not live: only after an explicit operator unblock decision may the blocked skill call `restore_blocked_spec_episode` for the exact owned future folder. The tool restores the exact readable pair without clobber or mode fallback and revalidates the same active identity. No-ownership old in-place blocking remains separate.
 
-For provider-absent/Backlog ownership, `handoff_task_episode` proves canonical primary-main caller context, exact owner/task/path in main and the Episode worktree, committed `In Progress` status, meaningful plans, clean owned worktree, exact Git/Orca and durable-session CWD identity, and quiescence. It binds both prompts to the exact task and reuses the same resources. It does not perform status, review, or terminal work.
+For provider-absent/Backlog ownership, `handoff_task_episode` proves canonical primary-main caller context, exact owner/task/path in main and the Episode worktree, committed `In Progress` status, meaningful plans, clean owned worktree, exact Git/Orca and durable-session CWD identity, and quiescence. The Beads branch proves canonical-primary Conversation context, exact active provider/task/operation/base/resource identity, meaningful persisted `in_progress` raw design, an idle/quiescent Episode, and a clean pushed current code head; then the accepted paired native evidence seam proves an unchanged target before its exact four-field receipt update. Both branches bind both prompts to the exact task and reuse the same resources. Neither performs status, review, or terminal work.
 
 Provider-absent/Backlog candidate review is evidence-led. After accepting an exact pushed candidate with no fixes remaining, the Conversation uses the supported Backlog CLI on canonical main to set only the bound task to `Ready for Merge`, reloads its exact ID/path/parent/status, verifies a one-path diff, commits only that task path, pushes, and records `mainHead`. In the exact idle Episode worktree, it runs ordinary `git merge --no-edit mainHead`; if the task conflicts, it restores the pre-merge Episode task content and applies only the Conversation-authorized `Ready for Merge` status through Backlog, while Git blocks other conflicts. It completes the merge, pushes, and verifies the refreshed `candidateHead`, upstream, task identity/path/parent/status, and clean worktree. It then shows the operator `(taskId, mainHead, candidateHead)`. There is no custom Ready publisher, two-parent reconciliation transaction, content digest, progress receipt, or replay protocol.
 

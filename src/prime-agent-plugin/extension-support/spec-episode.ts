@@ -56,10 +56,12 @@ import {
 } from "./project-initialization.ts";
 import { activeLegacyPlanFiles, restoreBlockedLegacyPlanFiles } from "./legacy-workflow.ts";
 import {
+  advancePublishedBeadsTaskEpisodeEvidence,
   meaningfulTaskImplementationPlan,
   reservePublishedBeadsTaskEpisodeOwnership,
   reserveTaskEpisodeOwnership,
   transitionLegacyEpisodeOwnershipToTask,
+  type BeadsTaskEvidenceAdvancementResult,
   type LegacyTaskOwnershipTransitionGit,
   type LegacyTaskOwnershipTransitionResult,
   type TaskEpisodeReservationInput,
@@ -138,10 +140,15 @@ export interface BlockedLegacyRestoreResult {
   restored: true; sourceLocation: string; episodeId: string; worktree: string;
   specification: string; implementation: string;
 }
-export interface TaskEpisodeHandoffResult {
-  admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
-  handoffDelivery: "prompt"; executeDelivery: "followUp";
-}
+export type TaskEpisodeHandoffResult =
+  | {
+      admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
+      handoffDelivery: "prompt"; executeDelivery: "followUp";
+    }
+  | ({
+      admitted: false; taskId: string; episodeId: string; episodeActiveSessionId: string;
+      handoffDelivery: "none"; executeDelivery: "none";
+    } & Extract<BeadsTaskEvidenceAdvancementResult, { status: "review-required" }>);
 export interface PublishedSession { activeSessionId: string; sessionId: string; sessionFile: string }
 
 export function episodeResultText(result: EpisodeResult): string {
@@ -222,6 +229,7 @@ export interface EpisodeDependencies {
 export interface TaskEpisodeHandoffDependencies extends EpisodeDependencies {
   taskRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  advanceBeadsEvidence?: typeof advancePublishedBeadsTaskEpisodeEvidence;
 }
 export interface EpisodeOwnershipTransitionDependencies extends EpisodeDependencies {
   transitionGit?: LegacyTaskOwnershipTransitionGit;
@@ -1180,7 +1188,14 @@ async function reopenIfNeeded<T extends EpisodeOwnershipRecord>(
   return { record: current, activeSessionId };
 }
 
-async function deliverOwnedEpisodeHandoff(
+type PreparedEpisodeHandoff = {
+  record: EpisodeOwnershipRecord;
+  activeSessionId: string;
+  handoffPrompt: string;
+  executePrompt: string;
+};
+
+async function prepareOwnedEpisodeHandoff(
   record: EpisodeOwnershipRecord,
   guidance: string,
   repo: string,
@@ -1191,7 +1206,7 @@ async function deliverOwnedEpisodeHandoff(
   publisher: SessionPublisher,
   store: EpisodeOwnershipStore,
   promptIdentity: { legacySnapshot?: boolean; taskId?: string; requireExactCwd?: boolean },
-): Promise<string> {
+): Promise<PreparedEpisodeHandoff> {
   if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
   validateWorktreeRecord(record, git, filesystem, repo);
   if (record.engine === "orca") {
@@ -1224,8 +1239,26 @@ async function deliverOwnedEpisodeHandoff(
   const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
   const state = await publisher.getState(route.activeSessionId);
   assertIdleEpisodeState(state, route.record, route.activeSessionId);
-  await publisher.deliverHandoff(route.activeSessionId, handoffPrompt, executePrompt);
-  return route.activeSessionId;
+  return { record: route.record, activeSessionId: route.activeSessionId, handoffPrompt, executePrompt };
+}
+
+async function deliverOwnedEpisodeHandoff(
+  record: EpisodeOwnershipRecord,
+  guidance: string,
+  repo: string,
+  ctx: ExtensionContext,
+  git: GitAdapter,
+  filesystem: FilesystemAdapter,
+  orca: OrcaAdapter,
+  publisher: SessionPublisher,
+  store: EpisodeOwnershipStore,
+  promptIdentity: { legacySnapshot?: boolean; taskId?: string; requireExactCwd?: boolean },
+): Promise<string> {
+  const prepared = await prepareOwnedEpisodeHandoff(
+    record, guidance, repo, ctx, git, filesystem, orca, publisher, store, promptIdentity,
+  );
+  await publisher.deliverHandoff(prepared.activeSessionId, prepared.handoffPrompt, prepared.executePrompt);
+  return prepared.activeSessionId;
 }
 
 export async function restoreBlockedSpecEpisode(
@@ -1427,6 +1460,27 @@ export async function transitionSpecEpisodeToTaskOwnership(
  * has published the main task's resumable `In Progress` state. This internal
  * seam is the guarded ordinary-continuation path for the public task lifecycle.
  */
+function sameBeadsHandoffBinding(
+  before: BeadsTaskEpisodeOwnershipRecord,
+  after: BeadsTaskEpisodeOwnershipRecord,
+): boolean {
+  const {
+    providerRevision: _beforeProviderRevision,
+    taskEvidence: _beforeTaskEvidence,
+    head: _beforeHead,
+    updatedAt: _beforeUpdatedAt,
+    ...beforeBinding
+  } = before;
+  const {
+    providerRevision: _afterProviderRevision,
+    taskEvidence: _afterTaskEvidence,
+    head: _afterHead,
+    updatedAt: _afterUpdatedAt,
+    ...afterBinding
+  } = after;
+  return JSON.stringify(beforeBinding) === JSON.stringify(afterBinding);
+}
+
 export async function handoffTaskEpisode(
   rawTaskId: string,
   guidance: string,
@@ -1457,14 +1511,78 @@ export async function handoffTaskEpisode(
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
       throw new Error("Episode handoff is available only from a top-level project Conversation");
     }
-    const record = store.read(repo, ctx.sessionManager.getSessionId());
+    const ownerSessionId = ctx.sessionManager.getSessionId();
+    const record = store.read(repo, ownerSessionId);
     if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
-    exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
+    exactAllocatableTaskRecord(record, taskId, ownerSessionId);
     if (record.status !== "active") {
       throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
     }
     validateWorktreeRecord(record, git, filesystem, repo);
     git.assertCleanWorktree(record.worktree!);
+
+    if (isBeadsTaskEpisodeOwnership(record)) {
+      if (record.taskEvidence.status !== "in_progress"
+          || !meaningfulTaskImplementationPlan(
+            typeof record.taskEvidence.design === "string" ? record.taskEvidence.design : null,
+          )) {
+        throw new Error("Beads task-native Episode handoff requires persisted in_progress evidence with a meaningful raw design");
+      }
+      publisher ??= new PrimeSessionPublisher();
+      const preflight = await prepareOwnedEpisodeHandoff(
+        record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
+        { taskId: record.taskId, requireExactCwd: true },
+      );
+      if (!isBeadsTaskEpisodeOwnership(preflight.record)
+          || preflight.record.status !== "active"
+          || preflight.record.ownerSessionId !== ownerSessionId
+          || preflight.record.taskId !== taskId) {
+        throw new Error("Beads task-native Episode ownership changed during idle handoff preflight");
+      }
+      const preparedRecord = preflight.record;
+      const currentEpisodeHead = git.head(preparedRecord.worktree!);
+      const advancement = (dependencies.advanceBeadsEvidence ?? advancePublishedBeadsTaskEpisodeEvidence)({
+        projectRoot: repo,
+        ownerSessionId,
+        taskId,
+        reviewedProviderRevision: preparedRecord.providerRevision,
+        reviewedTaskEvidence: preparedRecord.taskEvidence,
+        reviewedEpisodeHead: currentEpisodeHead,
+      });
+      if (advancement.status === "review-required") {
+        return {
+          admitted: false,
+          taskId,
+          episodeId: preparedRecord.episodeId!,
+          episodeActiveSessionId: preparedRecord.episodeActiveSessionId!,
+          handoffDelivery: "none",
+          executeDelivery: "none",
+          ...advancement,
+        };
+      }
+      if (!sameBeadsHandoffBinding(preparedRecord, advancement.record)) {
+        throw new Error("Beads evidence advancement changed retained Episode resource identity");
+      }
+      if (advancement.record.head !== currentEpisodeHead
+          || advancement.record.providerRevision !== advancement.publishedProviderRevision
+          || JSON.stringify(advancement.record.taskEvidence) !== JSON.stringify(preparedRecord.taskEvidence)) {
+        throw new Error("Beads evidence advancement returned an unexpected continuation receipt");
+      }
+      const activeSessionId = await deliverOwnedEpisodeHandoff(
+        advancement.record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
+        { taskId: advancement.record.taskId, requireExactCwd: true },
+      );
+      return {
+        admitted: true,
+        taskId: advancement.record.taskId,
+        episodeId: advancement.record.episodeId!,
+        episodeActiveSessionId: activeSessionId,
+        handoffDelivery: "prompt",
+        executeDelivery: "followUp",
+      };
+    }
+
+    exactOwnedTaskRecord(record, taskId, ownerSessionId);
     const mainTask = resolveTask(repo, taskId);
     if (!mainTask
       || mainTask.taskId !== record.taskId

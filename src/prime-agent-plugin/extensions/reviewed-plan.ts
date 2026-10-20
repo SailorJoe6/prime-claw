@@ -18,6 +18,7 @@ import {
   type TaskEpisodeCleanupDependencies,
   type TaskEpisodeCleanupOutcome,
   type TaskEpisodeCreationDependencies,
+  type TaskEpisodeHandoffDependencies,
   type TaskEpisodePlacementDependencies,
 } from "../extension-support/spec-episode.ts";
 import { CliTaskEpisodeCleanupAdapter } from "../extension-support/task-episode-cleanup.ts";
@@ -298,7 +299,7 @@ const DEFAULT_TASK_ACTIONS: TaskEpisodePublicActions = {
   cleanup: finalizeTaskEpisodeCleanup,
 };
 
-type ReviewedPlanDependencies = EpisodeDependencies & EpisodeOwnershipTransitionDependencies & TaskEpisodeCreationDependencies & {
+type ReviewedPlanDependencies = EpisodeDependencies & EpisodeOwnershipTransitionDependencies & TaskEpisodeCreationDependencies & TaskEpisodeHandoffDependencies & {
   createEpisode?: typeof createSpecEpisode;
   restoreBlockedEpisode?: typeof restoreBlockedSpecEpisode;
   handoffEpisode?: typeof handoffSpecEpisode;
@@ -811,7 +812,8 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       promptSnippet: "Hand off the exact task-native Episode and queue its next execute pass",
       promptGuidelines: [
         "Call handoff_task_episode only after this exact owner accepts an in-scope advance or recorded revision while the task remains In Progress.",
-        "Pass only the exact canonical task ID and optional bounded focus. Never infer another task or copy Episode-owned task content.",
+        "Pass only the exact canonical task ID and optional bounded focus. Guidance never accepts task changes or supplies provider revision or raw task authority.",
+        "For active Beads ownership, unchanged complete raw task evidence may advance through an already-published unrelated descendant; any same-task raw mismatch requires review and delivers neither handoff nor execute.",
         "Never use ordinary handoff for Blocked, merge, abandonment, cleanup, consultation, pause, or scope expansion.",
         "Treat handoff as terminal routing. Never retry uncertain transport or claim compaction or execute completion from admission alone.",
       ],
@@ -829,6 +831,12 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
           const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
+          if (!result.admitted) {
+            return {
+              content: [{ type: "text", text: `Task Episode handoff requires provider review for ${result.taskId}; no handoff or execute delivery occurred.` }],
+              details: result,
+            };
+          }
           return {
             content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.` }],
             details: result,

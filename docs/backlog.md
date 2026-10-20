@@ -671,8 +671,10 @@ its existing compact-first two-message flow, expiry and single-use behavior, and
 preselected placement. It binds the exact owner, provider, task, and project
 root (plus the exact task path for Backlog), re-resolves live provider-native
 status and plan/design evidence, rejects drift, and calls the accepted admission
-once. `/plan` and `plan_task` remain Backlog-only. Later handoff, oversight,
-blocked, finalization, cleanup, and receipt-advancement routing remain deferred.
+once. `/plan` and `plan_task` remain Backlog-only. The later sections activate
+provider-aware execute, oversight, receipt advancement, and unchanged-task
+handoff in bounded slices; blocked, finalization, cleanup, and the remaining
+lifecycle routes stay deferred.
 No provider matrix, normalized task model, snapshot/digest protocol, sidecar
 receipt, workspace-copy machinery, raw Dolt write, force, or automatic retry is
 introduced.
@@ -711,11 +713,12 @@ allocation, migration, and receipt mutation remain deferred.
 
 ### Internal same-owner Beads evidence advancement
 
-One internal provider-specific primitive can now advance reviewed published
-Beads evidence on an existing active version-2 owner. It has no public tool,
-managed-skill caller, handoff route, status transition, or lifecycle authority.
-The exact requesting Conversation owner is selected before provider or task
-interpretation; provider-absent/Backlog and version-1 records reject unchanged.
+One internal provider-specific primitive advances reviewed published Beads
+evidence on an existing active version-2 owner. It has no independent public
+tool, status transition, or lifecycle authority; the direct active-Beads
+handoff branch below is its sole managed caller. The exact requesting
+Conversation owner is selected before provider or task interpretation;
+provider-absent/Backlog and version-1 records reject unchanged.
 
 The input binds the exact owner and task, Conversation-reviewed complete raw
 native task view and published Dolt revision, and the reviewed pushed Episode
@@ -754,3 +757,41 @@ The primitive re-reads the exact persisted record. Owner drift, collisions,
 unsafe/unpushed code, non-descendant provider evidence, and uncertain writes
 fail closed without reservation, recreation, retry, force, or provider/task
 mutation. The live project registry is not used during development tests.
+
+### Direct active-Beads task handoff continuation
+
+The existing public `handoff_task_episode(taskId, guidance?)` now has one direct
+provider-specific branch for an exact active version-2 Beads owner. The public
+signature and the retained provider-absent/Backlog and version-1 paths are
+unchanged. The exact Conversation-keyed owner is selected before provider/task
+interpretation. Guidance is forwarded only into the canonical handoff prompt;
+it never supplies raw task evidence, provider revision authority, or acceptance
+of task changes.
+
+The branch requires canonical-primary `main` Conversation context and preserves
+the exact operation, code base, worktree, branch, Episode/session, and Orca
+resource binding. It requires persisted native `in_progress` evidence with a
+meaningful raw `design`, a clean owned worktree, an exact durable-session CWD,
+and the existing complete idle/quiescent transport proof before evidence
+advancement. It passes only the owner's persisted `providerRevision`, persisted
+complete raw `taskEvidence`, and the current Episode Git head to
+`advancePublishedBeadsTaskEpisodeEvidence`. That accepted boundary independently
+proves the current code head clean and equal to ordinary upstream/direct remote,
+and pairs a fresh clean native publication proof after its raw task read.
+
+An already-published unrelated native descendant may advance the existing
+receipt when the complete target raw view remains unchanged. The atomic owner
+write is still limited to `providerRevision`, `taskEvidence`, `head`, and
+`updatedAt`; every resource field remains exact. Any same-task raw change or
+publication pairing mismatch returns the exact managed-review evidence with
+`handoffDelivery: "none"` and `executeDelivery: "none"`. Busy, foreign, dirty,
+unpushed, drifted, or uncertain state fails before delivery and is never
+retried. After a valid advance, the branch repeats the existing resource and
+quiescence proof, then uses the existing canonical delivery once: one handoff
+prompt plus its sole execute follow-up, bound to the exact same task and
+resources.
+
+This slice does not accept newly reviewed same-task content or add a second
+receipt surface. It introduces no new public parameter/tool/protocol, task or
+status mutation, classifier, retry, force, raw Dolt write, blocked/resume,
+terminal/finalization/cleanup, planning/design, migration, or version-3 state.
