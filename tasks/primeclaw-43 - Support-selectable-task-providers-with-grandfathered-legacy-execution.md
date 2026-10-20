@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 18:07'
+updated_date: '2026-10-20 18:50'
 labels: []
 dependencies: []
 references:
@@ -17,6 +17,9 @@ documentation:
 modified_files:
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - tests/beads_task_episode_admission_extension.test.mjs
+  - src/prime-agent-plugin/extension-support/task-providers.ts
+  - tests/task_providers.test.mjs
+  - tests/test_task_providers.py
   - docs/backlog.md
 priority: p1
 type: epic
@@ -948,6 +951,22 @@ Advance only one bounded prerequisite slice: native Beads provider discovery/res
 Preserve primary-checkout Beads detection and every Backlog branch byte-for-byte. Add one direct helper/branch only. Do not add a provider framework, registry, universal workspace model, copied/symlinked/initialized store, redirect file, environment override, persisted state, or workspace cleanup. Prove the slice with bounded real disposable Git-worktree plus Beads 1.3.1 read-only context/task-resolution coverage and representative forged, foreign, and missing context failures; no Cartesian matrix.
 
 Keep reviewed-plan `/implement-task` and `create_task_episode` tool gating, managed execute skill, admission activation, handoff/oversight/finalization/cleanup, legacy/migration/cutover, PRIMECLAW-43.1, and version 3/sidecar/receipt deferred. Run focused/full host and Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
+
+2026-10-20 linked-worktree native Beads discovery slice implementation: preserved accepted admission head `4c556b296fc965244982655edce36c98a7117e93` and added one direct `scanLinkedWorktreeBeads` branch used only when Git reports a linked worktree with no Backlog evidence. It runs `bd context --json` from the linked cwd, then independently proves the exact linked top-level, real regular `.git` pointer, contained per-worktree gitdir, real non-symlink common `.git` directory, unique registered linked/primary worktree pair, and the canonical primary checkout derived from that common directory. It reuses `scanBeads` on the exact primary root for real/non-symlink/contained metadata/config and native no-db evidence, and requires schema-1 Dolt context to bind the exact linked cwd to that primary root/store/database/mode with `is_worktree: true` and `is_redirected: false`. Detection retains the linked project root, so capability `bd statuses` and exact `bd show` execute from the linked cwd against the proven native store. Primary-checkout detection is unchanged; existing Backlog evidence takes the pre-existing branch unchanged.
+
+Coverage added: mocked exact linked discovery/resolution proves primary evidence and linked-cwd context/status/show calls; representative missing, forged (`is_worktree: false`), and foreign root/store context all block before task reads/mutations with remediation. A real disposable Beads 1.3.1 test initializes one primary server store and task, registers one Git linked worktree, proves the live context identities, resolves the exact task through production `detectTaskProvider`/`resolveProviderTask`, proves raw before/after task views equal and `dolt_status=[]` before/after, stops the native server, and removes the fixture. Initial targeted provider suite passed 66/66 after committing disposable lifecycle config so read-only baseline evidence was clean. Focused rerun/static validation is in progress.
+
+Focused validation for the linked-worktree discovery slice passes: combined provider, Backlog admission, Beads admission, and ownership suites 136/136; provider static checks 3 passed/2 container deselected; `git diff --check` passes. Existing Backlog admission test source remains unchanged from accepted admission head `4c556b296fc965244982655edce36c98a7117e93`. The final production path uses exact canonical context strings (not merely equivalent normalized paths) for linked cwd, primary root, and primary `.beads` store. No research or expert child findings were received or applied; both disposable child sessions exited before review, so the candidate relies on the direct implementation, self-review, and executable evidence recorded here.
+
+Full-host validation exposed one concrete compatibility defect: all 22 task-history failures came from provider-absent registered Backlog linked worktrees being routed into the new Beads-context branch and blocked when `bd context` correctly reported no `.beads` directory. The branch is now selected only when the linked checkout contains checked-out `metadata.json` or `config.yaml` Beads authority metadata and no Backlog evidence. Provider-absent linked worktrees retain the prior `none` result and never invoke native Beads context; existing Backlog evidence still follows the original scan/dual-provider logic. Inside the new branch, native `bd context` remains the first authority read, and the linked `.beads` discovery directory is additionally required to be a real non-symlink directory at its exact canonical location before primary authority is accepted.
+
+A direct provider-absent regression proves `none` and zero `bd context` calls. Final provider suite passes 67/67, including real Beads 1.3.1 linked resolution plus missing/forged/foreign blocking. Final task-history suite passes 51/51, restoring every existing Backlog linked-worktree prepare/reuse/cleanup/mutation branch. The first full-host run's failures were solely this defect; no candidate code was committed or pushed before repair.
+
+Repaired full-host Node validation passes 388/388. This includes the new 67-test provider suite, the restored 51-test task-history suite, accepted Beads admission/recovery coverage, and every existing Backlog branch. `git diff --check` passes and the accepted Backlog admission test source remains byte-for-byte unchanged from `4c556b296fc965244982655edce36c98a7117e93`. Docker tier 1 remains.
+
+Docker tier 1/offline RPC passes for the final linked-worktree candidate: immutable image launched, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261020T184814Z-11310-17746729/tier1`. Final evidence is provider 67/67, task-history 51/51, focused admission/provider/ownership 136/136 before the provider-absent compatibility regression (whose final provider/task-history reruns are 67/67 and 51/51), full-host Node 388/388, provider static 3 passed/2 container deselected, Docker tier 1 PASS, and `git diff --check` PASS.
+
+The slice stays exact: one private helper plus one detection branch. Checked-out Beads metadata is only the candidate signal. Native `bd context --json` from the linked cwd is the first authority read, ordinary Git independently proves exact linked/common/registered-primary identity, the primary real `.beads` evidence is reused, and downstream `bd statuses`/`bd show` stay in linked cwd. Provider-absent and all Backlog paths remain unchanged. No store copy/symlink/init/redirect/env override/persisted state/cleanup or provider framework was added. Managed reviewed-plan/tool/execute routing, admission activation, later lifecycle, migration/cutover, PRIMECLAW-43.1, and version 3/sidecar/receipt remain deferred.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1012,4 +1031,6 @@ Revision requested for `38a982ce880b0a893d24db0f575139a76df2b3fe`: remove fresh-
 Repaired direct internal Beads admission candidate `38a982ce880b0a893d24db0f575139a76df2b3fe`: recovery no longer reapplies fresh-admission Git operation/clean/head/upstream checks and instead proves exact provider/task/status plus unchanged owner/base before its sole rollback or Blocked evidence advance. Before reservation, the complete live target `nativeView` must exactly equal published raw evidence; drift reserves nothing, surfaces both full raw views, preserves unrelated advances, and rolls back once. Direct 14/14, focused 133/133, full Node 384/384, real Beads 1.3.1 UAT, and Docker tier 1 pass.
 
 Accepted direct internal Beads admission through `4c556b296fc965244982655edce36c98a7117e93`. Next bounded slice: prove native Beads discovery/resolution from one exact registered Git linked worktree using `bd context --json`, safe Git common-directory metadata, and the existing primary-store evidence; preserve primary and Backlog behavior, block mismatches before mutation, test with real disposable Beads 1.3.1 worktree coverage, and keep managed routing/lifecycle deferred.
+
+Accepted direct Beads admission through `4c556b296fc965244982655edce36c98a7117e93` remains unchanged. Added one bounded native linked-worktree discovery branch: checked-out Beads metadata selects native `bd context --json` from linked cwd; exact safe Git common-directory/registration evidence derives the canonical primary; context must bind exact linked/primary/store/database/mode with worktree true and redirect false; primary store/no-db evidence and linked-cwd capabilities/show then resolve the exact task. Missing, forged, foreign, redirected, symlinked, or mismatched context blocks before task reads/mutation. Provider-absent linked and every Backlog path remain unchanged. Provider 67/67, task-history 51/51, full Node 388/388, real Beads 1.3.1 read-only UAT, and Docker tier 1 pass.
 <!-- SECTION:FINAL_SUMMARY:END -->
