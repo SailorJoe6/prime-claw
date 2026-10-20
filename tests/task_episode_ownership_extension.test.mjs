@@ -20,6 +20,7 @@ import {
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import {
   CliLegacyTaskOwnershipTransitionGit,
+  reservePublishedBeadsTaskEpisodeOwnership,
   reserveTaskEpisodeOwnership,
   transitionLegacyEpisodeOwnershipToTask,
 } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
@@ -110,6 +111,52 @@ function beadsOwnership(ownerSessionId, taskId, revision = "c".repeat(32)) {
     baseRef: "d".repeat(40),
     createdAt: "2026-10-20T12:00:00.000Z",
     updatedAt: "2026-10-20T12:00:00.000Z",
+  });
+}
+
+function publishedBeadsStatus(f, overrides = {}) {
+  const taskId = f.selection.taskId;
+  const rawTask = { id: taskId, title: `Native ${taskId}`, status: "in_progress", comments: [] };
+  const command = { command: "bd", args: [], status: 0, stdout: "", stderr: "" };
+  const revision = "d".repeat(32);
+  const evidence = {
+    provider: "beads",
+    projectRoot: f.root,
+    taskId,
+    remoteName: "origin",
+    publicationRef: "refs/dolt/data",
+    preparedRevision: "c".repeat(32),
+    committedRevision: revision,
+    publishedRevision: revision,
+    publicationHead: "e".repeat(40),
+    taskBefore: { taskId, title: rawTask.title, nativeStatus: "in_design", canonicalStatus: "In Design", nativeView: { ...rawTask, status: "in_design" } },
+    taskPublished: { taskId, title: rawTask.title, nativeStatus: rawTask.status, canonicalStatus: "In Progress", nativeView: rawTask },
+    postMutationProof: { revision, parentRevision: "c".repeat(32), clean: true, command },
+    localPublishedProof: { revision, parentRevision: "c".repeat(32), clean: true, command },
+    remotePublishedTask: {
+      publicationHead: "e".repeat(40), revision, taskRow: { id: taskId, title: rawTask.title, status: rawTask.status },
+      comments: [], refBefore: { command },
+    },
+    pull: command,
+    mutation: command,
+    push: command,
+    ...overrides,
+  };
+  return { status: "published", evidence };
+}
+
+function reservePublishedBeads(f, overrides = {}, dependencies = {}) {
+  return reservePublishedBeadsTaskEpisodeOwnership({
+    projectRoot: f.root,
+    publication: publishedBeadsStatus(f),
+    ownerSessionId: "beads-owner",
+    engine: "local",
+    baseRef: git(f.root, "rev-parse", "HEAD"),
+    operationId: "beads-operation-1234",
+    ...overrides,
+  }, {
+    now: () => "2026-10-20T16:30:00.000Z",
+    ...dependencies,
   });
 }
 
@@ -558,6 +605,65 @@ test("version-2 ownership rejects mixed provider fields, ambiguous identity, and
     { ...beads, provider: "other" },
     { ...legacyBacklog, provider: undefined, taskPath: undefined },
   ]) assert.throws(() => parseEpisodeOwnership(invalid), /unsupported shape/);
+});
+
+test("published Beads evidence reserves one exact provider-native owner and preserves unrelated legacy Backlog identity", () => {
+  const f = fixture();
+  const unrelated = taskOwnership("unrelated-owner", "PRIMECLAW-99");
+  writeEpisodeOwnership(f.root, unrelated);
+
+  const record = reservePublishedBeads(f, {
+    engine: "orca",
+    projectSetupId: "setup-123",
+    routingEnvironmentId: "environment-456",
+  });
+
+  assert.equal(record.provider, "beads");
+  assert.equal(record.taskId, f.selection.taskId);
+  assert.equal(record.providerRevision, "d".repeat(32));
+  assert.deepEqual(record.taskEvidence, {
+    id: f.selection.taskId,
+    title: `Native ${f.selection.taskId}`,
+    status: "in_progress",
+    comments: [],
+  });
+  assert.equal(record.baseRef, git(f.root, "rev-parse", "HEAD"));
+  assert.equal(record.projectSetupId, "setup-123");
+  assert.equal(record.routingEnvironmentId, "environment-456");
+  assert.deepEqual(readEpisodeOwnership(f.root, "beads-owner"), record);
+  assert.deepEqual(readEpisodeOwnership(f.root, "unrelated-owner"), unrelated);
+  assert.equal(taskEpisodeProvider(readEpisodeOwnership(f.root, "unrelated-owner")), "backlog");
+});
+
+test("Beads reservation rejects anything other than the proven published result before ownership write", () => {
+  const f = fixture();
+  assert.throws(() => reservePublishedBeads(f, {
+    publication: {
+      status: "review-required",
+      code: "publication-proof-failed",
+      phase: "publication-proof",
+      detail: "raw provider review evidence",
+      evidence: { provider: "beads", projectRoot: f.root, taskId: f.selection.taskId },
+    },
+  }), /already-published native status result/);
+  assert.throws(() => reservePublishedBeads(f, {}, {
+    git: {
+      repositoryRoot: () => f.root,
+      head: () => git(f.root, "rev-parse", "HEAD"),
+      status: () => " M src/changed.ts",
+    },
+  }), /exact clean Git code HEAD\/baseRef/);
+  assert.equal(readEpisodeOwnership(f.root, "beads-owner"), null);
+});
+
+test("Beads reservation preserves the global cross-provider task collision rule", () => {
+  const f = fixture();
+  const existing = taskOwnership("other-owner", f.selection.taskId);
+  writeEpisodeOwnership(f.root, existing);
+
+  assert.throws(() => reservePublishedBeads(f), /collides across Conversations/);
+  assert.deepEqual(readEpisodeOwnership(f.root, "other-owner"), existing);
+  assert.equal(readEpisodeOwnership(f.root, "beads-owner"), null);
 });
 
 test("provider-absent version-2 Backlog owners parse unchanged without registry rewrite", () => {

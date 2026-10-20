@@ -11,6 +11,7 @@ import {
   readEpisodeOwnership,
   writeEpisodeOwnership,
   type BacklogTaskEpisodeOwnershipRecord,
+  type BeadsTaskEpisodeOwnershipRecord,
   type EpisodeOwnershipRecord,
   type LegacyBacklogTaskEpisodeOwnershipRecord,
   type LegacyEpisodeOwnershipRecord,
@@ -18,7 +19,11 @@ import {
 import {
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
-import { requireBacklogTaskSelection, resolveProviderTask } from "./task-providers.ts";
+import {
+  requireBacklogTaskSelection,
+  resolveProviderTask,
+  type BeadsTaskMutationPublication,
+} from "./task-providers.ts";
 
 /**
  * Default resolver: provider-aware task resolution narrowed to the existing
@@ -61,6 +66,30 @@ export interface TaskEpisodeReservationDependencies {
   git?: TaskEpisodeReservationGit;
   ownership?: TaskEpisodeReservationStore;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  now?: () => string;
+}
+
+export interface BeadsTaskEpisodeReservationGit {
+  repositoryRoot(cwd: string): string;
+  head(repo: string): string;
+  status(repo: string): string;
+}
+
+export interface BeadsTaskEpisodeReservationInput {
+  projectRoot: string;
+  publication: BeadsTaskMutationPublication;
+  ownerSessionId: string;
+  engine: "orca" | "local";
+  projectSetupId?: string;
+  routingEnvironmentId?: string;
+  operationId?: string;
+  /** Exact clean code HEAD that this reservation binds as baseRef. */
+  baseRef: string;
+}
+
+export interface BeadsTaskEpisodeReservationDependencies {
+  git?: BeadsTaskEpisodeReservationGit;
+  ownership?: TaskEpisodeReservationStore;
   now?: () => string;
 }
 
@@ -118,6 +147,12 @@ export class CliTaskEpisodeReservationGit implements TaskEpisodeReservationGit {
     return output ? output.split(/\r?\n/).filter(Boolean) : [];
   }
   pathStatus(repo: string, path: string): string { return runGit(repo, ["status", "--porcelain", "--", path]); }
+}
+
+export class CliBeadsTaskEpisodeReservationGit implements BeadsTaskEpisodeReservationGit {
+  repositoryRoot(cwd: string): string { return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"])); }
+  head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
+  status(repo: string): string { return runGit(repo, ["status", "--porcelain=v1", "--untracked-files=no"]); }
 }
 
 export class CliLegacyTaskOwnershipTransitionGit implements LegacyTaskOwnershipTransitionGit {
@@ -517,5 +552,122 @@ export function reserveTaskEpisodeOwnership(
   };
   parseEpisodeOwnership(record);
   ownership.write(projectRoot, record);
+  return record;
+}
+
+
+const BEADS_RESERVATION_REVISION = /^[0-9a-v]{32}$/;
+const BEADS_IN_PROGRESS_STATUS = "in_progress";
+
+/**
+ * Persist one Beads task-native provisioning reservation from the already
+ * published provider-native status result. This deliberately has no caller in
+ * createTaskEpisode until the later admission slice activates it.
+ */
+export function reservePublishedBeadsTaskEpisodeOwnership(
+  input: BeadsTaskEpisodeReservationInput,
+  dependencies: BeadsTaskEpisodeReservationDependencies = {},
+): BeadsTaskEpisodeOwnershipRecord {
+  if (input.publication.status !== "published") {
+    throw new Error("Beads Episode reservation requires an already-published native status result");
+  }
+  const evidence = input.publication.evidence;
+  if (evidence.provider !== "beads") {
+    throw new Error("Beads Episode reservation requires exact provider-native publication evidence");
+  }
+
+  const requestedRoot = realpathSync(input.projectRoot);
+  const publishedRoot = realpathSync(evidence.projectRoot);
+  if (resolve(publishedRoot) !== resolve(requestedRoot)) {
+    throw new Error("Beads Episode reservation publication resolved in a different project");
+  }
+  const git = dependencies.git ?? new CliBeadsTaskEpisodeReservationGit();
+  const projectRoot = git.repositoryRoot(requestedRoot);
+  if (resolve(projectRoot) !== resolve(requestedRoot)) {
+    throw new Error("Beads Episode reservation must run from the exact repository root");
+  }
+  if (!evidence.taskId || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(evidence.taskId)) {
+    throw new Error("Beads Episode reservation requires the exact canonical published task ID");
+  }
+  if (!BEADS_RESERVATION_REVISION.test(evidence.publishedRevision)
+      || evidence.committedRevision !== evidence.publishedRevision
+      || evidence.localPublishedProof.revision !== evidence.publishedRevision
+      || evidence.localPublishedProof.clean !== true
+      || evidence.remotePublishedTask.revision !== evidence.publishedRevision) {
+    throw new Error("Beads Episode reservation requires one exact clean published provider revision");
+  }
+
+  const publishedTask = evidence.taskPublished;
+  const rawTask = publishedTask.nativeView;
+  const remoteTask = evidence.remotePublishedTask.taskRow;
+  if (publishedTask.taskId !== evidence.taskId
+      || publishedTask.canonicalStatus !== "In Progress"
+      || publishedTask.nativeStatus !== BEADS_IN_PROGRESS_STATUS
+      || !rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
+      || rawTask.id !== evidence.taskId
+      || rawTask.title !== publishedTask.title
+      || rawTask.status !== publishedTask.nativeStatus
+      || !remoteTask || typeof remoteTask !== "object" || Array.isArray(remoteTask)
+      || remoteTask.id !== rawTask.id
+      || remoteTask.title !== rawTask.title
+      || remoteTask.status !== rawTask.status) {
+    throw new Error("Beads Episode reservation requires matching raw published In Progress task evidence");
+  }
+
+  if (!input.ownerSessionId) throw new Error("Beads Episode reservation requires an exact owner session");
+  if (input.engine === "orca" && !input.projectSetupId) {
+    throw new Error("Beads Orca reservation requires an exact project setup");
+  }
+  if (input.engine === "local" && (input.projectSetupId || input.routingEnvironmentId)) {
+    throw new Error("Beads local reservation cannot carry Orca placement identity");
+  }
+  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(input.baseRef)) {
+    throw new Error("Beads Episode reservation requires an exact Git code HEAD");
+  }
+  if (git.head(projectRoot) !== input.baseRef || git.status(projectRoot) !== "") {
+    throw new Error("Beads Episode reservation requires the exact clean Git code HEAD/baseRef");
+  }
+
+  const ownership = dependencies.ownership ?? defaultOwnership;
+  const initial = ownership.read(projectRoot, input.ownerSessionId);
+  if (initial && initial.status !== "inactive") {
+    const identity = initial.version === 2 ? initial.taskId : initial.sourceLocation;
+    throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of reserving again`);
+  }
+  const operationId = input.operationId ?? randomUUID();
+  if (!/^[A-Za-z0-9-]+$/.test(operationId)) {
+    throw new Error("Beads Episode reservation requires a safe operation ID");
+  }
+  const now = dependencies.now?.() ?? new Date().toISOString();
+  const record = parseEpisodeOwnership({
+    version: 2,
+    provider: "beads",
+    status: "provisioning",
+    operationId,
+    engine: input.engine,
+    ownerSessionId: input.ownerSessionId,
+    taskId: evidence.taskId,
+    providerRevision: evidence.publishedRevision,
+    taskEvidence: rawTask,
+    baseRef: input.baseRef,
+    createdAt: now,
+    updatedAt: now,
+    ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
+    ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
+  }) as BeadsTaskEpisodeOwnershipRecord;
+
+  if (git.head(projectRoot) !== input.baseRef || git.status(projectRoot) !== "") {
+    throw new Error("Git state changed during Beads Episode reservation validation");
+  }
+  const beforeWrite = ownership.read(projectRoot, input.ownerSessionId);
+  if ((initial === null) !== (beforeWrite === null)
+      || (initial !== null && beforeWrite !== null && JSON.stringify(initial) !== JSON.stringify(beforeWrite))) {
+    throw new Error("Episode ownership changed during Beads reservation validation");
+  }
+  ownership.write(projectRoot, record);
+  const stored = ownership.read(projectRoot, input.ownerSessionId);
+  if (!sameOwnership(stored, record)) {
+    throw new Error("Beads Episode reservation could not verify the exact completed binding");
+  }
   return record;
 }

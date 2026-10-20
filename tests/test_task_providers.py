@@ -89,6 +89,10 @@ def test_version_two_ownership_keeps_one_discriminated_provider_native_shape() -
     ):
         assert sentinel in ownership
     assert writer.count('provider: "backlog"') == 2
+    assert writer.count("reservePublishedBeadsTaskEpisodeOwnership") == 1
+    assert 'input.publication.status !== "published"' in writer
+    assert 'provider: "beads"' in writer
+    assert "reservePublishedBeadsTaskEpisodeOwnership" not in episode
     assert "Legacy ownership transition replay does not yet support Beads ownership" in writer
     assert "isBacklogTaskEpisodeOwnership(record)" in episode
     assert "does not yet admit Beads ownership" in episode
