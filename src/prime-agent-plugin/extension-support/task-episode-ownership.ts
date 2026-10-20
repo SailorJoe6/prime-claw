@@ -5,24 +5,34 @@ import { execFileSync } from "node:child_process";
 
 import {
   isBacklogTaskEpisodeOwnership,
+  isBeadsTaskEpisodeOwnership,
   isLegacyEpisodeOwnership,
   isTaskEpisodeOwnership,
+  mutateEpisodeOwnership,
   parseEpisodeOwnership,
   readEpisodeOwnership,
   writeEpisodeOwnership,
   type BacklogTaskEpisodeOwnershipRecord,
   type BeadsTaskEpisodeOwnershipRecord,
+  type EpisodeOwnershipMutation,
   type EpisodeOwnershipRecord,
   type LegacyBacklogTaskEpisodeOwnershipRecord,
   type LegacyEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import {
+  ProcessCommandRunner,
+  type CommandRunner,
+} from "./project-initialization.ts";
+import {
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
 import {
+  prepareBeadsWorkspaceTransport,
   requireBacklogTaskSelection,
   resolveProviderTask,
   type BeadsTaskMutationPublication,
+  type BeadsWorkspaceTransportPreparation,
+  type ProviderTaskResolution,
 } from "./task-providers.ts";
 
 /**
@@ -93,6 +103,61 @@ export interface BeadsTaskEpisodeReservationDependencies {
   now?: () => string;
 }
 
+/** Reviewed provider-native facts that may advance one existing active Beads owner. */
+export interface BeadsTaskEvidenceAdvancementInput {
+  /** Canonical primary checkout that contains the existing ownership registry. */
+  projectRoot: string;
+  ownerSessionId: string;
+  taskId: string;
+  reviewedProviderRevision: string;
+  reviewedTaskEvidence: Record<string, unknown>;
+  reviewedEpisodeHead: string;
+}
+
+export interface BeadsTaskEvidenceAdvancementGit {
+  repositoryRoot(cwd: string): string;
+  branch(repo: string): string;
+  head(repo: string): string;
+  upstreamHead(repo: string): string;
+  directRemoteHead(repo: string, branch: string): string;
+  status(repo: string): string;
+  operationInProgress(repo: string): boolean;
+  isAncestor(repo: string, ancestor: string, descendant: string): boolean;
+}
+
+export interface BeadsTaskEvidenceAdvancementStore {
+  read(projectRoot: string, ownerSessionId: string): EpisodeOwnershipRecord | null;
+  mutate(projectRoot: string, ownerSessionId: string, mutation: EpisodeOwnershipMutation): EpisodeOwnershipRecord | null;
+}
+
+export interface BeadsTaskEvidenceAdvancementDependencies {
+  git?: BeadsTaskEvidenceAdvancementGit;
+  ownership?: BeadsTaskEvidenceAdvancementStore;
+  runner?: CommandRunner;
+  prepareTransport?: (cwd: string, runner: CommandRunner) => BeadsWorkspaceTransportPreparation;
+  resolveTask?: (cwd: string, taskId: string, runner: CommandRunner) => ProviderTaskResolution | null;
+  providerRevisionIsAncestor?: (
+    cwd: string, ancestor: string, descendant: string, runner: CommandRunner,
+  ) => boolean;
+  now?: () => string;
+}
+
+export type BeadsTaskEvidenceAdvancementResult =
+  | {
+      status: "advanced";
+      record: BeadsTaskEpisodeOwnershipRecord;
+      reviewedProviderRevision: string;
+      publishedProviderRevision: string;
+    }
+  | {
+      status: "review-required";
+      code: "task-evidence-mismatch";
+      reviewedProviderRevision: string;
+      publishedProviderRevision: string;
+      acceptedTaskEvidence: Record<string, unknown>;
+      currentTaskEvidence: Record<string, unknown>;
+    };
+
 export interface LegacyTaskOwnershipTransitionInput {
   projectRoot: string;
   sourceLocation: string;
@@ -155,6 +220,47 @@ export class CliBeadsTaskEpisodeReservationGit implements BeadsTaskEpisodeReserv
   status(repo: string): string { return runGit(repo, ["status", "--porcelain=v1", "--untracked-files=no"]); }
 }
 
+export class CliBeadsTaskEvidenceAdvancementGit implements BeadsTaskEvidenceAdvancementGit {
+  repositoryRoot(cwd: string): string { return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"])); }
+  branch(repo: string): string { return runGit(repo, ["symbolic-ref", "--short", "HEAD"]); }
+  head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
+  upstreamHead(repo: string): string { return runGit(repo, ["rev-parse", "@{upstream}"]); }
+  directRemoteHead(repo: string, branch: string): string {
+    const remote = runGit(repo, ["config", "--get", `branch.${branch}.remote`]);
+    const mergeRef = runGit(repo, ["config", "--get", `branch.${branch}.merge`]);
+    if (!remote || !mergeRef || mergeRef !== `refs/heads/${branch}`) {
+      throw new Error("Beads evidence advancement requires the recorded branch's exact ordinary upstream");
+    }
+    const urls = runGit(repo, ["remote", "get-url", "--all", remote]).split(/\r?\n/).filter(Boolean);
+    if (urls.length !== 1) {
+      throw new Error("Beads evidence advancement requires one exact code remote transport");
+    }
+    const rows = runGit(repo, ["ls-remote", "--exit-code", "--heads", urls[0]!, mergeRef])
+      .split(/\r?\n/).filter(Boolean);
+    const match = rows.length === 1
+      ? /^([0-9a-f]{40}|[0-9a-f]{64})\s+refs\/heads\/(.+)$/.exec(rows[0]!)
+      : null;
+    if (!match || match[2] !== branch) {
+      throw new Error("Beads evidence advancement could not prove the exact direct-remote code head");
+    }
+    return match[1]!;
+  }
+  status(repo: string): string { return runGit(repo, ["status", "--porcelain=v1", "--untracked-files=all"]); }
+  operationInProgress(repo: string): boolean {
+    return ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer"]
+      .some((marker) => existsSync(resolve(repo, runGit(repo, ["rev-parse", "--git-path", marker]))));
+  }
+  isAncestor(repo: string, ancestor: string, descendant: string): boolean {
+    try {
+      execFileSync("git", ["-C", repo, "merge-base", "--is-ancestor", ancestor, descendant], { stdio: "ignore" });
+      return true;
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "status" in error && error.status === 1) return false;
+      throw error;
+    }
+  }
+}
+
 export class CliLegacyTaskOwnershipTransitionGit implements LegacyTaskOwnershipTransitionGit {
   repositoryRoot(cwd: string): string { return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"])); }
   isPrimaryWorktree(repo: string): boolean {
@@ -208,6 +314,11 @@ export class CliLegacyTaskOwnershipTransitionGit implements LegacyTaskOwnershipT
 const defaultOwnership: TaskEpisodeReservationStore = {
   read: readEpisodeOwnership,
   write: writeEpisodeOwnership,
+};
+
+const defaultBeadsEvidenceAdvancementOwnership: BeadsTaskEvidenceAdvancementStore = {
+  read: (projectRoot, ownerSessionId) => readEpisodeOwnership(projectRoot, ownerSessionId),
+  mutate: mutateEpisodeOwnership,
 };
 
 function containedBy(parent: string, child: string): boolean {
@@ -670,4 +781,206 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
     throw new Error("Beads Episode reservation could not verify the exact completed binding");
   }
   return record;
+}
+
+
+function exactBeadsProviderRevisionAncestor(
+  cwd: string,
+  ancestor: string,
+  descendant: string,
+  runner: CommandRunner,
+): boolean {
+  if (ancestor === descendant) return true;
+  const query = `SELECT dolt_merge_base('${ancestor}', '${descendant}') AS merge_base`;
+  const result = runner.run("bd", ["--readonly", "sql", "--json", query], { cwd, allowFailure: true });
+  if (result.status !== 0) {
+    throw new Error(`Beads evidence advancement could not prove provider revision ancestry: ${result.stderr.trim() || result.stdout.trim() || `exit ${result.status}`}`);
+  }
+  let parsed: unknown;
+  try { parsed = JSON.parse(result.stdout); }
+  catch (error) {
+    throw new Error(`Beads evidence advancement received invalid provider ancestry JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const row = Array.isArray(parsed) && parsed.length === 1 && parsed[0]
+    && typeof parsed[0] === "object" && !Array.isArray(parsed[0])
+    ? parsed[0] as Record<string, unknown>
+    : null;
+  if (!row || typeof row.merge_base !== "string" || !BEADS_RESERVATION_REVISION.test(row.merge_base)) {
+    throw new Error("Beads evidence advancement received unsupported provider ancestry evidence");
+  }
+  return row.merge_base === ancestor;
+}
+
+function proveReviewedBeadsEpisodeCode(
+  record: BeadsTaskEpisodeOwnershipRecord,
+  reviewedHead: string,
+  git: BeadsTaskEvidenceAdvancementGit,
+): void {
+  const episodeRoot = realpathSync(record.worktree!);
+  if (git.repositoryRoot(episodeRoot) !== episodeRoot) {
+    throw new Error("Beads evidence advancement requires the exact recorded Episode repository root");
+  }
+  if (git.operationInProgress(episodeRoot) || git.status(episodeRoot) !== "") {
+    throw new Error("Beads evidence advancement requires a clean Episode worktree with no Git operation in progress");
+  }
+  if (git.branch(episodeRoot) !== record.branch) {
+    throw new Error("Beads evidence advancement recorded Episode branch drifted");
+  }
+  const localHead = git.head(episodeRoot);
+  const upstreamHead = git.upstreamHead(episodeRoot);
+  const directRemoteHead = git.directRemoteHead(episodeRoot, record.branch!);
+  if (localHead !== reviewedHead || upstreamHead !== reviewedHead || directRemoteHead !== reviewedHead) {
+    throw new Error("Beads evidence advancement requires the exact reviewed pushed local/upstream/direct-remote Episode head");
+  }
+  if (!record.head || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(record.head)
+      || !git.isAncestor(episodeRoot, record.baseRef, record.head)
+      || !git.isAncestor(episodeRoot, record.head, reviewedHead)
+      || !git.isAncestor(episodeRoot, record.baseRef, reviewedHead)) {
+    throw new Error("Beads evidence advancement found unsafe Episode base/head ancestry");
+  }
+}
+
+function activeForeignBeadsEvidenceCollision(
+  retained: BeadsTaskEpisodeOwnershipRecord,
+  allRecords: readonly EpisodeOwnershipRecord[],
+): EpisodeOwnershipRecord | null {
+  return allRecords.find((record) => record.ownerSessionId !== retained.ownerSessionId
+    && record.status !== "inactive"
+    && ((record.version === 2 && record.taskId === retained.taskId)
+      || (record.episodeId !== undefined && record.episodeId === retained.episodeId)
+      || (record.worktree !== undefined && record.worktree === retained.worktree)
+      || (record.branch !== undefined && record.branch === retained.branch))) ?? null;
+}
+
+/**
+ * Advance only the reviewed provider/task/code evidence on one retained active
+ * Beads owner. This internal primitive creates no owner, task mutation, status
+ * transition, lifecycle routing, or retry. Raw same-task drift is returned for
+ * managed review without classification or ownership mutation.
+ */
+export function advancePublishedBeadsTaskEpisodeEvidence(
+  input: BeadsTaskEvidenceAdvancementInput,
+  dependencies: BeadsTaskEvidenceAdvancementDependencies = {},
+): BeadsTaskEvidenceAdvancementResult {
+  if (!input.ownerSessionId) throw new Error("Beads evidence advancement requires the exact requesting owner");
+  const ownershipRoot = realpathSync(input.projectRoot);
+  const ownership = dependencies.ownership ?? defaultBeadsEvidenceAdvancementOwnership;
+
+  // The exact owner is selected before provider/task interpretation. Never scan
+  // owners to infer a binding from task ID or placement.
+  const selected = ownership.read(ownershipRoot, input.ownerSessionId);
+  if (!selected) throw new Error("Beads evidence advancement found no ownership for the exact requesting owner");
+  if (selected.ownerSessionId !== input.ownerSessionId) {
+    throw new Error("Beads evidence advancement ownership does not match the exact requesting owner");
+  }
+  if (selected.version !== 2 || selected.status !== "active" || !isBeadsTaskEpisodeOwnership(selected)) {
+    throw new Error("Beads evidence advancement requires one retained active provider-specific Beads owner");
+  }
+  if (selected.taskId !== input.taskId) {
+    throw new Error("Beads evidence advancement task does not match the exact retained owner");
+  }
+  if (!BEADS_RESERVATION_REVISION.test(input.reviewedProviderRevision)
+      || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(input.reviewedEpisodeHead)) {
+    throw new Error("Beads evidence advancement requires exact reviewed provider and Episode revisions");
+  }
+  if (!selected.worktree || !selected.branch || !selected.head || !selected.episodeId
+      || !selected.episodeSessionFile || !selected.episodeActiveSessionId) {
+    throw new Error("Beads evidence advancement requires complete retained Episode identity");
+  }
+  assertRegularNonemptyFile(selected.episodeSessionFile, "Owned Beads Episode session transcript");
+  const episodeRoot = realpathSync(selected.worktree);
+
+  // Reuse the version-2 parser to reject malformed/mixed reviewed evidence
+  // without inventing a second task model.
+  parseEpisodeOwnership({
+    ...selected,
+    providerRevision: input.reviewedProviderRevision,
+    taskEvidence: input.reviewedTaskEvidence,
+    head: input.reviewedEpisodeHead,
+  }, "reviewed Beads evidence advancement input");
+  if (input.reviewedTaskEvidence.id !== input.taskId
+      || input.reviewedTaskEvidence.status !== BEADS_IN_PROGRESS_STATUS) {
+    throw new Error("Beads evidence advancement requires exact reviewed raw in_progress task evidence");
+  }
+
+  const runner = dependencies.runner ?? new ProcessCommandRunner();
+  const preparation = (dependencies.prepareTransport ?? prepareBeadsWorkspaceTransport)(ownershipRoot, runner);
+  if (preparation.status !== "ready") {
+    throw new Error(`Beads evidence advancement native publication proof is blocked (${preparation.code}): ${preparation.detail}`);
+  }
+  const prepared = preparation.evidence;
+  if (realpathSync(prepared.projectRoot) !== ownershipRoot
+      || prepared.provider !== "beads"
+      || prepared.publishedRevision !== prepared.revision
+      || !BEADS_RESERVATION_REVISION.test(prepared.publishedRevision)) {
+    throw new Error("Beads evidence advancement publication proof does not match the exact recorded Episode project");
+  }
+  const revisionIsAncestor = dependencies.providerRevisionIsAncestor ?? exactBeadsProviderRevisionAncestor;
+  if (!revisionIsAncestor(episodeRoot, input.reviewedProviderRevision, prepared.publishedRevision, runner)) {
+    throw new Error("Beads evidence advancement reviewed provider revision is not an ancestor of the current published revision");
+  }
+
+  const currentTask = (dependencies.resolveTask ?? resolveProviderTask)(episodeRoot, input.taskId, runner);
+  if (!currentTask || currentTask.provider !== "beads" || currentTask.taskId !== input.taskId
+      || realpathSync(currentTask.projectRoot) !== episodeRoot) {
+    throw new Error("Beads evidence advancement could not prove the exact native task identity and project");
+  }
+  if (JSON.stringify(currentTask.nativeView) !== JSON.stringify(input.reviewedTaskEvidence)) {
+    return {
+      status: "review-required",
+      code: "task-evidence-mismatch",
+      reviewedProviderRevision: input.reviewedProviderRevision,
+      publishedProviderRevision: prepared.publishedRevision,
+      acceptedTaskEvidence: input.reviewedTaskEvidence,
+      currentTaskEvidence: currentTask.nativeView,
+    };
+  }
+  if (currentTask.nativeStatus !== BEADS_IN_PROGRESS_STATUS || currentTask.status !== "In Progress") {
+    throw new Error("Beads evidence advancement requires the exact unchanged native In Progress task before ownership mutation");
+  }
+
+  const git = dependencies.git ?? new CliBeadsTaskEvidenceAdvancementGit();
+  const target = parseEpisodeOwnership({
+    ...selected,
+    providerRevision: prepared.publishedRevision,
+    taskEvidence: input.reviewedTaskEvidence,
+    head: input.reviewedEpisodeHead,
+    updatedAt: dependencies.now?.() ?? new Date().toISOString(),
+  }, "advanced Beads Episode evidence") as BeadsTaskEpisodeOwnershipRecord;
+
+  let mutationResult: EpisodeOwnershipRecord | null;
+  try {
+    mutationResult = ownership.mutate(ownershipRoot, input.ownerSessionId, (current, allRecords) => {
+      if (!sameOwnership(current, selected)) {
+        throw new Error("Beads evidence advancement owner or binding drifted before atomic mutation");
+      }
+      if (activeForeignBeadsEvidenceCollision(selected, allRecords)) {
+        throw new Error("Beads evidence advancement found a foreign active owner collision");
+      }
+      // Put the pushed-head proof immediately beside the sole ownership write.
+      proveReviewedBeadsEpisodeCode(selected, input.reviewedEpisodeHead, git);
+      return target;
+    });
+  } catch (error) {
+    let observed: EpisodeOwnershipRecord | null = null;
+    try { observed = ownership.read(ownershipRoot, input.ownerSessionId); } catch { /* exact uncertainty below */ }
+    if (sameOwnership(observed, target)) mutationResult = target;
+    else if (sameOwnership(observed, selected)) throw error;
+    else {
+      throw new Error(`Beads evidence advancement write is uncertain and made no retry: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (!sameOwnership(mutationResult, target)) {
+    throw new Error("Beads evidence advancement atomic store returned unexpected ownership evidence");
+  }
+  const stored = ownership.read(ownershipRoot, input.ownerSessionId);
+  if (!sameOwnership(stored, target)) {
+    throw new Error("Beads evidence advancement could not re-read the exact persisted evidence");
+  }
+  return {
+    status: "advanced",
+    record: target,
+    reviewedProviderRevision: input.reviewedProviderRevision,
+    publishedProviderRevision: prepared.publishedRevision,
+  };
 }

@@ -20,6 +20,7 @@ import {
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import {
   CliLegacyTaskOwnershipTransitionGit,
+  advancePublishedBeadsTaskEpisodeEvidence,
   reservePublishedBeadsTaskEpisodeOwnership,
   reserveTaskEpisodeOwnership,
   transitionLegacyEpisodeOwnershipToTask,
@@ -157,6 +158,99 @@ function reservePublishedBeads(f, overrides = {}, dependencies = {}) {
   }, {
     now: () => "2026-10-20T16:30:00.000Z",
     ...dependencies,
+  });
+}
+
+function evidenceAdvancementFixture() {
+  const rawRoot = mkdtempSync(join(tmpdir(), "prime-claw-beads-evidence-main-"));
+  execFileSync("git", ["init", "-q", "-b", "main", rawRoot]);
+  const root = realpathSync(rawRoot);
+  const remote = mkdtempSync(join(tmpdir(), "prime-claw-beads-evidence-remote-"));
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  git(root, "remote", "add", "origin", remote);
+  git(root, "config", "user.name", "Prime Claw Test");
+  git(root, "config", "user.email", "prime-claw@example.invalid");
+  writeFileSync(join(root, "README.md"), "evidence fixture\n");
+  git(root, "add", "README.md");
+  git(root, "commit", "-q", "-m", "base code");
+  const baseRef = git(root, "rev-parse", "HEAD");
+  git(root, "push", "-q", "-u", "origin", "main");
+
+  const episodeParent = mkdtempSync(join(tmpdir(), "prime-claw-beads-evidence-episode-"));
+  const episodeRoot = join(episodeParent, "episode");
+  execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", "episode-evidence", episodeRoot, baseRef]);
+  writeFileSync(join(episodeRoot, "candidate.txt"), "first candidate\n");
+  git(episodeRoot, "add", "candidate.txt");
+  git(episodeRoot, "commit", "-q", "-m", "first candidate");
+  const previousHead = git(episodeRoot, "rev-parse", "HEAD");
+  writeFileSync(join(episodeRoot, "candidate.txt"), "reviewed candidate\n");
+  git(episodeRoot, "add", "candidate.txt");
+  git(episodeRoot, "commit", "-q", "-m", "reviewed candidate");
+  const reviewedHead = git(episodeRoot, "rev-parse", "HEAD");
+  git(episodeRoot, "push", "-q", "-u", "origin", "episode-evidence");
+
+  const sessionFile = join(mkdtempSync(join(tmpdir(), "prime-claw-beads-evidence-session-")), "episode.jsonl");
+  writeFileSync(sessionFile, "{\"episode\":\"active\"}\n");
+  const taskId = "PRIMECLAW-43";
+  const oldTaskEvidence = {
+    id: taskId, title: "Provider evidence fixture", status: "in_progress",
+    design: "Implement the original bounded design", comments: [{ body: "original" }],
+  };
+  const reviewedTaskEvidence = {
+    ...oldTaskEvidence,
+    design: "Implement the reviewed owner-authored living-plan update",
+    updated_at: "2026-10-20T21:00:00Z",
+  };
+  const owner = parseEpisodeOwnership({
+    version: 2, provider: "beads", status: "active", operationId: "operation-evidence", engine: "local",
+    ownerSessionId: "beads-owner", taskId, providerRevision: "a".repeat(32), taskEvidence: oldTaskEvidence,
+    baseRef, head: previousHead, worktree: realpathSync(episodeRoot), branch: "episode-evidence",
+    episodeId: "episode-evidence-id", episodeSessionFile: sessionFile, episodeActiveSessionId: "active-evidence-id",
+    createdAt: "2026-10-20T20:00:00.000Z", updatedAt: "2026-10-20T20:00:00.000Z",
+  });
+  writeEpisodeOwnership(root, owner);
+  const unrelated = taskOwnership("unrelated-owner", "PRIMECLAW-99");
+  writeEpisodeOwnership(root, unrelated);
+  return {
+    root, episodeRoot: realpathSync(episodeRoot), taskId, owner, unrelated, reviewedHead,
+    reviewedProviderRevision: "b".repeat(32), publishedProviderRevision: "c".repeat(32), reviewedTaskEvidence,
+  };
+}
+
+function evidenceAdvancementProvider(f, overrides = {}) {
+  const currentTaskEvidence = overrides.currentTaskEvidence ?? f.reviewedTaskEvidence;
+  return {
+    prepareTransport: () => ({
+      status: "ready",
+      evidence: {
+        provider: "beads", projectRoot: f.root,
+        revision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
+        publishedRevision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
+      },
+    }),
+    resolveTask: () => ({
+      provider: "beads", taskId: f.taskId, title: currentTaskEvidence.title,
+      nativeStatus: currentTaskEvidence.status, status: overrides.canonicalStatus ?? "In Progress",
+      projectRoot: overrides.taskProjectRoot ?? f.episodeRoot, nativeView: currentTaskEvidence,
+    }),
+    providerRevisionIsAncestor: overrides.providerRevisionIsAncestor ?? (() => true),
+    now: () => "2026-10-20T22:00:00.000Z",
+    ...overrides.dependencies,
+  };
+}
+
+function advanceEvidence(f, inputOverrides = {}, dependencyOverrides = {}) {
+  return advancePublishedBeadsTaskEpisodeEvidence({
+    projectRoot: f.root,
+    ownerSessionId: f.owner.ownerSessionId,
+    taskId: f.taskId,
+    reviewedProviderRevision: f.reviewedProviderRevision,
+    reviewedTaskEvidence: f.reviewedTaskEvidence,
+    reviewedEpisodeHead: f.reviewedHead,
+    ...inputOverrides,
+  }, {
+    ...evidenceAdvancementProvider(f),
+    ...dependencyOverrides,
   });
 }
 
@@ -702,6 +796,110 @@ test("Beads receipt evidence may advance without changing ownership identity", (
     })),
     /task Episode binding collides/,
   );
+});
+
+test("reviewed Beads evidence advances only the same active owner's four evidence fields", () => {
+  const f = evidenceAdvancementFixture();
+  const ancestry = [];
+  const result = advanceEvidence(f, {}, {
+    providerRevisionIsAncestor: (cwd, ancestor, descendant) => {
+      ancestry.push({ cwd, ancestor, descendant });
+      return true;
+    },
+  });
+
+  assert.equal(result.status, "advanced");
+  assert.equal(result.reviewedProviderRevision, f.reviewedProviderRevision);
+  assert.equal(result.publishedProviderRevision, f.publishedProviderRevision);
+  assert.deepEqual(ancestry, [{
+    cwd: f.episodeRoot,
+    ancestor: f.reviewedProviderRevision,
+    descendant: f.publishedProviderRevision,
+  }]);
+  const changed = Object.keys(result.record).filter((key) =>
+    JSON.stringify(result.record[key]) !== JSON.stringify(f.owner[key]));
+  assert.deepEqual(changed.sort(), ["head", "providerRevision", "taskEvidence", "updatedAt"]);
+  assert.equal(result.record.head, f.reviewedHead);
+  assert.equal(result.record.providerRevision, f.publishedProviderRevision);
+  assert.deepEqual(result.record.taskEvidence, f.reviewedTaskEvidence);
+  assert.equal(result.record.updatedAt, "2026-10-20T22:00:00.000Z");
+  assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), result.record);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
+});
+
+test("same-task Beads mismatch returns exact accepted/current raw evidence with no owner write", () => {
+  const f = evidenceAdvancementFixture();
+  const currentTaskEvidence = {
+    ...f.reviewedTaskEvidence,
+    status: "blocked",
+    design: "outside same-task edit requiring managed review",
+    comments: [...f.reviewedTaskEvidence.comments, { body: "outside writer changed authority" }],
+  };
+  const result = advanceEvidence(f, {}, evidenceAdvancementProvider(f, {
+    currentTaskEvidence,
+    canonicalStatus: "Blocked",
+  }));
+
+  assert.deepEqual(result, {
+    status: "review-required",
+    code: "task-evidence-mismatch",
+    reviewedProviderRevision: f.reviewedProviderRevision,
+    publishedProviderRevision: f.publishedProviderRevision,
+    acceptedTaskEvidence: f.reviewedTaskEvidence,
+    currentTaskEvidence,
+  });
+  assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
+});
+
+test("Beads evidence advancement rejects foreign, drifted, colliding, uncertain, or unpushed identity without retry", () => {
+  const f = evidenceAdvancementFixture();
+  assert.throws(() => advanceEvidence(f, { ownerSessionId: "foreign-owner" }), /no ownership for the exact requesting owner/);
+  assert.throws(() => advanceEvidence(f, {}, {
+    providerRevisionIsAncestor: () => false,
+  }), /not an ancestor/);
+
+  const cleanGit = {
+    repositoryRoot: () => f.episodeRoot,
+    branch: () => f.owner.branch,
+    head: () => f.reviewedHead,
+    upstreamHead: () => f.reviewedHead,
+    directRemoteHead: () => "f".repeat(40),
+    status: () => "",
+    operationInProgress: () => false,
+    isAncestor: () => true,
+  };
+  assert.throws(() => advanceEvidence(f, {}, { git: cleanGit }), /local\/upstream\/direct-remote Episode head/);
+
+  const drifted = { ...f.owner, updatedAt: "2026-10-20T21:59:00.000Z" };
+  const driftStore = {
+    read: () => f.owner,
+    mutate: (_root, _owner, mutation) => mutation(drifted, [drifted]),
+  };
+  assert.throws(() => advanceEvidence(f, {}, { ownership: driftStore }), /owner or binding drifted/);
+
+  const foreignCollision = taskOwnership("collision-owner", f.taskId);
+  const collisionStore = {
+    read: () => f.owner,
+    mutate: (_root, _owner, mutation) => mutation(f.owner, [f.owner, foreignCollision]),
+  };
+  assert.throws(() => advanceEvidence(f, {}, { ownership: collisionStore }), /foreign active owner collision/);
+
+  let uncertainState = f.owner;
+  let mutationAttempts = 0;
+  const uncertainStore = {
+    read: () => uncertainState,
+    mutate: (_root, _owner, mutation) => {
+      mutationAttempts += 1;
+      mutation(uncertainState, [uncertainState]);
+      uncertainState = { ...f.owner, updatedAt: "foreign-write" };
+      throw new Error("simulated write transport failure");
+    },
+  };
+  assert.throws(() => advanceEvidence(f, {}, { ownership: uncertainStore }), /write is uncertain and made no retry/);
+  assert.equal(mutationAttempts, 1);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
 });
 
 test("legacy and task-native ownership schemas coexist without mixing authority", () => {

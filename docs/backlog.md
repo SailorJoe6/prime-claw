@@ -708,3 +708,41 @@ pre-write, post-write, and published raw views plus the published revision/ref
 and code head so the owning Conversation can later advance the existing
 receipt. Admission activation, other lifecycle prompts, provider-aware
 allocation, migration, and receipt mutation remain deferred.
+
+### Internal same-owner Beads evidence advancement
+
+One internal provider-specific primitive can now advance reviewed published
+Beads evidence on an existing active version-2 owner. It has no public tool,
+managed-skill caller, handoff route, status transition, or lifecycle authority.
+The exact requesting Conversation owner is selected before provider or task
+interpretation; provider-absent/Backlog and version-1 records reject unchanged.
+
+The input binds the exact owner and task, Conversation-reviewed complete raw
+native task view and published Dolt revision, and the reviewed pushed Episode
+code head. Existing native transport preparation from the canonical primary checkout
+proves the selected Beads database, clean published revision, remote publication
+ref, and supported provider authority. Exact native `bd show --json --long
+--include-comments` from the recorded linked Episode worktree then proves the
+target remains `in_progress`/`In Progress`.
+When the published revision has advanced since review, one read-only native
+Dolt merge-base query must prove the reviewed revision is its ancestor. The
+advance remains valid when the complete raw target view is unchanged, including
+an unrelated-task descendant. A changed target view returns the complete
+accepted and current raw objects plus both revisions as unclassified review
+evidence and writes nothing.
+
+The recorded Episode worktree must remain the exact repository root and branch,
+with no Git operation, no tracked or untracked changes, and local, upstream, and
+direct-remote heads all equal to the reviewed head. Ordinary Git ancestry must
+prove `baseRef` → prior recorded head → reviewed head. The existing Episode
+session transcript must remain a readable non-empty regular file.
+
+On success, the existing atomic Conversation-keyed ownership mutation checks
+the exact retained owner and foreign active binding collisions beside its sole
+write. Only `providerRevision`, `taskEvidence`, `head`, and `updatedAt` change.
+Every operation, provider/task, base, engine/placement, worktree/branch,
+Episode/session, creation, cleanup, and unrelated-owner field is preserved.
+The primitive re-reads the exact persisted record. Owner drift, collisions,
+unsafe/unpushed code, non-descendant provider evidence, and uncertain writes
+fail closed without reservation, recreation, retry, force, or provider/task
+mutation. The live project registry is not used during development tests.
