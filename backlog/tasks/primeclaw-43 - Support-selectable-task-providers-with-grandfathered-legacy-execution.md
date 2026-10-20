@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 15:32'
+updated_date: '2026-10-20 15:37'
 labels: []
 dependencies: []
 references:
@@ -825,6 +825,14 @@ Exactly three representative integration contracts pass: Backlog commands/Git re
 Docker tier 1/offline RPC probe passes after the final plugin source: immutable image launch, network absence, checks, teardown verification, and manifest publication all succeeded. Evidence: `.test-results/20261020T152934Z-42306-75042cc7/tier1`.
 
 No ownership/receipt schema, admission/handoff/finalization/cleanup routing, migration/cutover, legacy transition, PRIMECLAW-43.1, framework/registry/state/mirror/lock, table classifier, automatic pull/retry, force, or raw live-store write was added. The task remains exactly In Progress. Stop after one clean candidate push and owning-Conversation notification; do not start another slice.
+
+2026-10-20 Conversation ACCEPT: status-publication integration candidate `65ff940f42d6a2dfae279ad7c0eab953bc7fe9c7` is accepted. Parent verified exact ownership/task status, clean pushed remote-equal head, narrow diff, `git diff --check`, provider 63/63, and admission 19/19. Preserve byte-for-byte Backlog behavior and direct Beads publication delegation without activating admission.
+
+Advance only the version-2 ownership/receipt schema prerequisite for later Beads admission. Extend the existing version-2 task ownership shape in place with the smallest discriminated provider-native identity: explicit provider on new records; canonical task ID for both providers; Backlog-only task-path evidence; Beads-only exact published provider revision plus raw/native task evidence only where AC9/14 requires it. Preserve the existing exact Episode code/base HEAD field instead of adding parallel state.
+
+Existing provider-absent version-2 Backlog records, including this active owner and unrelated owners, must continue to parse unchanged only when their existing exact Backlog task ID/path fields are valid. Do not rewrite, migrate, or otherwise modify live registry content in this slice. Reject ambiguous or mixed provider fields and malformed provider revisions. Update only the existing parser, types, validation, representative unit/static coverage, docs, and task evidence.
+
+Do not create version 3, another authority/receipt file, generalized task model, migration checkpoint, state machine, registry, or sidecar. Do not activate Beads admission, reservation, handoff, oversight, finalization, cleanup, legacy transition, migration/cutover, or PRIMECLAW-43.1, and do not modify `ownership.json`. Run focused/full host and Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -863,4 +871,6 @@ Revised native-first Beads candidate closes the post-update descendant race with
 Accepted candidate `4001bcddeb7704185936063d49ffee5e803f7b1f`. Next bounded slice integrates its native Beads publication result only at `commitConversationTaskStatus`: preserve the Backlog/Git branch unchanged; route Beads through `mutateAndPublishBeadsTaskStatus`; return exact published evidence or surface raw review/blocked evidence without semantic decisions or retries. All other lifecycle routes and expanded architecture remain deferred.
 
 Accepted native-first Beads publication is integrated only at `commitConversationTaskStatus`. Backlog keeps its ordinary native edit and task-file Git behavior unchanged. Beads now returns `mutateAndPublishBeadsTaskStatus` directly: exact publication evidence on `published`, and raw provider evidence on `review-required` or `blocked`, with no semantic classifier or retry. All other provider lifecycle routing remains deferred. Validated by focused provider 63/63, combined provider/admission 82/82, Python bridge, full host 363/363, and Docker tier 1.
+
+Accepted status-publication integration candidate `65ff940f42d6a2dfae279ad7c0eab953bc7fe9c7`. Next bounded slice extends the existing version-2 ownership shape in place with a minimal provider discriminator and provider-native identity: legacy provider-absent records remain valid Backlog only with exact existing ID/path; new Backlog records carry path evidence; new Beads records carry exact published provider revision and only required raw/native evidence. Reject mixed/malformed fields, preserve existing Episode Git HEAD, do not rewrite live ownership or activate any Beads lifecycle route.
 <!-- SECTION:FINAL_SUMMARY:END -->
