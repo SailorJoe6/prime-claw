@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
+import { commitConversationTaskStatus } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import {
   BEADS_DOLT_DATA_REF,
   BEADS_STATUS_MAP,
@@ -1161,6 +1162,129 @@ test("Beads mutation preserves a rejected non-force push with raw evidence and n
   assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
   assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
   assert.equal(runner.calls.some((call) => call.includes("--force")), false);
+});
+
+function conversationStatusGit(overrides = {}) {
+  const calls = [];
+  return {
+    calls,
+    head() { calls.push(["head"]); return "a".repeat(40); },
+    commitOnlyPath(root, path, message) {
+      calls.push(["commitOnlyPath", root, path, message]);
+      return "c".repeat(40);
+    },
+    commitPaths(root, commit) {
+      calls.push(["commitPaths", root, commit]);
+      return ["backlog/tasks/tst-1.md"];
+    },
+    pathStatus(root, path) {
+      calls.push(["pathStatus", root, path]);
+      return "";
+    },
+    ...overrides,
+  };
+}
+
+function failIfConversationFilePathIsUsed() {
+  return new Proxy({}, {
+    get(_target, property) {
+      throw new Error(`Beads status publication must not use Conversation Git path operation ${String(property)}`);
+    },
+  });
+}
+
+test("conversation status publication preserves the ordinary Backlog mutation and Git commit result", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  const relative = "backlog/tasks/tst-1.md";
+  const taskPath = writeBacklogTaskFile(root, relative);
+  let status = "In Planning";
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const runner = { run(command, args, options = {}) {
+    const key = [command, ...args].join("\0");
+    calls.push(key);
+    const canned = {
+      ...BACKLOG_OK,
+      ["backlog\0task\0edit\0--status\0In Progress\0--append-notes\0admit\0--plain\0--\0TST-1"]: { stdout: "", stderr: "", status: 0 },
+    }[key];
+    if (canned) {
+      if (key.startsWith("backlog\0task\0edit")) status = "In Progress";
+      return canned;
+    }
+    if (key === "backlog\0task\0view\0--json\0--\0TST-1") {
+      return { stdout: backlogTaskView("TST-1", status, relative) + "\n", stderr: "", status: 0 };
+    }
+    return real.run(command, args, options);
+  } };
+  const selection = () => ({
+    taskId: "TST-1", title: "Fixture task", status, implementationPlan: "One meaningful step",
+    projectRoot: root, taskPath, taskPathRelative: relative,
+  });
+  const git = conversationStatusGit();
+
+  const result = commitConversationTaskStatus({
+    taskId: "TST-1", projectRoot: root, taskPath: relative, status: "In Progress",
+    message: "chore: admit TST-1 episode", note: "admit", runner, git, resolveTask: selection,
+  });
+
+  assert.deepEqual(result, { selection: selection(), commit: "c".repeat(40) });
+  assert.deepEqual(calls.filter((call) => call.startsWith("backlog\0")), [
+    "backlog\0--version",
+    "backlog\0config\0get\0statuses",
+    "backlog\0task\0view\0--json\0--\0TST-1",
+    "backlog\0task\0edit\0--status\0In Progress\0--append-notes\0admit\0--plain\0--\0TST-1",
+    "backlog\0--version",
+    "backlog\0config\0get\0statuses",
+    "backlog\0task\0view\0--json\0--\0TST-1",
+  ]);
+  assert.equal(calls.some((call) => call.startsWith("bd\0")), false);
+  assert.deepEqual(git.calls, [
+    ["commitOnlyPath", root, relative, "chore: admit TST-1 episode"],
+    ["commitPaths", root, "c".repeat(40)],
+    ["pathStatus", root, relative],
+  ]);
+});
+
+test("conversation status publication returns the exact published Beads evidence without file mutation", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const runner = beadsMutationRunner(root);
+  const result = commitConversationTaskStatus({
+    taskId: "TST-1", projectRoot: root, taskPath: "backlog/tasks/unused.md", status: "In Progress",
+    message: "unused for Beads", runner, git: failIfConversationFilePathIsUsed(),
+    resolveTask() { throw new Error("Beads publication must not resolve a Backlog task path"); },
+  });
+
+  assert.equal(result.status, "published");
+  assert.equal(result.evidence.provider, "beads");
+  assert.equal(result.evidence.preparedRevision, DOLT_REVISION);
+  assert.equal(result.evidence.publishedRevision, "d".repeat(32));
+  assert.equal(result.evidence.publicationHead, "e".repeat(40));
+  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "update"), false);
+  assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on").length, 1);
+});
+
+test("conversation status publication propagates raw Beads review evidence without classification", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const runner = beadsMutationRunner(root, { concurrentPull: true });
+  const result = commitConversationTaskStatus({
+    taskId: "TST-1", projectRoot: root, taskPath: "backlog/tasks/unused.md", status: "In Progress",
+    message: "unused for Beads", runner, git: failIfConversationFilePathIsUsed(),
+    resolveTask() { throw new Error("Beads review evidence must not resolve a Backlog task path"); },
+  });
+
+  assert.equal(result.status, "review-required");
+  assert.equal(result.code, "concurrent-advance");
+  assert.equal(result.phase, "synchronization");
+  assert.equal(result.evidence.preparedRevision, DOLT_REVISION);
+  assert.equal(result.evidence.observedRevision, "c".repeat(32));
+  assert.deepEqual(JSON.parse(result.evidence.diff.stdout), {
+    from: DOLT_REVISION, to: "c".repeat(32), changes: [{ raw: true }],
+  });
+  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "update"), false);
+  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on"), false);
 });
 
 test("provider status mutation edits the Backlog task natively and proves the new status", () => {

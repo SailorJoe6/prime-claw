@@ -35,7 +35,14 @@ import {
   validateFutureLocation,
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
-import { mutateProviderTaskStatus, requireBacklogTaskSelection, resolveProviderTask } from "./task-providers.ts";
+import {
+  detectTaskProvider,
+  mutateAndPublishBeadsTaskStatus,
+  mutateProviderTaskStatus,
+  requireBacklogTaskSelection,
+  resolveProviderTask,
+  type BeadsTaskMutationPublication,
+} from "./task-providers.ts";
 import {
   ProcessCommandRunner,
   resolveNearestProjectRoot,
@@ -1673,7 +1680,11 @@ function exactAdmissionTask(
   return selection;
 }
 
-function commitConversationTaskStatus(options: {
+export type ConversationTaskStatusCommitResult =
+  | { selection: BacklogTaskSelection; commit: string }
+  | BeadsTaskMutationPublication;
+
+export function commitConversationTaskStatus(options: {
   taskId: string;
   projectRoot: string;
   taskPath: string;
@@ -1683,11 +1694,19 @@ function commitConversationTaskStatus(options: {
   runner: CommandRunner;
   git: TaskEpisodeAdmissionGit;
   resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null;
-}): { selection: BacklogTaskSelection; commit: string } {
-  // Route the status mutation through the selected provider's native
-  // interface (Backlog `task edit --status` today; Beads `update --status`
-  // once these file-bound admission paths support it) and prove the exact
-  // task reached the status by native re-read inside the provider seam.
+}): ConversationTaskStatusCommitResult {
+  const provider = detectTaskProvider(options.projectRoot, options.runner);
+  if (provider.kind === "selected" && provider.evidence.provider === "beads") {
+    return mutateAndPublishBeadsTaskStatus({
+      projectRoot: options.projectRoot,
+      taskId: options.taskId,
+      status: options.status,
+      runner: options.runner,
+    });
+  }
+
+  // Preserve the ordinary Backlog task-file path exactly: native status edit,
+  // exact task re-read, one task-file-only Git commit, and cleanliness proof.
   mutateProviderTaskStatus({
     projectRoot: options.projectRoot,
     taskId: options.taskId,
@@ -1974,7 +1993,7 @@ export async function createTaskEpisode(
         runner,
         git,
         resolveTask,
-      });
+      }) as { selection: BacklogTaskSelection; commit: string };
       const reservationInput: TaskEpisodeReservationInput = {
         projectRoot,
         taskId,

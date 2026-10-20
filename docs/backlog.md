@@ -529,9 +529,29 @@ enumeration, normalized diff, or deterministic semantic compatibility decision.
 A managed Episode or Conversation reviews the native evidence and may
 deliberately continue on a later pass.
 
-The focused contract uses five representative cases only: ordinary clean
-direct-parent success, one post-update descendant, one dirty-state refusal, one
-concurrent pull advance, and one rejected non-force push. Lifecycle wiring,
-automatic semantic reconciliation, provider-neutral mutation, migration,
-legacy transition, PRIMECLAW-43.1, locks, mirrors, registries, frameworks, and
-persistent Prime Claw state remain out of scope.
+The focused publication contract uses five representative cases only: ordinary
+clean direct-parent success, one post-update descendant, one dirty-state
+refusal, one concurrent pull advance, and one rejected non-force push.
+
+### Conversation status-publication integration boundary
+
+`commitConversationTaskStatus` is the first and only lifecycle-adjacent caller
+to select this publication seam. Its Backlog branch remains the existing
+ordinary `backlog task edit`, exact task re-read, task-file-only Git commit,
+commit-path proof, and post-commit cleanliness check. When the selected live
+provider is Beads, the boundary calls `mutateAndPublishBeadsTaskStatus` instead
+of the older unpublished `bd update` path and returns its discriminated result
+unchanged. `published` therefore carries the exact native publication evidence;
+`review-required` and `blocked` retain the provider's raw command, revision,
+task, diff, ref, and remote snapshot evidence for managed review. The boundary
+does not interpret compatibility, pull again, retry, or choose semantics.
+
+Focused integration coverage is deliberately limited to three representative
+contracts: Backlog behavior and return shape stay unchanged, Beads publication
+returns the exact published evidence without task-file Git operations, and a
+Beads concurrent advance propagates raw review evidence without mutation or
+classification. Other mutation callers and admission, handoff, finalization,
+cleanup, ownership/receipt, migration, cutover, and legacy routing remain
+deferred. Provider-neutral mutation, PRIMECLAW-43.1, locks, mirrors,
+registries, frameworks, persistent Prime Claw state, automatic retry, force,
+and raw live-store writes also remain out of scope.
