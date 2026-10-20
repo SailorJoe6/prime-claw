@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 14:01'
+updated_date: '2026-10-20 14:05'
 labels: []
 dependencies: []
 references:
@@ -742,6 +742,14 @@ Independent read-only review: ACCEPT. The review verified complete isolated succ
 Final validation on the frozen source: focused provider suite 67/67; static bridge 2 passed with 1 container deselected; TypeScript import and `git diff --check` passed; full host Node suite 367/367; Docker tier 1 with offline RPC probe passed, including immutable image launch, no network, teardown verification, and manifest publication. Docker evidence: `.test-results/20261020T135935Z-69135-b0339aa6/tier1`.
 
 The candidate changes only `src/prime-agent-plugin/extension-support/task-providers.ts`, `tests/task_providers.test.mjs`, `tests/test_task_providers.py`, `docs/backlog.md`, and this durable task record. PRIMECLAW-43 remains exactly In Progress. This Episode now stops for owning-Conversation review; no lifecycle wiring, task-store cutover, merge, cleanup, or later Beads slice was started.
+
+2026-10-20 Conversation REVISE: candidate `1bd22438815d38f05a8d2ff4e531c46496fab73b` is rejected for a material least-technology violation despite green validation. It added 1,201 source lines and 619 focused-test lines for one seam, hardcoded Beads internal/operational tables and relation columns, built a custom deterministic task-scope classifier/evidence engine, and automatically pulled/classified/retried rejected publication. That conflicts with the approved plan: provider-native behavior first, semantic compatibility decided by the managed LLM, no custom diff/semantic classifier, deterministic code only for exact identity/integrity/transport, and one focused contract fixture per seam rather than a phase-by-table race matrix. This is a revision direction, not a blocker; no operator product decision is needed.
+
+Replace the candidate with the smallest provider-native flow while preserving accepted foundation `c691ae297e8ce0bd506948c2ab1f949b67f7abf3`: prepare/pull once; read one exact task with supported `bd show`; perform guarded atomic update+commit through `bd --dolt-auto-commit=on update <exact-id> --status <native-status> --if-status <prior-native-status> --json`; perform one `bd dolt push --remote <name> --no-adopt` without force; then prove exact revision/ref/task publication.
+
+If a concurrent advance or rejected push occurs, preserve it and return raw supported provider-native evidence for managed classification and reconciliation. Prefer `bd --readonly diff <from> <to> --json` plus exact `bd show --json --long --include-comments` views and revision/ref facts. Do not enumerate internal Beads tables, synthesize a normalized diff, decide semantic compatibility in TypeScript, or automatically pull/retry after a rejected push. Deterministic code may compare only exact canonical ID/status and revision/ref identities. Unrelated descendants remain allowed and same-task changes remain reviewable by the managed LLM.
+
+Use only a few representative tests/UAT cases: ordinary success, one concurrent-advance evidence path, and one guarded mutation or push failure. Preserve no-force, no raw live-store Dolt, no lock/state/framework/registry/mirror/lifecycle wiring/migration/legacy transition/PRIMECLAW-43.1. Run focused/full-host/Docker tier 1, record the revision, push one clean replacement candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -768,4 +776,6 @@ Residual Beads authority-containment revision supersedes REVISE candidate 2ba92f
 Beads 1.3.1 foundation compatibility now normalizes configured, native-listed, and repository Git HTTPS/SSH/file/absolute-path forms to one exact `git+...` identity before comparison while preserving strict one-native/one-Git cardinality and every publication, clean-revision, server, containment, post-clone, and final-race proof. Focused fixtures pass 55/55 and a real disposable Beads 1.3.1/Dolt 2.5.0 absolute-path→`git+file://` readiness flow passed twice with clean status and stable `refs/dolt/data`. Full Node passes 355/355 and Docker tier 1 passes. Scope and PRIMECLAW-43 In Progress status are unchanged.
 
 First bounded Beads native mutation/publication slice is implemented for review. It uses supported native pull/read/guarded update/commit/non-force push; accepts proven unrelated task/table/live/remote descendants; integrates one unrelated non-fast-forward remote advance through native pull and bounded retry; and preserves same-task descendants as exact revision/task/task-scoped-diff reconciliation evidence. Task scope includes issue fields, comments, labels, both dependency sides, events/snapshots/interactions/leases/provenance/journal/compaction, and ordinary/wisp parent counters. Successful evidence retains separate live and published revisions, stable `refs/dolt/data`, full isolated issue plus comments/labels/dependencies, committed/live/publication diffs, and recoverable failure facts. No force, rollback, raw live-store Dolt, lock, semantic auto-merge, lifecycle wiring, framework, or persistent Prime Claw state was added. Validated by focused 67/67, full host 367/367, real Beads 1.3.1/Dolt 2.5.0 descendant and comment-race UATs, independent ACCEPT review, and Docker tier 1.
+
+Revision required: the validated candidate `1bd22438815d38f05a8d2ff4e531c46496fab73b` is superseded as overbuilt. The replacement must remove custom Beads table enumeration, normalized diff/classification logic, and automatic pull/retry reconciliation. Keep only native prepare/pull, exact `bd show`, atomic guarded `bd --dolt-auto-commit=on update`, one non-force push, exact revision/ref/task proof, and raw provider-native evidence for managed LLM classification of any concurrent advance or rejection.
 <!-- SECTION:FINAL_SUMMARY:END -->
