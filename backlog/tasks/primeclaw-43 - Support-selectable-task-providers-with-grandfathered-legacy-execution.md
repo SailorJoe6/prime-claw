@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 16:41'
+updated_date: '2026-10-20 16:45'
 labels: []
 dependencies: []
 references:
@@ -891,6 +891,12 @@ Representative focused coverage passes 37/37: exact Orca success with raw provid
 Representative tests prove Orca success and exact re-read, raw provider-native evidence persistence, unrelated provider-absent Backlog owner preservation, rejection of non-published evidence and dirty tracked code before write, and cross-provider canonical-task collision without damage. Static coverage proves the new primitive is absent from `spec-episode.ts` and that the unchanged Backlog producer count remains fixed.
 
 Validation after final source: focused ownership 37/37; provider/schema static 3 passed with 1 container bridge deselected; full-host Node 370/370; Docker tier 1/offline RPC passes with immutable image launch, network absence, checks, teardown verification, and manifest publication at `.test-results/20261020T163934Z-15564-00139146/tier1`; `git diff --check` passes. No admission/allocation, createTaskEpisode activation, status mutation, handoff, oversight, finalization, cleanup, legacy transition, migration, generalized abstraction, sidecar, lock/state machine, retry, raw Dolt write, classifier, version 3, or PRIMECLAW-43.1 work was added.
+
+2026-10-20 Conversation ACCEPTED bounded Beads ownership-reservation candidate `74b46067348773f573fa01da6861fff49e76f4e9`. Parent verified exact owner/task state, clean pushed remote-equal head, ancestry, `git diff --check`, publication-only input, current-registry atomic write/re-read, absence of a lifecycle caller, unchanged Backlog behavior, and focused ownership 37/37. Preserve that candidate unchanged.
+
+Advance only one bounded prerequisite for later managed planning/admission: make the existing Beads branch of `resolveProviderTask` and its native read use the supported exact `bd show <exact-id> --json --long --include-comments` view and return the full validated raw task object as a Beads-only `nativeView`. Retain the current exact canonical task ID, title, native status/canonical status, project root, identity-before-mutation behavior, and the Backlog branch byte-for-byte. Validate only the minimum stable top-level fields already required: exact ID, nonblank title and status, and non-array object shape. Preserve every other provider-native field verbatim for the managed LLM.
+
+Do not add normalized implementationPlan, description, design, acceptance criteria, references, or paths; do not select semantic fields or duplicate the publication snapshot model. Update only representative resolution/mutation/static tests needed to prove exact command arguments, raw-field preservation, shorthand rejection before mutation, and unchanged Backlog behavior. No admission, status-publication change, reservation callsite, allocation, lifecycle activation, managed skill/template rewrite, migration/cutover, legacy transition, cleanup/finalization, PRIMECLAW-43.1, framework, registry, state, or sidecar. Run focused/full host and Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -941,4 +947,6 @@ Repaired the otherwise accepted provider-native version-2 ownership schema by ma
 Accepted provider-native v2 schema candidate `1a7da30a34300c8587ab07e5154896d9552ea5de`. Next bounded slice is one provider-specific Beads ownership-reservation primitive fed only by an already-proven native `published` result plus existing owner/engine/placement identity. Validate exact project/task/status/revision/raw evidence/Git/owner/placement and existing collision rules, persist through the existing atomic v2 store, re-read exact evidence, preserve unrelated and provider-absent owners, and leave Backlog producers and all lifecycle routes unchanged.
 
 Added one isolated provider-specific Beads ownership-reservation primitive beside unchanged Backlog reservation. It accepts only the accepted native `published` status result plus existing owner/engine/placement/baseRef identity, validates exact project/task/status/revision/raw evidence/Git/ownership constraints, persists one provider-native version-2 provisioning record through the atomic ownership store, and re-reads exact evidence. It remains uncalled by lifecycle routes. Representative success/failure/collision tests pass; focused 37/37, full host 370/370, static checks, and Docker tier 1 pass.
+
+Accepted Beads reservation candidate `74b46067348773f573fa01da6861fff49e76f4e9`. Next bounded slice is only the raw Beads task-view prerequisite: resolve an exact ID through `bd show <id> --json --long --include-comments`, validate only object/exact-ID/nonblank-title/status, expose the full raw object as Beads-only `nativeView`, and preserve current identity/status/root behavior plus unchanged Backlog behavior. No normalized semantic model or lifecycle activation.
 <!-- SECTION:FINAL_SUMMARY:END -->
