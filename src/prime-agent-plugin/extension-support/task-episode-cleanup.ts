@@ -111,8 +111,11 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     if (!samePath(summary.cwd, record.worktree!)) {
       throw new Error("Task Episode cleanup found a descendant outside the owned worktree");
     }
+    const parentIdPresent = summary.parentSessionId !== undefined;
     if (child && (summary.runtimeKind !== "subagent" || !summary.rlmChildId
-      || !summary.parentSessionId || !summary.parentSessionPath)) {
+      || !summary.parentSessionPath
+      || (parentIdPresent && (typeof summary.parentSessionId !== "string" || summary.parentSessionId.length === 0))
+      || (!parentIdPresent && (summary.activeSessionId !== undefined || summary.isSessionActive !== false)))) {
       throw new Error("Task Episode cleanup found a malformed Prime Agent descendant identity");
     }
     if (!child && (summary.runtimeKind === "subagent" || (summary.rlmDepth !== undefined && summary.rlmDepth !== 0))) {
@@ -153,13 +156,17 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       const parentFile = parent.summary.sessionFile!;
       for (const candidate of sessions) {
         if (owned.has(candidate)) continue;
+        const parentIdPresent = candidate.parentSessionId !== undefined;
         const idMatch = candidate.parentSessionId === parentId;
         const pathMatch = samePath(candidate.parentSessionPath, parentFile);
         if (!idMatch && !pathMatch) continue;
-        if (!idMatch || !pathMatch) {
+        if (!pathMatch || (parentIdPresent && !idMatch)) {
           throw new Error("Task Episode cleanup found an ambiguous Prime Agent descendant parent chain");
         }
         this.validateSessionIdentity(candidate, record, true);
+        if (candidate.rlmDepth !== parent.depth + 1) {
+          throw new Error("Task Episode cleanup found a malformed Prime Agent descendant identity");
+        }
         const edge = `${parentId}\0${resolve(parentFile)}\0${candidate.rlmChildId}`;
         if (childEdges.has(edge)) {
           throw new Error("Task Episode cleanup found a duplicate Prime Agent descendant identity");
@@ -225,8 +232,17 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       }
     }
     const beforeDelete = await this.sessions.list();
-    const savedPresent = existsSync(sessionFile) || beforeDelete.some((entry) => entry.sessionId === sessionId
-      || samePath(entry.sessionFile, sessionFile));
+    const savedRows = beforeDelete.filter((entry) => entry.sessionId === sessionId
+      || samePath(entry.sessionFile, sessionFile)
+      || (activeSessionId !== undefined && entry.activeSessionId === activeSessionId));
+    if (activeSessionId === undefined) {
+      const listed = savedRows[0];
+      if (savedRows.length !== 1 || !listed || !this.exactSession(listed, summary)
+        || !rosterScheduleQuiescent(listed) || !quiescentState(listed)) {
+        throw new Error("Task Episode cleanup refuses to remove a changed or busy Prime Agent session");
+      }
+    }
+    const savedPresent = existsSync(sessionFile) || savedRows.length > 0;
     if (savedPresent) {
       if (!this.sessions.deleteSaved) throw new Error("Prime Agent runtime does not support saved-session deletion");
       await this.sessions.deleteSaved(sessionFile);

@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 19:09'
+updated_date: '2026-10-20 13:07'
 labels: []
 dependencies: []
 references:

@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.38
 title: Replace .ralph/plans with task-native Backlog/Ralph lifecycle
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-10-12 21:02'
-updated_date: '2026-10-19 14:52'
+updated_date: '2026-10-20 04:20'
 labels:
   - backlog-md
   - episode-loop
@@ -2219,6 +2219,18 @@ Repair the cleanup-only `finalize_task_episode` host boundary without changing i
 6. Update living finalization/oversight documentation and task evidence. Run focused tests plus required Docker Tier 1, produce one independently reviewed pushed candidate, and stop without attempting live Episode cleanup.
 
 Do not add a child-session registry, receipt, reconciliation engine, new lifecycle state machine, manual session-file deletion, or Prime Agent source change.
+
+## Step 11 UAT follow-up — provider-native path-only saved descendants
+
+Repair the accepted second cleanup UAT defect inside the existing Step 11 scope:
+
+1. Use the restarted supported Prime Agent saved-session catalog as the primary compatibility contract. Reproduce the real six inactive, unrouted direct descendants that have an existing session file, the exact Episode worktree, `runtimeKind: subagent`, `rlmDepth: 1`, `rlmChildId`, and exact canonical `parentSessionPath`, but omit `parentSessionId`.
+2. Prove descendant ownership by the exact canonical parent session path. For an otherwise exact inactive and unrouted saved descendant, an absent `parentSessionId` is compatible historical provider output; when `parentSessionId` is present, it must match the selected parent exactly. Routed descendants and every conflicting or mismatched ID/path pair remain fail-closed.
+3. Preserve complete identity, quiescence, uniqueness, foreign-collision, route, changed-state, worktree, session-file, deletion-order, same-head retry, and other-Conversation guards. A shared worktree or path fragment alone never grants ownership.
+4. Add focused coverage using the real six path-only rows as the primary regression, plus proportional mixed present/absent parent IDs and explicit mismatched-parent-ID rejection. Update living finalization documentation and task evidence.
+5. Run required focused and Docker validation, obtain independent exact-candidate review, push one correction candidate, and stop without live cleanup.
+
+Keep `finalize_task_episode` cleanup-only and least-technology. Add no manual session-file deletion, child registry, receipt, reconciler, lifecycle state, or Prime Agent source change.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -3040,6 +3052,32 @@ Independent exact-commit review of `5f9273aa13ae032e22bf4fcf06933048b877557f` fo
 The accepted bounded repair preserves the fresh list row's three schedule flags while also requiring the routed `get_state` identity and quiescence checks. Deletion-time revalidation now obtains another exact list row, rejects duplicate or changed identity and any listed schedule work, then validates live state before supported kill/delete operations. This does not add lifecycle state or change descendant ownership.
 
 Regression coverage exercises all three list-only flags for both a routed root and a routed descendant while `get_state` deliberately omits them. Each case proves inspection is non-idle, runtime removal refuses before mutation, and the mutation log remains empty. The focused cleanup group passes 15 tests/subtests; the wider selected Node lifecycle/ownership/finalization suites pass 156 with no failures; related host policy checks pass 40 with 5 environment-only skips. `git diff --check` passes.
+
+## Step 11 second cleanup UAT defect accepted (2026-10-19)
+
+After the accepted repair was merged and Prime Agent restarted, the supported saved-session catalog returned the six legitimate inactive direct descendants with exact canonical `parentSessionPath`, `runtimeKind: subagent`, `rlmDepth: 1`, `rlmChildId`, the exact Episode worktree, and existing saved-session files, but without `parentSessionId`. The current tree builder requires both parent fields; it sees the exact path edge plus an absent ID as a partial match and rejects the provider-native historical rows as `Task Episode cleanup found an ambiguous Prime Agent descendant parent chain`.
+
+The owning Conversation accepted a bounded Step 11 compatibility repair: canonical `parentSessionPath` is required; an optional `parentSessionId`, when present, must match. Absence is allowed only for an otherwise exact inactive, unrouted saved descendant. All routed, foreign, conflicting, duplicate, changed, malformed, busy, and mismatched-lineage cases remain fail-closed. The next execute pass must use the real six path-only rows as the primary regression, cover mixed present/absent IDs and mismatched IDs, update finalization docs/evidence, validate in Docker, obtain independent review, and push one candidate. Do not perform live cleanup during implementation.
+
+## Step 11 path-only saved-descendant compatibility implementation (2026-10-19)
+
+Root cause and red evidence:
+- The supported post-restart saved-session catalog omits `parentSessionId` on the six legitimate inactive, unrouted direct descendants while retaining exact canonical `parentSessionPath` and the complete saved-subagent identity.
+- `sessionTree()` treated the exact path plus absent ID as a partial edge and threw `Task Episode cleanup found an ambiguous Prime Agent descendant parent chain`; the primary six-row regression and mixed nested regression failed before the repair.
+
+Bounded implementation:
+- Canonical `parentSessionPath` remains mandatory. A present `parentSessionId` must match exactly; absence is accepted only when the row is inactive, has no route, is a saved `subagent`, has an existing session file in the exact Episode worktree, carries `rlmChildId`, and has the exact next `rlmDepth`.
+- Routed missing-ID rows, wrong depth, mismatched present IDs, path mismatch, foreign/duplicate rows, and busy or malformed state remain fail-closed.
+- Immediately before deleting an unrouted saved row, cleanup re-lists and requires one exact unchanged, quiescent identity. A late route or lineage/state change refuses before mutation.
+- No public tool parameter, cleanup ordering, lifecycle state, registry, receipt, reconciler, manual file deletion, or Prime Agent source changed.
+
+Regression and local validation:
+- Focused cleanup Docker group: 19 tests/subtests passed, including the real six path-only rows, a mixed absent/present nested tree, mismatched present ID, routed missing ID, wrong depth, and deletion-time route drift with zero unsafe mutation.
+- Wider Docker Episode lifecycle/ownership/finalization selection: 160 passed.
+- Related host-policy selection: 43 passed and 12 deselected; the one failure is the pre-existing project-template installed-hash mismatch already recorded as unrelated to this slice.
+- `git diff --check` passed. Docker Tier 1 and independent exact-candidate review remain before candidate publication.
+
+Docker Tier 1 source mode passed the final pre-commit implementation content at `.test-results/20261019T144125Z-86920-3a759190/tier1`: repository content hash `15f6041d1127ac693d3ccc2e87c9d4126f6e88f78e1c392ff996b0ad01915240`, expected dirty task/code/docs/test worktree, immutable image launch, offline RPC probe, no failure codes, verified absent network, clean teardown, and manifest publication. The same final bytes plus this durable evidence entry will be committed and rerun from a clean exact candidate before independent review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -3054,4 +3092,10 @@ Focused suites, the broad baseline apart from four documented unrelated failures
 Post-merge cleanup repair complete: `finalize_task_episode` retains its cleanup-only public boundary and now treats only the daemon-proven inactive, quiescent session tree rooted at the bound Episode as owned runtime. It deletes verified descendants deepest-first through supported Prime Agent operations, preserves all foreign/ambiguous/busy fail-closed guards, safely resumes same-head partial deletion, and leaves other Conversation-owned Episodes unchanged. The real six-descendant defect is reproduced by a red-before/green-after regression; focused lifecycle tests and Docker Tier 1 pass. No live cleanup was attempted.
 
 Independent review correction: routed `get_state` cannot erase list-reported active/registered heartbeat or cron evidence. Cleanup now preserves those roster flags at preflight and revalidates a fresh exact list row before deletion; routed-root and routed-descendant regressions cover all three supported scheduler flags and prove zero mutation.
+
+Step 11 remains open for one accepted post-restart UAT compatibility repair. Supported historical saved-descendant rows can prove lineage with exact canonical `parentSessionPath` while omitting `parentSessionId`; the next execute pass will accept that absence only for otherwise exact inactive, unrouted saved descendants and will preserve all conflicting, routed, busy, foreign, duplicate, and changed-state fail-closed guards. No live cleanup is authorized in implementation.
+
+Second Step 11 UAT repair implemented: provider-native historical saved descendants may omit `parentSessionId` only when canonical path lineage and every inactive, unrouted saved-subagent identity field are exact. Mixed trees work; present mismatches, routes, wrong depth, busy/foreign/duplicate/change cases remain fail-closed, with immediate pre-delete revalidation. Docker Tier 1 and independent exact-candidate review remain pending before publication.
+
+Validation complete for the bounded path-only saved-descendant repair: focused cleanup and wider lifecycle suites pass, Docker Tier 1 passes with network absence and clean teardown, and only the documented unrelated template-hash host-policy baseline failure remains. Exact clean-commit Tier 1 and independent review are the remaining publication gates.
 <!-- SECTION:FINAL_SUMMARY:END -->
