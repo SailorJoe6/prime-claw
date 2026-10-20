@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 04:43'
+updated_date: '2026-10-20 04:46'
 labels: []
 dependencies: []
 references:
@@ -636,6 +636,12 @@ Focused fixtures run the full transport preparation with Beads 1.3.1/Dolt 2.5.0 
 Final verification: focused task-provider Node 55/55; static bridge 2 passed/1 container deselected; TypeScript import passed; full host Node 355/355; `git diff --check` clean. Docker tier 1 passed with immutable image, network absent, checks passed, teardown verified, and manifest published. Its first attempt stopped in the isolated upstream source builder before candidate checks with clean teardown and unchanged source/checkout inventory; one bounded retry passed completely.
 
 Changed only the task record through supported Backlog CLI, `task-providers.ts`, focused provider contracts, and `docs/backlog.md`. No per-task mutation/publication/reconciliation, Episode lifecycle wiring, schema, provider UX, migration/cutover, PRIMECLAW-43.1, framework, or persistent state was added. PRIMECLAW-43 remains In Progress.
+
+2026-10-20 Conversation ACCEPT: Beads 1.3.1 foundation compatibility candidate `c691ae297e8ce0bd506948c2ab1f949b67f7abf3` is accepted. Parent independent disposable UAT returned ready twice with exact Beads 1.3.1/Dolt 2.5.0 server/database/branch/revision, normalized `git+file://` remote, stable `refs/dolt/data`, and published revision; following `dolt_status` was `[]`, direct ref stayed stable, focused provider tests passed 55/55, and the server was stopped. Preserve every accepted foundation closure.
+
+Advance with exactly the first bounded Beads native task mutation/publication sub-slice. Use supported native `bd` synchronization/read/update/commit/push. Require the exact canonical task ID and a clean native revision before mutation. Verify the exact native task view after mutation, commit through supported `bd`, push without force, and prove publication through the direct ref plus isolated remote revision/task evidence. On native sync, commit, push, or revision failure, preserve recoverable local work and return exact factual evidence; never force or silently overwrite.
+
+Automatic concurrent remote reconciliation and all semantic decisions remain deferred to a later reviewed slice. Do not add lifecycle/admission/finalization/cleanup wiring, ownership/receipt schema, provider-neutral UX, migration/cutover, legacy transition, PRIMECLAW-43.1, raw Dolt access to the live store, JSONL authority, a framework, coordinator, lock, mirror, registry, universal task model, or persistent state. Add only focused representative real Beads 1.3.1/native fixtures plus relevant docs/task evidence, run focused/full host and Docker tier 1, keep PRIMECLAW-43 exactly In Progress, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
