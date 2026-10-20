@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 15:07'
+updated_date: '2026-10-20 15:10'
 labels: []
 dependencies: []
 references:
@@ -802,6 +802,12 @@ Final validation on the frozen source: focused provider suite 60/60; static brid
 The independent reviewer bootstrap hit the known Prime Agent automatic-preparation admission race before producing a review and was not retried or treated as acceptance. A bounded final source review found the local-proof ordering gap, moved the final reproof after the isolated remote snapshot, and reran the entire focused/full-host/Docker stack successfully. No additional scope was added.
 
 The task remains exactly In Progress. This Episode stops after pushing one clean replacement candidate for the owning Conversation; no later slice is started.
+
+2026-10-20 Conversation ACCEPT: native-first Beads mutation/publication candidate `4001bcddeb7704185936063d49ffee5e803f7b1f` is accepted. Parent verified clean/pushed/remote-equal ownership and task identity, narrow ancestry/cleanliness diff, `git diff --check`, and focused provider 60/60. Preserve the one-pull, guarded Beads-owned atomic update, one non-force push, stable isolated remote proof, raw evidence design, and every accepted foundation closure.
+
+Advance only one exact status-publication integration boundary. Update the existing `commitConversationTaskStatus` path so its Backlog branch remains byte-for-byte ordinary Backlog/Git behavior, while its Beads branch calls `mutateAndPublishBeadsTaskStatus` instead of the older unpublished direct mutation. On `published`, return only the exact native publication evidence needed by the existing caller. On `review-required` or blocked, preserve and surface raw provider evidence to the managed Conversation/Episode; TypeScript must not classify compatibility, retry, or choose semantics.
+
+Keep every other mutation call site and lifecycle route deferred unless the minimum type plumbing strictly required by this one boundary cannot compile; report rather than widen. Add only focused representative contracts for Backlog unchanged, Beads published, and Beads review-required propagation, plus relevant docs/task evidence. Do not add ownership/receipt schema, admission/handoff/finalization/cleanup routing, migration/cutover, legacy transition, PRIMECLAW-43.1, framework/registry/state/mirror/lock, internal table classifier, automatic pull/retry, force, or raw live-store writes. Run focused/full host and Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -836,4 +842,6 @@ Least-technology replacement completed for the first bounded Beads native mutati
 Revision required for candidate `ab016f7cd883f45d9350895b71fb8551b55a9c35`: add narrow provider-native direct-parent and clean-working-set proof so a post-update concurrent descendant cannot be adopted as the owner commit. Return raw native diff and exact task views on parent mismatch; require clean exact local revision before push and final success. Preserve the current one-prepare/one-pull/one-update/one-push architecture and isolated remote proof.
 
 Revised native-first Beads candidate closes the post-update descendant race with one supported read-only proof of exact `HEAD`, `HEAD~1`, and native `dolt_status`. Publication requires the update commit to be a clean direct child of the prepared revision. Parent mismatch returns raw provider diff plus exact before/after long/comments task views for managed review; dirty state refuses before push. After the sole non-force push and existing isolated remote snapshot, the seam re-proves the same clean exact local revision immediately before success. The one-prepare/one-pull/one-guarded-update/one-push architecture remains, with no table registry, normalized diff/classifier, retry, force, rollback, raw live-store write, lock/state/framework/registry/mirror/lifecycle/migration/legacy/PRIMECLAW-43.1. Validated by focused 60/60, full host 360/360, representative real Beads 1.3.1/Dolt 2.5.0 direct-parent and descendant UAT, and final Docker tier 1.
+
+Accepted candidate `4001bcddeb7704185936063d49ffee5e803f7b1f`. Next bounded slice integrates its native Beads publication result only at `commitConversationTaskStatus`: preserve the Backlog/Git branch unchanged; route Beads through `mutateAndPublishBeadsTaskStatus`; return exact published evidence or surface raw review/blocked evidence without semantic decisions or retries. All other lifecycle routes and expanded architecture remain deferred.
 <!-- SECTION:FINAL_SUMMARY:END -->
