@@ -550,8 +550,9 @@ Focused integration coverage is deliberately limited to three representative
 contracts: Backlog behavior and return shape stay unchanged, Beads publication
 returns the exact published evidence without task-file Git operations, and a
 Beads concurrent advance propagates raw review evidence without mutation or
-classification. Other mutation callers and admission, handoff, finalization,
-cleanup, migration, cutover, and legacy routing remain deferred.
+classification. Other mutation callers plus handoff, finalization, cleanup, migration,
+cutover, and legacy routing remain deferred. The one direct admission caller is
+bounded separately below.
 Provider-neutral mutation, PRIMECLAW-43.1, locks, mirrors, registries,
 frameworks, persistent Prime Claw state, automatic retry, force, and raw
 live-store writes also remain out of scope.
@@ -583,7 +584,41 @@ The parser rejects unknown providers, provider/path/revision mixtures, missing
 or mismatched native task evidence, and malformed Dolt revisions. Active
 binding uniqueness preserves canonical task-ID uniqueness across providers and
 exact Backlog path uniqueness; advancing a Beads revision does not change the owned
-Episode identity. Existing Backlog lifecycle entry points explicitly keep
-requiring a Backlog ownership branch. This schema prerequisite does not admit,
-reserve, hand off, oversee, finalize, or clean up a Beads Episode, and it does
-not migrate or rewrite `.prime-claw/ownership.json`.
+Episode identity. Existing Backlog lifecycle entry points explicitly keep requiring a Backlog
+ownership branch. The public creation boundary below is the sole Beads admission
+exception; handoff, oversight, finalization, cleanup, migration, and legacy
+transition still reject Beads ownership and never rewrite another owner.
+
+### Direct Beads task Episode admission
+
+The existing public `createTaskEpisode` path now dispatches only a selected live
+Beads provider to one provider-specific admission branch. The Backlog branch and
+its task-file transaction remain unchanged. Before native mutation, Beads
+admission requires the exact requested canonical ID, canonical `In Planning`
+and native `in_planning`, and a meaningful raw `nativeView.design` string under
+the same placeholder guard used for Backlog implementation plans. Supported
+Beads 1.3.1 was verified to preserve `design` through `bd create --design` and
+`bd show <id> --json --long --include-comments`; no alternate plan mapping is
+used.
+
+The primary checkout must be canonical `main`, have no merge/rebase/sequencer
+operation, have no staged or tracked changes, and have an exact code `HEAD`
+equal to its upstream. Admission re-proves that code head, task/design, and
+owner absence under the existing repository serialization lock. It then calls
+`commitConversationTaskStatus` with an expected Beads-provider guard, accepts
+only an exact `published` `In Progress`/`in_progress` result, reserves through
+`reservePublishedBeadsTaskEpisodeOwnership`, and reuses the existing placement
+and allocation machinery. Final success requires the stored active Beads owner
+to match the clean code `baseRef`, published provider revision and raw task
+evidence, operation, task, worktree, branch, and Episode session identities.
+The allocation-only ownership guard accepts Beads; later Backlog lifecycle
+routes remain closed.
+
+Recovery never retries admission. If `In Progress` published but no durable
+owner or resource mutation exists, the same publication seam must prove one
+`In Planning` rollback. With exact readable durable ownership, failure publishes
+`Blocked` once, re-proves the unchanged owner, and advances only that owner's
+`providerRevision`, raw `taskEvidence`, and timestamp. Provider review/block
+results, failed recovery publication, ownership drift, or unreadable ownership
+fail closed with raw evidence preserved. No provider matrix, normalized task
+model, sidecar receipt, raw Dolt write, force, or automatic retry is introduced.

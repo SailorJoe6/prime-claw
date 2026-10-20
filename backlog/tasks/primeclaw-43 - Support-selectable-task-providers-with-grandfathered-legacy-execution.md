@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 16:59'
+updated_date: '2026-10-20 17:29'
 labels: []
 dependencies: []
 references:
@@ -13,26 +13,11 @@ references:
     https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md
   - 'https://www.dolthub.com/docs/concepts/dolt/git/remotes/'
 documentation:
-  - VISION.md
-  - LONG_RANGE_PLAN.md
-  - docs/project-initialization.md
-  - docs/future-specification-bundles.md
-  - docs/conversation-driven-episode-oversight.md
   - docs/backlog.md
-  - docs/user-stories/C-specification.md
-  - docs/user-stories/D-planning.md
-  - docs/user-stories/E-episode-promotion.md
-  - docs/user-stories/F-episode-execution.md
-  - docs/user-stories/G-oversight-and-review.md
-  - docs/user-stories/H-handoff-and-continuation.md
-  - docs/user-stories/I-episode-finalization.md
-  - docs/user-stories/traceability.md
 modified_files:
-  - src/prime-agent-plugin/extension-support/episode-ownership.ts
-  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
-  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
-  - tests/task_episode_ownership_extension.test.mjs
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
+  - tests/beads_task_episode_admission_extension.test.mjs
   - tests/test_task_providers.py
   - docs/backlog.md
 priority: p1
@@ -917,6 +902,20 @@ Require canonical primary main, no active Git operation, tracked-clean and upstr
 Use only the existing deterministic recovery boundaries. If `In Progress` was published but no durable reservation/resources exist, publish `In Planning` rollback and verify it. After durable or uncertain reservation/resource mutation, publish `Blocked` and advance the same owned `providerRevision`/`taskEvidence` to the exact Blocked publication without changing provider/task/base/resource identity. If recovery publication returns `review-required`/`blocked` or exact ownership cannot be proven, fail closed with raw evidence and preserve everything; never retry or start a fresh admission.
 
 Do not route handoff, oversight, finalization, cleanup, Ready for Merge/Done, managed skills/templates, legacy transition, migration/cutover, PRIMECLAW-43.1, version 3, sidecar/receipt, generalized state/framework, semantic classifier, raw Dolt writes, force, or automatic retry. Add one representative Beads happy path plus preflight, review-required, rollback, and post-reservation Blocked recovery contracts without a provider-by-lifecycle matrix. Run focused/full host, relevant real disposable Beads UAT if feasible, and Docker tier 1; push one clean candidate, notify the owning Conversation, and stop for review.
+
+2026-10-20 direct Beads task Episode admission/allocation implementation is complete in the working tree. `createTaskEpisode` now dispatches only a selected live Beads provider into one provider-specific branch while the existing Backlog body and its tests remain unchanged. Beads preflight requires exact requested ID/root, `In Planning`/`in_planning`, meaningful raw `nativeView.design` under the existing placeholder guard, canonical primary `main`, no active Git operation, no staged/tracked changes, exact `HEAD == upstream`, persisted top-level owner, valid placement, and no nonterminal owner. All task/design/code/owner facts are re-proved under the existing admission lock.
+
+The serialized branch calls `commitConversationTaskStatus` with an expected-Beads race guard, accepts only exact `published` In Progress evidence, reserves through `reservePublishedBeadsTaskEpisodeOwnership`, and calls the existing allocator through an allocation-only provider-neutral ownership guard. Later Backlog handoff/blocked/finalization/cleanup routes retain their Beads rejection. Final success proves active provider:`beads`, exact owner/task/operation/code baseRef/head, published provider revision/raw evidence, and returned/stored placement/worktree/session identity.
+
+Recovery does not retry. A published In Progress task with no reservation write or readable nonterminal owner gets one verified In Planning rollback. A readable durable Beads owner gets one verified Blocked publication, then only the same record's providerRevision/taskEvidence/updatedAt advance after exact before/after owner proof. A started-but-unprovable ownership write, provider review/block result, failed recovery publication, or ownership drift fails closed with raw publication evidence preserved.
+
+Focused evidence: new direct Beads contracts 11/11; combined admission/provider/ownership suite 130/130; existing Backlog admission 19/19 unchanged; static provider/schema 3 passed with one container bridge deselected; module import and `git diff --check` pass. Real Beads 1.3.1 first proved `design` round-trip through exact long/comments view. A full disposable production `createTaskEpisode` run then passed after intentionally strict fixture preflights caught an unpushed Git HEAD and dirty Dolt config working set. The clean run published `UAT-yes` to native `in_progress`, reserved provider revision `h6k80h9fsi9c6ps4k29fabtmtcdho6cm`, returned/stored active Beads ownership at exact unchanged code base/head `5d2b0f18e158743ad60fe9d0a9cc26537392c052`, retained the raw design, ended with `dolt_status=[]`, exact Git HEAD/upstream equality and empty tracked status, then stopped the server and removed all disposable resources. Full-host and Docker tier 1 remain.
+
+2026-10-20 final validation for the bounded direct Beads `createTaskEpisode` admission/allocation slice: focused direct Beads contracts 11/11; combined admission/provider/ownership Node 130/130; unchanged existing Backlog admission 19/19; full-host Node 381/381; provider/schema static checks 3 passed with 2 container bridges deselected after adding the new suite bridge; `git diff --check` passes. The broader host Python run reached 669 passed, 1 skipped, 67 deselected, and four failures: the known runtime-test docstring sentinel, customized project-template installed-hash drift, Backlog dependency pin drift, plus the every-Node-suite bridge check initially naming this new suite. The candidate-specific bridge was added; the isolated bridge check then advances to the pre-existing unbridged `task_episode_admission_extension.test.mjs`, absent already at checkpoint `bb8b3ac`. No unrelated baseline repair was taken.
+
+Docker tier 1/offline RPC passes with the new Beads admission bridge: immutable image launched, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261020T172709Z-4623-5ecf9139/tier1`. Real Beads 1.3.1 evidence remains: exact design round-trip passed; strict preflight safely rejected an unpushed fixture Git HEAD and then a dirty native config working set while preserving raw blocked evidence; after the fixture pushed its initialization commits and committed/pushed native lifecycle config, production `createTaskEpisode` published native `in_progress`, reserved exact revision `h6k80h9fsi9c6ps4k29fabtmtcdho6cm`, returned and stored active provider:`beads` ownership with raw design and exact code base/head `5d2b0f18e158743ad60fe9d0a9cc26537392c052`, ended with `dolt_status=[]`, `HEAD == upstream`, and no tracked Git changes, then stopped its server and removed every disposable resource.
+
+Scope stayed bounded: one direct Beads public-path branch, expected-provider publication race guard, allocation-only Beads ownership acceptance, exact success proof, and deterministic rollback/Blocked evidence advancement. The existing Backlog admission test source is byte-for-byte unchanged. Later handoff/oversight/finalization/cleanup and legacy transition still reject Beads. No provider framework/matrix, normalized semantic task model, sidecar/receipt, version 3, raw Dolt write, force, retry, migration/cutover, managed skill/template change, PRIMECLAW-43.1, or terminal lifecycle routing was added.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -973,4 +972,6 @@ Accepted Beads reservation candidate `74b46067348773f573fa01da6861fff49e76f4e9`.
 Added only the raw Beads task-view prerequisite: the Beads resolver now calls exact `bd show <id> --json --long --include-comments`, validates the minimal stable task shape, retains canonical ID/title/native+canonical status/project root, and returns the complete raw object as Beads-only `nativeView`. Mutation keeps its pre-write exact-identity rejection, and Backlog behavior is unchanged. Focused 63/63, full host 370/370, static checks, and Docker tier 1 pass.
 
 Accepted raw Beads view candidate `4eb3e519dac366ba67b7a7388a079aff4c14a271`. Next bounded slice is only direct Beads admission/allocation through existing `createTaskEpisode`: exact In Planning native design preflight, canonical-main/upstream code proof, published In Progress result, accepted Beads reservation, existing allocation, exact active ownership proof, and deterministic In Planning rollback or same-owner Blocked recovery. Backlog branch remains unchanged; no provider framework or later lifecycle routes.
+
+Implemented only direct Beads task Episode admission/allocation through existing `createTaskEpisode`. It requires exact `In Planning`/`in_planning` raw design, canonical clean upstream-equal primary main, serialized task/code/owner reproof, exact published In Progress evidence, accepted Beads reservation, existing allocation, and exact active ownership/resource proof. Recovery performs one proven In Planning rollback before durable mutation or one same-owner Blocked evidence advance after durable mutation, with no retry. Backlog admission tests remain byte-for-byte unchanged. Focused 130/130, full Node 381/381, real Beads 1.3.1 production UAT, and Docker tier 1 pass.
 <!-- SECTION:FINAL_SUMMARY:END -->

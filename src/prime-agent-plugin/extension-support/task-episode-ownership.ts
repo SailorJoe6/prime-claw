@@ -561,8 +561,8 @@ const BEADS_IN_PROGRESS_STATUS = "in_progress";
 
 /**
  * Persist one Beads task-native provisioning reservation from the already
- * published provider-native status result. This deliberately has no caller in
- * createTaskEpisode until the later admission slice activates it.
+ * published provider-native status result. The public admission path calls
+ * this only after exact serialized provider publication proof.
  */
 export function reservePublishedBeadsTaskEpisodeOwnership(
   input: BeadsTaskEpisodeReservationInput,
