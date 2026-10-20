@@ -3,10 +3,10 @@ id: PRIMECLAW-10.39
 title: >-
   Compact Conversation context after episode handoff when utilization exceeds
   threshold
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: '2026-10-15 05:15'
-updated_date: '2026-10-18 19:10'
+updated_date: '2026-10-19 14:57'
 labels:
   - episode-loop
   - phase4

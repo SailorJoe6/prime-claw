@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-43
 title: Support selectable task providers with grandfathered legacy execution
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-18 19:09'
+updated_date: '2026-10-19 18:37'
 labels: []
 dependencies: []
 references:
