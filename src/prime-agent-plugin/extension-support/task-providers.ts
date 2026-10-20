@@ -1710,7 +1710,15 @@ export function mutateAndPublishBeadsTaskStatus(options: {
  */
 export type ProviderTaskResolution =
   | ({ provider: "backlog" } & BacklogTaskSelection)
-  | { provider: "beads"; taskId: string; title: string; status: string; projectRoot: string };
+  | {
+      provider: "beads";
+      taskId: string;
+      title: string;
+      nativeStatus: string;
+      status: CanonicalLifecycleStatus;
+      projectRoot: string;
+      nativeView: JsonRecord;
+    };
 
 function requireLiveProvider(cwd: string, runner: CommandRunner): Extract<TaskProviderDetection, { kind: "selected" }> {
   const detection = detectTaskProvider(cwd, runner);
@@ -1728,18 +1736,22 @@ function requireLiveProvider(cwd: string, runner: CommandRunner): Extract<TaskPr
   return detection;
 }
 
-/** Parse `bd show <id> --json` output into the validated native issue view. */
-function parseBeadsIssueView(stdout: string, selectedTaskId: string): { taskId: string; title: string; status: string } {
+/** Parse the exact long `bd show` response and retain its raw task object verbatim. */
+function parseBeadsIssueView(
+  stdout: string,
+  selectedTaskId: string,
+): { taskId: string; title: string; status: string; nativeView: JsonRecord } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stdout);
   } catch (error) {
     throw new Error(`Beads returned invalid JSON for ${selectedTaskId}: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (!Array.isArray(parsed) || parsed.length !== 1 || !parsed[0] || typeof parsed[0] !== "object") {
+  if (!Array.isArray(parsed) || parsed.length !== 1 || !parsed[0]
+      || typeof parsed[0] !== "object" || Array.isArray(parsed[0])) {
     throw new Error(`Beads returned an unsupported task-view schema for ${selectedTaskId}`);
   }
-  const issue = parsed[0] as Record<string, unknown>;
+  const issue = parsed[0] as JsonRecord;
   if (typeof issue.id !== "string" || !issue.id.trim()) {
     throw new Error(`Beads returned no canonical task ID for ${selectedTaskId}`);
   }
@@ -1749,16 +1761,16 @@ function parseBeadsIssueView(stdout: string, selectedTaskId: string): { taskId: 
   if (typeof issue.status !== "string" || !issue.status.trim()) {
     throw new Error(`Beads task ${selectedTaskId} has no status`);
   }
-  return { taskId: issue.id, title: issue.title, status: issue.status };
+  return { taskId: issue.id, title: issue.title, status: issue.status, nativeView: issue };
 }
 
-/** Read one Beads issue natively, with no canonical-status conversion. */
+/** Read one exact Beads issue natively, with no canonical-status conversion. */
 function readBeadsIssue(
   projectRoot: string,
   selectedTaskId: string,
   runner: CommandRunner,
-): { taskId: string; title: string; status: string } {
-  const result = runner.run("bd", ["show", selectedTaskId, "--json"], {
+): { taskId: string; title: string; status: string; nativeView: JsonRecord } {
+  const result = runner.run("bd", ["show", selectedTaskId, "--json", "--long", "--include-comments"], {
     cwd: projectRoot,
     allowFailure: true,
   });
@@ -1810,8 +1822,10 @@ export function resolveProviderTask(
     provider: "beads",
     taskId: issue.taskId,
     title: issue.title,
+    nativeStatus: issue.status,
     status: beadsCanonicalStatus(issue.taskId, issue.status),
     projectRoot: detection.projectRoot,
+    nativeView: issue.nativeView,
   };
 }
 

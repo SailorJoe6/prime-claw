@@ -107,8 +107,11 @@ const BD_NO_DB_FALSE = { ["bd\0config\0get\0no-db"]: { stdout: "false\n", stderr
 function detectionRunner(extra = {}) {
   const responses = { ...BD_NO_DB_FALSE, ...extra };
   const real = new ProcessCommandRunner();
+  const calls = [];
   return {
+    calls,
     run(command, args, options = {}) {
+      calls.push([command, ...args]);
       const key = [command, ...args].join("\0");
       if (key in responses) return responses[key];
       return real.run(command, args, options);
@@ -994,22 +997,40 @@ test("provider task resolution routes a Backlog repo through the native backlog 
   assert.equal(selection.taskPath, realpathSync(join(root, "backlog/tasks/tst-1.md")));
 });
 
-test("provider task resolution routes a Beads repo through the native bd read with canonical status", () => {
+test("provider task resolution returns the exact long Beads native view with canonical status", () => {
   const root = fixtureRoot();
   writeBeadsStore(root);
+  const nativeView = {
+    id: "TST-1",
+    title: "Fixture task",
+    status: "in_design",
+    description: "Provider-authored description",
+    design: "Provider-authored design",
+    acceptance_criteria: "Provider-authored acceptance",
+    labels: ["provider-native"],
+    dependencies: [{ id: "TST-0", type: "blocks" }],
+    comments: [{ id: 7, text: "raw comment", author: "fixture" }],
+    provider_extension: { nested: [1, { retained: true }] },
+  };
   const runner = detectionRunner({
     ...BEADS_OK,
-    ["bd\0show\0TST-1\0--json"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
+    ["bd\0show\0TST-1\0--json\0--long\0--include-comments"]: {
+      stdout: JSON.stringify([nativeView]) + "\n", stderr: "", status: 0,
+    },
   });
   const selection = resolveProviderTask(root, "TST-1", runner);
   assert.deepEqual(selection, {
     provider: "beads",
     taskId: "TST-1",
     title: "Fixture task",
+    nativeStatus: "in_design",
     status: "In Design",
     projectRoot: root,
+    nativeView,
   });
-  // No provider-neutral normalization: no invented plan/path/reference fields.
+  assert.ok(runner.calls.some((call) => JSON.stringify(call)
+    === JSON.stringify(["bd", "show", "TST-1", "--json", "--long", "--include-comments"])));
+  // No provider-neutral normalization: the raw view remains Beads-only.
   assert.equal("taskPath" in selection, false);
   assert.equal("taskPathRelative" in selection, false);
   assert.equal("implementationPlan" in selection, false);
@@ -1021,7 +1042,7 @@ test("provider task resolution fails closed on a Beads task with an unmapped sta
   writeBeadsStore(root);
   const runner = detectionRunner({
     ...BEADS_OK,
-    ["bd\0show\0TST-1\0--json"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "open" }]) + "\n", stderr: "", status: 0 },
+    ["bd\0show\0TST-1\0--json\0--long\0--include-comments"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "open" }]) + "\n", stderr: "", status: 0 },
   });
   assert.throws(() => resolveProviderTask(root, "TST-1", runner), /unmapped status open/);
 });
@@ -1334,14 +1355,25 @@ test("provider status mutation updates the Beads store natively with the mapped 
       if (key.startsWith("bd\0update")) status = "in_progress";
       return canned;
     }
-    if (key === "bd\0show\0TST-1\0--json") {
-      return { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status }]) + "\n", stderr: "", status: 0 };
+    if (key === "bd\0show\0TST-1\0--json\0--long\0--include-comments") {
+      return {
+        stdout: JSON.stringify([{
+          id: "TST-1", title: "Fixture task", status,
+          comments: [{ id: 11, text: "raw mutation view" }],
+          provider_extension: { retained: true },
+        }]) + "\n",
+        stderr: "", status: 0,
+      };
     }
     return real.run(command, args, options);
   } };
   const resolved = mutateProviderTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
   assert.equal(resolved.provider, "beads");
+  assert.equal(resolved.nativeStatus, "in_progress");
   assert.equal(resolved.status, "In Progress");
+  assert.deepEqual(resolved.nativeView.comments, [{ id: 11, text: "raw mutation view" }]);
+  assert.deepEqual(resolved.nativeView.provider_extension, { retained: true });
+  assert.ok(calls.includes("bd\0show\0TST-1\0--json\0--long\0--include-comments"));
   assert.ok(calls.includes("bd\0update\0TST-1\0--status\0in_progress\0--json"));
 });
 
@@ -1402,7 +1434,7 @@ test("requireBacklogTaskSelection passes Backlog through and rejects the Beads b
   writeBeadsStore(beadsRoot);
   const beadsRunner = detectionRunner({
     ...BEADS_OK,
-    ["bd\0show\0TST-1\0--json"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
+    ["bd\0show\0TST-1\0--json\0--long\0--include-comments"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
   });
   assert.throws(
     () => requireBacklogTaskSelection(resolveProviderTask(beadsRoot, "TST-1", beadsRunner), "test path"),
@@ -1423,7 +1455,7 @@ test("provider status mutation rejects Beads shorthand with zero writes before a
       ...BEADS_OK,
       ...BD_NO_DB_FALSE,
       // Native shorthand: requested tst-pyb resolves to the longer canonical ID.
-      ["bd\0show\0tst-pyb\0--json"]: { stdout: JSON.stringify([{ id: "tst-pyb-full-9f2c", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
+      ["bd\0show\0tst-pyb\0--json\0--long\0--include-comments"]: { stdout: JSON.stringify([{ id: "tst-pyb-full-9f2c", title: "Fixture task", status: "in_design" }]) + "\n", stderr: "", status: 0 },
     }[key];
     if (canned) return canned;
     return real.run(command, args, options);
@@ -1432,6 +1464,7 @@ test("provider status mutation rejects Beads shorthand with zero writes before a
     () => mutateProviderTaskStatus({ projectRoot: root, taskId: "tst-pyb", status: "In Progress", runner }),
     /refusing to mutate: requested tst-pyb but Beads resolved canonical ID tst-pyb-full-9f2c; no writes were attempted/,
   );
+  assert.ok(calls.includes("bd\0show\0tst-pyb\0--json\0--long\0--include-comments"));
   assert.equal(calls.some((key) => key.startsWith("bd\0update")), false);
 });
 
@@ -1469,7 +1502,7 @@ test("provider status mutation fails closed when the task cannot be resolved bef
     const canned = {
       ...BEADS_OK,
       ...BD_NO_DB_FALSE,
-      ["bd\0show\0GHOST-1\0--json"]: { stdout: "", stderr: "issue not found", status: 1 },
+      ["bd\0show\0GHOST-1\0--json\0--long\0--include-comments"]: { stdout: "", stderr: "issue not found", status: 1 },
     }[key];
     if (canned) return canned;
     return real.run(command, args, options);
