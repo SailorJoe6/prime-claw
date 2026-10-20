@@ -489,8 +489,80 @@ remote, credentials, ref, or exact published revision returns bounded native
 remediation; no force push, daemon, sidecar, mirror, registry, lock, protocol,
 or persistent Prime Claw state is introduced.
 
-Still out of scope: Beads per-task mutation/publication/reconciliation,
-Episode admission/finalization/cleanup wiring, ownership/receipt fields,
-provider-neutral UX, managed semantic decisions, legacy transition,
-migration/cutover, PRIMECLAW-43.1, and any coordinator, lock, checkpoint,
-framework, or persistent state.
+### First native Beads task mutation and publication seam
+
+`mutateAndPublishBeadsTaskStatus` adds one direct Beads status transition without
+wiring it into Episode lifecycle commands. It first runs the full workspace and
+transport proof, reads the exact canonical task, and performs a supported
+`bd dolt pull`. A clean synchronized advance is compared through native task and
+target-filtered diff evidence: an unrelated advance becomes the new mutation
+base, while a target-task change returns reconciliation evidence. The same
+classification handles a clean unrelated revision that appears at the final
+pre-mutation check or while the guarded mutation is running.
+
+The seam maps the requested canonical status and uses
+`bd --dolt-auto-commit=batch update` with the exact prior native status as
+`--if-status`. The task and native working set are read again before a supported
+`bd dolt commit`. If another supported writer already committed the exact
+requested target delta plus unrelated work, that clean commit is reused instead
+of creating an empty commit. A same-task delta beyond the requested lifecycle
+fields is preserved and returned for managed reconciliation.
+
+Read-only native `dolt_diff_summary` plus task-filtered `dolt_diff` evidence
+proves that the `issues` row contains the exact requested status transition and
+no non-lifecycle target-field change. The same evidence aggregates every changed
+Beads table linked by `issue_id` (and both sides of dependencies), including
+comments, labels, dependencies, events, snapshots, interactions, leases,
+provenance, journal, compaction, ordinary/wisp child counters keyed by parent,
+and wisp-related rows. Any such target-linked
+row is a same-task change. Rows and tables linked only to other tasks remain
+compatible. A clean descendant that appears before push is compared from the
+local commit. If its complete task-scoped diff is empty, the ordinary
+`bd dolt push --remote <name> --no-adopt` proceeds. The command never uses
+`--force`.
+
+A non-force push rejection triggers an immediate direct-ref and isolated remote
+snapshot from the clean mutation base. If its target-task diff is non-empty, the
+local commit and remote descendant are preserved and returned for managed
+reconciliation. If the target diff is empty, the remote advance is proven
+unrelated; one supported `bd dolt pull` integrates it, the committed-to-integrated
+task-scoped diff must remain empty, and one ordinary non-force push retry
+publishes the combined descendant. If that bounded retry races again, a second
+stable remote snapshot returns same-task reconciliation evidence or a blocked
+result containing exact unrelated remote revision/head/task/diff evidence; it
+never falls back to stderr-only reporting. No conflict strategy or semantic
+side is selected.
+
+Immediately after a successful push, native and repository remote identity are
+re-proved without requiring the live server HEAD to equal the independently
+published HEAD. A stable direct `refs/dolt/data` read brackets a disposable clone
+that reads the actual published revision, full issue row, and current comments,
+labels, and both dependency sides. That complete isolated view is retained in
+successful publication evidence, not reduced to ID/title/status. The clone then
+compares the local committed revision to
+the published revision with provider-native table summary and complete
+task-scoped diffs. The live clean revision,
+task, and committed-to-live diff are proved separately and re-read after the
+remote comparison. Thus an independent remote-only descendant, a live descendant,
+or a descendant already present at the push boundary can be classified without
+conflating live and remote authority.
+
+A descendant with no target rows is a compatible unrelated advance and returns
+successful exact live and publication evidence. Any target row returns
+`reconciliation-required` with exact prior and observed revisions, native task
+views, table summary, target-row diff, and publication evidence when publication
+occurred. Every descendant is preserved. Prime Claw never rolls it back, forces,
+overwrites, or calls a same-task mismatch exact success. An unproved later race
+blocks without a stale success claim.
+
+Synchronization, mutation, commit, push, revision, or isolated-comparison
+failure retains the exact observed phase and recoverable clean state, working
+set, or local commit. Direct `dolt` remains limited to executable discovery and
+read-only disposable-clone inspection; the live store is accessed only through
+supported `bd` commands.
+
+Still out of scope: automatic semantic reconciliation, Episode
+admission/finalization/cleanup wiring, ownership/receipt fields,
+provider-neutral UX, maintenance locking, exact-revision publication emulation,
+legacy transition, migration/cutover, PRIMECLAW-43.1, and any coordinator,
+mirror, registry, framework, or persistent state.

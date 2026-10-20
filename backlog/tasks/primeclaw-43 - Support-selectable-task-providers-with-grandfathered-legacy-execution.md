@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 13:09'
+updated_date: '2026-10-20 14:01'
 labels: []
 dependencies: []
 references:
@@ -30,6 +30,7 @@ documentation:
 modified_files:
   - src/prime-agent-plugin/extension-support/task-providers.ts
   - tests/task_providers.test.mjs
+  - tests/test_task_providers.py
   - docs/backlog.md
 priority: p1
 type: epic
@@ -691,6 +692,56 @@ Apply the task's actual concurrency contract. Unrelated task advances must not b
 Continue exactly the first bounded Beads native task mutation/publication slice. Use supported native synchronization/read, guarded mutation, supported commit, and non-force push. Immediately after push, compare exact native revision, task views, and provider-native diff evidence. If a concurrent descendant was published, preserve it: treat proven unrelated task changes as compatible and report success with exact final evidence; return same-task mismatch as reconciliation-required with exact evidence, without rollback, force, overwrite, or a false exact-success claim.
 
 Do not add maintenance locking, exact-revision publication emulation, raw live-store Dolt access, automatic semantic reconciliation, lifecycle/admission/finalization/cleanup wiring, ownership/receipt schema or state, provider-neutral UX, frameworks, coordinators, mirrors, registries, migration/cutover, legacy transition, or PRIMECLAW-43.1. Reuse only the minimum prior investigated code that satisfies this corrected contract. Add focused representative Beads 1.3.1/native fixtures and relevant docs/task evidence, run focused/full host and Docker tier 1, keep PRIMECLAW-43 exactly In Progress, push one clean candidate, notify the owning Conversation, and stop for review.
+
+2026-10-20 corrected first Beads native mutation/publication slice implemented after Conversation rejected the prior atomic-publication invariant. `mutateAndPublishBeadsTaskStatus` now performs full native preparation, supported `bd dolt pull`, exact canonical `bd show`, guarded `bd --dolt-auto-commit=batch update --if-status`, supported `bd dolt commit`, and `bd dolt push --remote <name> --no-adopt`. It never passes force, resets, rolls back, rewrites, or accesses the live store with raw Dolt.
+
+Target-filtered native `dolt_diff_summary`/`dolt_diff` evidence proves the requested target status transition while permitting unrelated task rows/tables in the working set and commit. A clean pre-push descendant is compared to the local commit: an empty target-task diff is compatible; a target-task diff returns reconciliation-required before push. Immediately after push, full preparation proves the actual clean native/published revision and stable direct `refs/dolt/data`, then a disposable clone queries the exact published task and compares committed→published revision with native table summary and target-row diff. An unrelated published descendant returns success with exact final evidence. A same-task descendant is preserved and returned as `reconciliation-required` with exact revisions, task views, diff rows, and publication evidence. A final native task/revision/direct-ref re-read blocks stale success if the authority races again.
+
+Focused synthetic coverage passes 61/61 for the complete provider suite. New scenarios prove unrelated table/task work is accepted, clean unrelated descendants before or during push succeed, guarded/committed/pre-push/published same-task changes return reconciliation evidence, all publication remains non-force, and sync/commit/push/isolated-query failures retain factual recovery evidence. Static bridge passes 2 with 1 container deselected, TypeScript import passes, and `git diff --check` passes.
+
+Representative real Beads 1.3.1/Dolt 2.5.0 server UAT injected an unrelated default-auto-commit task update inside the runner at the exact push command boundary. Target `UAT-byl` moved from `in_planning` to `in_progress`; unrelated `UAT-bxf` independently moved from `in_progress` to `ready_for_merge`. The seam committed target revision `f5cl6ujldr1q0vpfbic8cmgt3b2ntr5v`, published and preserved descendant `slkq0l5i3il4nttl26ca6ou0nsa1maoh`, proved stable direct head `d9f6b02eae19763e9fd4a48219a150793f1b3fae`, returned `concurrentDescendant=true`, an exact unrelated `issues` summary, and zero target rows in the publication diff. Final native views preserved both intended outcomes, `dolt_status=[]`, the server stopped, and all disposable resources were removed.
+
+Pending before candidate: independent read-only review, full host Node suite, Docker tier 1, final task evidence/summary, clean commit/push, and owning-Conversation notification.
+
+2026-10-20 final review repairs: an independent review found two material concurrency gaps and both are closed in the current candidate.
+
+First, target-delta proof now receives the exact requested native status and requires both the observed task and `to_status` to equal it. A concurrent same-task change from the requested `in_progress` to another valid lifecycle status can no longer pass merely because the helper compared the row with that later observed status. Focused regression covers the different-final-status race and returns reconciliation-required.
+
+Second, post-push proof no longer calls the foundation preparation routine that requires live HEAD == remote HEAD. Live and remote authority are tracked independently. The seam re-proves native/configured/repository remote identity and cardinality, brackets a disposable remote clone with stable direct `refs/dolt/data` reads, obtains the actual published revision/full target row, and compares committed→published revision. Live clean revision/task/committed→live diff are proved and stabilized separately. Remote-only unrelated descendants therefore succeed, while remote-only same-task descendants return exact reconciliation evidence.
+
+A non-fast-forward push rejection now snapshots mutation-base→remote revision/task/diff. Same-task remote changes return reconciliation immediately. A proven unrelated remote change is integrated by one supported strategy-free `bd dolt pull`; committed→integrated target diff must remain empty before one non-force retry. If that pull reveals a newer same-task change, retry stops and exact reconciliation evidence is returned. No force, rollback, reset, overwrite, raw live-store Dolt, lock, or exact-revision publication emulation was added.
+
+Focused provider tests now pass 64/64, including 10/10 mutation scenarios. Added fixtures distinguish live and remote revisions and cover unrelated/same-task synchronization, immediate pre-mutation advance, mutation-boundary advance, already-committed requested mutation, wrong-final-status race, pre-push descendant, push-boundary local descendant, non-fast-forward remote rejection with unrelated integration/retry, same-task change during reconciliation pull, independent remote-only unrelated/same-task descendants, native failures, and exact isolated query errors.
+
+Final-code real Beads 1.3.1/Dolt 2.5.0 UAT ran twice in one disposable bd-managed server project. First, an unrelated `UAT-8fn` auto-commit was injected at target `UAT-uaz`'s push boundary: target commit `p287fmq0gpp4g28t9p52o0jg7iumbrv8`, preserved/published descendant `59k2re2nhsg7o112tne4fe67mk3vfr01`, direct head `232f777bfc9e543e9ca486e1650eedde9c66bdca`, exact live/published revision parity, and zero target rows in both live and publication descendant diffs. Second, the first non-force push was deliberately rejected before transport; exact remote snapshot, supported native pull, and one non-force retry published target commit/revision `8ho7ovkmdqq3spu10c506jmjm2dm88uh` at direct head `81300b62cbd69f1a0bd7f0b83045f852c74124f3`, with empty committed→published target diff. Final tasks were `UAT-uaz=in_progress` and `UAT-8fn=in_progress`, `dolt_status=[]`, the server stopped, and all disposable resources were removed.
+
+Pending only fresh independent acceptance, full host Node, Docker tier 1, final task summary, commit/push, and Conversation notification.
+
+2026-10-20 related-task and repeated-rejection review repairs are complete.
+
+Task-scoped native diff evidence now covers every Beads 1.3.1 table linked by `issue_id`, both dependency sides, and wisp-related equivalents: issues, journal, comments, compaction snapshots, dependencies, events, interactions, issue snapshots, labels, leases, provenance events, and wisp comments/dependencies/events/labels. Changed related tables are selected from `dolt_diff_summary`, queried through target-filtered `dolt_diff`, and aggregated with table identity. Requested status proof requires exactly one permitted `issues` row and no other target-linked row. Isolated publication evidence also captures the full current issue row plus current comments, labels, and both dependency sides. Concurrent target comments/labels/dependencies/related writes therefore return reconciliation-required rather than unrelated success.
+
+A bounded second non-fast-forward failure now takes another stable direct-ref/isolated remote snapshot. A second same-task advance returns exact reconciliation evidence. A second unrelated advance returns Blocked with structured `observedRemote` revision, ref head, full task view, table summary, and task-scoped diff rather than stderr-only evidence; repeated remote churn is bounded without force. Post-publication remote reproof now follows foundation semantics: other distinct remotes are allowed while exactly one healthy native row must match the selected remote name/normalized identity.
+
+Focused provider suite passes 67/67, with 12/12 mutation scenarios. New regressions cover local target comments, remote-only target comments with isolated related views, exact second-rejection unrelated/same-task evidence, and a distinct non-selected native remote.
+
+Final real Beads 1.3.1/Dolt 2.5.0 related-row UAT injected supported `bd comments add UAT-r8y "concurrent comment"` at the non-force push boundary after the requested target status commit. The clean descendant was published and preserved at revision `0l4ten1ia8ujl7sd7ruk08dr0k4d858f`, direct head `60e9d6e639d352ab31744a4f63b57d533a14ece5`, then returned `reconciliation-required` with a `comments` summary and exact target comment diff (`to_issue_id=UAT-r8y`) plus publication evidence. Final `bd show --long --include-comments` preserved target status `in_planning` and the concurrent comment, `dolt_status=[]`, direct head stable, server stopped, and all disposable resources removed.
+
+Pending fresh independent acceptance, full host Node, Docker tier 1, final summary, commit/push, and Conversation notification.
+
+2026-10-20 final evidence-shape repairs: successful publication evidence now retains the complete isolated `BeadsNativeTaskEvidence` rather than reducing it to ID/title/status. Its native view contains the exact published issue row plus current comments, labels, and both dependency sides. Focused success coverage asserts those related collections survive in the returned result.
+
+Task-scoped diff classification now also covers `child_counters.parent_id` and `wisp_child_counters.parent_id`, plus `depends_on_wisp_id` on dependency tables. Local and remote-only parent-counter fixtures return reconciliation-required with table-identified exact rows. This closes hierarchical child-creation evidence while preserving other-task compatibility. Focused mutation coverage remains 12/12.
+
+Pending fresh independent acceptance, full host Node, Docker tier 1, final summary, commit/push, and Conversation notification.
+
+2026-10-20 final validation complete for the first bounded Beads native mutation/publication slice.
+
+Independent read-only review: ACCEPT. The review verified complete isolated success evidence, issue/comment/label/dependency and child-counter task scoping, exact requested status, bounded second-rejection evidence, selected-remote cardinality, separate live/remote stabilization, non-force publication, no rollback/reset, and no scope expansion.
+
+Final validation on the frozen source: focused provider suite 67/67; static bridge 2 passed with 1 container deselected; TypeScript import and `git diff --check` passed; full host Node suite 367/367; Docker tier 1 with offline RPC probe passed, including immutable image launch, no network, teardown verification, and manifest publication. Docker evidence: `.test-results/20261020T135935Z-69135-b0339aa6/tier1`.
+
+The candidate changes only `src/prime-agent-plugin/extension-support/task-providers.ts`, `tests/task_providers.test.mjs`, `tests/test_task_providers.py`, `docs/backlog.md`, and this durable task record. PRIMECLAW-43 remains exactly In Progress. This Episode now stops for owning-Conversation review; no lifecycle wiring, task-store cutover, merge, cleanup, or later Beads slice was started.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -715,4 +766,6 @@ Beads foundation revision supersedes rejected candidate 30c9cbd and fixes only t
 Residual Beads authority-containment revision supersedes REVISE candidate 2ba92f1. Before native proof, `.beads`, `metadata.json`, and `config.yaml` must now have readable exact canonical real non-symlink identities inside the selected project/store. The three-case symlink regression proves zero native authority/remote calls, no external content exposure, and unchanged external sentinels. Existing exact `.beads/dolt` and post-clone live reproof closures remain intact. Verified focused 53/53, static 2 passed/1 deselected, full Node 353/353, and Docker tier 1. PRIMECLAW-43 remains In Progress; accepted slices and deferred scope are unchanged.
 
 Beads 1.3.1 foundation compatibility now normalizes configured, native-listed, and repository Git HTTPS/SSH/file/absolute-path forms to one exact `git+...` identity before comparison while preserving strict one-native/one-Git cardinality and every publication, clean-revision, server, containment, post-clone, and final-race proof. Focused fixtures pass 55/55 and a real disposable Beads 1.3.1/Dolt 2.5.0 absolute-path→`git+file://` readiness flow passed twice with clean status and stable `refs/dolt/data`. Full Node passes 355/355 and Docker tier 1 passes. Scope and PRIMECLAW-43 In Progress status are unchanged.
+
+First bounded Beads native mutation/publication slice is implemented for review. It uses supported native pull/read/guarded update/commit/non-force push; accepts proven unrelated task/table/live/remote descendants; integrates one unrelated non-fast-forward remote advance through native pull and bounded retry; and preserves same-task descendants as exact revision/task/task-scoped-diff reconciliation evidence. Task scope includes issue fields, comments, labels, both dependency sides, events/snapshots/interactions/leases/provenance/journal/compaction, and ordinary/wisp parent counters. Successful evidence retains separate live and published revisions, stable `refs/dolt/data`, full isolated issue plus comments/labels/dependencies, committed/live/publication diffs, and recoverable failure facts. No force, rollback, raw live-store Dolt, lock, semantic auto-merge, lifecycle wiring, framework, or persistent Prime Claw state was added. Validated by focused 67/67, full host 367/367, real Beads 1.3.1/Dolt 2.5.0 descendant and comment-race UATs, independent ACCEPT review, and Docker tier 1.
 <!-- SECTION:FINAL_SUMMARY:END -->
