@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 14:39'
+updated_date: '2026-10-20 14:43'
 labels: []
 dependencies: []
 references:
@@ -778,6 +778,12 @@ Independent final read-only review: ACCEPT. It verified one preparation, one pul
 Final frozen-source validation: focused provider suite 58/58; static bridge 2 passed with 1 container deselected; TypeScript import and `git diff --check` passed; full host Node suite 358/358; Docker tier 1 with offline RPC probe passed, including immutable image launch, no network, teardown verification, and manifest publication. Docker evidence: `.test-results/20261020T143712Z-38805-20e391f0/tier1`. Real Beads 1.3.1/Dolt 2.5.0 ordinary success, concurrent-advance, guarded-failure, isolated remote-success, and rejected-push evidence UAT passed; all disposable servers stopped and resources removed.
 
 The task remains exactly In Progress. This Episode now stops for owning-Conversation review; no later slice was started.
+
+2026-10-20 Conversation REVISE: native-first candidate `ab016f7cd883f45d9350895b71fb8551b55a9c35` has one narrow reproducible post-update race. After `bd --dolt-auto-commit=on update` returns, another writer can commit before the current revision read. The code can then adopt that descendant as `committedRevision` whenever exact ID/status still match, push it, and return `published` without the raw concurrent-advance evidence promised by the contract. Preserve the reduced architecture; this is a bounded revision, not a blocker.
+
+Repair only with narrow provider-native ancestry and cleanliness proof. Immediately after mutation, read exact `HEAD` and its first parent (`HEAD~1` or equivalent) together through supported read-only native evidence and require the parent to equal the prepared revision. If it does not, return `review-required` with raw `bd --readonly diff <prepared> <observed> --json` and exact before/after `bd show --json --long --include-comments` views; do not classify semantics. Require native `dolt_status` to be empty before push, and recheck the same clean exact local revision before final `published` success.
+
+Add only one focused regression that injects a descendant between update return and revision proof, plus one dirty-state refusal. Run representative real Beads UAT proving direct-parent/clean success and descendant evidence. Keep exactly one preparation, one pull, one atomic guarded update, one non-force push, and the existing stable isolated remote proof. Do not restore any internal-table registry, normalized diff, automatic pull/retry, semantic classifier, force, raw live-store write, lock, state, framework, registry, mirror, lifecycle wiring, migration, legacy transition, or PRIMECLAW-43.1. Run focused/full-host/Docker tier 1, push one clean replacement candidate, notify the owning Conversation, and stop.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -808,4 +814,6 @@ First bounded Beads native mutation/publication slice is implemented for review.
 Revision required: the validated candidate `1bd22438815d38f05a8d2ff4e531c46496fab73b` is superseded as overbuilt. The replacement must remove custom Beads table enumeration, normalized diff/classification logic, and automatic pull/retry reconciliation. Keep only native prepare/pull, exact `bd show`, atomic guarded `bd --dolt-auto-commit=on update`, one non-force push, exact revision/ref/task proof, and raw provider-native evidence for managed LLM classification of any concurrent advance or rejection.
 
 Least-technology replacement completed for the first bounded Beads native mutation/publication slice. It performs one accepted transport preparation, one native pull, exact `bd show --json --long --include-comments`, one guarded atomic `bd --dolt-auto-commit=on update ... --if-status ... --json`, one non-force `bd dolt push --remote ... --no-adopt`, and exact revision/ref/task publication proof. Concurrent advances, guarded failures, rejected pushes, and remote descendants are preserved as raw native command/task/revision/ref evidence for managed LLM review. A narrow stable-ref-bracketed disposable clone binds the remote Dolt revision and requested issue/comments to the publication result. The rejected table registry, normalized diff/classifier, automatic pull/retry, force/rollback, and expanded architecture are absent. Validated by focused 58/58, full host 358/358, independent ACCEPT review, representative real Beads 1.3.1/Dolt 2.5.0 UAT, and Docker tier 1.
+
+Revision required for candidate `ab016f7cd883f45d9350895b71fb8551b55a9c35`: add narrow provider-native direct-parent and clean-working-set proof so a post-update concurrent descendant cannot be adopted as the owner commit. Return raw native diff and exact task views on parent mismatch; require clean exact local revision before push and final success. Preserve the current one-prepare/one-pull/one-update/one-push architecture and isolated remote proof.
 <!-- SECTION:FINAL_SUMMARY:END -->
