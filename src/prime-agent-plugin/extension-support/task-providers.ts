@@ -21,7 +21,7 @@
 
 import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   type CommandRunner,
@@ -506,6 +506,203 @@ function scanBeads(projectRoot: string, runner: CommandRunner): ScanResult {
 }
 
 /**
+ * Resolve the one native Beads authority inherited by a registered Git linked
+ * worktree. `bd context` is the provider-native discovery source; ordinary Git
+ * metadata independently proves the linked checkout and derives the canonical
+ * primary checkout whose real `.beads` directory remains the sole authority.
+ */
+function scanLinkedWorktreeBeads(projectRoot: string, runner: CommandRunner): ScanResult {
+  const blocked = (detail: string, remediation: string): ScanResult => ({
+    blocked: { code: "malformed-evidence", detail, remediation },
+  });
+  const contextCommand = runner.run("bd", ["context", "--json"], { cwd: projectRoot, allowFailure: true });
+  if (contextCommand.status !== 0) {
+    return blocked(
+      `native Beads linked-worktree context is unavailable: ${commandFailure("bd context --json", contextCommand)}`,
+      "Run `bd context --json` from this registered Git linked worktree and repair its native worktree binding before retrying; do not initialize, copy, link, or redirect a second store",
+    );
+  }
+  let context: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(contextCommand.stdout);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not a JSON object");
+    context = parsed as Record<string, unknown>;
+  } catch (error) {
+    return blocked(
+      `native Beads linked-worktree context is invalid: ${error instanceof Error ? error.message : String(error)}`,
+      "Repair `bd context --json` so it returns the supported linked-worktree schema before retrying; do not create a redirect or replacement store",
+    );
+  }
+
+  const gitProbe = (args: string[]) => runner.run("git", args, { cwd: projectRoot, allowFailure: true });
+  const topResult = gitProbe(["rev-parse", "--show-toplevel"]);
+  const gitDirResult = gitProbe(["rev-parse", "--git-dir"]);
+  const commonDirResult = gitProbe(["rev-parse", "--git-common-dir"]);
+  const worktreesResult = gitProbe(["worktree", "list", "--porcelain", "-z"]);
+  if ([topResult, gitDirResult, commonDirResult, worktreesResult].some((result) => result.status !== 0 || !result.stdout.trim())) {
+    return blocked(
+      "Git could not prove this checkout's exact registered linked-worktree identity and common directory",
+      "Repair the registered Git worktree so `git rev-parse --show-toplevel --git-dir --git-common-dir` and `git worktree list --porcelain -z` succeed before retrying",
+    );
+  }
+
+  let canonicalLinkedRoot: string;
+  let canonicalTop: string;
+  let canonicalGitDir: string;
+  let canonicalCommonDir: string;
+  try {
+    canonicalLinkedRoot = realpathSync(projectRoot);
+    canonicalTop = realpathSync(resolve(projectRoot, topResult.stdout.trim()));
+    canonicalGitDir = realpathSync(resolve(projectRoot, gitDirResult.stdout.trim()));
+    canonicalCommonDir = realpathSync(resolve(projectRoot, commonDirResult.stdout.trim()));
+  } catch {
+    return blocked(
+      "Git linked-worktree paths have unreadable or ambiguous canonical identity",
+      "Repair the registered Git worktree and its common-directory metadata before retrying",
+    );
+  }
+
+  let linkedDotGit: ReturnType<typeof lstatSync>;
+  let linkedBeadsDir: ReturnType<typeof lstatSync>;
+  let canonicalLinkedBeads: string;
+  let commonEntry: ReturnType<typeof lstatSync>;
+  let gitDirEntry: ReturnType<typeof lstatSync>;
+  try {
+    linkedDotGit = lstatSync(join(canonicalLinkedRoot, ".git"));
+    linkedBeadsDir = lstatSync(join(canonicalLinkedRoot, BEADS_DIR));
+    canonicalLinkedBeads = realpathSync(join(canonicalLinkedRoot, BEADS_DIR));
+    commonEntry = lstatSync(canonicalCommonDir);
+    gitDirEntry = lstatSync(canonicalGitDir);
+  } catch {
+    return blocked(
+      "Git linked-worktree or local Beads discovery metadata is missing or unreadable",
+      "Restore the registered linked worktree's real `.git` file, checked-out `.beads` metadata directory, and common-directory entries before retrying",
+    );
+  }
+  const primaryRoot = dirname(canonicalCommonDir);
+  const expectedGitDirParent = join(canonicalCommonDir, "worktrees");
+  if (canonicalTop !== canonicalLinkedRoot || canonicalGitDir === canonicalCommonDir
+      || !linkedDotGit.isFile() || linkedDotGit.isSymbolicLink()
+      || !linkedBeadsDir.isDirectory() || linkedBeadsDir.isSymbolicLink()
+      || canonicalLinkedBeads !== join(canonicalLinkedRoot, BEADS_DIR)
+      || !commonEntry.isDirectory() || commonEntry.isSymbolicLink()
+      || !gitDirEntry.isDirectory() || gitDirEntry.isSymbolicLink()
+      || basename(canonicalCommonDir) !== ".git"
+      || dirname(canonicalGitDir) !== expectedGitDirParent
+      || !containedBy(canonicalCommonDir, canonicalGitDir)
+      || primaryRoot === canonicalLinkedRoot) {
+    return blocked(
+      "Git metadata does not describe one real registered linked worktree beneath the canonical primary repository's common directory",
+      "Repair or re-register this Git worktree from the canonical primary checkout before retrying; do not infer provider authority from placement alone",
+    );
+  }
+
+  let dotGitTarget: string;
+  try {
+    const dotGitText = readFileSync(join(canonicalLinkedRoot, ".git"), "utf8").trim();
+    const match = /^gitdir:\s*(.+)$/.exec(dotGitText);
+    if (!match) throw new Error("missing gitdir target");
+    dotGitTarget = realpathSync(resolve(canonicalLinkedRoot, match[1]));
+  } catch {
+    return blocked(
+      "the linked worktree's `.git` file does not carry one readable canonical gitdir target",
+      "Repair the registered Git worktree's `.git` file through ordinary Git worktree recovery before retrying",
+    );
+  }
+  if (dotGitTarget !== canonicalGitDir) {
+    return blocked(
+      "the linked worktree's `.git` target does not match Git's reported git directory",
+      "Repair or re-register this linked worktree before retrying; do not redirect provider authority manually",
+    );
+  }
+
+  let canonicalPrimaryRoot: string;
+  let primaryTop: string;
+  let primaryGitDir: string;
+  let primaryCommonDir: string;
+  try {
+    canonicalPrimaryRoot = realpathSync(primaryRoot);
+    const primaryTopResult = runner.run("git", ["rev-parse", "--show-toplevel"], { cwd: primaryRoot, allowFailure: true });
+    const primaryGitDirResult = runner.run("git", ["rev-parse", "--git-dir"], { cwd: primaryRoot, allowFailure: true });
+    const primaryCommonResult = runner.run("git", ["rev-parse", "--git-common-dir"], { cwd: primaryRoot, allowFailure: true });
+    if ([primaryTopResult, primaryGitDirResult, primaryCommonResult].some((result) => result.status !== 0 || !result.stdout.trim())) {
+      throw new Error("primary Git probes failed");
+    }
+    primaryTop = realpathSync(resolve(primaryRoot, primaryTopResult.stdout.trim()));
+    primaryGitDir = realpathSync(resolve(primaryRoot, primaryGitDirResult.stdout.trim()));
+    primaryCommonDir = realpathSync(resolve(primaryRoot, primaryCommonResult.stdout.trim()));
+  } catch {
+    return blocked(
+      "the Git common directory does not derive one readable canonical primary working tree",
+      "Restore the canonical primary checkout and its common Git directory before retrying",
+    );
+  }
+  if (canonicalPrimaryRoot !== primaryRoot || primaryTop !== primaryRoot
+      || primaryGitDir !== canonicalCommonDir || primaryCommonDir !== canonicalCommonDir) {
+    return blocked(
+      "the derived primary checkout does not exactly own the linked worktree's common Git directory",
+      "Repair the canonical primary checkout/worktree registration before retrying",
+    );
+  }
+
+  const listedRoots: string[] = [];
+  try {
+    for (const field of worktreesResult.stdout.split("\0")) {
+      if (!field.startsWith("worktree ")) continue;
+      listedRoots.push(realpathSync(field.slice("worktree ".length)));
+    }
+  } catch {
+    return blocked(
+      "Git's registered worktree list contains an unreadable working-tree identity",
+      "Prune or repair stale Git worktree registrations before retrying",
+    );
+  }
+  if (listedRoots.filter((root) => root === canonicalLinkedRoot).length !== 1
+      || listedRoots.filter((root) => root === canonicalPrimaryRoot).length !== 1) {
+    return blocked(
+      "Git does not register exactly one matching linked checkout and canonical primary checkout",
+      "Repair the Git worktree registry (`git worktree list`/`git worktree prune`) before retrying",
+    );
+  }
+
+  const primaryBeads = scanBeads(canonicalPrimaryRoot, runner);
+  if (!primaryBeads) {
+    return blocked(
+      "the derived canonical primary checkout has no complete live Beads authority",
+      "Restore the existing primary `.beads` Dolt store through supported Beads recovery; do not initialize or copy a store into the linked worktree",
+    );
+  }
+  if ("blocked" in primaryBeads) return primaryBeads;
+  if (primaryBeads.evidence.provider !== "beads") {
+    return blocked(
+      "the derived canonical primary checkout did not select Beads authority",
+      "Repair the primary provider evidence before retrying from the linked worktree",
+    );
+  }
+  const selected = primaryBeads.evidence;
+  const exactContext = context.schema_version === 1
+    && context.backend === "dolt"
+    && typeof context.bd_version === "string" && /^\d+\.\d+\.\d+$/.test(context.bd_version)
+    && typeof context.cwd_repo_root === "string" && isAbsolute(context.cwd_repo_root)
+    && context.cwd_repo_root === canonicalLinkedRoot
+    && typeof context.repo_root === "string" && isAbsolute(context.repo_root)
+    && context.repo_root === canonicalPrimaryRoot
+    && typeof context.beads_dir === "string" && isAbsolute(context.beads_dir)
+    && context.beads_dir === selected.storeDir
+    && context.database === selected.doltDatabase
+    && context.dolt_mode === selected.doltMode
+    && context.is_worktree === true
+    && context.is_redirected === false;
+  if (!exactContext) {
+    return blocked(
+      "`bd context --json` does not exactly bind this linked checkout to the derived primary repository's selected Beads store, backend, database, mode, and worktree identity",
+      "Run `bd context --json` from this linked worktree and repair foreign, redirected, or mismatched native context before retrying; do not create a redirect or replacement store",
+    );
+  }
+  return primaryBeads;
+}
+
+/**
  * Detect the repository's sole live task provider from native store evidence.
  * Returns `none` when no valid evidence exists so initialization can default
  * to `.backlog/` (or an explicitly selected supported Beads store), and
@@ -515,10 +712,20 @@ export function detectTaskProvider(
   cwd: string,
   runner: CommandRunner = new ProcessCommandRunner(),
 ): TaskProviderDetection {
-  const projectRoot = resolveNearestProjectRoot(cwd, process.env.HOME ?? "", runner).root;
+  const project = resolveNearestProjectRoot(cwd, process.env.HOME ?? "", runner);
+  const projectRoot = project.root;
   const backlog = scanBacklog(projectRoot);
   if (backlog && "blocked" in backlog) return { kind: "blocked", projectRoot, ...backlog.blocked };
-  const beads = scanBeads(projectRoot, runner);
+
+  // Preserve every existing Backlog and provider-absent linked-worktree path
+  // exactly. Checked-out Beads authority metadata selects the one new branch;
+  // native context remains the first authority read inside that branch.
+  const linkedBeadsCandidate = project.kind === "linked-worktree" && !backlog
+    && (isFile(join(projectRoot, BEADS_DIR, "metadata.json"))
+      || isFile(join(projectRoot, BEADS_DIR, "config.yaml")));
+  const beads = linkedBeadsCandidate
+    ? scanLinkedWorktreeBeads(projectRoot, runner)
+    : scanBeads(projectRoot, runner);
   if (beads && "blocked" in beads) return { kind: "blocked", projectRoot, ...beads.blocked };
   if (backlog && beads) {
     const backlogPath = (backlog.evidence as BacklogProviderEvidence).configPath;

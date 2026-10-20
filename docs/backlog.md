@@ -136,6 +136,22 @@ provider-selection file or shadow record:
   evidence returns `none` so initialization can default to `.backlog/` unless
   the operator explicitly selects a supported Beads store.
 
+One direct discovery branch supports a registered Git linked worktree whose
+canonical primary checkout owns that Beads authority. From the linked cwd it
+first reads native `bd context --json`, then independently proves the exact
+linked root, real `.git` file, per-worktree gitdir, common directory, registered
+worktree pair, and canonical primary root through ordinary Git metadata. The
+context must identify schema 1, Dolt, the linked cwd, `is_worktree: true`, no
+redirect, and the exact primary root/store/database/mode. The primary `.beads`
+store must then pass the same real, readable, non-symlink, contained
+`metadata.json`/`config.yaml` and native `no-db` checks used by primary-checkout
+discovery. Capability status reads and the eventual exact `bd show` run from
+the linked cwd against that proven primary store. Missing, forged, foreign,
+redirected, stale, or ambiguous context blocks before any task read or mutation
+with recovery instructions; Prime Claw never copies, links, initializes, or
+persists a second workspace store. Primary-checkout Beads discovery and all
+Backlog branches remain unchanged.
+
 `checkBacklogCapabilities` proves the pinned managed `backlog` executable
 responds and the resolved configuration carries the exact ordered lifecycle
 statuses before any task mutation. `checkBeadsCapabilities` proves the `bd`

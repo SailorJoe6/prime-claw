@@ -53,6 +53,54 @@ function writeBeadsStore(root, { metadataOverrides = {}, configText = "# beads c
   return dir;
 }
 
+function linkedWorktreeFixture() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-linked-provider-")));
+  const primary = join(root, "primary");
+  const linked = join(root, "linked");
+  mkdirSync(primary);
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: primary });
+  execFileSync("git", ["config", "user.name", "Provider Fixture"], { cwd: primary });
+  execFileSync("git", ["config", "user.email", "provider@example.invalid"], { cwd: primary });
+  writeFileSync(join(primary, "README.md"), "fixture\n");
+  writeBeadsStore(primary, { metadataOverrides: { dolt_mode: "server" } });
+  execFileSync("git", ["add", "README.md", ".beads/config.yaml", ".beads/metadata.json"], { cwd: primary });
+  execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: primary });
+  execFileSync("git", ["worktree", "add", "-q", "-b", "episode", linked], { cwd: primary });
+  return { root, primary: realpathSync(primary), linked: realpathSync(linked) };
+}
+
+function linkedBeadsContext(primary, linked, overrides = {}) {
+  return {
+    schema_version: 1,
+    backend: "dolt",
+    bd_version: "1.3.1",
+    beads_dir: join(primary, ".beads"),
+    cwd_repo_root: linked,
+    database: "fixture_db",
+    dolt_mode: "server",
+    is_redirected: false,
+    is_worktree: true,
+    repo_root: primary,
+    ...overrides,
+  };
+}
+
+function linkedBeadsRunner(contextResult, extra = {}) {
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const canned = { ...BEADS_OK, ...BD_NO_DB_FALSE, ...extra };
+  return {
+    calls,
+    run(command, args, options = {}) {
+      calls.push({ command, args: [...args], cwd: options.cwd });
+      const key = [command, ...args].join("\0");
+      if (key === "bd\0context\0--json") return contextResult;
+      if (key in canned) return canned[key];
+      return real.run(command, args, options);
+    },
+  };
+}
+
 /** Fake CommandRunner: exact (command, args) → canned result. */
 function fakeRunner(responses) {
   const calls = [];
@@ -388,6 +436,169 @@ test("valid backlog plus export-only .beads residue still selects backlog", () =
   assert.equal(detection.kind, "selected");
   assert.equal(detection.evidence.provider, "backlog");
 });
+
+test("provider-absent registered linked worktree remains none without invoking native Beads context", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-linked-none-")));
+  const primary = join(root, "primary");
+  const linked = join(root, "linked");
+  mkdirSync(primary);
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const runner = {
+    run(command, args, options = {}) {
+      calls.push([command, ...args]);
+      return real.run(command, args, options);
+    },
+  };
+  try {
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: primary });
+    execFileSync("git", ["config", "user.name", "Provider Fixture"], { cwd: primary });
+    execFileSync("git", ["config", "user.email", "provider@example.invalid"], { cwd: primary });
+    writeFileSync(join(primary, "README.md"), "provider absent\n");
+    execFileSync("git", ["add", "README.md"], { cwd: primary });
+    execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: primary });
+    execFileSync("git", ["worktree", "add", "-q", "-b", "episode", linked], { cwd: primary });
+    const detection = detectTaskProvider(linked, runner);
+    assert.deepEqual(detection, { kind: "none", projectRoot: realpathSync(linked) });
+    assert.equal(calls.some(([command, subcommand]) => command === "bd" && subcommand === "context"), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("registered linked worktree resolves the primary Beads authority and reads the exact task from linked cwd", () => {
+  const fixture = linkedWorktreeFixture();
+  try {
+    const context = linkedBeadsContext(fixture.primary, fixture.linked);
+    const runner = linkedBeadsRunner(
+      { stdout: JSON.stringify(context) + "\n", stderr: "", status: 0 },
+      {
+        [["bd", "--version"].join("\0")]: { stdout: "bd version 1.3.1 (Homebrew)\n", stderr: "", status: 0 },
+        [["bd", "show", "TST-1", "--json", "--long", "--include-comments"].join("\0")]: {
+          stdout: JSON.stringify([{ id: "TST-1", title: "Linked native task", status: "in_planning", design: "exact" }]) + "\n",
+          stderr: "", status: 0,
+        },
+      },
+    );
+    const detection = detectTaskProvider(fixture.linked, runner);
+    assert.equal(detection.kind, "selected");
+    assert.equal(detection.projectRoot, fixture.linked);
+    assert.deepEqual(detection.evidence, {
+      provider: "beads",
+      storeDir: join(fixture.primary, ".beads"),
+      metadataPath: join(fixture.primary, ".beads", "metadata.json"),
+      configPath: join(fixture.primary, ".beads", "config.yaml"),
+      doltMode: "server",
+      doltDatabase: "fixture_db",
+    });
+
+    const resolved = resolveProviderTask(fixture.linked, "TST-1", runner);
+    assert.equal(resolved.provider, "beads");
+    assert.equal(resolved.taskId, "TST-1");
+    assert.equal(resolved.status, "In Planning");
+    assert.equal(resolved.projectRoot, fixture.linked);
+    assert.equal(resolved.nativeView.design, "exact");
+    for (const args of [["context", "--json"], ["statuses", "--json"], ["show", "TST-1", "--json", "--long", "--include-comments"]]) {
+      const call = runner.calls.find((item) => item.command === "bd" && JSON.stringify(item.args) === JSON.stringify(args));
+      assert.ok(call, `missing native linked-worktree call: bd ${args.join(" ")}`);
+      assert.equal(call.cwd, fixture.linked);
+    }
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("linked Beads discovery blocks missing, forged, and foreign native context before task reads", () => {
+  const fixture = linkedWorktreeFixture();
+  const scenarios = [
+    {
+      name: "missing",
+      result: { stdout: "", stderr: "not initialized", status: 1 },
+      pattern: /context is unavailable.*not initialized/,
+    },
+    {
+      name: "forged",
+      result: { stdout: JSON.stringify(linkedBeadsContext(fixture.primary, fixture.linked, { is_worktree: false, is_redirected: true })) + "\n", stderr: "", status: 0 },
+      pattern: /does not exactly bind/,
+    },
+    {
+      name: "foreign",
+      result: { stdout: JSON.stringify(linkedBeadsContext(fixture.primary, fixture.linked, {
+        repo_root: join(fixture.root, "foreign"), beads_dir: join(fixture.root, "foreign", ".beads"),
+      })) + "\n", stderr: "", status: 0 },
+      pattern: /does not exactly bind/,
+    },
+  ];
+  try {
+    for (const scenario of scenarios) {
+      const runner = linkedBeadsRunner(scenario.result);
+      const detection = detectTaskProvider(fixture.linked, runner);
+      assert.equal(detection.kind, "blocked", scenario.name);
+      assert.equal(detection.code, "malformed-evidence", scenario.name);
+      assert.match(detection.detail, scenario.pattern, scenario.name);
+      assert.match(detection.remediation, /repair|Run `bd context/i, scenario.name);
+      assert.equal(runner.calls.some((item) => item.command === "bd" && ["show", "statuses", "update"].includes(item.args[0])), false, scenario.name);
+    }
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("real Beads 1.3.1 resolves one task read-only from a registered Git linked worktree", { timeout: 60_000 }, () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-real-linked-beads-")));
+  const primary = join(root, "primary");
+  const linked = join(root, "linked");
+  mkdirSync(primary);
+  const run = (command, args, cwd = primary) => execFileSync(command, args, { cwd, encoding: "utf8" });
+  try {
+    run("git", ["init", "-q", "-b", "main"]);
+    run("git", ["config", "user.name", "Real Beads Fixture"]);
+    run("git", ["config", "user.email", "real-beads@example.invalid"]);
+    writeFileSync(join(primary, "README.md"), "real linked fixture\n");
+    run("git", ["add", "README.md"]);
+    run("git", ["commit", "-q", "-m", "baseline"]);
+    assert.match(run("bd", ["--version"]), /\bbd version 1\.3\.1\b/);
+    run("bd", ["init", "--server", "--skip-hooks", "--prefix", "RWT", "--quiet"]);
+    run("bd", ["config", "set", "status.custom", "in_design:active,in_planning:active,ready_for_merge:wip,done:done"]);
+    run("bd", ["dolt", "commit", "-m", "configure lifecycle"]);
+    const created = JSON.parse(run("bd", ["create", "Linked worktree read", "--status", "in_planning", "--design", "Read without mutation", "--json"]));
+    assert.equal(typeof created.id, "string");
+    run("git", ["worktree", "add", "-q", "-b", "episode", linked]);
+
+    const context = JSON.parse(run("bd", ["context", "--json"], linked));
+    assert.equal(context.schema_version, 1);
+    assert.equal(context.backend, "dolt");
+    assert.equal(context.is_worktree, true);
+    assert.equal(context.is_redirected, false);
+    assert.equal(context.cwd_repo_root, realpathSync(linked));
+    assert.equal(context.repo_root, realpathSync(primary));
+    assert.equal(context.beads_dir, realpathSync(join(primary, ".beads")));
+
+    const beforeView = JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"], linked));
+    const beforeStatus = JSON.parse(run("bd", ["--readonly", "sql", "--json", "SELECT * FROM dolt_status"], linked));
+    const detection = detectTaskProvider(linked);
+    const resolved = resolveProviderTask(linked, created.id);
+    const afterView = JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"], linked));
+    const afterStatus = JSON.parse(run("bd", ["--readonly", "sql", "--json", "SELECT * FROM dolt_status"], linked));
+
+    assert.equal(detection.kind, "selected");
+    assert.equal(detection.projectRoot, realpathSync(linked));
+    assert.equal(detection.evidence.provider, "beads");
+    assert.equal(detection.evidence.storeDir, realpathSync(join(primary, ".beads")));
+    assert.equal(resolved.provider, "beads");
+    assert.equal(resolved.taskId, created.id);
+    assert.equal(resolved.status, "In Planning");
+    assert.equal(resolved.projectRoot, realpathSync(linked));
+    assert.deepEqual(resolved.nativeView, beforeView[0]);
+    assert.deepEqual(afterView, beforeView);
+    assert.deepEqual(beforeStatus, []);
+    assert.deepEqual(afterStatus, []);
+  } finally {
+    try { run("bd", ["dolt", "stop"]); } catch {}
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 
 test("an empty .beads directory alone is not live evidence", () => {
   const root = fixtureRoot();
