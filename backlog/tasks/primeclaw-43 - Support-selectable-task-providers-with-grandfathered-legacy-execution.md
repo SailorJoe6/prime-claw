@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 19:19'
+updated_date: '2026-10-20 19:23'
 labels: []
 dependencies: []
 references:
@@ -990,6 +990,16 @@ Final focused validation after the UAT wording repair passes: execute/managed-se
 Full-host Node validation passes 388/388 for the final provider-aware execute source/template. This covers every existing Backlog/admission/lifecycle branch plus the managed asset/template surfaces; no runtime TypeScript or deferred workflow was changed. Docker tier 1 remains.
 
 Docker tier 1/offline RPC passes for the final provider-aware execute candidate: immutable image launched, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261020T191728Z-98997-be27e605/tier1`. Final acceptance evidence: focused Python 14 passed/1 container skip; focused Node 46/46; real disposable Beads 1.3.1 linked-cwd owner-content update/publication/isolated-remote proof; full-host Node 388/388; Docker tier 1 PASS; canonical/template bytes and exact managed hashes match; `git diff --check` PASS. The known unrelated `project-skill-design` self-host manifest mismatch remains unchanged from `fb1f411` and was excluded from the focused Python selection rather than modified outside this execute-only slice.
+
+2026-10-20 Conversation ACCEPTED managed provider-aware execute candidate `a6c69837cb6d4d35285a5f2048e8cb73eaa88a04`. Preserve it, its native-first prompt, and all prior accepted seams unchanged. Parent verified exact task/owner/idle Episode, clean pushed remote-equal ancestry, diff check, byte-identical Backlog task block and retained version-1 section, identical canonical/installed execute bytes with exact managed hashes, and focused pytest 12/12.
+
+Advance exactly one slice: extend the existing `/implement-task` prep/readiness workflow, its one-turn single-use approval, and the `create_task_episode` tool gate to Beads. Use existing discriminated provider-native resolution. Preserve Backlog selection/path and all version-1 behavior exactly. Beads uses exact taskId/projectRoot/nativeView/design/native+canonical status with no invented taskPath or normalized task model. Accept only one exact operator-selected canonical ID; never search, infer, or substitute. Require native `in_planning`, canonical `In Planning`, and meaningful raw design. Semantic readiness remains in the managed implement-task workflow, never TypeScript.
+
+Bind the existing in-memory approval to exact owner/provider/task/root and existing preselected placement; Backlog retains its exact path binding. Preserve expiry, single-use, compact-first, two-message admission semantics. At tool use re-resolve the selected provider/task/status/plan, reject provider/identity/placement drift before creation, then call the accepted `createTaskEpisode` admission exactly once. Do not add task-content digests, approval snapshots, lifecycle receipts, alternate authority, or another protocol. Widen shared prep-chain types only as strictly required here; `/plan` and `plan_task` remain unchanged and Backlog-only until a later slice.
+
+Update only the managed `implement-task` and `implement-task-prep` native-read/readiness/report prose to branch directly on live provider. Preserve the current Backlog transaction explanation. Add exact Beads native publication, code-base, and recovery evidence. Use existing workflow asset delivery/reconciliation; do not copy prompts into TypeScript. Do not change execute again or activate handoff, oversight, blocked workflow, receipt advancement, Ready for Merge/Done, finalization/cleanup, planning/design/spec-it-out UX, legacy transition, migration/cutover, PRIMECLAW-43.1, universal models/frameworks, persisted state/sidecars/version 3, retries, classifiers, force, or raw Dolt writes.
+
+Add representative real Beads registered-tool-path coverage for compact-first admission, approval consumption, exact create dispatch, and one fixed execute assignment, plus provider/identity/status failures and unchanged Backlog fixtures. Avoid a Cartesian matrix and fake semantic-behavior tests. Run focused/full host, relevant disposable UAT if practical, Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1060,4 +1070,6 @@ Accepted direct Beads admission through `4c556b296fc965244982655edce36c98a7117e9
 Accepted linked-worktree Beads discovery through `f1c54e4c02b0cb313e5de72d664a4259ff35408f`. Next bounded slice: make only the managed execute workflow source/template provider-aware while preserving provider-absent/Backlog semantics. Beads mode must bind exact owner/native evidence, reason over raw task fields and exact same-task drift, allow only supported owner-authored content updates with native sync/read and non-force publication proof, report raw before/after/revision evidence, and leave runtime gating and lifecycle activation deferred.
 
 Accepted linked-worktree discovery `f1c54e4c02b0cb313e5de72d664a4259ff35408f` remains unchanged. The managed execute source/template is provider-aware without activating a lifecycle path: it selects the exact Conversation owner first; provider-absent/Backlog retains the existing structured task/path/status/content/commit branch; Beads binds exact owner revision/raw evidence/code/worktree/session identity, performs linked-cwd native sync/raw reads, reasons field-for-field about same-task drift while allowing unrelated advances, updates only supported owner-authored content without lifecycle mutation, publishes once non-force, proves exact raw/revision/ref/code evidence, and reports it for later Conversation receipt advancement. Only the existing execute asset, its managed state, focused tests, docs, and this task changed. Focused Python/Node, real Beads 1.3.1 UAT, full Node 388/388, and Docker tier 1 pass.
+
+Accepted provider-aware execute through `a6c69837cb6d4d35285a5f2048e8cb73eaa88a04`. Next bounded slice: activate only `/implement-task` prep/readiness, its existing one-turn single-use approval, and `create_task_episode` gate for Beads using exact provider-native selection/evidence and existing createTaskEpisode admission. Preserve Backlog/version-1, compact-first/two-message/single-use semantics, preselected placement, and all deferred lifecycle/planning/migration areas.
 <!-- SECTION:FINAL_SUMMARY:END -->
