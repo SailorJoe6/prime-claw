@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 15:37'
+updated_date: '2026-10-20 16:03'
 labels: []
 dependencies: []
 references:
@@ -28,9 +28,11 @@ documentation:
   - docs/user-stories/I-episode-finalization.md
   - docs/user-stories/traceability.md
 modified_files:
-  - src/prime-agent-plugin/extension-support/task-providers.ts
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
-  - tests/task_providers.test.mjs
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - tests/task_episode_ownership_extension.test.mjs
   - tests/test_task_providers.py
   - docs/backlog.md
 priority: p1
@@ -833,6 +835,28 @@ Advance only the version-2 ownership/receipt schema prerequisite for later Beads
 Existing provider-absent version-2 Backlog records, including this active owner and unrelated owners, must continue to parse unchanged only when their existing exact Backlog task ID/path fields are valid. Do not rewrite, migrate, or otherwise modify live registry content in this slice. Reject ambiguous or mixed provider fields and malformed provider revisions. Update only the existing parser, types, validation, representative unit/static coverage, docs, and task evidence.
 
 Do not create version 3, another authority/receipt file, generalized task model, migration checkpoint, state machine, registry, or sidecar. Do not activate Beads admission, reservation, handoff, oversight, finalization, cleanup, legacy transition, migration/cutover, or PRIMECLAW-43.1, and do not modify `ownership.json`. Run focused/full host and Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
+
+2026-10-20 version-2 provider-native ownership schema prerequisite implemented from accepted checkpoint `ff77fec8a3e112cfc64a7aa5247589a6586b693b`.
+
+The existing version-2 ownership type is now a minimal discriminated union. Both provider branches retain canonical `taskId`, existing exact Git `baseRef`, and current lifecycle/resource fields. New Backlog records use `provider: "backlog"` plus exact `taskPath` and no Beads fields. Beads records use `provider: "beads"`, exact published 32-character lowercase Dolt `providerRevision`, and the raw native task object as `taskEvidence`; evidence must have an exact matching `id` plus nonempty native title/status, and the Beads branch cannot carry `taskPath`.
+
+Provider-absent version-2 records remain the exact prior Backlog compatibility shape only when canonical task ID, safe exact task path, and all existing validation succeed. Parser reads do not rewrite the registry. Both current record producers—Backlog reservation and retained legacy-to-task transition—now explicitly emit `provider: "backlog"`. Active binding validation compares provider-native IDs and keeps exact Backlog path uniqueness while allowing a Beads receipt revision/evidence to advance without changing Episode identity.
+
+Existing file-bound lifecycle entry points now explicitly narrow ownership to the Backlog branch and fail closed on Beads, so no Beads admission, reservation, handoff, oversight, finalization, cleanup, migration, or legacy route was activated. No version 3, new file/store, state machine, generalized task model, registry, sidecar, checkpoint, or live `.prime-claw/ownership.json` mutation was added.
+
+Representative ownership unit coverage passes 33/33, including explicit Backlog, explicit Beads, provider-absent compatibility without rewrite, mixed fields, mismatched evidence, unknown provider, malformed revision, and existing producer behavior. Related ownership/admission/spec/reviewed-plan suites pass 162/162. Static provider/managed/future-plan checks pass 30 with 2 container tests deselected; TypeScript module imports and `git diff --check` pass. Independent read-only review is pending, followed by full host and Docker tier 1.
+
+2026-10-20 final provider-native version-2 ownership-schema evidence: this prerequisite slice is complete.
+
+Clarification to the progress note: active binding uniqueness preserves the prior global canonical `taskId` collision guard across providers, plus exact Backlog path uniqueness. The provider discriminator prevents a record from changing its provider in place; it does not permit two active Conversations to bind the same canonical task ID. A Beads record may advance only its exact published `providerRevision`, matching raw `taskEvidence`, and timestamp while remaining the same provider/task Episode binding.
+
+The existing version-2 parser/types now accept exactly three shapes: grandfathered provider-absent Backlog with the prior validated canonical ID/path; new explicit Backlog with canonical ID/path and no Beads fields; and explicit Beads with canonical ID, exact 32-character lowercase Dolt revision, raw native task object with matching ID/nonblank title/status, and no Backlog path. All retain the existing exact Git `baseRef` and lifecycle/resource fields. Mixed fields, missing or mismatched evidence, unknown providers, and malformed revisions fail closed. Reads leave provider-absent owner records byte-for-byte untouched in the tested registry. New Backlog reservation and retained transition writes add only `provider: "backlog"`.
+
+Existing file-bound lifecycle and legacy-transition replay paths explicitly require Backlog ownership and fail closed on Beads. No Beads admission, reservation, handoff, oversight, finalization, cleanup, legacy transition, migration/cutover, or PRIMECLAW-43.1 route was activated. No version 3, authority/receipt file, generalized task model, migration checkpoint, state machine, registry, sidecar, or live `.prime-claw/ownership.json` rewrite was introduced.
+
+Validation after final source: focused ownership 34/34; static provider/schema 3 passed with 1 container bridge deselected; TypeScript module imports and `git diff --check` pass; full host Node 367/367. Docker tier 1/offline RPC passes with immutable image launch, network absence, checks, teardown verification, and manifest publication. Evidence: `.test-results/20261020T160107Z-61783-5b7a3f43/tier1`.
+
+Keep PRIMECLAW-43 exactly In Progress. Stop after one clean candidate push and owning-Conversation notification; do not begin Beads admission or another slice.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -873,4 +897,6 @@ Accepted candidate `4001bcddeb7704185936063d49ffee5e803f7b1f`. Next bounded slic
 Accepted native-first Beads publication is integrated only at `commitConversationTaskStatus`. Backlog keeps its ordinary native edit and task-file Git behavior unchanged. Beads now returns `mutateAndPublishBeadsTaskStatus` directly: exact publication evidence on `published`, and raw provider evidence on `review-required` or `blocked`, with no semantic classifier or retry. All other provider lifecycle routing remains deferred. Validated by focused provider 63/63, combined provider/admission 82/82, Python bridge, full host 363/363, and Docker tier 1.
 
 Accepted status-publication integration candidate `65ff940f42d6a2dfae279ad7c0eab953bc7fe9c7`. Next bounded slice extends the existing version-2 ownership shape in place with a minimal provider discriminator and provider-native identity: legacy provider-absent records remain valid Backlog only with exact existing ID/path; new Backlog records carry path evidence; new Beads records carry exact published provider revision and only required raw/native evidence. Reject mixed/malformed fields, preserve existing Episode Git HEAD, do not rewrite live ownership or activate any Beads lifecycle route.
+
+Extended the existing version-2 ownership record in place with a minimal provider-native discriminator. New Backlog records explicitly bind provider, canonical task ID, and exact task path. Beads schema records bind provider, canonical task ID, exact published Dolt revision, raw matching native task evidence, and the existing Git baseRef without a Backlog path. Provider-absent version-2 records remain validated Backlog compatibility input and are not rewritten. Mixed/malformed shapes fail closed; current lifecycle routes remain Backlog-only. Validated by focused ownership 34/34, full host 367/367, static/import checks, and Docker tier 1.
 <!-- SECTION:FINAL_SUMMARY:END -->
