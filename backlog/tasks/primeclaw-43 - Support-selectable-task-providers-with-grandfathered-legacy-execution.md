@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 17:29'
+updated_date: '2026-10-20 17:41'
 labels: []
 dependencies: []
 references:
@@ -916,6 +916,16 @@ Focused evidence: new direct Beads contracts 11/11; combined admission/provider/
 Docker tier 1/offline RPC passes with the new Beads admission bridge: immutable image launched, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261020T172709Z-4623-5ecf9139/tier1`. Real Beads 1.3.1 evidence remains: exact design round-trip passed; strict preflight safely rejected an unpushed fixture Git HEAD and then a dirty native config working set while preserving raw blocked evidence; after the fixture pushed its initialization commits and committed/pushed native lifecycle config, production `createTaskEpisode` published native `in_progress`, reserved exact revision `h6k80h9fsi9c6ps4k29fabtmtcdho6cm`, returned and stored active provider:`beads` ownership with raw design and exact code base/head `5d2b0f18e158743ad60fe9d0a9cc26537392c052`, ended with `dolt_status=[]`, `HEAD == upstream`, and no tracked Git changes, then stopped its server and removed every disposable resource.
 
 Scope stayed bounded: one direct Beads public-path branch, expected-provider publication race guard, allocation-only Beads ownership acceptance, exact success proof, and deterministic rollback/Blocked evidence advancement. The existing Backlog admission test source is byte-for-byte unchanged. Later handoff/oversight/finalization/cleanup and legacy transition still reject Beads. No provider framework/matrix, normalized semantic task model, sidecar/receipt, version 3, raw Dolt write, force, retry, migration/cutover, managed skill/template change, PRIMECLAW-43.1, or terminal lifecycle routing was added.
+
+2026-10-20 Conversation REQUESTED one bounded revision to direct Beads admission candidate `38a982ce880b0a893d24db0f575139a76df2b3fe`. Preserve every other source change, accepted seam, Backlog behavior/test, and reported validation result. Fix exactly two confirmed contract defects.
+
+1. Recovery must not reapply the failed fresh-admission Git gate. `proveBeadsAdmissionCodeHead` currently runs before both post-reservation Blocked publication and pre-reservation In Planning rollback. Expert reproduction showed post-publication tracked drift leaving only `[In Progress]`, task In Progress, and no owner; post-reservation tracked drift plus allocation failure never attempted Blocked and left stale provisioning evidence. Keep no-operation/tracked-clean/exact HEAD/upstream checks for initial admission and pre-reservation success only. In recovery, require exact provider/task/status, exact owner/captured-base binding where present, and unchanged relevant ownership; do not require current Git cleanliness/upstream equality, do not mutate code/baseRef/resources, and perform only the existing single native In Planning rollback or Blocked publication plus same-owner evidence advance. Add one representative regression at each recovery boundary.
+
+2. Before reservation, the post-publication target-task re-read must prove its complete raw native view equals `inProgressPublication.evidence.taskPublished.nativeView`, not only status and meaningful design. Parent reproduced a different meaningful outside design arriving after publication: the candidate returned active ownership bound to old design while the live task held new design. Preserve unrelated-task store advances. On any raw target-task difference, reserve nothing, surface both provider-native views without semantic classification, and execute the one In Planning rollback. Add one representative same-task design or other raw-field drift regression.
+
+Keep actual reviewed-plan `/implement-task` and `create_task_episode` tool gating, managed execute skill, and provider-aware Episode worktree routing explicitly deferred and unchanged. Independent review confirmed they are not activated, so describe this slice as the direct internal admission/allocation seam, not end-to-end managed-tool support. Do not add workspace-copy machinery: Beads 1.3.1 discovers the primary native store through Git common-directory metadata. No retry, semantic classifier, normalized model, new lock/state/framework/receipt/sidecar/version 3, force/raw Dolt, lifecycle expansion, migration, legacy work, cleanup, or PRIMECLAW-43.1.
+
+Rerun focused/full host, the two exact recovery repros plus raw-view drift repro, relevant disposable UAT only if needed, and Docker tier 1. Push one clean repaired candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -974,4 +984,6 @@ Added only the raw Beads task-view prerequisite: the Beads resolver now calls ex
 Accepted raw Beads view candidate `4eb3e519dac366ba67b7a7388a079aff4c14a271`. Next bounded slice is only direct Beads admission/allocation through existing `createTaskEpisode`: exact In Planning native design preflight, canonical-main/upstream code proof, published In Progress result, accepted Beads reservation, existing allocation, exact active ownership proof, and deterministic In Planning rollback or same-owner Blocked recovery. Backlog branch remains unchanged; no provider framework or later lifecycle routes.
 
 Implemented only direct Beads task Episode admission/allocation through existing `createTaskEpisode`. It requires exact `In Planning`/`in_planning` raw design, canonical clean upstream-equal primary main, serialized task/code/owner reproof, exact published In Progress evidence, accepted Beads reservation, existing allocation, and exact active ownership/resource proof. Recovery performs one proven In Planning rollback before durable mutation or one same-owner Blocked evidence advance after durable mutation, with no retry. Backlog admission tests remain byte-for-byte unchanged. Focused 130/130, full Node 381/381, real Beads 1.3.1 production UAT, and Docker tier 1 pass.
+
+Revision requested for `38a982ce880b0a893d24db0f575139a76df2b3fe`: remove fresh-admission Git cleanliness/upstream checks only from both deterministic recovery branches, and require exact full raw target-task equality between published In Progress evidence and the pre-reservation re-read. Add tracked-drift rollback/Blocked regressions plus raw same-task drift rollback. Preserve all other behavior and keep managed-tool/worktree routing deferred.
 <!-- SECTION:FINAL_SUMMARY:END -->
