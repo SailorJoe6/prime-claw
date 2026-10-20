@@ -121,15 +121,16 @@ const DOLT_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch()
 const DOLT_DIRTY_QUERY = "SELECT table_name, staged, status FROM dolt_status ORDER BY table_name";
 const DOLT_REMOTE_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision";
 
-function beadsWorkspaceResponses(root, { operatorManaged = false } = {}) {
+function beadsWorkspaceResponses(root, { operatorManaged = false, bdVersion = "1.1.2", doltVersion = "2.2.3" } = {}) {
   const storeDir = join(root, ".beads");
   return {
     ...BEADS_OK,
     ...BD_NO_DB_FALSE,
+    ["bd\0--version"]: { stdout: `bd version ${bdVersion} (Homebrew) \n`, stderr: "", status: 0 },
     ["bd\0context\0--json"]: { stdout: JSON.stringify({
       schema_version: 1,
       backend: "dolt",
-      bd_version: "1.1.2",
+      bd_version: bdVersion,
       beads_dir: storeDir,
       cwd_repo_root: root,
       repo_root: root,
@@ -171,9 +172,9 @@ function beadsWorkspaceResponses(root, { operatorManaged = false } = {}) {
       port: 3307,
       data_dir: join(storeDir, "dolt"),
     }) + "\n", stderr: "", status: 0 },
-    ["dolt\0version"]: { stdout: "dolt version 2.2.3\n", stderr: "", status: 0 },
+    ["dolt\0version"]: { stdout: `dolt version ${doltVersion}\n`, stderr: "", status: 0 },
     [["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")]: { stdout: JSON.stringify([{
-      database_name: "fixture_db", branch: "main", revision: DOLT_REVISION, dolt_version: "2.2.3",
+      database_name: "fixture_db", branch: "main", revision: DOLT_REVISION, dolt_version: doltVersion,
     }]) + "\n", stderr: "", status: 0 },
     [["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")]: { stdout: "[]\n", stderr: "", status: 0 },
     ["bd\0config\0get\0sync.remote\0--json"]: { stdout: JSON.stringify({
@@ -612,6 +613,96 @@ test("Beads workspace transport proves bd-managed server, native revision, remot
   assert.equal(runner.calls.filter((call) => call.join("\0") === ["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")).length, 2);
   assert.equal(runner.calls.filter((call) => call.join("\0") === ["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")).length, 2);
   assert.equal(runner.calls.filter(([command, subcommand]) => command === "git" && subcommand === "ls-remote").length, 2);
+});
+
+test("Beads 1.3.1 transport normalizes equivalent configured, native, and repository Git remote forms", () => {
+  const root = fixtureRoot();
+  const localRemote = join(root, "published.git");
+  const fileUrl = `file://${localRemote}`;
+  const gitFileUrl = `git+${fileUrl}`;
+  const cases = [
+    {
+      label: "https",
+      configured: "https://example.invalid/org/repo.git",
+      listed: "git+https://example.invalid/org/repo.git",
+      repository: "https://example.invalid/org/repo.git",
+      normalized: "git+https://example.invalid/org/repo.git",
+    },
+    {
+      label: "ssh",
+      configured: "git+ssh://git@example.invalid/org/repo.git",
+      listed: "ssh://git@example.invalid/org/repo.git",
+      repository: "git@example.invalid:org/repo.git",
+      normalized: "git+ssh://git@example.invalid/org/repo.git",
+    },
+    {
+      label: "file URL",
+      configured: fileUrl,
+      listed: gitFileUrl,
+      repository: localRemote,
+      normalized: gitFileUrl,
+    },
+    {
+      label: "absolute path",
+      configured: localRemote,
+      listed: gitFileUrl,
+      repository: fileUrl,
+      normalized: gitFileUrl,
+    },
+  ];
+
+  for (const remote of cases) {
+    writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+    const responses = beadsWorkspaceResponses(root, { bdVersion: "1.3.1", doltVersion: "2.5.0" });
+    const configured = JSON.parse(responses["bd\0config\0get\0sync.remote\0--json"].stdout);
+    configured.value = remote.configured;
+    responses["bd\0config\0get\0sync.remote\0--json"] = {
+      stdout: JSON.stringify(configured) + "\n", stderr: "", status: 0,
+    };
+    responses["bd\0dolt\0remote\0list\0--json"] = {
+      stdout: JSON.stringify([{ name: "origin", url: remote.listed, sql_url: remote.listed, status: "ok" }]) + "\n",
+      stderr: "", status: 0,
+    };
+    responses["git\0remote\0get-url\0--all\0origin"] = { stdout: `${remote.repository}\n`, stderr: "", status: 0 };
+    const runner = recordedDetectionRunner(responses);
+    const result = prepareBeadsWorkspaceTransport(root, runner);
+    assert.equal(result.status, "ready", remote.label);
+    assert.equal(result.evidence.remoteUrl, remote.normalized, remote.label);
+    const clone = runner.calls.find(([command, subcommand]) => command === "dolt" && subcommand === "clone");
+    assert.ok(clone, remote.label);
+    assert.equal(clone.at(-2), remote.normalized, remote.label);
+  }
+});
+
+test("Beads remote normalization preserves exact native and repository remote cardinality", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const responses = beadsWorkspaceResponses(root, { bdVersion: "1.3.1", doltVersion: "2.5.0" });
+  const configured = JSON.parse(responses["bd\0config\0get\0sync.remote\0--json"].stdout);
+  configured.value = "https://example.invalid/org/repo.git";
+  responses["bd\0config\0get\0sync.remote\0--json"] = {
+    stdout: JSON.stringify(configured) + "\n", stderr: "", status: 0,
+  };
+  responses["bd\0dolt\0remote\0list\0--json"] = {
+    stdout: JSON.stringify([
+      { name: "origin", url: "git+https://example.invalid/org/repo.git", sql_url: "git+https://example.invalid/org/repo.git", status: "ok" },
+      { name: "mirror", url: "https://example.invalid/org/repo.git", sql_url: "https://example.invalid/org/repo.git", status: "ok" },
+    ]) + "\n",
+    stderr: "", status: 0,
+  };
+  const duplicate = prepareBeadsWorkspaceTransport(root, recordedDetectionRunner(responses));
+  assert.equal(duplicate.status, "blocked");
+  assert.equal(duplicate.code, "remote-transport");
+  assert.match(duplicate.detail, /exactly one healthy native Dolt remote/);
+
+  configured.value = "../relative/repo.git";
+  responses["bd\0config\0get\0sync.remote\0--json"] = {
+    stdout: JSON.stringify(configured) + "\n", stderr: "", status: 0,
+  };
+  const relative = prepareBeadsWorkspaceTransport(root, recordedDetectionRunner(responses));
+  assert.equal(relative.status, "blocked");
+  assert.equal(relative.code, "remote-transport");
+  assert.match(relative.detail, /supported config.yaml-backed Git remote URL or absolute path/);
 });
 
 test("Beads workspace transport rejects foreign, symlinked, and ambiguous bd-managed data directories", () => {

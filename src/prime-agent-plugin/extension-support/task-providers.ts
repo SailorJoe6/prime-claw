@@ -22,6 +22,7 @@
 import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   type CommandRunner,
   ProcessCommandRunner,
@@ -722,8 +723,10 @@ function parseJSONRecordCommand(
 }
 
 function normalizedDoltGitRemote(url: string): string | null {
+  if (!url || url.includes("\0") || /[\r\n]/.test(url)) return null;
   if (/^git\+(?:https?|ssh|file):\/\//.test(url)) return url;
   if (/^(?:https?|ssh|file):\/\//.test(url)) return `git+${url}`;
+  if (isAbsolute(url)) return `git+${pathToFileURL(normalize(url)).href}`;
   const scp = /^([^/:]+@[^/:]+):(.+)$/.exec(url);
   if (scp) return `git+ssh://${scp[1]}/${scp[2]}`;
   return null;
@@ -1009,14 +1012,15 @@ export function prepareBeadsWorkspaceTransport(
     };
   }
   const configuredRemoteView = configuredRemoteResult.value;
-  const configuredRemote = typeof configuredRemoteView.value === "string" ? configuredRemoteView.value.trim() : "";
+  const configuredRemoteInput = typeof configuredRemoteView.value === "string" ? configuredRemoteView.value.trim() : "";
+  const configuredRemote = normalizedDoltGitRemote(configuredRemoteInput);
   if (configuredRemoteView.schema_version !== 1 || configuredRemoteView.key !== "sync.remote"
-      || configuredRemoteView.location !== "config.yaml" || !configuredRemote) {
+      || configuredRemoteView.location !== "config.yaml" || !configuredRemoteInput || !configuredRemote) {
     return {
       status: "blocked",
       code: "remote-transport",
-      detail: "`bd config get sync.remote --json` did not prove one exact config.yaml-backed remote URL",
-      remediation: "Add the intended remote with `bd dolt remote add <name> <url>` so native config and remote evidence agree",
+      detail: "`bd config get sync.remote --json` did not prove one supported config.yaml-backed Git remote URL or absolute path",
+      remediation: "Add the intended Git-backed remote with `bd dolt remote add <name> <url>` so native config and remote evidence agree",
     };
   }
 
@@ -1058,7 +1062,10 @@ export function prepareBeadsWorkspaceTransport(
       remediation: "Repair the pinned bd installation and native remote configuration before retrying",
     };
   }
-  const matches = remoteRows.filter((row) => row.url === configuredRemote && row.sql_url === configuredRemote && row.status === "ok");
+  const matches = remoteRows.filter((row) =>
+    normalizedDoltGitRemote(row.url as string) === configuredRemote
+      && normalizedDoltGitRemote(row.sql_url as string) === configuredRemote
+      && row.status === "ok");
   if (matches.length !== 1) {
     return {
       status: "blocked",
@@ -1068,14 +1075,6 @@ export function prepareBeadsWorkspaceTransport(
     };
   }
   const remoteName = matches[0].name as string;
-  if (!/^git\+(?:https?|ssh|file):\/\//.test(configuredRemote)) {
-    return {
-      status: "blocked",
-      code: "publication-authority",
-      detail: `the configured Dolt remote ${JSON.stringify(configuredRemote)} is not a supported Git-backed transport for ${BEADS_DOLT_DATA_REF}`,
-      remediation: "Configure the repository remote with `bd dolt remote add <name> <git+https-or-git+ssh-url>`; do not substitute JSONL or raw Dolt writes",
-    };
-  }
 
   const gitRemoteResult = runner.run("git", ["remote", "get-url", "--all", remoteName], { cwd: projectRoot, allowFailure: true });
   const gitRemoteUrls = gitRemoteResult.stdout.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean);

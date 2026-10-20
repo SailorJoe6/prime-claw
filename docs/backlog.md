@@ -467,7 +467,11 @@ uses supported native reads in one fail-closed sequence:
   authority and blocks with native commit remediation;
 - `bd config get sync.remote --json` and `bd dolt remote list --json` must select
   one healthy Git-backed Dolt remote matching one repository Git remote.
-  Direct `git ls-remote --refs` must expose exactly one `refs/dolt/data` ref;
+  Before exact comparison, supported ordinary HTTPS, SSH, and file URLs plus
+  safe absolute filesystem paths normalize to the same `git+...` transport
+  identity emitted by native Beads; normalization does not relax either native
+  or repository-remote cardinality. Direct `git ls-remote --refs` must expose
+  exactly one `refs/dolt/data` ref;
   then a disposable isolated `dolt clone --ref refs/dolt/data` must report the
   same native branch and revision as the live server. After that isolated proof,
   the live native database, branch, revision, Dolt version, and clean
