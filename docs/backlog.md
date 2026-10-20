@@ -508,21 +508,30 @@ the change as same-task or unrelated.
 
 With no concurrent advance, the seam asks Beads to own the guarded atomic
 write and commit through `bd --dolt-auto-commit=on update <exact-id> --status
-<native-status> --if-status <prior-native-status> --json`. It then makes one
-`bd dolt push --remote <name> --no-adopt`, never force-pushes, then uses one
-disposable read-only clone bracketed by stable direct ref reads. The snapshot
-retains the raw remote revision, exact issue row, and comments. Success requires
-that remote revision to equal the proved committed/live revision and the remote
-row to carry the exact requested status; a remote descendant is review evidence,
-not exact success. A guarded mutation failure or rejected push is preserved and
-returned with raw command output, exact local and remote task/revision/ref facts,
-and raw native diff evidence. There is no automatic second pull, retry,
-rollback, table enumeration, normalized diff, or deterministic semantic
-compatibility decision. A managed Episode or Conversation reviews the native
-evidence and may deliberately continue on a later pass.
+<native-status> --if-status <prior-native-status> --json`. One supported
+read-only native query then captures the exact `HEAD`, `HEAD~1`, and
+`dolt_status` row count together. The update is eligible to publish only when
+`HEAD~1` is the prepared revision and the working set is empty. A different
+first parent returns raw `bd --readonly diff <prepared> <observed> --json` plus
+exact before/after long-and-comments task views for managed review; deterministic
+code does not classify the descendant.
 
-The focused contract uses three representative cases only: ordinary success,
-one concurrent pull advance, and one rejected non-force push. Lifecycle wiring,
+The seam then makes one `bd dolt push --remote <name> --no-adopt`, never
+force-pushes, and re-proves the same exact clean local revision before success.
+One disposable read-only clone bracketed by stable direct ref reads retains the
+raw remote revision, exact issue row, and comments. Success requires that remote
+revision to equal the proved committed/live revision and the remote row to carry
+the exact requested status; a remote descendant is review evidence, not exact
+success. A guarded mutation failure or rejected push is preserved and returned
+with raw command output, exact local and remote task/revision/ref facts, and raw
+native diff evidence. There is no automatic second pull, retry, rollback, table
+enumeration, normalized diff, or deterministic semantic compatibility decision.
+A managed Episode or Conversation reviews the native evidence and may
+deliberately continue on a later pass.
+
+The focused contract uses five representative cases only: ordinary clean
+direct-parent success, one post-update descendant, one dirty-state refusal, one
+concurrent pull advance, and one rejected non-force push. Lifecycle wiring,
 automatic semantic reconciliation, provider-neutral mutation, migration,
 legacy transition, PRIMECLAW-43.1, locks, mirrors, registries, frameworks, and
 persistent Prime Claw state remain out of scope.

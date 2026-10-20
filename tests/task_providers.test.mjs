@@ -121,7 +121,7 @@ const DOLT_REMOTE_URL = "git+https://example.invalid/org/repo.git";
 const DOLT_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, dolt_version() AS dolt_version";
 const DOLT_DIRTY_QUERY = "SELECT table_name, staged, status FROM dolt_status ORDER BY table_name";
 const DOLT_REMOTE_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision";
-const DOLT_MUTATION_IDENTITY_QUERY = DOLT_REMOTE_IDENTITY_QUERY;
+const DOLT_MUTATION_REVISION_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, dolt_hashof('HEAD~1') AS parent_revision, (SELECT COUNT(*) FROM dolt_status) AS status_count";
 
 function beadsWorkspaceResponses(root, { operatorManaged = false, bdVersion = "1.1.2", doltVersion = "2.2.3" } = {}) {
   const storeDir = join(root, ".beads");
@@ -225,9 +225,11 @@ function beadsMutationRunner(root, scenario = {}) {
   const delegate = beadsTransportRunner(beadsWorkspaceResponses(root));
   const calls = [];
   let revision = DOLT_REVISION;
+  let parentRevision = "9".repeat(32);
   let remoteRevision = DOLT_REVISION;
   let head = DOLT_DATA_HEAD;
   let status = "in_design";
+  let mutationCompleted = false;
   let remoteStatus = "in_design";
   let pushCompleted = false;
   let postPushRefReads = 0;
@@ -245,7 +247,9 @@ function beadsMutationRunner(root, scenario = {}) {
       if (command === "bd" && args[0] === "--dolt-auto-commit=on") {
         if (scenario.mutationFailure) return { stdout: "", stderr: "guard rejected\n", status: 1 };
         status = args[args.indexOf("--status") + 1];
-        revision = "d".repeat(32);
+        mutationCompleted = true;
+        revision = scenario.postUpdateDescendant ? "e".repeat(32) : "d".repeat(32);
+        parentRevision = scenario.postUpdateDescendant ? "d".repeat(32) : DOLT_REVISION;
         return { stdout: JSON.stringify([{ id: "TST-1", status }]) + "\n", stderr: "", status: 0 };
       }
       if (command === "bd" && args[0] === "dolt" && args[1] === "push") {
@@ -256,7 +260,7 @@ function beadsMutationRunner(root, scenario = {}) {
         pushCompleted = true;
         return { stdout: "pushed\n", stderr: "", status: 0 };
       }
-      if (command === "dolt" && args[0] === "sql" && args.at(-1) === DOLT_MUTATION_IDENTITY_QUERY) {
+      if (command === "dolt" && args[0] === "sql" && args.at(-1) === DOLT_REMOTE_IDENTITY_QUERY) {
         return { stdout: JSON.stringify({ rows: [{ database_name: "fixture_db", branch: "main", revision: remoteRevision }] }) + "\n", stderr: "", status: 0 };
       }
       if (command === "dolt" && args[0] === "sql" && args.at(-1).startsWith("SELECT * FROM issues WHERE id =")) {
@@ -265,8 +269,11 @@ function beadsMutationRunner(root, scenario = {}) {
       if (command === "dolt" && args[0] === "sql" && args.at(-1).startsWith("SELECT * FROM comments WHERE issue_id =")) {
         return { stdout: JSON.stringify({ rows: [] }) + "\n", stderr: "", status: 0 };
       }
-      if (command === "bd" && args.at(-1) === DOLT_MUTATION_IDENTITY_QUERY) {
-        return { stdout: JSON.stringify([{ database_name: "fixture_db", branch: "main", revision }]) + "\n", stderr: "", status: 0 };
+      if (command === "bd" && args.at(-1) === DOLT_MUTATION_REVISION_QUERY) {
+        return { stdout: JSON.stringify([{
+          database_name: "fixture_db", branch: "main", revision, parent_revision: parentRevision,
+          status_count: mutationCompleted && scenario.dirtyAfterMutation ? 1 : 0,
+        }]) + "\n", stderr: "", status: 0 };
       }
       if (command === "bd" && args[0] === "--readonly" && args[1] === "diff") {
         return { stdout: JSON.stringify({ from: args[2], to: args[3], changes: [{ raw: true }] }) + "\n", stderr: "", status: 0 };
@@ -1061,6 +1068,11 @@ test("Beads mutation publishes one guarded provider-native update without retry 
   assert.equal(result.evidence.publishedRevision, "d".repeat(32));
   assert.equal(result.evidence.publicationHead, "e".repeat(40));
   assert.equal(result.evidence.taskPublished.nativeStatus, "in_progress");
+  assert.equal(result.evidence.postMutationProof.parentRevision, DOLT_REVISION);
+  assert.equal(result.evidence.postMutationProof.clean, true);
+  assert.equal(result.evidence.localPublishedProof.revision, "d".repeat(32));
+  assert.equal(result.evidence.localPublishedProof.parentRevision, DOLT_REVISION);
+  assert.equal(result.evidence.localPublishedProof.clean, true);
   assert.equal(result.evidence.remotePublishedTask.revision, "d".repeat(32));
   assert.equal(result.evidence.remotePublishedTask.taskRow.status, "in_progress");
   assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
@@ -1068,6 +1080,45 @@ test("Beads mutation publishes one guarded provider-native update without retry 
   assert.ok(runner.calls.some((call) => call.join(" ").includes("--dolt-auto-commit=on update TST-1 --status in_progress --if-status in_design --json")));
   assert.equal(runner.calls.some((call) => call.includes("--force")), false);
 });
+
+test("Beads mutation returns raw evidence when a descendant appears after the guarded update", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const runner = beadsMutationRunner(root, { postUpdateDescendant: true });
+  const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
+
+  assert.equal(result.status, "review-required");
+  assert.equal(result.code, "concurrent-advance");
+  assert.equal(result.phase, "mutation");
+  assert.equal(result.evidence.observedRevision, "e".repeat(32));
+  assert.equal(result.evidence.revisionProof.parentRevision, "d".repeat(32));
+  assert.equal(result.evidence.revisionProof.clean, true);
+  assert.equal(result.evidence.taskBefore.task.nativeStatus, "in_design");
+  assert.equal(result.evidence.taskObserved.task.nativeStatus, "in_progress");
+  assert.deepEqual(result.evidence.taskBefore.command.args, ["show", "TST-1", "--json", "--long", "--include-comments"]);
+  assert.deepEqual(result.evidence.taskObserved.command.args, ["show", "TST-1", "--json", "--long", "--include-comments"]);
+  assert.deepEqual(JSON.parse(result.evidence.diff.stdout), {
+    from: DOLT_REVISION, to: "e".repeat(32), changes: [{ raw: true }],
+  });
+  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push"), false);
+});
+
+test("Beads mutation refuses a dirty native working set before push", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const runner = beadsMutationRunner(root, { dirtyAfterMutation: true });
+  const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
+
+  assert.equal(result.status, "review-required");
+  assert.equal(result.code, "guarded-mutation-failed");
+  assert.equal(result.phase, "mutation");
+  assert.equal(result.evidence.observedRevision, "d".repeat(32));
+  assert.equal(result.evidence.revisionProof.parentRevision, DOLT_REVISION);
+  assert.equal(result.evidence.revisionProof.clean, false);
+  assert.match(result.detail, /dolt_status.*not empty/);
+  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push"), false);
+});
+
 
 test("Beads mutation returns raw native evidence for a concurrent pull and does not mutate", () => {
   const root = fixtureRoot();

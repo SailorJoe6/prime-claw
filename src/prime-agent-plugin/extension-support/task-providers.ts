@@ -1293,6 +1293,14 @@ export interface BeadsRemoteTaskSnapshotEvidence {
   error?: string;
 }
 
+export interface BeadsMutationRevisionEvidence {
+  revision?: string;
+  parentRevision?: string;
+  clean?: boolean;
+  command: BeadsRawCommandEvidence;
+  error?: string;
+}
+
 export interface BeadsTaskMutationPublishedEvidence {
   provider: "beads";
   projectRoot: string;
@@ -1305,6 +1313,8 @@ export interface BeadsTaskMutationPublishedEvidence {
   publicationHead: string;
   taskBefore: BeadsNativeTaskSnapshot;
   taskPublished: BeadsNativeTaskSnapshot;
+  postMutationProof: BeadsMutationRevisionEvidence;
+  localPublishedProof: BeadsMutationRevisionEvidence;
   remotePublishedTask: BeadsRemoteTaskSnapshotEvidence;
   pull: BeadsRawCommandEvidence;
   mutation: BeadsRawCommandEvidence;
@@ -1318,6 +1328,7 @@ export interface BeadsTaskMutationReviewEvidence {
   prepared?: BeadsWorkspaceTransportEvidence;
   preparedRevision?: string;
   observedRevision?: string;
+  revisionProof?: BeadsMutationRevisionEvidence;
   taskBefore?: BeadsNativeTaskReadEvidence;
   taskObserved?: BeadsNativeTaskReadEvidence;
   operation?: BeadsRawCommandEvidence;
@@ -1342,7 +1353,8 @@ export type BeadsTaskMutationPublication =
       evidence: BeadsTaskMutationReviewEvidence;
     };
 
-const BEADS_MUTATION_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision";
+const BEADS_REMOTE_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision";
+const BEADS_MUTATION_REVISION_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, dolt_hashof('HEAD~1') AS parent_revision, (SELECT COUNT(*) FROM dolt_status) AS status_count";
 
 function rawCommand(
   command: string,
@@ -1396,22 +1408,29 @@ function readBeadsMutationRevision(
   projectRoot: string,
   expected: Pick<BeadsWorkspaceTransportEvidence, "database" | "branch">,
   runner: CommandRunner,
-): { revision?: string; command: BeadsRawCommandEvidence; error?: string } {
-  const args = ["--readonly", "sql", "--json", BEADS_MUTATION_IDENTITY_QUERY];
+): BeadsMutationRevisionEvidence {
+  const args = ["--readonly", "sql", "--json", BEADS_MUTATION_REVISION_QUERY];
   const result = runner.run("bd", args, { cwd: projectRoot, allowFailure: true });
   const command = rawCommand("bd", args, result);
-  if (result.status !== 0) return { command, error: commandFailure("bd --readonly sql native identity", result) };
+  if (result.status !== 0) return { command, error: commandFailure("bd --readonly sql native revision", result) };
   try {
     const parsed: unknown = JSON.parse(result.stdout);
     const row = Array.isArray(parsed) && parsed.length === 1 && parsed[0]
       && typeof parsed[0] === "object" && !Array.isArray(parsed[0]) ? parsed[0] as JsonRecord : null;
     if (!row || row.database_name !== expected.database || row.branch !== expected.branch
-        || typeof row.revision !== "string" || !/^[0-9a-v]{32}$/.test(row.revision)) {
-      return { command, error: "native identity did not preserve the exact database, branch, and revision" };
+        || typeof row.revision !== "string" || !/^[0-9a-v]{32}$/.test(row.revision)
+        || (row.parent_revision !== null && (typeof row.parent_revision !== "string" || !/^[0-9a-v]{32}$/.test(row.parent_revision)))
+        || typeof row.status_count !== "number" || !Number.isInteger(row.status_count) || row.status_count < 0) {
+      return { command, error: "native revision proof did not preserve the exact database, branch, HEAD, first parent, and working-set count" };
     }
-    return { command, revision: row.revision };
+    return {
+      command,
+      revision: row.revision,
+      parentRevision: typeof row.parent_revision === "string" ? row.parent_revision : undefined,
+      clean: row.status_count === 0,
+    };
   } catch (error) {
-    return { command, error: `native identity returned invalid JSON: ${error instanceof Error ? error.message : String(error)}` };
+    return { command, error: `native revision proof returned invalid JSON: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
@@ -1461,7 +1480,7 @@ function readIsolatedBeadsRemoteTask(
     evidence.clone = rawCommand("dolt", cloneArgs, cloneResult);
     if (cloneResult.status !== 0) return { ...evidence, error: commandFailure("dolt clone", cloneResult) };
 
-    const identityArgs = ["sql", "-r", "json", "-q", BEADS_MUTATION_IDENTITY_QUERY];
+    const identityArgs = ["sql", "-r", "json", "-q", BEADS_REMOTE_IDENTITY_QUERY];
     const identityResult = runner.run("dolt", identityArgs, { cwd: proofDatabase, allowFailure: true });
     evidence.identity = rawCommand("dolt", identityArgs, identityResult);
     const quotedTaskId = taskId.replaceAll("'", "''");
@@ -1600,10 +1619,32 @@ export function mutateAndPublishBeadsTaskStatus(options: {
         ? "the guarded provider-native mutation failed"
         : committed.error ?? afterMutation.error ?? "the guarded mutation did not prove the exact requested task status",
       evidence: {
-        ...evidence, observedRevision: committed.revision, taskBefore: before, taskObserved: afterMutation,
-        operation: mutation,
+        ...evidence, observedRevision: committed.revision, revisionProof: committed,
+        taskBefore: afterPull, taskObserved: afterMutation, operation: mutation,
         diff: committed.revision && committed.revision !== prepared.revision
           ? readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner) : undefined,
+      },
+    };
+  }
+  if (committed.parentRevision !== prepared.revision) {
+    return {
+      status: "review-required", code: "concurrent-advance", phase: "mutation",
+      detail: "the post-update HEAD is not a direct child of the prepared revision; managed review must classify the concurrent descendant",
+      evidence: {
+        ...evidence, observedRevision: committed.revision, revisionProof: committed,
+        taskBefore: afterPull, taskObserved: afterMutation, operation: mutation,
+        diff: readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner),
+      },
+    };
+  }
+  if (committed.clean !== true) {
+    return {
+      status: "review-required", code: "guarded-mutation-failed", phase: "mutation",
+      detail: "native dolt_status was not empty after the guarded mutation; the dirty working set was not pushed",
+      evidence: {
+        ...evidence, observedRevision: committed.revision, revisionProof: committed,
+        taskBefore: afterPull, taskObserved: afterMutation, operation: mutation,
+        diff: readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner),
       },
     };
   }
@@ -1617,18 +1658,19 @@ export function mutateAndPublishBeadsTaskStatus(options: {
       status: "review-required", code: "push-rejected", phase: "push",
       detail: "the single non-force provider-native push was rejected; no pull, retry, reset, or force was attempted",
       evidence: {
-        ...evidence, observedRevision: committed.revision, taskBefore: before, taskObserved: afterMutation,
-        operation: push, diff: readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner),
+        ...evidence, observedRevision: committed.revision, revisionProof: committed,
+        taskBefore: afterPull, taskObserved: afterMutation, operation: push,
+        diff: readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner),
         publicationRef: remoteTask.refAfter ?? remoteTask.refBefore, remoteTask,
       },
     };
   }
 
-  const published = readBeadsMutationRevision(prepared.projectRoot, prepared, runner);
-  const publishedTask = readExactBeadsTaskEvidence(prepared.projectRoot, taskId, runner);
   const remoteTask = readIsolatedBeadsRemoteTask(prepared, taskId, runner);
-  if (published.revision !== committed.revision || !publishedTask.task
-      || publishedTask.task.taskId !== taskId || publishedTask.task.nativeStatus !== nativeStatus
+  const publishedTask = readExactBeadsTaskEvidence(prepared.projectRoot, taskId, runner);
+  const published = readBeadsMutationRevision(prepared.projectRoot, prepared, runner);
+  if (published.revision !== committed.revision || published.parentRevision !== prepared.revision || published.clean !== true
+      || !publishedTask.task || publishedTask.task.taskId !== taskId || publishedTask.task.nativeStatus !== nativeStatus
       || publishedTask.task.canonicalStatus !== options.status
       || remoteTask.revision !== committed.revision || remoteTask.taskRow?.status !== nativeStatus
       || !remoteTask.publicationHead || remoteTask.publicationHead === prepared.publicationHead) {
@@ -1637,8 +1679,8 @@ export function mutateAndPublishBeadsTaskStatus(options: {
       detail: published.error ?? publishedTask.error ?? remoteTask.error
         ?? "isolated publication proof did not preserve the exact committed revision and requested task status",
       evidence: {
-        ...evidence, observedRevision: remoteTask.revision ?? published.revision,
-        taskBefore: before, taskObserved: publishedTask, operation: push,
+        ...evidence, observedRevision: remoteTask.revision ?? published.revision, revisionProof: published,
+        taskBefore: afterPull, taskObserved: publishedTask, operation: push,
         diff: published.revision && published.revision !== committed.revision
           ? readBeadsRawDiff(prepared.projectRoot, committed.revision, published.revision, runner) : undefined,
         publicationRef: remoteTask.refAfter ?? remoteTask.refBefore, remoteTask,
@@ -1653,6 +1695,7 @@ export function mutateAndPublishBeadsTaskStatus(options: {
       publicationRef: BEADS_DOLT_DATA_REF, preparedRevision: prepared.revision,
       committedRevision: committed.revision, publishedRevision: published.revision,
       publicationHead: remoteTask.publicationHead, taskBefore: before.task, taskPublished: publishedTask.task,
+      postMutationProof: committed, localPublishedProof: published,
       remotePublishedTask: remoteTask, pull, mutation, push,
     },
   };
