@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 16:22'
+updated_date: '2026-10-20 16:24'
 labels: []
 dependencies: []
 references:
@@ -873,6 +873,12 @@ Focused evidence after final repair source: ownership suite 34/34; provider/sche
 Validation after final repair source: focused ownership 34/34; provider/schema static 3 passed with 1 container bridge deselected; direct reproducer prints `REJECTED array providerRevision`; full host Node 367/367; Docker tier 1/offline RPC passes with immutable image launch, network absence, checks, teardown verification, and manifest publication at `.test-results/20261020T162000Z-87541-20d3ccf5/tier1`; `git diff --check` passes.
 
 No `cleanupHead`, other validator, schema decision, compatibility behavior, documentation, lifecycle route, or `.prime-claw/ownership.json` content changed. Keep PRIMECLAW-43 exactly In Progress and stop after this one repaired candidate is pushed and reported for review.
+
+2026-10-20 Conversation ACCEPTED repaired provider-native v2 ownership-schema candidate `1a7da30a34300c8587ab07e5154896d9552ea5de`, including schema baseline `e2dafc48570d43156a446a47e9f9c271371199d8`. Parent verified exact owner/task state, clean pushed remote-equal head, ancestry, `git diff --check`, the narrow non-coercing string guard/test diff, and direct array-reproducer rejection. Preserve the accepted schema unchanged.
+
+Advance only one bounded slice: add a provider-specific Beads ownership-reservation primitive beside the unchanged Backlog reservation path. Do not activate `createTaskEpisode` or any lifecycle route. The function must accept an already-proven `published` result from the accepted native Beads status-publication seam, never caller-assembled normalized task data, plus the existing owner/engine/placement identity. Before persistence, validate exact selected project root, canonical task ID, published native status corresponding to In Progress, exact 32-character publication revision, matching raw task evidence, current exact clean Git code HEAD/baseRef, owner identity, placement constraints, and existing nonterminal/collision rules. Persist only the accepted `provider: "beads"` version-2 record through the existing atomic ownership store, then re-read and prove exact evidence. Preserve unrelated owners and never rewrite the active provider-absent record. Keep Backlog reservation behavior and all producers unchanged.
+
+Add only representative success, failure, and idempotence-or-collision unit/static coverage needed by this primitive. No admission/allocation, status mutation, handoff, oversight, finalization, cleanup, legacy transition, migration/cutover, PRIMECLAW-43.1, generalized provider abstraction, receipt/sidecar, new lock/state machine, version 3, raw Dolt write, retry, or semantic classifier. If the accepted publication result lacks one strictly required field, add only the smallest typed field sourced from already-collected native evidence; do not re-probe or widen. Run focused/full host and Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -919,4 +925,6 @@ Extended the existing version-2 ownership record in place with a minimal provide
 Revision requested for `e2dafc48570d43156a446a47e9f9c271371199d8`: make Beads `providerRevision` validation non-coercing by requiring a string before the existing 32-character lowercase Dolt regex, and reject the exact array reproducer. Preserve the accepted schema and all other validators unchanged; rerun focused/full/Docker, push one repaired candidate, and stop.
 
 Repaired the otherwise accepted provider-native version-2 ownership schema by making Beads `providerRevision` validation non-coercing. The parser now requires a string before the existing exact Dolt revision regex, and regression coverage rejects the exact array reproducer while retaining malformed-string cases. Focused 34/34, full host 367/367, static checks, direct reproducer, and Docker tier 1 pass. No other schema, compatibility, validator, documentation, lifecycle, or live ownership behavior changed.
+
+Accepted provider-native v2 schema candidate `1a7da30a34300c8587ab07e5154896d9552ea5de`. Next bounded slice is one provider-specific Beads ownership-reservation primitive fed only by an already-proven native `published` result plus existing owner/engine/placement identity. Validate exact project/task/status/revision/raw evidence/Git/owner/placement and existing collision rules, persist through the existing atomic v2 store, re-read exact evidence, preserve unrelated and provider-absent owners, and leave Backlog producers and all lifecycle routes unchanged.
 <!-- SECTION:FINAL_SUMMARY:END -->
