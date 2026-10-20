@@ -746,21 +746,45 @@ test("registered active Beads handoff tool advances unchanged evidence and deliv
 });
 
 
-test("registered active Beads handoff tool returns exact raw mismatch evidence with zero delivery", async () => {
+test("registered active Beads handoff tool exposes complete unclassified provider review evidence with zero delivery", async () => {
   const f = harness({ list: (_count, session) => [session] });
-  const initial = activeBeadsTaskRecord(f);
+  const longTailMarker = "provider-native-long-tail-marker-9f6d8d1f";
+  const accepted = {
+    ...BEADS_TASK_EVIDENCE,
+    provider_native_tail: {
+      marker: longTailMarker,
+      opaque_values: ["accepted-tail-alpha", { nested: "accepted-tail-omega" }],
+    },
+  };
+  const initial = activeBeadsTaskRecord(f, { taskEvidence: accepted });
   f.ownership.write(f.root, initial);
   f.calls.length = 0;
-  const current = { ...BEADS_TASK_EVIDENCE, design: "Outside writer changed the target design." };
+  const publishedProviderRevision = "b".repeat(32);
+  const observedProviderRevision = "c".repeat(32);
+  const current = {
+    ...accepted,
+    design: "Outside writer changed the target design.",
+    provider_native_tail: {
+      ...accepted.provider_native_tail,
+      current_only: "current-tail-zeta",
+    },
+  };
+  const providerProof = {
+    status: "blocked",
+    code: "publication-ref-mismatch",
+    detail: "provider-proof-detail-retained-without-classification",
+  };
   const advanceBeadsEvidence = (input) => {
     f.calls.push(["advance", input]);
     return {
       status: "review-required",
-      code: "task-evidence-mismatch",
+      code: "provider-evidence-mismatch",
       reviewedProviderRevision: input.reviewedProviderRevision,
-      publishedProviderRevision: "b".repeat(32),
+      publishedProviderRevision,
+      observedProviderRevision,
       acceptedTaskEvidence: input.reviewedTaskEvidence,
       currentTaskEvidence: current,
+      providerProof,
     };
   };
   const tools = new Map();
@@ -775,12 +799,23 @@ test("registered active Beads handoff tool returns exact raw mismatch evidence w
     "handoff", { taskId: BEADS_TASK_ID, guidance: "must not accept changed content" }, undefined, undefined, f.ctx,
   );
   const result = toolResult.details;
+  const content = toolResult.content[0].text;
   assert.equal(toolResult.isError, undefined);
-  assert.match(toolResult.content[0].text, /requires provider review/);
+  assert.match(content, /requires provider review/);
+  assert.ok(content.endsWith(JSON.stringify(result)));
+  assert.ok(content.includes(JSON.stringify(accepted)));
+  assert.ok(content.includes(JSON.stringify(current)));
+  assert.match(content, new RegExp(longTailMarker));
+  assert.match(content, new RegExp(BEADS_REVISION));
+  assert.match(content, new RegExp(publishedProviderRevision));
+  assert.match(content, new RegExp(observedProviderRevision));
+  assert.match(content, /publication-ref-mismatch/);
+  assert.match(content, /provider-proof-detail-retained-without-classification/);
   assert.equal(result.admitted, false);
-  assert.equal(result.code, "task-evidence-mismatch");
-  assert.deepEqual(result.acceptedTaskEvidence, BEADS_TASK_EVIDENCE);
+  assert.equal(result.code, "provider-evidence-mismatch");
+  assert.deepEqual(result.acceptedTaskEvidence, accepted);
   assert.deepEqual(result.currentTaskEvidence, current);
+  assert.deepEqual(result.providerProof, providerProof);
   assert.equal(result.handoffDelivery, "none");
   assert.equal(result.executeDelivery, "none");
   assert.deepEqual(f.record, initial);

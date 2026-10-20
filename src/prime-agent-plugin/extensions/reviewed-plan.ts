@@ -833,7 +833,10 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
           if (!result.admitted) {
             return {
-              content: [{ type: "text", text: `Task Episode handoff requires provider review for ${result.taskId}; no handoff or execute delivery occurred.` }],
+              content: [{
+                type: "text",
+                text: `Task Episode handoff requires provider review for ${result.taskId}; no handoff or execute delivery occurred. Exact provider-native result: ${JSON.stringify(result)}`,
+              }],
               details: result,
             };
           }
