@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 14:43'
+updated_date: '2026-10-20 15:07'
 labels: []
 dependencies: []
 references:
@@ -784,6 +784,24 @@ The task remains exactly In Progress. This Episode now stops for owning-Conversa
 Repair only with narrow provider-native ancestry and cleanliness proof. Immediately after mutation, read exact `HEAD` and its first parent (`HEAD~1` or equivalent) together through supported read-only native evidence and require the parent to equal the prepared revision. If it does not, return `review-required` with raw `bd --readonly diff <prepared> <observed> --json` and exact before/after `bd show --json --long --include-comments` views; do not classify semantics. Require native `dolt_status` to be empty before push, and recheck the same clean exact local revision before final `published` success.
 
 Add only one focused regression that injects a descendant between update return and revision proof, plus one dirty-state refusal. Run representative real Beads UAT proving direct-parent/clean success and descendant evidence. Keep exactly one preparation, one pull, one atomic guarded update, one non-force push, and the existing stable isolated remote proof. Do not restore any internal-table registry, normalized diff, automatic pull/retry, semantic classifier, force, raw live-store write, lock, state, framework, registry, mirror, lifecycle wiring, migration, legacy transition, or PRIMECLAW-43.1. Run focused/full-host/Docker tier 1, push one clean replacement candidate, notify the owning Conversation, and stop.
+
+2026-10-20 post-update race repair implemented from handoff checkpoint `1e1caddbc682a55d0fb2cb0ae45b7ef9677d0706` without expanding the native-first architecture.
+
+One supported read-only native query now captures exact database/branch, `HEAD`, `HEAD~1`, and `dolt_status` count together. After the guarded Beads-owned update, publication proceeds only if first parent equals the prepared revision and the working set is empty. Parent mismatch returns `review-required`/`concurrent-advance` with the raw `bd --readonly diff <prepared> <observed> --json`, exact before/after `bd show --json --long --include-comments` views, and the raw ancestry/cleanliness query. Dirty state returns review-required before push. After the sole non-force push, the code re-proves the same exact local revision, direct parent, and empty `dolt_status` before isolated remote proof can yield success. The existing single prepare, pull, guarded auto-commit update, non-force push, and stable isolated remote snapshot remain unchanged; no classifier, table registry, retry, force, rollback, lock, state, framework, mirror, lifecycle, migration, legacy transition, or PRIMECLAW-43.1 was added.
+
+Focused coverage adds exactly two named regressions: a descendant injected between update return and revision proof, and dirty-state refusal before push. Focused provider suite passes 60/60; static bridge passes 2 with 1 container test deselected; TypeScript import and `git diff --check` pass.
+
+Representative real Beads 1.3.1/Dolt 2.5.0 UAT passed. Clean direct-parent case: prepared `ebbr7cfk73nqcf4jef4n5g5k6rvtrfpc`, committed `pjbicjdbq1ji31mqhof8srrgo3717rcb`, first parent exactly `ebbr7cfk73nqcf4jef4n5g5k6rvtrfpc`, clean after mutation and on final local reproof, with the same isolated remote revision. Descendant case used a supported second `bd --dolt-auto-commit=on update` after target update: prepared `pjbicjdbq1ji31mqhof8srrgo3717rcb`, observed `23r8ghl2njnaji8imh2bd1ctv8kju4tk`, first parent `lko7oreajglp8bsq0ff37jv2jtsq8lde` (therefore not prepared), clean working set, raw diff succeeded, exact target views changed `in_design` to `in_progress`, and push count was zero. Final native `dolt_status` was empty; server stopped and all disposable resources were removed.
+
+Pending independent narrow review, full host Node, Docker tier 1, final task evidence, clean replacement commit/push, and owning-Conversation notification.
+
+2026-10-20 final post-update race revision evidence: the bounded repair is complete. The final ordering places the isolated remote snapshot first after the sole push, then exact task re-read, then the same clean exact local revision/direct-parent query as the last local proof before `published`. This closes the remote-proof interval without adding another pull, update, push, semantic decision, or provider abstraction.
+
+Final validation on the frozen source: focused provider suite 60/60; static bridge 2 passed with 1 container test deselected; TypeScript import and `git diff --check` passed; full host Node suite 360/360. Docker tier 1/offline RPC probe passed after the final ordering change, including immutable image launch, network absence, checks, teardown verification, and manifest publication. Final Docker evidence: `.test-results/20261020T150454Z-91409-00e365d6/tier1`.
+
+The independent reviewer bootstrap hit the known Prime Agent automatic-preparation admission race before producing a review and was not retried or treated as acceptance. A bounded final source review found the local-proof ordering gap, moved the final reproof after the isolated remote snapshot, and reran the entire focused/full-host/Docker stack successfully. No additional scope was added.
+
+The task remains exactly In Progress. This Episode stops after pushing one clean replacement candidate for the owning Conversation; no later slice is started.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -816,4 +834,6 @@ Revision required: the validated candidate `1bd22438815d38f05a8d2ff4e531c46496fa
 Least-technology replacement completed for the first bounded Beads native mutation/publication slice. It performs one accepted transport preparation, one native pull, exact `bd show --json --long --include-comments`, one guarded atomic `bd --dolt-auto-commit=on update ... --if-status ... --json`, one non-force `bd dolt push --remote ... --no-adopt`, and exact revision/ref/task publication proof. Concurrent advances, guarded failures, rejected pushes, and remote descendants are preserved as raw native command/task/revision/ref evidence for managed LLM review. A narrow stable-ref-bracketed disposable clone binds the remote Dolt revision and requested issue/comments to the publication result. The rejected table registry, normalized diff/classifier, automatic pull/retry, force/rollback, and expanded architecture are absent. Validated by focused 58/58, full host 358/358, independent ACCEPT review, representative real Beads 1.3.1/Dolt 2.5.0 UAT, and Docker tier 1.
 
 Revision required for candidate `ab016f7cd883f45d9350895b71fb8551b55a9c35`: add narrow provider-native direct-parent and clean-working-set proof so a post-update concurrent descendant cannot be adopted as the owner commit. Return raw native diff and exact task views on parent mismatch; require clean exact local revision before push and final success. Preserve the current one-prepare/one-pull/one-update/one-push architecture and isolated remote proof.
+
+Revised native-first Beads candidate closes the post-update descendant race with one supported read-only proof of exact `HEAD`, `HEAD~1`, and native `dolt_status`. Publication requires the update commit to be a clean direct child of the prepared revision. Parent mismatch returns raw provider diff plus exact before/after long/comments task views for managed review; dirty state refuses before push. After the sole non-force push and existing isolated remote snapshot, the seam re-proves the same clean exact local revision immediately before success. The one-prepare/one-pull/one-guarded-update/one-push architecture remains, with no table registry, normalized diff/classifier, retry, force, rollback, raw live-store write, lock/state/framework/registry/mirror/lifecycle/migration/legacy/PRIMECLAW-43.1. Validated by focused 60/60, full host 360/360, representative real Beads 1.3.1/Dolt 2.5.0 direct-parent and descendant UAT, and final Docker tier 1.
 <!-- SECTION:FINAL_SUMMARY:END -->
