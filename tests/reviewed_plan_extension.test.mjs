@@ -12,7 +12,7 @@ import {
 } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
 
-function fixture({ throwOnSend = 0, taskStatus = "In Design" } = {}) {
+function fixture({ throwOnSend = 0, taskStatus = "In Design", providerTaskResolver, placementResolver } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-reviewed-")); execFileSync("git", ["init", "-q", root]);
   for (const slug of ["alpha", "beta"]) mkdirSync(join(root, ".ralph", "plans", "future", slug), { recursive: true });
   mkdirSync(join(root, ".prime-claw", "workflows"), { recursive: true });
@@ -35,7 +35,7 @@ ${name.toUpperCase()} POLICY
     async handoff(taskId, guidance) { taskCalls.push(["handoff", taskId, guidance]); return { admitted: true, taskId, episodeId: "task-episode", episodeActiveSessionId: "task-route", handoffDelivery: "prompt", executeDelivery: "followUp" }; },
     async cleanup(taskId, episodeHead, outcome) { taskCalls.push(["cleanup", taskId, episodeHead, outcome]); return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipStatus: "inactive", reused: false }; },
   };
-  const deps = { guideRoot, taskImplementationApprovals, taskActions, taskCleanup: {}, taskCleanupGit: { repositoryRoot: () => root }, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, async placementResolver() { return { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, transitionLegacyOwnership(location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies) { transitioned.push({ location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies }); return { record: { ...episode, version: 2, taskId, taskPath: "task.md" }, reused: false, mainHead, episodeHead, activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "a".repeat(40) }, activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "b".repeat(40) } }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
+  const deps = { guideRoot, taskImplementationApprovals, taskActions, taskCleanup: {}, taskCleanupGit: { repositoryRoot: () => root }, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, ...(providerTaskResolver ? { providerTaskResolver } : {}), async placementResolver(...args) { return placementResolver ? placementResolver(...args) : { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, transitionLegacyOwnership(location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies) { transitioned.push({ location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies }); return { record: { ...episode, version: 2, taskId, taskPath: "task.md" }, reused: false, mainHead, episodeHead, activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "a".repeat(40) }, activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "b".repeat(40) } }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
   createReviewedPlanExtension(deps)(pi);
   return { root, commands, tools, events, sent, created, restored, transitioned, resolved, taskCalls, ctx, episode, deps, taskImplementationApprovals, pi };
 }
@@ -117,6 +117,116 @@ test("public implement-task approval creates one task Episode with its bound pla
   const replay = await f.tools.get("create_task_episode").execute("again", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
   assert.equal(replay.isError, true);
   assert.match(replay.content[0].text, /no matching active/);
+});
+
+test("registered Beads implement-task path preserves compact-first approval, one consume, and one create dispatch", async () => {
+  const calls = [];
+  const providerTaskResolver = (cwd, taskId) => {
+    calls.push({ cwd, taskId });
+    return {
+      provider: "beads", taskId: "BEADS-42", title: "Native implementation fixture",
+      nativeStatus: "in_planning", status: "In Planning", projectRoot: cwd,
+      nativeView: {
+        id: "BEADS-42", title: "Native implementation fixture", status: "in_planning",
+        description: "Accepted outcome", design: "Implement the exact provider-native change",
+        acceptance_criteria: "Publish exact evidence", notes: "owner note", comments: [],
+      },
+    };
+  };
+  const f = fixture({ providerTaskResolver });
+  await f.commands.get("implement-task").handler("BEADS-42", f.ctx);
+  assert.equal(f.sent.length, 2);
+  assert.match(f.sent[0].message, /IMPLEMENT-TASK-PREP POLICY/);
+  assert.ok(f.sent[0].message.includes("<operator-implementation-task-id>\nBEADS-42\n</operator-implementation-task-id>"));
+  assert.match(f.sent[1].message, /IMPLEMENT-TASK POLICY/);
+  assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
+  assert.equal(f.taskCalls.length, 0);
+
+  await f.events.get("agent_end")({}, f.ctx);
+  const result = await f.tools.get("create_task_episode").execute(
+    "beads-create", { taskId: "BEADS-42" }, undefined, undefined, f.ctx,
+  );
+  assert.equal(result.isError, undefined);
+  assert.match(result.content[0].text, /One fixed execute assignment/);
+  assert.match(result.content[0].text, /Exact provider-native result/);
+  assert.match(result.content[0].text, /"taskId":"BEADS-42"/);
+  assert.deepEqual(f.taskCalls, [["create", "BEADS-42", { engine: "local" }]]);
+  assert.deepEqual(calls.map(({ taskId }) => taskId), ["BEADS-42", "BEADS-42"]);
+
+  const replay = await f.tools.get("create_task_episode").execute(
+    "beads-replay", { taskId: "BEADS-42" }, undefined, undefined, f.ctx,
+  );
+  assert.equal(replay.isError, true);
+  assert.match(replay.content[0].text, /no matching active/);
+  assert.equal(f.taskCalls.length, 1);
+});
+
+test("registered Beads create gate rejects provider, identity, status, and plan drift before dispatch", async () => {
+  for (const drift of ["provider", "identity", "root", "status", "plan"]) {
+    let changed = false;
+    const providerTaskResolver = (cwd) => {
+      if (!changed) return {
+        provider: "beads", taskId: "BEADS-42", title: "Native fixture",
+        nativeStatus: "in_planning", status: "In Planning", projectRoot: cwd,
+        nativeView: { id: "BEADS-42", title: "Native fixture", status: "in_planning", design: "Implement exact change" },
+      };
+      if (drift === "provider") return {
+        provider: "backlog", taskId: "BEADS-42", title: "Wrong provider", status: "In Planning",
+        implementationPlan: "Implement exact change", projectRoot: cwd,
+        taskPath: join(cwd, "task.md"), taskPathRelative: "task.md",
+      };
+      return {
+        provider: "beads", taskId: drift === "identity" ? "BEADS-OTHER" : "BEADS-42", title: "Native fixture",
+        nativeStatus: drift === "status" ? "in_progress" : "in_planning",
+        status: drift === "status" ? "In Progress" : "In Planning",
+        projectRoot: drift === "root" ? join(cwd, "other-root") : cwd,
+        nativeView: {
+          id: drift === "identity" ? "BEADS-OTHER" : "BEADS-42", title: "Native fixture",
+          status: drift === "status" ? "in_progress" : "in_planning",
+          design: drift === "plan" ? "" : "Implement exact change",
+        },
+      };
+    };
+    const f = fixture({ providerTaskResolver });
+    await f.commands.get("implement-task").handler("BEADS-42", f.ctx);
+    await f.events.get("agent_end")({}, f.ctx);
+    changed = true;
+    const result = await f.tools.get("create_task_episode").execute(
+      `beads-${drift}`, { taskId: "BEADS-42" }, undefined, undefined, f.ctx,
+    );
+    assert.equal(result.isError, true, drift);
+    assert.equal(f.taskCalls.length, 0, drift);
+  }
+});
+
+test("registered Beads create gate consumes approval before rejecting placement drift", async () => {
+  let placements = 0;
+  const f = fixture({
+    providerTaskResolver(cwd) {
+      return {
+        provider: "beads", taskId: "BEADS-42", title: "Native fixture",
+        nativeStatus: "in_planning", status: "In Planning", projectRoot: cwd,
+        nativeView: { id: "BEADS-42", title: "Native fixture", status: "in_planning", design: "Implement exact change" },
+      };
+    },
+    async placementResolver() {
+      placements += 1;
+      return placements === 1 ? { engine: "local" } : { engine: "orca", projectSetupId: "changed" };
+    },
+  });
+  await f.commands.get("implement-task").handler("BEADS-42", f.ctx);
+  await f.events.get("agent_end")({}, f.ctx);
+  const result = await f.tools.get("create_task_episode").execute(
+    "beads-placement", { taskId: "BEADS-42" }, undefined, undefined, f.ctx,
+  );
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /placement changed/);
+  assert.equal(f.taskCalls.length, 0);
+  const replay = await f.tools.get("create_task_episode").execute(
+    "beads-placement-replay", { taskId: "BEADS-42" }, undefined, undefined, f.ctx,
+  );
+  assert.equal(replay.isError, true);
+  assert.equal(f.taskCalls.length, 0);
 });
 
 test("task handoff remains disjoint from retained folder handoff", async () => {
@@ -341,7 +451,7 @@ test("inactive task implementation chain binds exact task, placement, and full p
   assert.ok(f.sent[1].message.indexOf("FULL OVERSIGHT GUIDE") < f.sent[1].message.indexOf("IMPLEMENT-TASK POLICY"));
   assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
 
-  const task = f.deps.taskResolver(f.root, "PRIMECLAW-10.38");
+  const task = { provider: "backlog", ...f.deps.taskResolver(f.root, "PRIMECLAW-10.38") };
   assert.equal(f.taskImplementationApprovals.consume(f.ctx, task), null);
   await f.events.get("agent_end")({}, f.ctx);
   const approval = f.taskImplementationApprovals.consume(f.ctx, task);
@@ -373,7 +483,7 @@ test("inactive task implementation placement failure or ambiguity queues nothing
   assert.match(result.message, /multiple ready local setups are ambiguous/);
   assert.equal(f.sent.length, 0);
   await f.events.get("agent_end")({}, f.ctx);
-  const task = f.deps.taskResolver(f.root, "PRIMECLAW-10.38");
+  const task = { provider: "backlog", ...f.deps.taskResolver(f.root, "PRIMECLAW-10.38") };
   assert.equal(f.taskImplementationApprovals.consume(f.ctx, task), null);
 
   const invalid = await admitTaskImplementationPrepChain(
@@ -402,7 +512,7 @@ test("inactive task approval fails closed on identity drift and clears at phase 
   );
   assert.equal((await admit()).ok, true);
   await f.events.get("agent_end")({}, f.ctx);
-  const task = f.deps.taskResolver(f.root, "PRIMECLAW-10.38");
+  const task = { provider: "backlog", ...f.deps.taskResolver(f.root, "PRIMECLAW-10.38") };
   assert.equal(f.taskImplementationApprovals.consume(f.ctx, { ...task, taskPath: join(f.root, "other.md") }), null);
   assert.deepEqual(f.taskImplementationApprovals.consume(f.ctx, task).placement, { engine: "local" });
 

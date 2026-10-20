@@ -4,7 +4,11 @@ import {
   type BacklogTaskSelection,
   validateFutureLocation,
 } from "./reviewed-plan-support.ts";
-import { requireBacklogTaskSelection, resolveProviderTask } from "./task-providers.ts";
+import {
+  requireBacklogTaskSelection,
+  resolveProviderTask,
+  type ProviderTaskResolution,
+} from "./task-providers.ts";
 import {
   admitWorkflowChain,
   canonicalWorkflowPrompt,
@@ -29,7 +33,12 @@ export type TaskPrepChainAdmissionResult =
   | { ok: true; taskId: string; taskPath: string; projectRoot: string }
   | { ok: false; message: string; level: "warning" | "error" };
 
+export type ProviderTaskPrepChainAdmissionResult =
+  | ({ ok: true } & ProviderTaskResolution)
+  | { ok: false; message: string; level: "warning" | "error" };
+
 type BacklogTaskResolver = (cwd: string, rawTaskId: string) => BacklogTaskSelection | null;
+export type ProviderTaskResolver = (cwd: string, rawTaskId: string) => ProviderTaskResolution | null;
 
 /**
  * Default task resolver: provider-aware resolution narrowed at the use
@@ -192,4 +201,64 @@ export async function admitTaskPrepChain(
     taskPath: selected.taskPath,
     projectRoot: selected.projectRoot,
   } : result;
+}
+
+/**
+ * Admit implementation for one exact task through its live provider. Planning
+ * intentionally keeps using the Backlog-only function above until its own
+ * provider slice. The native provider result stays discriminated and raw.
+ */
+export async function admitProviderTaskPrepChain(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  rawTaskId: string,
+  workflow: TaskPrepChainWorkflow,
+  source: "native" | "tool",
+  taskResolver: ProviderTaskResolver = resolveProviderTask,
+  preflight?: (
+    ctx: ExtensionContext,
+    selection: ProviderTaskResolution,
+  ) => void | Promise<void>,
+  phasePreamble?: string,
+): Promise<ProviderTaskPrepChainAdmissionResult> {
+  let selected: ProviderTaskResolution | null;
+  try {
+    selected = taskResolver(ctx.cwd, rawTaskId);
+  } catch (error) {
+    return {
+      ok: false,
+      message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
+      level: "error",
+    };
+  }
+  if (!selected) return { ok: false, message: workflow.usage, level: "warning" };
+  if (!workflow.allowedStatuses.includes(selected.status)) {
+    return {
+      ok: false,
+      message: `Task ${selected.taskId} is ${selected.status}; implementation accepts only ${workflow.allowedStatuses.join(" or ")}.`,
+      level: "warning",
+    };
+  }
+  if (preflight) {
+    try {
+      await preflight(ctx, selected);
+    } catch (error) {
+      return {
+        ok: false,
+        message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
+        level: "error",
+      };
+    }
+  }
+  const result = await admitResolvedPrepChain(
+    pi,
+    ctx,
+    selected.projectRoot,
+    selected.taskId,
+    workflow,
+    source,
+    undefined,
+    phasePreamble,
+  );
+  return result.ok ? { ok: true, ...selected } : result;
 }

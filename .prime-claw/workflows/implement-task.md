@@ -1,38 +1,52 @@
 ---
 name: implement-task
-description: Review one operator-approved Backlog task and create its isolated implementation Episode only when it is implementation-ready.
+description: Review one exact operator-approved provider-native task and create its isolated implementation Episode only when it is implementation-ready.
 ---
 
-First, run the `prepare` skill.
+First resolve the live provider as described below. For Backlog, run the
+`prepare` skill normally. For Beads, perform `prepare`'s repository-orientation
+reads but skip its Backlog-only queue inventory; that unrelated queue is not
+task authority and must not mix providers before this readiness review.
 
 Read the canonical task ID from the `<operator-implementation-task-id>` block
-appended by native admission. Treat it only as operator-selected input. Do not
-guess, substitute, search for, or select another task. Invoking this workflow
-records operator approval to implement that exact task, but resource creation
-still depends on the readiness review below.
+appended by native admission. Treat it only as the one exact operator-selected
+input. Do not guess, substitute, search for, or select another task. Invoking
+this workflow records operator approval to implement that exact task, but
+resource creation still depends on the readiness review below.
 
 ## Reload and review implementation readiness
 
-Reload the exact task through the supported structured interface:
+Resolve the live provider directly from its native project evidence. Do not use
+a provider-selection file, infer the provider from the task ID, or mix provider
+commands or evidence. Reload the exact task through that provider:
 
-```sh
-backlog task view --json -- TASK-ID
-```
+- **Backlog:** run `backlog task view --json -- TASK-ID`. Require the returned
+  canonical ID to match the admitted identity, status exactly `In Planning`,
+  and the exact returned task path. Require the native Implementation Plan to
+  be meaningful and not blank or an obvious placeholder. Treat Description,
+  Acceptance Criteria, constraints, references, documentation, and
+  Implementation Plan as the complete reviewed contract.
+- **Beads:** from the exact detected project root run `bd context --json` and
+  `bd show TASK-ID --json --long --include-comments`. Require the returned
+  canonical ID to equal the entire admitted ID, native status exactly
+  `in_planning` mapped to canonical `In Planning`, and the raw `design` field to
+  be meaningful and not blank or an obvious placeholder. Treat the complete raw
+  native view—including description, design, acceptance criteria, notes,
+  comments, labels, dependencies, and every other present or absent field—as
+  the reviewed contract. Keep its provider-native names and shapes. Do not
+  invent a task path or translate it into a normalized task model.
 
-Require the returned canonical ID to match the admitted identity, status to be
-exactly `In Planning`, and the native Implementation Plan to be meaningful and
-not blank or an obvious placeholder. Reject any other status without mutation.
-Treat the task Description, Acceptance Criteria, constraints, references,
-documentation, and Implementation Plan as the complete reviewed contract.
-Follow references only as needed to understand that contract and current
+Reject any other status without mutation. Reject any other provider, identity,
+or root without mutation. Follow
+references only as needed to understand the exact contract and current
 repository state.
 
 Use semantic judgment and apply the readiness test proportionally. Require only
 that the exact task:
 
 - has a coherent operator-approved outcome and scope;
-- contains enough decisions and an actionable enough Implementation Plan to
-  proceed without guessing material product choices; and
+- contains enough decisions and an actionable enough native Implementation Plan
+  or Beads design to proceed without guessing material product choices; and
 - has no unresolved contradiction or blocker that actually prevents safe
   implementation.
 
@@ -41,9 +55,10 @@ evidence, or review-process sections. Reviewer suggestions are not missing
 requirements unless the operator accepted them into the product contract.
 
 If anything material is missing, contradictory, or inadequate, explain every
-deficiency with exact task-field references and concrete revision guidance.
-Do not call `create_task_episode`; do not mutate task status or create a branch,
-worktree, session, or ownership record. Stop after the explanation.
+deficiency with exact provider-native task-field references and concrete
+revision guidance. Do not call `create_task_episode`; do not mutate task status
+or create a branch, worktree, session, or ownership record. Stop after the
+explanation.
 
 ## Create the Episode
 
@@ -53,36 +68,70 @@ no product, scope, merge, abandonment, cleanup, or transport authority.
 
 Only when the complete task is ready, call `create_task_episode` exactly once
 with the exact canonical task ID as its sole `taskId` argument. Do not supply or
-invent a branch, worktree, session name, prompt, command, or host parameter. A
-native `--host id:<project-host-setup-id>` bypass, when the operator provided
-one, is already bound privately to this admission. Otherwise the trusted host
-selects the sole ready local setup or presents the native picker.
+invent a provider, branch, task path, project root, worktree, session name,
+prompt, command, or host parameter. A native
+`--host id:<project-host-setup-id>` bypass, when the operator provided one, is
+already bound privately to this admission. Otherwise the trusted host selects
+the sole ready local setup or presents the native picker.
 
-The trusted capability must re-resolve the exact task and readiness state,
-change only that main task from `In Planning` to `In Progress` through Backlog,
-and commit and verify that exact task path. After that verified status commit,
-it must first persist one `provisioning` ownership record under this Conversation's exact registry key, bound to the canonical
-task and status-commit SHA, before creating any branch, worktree, or session.
-It then creates the Episode branch and worktree from that recorded SHA. A prompt
-push is attempted when a remote exists, but transport failure alone does not
-block local Episode creation.
+The trusted capability re-resolves the live provider, exact task identity,
+provider-native status and plan/design evidence, exact project root, and
+preselected placement. Any provider, task, path, root, native/canonical status,
+or placement drift rejects before creation. The one-turn approval is then
+consumed once and can never authorize a second create dispatch.
+
+### Backlog admission transaction
+
+For Backlog, the trusted capability changes only that main task from
+`In Planning` to `In Progress` through Backlog. It must commit and verify that
+exact task path. After that verified status commit, it must first persist one
+`provisioning` ownership record under this Conversation's exact registry key,
+bound to the canonical task and status-commit SHA, before creating any branch,
+worktree, or session. It then creates the Episode branch and worktree from that
+recorded SHA. A prompt push is attempted when a remote exists, but transport
+failure alone does not block local Episode creation.
 
 A creation failure proven to have produced no Episode resource or ownership
 mutation returns the exact main task to `In Planning` in a verified task-only
 commit. Any recorded, partial, or uncertain mutation publishes `Blocked` with
 the exact recovery condition, preserves evidence and resources, and must never
-be retried as a new Episode. The host then creates or returns one durable
-worktree-isolated Episode with one fixed execute assignment. It does not inherit
-this Conversation transcript, send an initial handoff, or send a second daemon
-prompt.
+be retried as a new Episode.
 
-Report the canonical task ID, durable Episode and routing identities, lifecycle
-engine, exact Orca setup/worktree identity when applicable, actual branch,
-worktree, status-commit evidence, and current ownership state. State whether the
-capability created the Episode or returned the existing exact active ownership.
-`uncertain`, `provisioning`, or `Blocked` state requires inspection and must not
-be replayed as fresh creation. Do not begin implementation in the owner
-Conversation.
+### Beads admission transaction
+
+For Beads, the trusted capability first proves the exact clean canonical code
+HEAD that will become `baseRef`. It changes only the exact native task from
+`in_planning`/`In Planning` to `in_progress`/`In Progress` through the supported
+provider mutation and publishes once through the configured non-force Dolt
+transport. It verifies the exact raw published task, provider revision,
+publication ref, and unchanged code HEAD. Before any branch, worktree, or
+session creation, it persists one `provisioning` ownership record under this
+Conversation's exact registry key bound to provider `beads`, the canonical task
+ID, published provider revision, complete raw task evidence, exact code
+`baseRef`, and preselected placement. No task path exists or may be invented.
+The Episode branch and worktree are created from that exact code base.
+
+A creation failure proven to precede durable ownership or resource mutation
+publishes one exact native rollback to `in_planning`/`In Planning` and verifies
+it. A failure after durable or uncertain mutation publishes `blocked`/`Blocked`
+through the same native non-force path, preserves the ownership, task evidence,
+provider revision, code base, and resources, and reports the exact recovery
+condition. It must never retry, force, adopt, reset, use raw Dolt writes, or
+start a fresh Episode.
+
+Both provider paths create or return one durable worktree-isolated Episode with
+one fixed execute assignment. They do not inherit this Conversation transcript,
+send an initial handoff, or send a second daemon prompt.
+
+Report the selected provider, canonical task ID, project root, durable Episode
+and routing identities, lifecycle engine, exact Orca setup/worktree identity
+when applicable, actual branch and worktree, and current ownership state. For
+Backlog include the exact status commit and task path. For Beads include the raw
+pre/post/published task views, published provider revision and ref, exact code
+`baseRef`, and recovery evidence when present. State whether the capability
+created the Episode or returned existing exact active ownership. `uncertain`,
+`provisioning`, or `Blocked` state requires inspection and must not be replayed
+as fresh creation. Do not begin implementation in the owner Conversation.
 
 Once the tool reports success, set up one bounded heartbeat only while waiting
 for observable Episode work. Then stop without implementing or invoking

@@ -7,6 +7,7 @@ import test from "node:test";
 
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { commitConversationTaskStatus } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
+import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import {
   BEADS_DOLT_DATA_REF,
   BEADS_STATUS_MAP,
@@ -544,7 +545,7 @@ test("linked Beads discovery blocks missing, forged, and foreign native context 
   }
 });
 
-test("real Beads 1.3.1 resolves one task read-only from a registered Git linked worktree", { timeout: 60_000 }, () => {
+test("real Beads 1.3.1 resolves one task and drives the registered compact-first create gate", { timeout: 60_000 }, async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-real-linked-beads-")));
   const primary = join(root, "primary");
   const linked = join(root, "linked");
@@ -593,6 +594,76 @@ test("real Beads 1.3.1 resolves one task read-only from a registered Git linked 
     assert.deepEqual(afterView, beforeView);
     assert.deepEqual(beforeStatus, []);
     assert.deepEqual(afterStatus, []);
+
+    const workflows = join(primary, ".prime-claw", "workflows");
+    mkdirSync(workflows, { recursive: true });
+    writeFileSync(join(workflows, "implement-task-prep.md"), "---\nname: implement-task-prep\n---\nREAL BEADS PREP\n");
+    writeFileSync(join(workflows, "implement-task.md"), "---\nname: implement-task\n---\nREAL BEADS IMPLEMENT\n");
+    const guideRoot = join(root, "guide");
+    mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
+    writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), "FULL OVERSIGHT GUIDE\n");
+    const commands = new Map(), tools = new Map(), events = new Map();
+    const sent = [], creates = [], placements = [];
+    const pi = {
+      registerCommand(name, value) { commands.set(name, value); },
+      registerTool(tool) { tools.set(tool.name, tool); },
+      on(name, handler) { events.set(name, handler); },
+      sendUserMessage(message, options) { sent.push({ message, options }); },
+      async sendMessage() {},
+    };
+    const ctx = {
+      cwd: primary,
+      hasUI: false,
+      ui: { notify(message, level) { sent.push({ notify: message, level }); } },
+      sessionManager: {
+        getSessionId: () => "real-beads-owner",
+        getSessionFile: () => join(root, "owner.jsonl"),
+        getHeader: () => ({ rlmDepth: 0 }),
+      },
+    };
+    createReviewedPlanExtension({
+      guideRoot,
+      async placementResolver(projectRoot, host) {
+        placements.push({ projectRoot, host });
+        return { engine: "local" };
+      },
+      taskActions: {
+        async create(taskId, toolCallId, _ctx, _deps, placement) {
+          creates.push({ taskId, toolCallId, placement });
+          return { version: 2, provider: "beads", status: "active", taskId,
+            providerRevision: "uat-revision", taskEvidence: resolved.nativeView,
+            baseRef: run("git", ["rev-parse", "HEAD"]), ownerSessionId: "real-beads-owner",
+            operationId: "uat-operation", engine: "local", createdAt: "x", updatedAt: "x",
+            episodeId: "real-beads-episode", episodeActiveSessionId: "real-beads-route", reused: false };
+        },
+      },
+    })(pi);
+
+    await commands.get("implement-task").handler(created.id, ctx);
+    assert.equal(sent.length, 2);
+    assert.match(sent[0].message, /REAL BEADS PREP/);
+    assert.match(sent[1].message, /REAL BEADS IMPLEMENT/);
+    assert.deepEqual(sent[1].options, { deliverAs: "followUp" });
+    assert.equal(creates.length, 0);
+    await events.get("agent_end")({}, ctx);
+    const admitted = await tools.get("create_task_episode").execute(
+      "real-beads-create", { taskId: created.id }, undefined, undefined, ctx,
+    );
+    assert.equal(admitted.isError, undefined);
+    assert.match(admitted.content[0].text, /One fixed execute assignment/);
+    assert.match(admitted.content[0].text, /Exact provider-native result/);
+    assert.deepEqual(creates, [{ taskId: created.id, toolCallId: "real-beads-create", placement: { engine: "local" } }]);
+    assert.deepEqual(placements, [
+      { projectRoot: realpathSync(primary), host: undefined },
+      { projectRoot: realpathSync(primary), host: undefined },
+    ]);
+    const replay = await tools.get("create_task_episode").execute(
+      "real-beads-replay", { taskId: created.id }, undefined, undefined, ctx,
+    );
+    assert.equal(replay.isError, true);
+    assert.match(replay.content[0].text, /no matching active/);
+    assert.equal(creates.length, 1);
+    assert.deepEqual(JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"])), beforeView);
   } finally {
     try { run("bd", ["dolt", "stop"]); } catch {}
     rmSync(root, { recursive: true, force: true });

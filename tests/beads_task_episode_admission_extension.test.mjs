@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -9,6 +9,7 @@ import {
   CliTaskEpisodeAdmissionGit,
   createTaskEpisode,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
+import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 
 function git(root, ...args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -238,6 +239,73 @@ function fixture() {
 async function create(f) {
   return createTaskEpisode(f.taskId, "tool-call", f.ctx, f.dependencies, { engine: "local" });
 }
+
+test("registered Beads implement-task path consumes one approval and delegates once to accepted admission", async () => {
+  const f = fixture();
+  const workflows = join(f.root, ".prime-claw", "workflows");
+  mkdirSync(workflows, { recursive: true });
+  writeFileSync(join(workflows, "implement-task-prep.md"), "---\nname: implement-task-prep\n---\nBEADS PREP POLICY\n");
+  writeFileSync(join(workflows, "implement-task.md"), "---\nname: implement-task\n---\nBEADS IMPLEMENT POLICY\n");
+  const guideRoot = join(f.root, "plugin");
+  mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
+  writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), "FULL OVERSIGHT GUIDE\n");
+
+  const commands = new Map(), tools = new Map(), events = new Map(), sent = [], placements = [];
+  const pi = {
+    registerCommand(name, value) { commands.set(name, value); },
+    registerTool(tool) { tools.set(tool.name, tool); },
+    on(name, handler) { events.set(name, handler); },
+    sendUserMessage(message, options) { sent.push({ message, options }); },
+    async sendMessage() {},
+  };
+  const ctx = {
+    ...f.ctx,
+    hasUI: false,
+    ui: { notify(message, level) { sent.push({ notify: message, level }); } },
+  };
+  createReviewedPlanExtension({
+    ...f.dependencies,
+    guideRoot,
+    async placementResolver(projectRoot, host) {
+      placements.push({ projectRoot, host });
+      return { engine: "local" };
+    },
+  })(pi);
+
+  await commands.get("implement-task").handler(f.taskId, ctx);
+  assert.equal(sent.length, 2);
+  assert.match(sent[0].message, /BEADS PREP POLICY/);
+  assert.match(sent[1].message, /BEADS IMPLEMENT POLICY/);
+  assert.deepEqual(sent[1].options, { deliverAs: "followUp" });
+  assert.equal(f.allocatorCalls, 0);
+  await events.get("agent_end")({}, ctx);
+
+  const result = await tools.get("create_task_episode").execute(
+    "registered-create", { taskId: f.taskId }, undefined, undefined, ctx,
+  );
+  assert.equal(result.isError, undefined);
+  assert.equal(result.details.provider, "beads");
+  assert.equal(result.details.providerRevision, revision["In Progress"]);
+  assert.equal(result.details.taskEvidence.design, f.design);
+  assert.match(result.content[0].text, /One fixed execute assignment/);
+  assert.match(result.content[0].text, /Exact provider-native result/);
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(f.reservationCalls.length, 1);
+  assert.equal(f.allocatorCalls, 1);
+  assert.deepEqual(placements, [
+    { projectRoot: f.root, host: undefined },
+    { projectRoot: f.root, host: undefined },
+  ]);
+
+  f.status = "In Planning";
+  const replay = await tools.get("create_task_episode").execute(
+    "registered-replay", { taskId: f.taskId }, undefined, undefined, ctx,
+  );
+  assert.equal(replay.isError, true);
+  assert.match(replay.content[0].text, /no matching active/);
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(f.allocatorCalls, 1);
+});
 
 test("direct Beads admission publishes, reserves, allocates, and proves one exact active identity", async () => {
   const f = fixture();

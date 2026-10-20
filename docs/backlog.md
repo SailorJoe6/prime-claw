@@ -86,16 +86,34 @@ retains `In Planning`, commits only the exact returned task path, and treats
 push failure as transport evidence.
 
 After separate operator approval, `/implement-task TASK-ID` is the primary
-implementation path. It resolves the exact `In Planning` task and placement,
-queues one compact-first readiness turn, and permits `create_task_episode` to
-consume that bound approval once. Trusted admission commits only the task's
-`In Progress` transition before version-2 ownership and resource allocation.
+implementation path. It resolves one exact `In Planning` task through the live
+provider and preselects placement before it queues the compact-first readiness
+turn. Backlog retains its exact returned task path and native Implementation
+Plan. Beads retains the exact canonical ID, project root, complete raw native
+view, raw design, and native `in_planning` plus canonical `In Planning` status;
+it never invents a task path or normalized task model. Semantic readiness stays
+in the managed `implement-task` workflow. Backlog runs ordinary `prepare`;
+Beads performs the same repository-orientation reads while skipping the
+Backlog-only queue inventory so preparation cannot select or mix providers.
+
+`create_task_episode` re-resolves the live provider, task identity, root,
+provider-native status and plan/design, and preselected placement before it
+consumes the owner/provider/task/root-bound approval once. Any provider,
+identity, status, or placement drift fails before creation. Backlog retains its
+existing exact task-only status commit and rollback transaction. Beads delegates
+once to the accepted provider-native admission: one non-force native
+`in_progress` publication, exact raw task/revision/ref proof, clean code
+`baseRef`, provisioning ownership before resources, and one fixed execute
+assignment. Clean pre-reservation failure publishes one native `in_planning`
+rollback; durable or uncertain mutation publishes `blocked` with exact recovery
+evidence. Neither path retries fresh admission.
+
 The resulting Episode uses the exact task as its sole durable authority, skips
 bundle copy and promotion, and leaves every later lifecycle status transition
 to the owning Conversation. Continuation uses `handoff_task_episode`. Review,
-status changes, merge, and abandonment use prompt instructions, ordinary Git,
-and the supported Backlog CLI. Cleanup alone uses `finalize_task_episode` as the
-separately confirmed exact-resource boundary.
+status changes, merge, and abandonment remain provider-native prompt-guided
+operations. Cleanup alone uses `finalize_task_episode` as the separately
+confirmed exact-resource boundary.
 
 ## Retained version-1 compatibility
 
@@ -647,11 +665,17 @@ be the failure being recovered, and recovery never mutates code, `baseRef`, or
 resources. Provider review/block results, failed recovery publication,
 ownership drift, or unreadable ownership fail closed with raw evidence preserved.
 
-This is only the direct internal admission/allocation seam. Reviewed-plan
-`/implement-task` and `create_task_episode` tool gating and provider-aware
-Episode worktree routing remain deferred. No provider matrix, normalized task
-model, sidecar receipt, workspace-copy machinery, raw Dolt write, force, or
-automatic retry is introduced.
+The direct admission/allocation seam is now reached by provider-aware
+`/implement-task` prep/readiness and `create_task_episode` gating. The gate keeps
+its existing compact-first two-message flow, expiry and single-use behavior, and
+preselected placement. It binds the exact owner, provider, task, and project
+root (plus the exact task path for Backlog), re-resolves live provider-native
+status and plan/design evidence, rejects drift, and calls the accepted admission
+once. `/plan` and `plan_task` remain Backlog-only. Later handoff, oversight,
+blocked, finalization, cleanup, and receipt-advancement routing remain deferred.
+No provider matrix, normalized task model, snapshot/digest protocol, sidecar
+receipt, workspace-copy machinery, raw Dolt write, force, or automatic retry is
+introduced.
 
 The managed `execute` skill is now provider-aware without activating any new
 lifecycle path. It still selects the exact Conversation-keyed owner before task

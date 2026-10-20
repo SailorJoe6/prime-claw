@@ -538,7 +538,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     for fragment in (
         "<operator-implementation-task-id>",
         "backlog task view --json -- TASK-ID",
-        "status is exactly `In Planning`",
+        "status exactly `In Planning`",
         "meaningful",
         "not blank or an obvious placeholder",
         "not the authoritative implementation-readiness review",
@@ -551,13 +551,24 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "compaction confirmed",
     ):
         assert fragment in prep
+    for fragment in (
+        "Resolve the live provider directly from its native project evidence",
+        "exact returned task path",
+        "bd context --json",
+        "bd show TASK-ID --json --long --include-comments",
+        "native status exactly `in_planning` mapped to canonical `In Planning`",
+        "raw `design` field",
+        "do not invent a task path or translate it into a normalized task model",
+        "exact native project root",
+    ):
+        assert fragment in prep
     assert prep.count("await compact.run(focus_hint)") == 1
     assert "Do not run `prepare`" in prep
 
     for fragment in (
         "<operator-implementation-task-id>",
         "backlog task view --json -- TASK-ID",
-        "status to be exactly `In Planning`",
+        "status exactly `In Planning`",
         "Reject any other status without mutation",
         "Description, Acceptance Criteria",
         "Implementation Plan",
@@ -580,12 +591,32 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "Do not begin implementation in the owner Conversation",
     ):
         assert fragment in implement
+    for fragment in (
+        "perform `prepare`'s repository-orientation reads",
+        "skip its Backlog-only queue inventory",
+        "Resolve the live provider directly from its native project evidence",
+        "exact returned task path",
+        "bd context --json",
+        "bd show TASK-ID --json --long --include-comments",
+        "native status exactly `in_planning` mapped to canonical `In Planning`",
+        "complete raw native view",
+        "Do not invent a task path or translate it into a normalized task model",
+        "provider-native status and plan/design evidence",
+        "approval is then consumed once",
+        "published provider revision",
+        "complete raw task evidence",
+        "exact code `baseRef`",
+        "No task path exists or may be invented",
+        "one fixed execute assignment",
+        "must never retry, force, adopt, reset, use raw Dolt writes",
+    ):
+        assert fragment in implement
     assert implement.index("verified status commit") < implement.index("persist one `provisioning` ownership record")
     assert implement.index("persist one `provisioning` ownership record") < implement.index("before creating any branch, worktree, or session")
     assert implement.index("before creating any branch, worktree, or session") < implement.index("creates the Episode branch and worktree from that recorded SHA")
 
     # Installed prep policy may differ until deliberate candidate activation.
-    for name in ("implement-task",):
+    for name in ("implement-task-prep", "implement-task"):
         source = workflow(name)
         tracked = ROOT / ".prime-claw" / "workflows" / f"{name}.md"
         assert tracked.read_bytes() == source.read_bytes()
@@ -595,6 +626,10 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     ).read_text()
     assert 'pi.registerCommand("implement-task"' in extension
     assert 'name: "create_task_episode"' in extension
+    assert "admitProviderTaskPrepChain" in extension
+    assert "providerTaskResolver" in extension
+    assert "requireLiveImplementationTask" in extension
+    assert "samePlacement" in extension
     assert 'name: "handoff_task_episode"' in extension
     assert 'name: "finalize_task_episode"' in extension
     assert 'name: "transition_spec_episode_to_task"' in extension

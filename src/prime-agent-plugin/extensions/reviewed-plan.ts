@@ -23,9 +23,11 @@ import {
 import { CliTaskEpisodeCleanupAdapter } from "../extension-support/task-episode-cleanup.ts";
 import {
   admitPrepChain,
+  admitProviderTaskPrepChain,
   admitTaskPrepChain,
   type PrepChainWorkflow,
-  type TaskPrepChainAdmissionResult,
+  type ProviderTaskPrepChainAdmissionResult,
+  type ProviderTaskResolver,
   type TaskPrepChainWorkflow,
 } from "../extension-support/prep-chain.ts";
 import {
@@ -38,19 +40,26 @@ import {
   validateFutureLocation,
   type BacklogTaskSelection,
 } from "../extension-support/reviewed-plan-support.ts";
-import { requireBacklogTaskSelection, resolveProviderTask } from "../extension-support/task-providers.ts";
+import {
+  resolveProviderTask,
+  type ProviderTaskResolution,
+} from "../extension-support/task-providers.ts";
 
-/**
- * Default tool-boundary resolver: provider-aware task resolution narrowed to
- * the existing Backlog selection contract the Episode-creation tool consumes.
- * A Beads store resolves the task with no Markdown path, so this file-bound
- * path rejects it explicitly until its own provider slice lands.
- */
-function defaultToolTaskResolver(cwd: string, rawTaskId: string): BacklogTaskSelection | null {
-  return requireBacklogTaskSelection(
-    resolveProviderTask(cwd, rawTaskId),
-    "create_task_episode",
-  );
+function asBacklogProviderResolver(
+  resolver: (cwd: string, rawTaskId: string) => BacklogTaskSelection | null,
+): ProviderTaskResolver {
+  return (cwd, rawTaskId) => {
+    const selected = resolver(cwd, rawTaskId);
+    return selected ? { provider: "backlog", ...selected } : null;
+  };
+}
+
+function implementationTaskResolver(
+  dependencies: TaskImplementationAdmissionDependencies,
+): ProviderTaskResolver {
+  if (dependencies.providerTaskResolver) return dependencies.providerTaskResolver;
+  if (dependencies.taskResolver) return asBacklogProviderResolver(dependencies.taskResolver);
+  return resolveProviderTask;
 }
 
 /**
@@ -118,14 +127,17 @@ type ImplementationApproval = {
   skipNextAgentEnd: boolean;
 };
 
-export type TaskImplementationApproval = {
+type TaskImplementationApprovalBase = {
   ownerSessionId: string;
   taskId: string;
-  taskPath: string;
   projectRoot: string;
   placement: TaskEpisodeAdmissionOptions;
   skipNextAgentEnd: boolean;
 };
+
+export type TaskImplementationApproval =
+  | (TaskImplementationApprovalBase & { provider: "backlog"; taskPath: string })
+  | (TaskImplementationApprovalBase & { provider: "beads"; taskPath?: never });
 
 /** One-turn, single-use authority for the exact task and preselected placement. */
 export class TaskImplementationApprovalStore {
@@ -133,31 +145,35 @@ export class TaskImplementationApprovalStore {
 
   grant(
     ctx: ExtensionContext,
-    task: BacklogTaskSelection,
+    task: ProviderTaskResolution,
     placement: TaskEpisodeAdmissionOptions,
   ): void {
     const ownerSessionId = ctx.sessionManager.getSessionId();
-    this.approvals.set(ownerSessionId, {
+    const common = {
       ownerSessionId,
       taskId: task.taskId,
-      taskPath: task.taskPath,
       projectRoot: task.projectRoot,
       placement: { ...placement },
       skipNextAgentEnd: true,
-    });
+    };
+    this.approvals.set(ownerSessionId, task.provider === "backlog"
+      ? { ...common, provider: "backlog", taskPath: task.taskPath }
+      : { ...common, provider: "beads" });
   }
 
   consume(
     ctx: ExtensionContext,
-    task: BacklogTaskSelection,
+    task: ProviderTaskResolution,
   ): TaskImplementationApproval | null {
     const ownerSessionId = ctx.sessionManager.getSessionId();
     const approval = this.approvals.get(ownerSessionId);
     if (!approval || approval.skipNextAgentEnd
       || approval.ownerSessionId !== ownerSessionId
+      || approval.provider !== task.provider
       || approval.taskId !== task.taskId
-      || approval.taskPath !== task.taskPath
-      || approval.projectRoot !== task.projectRoot) return null;
+      || approval.projectRoot !== task.projectRoot
+      || (approval.provider === "backlog"
+        && (task.provider !== "backlog" || approval.taskPath !== task.taskPath))) return null;
     this.approvals.delete(ownerSessionId);
     return { ...approval, placement: { ...approval.placement } };
   }
@@ -178,7 +194,9 @@ export class TaskImplementationApprovalStore {
 }
 
 export interface TaskImplementationAdmissionDependencies {
+  /** Backlog-only compatibility injection used by existing callers and tests. */
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  providerTaskResolver?: ProviderTaskResolver;
   placementResolver?: typeof resolveTaskEpisodePlacement;
   placement?: TaskEpisodePlacementDependencies;
   guideRoot?: string;
@@ -195,19 +213,25 @@ export async function admitTaskImplementationPrepChain(
   args: string,
   approvals: TaskImplementationApprovalStore,
   dependencies: TaskImplementationAdmissionDependencies = {},
-): Promise<TaskPrepChainAdmissionResult> {
+): Promise<ProviderTaskPrepChainAdmissionResult> {
   const parsed = parseTaskImplementationArgs(args);
   if (!parsed) return { ok: false, message: IMPLEMENT_TASK_USAGE, level: "warning" };
-  let selected: BacklogTaskSelection | undefined;
+  let selected: ProviderTaskResolution | undefined;
   let placement: TaskEpisodeAdmissionOptions | undefined;
-  const result = await admitTaskPrepChain(
+  const result = await admitProviderTaskPrepChain(
     pi,
     ctx,
     parsed.taskId,
     IMPLEMENT_TASK_PREP_WORKFLOW,
     "native",
-    dependencies.taskResolver,
+    implementationTaskResolver(dependencies),
     async (callCtx, task) => {
+      if (task.provider === "beads" && task.taskId !== parsed.taskId) {
+        throw new Error(`Beads task ${parsed.taskId} resolved to a different canonical ID ${task.taskId}`);
+      }
+      if (task.provider === "beads" && task.nativeStatus !== "in_planning") {
+        throw new Error(`Beads task ${task.taskId} must be In Planning/in_planning for implementation admission`);
+      }
       selected = task;
       const resolvePlacement = dependencies.placementResolver ?? resolveTaskEpisodePlacement;
       placement = await resolvePlacement(task.projectRoot, parsed.host, callCtx, dependencies.placement);
@@ -215,7 +239,7 @@ export async function admitTaskImplementationPrepChain(
     conversationGuideText({ guideRoot: dependencies.guideRoot }),
   );
   if (result.ok) {
-    if (!selected || !placement) throw new Error("Task implementation admission lost its exact placement binding");
+    if (!selected || !placement) throw new Error("Task implementation admission lost its exact provider and placement binding");
     approvals.grant(ctx, selected, placement);
   }
   return result;
@@ -293,6 +317,34 @@ type TaskEpisodeCleanupParams = {
   outcome: TaskEpisodeCleanupOutcome;
   confirmed: boolean;
 };
+
+function requireLiveImplementationTask(selection: ProviderTaskResolution): void {
+  if (selection.status !== "In Planning") {
+    throw new Error(`Task ${selection.taskId} is ${selection.status}; implementation requires In Planning`);
+  }
+  if (selection.provider === "beads") {
+    if (selection.nativeStatus !== "in_planning") {
+      throw new Error(`Beads task ${selection.taskId} must remain In Planning/in_planning`);
+    }
+    if (typeof selection.nativeView.design !== "string" || !selection.nativeView.design.trim()) {
+      throw new Error(`Beads task ${selection.taskId} has no readable provider-native design`);
+    }
+    return;
+  }
+  if (typeof selection.implementationPlan !== "string" || !selection.implementationPlan.trim()) {
+    throw new Error(`Backlog task ${selection.taskId} has no readable Implementation Plan`);
+  }
+}
+
+function placementHost(placement: TaskEpisodeAdmissionOptions): string | undefined {
+  return placement.engine === "orca" ? `id:${placement.projectSetupId}` : undefined;
+}
+
+function samePlacement(left: TaskEpisodeAdmissionOptions, right: TaskEpisodeAdmissionOptions): boolean {
+  return left.engine === right.engine
+    && left.projectSetupId === right.projectSetupId
+    && left.routingEnvironmentId === right.routingEnvironmentId;
+}
 
 async function runTaskEpisodeCleanup(
   params: TaskEpisodeCleanupParams,
@@ -381,7 +433,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       },
     });
     pi.registerCommand("implement-task", {
-      description: "Review and admit one exact planned Backlog task into an isolated implementation Episode",
+      description: "Review and admit one exact planned provider-native task into an isolated implementation Episode",
       handler: async (args, ctx) => {
         const result = await admitTaskImplementationPrepChain(
           pi,
@@ -390,6 +442,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           taskImplementationApprovals,
           {
             taskResolver: dependencies?.taskResolver,
+            providerTaskResolver: dependencies?.providerTaskResolver,
             placementResolver: dependencies?.placementResolver,
             placement: dependencies,
             guideRoot: dependencies?.guideRoot,
@@ -575,7 +628,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "create_task_episode",
       label: "Create task Episode",
-      description: "Create or return the one isolated Episode for the exact implementation-ready Backlog task admitted by the current /implement-task chain.",
+      description: "Create or return the one isolated Episode for the exact provider-native task admitted by the current /implement-task chain.",
       promptSnippet: "Create one exact task-native Episode after implementation readiness succeeds",
       promptGuidelines: [
         "Call create_task_episode exactly once only after the current /implement-task readiness workflow approves its exact In Planning task.",
@@ -586,21 +639,38 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       executionMode: "sequential",
       parameters: {
         type: "object",
-        properties: { taskId: { type: "string", description: "Exact canonical Backlog task ID admitted by /implement-task" } },
+        properties: { taskId: { type: "string", description: "Exact canonical provider-native task ID admitted by /implement-task" } },
         required: ["taskId"],
         additionalProperties: false,
       } as any,
       async execute(toolCallId, params, _signal, _onUpdate, ctx) {
-        const resolver = dependencies?.taskResolver ?? defaultToolTaskResolver;
+        const resolver = implementationTaskResolver(dependencies ?? {});
         try {
           const task = resolver(ctx.cwd, params.taskId);
-          if (!task) throw new Error(`Backlog task ${params.taskId} is unavailable`);
+          if (!task) throw new Error(`Task ${params.taskId} is unavailable through the live provider`);
+          if (task.provider === "beads" && task.taskId !== params.taskId) {
+            throw new Error(`Beads task ${params.taskId} resolved to a different canonical ID ${task.taskId}`);
+          }
+          requireLiveImplementationTask(task);
           const approval = taskImplementationApprovals.consume(ctx, task);
           if (!approval) throw new Error("no matching active /implement-task approval");
+          const resolvePlacement = dependencies?.placementResolver ?? resolveTaskEpisodePlacement;
+          const currentPlacement = await resolvePlacement(
+            task.projectRoot,
+            placementHost(approval.placement),
+            ctx,
+            dependencies,
+          );
+          if (!samePlacement(currentPlacement, approval.placement)) {
+            throw new Error("the preselected task Episode placement changed after /implement-task approval");
+          }
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
           const result = await actions.create(task.taskId, toolCallId, ctx, dependencies, approval.placement);
           return {
-            content: [{ type: "text", text: `Task Episode created for ${result.taskId}. One fixed execute assignment was admitted to ${result.episodeId}.` }],
+            content: [{
+              type: "text",
+              text: `Task Episode created for ${result.taskId}. One fixed execute assignment was admitted to ${result.episodeId}. Exact provider-native result: ${JSON.stringify(result)}`,
+            }],
             details: result,
           };
         } catch (error) {
