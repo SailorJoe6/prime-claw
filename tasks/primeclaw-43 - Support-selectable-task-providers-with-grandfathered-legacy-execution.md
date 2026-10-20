@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 18:56'
+updated_date: '2026-10-20 19:19'
 labels: []
 dependencies: []
 references:
@@ -15,11 +15,10 @@ references:
 documentation:
   - docs/backlog.md
 modified_files:
-  - src/prime-agent-plugin/extension-support/spec-episode.ts
-  - tests/beads_task_episode_admission_extension.test.mjs
-  - src/prime-agent-plugin/extension-support/task-providers.ts
-  - tests/task_providers.test.mjs
-  - tests/test_task_providers.py
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - .agents/skills/execute/SKILL.md
+  - .prime-claw/templates.json
+  - tests/test_execute_skill.py
   - docs/backlog.md
 priority: p1
 type: epic
@@ -975,6 +974,22 @@ Advance only one bounded slice: make the existing managed `execute` workflow sou
 The LLM instructions must treat raw description/design/acceptance criteria/notes/comments/labels/dependencies and all other provider fields as the durable work contract without normalizing them. Reconcile only compatible in-scope task/plan changes: compare persisted `taskEvidence` with the current raw view; unrelated-task revision advances do not block; present every outside same-task difference exactly and reason about it; escalate genuine semantic conflicts, scope, or authority. The Episode may update only owner-authored task content through supported native `bd update` fields and must never mutate status/lifecycle. Before and after writes, use native sync/read. Publish non-force with supported `bd dolt push --no-adopt`; require clean exact native revision/ref/task proof; report exact before/after raw views and published revision to the Conversation for later receipt advancement.
 
 No silent overwrite, retry, force, raw Dolt write, deterministic semantic classifier, normalized task model, or direct ownership registry mutation. On candidate/blocker, keep code/task evidence current, commit/push only Episode code-branch changes as appropriate, and report provider evidence; Conversation retains lifecycle status. Reconcile only the existing managed template/source through the normal asset mechanism. Add focused prose/static/template tests and representative disposable Beads UAT if practical. Do not alter runtime tool gating, admission, handoff/oversight/finalization/cleanup, project templates outside execute, legacy/migration/cutover, PRIMECLAW-43.1, or state/sidecar/version 3. Run focused/full-host/Docker tier 1, push one clean candidate, notify the owning Conversation, and stop for review.
+
+Implemented the bounded provider-aware managed execute source/template candidate. The exact owner-first and version-1 selection remains. Version-2 now branches only on the persisted provider: provider-absent/Backlog retains the existing structured Backlog block unchanged; Beads requires no taskPath plus exact persisted task/provider revision/raw evidence/baseRef/worktree/branch/session identity. The Beads instructions require linked-cwd native pull/show, exact ID, native/canonical In Progress, meaningful raw design, field-for-field persisted/live comparison, unrelated-task advance tolerance, exact same-task reasoning, guarded owner-content-only `bd update`, clean native rereads, one non-force `bd dolt push --no-adopt`, and exact raw/revision/ref/code evidence reporting. They explicitly forbid lifecycle/status mutation, normalization/classification, silent overwrite, retry/force/reset/adopt, raw Dolt SQL, Backlog mixing, and registry writes.
+
+Reconciled only `project-skill-execute`: canonical source, project template, and the exact managed manifest hashes now match. Added focused static tests for provider selection, unchanged Backlog contract, raw Beads contract/publication rules, and managed asset state. Updated `docs/backlog.md`. Focused validation is next; no lifecycle TypeScript, runtime tool gating, admission code, other templates, state, sidecar, or migration path was changed.
+
+Focused provider-aware execute validation is green after a real disposable Beads 1.3.1 UAT. Python execute/managed-session tests pass 14/14 with 1 container-only skip; the broader focused Python selection passes 18 with 4 skips and 1 deselected known-unrelated project-initialization check. That deselected test fails unchanged on `fb1f411`: its `project-skill-design` manifest hash (`938f03...`) already differs from the source hash (`12f612...`), outside this execute-only slice. The relevant Node project initialization/template-review run passed 46/46; a final rerun after the UAT-driven wording repair is active.
+
+The disposable UAT created a Beads 1.3.1 server project, tracked its discovery metadata, and used a real Git linked worktree. From the actual linked cwd, `bd context --json` proved `is_worktree:true`, `is_redirected:false`, exact linked `cwd_repo_root`, primary `repo_root`/`.beads`, database `UAT`, server mode, and configured native remote. Native `bd dolt pull` and `bd show UAT-619 --json --long --include-comments` returned exact `in_progress`, meaningful design, and complete raw fields. A single `bd update UAT-619 --design ... --append-notes ...` changed only design, notes, provider-generated `updated_at`, and raw row revision; exact status/description/acceptance/identity and every other raw view field stayed unchanged. The native Dolt revision advanced once from `fl0mph...` to `0vm1k1...`, with the former as exact parent and `dolt_status=0`. One exact `bd dolt push --no-adopt`, followed by one native pull/read, retained the identical raw task and clean revision. `refs/dolt/data` was present at `b869f84...`; an isolated Dolt clone of that ref proved exact remote task content/status and revision `0vm1k1...` with zero dirty rows. The server was stopped and the fixture removed.
+
+The UAT exposed and repaired one prose defect before candidate validation: a native content update necessarily changes provider-generated task `updated_at` and row revision. The managed instruction now requires the exact intended owner-authored changes, only those exact provider-generated revision/timestamp changes, every other raw task field unchanged, and a clean working set. It also requires a single post-publication native pull/read, exact published revision containment, unrelated-descendant handling, and the existing same-task reconciliation rule.
+
+Final focused validation after the UAT wording repair passes: execute/managed-session Python 14 passed with 1 container-only skip; project-initialization/template-review Node 46/46. Canonical execute source and project template are byte-identical at SHA-256 `f74b27fa8b8a9929c95a49e3b5816d67bbee7faf817c9c6e3896ca4a85c2d2a0`; only the exact `project-skill-execute` managed manifest entry carries that same baseline/installed/available hash and remains `managed`. `git diff --check` passes. The optional independent reviewer hit the documented child-startup admission race and produced no findings; no task was resent and the failed child was removed. Required self-review, static/template checks, and executable UAT evidence are recorded here. Full-host and Docker remain.
+
+Full-host Node validation passes 388/388 for the final provider-aware execute source/template. This covers every existing Backlog/admission/lifecycle branch plus the managed asset/template surfaces; no runtime TypeScript or deferred workflow was changed. Docker tier 1 remains.
+
+Docker tier 1/offline RPC passes for the final provider-aware execute candidate: immutable image launched, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261020T191728Z-98997-be27e605/tier1`. Final acceptance evidence: focused Python 14 passed/1 container skip; focused Node 46/46; real disposable Beads 1.3.1 linked-cwd owner-content update/publication/isolated-remote proof; full-host Node 388/388; Docker tier 1 PASS; canonical/template bytes and exact managed hashes match; `git diff --check` PASS. The known unrelated `project-skill-design` self-host manifest mismatch remains unchanged from `fb1f411` and was excluded from the focused Python selection rather than modified outside this execute-only slice.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1043,4 +1058,6 @@ Accepted direct internal Beads admission through `4c556b296fc965244982655edce36c
 Accepted direct Beads admission through `4c556b296fc965244982655edce36c98a7117e93` remains unchanged. Added one bounded native linked-worktree discovery branch: checked-out Beads metadata selects native `bd context --json` from linked cwd; exact safe Git common-directory/registration evidence derives the canonical primary; context must bind exact linked/primary/store/database/mode with worktree true and redirect false; primary store/no-db evidence and linked-cwd capabilities/show then resolve the exact task. Missing, forged, foreign, redirected, symlinked, or mismatched context blocks before task reads/mutation. Provider-absent linked and every Backlog path remain unchanged. Provider 67/67, task-history 51/51, full Node 388/388, real Beads 1.3.1 read-only UAT, and Docker tier 1 pass.
 
 Accepted linked-worktree Beads discovery through `f1c54e4c02b0cb313e5de72d664a4259ff35408f`. Next bounded slice: make only the managed execute workflow source/template provider-aware while preserving provider-absent/Backlog semantics. Beads mode must bind exact owner/native evidence, reason over raw task fields and exact same-task drift, allow only supported owner-authored content updates with native sync/read and non-force publication proof, report raw before/after/revision evidence, and leave runtime gating and lifecycle activation deferred.
+
+Accepted linked-worktree discovery `f1c54e4c02b0cb313e5de72d664a4259ff35408f` remains unchanged. The managed execute source/template is provider-aware without activating a lifecycle path: it selects the exact Conversation owner first; provider-absent/Backlog retains the existing structured task/path/status/content/commit branch; Beads binds exact owner revision/raw evidence/code/worktree/session identity, performs linked-cwd native sync/raw reads, reasons field-for-field about same-task drift while allowing unrelated advances, updates only supported owner-authored content without lifecycle mutation, publishes once non-force, proves exact raw/revision/ref/code evidence, and reports it for later Conversation receipt advancement. Only the existing execute asset, its managed state, focused tests, docs, and this task changed. Focused Python/Node, real Beads 1.3.1 UAT, full Node 388/388, and Docker tier 1 pass.
 <!-- SECTION:FINAL_SUMMARY:END -->
