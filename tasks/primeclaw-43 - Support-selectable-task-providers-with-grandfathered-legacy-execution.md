@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 04:46'
+updated_date: '2026-10-20 05:08'
 labels: []
 dependencies: []
 references:
@@ -642,6 +642,47 @@ Changed only the task record through supported Backlog CLI, `task-providers.ts`,
 Advance with exactly the first bounded Beads native task mutation/publication sub-slice. Use supported native `bd` synchronization/read/update/commit/push. Require the exact canonical task ID and a clean native revision before mutation. Verify the exact native task view after mutation, commit through supported `bd`, push without force, and prove publication through the direct ref plus isolated remote revision/task evidence. On native sync, commit, push, or revision failure, preserve recoverable local work and return exact factual evidence; never force or silently overwrite.
 
 Automatic concurrent remote reconciliation and all semantic decisions remain deferred to a later reviewed slice. Do not add lifecycle/admission/finalization/cleanup wiring, ownership/receipt schema, provider-neutral UX, migration/cutover, legacy transition, PRIMECLAW-43.1, raw Dolt access to the live store, JSONL authority, a framework, coordinator, lock, mirror, registry, universal task model, or persistent state. Add only focused representative real Beads 1.3.1/native fixtures plus relevant docs/task evidence, run focused/full host and Docker tier 1, keep PRIMECLAW-43 exactly In Progress, push one clean candidate, notify the owning Conversation, and stop for review.
+
+2026-10-20 first bounded Beads native task mutation/publication slice in progress from pushed checkpoint `24446b153ffec6926b8c790f4d7fdbc7eea78b93`.
+
+Added one Beads-specific `mutateAndPublishBeadsTaskStatus` seam without lifecycle wiring or new persistent state. Full workspace/transport preparation establishes the selected clean published authority. Supported `bd dolt pull --remote` then runs with no conflict strategy and must remain the same clean revision; any synchronized advance or dirty/conflicted state stops before mutation for the deferred reviewed reconciliation slice. An exact `bd show <id> --json --long --include-comments` must return the requested safe canonical ID, mapped prior status, and full native view, followed by an immediate clean-revision recheck.
+
+The status write uses `bd --dolt-auto-commit=batch update` with the exact previous native status as `--if-status`. The exact native task view must show the same canonical ID/title and expected mapped status while HEAD remains the prepared revision with an uncommitted working set. `bd dolt commit -m` must then create one new clean revision and preserve the exact task view. `bd dolt push --remote <name> --no-adopt` publishes without force. Existing full preparation proves that exact committed revision through stable direct `refs/dolt/data` and isolated remote revision evidence; a second disposable read-only remote clone proves the exact published ID/title/status, followed by final live task/revision/cleanliness and direct-ref rereads.
+
+Structured failures report the exact phase plus prior/observed revision and dirty table count where available, classifying recovery as clean pre-mutation state, native working set, or local commit. Sync, guarded mutation, commit, push, revision, or publication-proof failure performs no reset, rollback, conflict-side choice, force, or overwrite.
+
+Focused fixtures pass 58/58. They cover the successful ordered native pull/read/batch-update/re-read/commit/re-read/non-force-push/direct-ref/isolated-task path, canonical-ID mismatch before write, and exact recoverability for pull, immediate revision, commit, push, and isolated task-proof failures. Static bridge passes 2 with 1 container deselected; TypeScript import passes.
+
+A real disposable Beads 1.3.1/Dolt 2.5.0 server workspace also published `UAT-aaj` from `in_design` to `in_planning`: pre-revision `2io7lclgiisi617d5jmn1oedamst22ar`, committed/published revision `a4cg8c52rkicm28nm96mq5f8lgpit0nf`, direct `refs/dolt/data` head `c8881b27d80cb0c61618e136814bc0f42571c1f7`, exact isolated published task view, final `dolt_status=[]`, and exact final native task view. The server was stopped and disposable project/remote removed. Full host and Docker tier 1 remain before a candidate.
+
+2026-10-20 independent review found and this revision repairs three exact mutation/publication defects before candidate finalization.
+
+First, a batch-mode `bd dolt commit` commits the whole working set, so task ID/status re-read alone could include another actor's dirty table, other task, or other target-task field. The seam now proves both the pre-commit `HEAD..WORKING` delta and the immutable pre-revision..committed-revision delta through read-only native `bd sql` queries. `dolt_diff_summary` must show exactly one data-only, schema-stable `issues` table modification. `dolt_diff` must show exactly one modified row for the canonical target and exact prior/target native statuses/title, with every non-lifecycle content field unchanged. Any foreign table, task row, or content field preserves and blocks the working set before commit; any foreign content captured by a race into the commit preserves and blocks the local commit before push. The exact clean committed HEAD is re-read immediately before the non-force native push; a pre-push HEAD or working-set advance blocks.
+
+Second, a post-push preparation failure no longer fabricates the intended commit/zero-dirt as observed state. It runs a fresh native identity and `dolt_status` observation and reports those exact facts, or reports state unavailable. Third, disposable-clone identity/task SQL failures now check exit status first and retain the native stderr/exit evidence rather than reducing every failure to invalid JSON.
+
+Focused tests now pass 60/60. New regressions cover a foreign dirty table, foreign issue row, foreign target content field, foreign content included in the resulting commit, a HEAD advance before push, a successful push whose observed HEAD advanced, a dirty post-push state, and isolated revision/task SQL failures. They prove no force, no commit for unproved working sets, no push for unproved commits/pre-push state, and exact recovery facts.
+
+A second real Beads 1.3.1/Dolt 2.5.0 disposable flow exercised both working-set and committed `dolt_diff_summary`/`dolt_diff` proofs while publishing `UAT-g5m` from `in_planning` to built-in `in_progress`: pre-revision `v20e2qesvu5jk0trq0pum9l8f3l3k7p8`, committed/published revision `3475j8levbi932ui7hbmo4lksdqhlcnj`, stable direct `refs/dolt/data` head `c5dbd4a27d709735bb6eab377865164d14181e52`, exact isolated task view, final native task status `in_progress`, and `dolt_status=[]`. The managed server was stopped and all disposable resources removed. Full host must be rerun after these repairs, followed by Docker tier 1.
+
+2026-10-20 BLOCKER after bounded implementation, real UAT, and two independent read-only reviews: the requested absolute guarantee cannot be implemented with the allowed public Beads 1.3.1 commands while locks, raw live-store Dolt access, force, and automatic concurrent reconciliation remain forbidden. The uncommitted candidate implementation has been removed; accepted foundation candidate `c691ae297e8ce0bd506948c2ab1f949b67f7abf3` remains unchanged.
+
+Exact constraint:
+
+1. `bd --dolt-auto-commit=batch update` can apply the guarded `--if-status` mutation, but `bd dolt commit` commits every change in the current working set. Read-only `dolt_diff_summary`/`dolt_diff` proofs can detect foreign tables/tasks/fields before and after commit, but proof and commit are separate commands. Another public writer can add work after the proof and before commit. Post-commit proof prevents push but cannot prevent foreign work from entering the local commit.
+2. `bd batch` does make its supported update and `DOLT_COMMIT` one database transaction, but its grammar exposes no `--if-status`/expected-revision precondition. It therefore cannot combine the required exact prior-task guard with the atomic commit. It also does not publish.
+3. `bd dolt push --remote <name> --no-adopt` exposes no exact local revision/ref or expected-HEAD argument. A clean exact-commit proof immediately before push is still a separate command. Another default auto-commit writer can advance the local branch in that gap; the non-force push may publish the foreign descendant. Post-push preparation can detect and report the mismatch, but only after the remote changed.
+4. Beads 1.3.1 help and real server-mode UAT confirm these command contracts. The first real UAT successfully published a guarded batch update/explicit commit/push with exact remote task evidence. A repaired UAT additionally proved exact `HEAD..WORKING` and pre-revision..commit `dolt_diff_summary`/`dolt_diff` content and published successfully. Those proofs close ordinary foreign-content cases but cannot make either command boundary atomic. Independent re-review confirmed the remaining TOCTOU gap and found no supported public primitive within scope.
+
+Unsafe candidate code/tests/docs were reverted rather than pushed. The first review's separate factual-evidence defects were repairable, but retaining that partial code would still violate the governing no-silent-foreign-publication boundary. The interrupted post-repair full-host run was intentionally terminated after the product constraint was confirmed; earlier pre-repair full host passed 358/358, focused repaired fixtures passed 60/60, static bridge passed 2 with 1 container deselected, TypeScript import passed, and both real disposable server flows completed with final `dolt_status=[]`, stable direct refs, stopped servers, and removed resources. These are investigation evidence, not candidate acceptance evidence.
+
+Exact unblock requires one explicit reviewed product decision before another execute pass:
+
+- upgrade to a supported Beads API that atomically combines expected task/revision guard, exact commit, and exact-revision non-force publication; or
+- authorize a bounded native mutation exclusion/maintenance lock covering the proof→commit→push sequence; or
+- relax the absolute guarantee so a foreign descendant detected after commit/push may be retained/published with exact evidence and managed reconciliation.
+
+Do not retry the same proof-then-command sequence: it can narrow but never close the race. PRIMECLAW-43 remains exactly In Progress on the Episode branch; the owning Conversation decides whether to publish Blocked on main or obtain an operator scope decision.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
