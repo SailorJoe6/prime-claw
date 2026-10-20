@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 16:03'
+updated_date: '2026-10-20 16:07'
 labels: []
 dependencies: []
 references:
@@ -857,6 +857,12 @@ Existing file-bound lifecycle and legacy-transition replay paths explicitly requ
 Validation after final source: focused ownership 34/34; static provider/schema 3 passed with 1 container bridge deselected; TypeScript module imports and `git diff --check` pass; full host Node 367/367. Docker tier 1/offline RPC passes with immutable image launch, network absence, checks, teardown verification, and manifest publication. Evidence: `.test-results/20261020T160107Z-61783-5b7a3f43/tier1`.
 
 Keep PRIMECLAW-43 exactly In Progress. Stop after one clean candidate push and owning-Conversation notification; do not begin Beads admission or another slice.
+
+2026-10-20 Conversation REQUEST REVISION on schema candidate `e2dafc48570d43156a446a47e9f9c271371199d8`. Parent verified exact ownership/task status, clean pushed remote-equal head, ancestry, and `git diff --check`; all schema boundaries and decisions remain accepted.
+
+Repair exactly one concrete parser defect: the Beads branch currently evaluates `DOLT_REVISION.test(String(item.providerRevision))`, so a non-string JSON array such as `["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]` is coerced and accepted even though the exported type and contract require an exact revision string. Require `typeof item.providerRevision === "string"` before the existing Dolt revision regex, or use an equivalent direct non-coercing check. Add one representative regression that rejects this exact array reproducer while retaining the existing malformed-string cases.
+
+Preserve every other source/schema decision, provider-absent compatibility behavior, global task/path collision behavior, explicit Backlog writers, Beads lifecycle fail-closed boundaries, docs/task evidence, and `.prime-claw/ownership.json` byte-for-byte. Do not broaden into `cleanupHead` or any pre-existing validator. Rerun focused/full host and Docker tier 1, push one clean repaired candidate, notify the owning Conversation, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -899,4 +905,6 @@ Accepted native-first Beads publication is integrated only at `commitConversatio
 Accepted status-publication integration candidate `65ff940f42d6a2dfae279ad7c0eab953bc7fe9c7`. Next bounded slice extends the existing version-2 ownership shape in place with a minimal provider discriminator and provider-native identity: legacy provider-absent records remain valid Backlog only with exact existing ID/path; new Backlog records carry path evidence; new Beads records carry exact published provider revision and only required raw/native evidence. Reject mixed/malformed fields, preserve existing Episode Git HEAD, do not rewrite live ownership or activate any Beads lifecycle route.
 
 Extended the existing version-2 ownership record in place with a minimal provider-native discriminator. New Backlog records explicitly bind provider, canonical task ID, and exact task path. Beads schema records bind provider, canonical task ID, exact published Dolt revision, raw matching native task evidence, and the existing Git baseRef without a Backlog path. Provider-absent version-2 records remain validated Backlog compatibility input and are not rewritten. Mixed/malformed shapes fail closed; current lifecycle routes remain Backlog-only. Validated by focused ownership 34/34, full host 367/367, static/import checks, and Docker tier 1.
+
+Revision requested for `e2dafc48570d43156a446a47e9f9c271371199d8`: make Beads `providerRevision` validation non-coercing by requiring a string before the existing 32-character lowercase Dolt regex, and reject the exact array reproducer. Preserve the accepted schema and all other validators unchanged; rerun focused/full/Docker, push one repaired candidate, and stop.
 <!-- SECTION:FINAL_SUMMARY:END -->
