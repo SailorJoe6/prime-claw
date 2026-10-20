@@ -18,30 +18,7 @@ WS_SPEC_EPISODE_NODE_SUITE = "/workspace/tests/spec_episode_extension.test.mjs"
 WS_EPISODE_CLOSE_NODE_SUITE = "/workspace/tests/episode_close_extension.test.mjs"
 
 
-def _link_pi_coding_agent_package(tier1_container) -> None:
-    """Make the host package's public API resolvable for plain node suites.
-
-    The production extension imports `parseFrontmatter` from
-    `@earendil-works/pi-coding-agent`; under Prime Agent's jiti loader that
-    specifier resolves through the supported extension aliases/virtual
-    modules. Plain `node --test` has no loader, so the container exposes the
-    installed `prime-agent` package (whose dist re-exports the same public
-    API) under the canonical specifier at the filesystem root, which Node's
-    node_modules walk reaches from the read-only /workspace mount.
-    """
-    link = tier1_container.run(
-        "bash", "-lc",
-        'set -euo pipefail; pkg="$(npm root -g)/prime-agent"; '
-        'test -f "$pkg/dist/index.js"; '
-        "mkdir -p /node_modules/@earendil-works; "
-        'ln -sfn "$pkg" /node_modules/@earendil-works/pi-coding-agent',
-        timeout=30, workdir=None,
-    )
-    assert link.returncode == 0, link.stdout + link.stderr
-
-
 def test_reviewed_plan_node_suite(tier1_container) -> None:
-    _link_pi_coding_agent_package(tier1_container)
     result = tier1_container.run("node", "--experimental-strip-types", "--test", WS_REVIEWED_PLAN_NODE_SUITE, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
 

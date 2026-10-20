@@ -109,6 +109,37 @@ after the source and locked dependencies have been acquired. Preserve the
 verified source identity, lockfile hash, install log, SBOM when available, and
 final image digest as candidate evidence.
 
+## Plugin-local YAML dependency
+
+`reviewed-plan.ts` uses the explicitly shipped `yaml@2.9.0` Node bundle at
+`extension-support/vendor/yaml/yaml.cjs`. Only Prime Agent type imports remain
+in that extension. A runtime import of the coding-agent root barrel pulls the
+model registry into source-mode jiti and fails on `pi-ai/mcp` resolution. Do not
+repair that by changing the source launcher, aliases or upstream code.
+
+The plugin inventory delivers the bundle, ISC license and provenance as exact
+assets. No runtime or install-time dependency fetch runs. The bundle uses the
+parser's default YAML behavior, including duplicate-key errors, with only narrow
+frontmatter framing and threshold normalization in the extension. It imports no
+external packages; `process` and `buffer` are Node builtins. See
+[`scripts/vendor-plugin-yaml/README.md`](../scripts/vendor-plugin-yaml/README.md)
+for the locked Docker-only build and output integrity records.
+
+Validate both loader modes. Existing tier-1 bridges cover packaged runtime,
+threshold behavior and managed delivery. The additional default source-loader
+regression builds the exact annotated-tag source fixture (no generated dist,
+virtual modules or alias overrides), runs offline through the isolation wrapper,
+and checks the error collection plus registered commands and tools:
+
+```bash
+python3 -m pytest tests/test_reviewed_plan_source_loader.py -q -m container
+```
+
+The fixture verifies tag object, commit, tree, remote and lockfile before and
+after dependency installation. Its optional `SOURCE_LOADER_IMAGE` shortcut still
+checks image labels and in-image source identity; the normal command builds the
+pinned Dockerfile and does not depend on a disposable local tag.
+
 ## Unsupported installation paths
 
 The following are not Prime Claw installation paths:

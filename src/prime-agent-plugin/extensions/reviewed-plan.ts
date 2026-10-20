@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
+import yaml from "../extension-support/vendor/yaml/yaml.cjs";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -329,11 +329,16 @@ export async function maybeDeliverConversationAfterHandoff(
   }
   let frontmatter: Record<string, unknown>;
   try {
-    const parsed = parseFrontmatter<Record<string, unknown>>(content);
-    if (!parsed.frontmatter || typeof parsed.frontmatter !== "object" || Array.isArray(parsed.frontmatter)) {
+    // Keep the supported parser's YAML defaults, but do not load the runtime
+    // coding-agent barrel through source-mode jiti. The exact local dependency
+    // ships with the plugin; only framing and threshold normalization live here.
+    const endIndex = normalizedContent.indexOf("\n---", 3);
+    const header = normalizedContent.startsWith("---") ? normalizedContent.slice(4, endIndex) : "";
+    const parsed = header ? yaml.parse(header) ?? {} : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is not a mapping`, error: true };
     }
-    frontmatter = parsed.frontmatter;
+    frontmatter = parsed;
   } catch (error) {
     return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is invalid: ${boundedCompactionReason(error)}`, error: true };
   }

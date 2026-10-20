@@ -13,6 +13,9 @@
   "assets": [
     {"id":"plugin-asset-inventory-json","source":"asset-inventory.json","targets":[{"class":"plugin-root-exact","destination":"asset-inventory.json"}]},
     {"id":"global-role-kernel","source":"ROLE_KERNEL.md","targets":[{"class":"plugin-root-exact","destination":"ROLE_KERNEL.md"},{"class":"selected-context-block"}]},
+    {"id":"plugin-yaml-bundle","source":"extension-support/vendor/yaml/yaml.cjs","targets":[{"class":"plugin-root-exact","destination":"extension-support/vendor/yaml/yaml.cjs"}]},
+    {"id":"plugin-yaml-license","source":"extension-support/vendor/yaml/LICENSE","targets":[{"class":"plugin-root-exact","destination":"extension-support/vendor/yaml/LICENSE"}]},
+    {"id":"plugin-yaml-provenance","source":"extension-support/vendor/yaml/provenance.json","targets":[{"class":"plugin-root-exact","destination":"extension-support/vendor/yaml/provenance.json"}]},
     {"id":"plugin-extension-support-conversation-oversight-ts","source":"extension-support/conversation-oversight.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/conversation-oversight.ts"}]},
     {"id":"plugin-extension-support-episode-close-ts","source":"extension-support/episode-close.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/episode-close.ts"}]},
     {"id":"plugin-extension-support-episode-ownership-ts","source":"extension-support/episode-ownership.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/episode-ownership.ts"}]},

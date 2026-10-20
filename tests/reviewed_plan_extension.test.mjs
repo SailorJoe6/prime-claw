@@ -534,6 +534,26 @@ test("customized project threshold and prompt load from the same workflow file",
   assert.equal(belowResult.details.conversationCompaction.outcome, "skipped");
 });
 
+test("project YAML framing and quoted scalars retain parser semantics", async () => {
+  for (const content of [
+    "AFTER-HANDOFF POLICY without frontmatter",
+    "---\n---\nAFTER-HANDOFF POLICY",
+    "---\n# empty mapping\n---\nAFTER-HANDOFF POLICY",
+    "---\nnull\n---\nAFTER-HANDOFF POLICY",
+    "\uFEFF---\r\nthreshold_percent: \"60%\"\r\n---\r\nAFTER-HANDOFF POLICY",
+    "---\nthreshold_percent: '60' # percent\n---\nAFTER-HANDOFF POLICY",
+    "---\nbase: &limit 60\nthreshold_percent: *limit\n---\nAFTER-HANDOFF POLICY",
+  ]) {
+    const f = fixture({ usage: 61 });
+    writeFileSync(f.afterHandoffPath, content);
+    const result = await maybeDeliverConversationAfterHandoff(f.pi, f.ctx);
+    assert.equal(result.outcome, "prompt-delivered", content);
+    assert.equal(result.threshold, 0.6, content);
+    assert.equal(f.sent.length, 1);
+    assert.ok(f.sent[0].message.includes(content));
+  }
+});
+
 test("invalid workflow configuration is a bounded skip, never a failed handoff", async () => {
   const cases = [
     ["---\nname: conversation-after-handoff\nthreshold_percent: 6%\n---\nBODY\n", /10-100% range/],
@@ -543,6 +563,10 @@ test("invalid workflow configuration is a bounded skip, never a failed handoff",
     ["---\nname: conversation-after-handoff\nthreshold_percent: 60\n", /unterminated frontmatter/],
     ["---\n- just\n- a\n- list\n---\nBODY\n", /not a mapping/],
     ["---\nname: a\nname: b\n---\nBODY\n", /frontmatter is invalid/],
+    ["---\nthreshold_percent: 60\nthreshold_percent: 0\n---\nBODY\n", /frontmatter is invalid/],
+    ["---\nthreshold_percent: {bad: 60}\n---\nBODY\n", /numeric scalar/],
+    ["---\nthreshold_percent: \"60 trailing\"\n---\nBODY\n", /finite number/],
+    ["---\nthreshold_percent: \"unterminated\n---\nBODY\n", /frontmatter is invalid/],
   ];
   for (const [content, pattern] of cases) {
     const f = fixture({ taskStatus: "In Progress", usage: 100 });
