@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-20 17:41'
+updated_date: '2026-10-20 18:05'
 labels: []
 dependencies: []
 references:
@@ -16,9 +16,7 @@ documentation:
   - docs/backlog.md
 modified_files:
   - src/prime-agent-plugin/extension-support/spec-episode.ts
-  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - tests/beads_task_episode_admission_extension.test.mjs
-  - tests/test_task_providers.py
   - docs/backlog.md
 priority: p1
 type: epic
@@ -926,6 +924,22 @@ Scope stayed bounded: one direct Beads public-path branch, expected-provider pub
 Keep actual reviewed-plan `/implement-task` and `create_task_episode` tool gating, managed execute skill, and provider-aware Episode worktree routing explicitly deferred and unchanged. Independent review confirmed they are not activated, so describe this slice as the direct internal admission/allocation seam, not end-to-end managed-tool support. Do not add workspace-copy machinery: Beads 1.3.1 discovers the primary native store through Git common-directory metadata. No retry, semantic classifier, normalized model, new lock/state/framework/receipt/sidecar/version 3, force/raw Dolt, lifecycle expansion, migration, legacy work, cleanup, or PRIMECLAW-43.1.
 
 Rerun focused/full host, the two exact recovery repros plus raw-view drift repro, relevant disposable UAT only if needed, and Docker tier 1. Push one clean repaired candidate, notify the owning Conversation, and stop for review.
+
+2026-10-20 bounded repair of candidate `38a982ce880b0a893d24db0f575139a76df2b3fe` is implemented in the working tree. Recovery no longer calls the fresh-admission Git operation/clean/head/upstream proof: pre-reservation rollback now proves exact unchanged ownership absence/inactive state before and after its one native In Planning publication, while post-reservation recovery still proves the exact Beads owner/task/captured base and unchanged full owner before Blocked publication and evidence advancement. The final post-allocation Git gate was also removed so code cleanliness/head/upstream proofs occur only at initial admission and immediately before successful reservation, as requested; recovery never mutates code, baseRef, or resources.
+
+Immediately before reservation, the branch now compares the complete raw live target-task `nativeView` byte-structurally with `inProgressPublication.evidence.taskPublished.nativeView`. Any difference raises one unclassified error containing both raw views, reserves nothing, and enters the existing one-shot In Planning rollback; unrelated task/store advances are not compared and remain allowed.
+
+Three exact regressions pass: tracked drift after In Progress still performs exactly `[In Progress, In Planning]` with zero reservation/owner/resources; tracked drift after reservation plus allocation failure performs exactly `[In Progress, Blocked]`, preserves provider/task/owner/base/resources/status, and advances only Blocked native evidence; meaningful same-task design drift surfaces both old/new provider-native views, performs no reservation, and rolls back once. Direct Beads admission suite passes 14/14. Documentation now describes this only as the internal admission/allocation seam and explicitly keeps reviewed-plan `/implement-task`, `create_task_episode` gating, managed execute activation, and provider-aware worktree routing deferred.
+
+2026-10-20 review follow-up and production UAT: independent read-only review confirmed both repaired mechanics, exact owner/base checks, one-shot recovery, complete pre-reservation raw comparison, zero reservation on drift, and untruncated raw evidence. It initially identified missing explicit unrelated-task preservation coverage. The existing raw-drift regression now models an outside advance to a second native task during In Progress publication, proves the target rollback is issued only for the exact target ID, and verifies the unrelated raw revision/comment survives unchanged. Focused combined validation then passed 133/133 plus provider static 3 passed/2 container deselected and `git diff --check`.
+
+A fresh disposable Beads 1.3.1 production `createTaskEpisode` UAT passed the repaired raw-equality boundary. Beads generated target `UAT-0d7`; after the fixture pushed its Git initialization commits and committed/pushed native lifecycle config, admission published native `in_progress`, reserved exact provider revision `fd3pl61m8kcnkn8qjnbn1sc783bfc7l5`, and returned/stored active provider-native ownership with exact raw design and code base/head `d51f526f2878bc62a452de9721ae39038248dca2`. Final verification showed the full raw live view, `dolt_status=[]`, exact Git HEAD/upstream equality, and empty tracked Git status. The native server was stopped and the entire disposable fixture removed. An initial UAT invocation used the stale example ID `UAT-yes` while this fresh store generated `UAT-0d7`; it failed before mutation as expected, then the corrected exact generated ID passed. Full-host Node and Docker tier 1 remain.
+
+2026-10-20 bounded revision validation is complete. Direct suite 14/14 and combined admission/provider/ownership suite 133/133 pass. Full-host Node passes 384/384. Docker tier 1/offline RPC passes: immutable image launched, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261020T180311Z-1202-5bf48307/tier1`. `git diff --check` passes. Existing Backlog admission test source remains unchanged from reviewed candidate `38a982ce880b0a893d24db0f575139a76df2b3fe`.
+
+The two exact tracked-drift recovery repros pass: after published In Progress but before reservation, tracked drift produces exactly one verified In Planning rollback, zero reservation/owner/resources, and no Git mutation; after reservation plus allocation failure, tracked drift still produces exactly one Blocked publication and advances only the exact same provider-native owner evidence while preserving provider/task/owner/status/base/resource fields. The raw same-task drift repro passes with a >1000-character meaningful replacement design: zero reservation, both complete untruncated published/live raw views (including the live tail marker) are surfaced without field classification, the target rolls back exactly once, and a concurrent unrelated native task revision/comment remains byte-for-byte preserved.
+
+Fresh Beads 1.3.1 production UAT also passes the new pre-reservation raw equality proof and active allocation, with exact native revision `fd3pl61m8kcnkn8qjnbn1sc783bfc7l5`, raw design, code base/head `d51f526f2878bc62a452de9721ae39038248dca2`, empty native working set, empty tracked Git state, and exact upstream equality; its server and fixture were removed. Scope stayed exact: Git safety proof remains at initial admission and immediately before reservation only; recovery requires exact provider/task/status plus unchanged ownership and captured base where present, and never retries or mutates code/base/resources. Managed `/implement-task`, `create_task_episode` gating, execute activation, and provider-aware worktree routing remain deferred. No workspace copy, classifier, normalized model, lock/state/framework/receipt/sidecar/version 3, force/raw Dolt, lifecycle expansion, migration, legacy, cleanup, or PRIMECLAW-43.1 was added.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -986,4 +1000,6 @@ Accepted raw Beads view candidate `4eb3e519dac366ba67b7a7388a079aff4c14a271`. Ne
 Implemented only direct Beads task Episode admission/allocation through existing `createTaskEpisode`. It requires exact `In Planning`/`in_planning` raw design, canonical clean upstream-equal primary main, serialized task/code/owner reproof, exact published In Progress evidence, accepted Beads reservation, existing allocation, and exact active ownership/resource proof. Recovery performs one proven In Planning rollback before durable mutation or one same-owner Blocked evidence advance after durable mutation, with no retry. Backlog admission tests remain byte-for-byte unchanged. Focused 130/130, full Node 381/381, real Beads 1.3.1 production UAT, and Docker tier 1 pass.
 
 Revision requested for `38a982ce880b0a893d24db0f575139a76df2b3fe`: remove fresh-admission Git cleanliness/upstream checks only from both deterministic recovery branches, and require exact full raw target-task equality between published In Progress evidence and the pre-reservation re-read. Add tracked-drift rollback/Blocked regressions plus raw same-task drift rollback. Preserve all other behavior and keep managed-tool/worktree routing deferred.
+
+Repaired direct internal Beads admission candidate `38a982ce880b0a893d24db0f575139a76df2b3fe`: recovery no longer reapplies fresh-admission Git operation/clean/head/upstream checks and instead proves exact provider/task/status plus unchanged owner/base before its sole rollback or Blocked evidence advance. Before reservation, the complete live target `nativeView` must exactly equal published raw evidence; drift reserves nothing, surfaces both full raw views, preserves unrelated advances, and rolls back once. Direct 14/14, focused 133/133, full Node 384/384, real Beads 1.3.1 UAT, and Docker tier 1 pass.
 <!-- SECTION:FINAL_SUMMARY:END -->

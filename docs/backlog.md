@@ -606,8 +606,13 @@ operation, have no staged or tracked changes, and have an exact code `HEAD`
 equal to its upstream. Admission re-proves that code head, task/design, and
 owner absence under the existing repository serialization lock. It then calls
 `commitConversationTaskStatus` with an expected Beads-provider guard, accepts
-only an exact `published` `In Progress`/`in_progress` result, reserves through
-`reservePublishedBeadsTaskEpisodeOwnership`, and reuses the existing placement
+only an exact `published` `In Progress`/`in_progress` result, re-proves the clean
+code head, and requires the complete raw live target-task view to equal the
+published `nativeView` immediately before reservation. Any same-task raw drift
+surfaces both provider-native views without classification, reserves nothing,
+and enters the single rollback path. Unrelated-task provider advances remain
+allowed. The branch then reserves through
+`reservePublishedBeadsTaskEpisodeOwnership` and reuses the existing placement
 and allocation machinery. Final success requires the stored active Beads owner
 to match the clean code `baseRef`, published provider revision and raw task
 evidence, operation, task, worktree, branch, and Episode session identities.
@@ -616,9 +621,18 @@ routes remain closed.
 
 Recovery never retries admission. If `In Progress` published but no durable
 owner or resource mutation exists, the same publication seam must prove one
-`In Planning` rollback. With exact readable durable ownership, failure publishes
-`Blocked` once, re-proves the unchanged owner, and advances only that owner's
-`providerRevision`, raw `taskEvidence`, and timestamp. Provider review/block
-results, failed recovery publication, ownership drift, or unreadable ownership
-fail closed with raw evidence preserved. No provider matrix, normalized task
-model, sidecar receipt, raw Dolt write, force, or automatic retry is introduced.
+`In Planning` rollback. With exact readable durable ownership and its captured
+code base, failure publishes `Blocked` once, re-proves the unchanged owner, and
+advances only that owner's `providerRevision`, raw `taskEvidence`, and timestamp.
+Both recovery paths require the exact Beads provider, task, and native/canonical
+status, but deliberately do not reapply the fresh-admission Git operation,
+cleanliness, head, or upstream gate: tracked or head drift after publication can
+be the failure being recovered, and recovery never mutates code, `baseRef`, or
+resources. Provider review/block results, failed recovery publication,
+ownership drift, or unreadable ownership fail closed with raw evidence preserved.
+
+This is only the direct internal admission/allocation seam. Reviewed-plan
+`/implement-task` and `create_task_episode` tool gating, managed execute-skill
+activation, and provider-aware Episode worktree routing remain deferred. No
+provider matrix, normalized task model, sidecar receipt, workspace-copy
+machinery, raw Dolt write, force, or automatic retry is introduced.

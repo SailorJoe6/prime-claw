@@ -82,12 +82,21 @@ function fixture() {
 
   const taskId = "BEADS-43";
   const design = "1. Publish one exact task.\n2. Reserve and allocate its Episode.";
+  let liveDesign = design;
+  let unrelatedTask = {
+    id: "BEADS-other",
+    title: "Unrelated provider task",
+    status: "open",
+    revision: "unrelated-before",
+    comments: [],
+  };
   let status = "In Planning";
   let resolvedId = taskId;
   let operationInProgress = false;
   let trackedStatus = "";
   let upstreamHead = git(root, "rev-parse", "HEAD");
   let publicationOverride;
+  let publicationMutator;
   let reservationFailure;
   let allocationFailure;
   let allocationMutator;
@@ -124,15 +133,24 @@ function fixture() {
       nativeStatus: native,
       status,
       projectRoot: root,
-      nativeView: { id: resolvedId, title: "Provider-native admission fixture", status: native, design },
+      nativeView: {
+        id: resolvedId,
+        title: "Provider-native admission fixture",
+        status: native,
+        design: liveDesign,
+        comments: [{ id: 7, text: `${status} raw evidence` }],
+      },
     };
   };
   const commitTaskStatus = (options) => {
     statusCalls.push(options.status);
+    assert.equal(options.taskId, taskId);
     assert.equal(options.expectedProvider, "beads");
     if (publicationOverride) return publicationOverride(options.status);
     status = options.status;
-    return published(root, taskId, status, design);
+    const result = published(root, taskId, status, liveDesign);
+    publicationMutator?.(options.status);
+    return result;
   };
   const reserveBeadsTaskOwnership = (input, reservationDependencies) => {
     reservationCalls.push(input);
@@ -207,6 +225,10 @@ function fixture() {
     set trackedStatus(value) { trackedStatus = value; },
     set upstreamHead(value) { upstreamHead = value; },
     set publicationOverride(value) { publicationOverride = value; },
+    set publicationMutator(value) { publicationMutator = value; },
+    set liveDesign(value) { liveDesign = value; },
+    get unrelatedTask() { return structuredClone(unrelatedTask); },
+    set unrelatedTask(value) { unrelatedTask = structuredClone(value); },
     set reservationFailure(value) { reservationFailure = value; },
     set allocationFailure(value) { allocationFailure = value; },
     set allocationMutator(value) { allocationMutator = value; },
@@ -313,6 +335,73 @@ test("Beads post-reservation failure publishes Blocked and advances only same-ow
   assert.equal(retained.providerRevision, revision.Blocked);
   assert.equal(retained.taskEvidence.status, "blocked");
   assert.equal(retained.taskEvidence.design, f.design);
+});
+
+test("Beads pre-reservation recovery rolls back despite tracked drift after In Progress publication", async () => {
+  const f = fixture();
+  f.publicationMutator = (requested) => {
+    if (requested === "In Progress") f.trackedStatus = " M code.txt";
+  };
+
+  await assert.rejects(create(f), /returned to In Planning.*without staged or tracked changes/);
+  assert.deepEqual(f.statusCalls, ["In Progress", "In Planning"]);
+  assert.equal(f.status, "In Planning");
+  assert.equal(f.reservationCalls.length, 0);
+  assert.equal(f.ownership.read(f.root, "owner-session"), null);
+  assert.equal(f.allocatorCalls, 0);
+});
+
+test("Beads post-reservation recovery publishes Blocked despite later tracked drift", async () => {
+  const f = fixture();
+  const codeHead = git(f.root, "rev-parse", "HEAD");
+  f.allocationMutator = () => { f.trackedStatus = " M code.txt"; };
+  f.allocationFailure = new Error("allocation failed after tracked drift");
+
+  await assert.rejects(create(f), /is Blocked with advanced ownership evidence.*allocation failed after tracked drift/);
+  const retained = f.ownership.read(f.root, "owner-session");
+  assert.deepEqual(f.statusCalls, ["In Progress", "Blocked"]);
+  assert.equal(f.status, "Blocked");
+  assert.equal(f.reservationCalls.length, 1);
+  assert.equal(retained.provider, "beads");
+  assert.equal(retained.status, "provisioning");
+  assert.equal(retained.taskId, f.taskId);
+  assert.equal(retained.ownerSessionId, "owner-session");
+  assert.equal(retained.baseRef, codeHead);
+  assert.equal(retained.providerRevision, revision.Blocked);
+  assert.equal(retained.taskEvidence.status, "blocked");
+  assert.equal(f.allocatorCalls, 1);
+});
+
+test("Beads raw same-task drift before reservation surfaces both views and rolls back once", async () => {
+  const f = fixture();
+  const changedDesign = `1. Outside writer changed the plan.\n2. ${"x".repeat(1200)} raw-live-tail-marker`;
+  const unrelatedAdvance = {
+    ...f.unrelatedTask,
+    revision: "unrelated-after",
+    comments: [{ id: 99, text: "outside unrelated advance" }],
+  };
+  f.publicationMutator = (requested) => {
+    if (requested === "In Progress") {
+      f.liveDesign = changedDesign;
+      f.unrelatedTask = unrelatedAdvance;
+    }
+  };
+
+  await assert.rejects(create(f), (error) => {
+    assert.match(error.message, /returned to In Planning/);
+    assert.match(error.message, /published native view/);
+    assert.match(error.message, /live native view/);
+    assert.ok(error.message.includes("Publish one exact task"));
+    assert.ok(error.message.includes("Outside writer changed the plan"));
+    assert.ok(error.message.includes("raw-live-tail-marker"));
+    return true;
+  });
+  assert.deepEqual(f.statusCalls, ["In Progress", "In Planning"]);
+  assert.equal(f.status, "In Planning");
+  assert.equal(f.reservationCalls.length, 0);
+  assert.equal(f.ownership.read(f.root, "owner-session"), null);
+  assert.equal(f.allocatorCalls, 0);
+  assert.deepEqual(f.unrelatedTask, unrelatedAdvance);
 });
 
 test("Beads Blocked recovery preserves ownership and raw review evidence when publication is not proven", async () => {

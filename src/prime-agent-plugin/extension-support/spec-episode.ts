@@ -1949,6 +1949,15 @@ class BeadsPublicationEvidenceError extends Error {
   }
 }
 
+class BeadsRawTaskViewDriftError extends Error {
+  constructor(taskId: string, publishedNativeView: Record<string, unknown>, liveNativeView: Record<string, unknown>) {
+    super(
+      `Beads task ${taskId} raw provider view changed after In Progress publication; published native view: ${JSON.stringify(publishedNativeView)}; live native view: ${JSON.stringify(liveNativeView)}`,
+    );
+    this.name = "BeadsRawTaskViewDriftError";
+  }
+}
+
 function exactBeadsAdmissionTask(
   selection: ProviderTaskResolution | null,
   taskId: string,
@@ -2148,9 +2157,13 @@ async function createBeadsTaskEpisode(
         "Beads In Progress admission publication", taskId, projectRoot, "In Progress", "in_progress",
       );
       proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
-      exactBeadsAdmissionTask(
+      const livePublishedTask = exactBeadsAdmissionTask(
         resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
       );
+      const publishedNativeView = inProgressPublication.evidence.taskPublished.nativeView;
+      if (JSON.stringify(livePublishedTask.nativeView) !== JSON.stringify(publishedNativeView)) {
+        throw new BeadsRawTaskViewDriftError(taskId, publishedNativeView, livePublishedTask.nativeView);
+      }
       const reservation = reserve({
         projectRoot,
         publication: inProgressPublication,
@@ -2192,14 +2205,13 @@ async function createBeadsTaskEpisode(
       throw new Error("Beads task Episode allocation returned without the exact active reservation identity");
     }
     exactBeadsResourceIdentity(active, result);
-    proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
     exactBeadsAdmissionTask(
       resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
     );
     return { ...active, reused: result.reused };
   } catch (error) {
     if (error instanceof BeadsPublicationEvidenceError || !inProgressPublication || !projectRoot) throw error;
-    const cause = taskAdmissionError(error);
+    const cause = error instanceof BeadsRawTaskViewDriftError ? error.message : taskAdmissionError(error);
     let retained: EpisodeOwnershipRecord | null;
     try {
       retained = store.read(projectRoot, ownerSessionId);
@@ -2223,7 +2235,6 @@ async function createBeadsTaskEpisode(
           if (!current || JSON.stringify(current) !== JSON.stringify(retained)) {
             throw new Error("Beads ownership changed before Blocked recovery publication");
           }
-          proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
           exactBeadsAdmissionTask(
             resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
           );
@@ -2255,10 +2266,9 @@ async function createBeadsTaskEpisode(
     try {
       withEpisodeAdmissionLock(projectRoot, () => {
         const current = store.read(projectRoot, ownerSessionId);
-        if (current && current.status !== "inactive") {
-          throw new Error("Episode ownership appeared before Beads In Planning rollback");
+        if (JSON.stringify(current) !== JSON.stringify(retained)) {
+          throw new Error("Episode ownership changed before Beads In Planning rollback");
         }
-        proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
         exactBeadsAdmissionTask(
           resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
         );
@@ -2279,7 +2289,10 @@ async function createBeadsTaskEpisode(
         exactBeadsAdmissionTask(
           resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Planning", "in_planning",
         );
-        proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
+        const after = store.read(projectRoot, ownerSessionId);
+        if (JSON.stringify(after) !== JSON.stringify(retained)) {
+          throw new Error("Episode ownership changed during Beads In Planning rollback");
+        }
       });
     } catch (recoveryError) {
       throw new Error(`Beads task Episode creation failed before durable reservation or resource mutation, and exact In Planning rollback failed. Preserve all evidence and do not retry. Cause: ${cause}. Recovery failure: ${recoveryError instanceof Error ? recoveryError.message : String(recoveryError)}`);
