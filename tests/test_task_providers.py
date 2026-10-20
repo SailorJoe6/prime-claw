@@ -10,6 +10,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 MODULE = REPO / "src" / "prime-agent-plugin" / "extension-support" / "task-providers.ts"
+OWNERSHIP_MODULE = REPO / "src" / "prime-agent-plugin" / "extension-support" / "episode-ownership.ts"
+OWNERSHIP_WRITER = REPO / "src" / "prime-agent-plugin" / "extension-support" / "task-episode-ownership.ts"
+EPISODE_MODULE = REPO / "src" / "prime-agent-plugin" / "extension-support" / "spec-episode.ts"
 WS_NODE_SUITE = "/workspace/tests/task_providers.test.mjs"
 
 
@@ -68,3 +71,30 @@ def test_task_providers_module_keeps_the_narrow_deterministic_boundary() -> None
     # Discovery must not create or mutate anything: no write APIs.
     for write_api in ("writeFileSync", "mkdirSync", "execFileSync("):
         assert write_api not in source
+
+
+def test_version_two_ownership_keeps_one_discriminated_provider_native_shape() -> None:
+    ownership = OWNERSHIP_MODULE.read_text()
+    writer = OWNERSHIP_WRITER.read_text()
+    episode = EPISODE_MODULE.read_text()
+    for sentinel in (
+        'provider: "backlog"',
+        'provider: "beads"',
+        'providerRevision: string',
+        'taskEvidence: Record<string, unknown>',
+        'record.provider ?? "backlog"',
+        'DOLT_REVISION.test(String(item.providerRevision))',
+        'exactBeadsTaskEvidence(item.taskEvidence, item.taskId)',
+    ):
+        assert sentinel in ownership
+    assert writer.count('provider: "backlog"') == 2
+    assert "Legacy ownership transition replay does not yet support Beads ownership" in writer
+    assert "isBacklogTaskEpisodeOwnership(record)" in episode
+    assert "does not yet admit Beads ownership" in episode
+    for forbidden in (
+        "version: 3",
+        "schemaVersion: 2",
+        "ownership-receipt",
+        "provider-state",
+    ):
+        assert forbidden not in ownership

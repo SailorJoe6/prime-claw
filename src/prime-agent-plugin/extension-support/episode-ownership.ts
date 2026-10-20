@@ -40,14 +40,42 @@ export interface LegacyEpisodeOwnershipRecord extends EpisodeOwnershipBase {
   bundleDigest: string;
 }
 
-/** Task-native identity. The exact task and its status commit replace plan authority. */
-export interface TaskEpisodeOwnershipRecord extends EpisodeOwnershipBase {
+interface TaskEpisodeOwnershipBase extends EpisodeOwnershipBase {
   version: 2;
+  /** Canonical provider-native task ID. */
   taskId: string;
-  taskPath: string;
   /** Exact terminal Episode head bound before separately authorized resource cleanup. */
   cleanupHead?: string;
 }
+
+/** Compatibility shape for version-2 records written before provider identity existed. */
+export interface LegacyBacklogTaskEpisodeOwnershipRecord extends TaskEpisodeOwnershipBase {
+  provider?: undefined;
+  taskPath: string;
+  providerRevision?: never;
+  taskEvidence?: never;
+}
+
+/** New Backlog ownership carries only its exact task-file identity. */
+export interface BacklogTaskEpisodeOwnershipRecord extends TaskEpisodeOwnershipBase {
+  provider: "backlog";
+  taskPath: string;
+  providerRevision?: never;
+  taskEvidence?: never;
+}
+
+/** New Beads ownership carries the exact published native revision and task view. */
+export interface BeadsTaskEpisodeOwnershipRecord extends TaskEpisodeOwnershipBase {
+  provider: "beads";
+  providerRevision: string;
+  taskEvidence: Record<string, unknown>;
+  taskPath?: never;
+}
+
+export type TaskEpisodeOwnershipRecord =
+  | LegacyBacklogTaskEpisodeOwnershipRecord
+  | BacklogTaskEpisodeOwnershipRecord
+  | BeadsTaskEpisodeOwnershipRecord;
 
 export type EpisodeOwnershipRecord = LegacyEpisodeOwnershipRecord | TaskEpisodeOwnershipRecord;
 
@@ -65,6 +93,7 @@ export type EpisodeOwnershipMutation = (
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const GIT_OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const DOLT_REVISION = /^[0-9a-v]{32}$/;
 const COMMON_STRING_FIELDS = [
   "operationId", "ownerSessionId", "baseRef", "createdAt", "updatedAt",
 ] as const;
@@ -77,7 +106,12 @@ const COMMON_RECORD_FIELDS = new Set<string>([
   "version", "status", "engine", "terminalHandles", ...COMMON_STRING_FIELDS, ...OPTIONAL_STRING_FIELDS,
 ]);
 const LEGACY_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "sourceLocation", "slug", "bundleDigest"]);
-const TASK_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "taskId", "taskPath", "cleanupHead"]);
+const BACKLOG_TASK_RECORD_FIELDS = new Set<string>([
+  ...COMMON_RECORD_FIELDS, "provider", "taskId", "taskPath", "cleanupHead",
+]);
+const BEADS_TASK_RECORD_FIELDS = new Set<string>([
+  ...COMMON_RECORD_FIELDS, "provider", "taskId", "providerRevision", "taskEvidence", "cleanupHead",
+]);
 
 function hasOnlyFields(item: Record<string, unknown>, allowed: Set<string>): boolean {
   return Object.keys(item).every((field) => allowed.has(field));
@@ -92,12 +126,36 @@ function canonicalTaskId(value: unknown): value is string {
   return typeof value === "string" && value !== "" && !/\s/.test(value) && !value.startsWith("-");
 }
 
+function exactBeadsTaskEvidence(value: unknown, taskId: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const task = value as Record<string, unknown>;
+  return task.id === taskId
+    && typeof task.title === "string" && task.title.trim() !== ""
+    && typeof task.status === "string" && task.status.trim() !== "";
+}
+
 export function isLegacyEpisodeOwnership(record: EpisodeOwnershipRecord): record is LegacyEpisodeOwnershipRecord {
   return record.version === 1;
 }
 
 export function isTaskEpisodeOwnership(record: EpisodeOwnershipRecord): record is TaskEpisodeOwnershipRecord {
   return record.version === 2;
+}
+
+export function taskEpisodeProvider(record: TaskEpisodeOwnershipRecord): "backlog" | "beads" {
+  return record.provider ?? "backlog";
+}
+
+export function isBacklogTaskEpisodeOwnership(
+  record: TaskEpisodeOwnershipRecord,
+): record is LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord {
+  return taskEpisodeProvider(record) === "backlog";
+}
+
+export function isBeadsTaskEpisodeOwnership(
+  record: TaskEpisodeOwnershipRecord,
+): record is BeadsTaskEpisodeOwnershipRecord {
+  return record.provider === "beads";
 }
 
 export function episodeOwnershipPath(projectRoot: string): string {
@@ -130,12 +188,19 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
       && hasOnlyFields(item, LEGACY_RECORD_FIELDS);
     if (!legacy) throw new Error(`Episode ownership has an unsupported shape: ${path}`);
   } else {
-    const task = canonicalTaskId(item.taskId)
-      && safeTaskPath(item.taskPath)
+    const commonTask = canonicalTaskId(item.taskId)
       && GIT_OID.test(String(item.baseRef))
-      && (item.cleanupHead === undefined || GIT_OID.test(String(item.cleanupHead)))
-      && hasOnlyFields(item, TASK_RECORD_FIELDS);
-    if (!task) throw new Error(`Episode ownership has an unsupported shape: ${path}`);
+      && (item.cleanupHead === undefined || GIT_OID.test(String(item.cleanupHead)));
+    const backlogTask = (item.provider === undefined || item.provider === "backlog")
+      && safeTaskPath(item.taskPath)
+      && hasOnlyFields(item, BACKLOG_TASK_RECORD_FIELDS);
+    const beadsTask = item.provider === "beads"
+      && DOLT_REVISION.test(String(item.providerRevision))
+      && exactBeadsTaskEvidence(item.taskEvidence, item.taskId)
+      && hasOnlyFields(item, BEADS_TASK_RECORD_FIELDS);
+    if (!commonTask || (!backlogTask && !beadsTask)) {
+      throw new Error(`Episode ownership has an unsupported shape: ${path}`);
+    }
   }
 
   if (item.engine === "orca" && typeof item.projectSetupId !== "string") {
@@ -223,7 +288,12 @@ function active(record: EpisodeOwnershipRecord): boolean {
 
 function sameEpisodeBinding(left: EpisodeOwnershipRecord, right: EpisodeOwnershipRecord): boolean {
   if (left.version === 1 && right.version === 1) return left.sourceLocation === right.sourceLocation;
-  if (left.version === 2 && right.version === 2) return left.taskId === right.taskId && left.taskPath === right.taskPath;
+  if (left.version === 2 && right.version === 2) {
+    if (taskEpisodeProvider(left) !== taskEpisodeProvider(right) || left.taskId !== right.taskId) return false;
+    return isBacklogTaskEpisodeOwnership(left) && isBacklogTaskEpisodeOwnership(right)
+      ? left.taskPath === right.taskPath
+      : isBeadsTaskEpisodeOwnership(left) && isBeadsTaskEpisodeOwnership(right);
+  }
   return Boolean(left.episodeId && right.episodeId
     && left.episodeId === right.episodeId
     && left.worktree && left.worktree === right.worktree
@@ -236,9 +306,14 @@ function validateActiveBindingUniqueness(registry: EpisodeOwnershipRegistry): vo
     for (let otherIndex = index + 1; otherIndex < records.length; otherIndex += 1) {
       const left = records[index];
       const right = records[otherIndex];
-      if (left.version === 2 && right.version === 2
-        && (left.taskId === right.taskId || left.taskPath === right.taskPath)) {
-        throw new Error(`Active task Episode binding collides across Conversations: ${left.taskId} / ${right.taskId}`);
+      if (left.version === 2 && right.version === 2) {
+        const sameTaskId = left.taskId === right.taskId;
+        const sameBacklogPath = isBacklogTaskEpisodeOwnership(left)
+          && isBacklogTaskEpisodeOwnership(right)
+          && left.taskPath === right.taskPath;
+        if (sameTaskId || sameBacklogPath) {
+          throw new Error(`Active task Episode binding collides across Conversations: ${left.taskId} / ${right.taskId}`);
+        }
       }
       if (left.version === 1 && right.version === 1 && left.sourceLocation === right.sourceLocation) {
         throw new Error(`Active retained source binding collides across Conversations: ${left.sourceLocation}`);

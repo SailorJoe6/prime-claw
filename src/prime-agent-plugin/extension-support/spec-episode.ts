@@ -20,13 +20,16 @@ import {
   canonicalWorkflowPrompt,
 } from "./workflow-chain.ts";
 import {
+  isBacklogTaskEpisodeOwnership,
   isLegacyEpisodeOwnership,
   isTaskEpisodeOwnership,
   parseEpisodeOwnership,
   readEpisodeOwnership,
   withEpisodeAdmissionLock,
   writeEpisodeOwnership,
+  type BacklogTaskEpisodeOwnershipRecord,
   type EpisodeOwnershipRecord,
+  type LegacyBacklogTaskEpisodeOwnershipRecord,
   type LegacyEpisodeOwnershipRecord,
   type TaskEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
@@ -953,8 +956,11 @@ function exactOwnedTaskRecord(
   record: EpisodeOwnershipRecord,
   taskId: string,
   ownerSessionId: string,
-): asserts record is TaskEpisodeOwnershipRecord {
+): asserts record is LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord {
   if (!isTaskEpisodeOwnership(record)) throw new Error("Existing future-folder episode ownership conflicts with task-native allocation");
+  if (!isBacklogTaskEpisodeOwnership(record)) {
+    throw new Error("This task-native Episode lifecycle path does not yet admit Beads ownership");
+  }
   if (record.taskId !== taskId) throw new Error("Existing episode ownership conflicts on taskId");
   if (record.ownerSessionId !== ownerSessionId) throw new Error("Existing episode ownership conflicts on ownerSessionId");
 }
@@ -1774,7 +1780,7 @@ function taskCleanupStage(
 
 function verifyTaskEpisodeTerminalState(
   projectRoot: string,
-  record: TaskEpisodeOwnershipRecord,
+  record: LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord,
   episodeHead: string,
   outcome: TaskEpisodeCleanupOutcome,
   git: TaskEpisodeCleanupGit,
@@ -1854,7 +1860,7 @@ export async function finalizeTaskEpisodeCleanup(
   git.assertCleanWorktree(projectRoot);
   verifyTaskEpisodeTerminalState(projectRoot, record, episodeHead, outcome, git, resolveTask);
   if (!record.cleanupHead) {
-    const bound: TaskEpisodeOwnershipRecord = {
+    const bound: LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord = {
       ...record,
       cleanupHead: episodeHead,
       updatedAt: dependencies.now?.() ?? new Date().toISOString(),
@@ -1888,7 +1894,7 @@ export async function finalizeTaskEpisodeCleanup(
   if (!retained || JSON.stringify(retained) !== JSON.stringify(record)) {
     throw new Error("Task Episode ownership changed during authorized cleanup");
   }
-  const closed: TaskEpisodeOwnershipRecord = {
+  const closed: LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord = {
     ...record,
     status: "inactive",
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),

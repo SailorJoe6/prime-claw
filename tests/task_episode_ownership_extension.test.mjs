@@ -6,9 +6,12 @@ import { execFileSync, spawn } from "node:child_process";
 import test from "node:test";
 
 import {
+  isBacklogTaskEpisodeOwnership,
+  isBeadsTaskEpisodeOwnership,
   isLegacyEpisodeOwnership,
   isTaskEpisodeOwnership,
   parseEpisodeOwnership,
+  taskEpisodeProvider,
   parseEpisodeOwnershipRegistry,
   readAllEpisodeOwnership,
   readEpisodeOwnership,
@@ -85,6 +88,28 @@ function taskOwnership(ownerSessionId, taskId, taskPath = `backlog/tasks/${taskI
     baseRef: "a".repeat(40),
     createdAt: "2026-10-18T12:00:00.000Z",
     updatedAt: "2026-10-18T12:00:00.000Z",
+  });
+}
+
+function beadsOwnership(ownerSessionId, taskId, revision = "c".repeat(32)) {
+  return parseEpisodeOwnership({
+    version: 2,
+    provider: "beads",
+    status: "provisioning",
+    operationId: `operation-${ownerSessionId}`,
+    engine: "local",
+    ownerSessionId,
+    taskId,
+    providerRevision: revision,
+    taskEvidence: {
+      id: taskId,
+      title: `Native ${taskId}`,
+      status: "in_progress",
+      comments: [{ body: "exact raw native evidence" }],
+    },
+    baseRef: "d".repeat(40),
+    createdAt: "2026-10-20T12:00:00.000Z",
+    updatedAt: "2026-10-20T12:00:00.000Z",
   });
 }
 
@@ -198,6 +223,7 @@ test("guarded transition replaces only the exact owner's legacy authority and pr
   assert.match(result.activeSpecification.blob, /^[0-9a-f]{40}$/);
   assert.match(result.activeImplementationPlan.blob, /^[0-9a-f]{40}$/);
   assert.equal(result.record.version, 2);
+  assert.equal(result.record.provider, "backlog");
   assert.equal(result.record.taskId, f.selection.taskId);
   assert.equal(result.record.taskPath, f.relative);
   assert.equal(result.record.updatedAt, "2026-10-14T09:00:00.000Z");
@@ -386,6 +412,7 @@ test("exact status commit becomes one durable task-native provisioning reservati
   const f = fixture();
   const record = reserve(f);
   assert.equal(record.version, 2);
+  assert.equal(record.provider, "backlog");
   assert.equal(record.status, "provisioning");
   assert.equal(record.taskId, "PRIMECLAW-10.38");
   assert.equal(record.taskPath, f.relative);
@@ -490,6 +517,85 @@ test("reservation re-resolves the exact canonical task at the trusted boundary",
   assert.equal(readEpisodeOwnership(missing.root), null);
 });
 
+
+test("version-2 ownership discriminates provider-native identity while preserving legacy Backlog records", () => {
+  const legacyBacklog = taskOwnership("legacy-backlog", "PRIMECLAW-43");
+  assert.equal(legacyBacklog.provider, undefined);
+  assert.equal(taskEpisodeProvider(legacyBacklog), "backlog");
+  assert.equal(isBacklogTaskEpisodeOwnership(legacyBacklog), true);
+
+  const explicitBacklog = parseEpisodeOwnership({ ...legacyBacklog, provider: "backlog" });
+  assert.equal(taskEpisodeProvider(explicitBacklog), "backlog");
+  assert.equal(isBacklogTaskEpisodeOwnership(explicitBacklog), true);
+  assert.equal(explicitBacklog.taskPath, "backlog/tasks/PRIMECLAW-43.md");
+  assert.equal(explicitBacklog.providerRevision, undefined);
+  assert.equal(explicitBacklog.taskEvidence, undefined);
+
+  const beads = beadsOwnership("beads-owner", "PRIMECLAW-43");
+  assert.equal(taskEpisodeProvider(beads), "beads");
+  assert.equal(isBeadsTaskEpisodeOwnership(beads), true);
+  assert.equal(beads.taskPath, undefined);
+  assert.equal(beads.providerRevision, "c".repeat(32));
+  assert.deepEqual(beads.taskEvidence.comments, [{ body: "exact raw native evidence" }]);
+  assert.equal(beads.baseRef, "d".repeat(40));
+});
+
+test("version-2 ownership rejects mixed provider fields, ambiguous identity, and malformed revisions", () => {
+  const legacyBacklog = taskOwnership("owner", "PRIMECLAW-43");
+  const beads = beadsOwnership("owner", "PRIMECLAW-43");
+  for (const invalid of [
+    { ...legacyBacklog, provider: "backlog", providerRevision: "a".repeat(32) },
+    { ...legacyBacklog, provider: "backlog", taskEvidence: { id: "PRIMECLAW-43", title: "x", status: "open" } },
+    { ...legacyBacklog, provider: "beads", providerRevision: "a".repeat(32), taskEvidence: beads.taskEvidence },
+    { ...beads, taskPath: "backlog/tasks/PRIMECLAW-43.md" },
+    { ...beads, providerRevision: "a".repeat(31) },
+    { ...beads, providerRevision: "z".repeat(32) },
+    { ...beads, providerRevision: "A".repeat(32) },
+    { ...beads, taskEvidence: { ...beads.taskEvidence, id: "PRIMECLAW-44" } },
+    { ...beads, taskEvidence: { ...beads.taskEvidence, title: "   " } },
+    { ...beads, taskEvidence: [{ id: "PRIMECLAW-43" }] },
+    { ...beads, provider: "other" },
+    { ...legacyBacklog, provider: undefined, taskPath: undefined },
+  ]) assert.throws(() => parseEpisodeOwnership(invalid), /unsupported shape/);
+});
+
+test("provider-absent version-2 Backlog owners parse unchanged without registry rewrite", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-provider-compatibility-"));
+  mkdirSync(join(root, ".prime-claw"), { recursive: true });
+  const oldOwner = taskOwnership("old-owner", "PRIMECLAW-43", "backlog/tasks/43.md");
+  const unrelatedOwner = taskOwnership("unrelated-owner", "PRIMECLAW-99", "backlog/tasks/99.md");
+  const raw = { schemaVersion: 1, owners: { "old-owner": oldOwner, "unrelated-owner": unrelatedOwner } };
+  const path = join(root, ".prime-claw", "ownership.json");
+  const bytes = `${JSON.stringify(raw, null, 2)}\n`;
+  writeFileSync(path, bytes);
+
+  const parsed = readEpisodeOwnershipRegistry(root);
+  assert.deepEqual(parsed.owners["old-owner"], oldOwner);
+  assert.deepEqual(parsed.owners["unrelated-owner"], unrelatedOwner);
+  assert.equal(taskEpisodeProvider(parsed.owners["old-owner"]), "backlog");
+  assert.equal(readFileSync(path, "utf8"), bytes);
+});
+
+test("Beads receipt evidence may advance without changing ownership identity", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-beads-receipt-advance-"));
+  const first = beadsOwnership("beads-owner", "PRIMECLAW-43", "a".repeat(32));
+  writeEpisodeOwnership(root, first);
+  const advanced = parseEpisodeOwnership({
+    ...first,
+    providerRevision: "b".repeat(32),
+    taskEvidence: { ...first.taskEvidence, status: "blocked" },
+    updatedAt: "2026-10-20T13:00:00.000Z",
+  });
+  writeEpisodeOwnership(root, advanced);
+  assert.deepEqual(readEpisodeOwnership(root, "beads-owner"), advanced);
+
+  assert.throws(
+    () => writeEpisodeOwnership(root, parseEpisodeOwnership({
+      ...taskOwnership("backlog-owner", "PRIMECLAW-43"), provider: "backlog",
+    })),
+    /task Episode binding collides/,
+  );
+});
 
 test("legacy and task-native ownership schemas coexist without mixing authority", () => {
   const legacy = parseEpisodeOwnership({

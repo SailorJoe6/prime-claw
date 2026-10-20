@@ -11,7 +11,7 @@ import {
   type TaskEpisodeCleanupAdapter,
   type TaskEpisodeCleanupSnapshot,
 } from "./spec-episode.ts";
-import type { TaskEpisodeOwnershipRecord } from "./task-episode-ownership.ts";
+import type { TaskEpisodeOwnershipRecord } from "./episode-ownership.ts";
 
 function samePath(a: string | undefined, b: string): boolean {
   if (typeof a !== "string") return false;

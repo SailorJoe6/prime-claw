@@ -551,7 +551,39 @@ contracts: Backlog behavior and return shape stay unchanged, Beads publication
 returns the exact published evidence without task-file Git operations, and a
 Beads concurrent advance propagates raw review evidence without mutation or
 classification. Other mutation callers and admission, handoff, finalization,
-cleanup, ownership/receipt, migration, cutover, and legacy routing remain
-deferred. Provider-neutral mutation, PRIMECLAW-43.1, locks, mirrors,
-registries, frameworks, persistent Prime Claw state, automatic retry, force,
-and raw live-store writes also remain out of scope.
+cleanup, migration, cutover, and legacy routing remain deferred.
+Provider-neutral mutation, PRIMECLAW-43.1, locks, mirrors, registries,
+frameworks, persistent Prime Claw state, automatic retry, force, and raw
+live-store writes also remain out of scope.
+
+### Version-2 provider-native ownership identity
+
+The existing version-2 ownership record now has one small discriminated
+provider-native task identity; there is no version 3 or second receipt store.
+Every newly written record names `provider`. Both provider branches retain the
+canonical `taskId`, the existing exact Episode Git `baseRef`, and the existing
+resource/lifecycle bindings:
+
+- `provider: "backlog"` carries the exact repository-relative `taskPath` and no
+  Beads revision or task evidence.
+- `provider: "beads"` carries no Backlog path. It requires the exact published
+  32-character Dolt `providerRevision` and `taskEvidence`: the raw native task
+  object whose exact `id` matches `taskId` and whose native title and status
+  are present. This is the task-scoped evidence required to compare a later
+  native view; it is not a normalized task model or semantic receipt.
+
+Provider-absent version-2 records remain a read-only compatibility shape for
+already-written Backlog ownership. They parse as Backlog only when their
+existing canonical task ID and safe exact task path remain valid. Reads do not
+rewrite those records, including unrelated owners in the Conversation-keyed
+registry. New Backlog reservation and retained-ownership transition writes
+include `provider: "backlog"` while preserving all existing fields.
+
+The parser rejects unknown providers, provider/path/revision mixtures, missing
+or mismatched native task evidence, and malformed Dolt revisions. Active
+binding uniqueness preserves canonical task-ID uniqueness across providers and
+exact Backlog path uniqueness; advancing a Beads revision does not change the owned
+Episode identity. Existing Backlog lifecycle entry points explicitly keep
+requiring a Backlog ownership branch. This schema prerequisite does not admit,
+reserve, hand off, oversee, finalize, or clean up a Beads Episode, and it does
+not migrate or rewrite `.prime-claw/ownership.json`.

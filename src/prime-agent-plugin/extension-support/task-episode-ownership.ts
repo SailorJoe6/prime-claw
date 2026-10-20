@@ -4,14 +4,16 @@ import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
 import {
+  isBacklogTaskEpisodeOwnership,
   isLegacyEpisodeOwnership,
   isTaskEpisodeOwnership,
   parseEpisodeOwnership,
   readEpisodeOwnership,
   writeEpisodeOwnership,
+  type BacklogTaskEpisodeOwnershipRecord,
   type EpisodeOwnershipRecord,
+  type LegacyBacklogTaskEpisodeOwnershipRecord,
   type LegacyEpisodeOwnershipRecord,
-  type TaskEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import {
   type BacklogTaskSelection,
@@ -96,7 +98,7 @@ export interface LegacyTaskOwnershipTransitionDependencies {
 }
 
 export interface LegacyTaskOwnershipTransitionResult {
-  record: TaskEpisodeOwnershipRecord;
+  record: LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord;
   reused: boolean;
   mainHead: string;
   episodeHead: string;
@@ -339,6 +341,9 @@ export function transitionLegacyEpisodeOwnershipToTask(
       throw new Error("Ownership transition previous runtime route drifted before atomic replacement");
     }
   } else {
+    if (!isBacklogTaskEpisodeOwnership(initial)) {
+      throw new Error("Legacy ownership transition replay does not yet support Beads ownership");
+    }
     if (initial.taskId !== input.taskId || initial.taskPath !== taskPath
       || initial.episodeActiveSessionId !== input.verifiedCurrentEpisodeActiveSessionId) {
       throw new Error("Existing task-native ownership does not match the completed transition binding");
@@ -406,11 +411,12 @@ export function transitionLegacyEpisodeOwnershipToTask(
   const target = parseEpisodeOwnership({
     ...preserved,
     version: 2,
+    provider: "backlog",
     taskId: input.taskId,
     taskPath,
     episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-  }) as TaskEpisodeOwnershipRecord;
+  }) as BacklogTaskEpisodeOwnershipRecord;
 
   if (git.operationInProgress(root) || git.head(root) !== input.expectedMainHead || git.upstreamHead(root) !== input.expectedMainHead
     || !canonicalMainStatusIsSafe(git.status(root)) || git.head(episodeRoot) !== input.expectedEpisodeHead
@@ -440,7 +446,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
 export function reserveTaskEpisodeOwnership(
   input: TaskEpisodeReservationInput,
   dependencies: TaskEpisodeReservationDependencies = {},
-): TaskEpisodeOwnershipRecord {
+): BacklogTaskEpisodeOwnershipRecord {
   const git = dependencies.git ?? new CliTaskEpisodeReservationGit();
   const ownership = dependencies.ownership ?? defaultOwnership;
   if (!input.taskId || /\s/.test(input.taskId) || input.taskId.startsWith("-")) {
@@ -494,8 +500,9 @@ export function reserveTaskEpisodeOwnership(
   const operationId = input.operationId ?? randomUUID();
   if (!/^[A-Za-z0-9-]+$/.test(operationId)) throw new Error("Task-native Episode reservation requires a safe operation ID");
   const now = dependencies.now?.() ?? new Date().toISOString();
-  const record: TaskEpisodeOwnershipRecord = {
+  const record: BacklogTaskEpisodeOwnershipRecord = {
     version: 2,
+    provider: "backlog",
     status: "provisioning",
     operationId,
     engine: input.engine,
