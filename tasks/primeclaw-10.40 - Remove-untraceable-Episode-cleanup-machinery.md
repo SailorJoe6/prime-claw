@@ -4,7 +4,7 @@ title: Make task-native Episode cleanup complete and owner-safe
 status: In Progress
 assignee: []
 created_date: '2026-10-20 04:32'
-updated_date: '2026-10-21 18:47'
+updated_date: '2026-10-21 18:49'
 labels: []
 dependencies: []
 references:
@@ -109,4 +109,6 @@ Slice 1 complete: explicit recursive runtime ownership (plan step 3 runtime port
 - Host-safe focused static: `python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_managed_session_protocol.py -q` -> 11 passed, 6 skipped. Full host-static suite -> 663 passed, 68 skipped, 8 failed, 75 subtests passed. All eight failures were reproduced in an isolated local clone at unchanged base ebc7c7399d72fdecc558054dbe27222e87cd61aa: duplicate pre-existing archived PRIMECLAW-10.40 ID, missing local Backlog artifact (three tests), two stale test-tier/bridge assertions, stale installed template hash, and absent/uninitialized pinned Backlog source. Evidence: /tmp/primeclaw-10-40-slice1-static-full.log and /tmp/primeclaw-10-40-slice1-baseline.log. No unrelated repairs attempted.
 - Validation correction: an initial direct host Node invocation was stopped without using it as acceptance evidence. All final behavior and plugin validation ran in Docker; no host-global apply/check/probe ran.
 Remaining scope: plan steps 1-2 (remove cleanup state/stages and compare-and-remove owner), step 4 (Orca force and remote/local branch transport), step 5 (prompt-led cleanup and public schema), and their focused tests/living policy updates. Merge-readiness idle guidance is also pending. Leave status In Progress; this is an intermediate slice, not a full task candidate.
+
+Owner accepted Slice 1 and authorized the next bounded execute slice (plan steps 1-2 only): remove cleanupHead/stage/inactive version-2 bookkeeping and implement exact atomic compare-and-remove ownership after resources are absent. Preserve version-1 finalize_spec_episode behavior and foreign owners. Use actual state: absent is complete, exact present is removable, changed or ambiguous state blocks. At the parser boundary only, tolerate and discard legacy cleanupHead; do not add migration workflows, retry machinery, lifecycle state, provider/Git transport changes, or prompt/schema policy in this slice. Keep provider/Git transport (step 4) and prompt/schema changes (step 5) deferred. Validate candidate behavior and plugin execution only in Docker Tier 1; host-safe static checks are allowed. Known baseline static failures and Slice 1 evidence are recorded above.
 <!-- SECTION:NOTES:END -->
