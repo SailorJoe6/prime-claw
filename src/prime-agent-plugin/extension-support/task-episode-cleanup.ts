@@ -94,9 +94,9 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       && typeof summary.sessionFile === "string"
       && typeof expected.sessionFile === "string"
       && samePath(summary.sessionFile, expected.sessionFile)
-      && typeof summary.cwd === "string"
-      && typeof expected.cwd === "string"
-      && samePath(summary.cwd, expected.cwd)
+      && ((summary.cwd === undefined && expected.cwd === undefined)
+        || (typeof summary.cwd === "string" && typeof expected.cwd === "string"
+          && samePath(summary.cwd, expected.cwd)))
       && summary.activeSessionId === expected.activeSessionId
       && summary.parentSessionId === expected.parentSessionId
       && ((summary.parentSessionPath === undefined && expected.parentSessionPath === undefined)
@@ -105,21 +105,11 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
   }
 
   private validateSessionIdentity(summary: SessionSummary, record: TaskEpisodeOwnershipRecord, child: boolean): void {
-    if (!summary.sessionId || !summary.sessionFile || !summary.cwd || !existsSync(summary.sessionFile)) {
+    if (!summary.sessionId || !summary.sessionFile || !existsSync(summary.sessionFile)) {
       throw new Error("Task Episode cleanup found a malformed or missing Prime Agent session identity");
     }
-    if (!samePath(summary.cwd, record.worktree!)) {
-      throw new Error("Task Episode cleanup found a descendant outside the owned worktree");
-    }
-    const parentIdPresent = summary.parentSessionId !== undefined;
-    if (child && (summary.runtimeKind !== "subagent" || !summary.rlmChildId
-      || !summary.parentSessionPath
-      || (parentIdPresent && (typeof summary.parentSessionId !== "string" || summary.parentSessionId.length === 0))
-      || (!parentIdPresent && (summary.activeSessionId !== undefined || summary.isSessionActive !== false)))) {
-      throw new Error("Task Episode cleanup found a malformed Prime Agent descendant identity");
-    }
-    if (!child && (summary.runtimeKind === "subagent" || (summary.rlmDepth !== undefined && summary.rlmDepth !== 0))) {
-      throw new Error("Task Episode cleanup found a malformed Prime Agent root identity");
+    if (!child && !samePath(summary.cwd, record.worktree!)) {
+      throw new Error("Task Episode cleanup found a changed Prime Agent root worktree identity");
     }
   }
 
@@ -149,7 +139,6 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
 
     const owned = new Set<SessionSummary>([root]);
     const nodes: OwnedEpisodeSession[] = [{ summary: root, depth: 0 }];
-    const childEdges = new Set<string>();
     for (let index = 0; index < nodes.length; index += 1) {
       const parent = nodes[index]!;
       const parentId = parent.summary.sessionId!;
@@ -160,18 +149,11 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
         const idMatch = candidate.parentSessionId === parentId;
         const pathMatch = samePath(candidate.parentSessionPath, parentFile);
         if (!idMatch && !pathMatch) continue;
-        if (!pathMatch || (parentIdPresent && !idMatch)) {
+        if ((parentIdPresent && !idMatch)
+          || (candidate.parentSessionPath !== undefined && !pathMatch)) {
           throw new Error("Task Episode cleanup found an ambiguous Prime Agent descendant parent chain");
         }
         this.validateSessionIdentity(candidate, record, true);
-        if (candidate.rlmDepth !== parent.depth + 1) {
-          throw new Error("Task Episode cleanup found a malformed Prime Agent descendant identity");
-        }
-        const edge = `${parentId}\0${resolve(parentFile)}\0${candidate.rlmChildId}`;
-        if (childEdges.has(edge)) {
-          throw new Error("Task Episode cleanup found a duplicate Prime Agent descendant identity");
-        }
-        childEdges.add(edge);
         owned.add(candidate);
         nodes.push({ summary: candidate, depth: parent.depth + 1 });
       }
@@ -331,7 +313,7 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
 
   async removeRuntime(record: TaskEpisodeOwnershipRecord): Promise<void> {
     const before = await this.inspect(record);
-    if (!before.runtime || !before.runtime.idle) throw new Error("Task Episode cleanup runtime removal requires the exact idle runtime");
+    if (!before.runtime || !before.runtime.idle) throw new Error("The Episode has not completed its work: cleanup requires the exact idle runtime and descendants");
     const initial = await this.sessionTree(record, await this.sessions.list());
     if (!initial || !initial.idle) throw new Error("Task Episode cleanup runtime changed before removal");
     const plannedDescendants = [...initial.descendants].sort((left, right) =>

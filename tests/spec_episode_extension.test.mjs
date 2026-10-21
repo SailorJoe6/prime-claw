@@ -1311,7 +1311,7 @@ test("production local cleanup adapter proves exact idle runtime, worktree, and 
   assert.deepEqual(calls, [["kill", "route"], ["delete", sessionFile], ["delete", sessionFile]]);
 });
 
-test("production cleanup adapter removes six daemon-proven inactive direct descendants before the root", async () => {
+test("production cleanup adapter removes ID-only and path-only descendants without CWD or RLM ownership guesses", async () => {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-cleanup-descendants-"));
   execFileSync("git", ["init", "-q", "-b", "main", root]);
   execFileSync("git", ["-C", root, "config", "user.name", "Fixture"]);
@@ -1325,10 +1325,22 @@ test("production cleanup adapter removes six daemon-proven inactive direct desce
   const sessionFile = join(root, "episode.jsonl"); writeFileSync(sessionFile, "{}\n");
   const childFiles = Array.from({ length: 6 }, (_, index) => join(root, `child-${index + 1}.jsonl`));
   for (const path of childFiles) writeFileSync(path, "{}\n");
+  const parentAlias = join(root, "parent-alias.jsonl"); symlinkSync(sessionFile, parentAlias);
   let rows = [
     { activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, lifecycle: "live", activity: "idle", runtimeKind: "top-level", isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } },
-    ...childFiles.map((path, index) => ({ sessionId: `child-${index + 1}`, sessionFile: path, cwd: worktree, lifecycle: index === 5 ? "archived" : "live", activity: "idle", runtimeKind: "subagent", rlmDepth: 1, isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] }, parentActiveSessionId: "route", parentSessionPath: sessionFile, rlmChildId: `sub-${index + 1}`, workerState: "ready" })),
+    ...childFiles.map((path, index) => ({ sessionId: `child-${index + 1}`, sessionFile: path,
+      // Neither working directory nor RLM metadata establishes session ownership.
+      ...(index === 0 ? { cwd: root, runtimeKind: "top-level", rlmDepth: 99 } : {}),
+      lifecycle: index === 5 ? "archived" : "live", activity: "idle",
+      isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0,
+      unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] },
+      ...(index < 3 ? { parentSessionId: "episode" } : { parentSessionPath: index === 5 ? parentAlias : sessionFile }),
+      ...(index === 3 ? { activeSessionId: "child-route" } : {}),
+    })),
   ];
+  rows[0].parentSessionId = "conversation";
+  const siblingFile = join(root, "possible-sibling.jsonl"); writeFileSync(siblingFile, "{}\n");
+  rows.push({ sessionId: "possible-sibling", sessionFile: siblingFile, cwd: root, parentSessionId: "conversation" });
   const calls = [];
   const sessions = {
     async list() { return rows.map((row) => structuredClone(row)); },
@@ -1344,10 +1356,12 @@ test("production cleanup adapter removes six daemon-proven inactive direct desce
   assert.equal((await adapter.inspect(record)).runtime.idle, true);
   await adapter.removeRuntime(record);
   assert.equal((await adapter.inspect(record)).runtime, undefined);
-  assert.deepEqual(calls.filter(([kind]) => kind === "kill"), [["kill", "route"]]);
+  assert.deepEqual(calls.filter(([kind]) => kind === "kill"), [["kill", "child-route"], ["kill", "route"]]);
   const deleted = calls.filter(([kind]) => kind === "delete").map(([, path]) => path);
   assert.equal(deleted.at(-1), sessionFile);
   assert.deepEqual(new Set(deleted.slice(0, -1)), new Set(childFiles));
+  assert.equal(existsSync(siblingFile), true);
+  assert.deepEqual(rows.map((row) => row.sessionId), ["possible-sibling"]);
 });
 
 test("production cleanup adapter removes nested descendants deepest-first and resumes exact partial deletion", async () => {
@@ -1363,8 +1377,8 @@ test("production cleanup adapter removes nested descendants deepest-first and re
   const idle = { lifecycle: "live", activity: "idle", isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } };
   let rows = [
     { ...idle, activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, runtimeKind: "top-level", rlmDepth: 0 },
-    { ...idle, sessionId: "child", sessionFile: childFile, cwd: worktree, runtimeKind: "subagent", rlmDepth: 1, parentSessionPath: sessionFile, rlmChildId: "sub-child" },
-    { ...idle, sessionId: "grandchild", sessionFile: grandchildFile, cwd: worktree, runtimeKind: "subagent", rlmDepth: 2, parentSessionId: "child", parentSessionPath: childFile, rlmChildId: "sub-grandchild" },
+    { ...idle, sessionId: "child", sessionFile: childFile, cwd: root, parentSessionId: "episode" },
+    { ...idle, sessionId: "grandchild", sessionFile: grandchildFile, parentSessionPath: childFile },
   ];
   const calls = []; let childDeleteAttempts = 0;
   const sessions = {
@@ -1442,13 +1456,29 @@ test("production cleanup adapter blocks busy, foreign, and ambiguous descendants
     rows = [rootRow, { ...childRow, parentSessionId: "wrong-parent" }];
     await assert.rejects(adapter.inspect(record), /ambiguous Prime Agent descendant parent chain/);
   });
-  await t.test("routed descendant cannot omit its parent ID", async () => {
+  await t.test("routed descendant can use only its explicit parent path", async () => {
     rows = [rootRow, { ...childRow, activeSessionId: "child-route", parentSessionId: undefined }];
-    await assert.rejects(adapter.inspect(record), /malformed Prime Agent descendant identity/);
+    assert.equal((await adapter.inspect(record)).runtime.idle, true);
   });
-  await t.test("path-only descendant requires the exact next RLM depth", async () => {
+  await t.test("path-only descendant does not depend on RLM depth", async () => {
     rows = [rootRow, { ...childRow, parentSessionId: undefined, rlmDepth: 2 }];
-    await assert.rejects(adapter.inspect(record), /malformed Prime Agent descendant identity/);
+    assert.equal((await adapter.inspect(record)).runtime.idle, true);
+  });
+  for (const [field, value] of [["isSessionActive", true], ["isSessionActive", undefined],
+    ["isStreaming", undefined], ["isCompacting", undefined], ["sessionActions", undefined]]) {
+    await t.test(`owned descendant without idle proof: ${field}=${value}`, async () => {
+      rows = [rootRow, { ...childRow, [field]: value }];
+      assert.equal((await adapter.inspect(record)).runtime.idle, false);
+      await assert.rejects(adapter.removeRuntime(record), /Episode has not completed its work/);
+    });
+  }
+  await t.test("active root blocks before mutation", async () => {
+    rows = [{ ...rootRow, isSessionActive: true }, childRow];
+    await assert.rejects(adapter.removeRuntime(record), /Episode has not completed its work/);
+  });
+  await t.test("duplicate explicit child identity blocks before mutation", async () => {
+    rows = [rootRow, childRow, { ...childRow, sessionFile: foreignFile }];
+    await assert.rejects(adapter.removeRuntime(record), /foreign or duplicate Prime Agent session identity/);
   });
   await t.test("path-only descendant identity is revalidated immediately before deletion", async () => {
     rows = [rootRow, { ...childRow, parentSessionId: undefined }];

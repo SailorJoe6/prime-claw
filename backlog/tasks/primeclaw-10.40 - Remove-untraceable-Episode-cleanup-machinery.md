@@ -4,12 +4,16 @@ title: Make task-native Episode cleanup complete and owner-safe
 status: In Progress
 assignee: []
 created_date: '2026-10-20 04:32'
-updated_date: '2026-10-21 18:27'
+updated_date: '2026-10-21 18:47'
 labels: []
 dependencies: []
 references:
   - PRIMECLAW-10.38
 documentation:
+  - docs/user-stories/I-episode-finalization.md
+modified_files:
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - tests/spec_episode_extension.test.mjs
   - docs/user-stories/I-episode-finalization.md
 parent_task_id: PRIMECLAW-10
 priority: p1
@@ -64,7 +68,7 @@ This task changes only version-2 task-native cleanup. It does not change version
 <!-- AC:BEGIN -->
 - [ ] #1 After an operator-authorized merge or abandonment is committed and pushed and its terminal result is verified, the owning Conversation immediately invokes task-native Episode cleanup without a second cleanup confirmation; no event hook or background automation is introduced.
 - [ ] #2 Before destructive cleanup, the exact root Episode and every explicitly related descendant are idle. Any active owned session causes zero destructive mutation and a clear report that the Episode has not completed its work.
-- [ ] #3 Cleanup recursively selects only sessions connected to the exact Episode by explicit Prime Agent parent ID or canonical parent session-file path edges; shared-worktree sessions, possible siblings, and unrelated sessions are never selected.
+- [x] #3 Cleanup recursively selects only sessions connected to the exact Episode by explicit Prime Agent parent ID or canonical parent session-file path edges; shared-worktree sessions, possible siblings, and unrelated sessions are never selected.
 - [ ] #4 Cleanup removes the exact owned session tree, provider worktree, local branch, exact upstream remote branch, and ownership entry. Initialized submodules do not block removal of a proven-clean Orca worktree, and unrelated ownership records and resources remain unchanged.
 - [ ] #5 Terminal outcome, exact terminal head, clean worktree, branch identity, and remote identity are verified before deletion; dirty, changed, ambiguous, foreign, or mismatched evidence blocks unsafe mutation.
 - [ ] #6 After partial or transient failure, each invocation re-reads ordinary ownership plus actual Prime Agent, provider, and Git state: an absent exact resource is complete, an exact present resource is removable, and changed or ambiguous state blocks. The tool stores no `cleanupHead`, stage, tombstone, receipt, retry registry, error taxonomy, or background reconciliation state; the Conversation decides whether to invoke it again and asks for help only when safe progress is impossible.
@@ -90,3 +94,19 @@ This task changes only version-2 task-native cleanup. It does not change version
 
 7. **Synchronize current policy and validate.** Update only living documents that currently assert separate cleanup confirmation, durable cleanup binding, or inactive version-2 ownership—including the relevant lifecycle paragraphs in `VISION.md`, `LONG_RANGE_PLAN.md`, `docs/backlog.md`, `docs/future-specification-bundles.md`, `docs/handoff-chain.md`, `docs/conversation-driven-episode-oversight.md`, and `docs/user-stories/*`. Describe prompt-led automatic cleanup, explicit recursive lineage, active-session refusal, exact local/remote branch removal, owner-entry deletion, and Conversation-led retry. Leave historical evidence unchanged and keep command-surface unification out of scope. Run the focused Node and Python tests, then Docker-only Tier 1 plugin validation, and verify the diff contains no version-1 behavior change or new lifecycle machinery.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Slice 1 selected (2026-10-21): implement plan step 3 explicit recursive session lineage in task-episode-cleanup.ts, focused runtime identity/idle tests, and living finalization docs. Session ownership follows parentSessionId or canonical parentSessionPath; CWD and RLM metadata are not ownership. Keep the remaining cleanup-state, owner removal, Git/provider transport, and prompt-policy changes for subsequent slices. Local submodule CLI is absent; use the repository-built /Users/jlanders/code/prime-claw/deps/backlog/dist/backlog artifact from this Episode CWD.
+
+Slice 1 complete: explicit recursive runtime ownership (plan step 3 runtime portion).
+- task-episode-cleanup.ts accepts parentSessionId-only or canonical parentSessionPath-only edges, requires agreement when both exist, and derives deletion depth from those edges. Descendant CWD, runtimeKind, rlmDepth, and rlmChildId are not ownership requirements. The exact root still matches its recorded session ID/file/worktree and route.
+- Focused tests cover ID-only/path-only and canonical symlink paths, a routed path-only child, nested mixed lineage with interrupted deletion, descendants outside the worktree or without CWD/RLM metadata, preserved possible siblings, contradictory and duplicate identities, root/descendant activity, missing idle proof, and identity drift before deletion. No runtime/provider operation is added; no persistent state is added. Version-1 behavior and code are unchanged.
+- Docker behavior: `python3 -m pytest tests/test_reviewed_plan_extension.py -q -m container` -> 5 passed, 9 deselected (136.22s). The first attempt failed in disposable builder setup before tests; one retry passed against the final source/tests. Evidence: /tmp/primeclaw-10-40-slice1-container-retry.log and .test-results/20261021T184353Z-30991-17925498/tier1/manifest.json; all run-owned containers removed.
+- Docker plugin probe: `scripts/test-tier1.sh --probe` -> passed, offline checks and teardown verified. Evidence: .test-results/20261021T184203Z-24100-4daa17ad/tier1/manifest.json (run.status=passed, no failure codes). Source checkout identities were independently verified against docs/prime-agent-installation.md before setting the ignored local .env selector.
+- Red test: run only `production cleanup adapter removes ID-only` in the immutable Tier-1 image with the final test and pre-slice cleanup source -> expected failure `ambiguous Prime Agent descendant parent chain`. Docker was offline/read-only with only a scratch test snapshot mounted. Evidence: /tmp/primeclaw-10-40-slice1-red.log.
+- Host-safe focused static: `python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_managed_session_protocol.py -q` -> 11 passed, 6 skipped. Full host-static suite -> 663 passed, 68 skipped, 8 failed, 75 subtests passed. All eight failures were reproduced in an isolated local clone at unchanged base ebc7c7399d72fdecc558054dbe27222e87cd61aa: duplicate pre-existing archived PRIMECLAW-10.40 ID, missing local Backlog artifact (three tests), two stale test-tier/bridge assertions, stale installed template hash, and absent/uninitialized pinned Backlog source. Evidence: /tmp/primeclaw-10-40-slice1-static-full.log and /tmp/primeclaw-10-40-slice1-baseline.log. No unrelated repairs attempted.
+- Validation correction: an initial direct host Node invocation was stopped without using it as acceptance evidence. All final behavior and plugin validation ran in Docker; no host-global apply/check/probe ran.
+Remaining scope: plan steps 1-2 (remove cleanup state/stages and compare-and-remove owner), step 4 (Orca force and remote/local branch transport), step 5 (prompt-led cleanup and public schema), and their focused tests/living policy updates. Merge-readiness idle guidance is also pending. Leave status In Progress; this is an intermediate slice, not a full task candidate.
+<!-- SECTION:NOTES:END -->
