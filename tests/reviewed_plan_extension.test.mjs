@@ -41,7 +41,7 @@ AFTER-HANDOFF POLICY
   const taskActions = {
     async create(taskId, toolCallId, callCtx, _dependencies, placement) { taskCalls.push(["create", taskId, placement]); return { version: 2, status: "active", taskId, episodeId: "task-episode", episodeActiveSessionId: "task-route", reused: false }; },
     async handoff(taskId, guidance) { taskCalls.push(["handoff", taskId, guidance]); return { admitted: true, taskId, episodeId: "task-episode", episodeActiveSessionId: "task-route", handoffDelivery: "prompt", executeDelivery: "followUp" }; },
-    async cleanup(taskId, episodeHead, outcome) { taskCalls.push(["cleanup", taskId, episodeHead, outcome]); return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipStatus: "inactive", reused: false }; },
+    async cleanup(taskId, episodeHead, outcome) { taskCalls.push(["cleanup", taskId, episodeHead, outcome]); return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipRemoved: true }; },
   };
   const deps = { guideRoot, taskImplementationApprovals, taskActions, taskCleanup: {}, taskCleanupGit: { repositoryRoot: () => root }, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, async placementResolver() { return { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, transitionLegacyOwnership(location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies) { transitioned.push({ location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies }); return { record: { ...episode, version: 2, taskId, taskPath: "task.md" }, reused: false, mainHead, episodeHead, activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "a".repeat(40) }, activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "b".repeat(40) } }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
   createReviewedPlanExtension(deps)(pi);
@@ -151,7 +151,7 @@ test("finalize_task_episode exposes only separate cleanup and requires explicit 
     taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome: "merged", confirmed: true,
   }, undefined, undefined, f.ctx);
   assert.equal(cleaned.isError, undefined);
-  assert.equal(cleaned.details.result.ownershipStatus, "inactive");
+  assert.equal(cleaned.details.result.ownershipRemoved, true);
   assert.deepEqual(f.taskCalls, [["cleanup", "PRIMECLAW-10.38", "e".repeat(40), "merged"]]);
 });
 

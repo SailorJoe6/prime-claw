@@ -744,109 +744,173 @@ function cleanupHarness(outcome = "merged", options = {}) {
   });
   const records = new Map([[record.ownerSessionId, record], [foreign.ownerSessionId, foreign]]);
   const calls = [];
-  let stage = options.stage ?? 0;
+  const state = {
+    runtime: { cwd: f.worktree, idle: !options.busy },
+    worktree: { path: f.worktree, branch: f.wt.branch, head: episodeHead, clean: !options.dirtyEpisode },
+    branch: { name: f.wt.branch, head: episodeHead },
+  };
+  for (const resource of options.absent ?? []) delete state[resource];
   const ownership = {
     read(_root, ownerSessionId) { return structuredClone(records.get(ownerSessionId) ?? null); },
-    write(_root, value) { records.set(value.ownerSessionId, structuredClone(value)); calls.push(["ownership", value.status, value.cleanupHead]); },
+    removeTask(_root, expected) {
+      assert.deepEqual(records.get(expected.ownerSessionId), expected, "ownership changed during cleanup");
+      assert.deepEqual(state, {}, "owner removal requires every resource absent");
+      records.delete(expected.ownerSessionId); calls.push(["remove-owner"]);
+    },
   };
   const cleanupGit = {
     repositoryRoot: () => f.root,
     branch: () => "main",
     head: () => mainHead,
     upstreamHead: () => options.unpushed ? "d".repeat(40) : mainHead,
-    branchUpstreamHead: () => options.unpushedEpisode ? "d".repeat(40) : episodeHead,
+    branchUpstreamHead() { calls.push(["branch-upstream"]); return options.unpushedEpisode ? "d".repeat(40) : episodeHead; },
     assertCleanWorktree() { calls.push(["clean"]); if (options.dirty) throw new Error("dirty main"); },
     isAncestor(_repo, ancestor, descendant) {
-      if (ancestor === TASK_BASE && descendant === episodeHead) return true;
-      if (ancestor === episodeHead && descendant === mainHead) return outcome === "merged";
+      if (ancestor === TASK_BASE && descendant === episodeHead) return !options.foreignBase;
+      if (ancestor === episodeHead && descendant === mainHead) return outcome === "merged" && !options.unmerged;
       return false;
     },
     pathTrackedAtRef(_repo, ref, path) {
       assert.equal(ref, mainHead);
-      if (outcome !== "abandoned") return path === "backlog/tasks/primeclaw-10.38.md";
+      if (outcome !== "abandoned" || options.notArchived) return path === "backlog/tasks/primeclaw-10.38.md";
       return path === "backlog/archive/tasks/primeclaw-10.38.md";
     },
   };
-  const snapshots = () => ({
-    ...(stage === 0 ? { runtime: { cwd: f.worktree, idle: !options.busy } } : {}),
-    ...(stage <= 1 ? { worktree: { path: f.worktree, branch: f.wt.branch, head: episodeHead, clean: !options.dirtyEpisode } } : {}),
-    ...(stage <= 2 ? { branch: { name: f.wt.branch, head: episodeHead } } : {}),
-  });
   const cleanup = {
-    async inspect() { calls.push(["inspect", stage]); return snapshots(); },
-    async removeRuntime() { calls.push(["remove-runtime"]); stage = 1; },
-    async removeWorktree() { calls.push(["remove-worktree"]); stage = 2; },
-    async removeBranch() { calls.push(["remove-branch"]); stage = 3; },
+    async inspect() { calls.push(["inspect"]); return structuredClone(state); },
+    async removeRuntime() { calls.push(["remove-runtime"]); delete state.runtime; },
+    async removeWorktree() { calls.push(["remove-worktree"]); delete state.worktree; },
+    async removeBranch() { calls.push(["remove-branch"]); delete state.branch; },
   };
-  const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: "Done" });
+  const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: options.taskStatus ?? "Done" });
   return {
-    f, episodeHead, calls, ownership, cleanupGit, cleanup, taskResolver,
+    f, episodeHead, calls, ownership, cleanupGit, cleanup, taskResolver, state, records,
     get record() { return records.get("owner"); },
     get foreignRecord() { return records.get("foreign-owner"); },
-    deps: { ownership, cleanupGit, cleanup, taskResolver, now: () => "2026-10-18T00:00:00.000Z" },
+    deps: { ownership, cleanupGit, cleanup, taskResolver },
   };
 }
 
-test("cleanup-only task finalization binds one head, removes exact resources, and closes ownership", async () => {
+test("cleanup-only task finalization removes exact resources then deletes only the unchanged owner", async () => {
   const h = cleanupHarness("merged");
   const foreignBefore = structuredClone(h.foreignRecord);
   const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
-  assert.equal(result.resourcesRemoved, true);
-  assert.equal(result.ownershipStatus, "inactive");
-  assert.equal(result.reused, false);
-  assert.equal(h.record.cleanupHead, h.episodeHead);
-  assert.equal(h.record.status, "inactive");
+  assert.deepEqual(result, {
+    verified: true, outcome: "merged", taskId: "PRIMECLAW-10.38", episodeHead: h.episodeHead,
+    resourcesRemoved: true, ownershipRemoved: true,
+  });
+  assert.equal(h.record, undefined);
   assert.deepEqual(h.foreignRecord, foreignBefore);
   assert.deepEqual(h.calls.filter((call) => call[0].startsWith("remove-")), [
-    ["remove-runtime"], ["remove-worktree"], ["remove-branch"],
+    ["remove-runtime"], ["remove-worktree"], ["remove-branch"], ["remove-owner"],
   ]);
-  assert.ok(h.calls.findIndex((call) => call[0] === "ownership" && call[1] === "active")
-    < h.calls.findIndex((call) => call[0] === "remove-runtime"));
 });
 
-test("cleanup-only task finalization supports abandonment and same-head idempotence", async () => {
+test("cleanup-only finalization deletes its registry entry through the production ownership store", async () => {
+  const h = cleanupHarness();
+  writeEpisodeOwnership(h.f.root, h.record);
+  writeEpisodeOwnership(h.f.root, h.foreignRecord);
+  const path = join(h.f.root, ".prime-claw", "ownership.json");
+  const foreign = JSON.parse(readFileSync(path, "utf8")).owners["foreign-owner"];
+  await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, { ...h.deps, ownership: undefined });
+  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")).owners, { "foreign-owner": foreign });
+});
+
+test("cleanup-only task finalization supports abandonment without an inactive replay record", async () => {
   const h = cleanupHarness("abandoned");
   await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
-  const replay = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
-  assert.equal(replay.reused, true);
-  assert.equal(h.record.status, "inactive");
+  const beforeReplay = structuredClone(h.calls);
+  await assert.rejects(
+    finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps),
+    /No durable task-native Episode ownership/,
+  );
+  assert.deepEqual(h.calls, beforeReplay);
+  assert.equal(h.record, undefined);
 });
 
-test("cleanup-only task finalization resumes from branch-only partial cleanup", async () => {
-  const h = cleanupHarness("merged", { stage: 2 });
-  const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
-  assert.equal(result.ownershipStatus, "inactive");
-  assert.deepEqual(h.calls.filter((call) => call[0].startsWith("remove-")), [["remove-branch"]]);
+test("cleanup-only task finalization accepts every combination of already absent exact resources", async (t) => {
+  for (const runtime of [true, false]) for (const worktree of [true, false]) for (const branch of [true, false]) {
+    const absent = Object.entries({ runtime, worktree, branch }).filter(([, present]) => !present).map(([key]) => key);
+    await t.test(`absent: ${absent.join(",") || "none"}`, async () => {
+      const h = cleanupHarness("merged", { absent });
+      await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
+      assert.equal(h.record, undefined);
+      assert.deepEqual(h.calls.filter((call) => call[0].startsWith("remove-")), [
+        ...(runtime ? [["remove-runtime"]] : []), ...(worktree ? [["remove-worktree"]] : []),
+        ...(branch ? [["remove-branch"]] : []), ["remove-owner"],
+      ]);
+      assert.equal(h.calls.some(([kind]) => kind === "branch-upstream"), branch);
+    });
+  }
 });
 
-test("cleanup-only task finalization rejects a different durable head and unsafe live resources", async (t) => {
-  await t.test("different head", async () => {
-    const h = cleanupHarness("merged", { record: { cleanupHead: "d".repeat(40) } });
-    await assert.rejects(
-      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
-      /differs from the durable cleanup binding/,
-    );
+test("cleanup-only task finalization preserves ordinary ownership on failure and rereads actual state on a later call", async () => {
+  const h = cleanupHarness();
+  const original = structuredClone(h.record);
+  const removeWorktree = h.cleanup.removeWorktree;
+  let attempts = 0;
+  h.cleanup.removeWorktree = async () => { attempts += 1; throw new Error("bounded provider error"); };
+  await assert.rejects(finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps), /bounded provider error/);
+  assert.equal(attempts, 1);
+  assert.deepEqual(h.record, original);
+  assert.equal(h.state.runtime, undefined);
+  assert.ok(h.state.worktree);
+  h.cleanup.removeWorktree = removeWorktree;
+  await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
+  assert.equal(h.record, undefined);
+  assert.equal(h.calls.filter(([kind]) => kind === "remove-runtime").length, 1);
+});
+
+test("cleanup-only task finalization requires verified absence and unchanged ownership before owner deletion", async (t) => {
+  await t.test("provider no-op", async () => {
+    const h = cleanupHarness(); const original = structuredClone(h.record);
+    h.cleanup.removeRuntime = async () => {};
+    await assert.rejects(finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps), /runtime removal was not verified/);
+    assert.deepEqual(h.record, original);
+    assert.equal(h.calls.some(([kind]) => kind === "remove-owner"), false);
   });
-  await t.test("busy runtime", async () => {
-    const h = cleanupHarness("merged", { busy: true });
-    await assert.rejects(
-      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
-      /runtime is busy/,
-    );
+  await t.test("owner changed during resource removal", async () => {
+    const h = cleanupHarness();
+    h.cleanup.removeBranch = async () => {
+      delete h.state.branch;
+      h.records.set("owner", { ...h.record, updatedAt: "changed" });
+    };
+    await assert.rejects(finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps), /ownership changed during cleanup/);
+    assert.equal(h.record.updatedAt, "changed");
+    assert.equal(h.calls.some(([kind]) => kind === "remove-owner"), false);
   });
-  await t.test("unpushed main", async () => {
-    const h = cleanupHarness("merged", { unpushed: true });
-    await assert.rejects(
-      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
-      /pushed canonical main/,
-    );
+});
+
+test("cleanup-only task finalization refuses unsafe identity or terminal evidence before mutation", async (t) => {
+  for (const [name, options, pattern] of [
+    ["busy runtime", { busy: true }, /Episode has not completed its work/],
+    ["dirty Episode", { dirtyEpisode: true }, /worktree is dirty/],
+    ["dirty main", { dirty: true }, /dirty main/],
+    ["unpushed main", { unpushed: true }, /pushed canonical main/],
+    ["unpushed Episode", { unpushedEpisode: true }, /exact Episode head to be pushed/],
+    ["foreign base", { foreignBase: true }, /not descended from the owned Episode base/],
+    ["not Done", { taskStatus: "In Progress" }, /requires .* to be Done/],
+    ["not merged", { unmerged: true }, /exact Episode candidate in canonical main history/],
+    ["inactive ownership", { record: { status: "inactive" } }, /cannot finalize inactive ownership/],
+  ]) await t.test(name, async () => {
+    const h = cleanupHarness("merged", options); const original = structuredClone(h.record);
+    await assert.rejects(finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps), pattern);
+    assert.deepEqual(h.record, original);
+    assert.equal(h.calls.some(([kind]) => kind.startsWith("remove-")), false);
   });
-  await t.test("unpushed Episode", async () => {
-    const h = cleanupHarness("merged", { unpushedEpisode: true });
-    await assert.rejects(
-      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
-      /exact Episode head to be pushed/,
-    );
+  for (const [name, resource, change, pattern] of [
+    ["runtime CWD", "runtime", { cwd: "/foreign" }, /runtime is no longer exact/],
+    ["worktree identity", "worktree", { path: "/foreign" }, /worktree is dirty or no longer exact/],
+    ["branch head", "branch", { head: "d".repeat(40) }, /branch is no longer exact/],
+  ]) await t.test(name, async () => {
+    const h = cleanupHarness(); Object.assign(h.state[resource], change);
+    await assert.rejects(finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps), pattern);
+    assert.equal(h.calls.some(([kind]) => kind.startsWith("remove-")), false);
+  });
+  await t.test("abandonment requires archive", async () => {
+    const h = cleanupHarness("abandoned", { notArchived: true });
+    await assert.rejects(finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps), /exact task to be archived/);
+    assert.equal(h.calls.some(([kind]) => kind.startsWith("remove-")), false);
   });
 });
 
@@ -1008,11 +1072,11 @@ test("task-native handoff rejects changed task state and foreign durable session
   });
 });
 
-test("ownership parser requires active durable bindings and validates cleanupHead", () => {
+test("ownership parser requires active durable bindings and discards legacy cleanupHead", () => {
   assert.throws(() => parseEpisodeOwnership({ version: 1, status: "active", engine: "orca" }), /unsupported shape/);
   const f = harness();
   const record = activeTaskRecord(f, { cleanupHead: "b".repeat(40) });
-  assert.equal(record.cleanupHead, "b".repeat(40));
+  assert.equal(Object.hasOwn(record, "cleanupHead"), false);
   assert.throws(() => parseEpisodeOwnership({ ...record, cleanupHead: "not-a-head" }), /unsupported shape/);
 });
 
@@ -1309,6 +1373,56 @@ test("production local cleanup adapter proves exact idle runtime, worktree, and 
   snapshot = await adapter.inspect(record);
   assert.deepEqual(snapshot, {});
   assert.deepEqual(calls, [["kill", "route"], ["delete", sessionFile], ["delete", sessionFile]]);
+});
+
+test("cleanup retains ownership when an explicit child survives its missing root", async (t) => {
+  for (const edge of ["parentSessionId", "parentSessionPath"]) await t.test(edge, async () => {
+    const h = cleanupHarness("merged", { absent: ["runtime", "worktree", "branch"] });
+    rmSync(h.f.worktree, { recursive: true, force: true });
+    const original = structuredClone(h.record);
+    const childFile = join(h.f.root, "surviving-child.jsonl"); writeFileSync(childFile, "{}\n");
+    const child = { sessionId: "child", sessionFile: childFile, cwd: h.f.root, isSessionActive: true,
+      [edge]: edge === "parentSessionId" ? h.record.episodeId : h.record.episodeSessionFile };
+    const sessions = { async list() { return [child]; } };
+    const runner = { run(_command, args) {
+      if (args[0] === "check-ref-format") return { status: 0, stdout: "", stderr: "" };
+      assert.deepEqual(args, ["show-ref", "--verify", "--quiet", `refs/heads/${h.record.branch}`]);
+      return { status: 1, stdout: "", stderr: "" };
+    } };
+    const adapter = new CliTaskEpisodeCleanupAdapter(h.f.root, h.episodeHead, { sessions, runner, git: { worktrees: () => [] } });
+    await assert.rejects(
+      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, { ...h.deps, cleanup: adapter }),
+      /explicit descendant without its recorded root/,
+    );
+    assert.deepEqual(h.record, original);
+    assert.equal(existsSync(childFile), true);
+    assert.equal(h.calls.some(([kind]) => kind.startsWith("remove-")), false);
+  });
+});
+
+test("production cleanup adapter removes an exact idle runtime after worktree and branch are already absent", async () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-cleanup-runtime-only-"));
+  const worktree = join(root, "absent-worktree");
+  const sessionFile = join(root, "episode.jsonl"); writeFileSync(sessionFile, "{}\n");
+  let rows = [{ sessionId: "episode", sessionFile, cwd: worktree, isSessionActive: false,
+    isStreaming: false, isCompacting: false, sessionActions: { queuedCount: 0, steering: [], followUps: [] } }];
+  const sessions = {
+    async list() { return structuredClone(rows); },
+    async deleteSaved(path) { assert.equal(path, sessionFile); unlinkSync(path); rows = []; },
+  };
+  const runner = { run(_command, args) {
+    if (args[0] === "check-ref-format") return { status: 0, stdout: "", stderr: "" };
+    assert.deepEqual(args, ["show-ref", "--verify", "--quiet", "refs/heads/episode-cleanup"]);
+    return { status: 1, stdout: "", stderr: "" };
+  } };
+  const record = parseEpisodeOwnership({ version: 2, status: "active", operationId: "op", engine: "local",
+    ownerSessionId: "owner", taskId: "PRIMECLAW-1", taskPath: "backlog/tasks/task.md", baseRef: TASK_BASE,
+    createdAt: "x", updatedAt: "x", worktree, branch: "episode-cleanup", head: TASK_BASE,
+    episodeId: "episode", episodeSessionFile: sessionFile, episodeActiveSessionId: "route" });
+  const adapter = new CliTaskEpisodeCleanupAdapter(root, TASK_BASE, { sessions, runner, git: { worktrees: () => [] } });
+  assert.deepEqual(await adapter.inspect(record), { runtime: { cwd: worktree, idle: true } });
+  await adapter.removeRuntime(record);
+  assert.deepEqual(await adapter.inspect(record), {});
 });
 
 test("production cleanup adapter removes ID-only and path-only descendants without CWD or RLM ownership guesses", async () => {

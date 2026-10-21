@@ -127,6 +127,10 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
         || samePath(entry.sessionFile, record.episodeSessionFile!)
         || samePath(entry.cwd, record.worktree!));
       if (collision) throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
+      if (sessions.some((entry) => entry.parentSessionId === record.episodeId
+        || samePath(entry.parentSessionPath, record.episodeSessionFile!))) {
+        throw new Error("Task Episode cleanup found an explicit descendant without its recorded root session");
+      }
       if (existsSync(record.episodeSessionFile!)) {
         throw new Error("Task Episode cleanup found an untracked saved-session file");
       }
@@ -291,10 +295,6 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     // Keeping the pane out of the Prime runtime stage avoids retiring its durable
     // surface before Orca has proved the PTY stopped.
     const runtimePresent = Boolean(sessionTree || existsSync(record.episodeSessionFile));
-    const head = worktreeHead ?? branch?.head;
-    if (runtimePresent && !head) {
-      throw new Error("Task Episode cleanup found runtime state after both worktree and branch disappeared");
-    }
     return {
       ...(runtimePresent ? {
         runtime: { cwd: record.worktree, idle: sessionIdle },
@@ -338,8 +338,8 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
 
   async removeWorktree(record: TaskEpisodeOwnershipRecord): Promise<void> {
     const before = await this.inspect(record);
-    if (before.runtime || !before.worktree || !before.branch) {
-      throw new Error("Task Episode cleanup worktree removal requires runtime absence and exact worktree/branch identity");
+    if (before.runtime || !before.worktree) {
+      throw new Error("Task Episode cleanup worktree removal requires runtime absence and exact worktree identity");
     }
     if (record.engine === "orca") {
       const worktree = this.orcaWorktree(record);
@@ -372,7 +372,7 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       const registered = this.git.worktrees(this.projectRoot).filter((entry) => samePath(entry.path, record.worktree!));
       const branch = this.branchHead(this.projectRoot, record.branch!);
       if (registered.length !== 1 || registered[0].branch !== record.branch
-        || this.git.head(record.worktree!) !== this.expectedHead || branch?.head !== this.expectedHead) {
+        || this.git.head(record.worktree!) !== this.expectedHead || (branch && branch.head !== this.expectedHead)) {
         throw new Error("Task Episode cleanup refuses to remove a changed local worktree");
       }
       this.git.assertCleanWorktree(record.worktree!);

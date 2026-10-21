@@ -28,6 +28,11 @@ def test_spec_episode_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_task_episode_ownership_node_suite(tier1_container) -> None:
+    result = tier1_container.run("node", "--experimental-strip-types", "--test", "/workspace/tests/task_episode_ownership_extension.test.mjs", timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_episode_close_node_suite(tier1_container) -> None:
     result = tier1_container.run("node", "--experimental-strip-types", "--test", WS_EPISODE_CLOSE_NODE_SUITE, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -124,7 +129,10 @@ def test_task_finalization_surface_is_cleanup_only() -> None:
     assert 'name: "finalize_task_episode"' in extension
     assert 'enum: ["merged", "abandoned"]' in extension
     assert 'required: ["taskId", "episodeHead", "outcome", "confirmed"]' in extension
-    assert "cleanupHead" in support
+    assert "cleanupHead" not in support
+    assert "taskCleanupStage" not in support
+    assert "ownershipRemoved: true" in support
+    assert "store.removeTask(projectRoot, record)" in support
     assert 'runGit(repo, ["merge", "--ff-only"' not in support
 
 

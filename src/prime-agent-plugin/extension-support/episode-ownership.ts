@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 
 export type EpisodeLifecycleStatus = "provisioning" | "active" | "uncertain" | "inactive";
 export type EpisodeLifecycleEngine = "orca" | "local";
@@ -45,8 +46,6 @@ export interface TaskEpisodeOwnershipRecord extends EpisodeOwnershipBase {
   version: 2;
   taskId: string;
   taskPath: string;
-  /** Exact terminal Episode head bound before separately authorized resource cleanup. */
-  cleanupHead?: string;
 }
 
 export type EpisodeOwnershipRecord = LegacyEpisodeOwnershipRecord | TaskEpisodeOwnershipRecord;
@@ -158,7 +157,12 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
       throw new Error(`Episode ownership terminal inventory omits its primary terminal: ${path}`);
     }
   }
-  return item as unknown as EpisodeOwnershipRecord;
+  if (item.version === 2) {
+    // Read old cleanup markers only at this boundary; they are not ownership state.
+    const { cleanupHead: _cleanupHead, ...record } = item;
+    return record as unknown as TaskEpisodeOwnershipRecord;
+  }
+  return item as unknown as LegacyEpisodeOwnershipRecord;
 }
 
 export function parseEpisodeOwnershipRegistry(value: unknown, path = "episode ownership"): EpisodeOwnershipRegistry {
@@ -296,20 +300,46 @@ export function mutateEpisodeOwnership(
 ): EpisodeOwnershipRecord | null {
   if (!ownerSessionId) throw new Error("Episode ownership mutation requires an exact ownerSessionId");
   return withOwnershipLock(projectRoot, () => {
-    const registry = readEpisodeOwnershipRegistry(projectRoot);
+    const value = readOwnershipValue(projectRoot);
+    const registry = value === null
+      ? { schemaVersion: 1 as const, owners: {} as Record<string, EpisodeOwnershipRecord> }
+      : parseEpisodeOwnershipRegistry(value, episodeOwnershipPath(projectRoot));
+    // Parsing validates all owners, but normalization belongs only to the owner
+    // being changed. Keep foreign JSON entries exactly as they were read.
+    const rawOwners = value === null ? {}
+      : (value as EpisodeOwnershipRegistry).schemaVersion === 1
+        ? (value as EpisodeOwnershipRegistry).owners
+        : { [(value as EpisodeOwnershipRecord).ownerSessionId]: value as EpisodeOwnershipRecord };
     const current = registry.owners[ownerSessionId] ?? null;
-    const next = mutation(current, Object.values(registry.owners));
+    const proposed = mutation(current, Object.values(registry.owners));
+    const next = proposed === null ? null : parseEpisodeOwnership(proposed);
     if (next === null) delete registry.owners[ownerSessionId];
     else {
-      parseEpisodeOwnership(next);
       if (next.ownerSessionId !== ownerSessionId) throw new Error("Episode ownership mutation cannot change its ownerSessionId");
       if (current && active(current) && active(next) && !sameEpisodeBinding(current, next)) {
         throw new Error(`Conversation ${ownerSessionId} already owns a different active Episode`);
       }
       registry.owners[ownerSessionId] = next;
     }
+    for (const [foreignOwner, rawRecord] of Object.entries(rawOwners)) {
+      if (foreignOwner !== ownerSessionId) registry.owners[foreignOwner] = rawRecord;
+    }
     persistOwnershipRegistry(projectRoot, registry);
     return next;
+  });
+}
+
+/** Remove only an unchanged active task-native entry after its resources are absent. */
+export function removeTaskEpisodeOwnership(projectRoot: string, expected: TaskEpisodeOwnershipRecord): void {
+  parseEpisodeOwnership(expected);
+  if (expected.version !== 2 || expected.status !== "active") {
+    throw new Error("Task Episode ownership removal requires an exact active version-2 record");
+  }
+  mutateEpisodeOwnership(projectRoot, expected.ownerSessionId, (current) => {
+    if (!current || current.version !== 2 || current.status !== "active" || !isDeepStrictEqual(current, expected)) {
+      throw new Error("Task Episode ownership changed or is missing before removal");
+    }
+    return null;
   });
 }
 

@@ -151,7 +151,7 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
     assert "The Episode edits only its bound task content" not in future
 
     assert "stores no review, progress, merge, or abandonment receipts" in current
-    assert "optional `cleanupHead`" in current
+    assert "Version 2 stores no `cleanupHead` or cleanup-progress stage" in current
     assert "cleanup-only `finalize_task_episode`" in current
     assert "ordinary Git and the supported Backlog CLI" in current
     assert "placement, and task-native lifecycle receipts" not in current

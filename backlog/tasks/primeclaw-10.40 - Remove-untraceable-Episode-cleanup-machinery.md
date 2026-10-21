@@ -4,17 +4,29 @@ title: Make task-native Episode cleanup complete and owner-safe
 status: In Progress
 assignee: []
 created_date: '2026-10-20 04:32'
-updated_date: '2026-10-21 18:49'
+updated_date: '2026-10-21 19:03'
 labels: []
 dependencies: []
 references:
   - PRIMECLAW-10.38
 documentation:
   - docs/user-stories/I-episode-finalization.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/F-episode-execution.md
+  - docs/user-stories/H-handoff-and-continuation.md
 modified_files:
-  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
-  - tests/spec_episode_extension.test.mjs
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/F-episode-execution.md
+  - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/I-episode-finalization.md
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - tests/reviewed_plan_extension.test.mjs
+  - tests/spec_episode_extension.test.mjs
+  - tests/task_episode_ownership_extension.test.mjs
+  - tests/test_oversee_episode_skill.py
+  - tests/test_reviewed_plan_extension.py
 parent_task_id: PRIMECLAW-10
 priority: p1
 type: task
@@ -111,4 +123,25 @@ Slice 1 complete: explicit recursive runtime ownership (plan step 3 runtime port
 Remaining scope: plan steps 1-2 (remove cleanup state/stages and compare-and-remove owner), step 4 (Orca force and remote/local branch transport), step 5 (prompt-led cleanup and public schema), and their focused tests/living policy updates. Merge-readiness idle guidance is also pending. Leave status In Progress; this is an intermediate slice, not a full task candidate.
 
 Owner accepted Slice 1 and authorized the next bounded execute slice (plan steps 1-2 only): remove cleanupHead/stage/inactive version-2 bookkeeping and implement exact atomic compare-and-remove ownership after resources are absent. Preserve version-1 finalize_spec_episode behavior and foreign owners. Use actual state: absent is complete, exact present is removable, changed or ambiguous state blocks. At the parser boundary only, tolerate and discard legacy cleanupHead; do not add migration workflows, retry machinery, lifecycle state, provider/Git transport changes, or prompt/schema policy in this slice. Keep provider/Git transport (step 4) and prompt/schema changes (step 5) deferred. Validate candidate behavior and plugin execution only in Docker Tier 1; host-safe static checks are allowed. Known baseline static failures and Slice 1 evidence are recorded above.
+
+Slice 2 selected after owner acceptance: implement plan steps 1-2 only. Replace version-2 cleanupHead/stage/inactive replay bookkeeping with direct actual-state cleanup and atomic compare-and-remove of the unchanged owner after resources are absent. Preserve version-1 behavior, foreign owners, provider/Git commands, and public prompt/schema policy. Ownership/parser/CAS focused changes are delegated; cleanup path, integration tests, docs and Docker validation remain with the Episode root.
+
+Slice 2 review found a concrete retained-owner safety hole inherited from the session-tree inspector: a root-absent explicit child outside the worktree could be overlooked. Accepted minimal in-scope repair: refuse a missing recorded root with any directly explicit parent-ID or canonical parent-path child before returning runtime absence; do not infer missing intermediate sessions. Real-adapter/finalizer tests prove active children and ownership are retained for both edge forms. Read-only re-review confirmed the repair. Version-1 close remains byte-identical; provider/Git transport and prompt/schema policy remain unchanged. Validation is still pending on the final corrected snapshot.
+
+Slice 2 resumable checkpoint (plan steps 1-2 implemented; final supported Tier-1 acceptance BLOCKED):
+- Removed version-2 cleanupHead from ownership types and all cleanup head/stage/inactive/replay bookkeeping from finalizeTaskEpisodeCleanup. Cleanup now verifies each present resource, skips already absent resources, removes runtime/worktree/branch in dependency order, verifies resulting absence, then calls exact atomic compare-and-remove. Provider failures return immediately without internal retry; ordinary ownership remains unchanged until final removal. Base ancestry, terminal merged/archived outcome, pushed canonical main, present local branch's pushed head, and exact clean identity checks remain.
+- Added removeTaskEpisodeOwnership using the existing registry lock and atomic rename. It requires the unchanged active version-2 entry and rejects missing/replayed, changed, wrong-version, or non-active ownership. Parser-only compatibility validates/discards a legacy cleanupHead; persistence omits the caller's marker and preserves foreign raw entries, including legacy markers. Version-1 parsing and finalize_spec_episode behavior remain unchanged; episode-close.ts is byte-identical to accepted base.
+- Removed adapter-only unsafe-order assumptions, not provider/Git commands. A recorded root missing while a directly explicit child survives is a bounded refusal, not inferred absence. This prevents owner deletion while that known child remains. No lifecycle coordinator, new state, receipt, migration workflow, retry machinery, provider/Git transport, public schema, or prompt-policy change.
+- Focused tests cover all eight presence/absence combinations, exact resource mismatch, busy runtime, terminal/push/archive/ancestry refusal before mutation, verified provider no-op failure, one-call provider failure and later caller-led continuation, owner drift and foreign preservation, real registry integration, parser compatibility, root-only runtime cleanup after Git absence, and active explicit children outside the worktree when the root is absent. Living docs now describe current owner removal and actual-state semantics, leaving confirmation/provider/remote policy for later slices.
+- Final Docker unit snapshot: four existing suites (spec_episode_extension, task_episode_ownership_extension, reviewed_plan_extension, episode_close_extension) run together with `node --experimental-strip-types --test --test-timeout=60000` in immutable Tier-1 image sha256:5e58aee2dadb960c1768f696081c19361211fc0e602634883f3ae08c0d61d2dc; offline/read-only scratch source/test snapshot, tmpfs /tmp, no host plugin state. 214 tests passed, 0 failed (6.21s Node / 8.24s outer). Host Docker command ran through scripts/testing/bounded.py --timeout 150 --kill-grace 3. Evidence: /tmp/primeclaw-10-40-slice2-green.log. Snapshot inputs: /var/folders/4_/twy0wz3s1mq650wnqzn1b8rr0000gq/T/primeclaw-10-40-slice2-green-gn7xfjnh.
+- Red evidence in the same isolated immutable image: original adapter rejects the runtime-only absent-Git case (`runtime state after both worktree and branch disappeared`); final explicit-child safety tests fail against original adapter with `Missing expected rejection.` for both parent-ID and parent-path. Evidence: /tmp/primeclaw-10-40-slice2-red.log and /tmp/primeclaw-10-40-slice2-orphan-red-final.log. An initial orphan test setup caught its generated worktree still existing; the fixture was corrected before the final 214-test pass.
+- Final host-safe focused command: `python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_managed_session_protocol.py tests/test_oversee_episode_skill.py -q` -> 17 passed, 7 skipped (0.42s). Full host static -> 663 passed, 69 skipped, 8 failed, 75 subtests passed; the exact same eight baseline failure IDs recorded in Slice 1, no new failure IDs. Evidence: /tmp/primeclaw-10-40-slice2-static-final.log and /tmp/primeclaw-10-40-slice2-static-full.log. No unrelated fixes.
+BLOCKER: final supported `python3 -m pytest tests/test_reviewed_plan_extension.py -q -m container` could not reach tests: source builder passed, but disposable source Prime Agent install returned nonzero at tests/conftest.py:888. One bounded retry with unchanged candidate failed at the same pre-test phase. Both runtime teardowns are clean/absent; no run-owned containers remain. Installer detail is not preserved by the fixture; the underlying cause is unknown. Evidence: /tmp/primeclaw-10-40-slice2-container-corrected.log, .test-results/20261021T185822Z-41637-cb71f2d1/tier1/manifest.json; /tmp/primeclaw-10-40-slice2-container-retry.log, .test-results/20261021T190056Z-84314-366eb8e3/tier1/manifest.json. Earlier superseded snapshots passed the bridge or exposed the corrected test-fixture issue; they are not final acceptance evidence.
+UNBLOCK CONDITION / NEXT ACTION: restore the supported disposable source Prime Agent installation path (without upstream changes, credentials, host plugin activation, or scope expansion), then run the exact supported Docker bridge against this unchanged source/test snapshot and obtain a passing result with clean teardown. Do not implement plan steps 4-5 in that validation pass. This checkpoint is not Ready for Merge and does not claim completed acceptance. No more installer retries in this pass. Task status remains In Progress; only the owning Conversation may publish Blocked or other lifecycle state. After validation, report the candidate and wait for owner acceptance. Later provider/remote transport and prompt/schema policy remain deferred.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Intermediate Slice 2 checkpoint: steps 1-2 code and focused docs/tests are implemented. Direct actual-state cleanup removes only the unchanged owner after verified resource absence; no version-2 cleanup marker, stage, inactive record, or replay result is emitted. Final standalone Docker behavior suites passed 214 tests and focused static passed 17. Final supported Tier-1 bridge is blocked before tests by repeated disposable source Prime Agent installation failure, so this is not an accepted/merge-ready candidate. See latest Implementation Notes for exact evidence and unblock condition. Task remains In Progress. Provider/remote transport and prompt/schema policy are still deferred.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -24,6 +24,7 @@ import {
   isTaskEpisodeOwnership,
   parseEpisodeOwnership,
   readEpisodeOwnership,
+  removeTaskEpisodeOwnership,
   withEpisodeAdmissionLock,
   writeEpisodeOwnership,
   type EpisodeOwnershipRecord,
@@ -261,12 +262,13 @@ export interface TaskEpisodeCleanupAdapter {
   removeBranch(record: TaskEpisodeOwnershipRecord): Promise<void>;
 }
 export interface TaskEpisodeCleanupDependencies {
-  ownership?: EpisodeOwnershipStore;
+  ownership?: Pick<EpisodeOwnershipStore, "read"> & {
+    removeTask(projectRoot: string, expected: TaskEpisodeOwnershipRecord): void;
+  };
   cleanupGit?: TaskEpisodeCleanupGit;
   cleanup: TaskEpisodeCleanupAdapter;
   taskRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
-  now?: () => string;
 }
 export type TaskEpisodeCleanupResult = {
   verified: true;
@@ -274,8 +276,7 @@ export type TaskEpisodeCleanupResult = {
   taskId: string;
   episodeHead: string;
   resourcesRemoved: true;
-  ownershipStatus: "inactive";
-  reused: boolean;
+  ownershipRemoved: true;
 };
 
 function runGitRaw(cwd: string, args: string[]): string {
@@ -1710,13 +1711,16 @@ function expectedArchivedTaskPath(taskPath: string): string {
   return join(dirname(activeDirectory), "archive", "tasks", basename(taskPath));
 }
 
-function taskCleanupStage(
+function verifyTaskCleanupResources(
   snapshot: TaskEpisodeCleanupSnapshot,
   record: TaskEpisodeOwnershipRecord,
   episodeHead: string,
-): number {
-  if (snapshot.runtime && (!samePath(snapshot.runtime.cwd, record.worktree!) || !snapshot.runtime.idle)) {
-    throw new Error("Task Episode cleanup runtime is busy or no longer exact");
+): void {
+  if (snapshot.runtime && !samePath(snapshot.runtime.cwd, record.worktree!)) {
+    throw new Error("Task Episode cleanup runtime is no longer exact");
+  }
+  if (snapshot.runtime && !snapshot.runtime.idle) {
+    throw new Error("The Episode has not completed its work: cleanup requires the exact idle runtime and descendants");
   }
   if (snapshot.worktree && (!samePath(snapshot.worktree.path, record.worktree!)
     || snapshot.worktree.branch !== record.branch
@@ -1727,12 +1731,6 @@ function taskCleanupStage(
   if (snapshot.branch && (snapshot.branch.name !== record.branch || snapshot.branch.head !== episodeHead)) {
     throw new Error("Task Episode cleanup branch is no longer exact");
   }
-  const present = [Boolean(snapshot.runtime), Boolean(snapshot.worktree), Boolean(snapshot.branch)];
-  if (present.every(Boolean)) return 0;
-  if (!present[0] && present[1] && present[2]) return 1;
-  if (!present[0] && !present[1] && present[2]) return 2;
-  if (present.every((value) => !value)) return 3;
-  throw new Error("Task Episode cleanup resources are missing in an unsafe order");
 }
 
 function verifyTaskEpisodeTerminalState(
@@ -1787,7 +1785,7 @@ export async function finalizeTaskEpisodeCleanup(
     throw new Error("Task Episode cleanup is available only to the persisted top-level owning Conversation");
   }
   const git = dependencies.cleanupGit ?? new CliTaskEpisodeCleanupGit();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const store = dependencies.ownership ?? { read: readEpisodeOwnership, removeTask: removeTaskEpisodeOwnership };
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
   const resolveTask = dependencies.taskResolver
     ?? ((cwd: string, id: string) => resolveBacklogTask(cwd, id, runner));
@@ -1795,73 +1793,48 @@ export async function finalizeTaskEpisodeCleanup(
   if (!samePath(projectRoot, ctx.cwd) || git.branch(projectRoot) !== "main") {
     throw new Error("Task Episode cleanup must run from the canonical primary main checkout");
   }
-  let record = store.read(projectRoot, ctx.sessionManager.getSessionId());
+  const record = store.read(projectRoot, ctx.sessionManager.getSessionId());
   if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
   exactOwnedTaskRecord(record, taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active" && record.status !== "inactive") {
+  if (record.status !== "active") {
     throw new Error(`Task Episode cleanup cannot finalize ${record.status} ownership`);
   }
-  if (record.cleanupHead && record.cleanupHead !== episodeHead) {
-    throw new Error("Task Episode cleanup head differs from the durable cleanup binding");
+  const inspect = async (): Promise<TaskEpisodeCleanupSnapshot> => {
+    const snapshot = await dependencies.cleanup.inspect(record);
+    verifyTaskCleanupResources(snapshot, record, episodeHead);
+    return snapshot;
+  };
+  let snapshot = await inspect();
+  if (!git.isAncestor(projectRoot, record.baseRef, episodeHead)) {
+    throw new Error("Task Episode cleanup head is not descended from the owned Episode base");
   }
-  let snapshot = await dependencies.cleanup.inspect(record);
-  let stage = taskCleanupStage(snapshot, record, episodeHead);
-  if (stage !== 3) {
-    if (!git.isAncestor(projectRoot, record.baseRef, episodeHead)) {
-      throw new Error("Task Episode cleanup head is not descended from the owned Episode base");
-    }
-    if (git.branchUpstreamHead(projectRoot, record.branch!) !== episodeHead) {
-      throw new Error("Task Episode cleanup requires the exact Episode head to be pushed");
-    }
+  if (snapshot.branch && git.branchUpstreamHead(projectRoot, record.branch!) !== episodeHead) {
+    throw new Error("Task Episode cleanup requires the exact Episode head to be pushed");
   }
   git.assertCleanWorktree(projectRoot);
   verifyTaskEpisodeTerminalState(projectRoot, record, episodeHead, outcome, git, resolveTask);
-  if (!record.cleanupHead) {
-    const bound: TaskEpisodeOwnershipRecord = {
-      ...record,
-      cleanupHead: episodeHead,
-      updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-    };
-    store.write(projectRoot, bound);
-    const verifiedBinding = store.read(projectRoot, ctx.sessionManager.getSessionId());
-    if (!verifiedBinding || !isTaskEpisodeOwnership(verifiedBinding)
-      || JSON.stringify(verifiedBinding) !== JSON.stringify(bound)) {
-      throw new Error("Task Episode cleanup could not persist the exact cleanup head");
+
+  if (snapshot.runtime) {
+    await dependencies.cleanup.removeRuntime(record);
+    snapshot = await inspect();
+    if (snapshot.runtime) throw new Error("Task Episode cleanup runtime removal was not verified exactly");
+  }
+  if (snapshot.worktree) {
+    await dependencies.cleanup.removeWorktree(record);
+    snapshot = await inspect();
+    if (snapshot.runtime || snapshot.worktree) {
+      throw new Error("Task Episode cleanup worktree removal was not verified exactly");
     }
-    record = bound;
   }
-
-  if (record.status === "inactive") {
-    if (stage !== 3) throw new Error("Inactive task Episode ownership still has retained resources");
-    return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipStatus: "inactive", reused: true };
+  if (snapshot.branch) {
+    await dependencies.cleanup.removeBranch(record);
+    snapshot = await inspect();
   }
-
-  const advance = async (remove: () => Promise<void>, expectedStages: number[]): Promise<void> => {
-    await remove();
-    snapshot = await dependencies.cleanup.inspect(record);
-    stage = taskCleanupStage(snapshot, record, episodeHead);
-    if (!expectedStages.includes(stage)) throw new Error("Task Episode cleanup removal was not verified exactly");
-  };
-  if (stage === 0) await advance(() => dependencies.cleanup.removeRuntime(record), [1]);
-  if (stage === 1) await advance(() => dependencies.cleanup.removeWorktree(record), [2, 3]);
-  if (stage === 2) await advance(() => dependencies.cleanup.removeBranch(record), [3]);
-  if (stage !== 3) throw new Error("Task Episode cleanup did not remove every exact resource");
-
-  const retained = store.read(projectRoot, ctx.sessionManager.getSessionId());
-  if (!retained || JSON.stringify(retained) !== JSON.stringify(record)) {
-    throw new Error("Task Episode ownership changed during authorized cleanup");
+  if (snapshot.runtime || snapshot.worktree || snapshot.branch) {
+    throw new Error("Task Episode cleanup did not remove every exact resource");
   }
-  const closed: TaskEpisodeOwnershipRecord = {
-    ...record,
-    status: "inactive",
-    updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-  };
-  store.write(projectRoot, closed);
-  const verified = store.read(projectRoot, ctx.sessionManager.getSessionId());
-  if (!verified || !isTaskEpisodeOwnership(verified) || JSON.stringify(verified) !== JSON.stringify(closed)) {
-    throw new Error("Task Episode cleanup could not verify inactive ownership bookkeeping");
-  }
-  return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipStatus: "inactive", reused: false };
+  store.removeTask(projectRoot, record);
+  return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipRemoved: true };
 }
 
 export async function createTaskEpisode(

@@ -109,13 +109,15 @@ concurrent reservation cannot overwrite another Conversation's entry.
 
 Each strict entry persists lifecycle state plus durable owner, authority,
 placement, and resource bindings. The registry is not an event journal and
-stores no review, progress, merge, or abandonment receipts. Version 2 adds only
-an optional `cleanupHead`, bound immediately before separately authorized
-resource deletion so same-head cleanup can resume safely.
+stores no review, progress, merge, or abandonment receipts. Version 2 stores no
+`cleanupHead` or cleanup-progress stage. The parser accepts and discards the old
+optional head marker without migrating or rewriting foreign owners.
 
 An entry is written before its external mutation and updated at genuine external
-boundaries. Active and inactive entries retain exact bindings needed for restart
-recovery and idempotent final bookkeeping. The former per-slug identity
+boundaries. Active entries retain exact bindings needed for restart recovery.
+Version-2 cleanup removes only the unchanged owner entry after all exact resources
+are absent; it leaves no inactive record. Version-1 final bookkeeping retains
+its inactive record and idempotent replay behavior. The former per-slug identity
 directory and transcript oversight markers are retired.
 
 For primary version-2 ownership, a short inter-process admission lock serializes
@@ -304,7 +306,7 @@ Immediately before Merge, the Conversation re-reads ownership and freshly prefli
 
 Confirmed abandonment is also prompt-led. From clean pushed canonical main, after explicit operator confirmation, the Conversation selects only the bound task file from the exact pushed Episode head, reapplies the non-`Done` status and truthful Final Summary with Backlog, archives the task, verifies only the exact active/archive move and no Episode code, commits, and pushes. Git and Backlog report unsafe intermediate state directly. Ownership and resources remain active.
 
-Cleanup alone remains a native destructive resource boundary. After the terminal main state is pushed and the operator separately authorizes Cleanup, `finalize_task_episode` receives the exact task, terminal Episode head, truthful merged/abandoned outcome, and confirmation. It durably records `cleanupHead`, verifies terminal main plus exact idle clean resources, removes runtime, worktree, and branch, verifies absence, and marks ownership inactive last. Same-head partial retry is idempotent. A different head, unpushed main, changed task/archive state, busy or foreign runtime, dirty or changed worktree, unsafe resource gap, provisioning, or uncertain ownership fails closed. The tool performs no review, task status edit, merge, abandonment, archive, or push.
+Cleanup alone remains a native destructive resource boundary. After the terminal main state is pushed and the operator separately authorizes Cleanup, `finalize_task_episode` receives the exact task, terminal Episode head, truthful merged/abandoned outcome, and confirmation. It verifies terminal main plus exact idle clean resources and removes runtime, worktree, and branch in dependency order. Any exact resource already absent is complete; any present resource must match. After verifying all resources absent, it atomically removes only the unchanged owner entry. No cleanup head, stage, inactive record, or replay result is stored. A provider failure returns its bounded error and retains ordinary ownership; the Conversation may re-read actual state and invoke cleanup again. The tool never retries internally. An unpushed main, changed task/archive state, busy or foreign runtime, dirty or changed resource, provisioning, uncertain, or inactive ownership fails closed. The tool performs no review, task status edit, merge, abandonment, archive, or push.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
