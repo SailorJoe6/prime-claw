@@ -76,6 +76,8 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
   private readonly projectRoot: string;
   private readonly expectedHead: string;
   private readonly ownsSessions: boolean;
+  // Invocation-local only: provider/native branch deletion can erase Git configuration.
+  private resolvedUpstream?: { branch: string; remote: string; ref: string; destination: string };
 
   constructor(projectRoot: string, expectedHead: string, options: { sessions?: SessionPublisher; runner?: CommandRunner; git?: CliGitAdapter } = {}) {
     if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(expectedHead)) {
@@ -247,7 +249,11 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       throw new Error("Task Episode cleanup host adapter requires every exact core resource identity");
     }
     const projectRoot = this.projectRoot;
-    const gitWorktree = this.git.worktrees(projectRoot).find((entry) => samePath(entry.path, record.worktree!));
+    const gitWorktrees = this.git.worktrees(projectRoot);
+    if (gitWorktrees.some((entry) => entry.branch === record.branch && !samePath(entry.path, record.worktree!))) {
+      throw new Error("Task Episode cleanup found the Episode branch in another worktree");
+    }
+    const gitWorktree = gitWorktrees.find((entry) => samePath(entry.path, record.worktree!));
     const orcaWorktree = record.engine === "orca" ? this.orcaWorktree(record) : null;
     if (gitWorktree && record.engine === "orca" && !orcaWorktree) {
       throw new Error("Task Episode cleanup found the owned Git worktree missing from Orca");
@@ -274,6 +280,11 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     const sessions = await this.sessions.list();
     const sessionTree = await this.sessionTree(record, sessions);
     const sessionIdle = sessionTree?.idle ?? true;
+    const upstream = this.configuredUpstream(record.branch, Boolean(branch));
+    const upstreamHead = this.remoteHead(upstream);
+    if (upstreamHead && upstreamHead !== this.expectedHead) {
+      throw new Error("Task Episode cleanup found a changed terminal upstream head");
+    }
 
     let exactTerminal: OrcaTerminalSnapshot | undefined;
     if (record.engine === "orca" && orcaWorktree) {
@@ -291,7 +302,7 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
         throw new Error("Task Episode cleanup found a foreign primary Orca terminal identity");
       }
     }
-    // Orca owns terminal teardown as part of its exact non-force worktree removal.
+    // Orca owns terminal teardown as part of its exact, verified-clean worktree removal.
     // Keeping the pane out of the Prime runtime stage avoids retiring its durable
     // surface before Orca has proved the PTY stopped.
     const runtimePresent = Boolean(sessionTree || existsSync(record.episodeSessionFile));
@@ -308,6 +319,7 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
         },
       } : {}),
       ...(branch ? { branch: { name: record.branch, head: branch.head } } : {}),
+      ...(upstreamHead ? { upstream: { remote: upstream.remote, ref: upstream.ref, head: upstreamHead } } : {}),
     };
   }
 
@@ -338,8 +350,9 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
 
   async removeWorktree(record: TaskEpisodeOwnershipRecord): Promise<void> {
     const before = await this.inspect(record);
-    if (before.runtime || !before.worktree) {
-      throw new Error("Task Episode cleanup worktree removal requires runtime absence and exact worktree identity");
+    if (before.runtime || before.upstream || !before.worktree || !before.worktree.clean
+      || before.worktree.branch !== record.branch) {
+      throw new Error("Task Episode cleanup worktree removal requires runtime/upstream absence and exact clean worktree identity");
     }
     if (record.engine === "orca") {
       const worktree = this.orcaWorktree(record);
@@ -361,8 +374,11 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
           || (primary && primary.agentIdentity !== "prime-agent")) {
           throw new Error("Task Episode cleanup refuses to remove an Orca worktree with foreign terminals");
         }
+        if (this.status(record.worktree!) !== "") {
+          throw new Error("Task Episode cleanup refuses to force-remove a dirty Orca worktree");
+        }
         this.orcaMutation(
-          ["worktree", "rm", "--worktree", `id:${record.worktreeId}`],
+          ["worktree", "rm", "--worktree", `id:${record.worktreeId}`, "--force"],
           "Orca worktree removal",
         );
       }
@@ -383,20 +399,42 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     }
   }
 
+  async removeUpstream(record: TaskEpisodeOwnershipRecord): Promise<void> {
+    const before = await this.inspect(record);
+    if (before.runtime || (before.worktree && (!before.worktree.clean || before.worktree.branch !== record.branch))) {
+      throw new Error("Task Episode cleanup upstream removal requires runtime absence and an exact clean worktree if present");
+    }
+    const upstream = this.resolvedUpstream!;
+    if (before.upstream) {
+      const result = this.runner.run("git", ["push", "--porcelain",
+        `--force-with-lease=${upstream.ref}:${this.expectedHead}`, "--", upstream.destination, `:${upstream.ref}`], {
+        cwd: this.projectRoot, allowFailure: true,
+      });
+      if (result.status !== 0) throw new Error(`Git upstream removal failed: ${(result.stderr.trim() || result.stdout.trim()).replaceAll(upstream.destination, "[configured upstream]")}`);
+    }
+    if (this.remoteHead(upstream)) {
+      throw new Error("Git did not confirm exact upstream ref absence; local branch retained");
+    }
+  }
+
   async removeBranch(record: TaskEpisodeOwnershipRecord): Promise<void> {
     const before = await this.inspect(record);
-    if (before.runtime || before.worktree || !before.branch) {
-      throw new Error("Task Episode cleanup branch removal requires only the exact terminal branch to remain");
+    if (before.runtime || before.worktree) {
+      throw new Error("Task Episode cleanup branch removal requires runtime and worktree absence");
     }
+    if (before.upstream) await this.removeUpstream(record);
     const branch = this.branchHead(this.projectRoot, record.branch!);
     if (!branch) return;
     if (branch.head !== this.expectedHead) {
       throw new Error("Task Episode cleanup refuses to delete a changed terminal branch");
     }
-    const result = this.runner.run("git", ["branch", "-D", "--", record.branch!], {
+    const result = this.runner.run("git", ["update-ref", "-d", "--no-deref", `refs/heads/${record.branch}`, this.expectedHead], {
       cwd: this.projectRoot, allowFailure: true,
     });
     if (result.status !== 0) throw new Error(`Git branch removal failed: ${result.stderr.trim() || result.stdout.trim()}`);
+    if (this.branchHead(this.projectRoot, record.branch!)) {
+      throw new Error("Git did not confirm exact local branch absence");
+    }
   }
 
   close(): void {
@@ -405,14 +443,79 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
   }
 
   private status(cwd: string): string {
-    const result = this.runner.run("git", ["status", "--porcelain", "--untracked-files=all"], { cwd, allowFailure: true });
+    const result = this.runner.run("git", ["status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none"], { cwd, allowFailure: true });
     if (result.status !== 0) throw new Error(`Git worktree status failed: ${result.stderr.trim()}`);
     return result.stdout.trim();
+  }
+
+  private configuredUpstream(branch: string, branchPresent: boolean): { remote: string; ref: string; destination: string } {
+    const config = (key: string): string | undefined => {
+      const result = this.runner.run("git", ["config", "--get-all", `branch.${branch}.${key}`], {
+        cwd: this.projectRoot, allowFailure: true,
+      });
+      if (result.status === 1 && result.stdout === "") return undefined;
+      if (result.status !== 0) throw new Error(`Git upstream configuration lookup failed: ${result.stderr.trim()}`);
+      const values = result.stdout.replace(/\r?\n$/, "").split(/\r?\n/);
+      if (values.length !== 1 || !values[0]) throw new Error("Task Episode cleanup found ambiguous upstream configuration");
+      return values[0];
+    };
+    const remote = config("remote"), ref = config("merge");
+    if (remote === undefined && ref === undefined && !branchPresent && this.resolvedUpstream?.branch === branch) {
+      return this.resolvedUpstream;
+    }
+    if (!remote || !ref) {
+      throw new Error("Task Episode cleanup cannot prove the exact configured upstream identity; ownership retained");
+    }
+    if (remote === "." || remote.startsWith("-") || /\s/.test(remote) || !ref.startsWith("refs/heads/")) {
+      throw new Error("Task Episode cleanup requires one exact configured remote branch");
+    }
+    const validRef = this.runner.run("git", ["check-ref-format", ref], { cwd: this.projectRoot, allowFailure: true });
+    const urls = (push: boolean): string[] => {
+      const result = this.runner.run("git", ["remote", "get-url", ...(push ? ["--push"] : []), "--all", "--", remote], {
+        cwd: this.projectRoot, allowFailure: true,
+      });
+      if (result.status !== 0) throw new Error("Task Episode cleanup cannot resolve the configured upstream destination");
+      return result.stdout.replace(/\r?\n$/, "").split(/\r?\n/);
+    };
+    const fetchUrls = urls(false), pushUrls = urls(true);
+    if (validRef.status !== 0 || fetchUrls.length !== 1 || pushUrls.length !== 1
+      || !fetchUrls[0] || fetchUrls[0] !== pushUrls[0]) {
+      throw new Error("Task Episode cleanup requires one unambiguous upstream fetch/push destination and ref");
+    }
+    const destination = fetchUrls[0];
+    if (this.resolvedUpstream && (this.resolvedUpstream.branch !== branch
+      || this.resolvedUpstream.remote !== remote || this.resolvedUpstream.ref !== ref
+      || this.resolvedUpstream.destination !== destination)) {
+      throw new Error("Task Episode cleanup found changed upstream configuration during cleanup");
+    }
+    this.resolvedUpstream = { branch, remote, ref, destination };
+    return this.resolvedUpstream;
+  }
+
+  private remoteHead(upstream: { destination: string; ref: string }): string | undefined {
+    const result = this.runner.run("git", ["ls-remote", "--refs", "--", upstream.destination, upstream.ref], {
+      cwd: this.projectRoot, allowFailure: true,
+    });
+    if (result.status !== 0) throw new Error(`Git upstream inspection failed: ${result.stderr.trim().replaceAll(upstream.destination, "[configured upstream]")}`);
+    const output = result.stdout.trim();
+    if (!output) return undefined;
+    const rows = output.split(/\r?\n/);
+    const fields = rows[0]!.split("\t");
+    const [head, ref] = fields;
+    if (rows.length !== 1 || fields.length !== 2 || ref !== upstream.ref || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(head ?? "")) {
+      throw new Error("Git returned an ambiguous upstream ref or malformed head");
+    }
+    return head;
   }
 
   private branchHead(projectRoot: string, branch: string): { head: string } | null {
     const format = this.runner.run("git", ["check-ref-format", "--branch", branch], { cwd: projectRoot, allowFailure: true });
     if (format.status !== 0) throw new Error("Task Episode cleanup ownership contains an invalid branch ref");
+    const symbolic = this.runner.run("git", ["symbolic-ref", "--quiet", `refs/heads/${branch}`], {
+      cwd: projectRoot, allowFailure: true,
+    });
+    if (symbolic.status === 0) throw new Error("Task Episode cleanup refuses a symbolic Episode branch ref");
+    if (symbolic.status !== 1) throw new Error("Git could not prove a direct Episode branch ref");
     const exists = this.runner.run("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], {
       cwd: projectRoot, allowFailure: true,
     });

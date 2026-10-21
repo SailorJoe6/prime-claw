@@ -243,7 +243,6 @@ export interface TaskEpisodeCleanupGit {
   branch(repo: string): string;
   head(repo: string): string;
   upstreamHead(repo: string): string;
-  branchUpstreamHead(repo: string, branch: string): string;
   assertCleanWorktree(repo: string): void;
   isAncestor(repo: string, ancestor: string, descendant: string): boolean;
   pathTrackedAtRef(repo: string, ref: string, path: string): boolean;
@@ -254,10 +253,12 @@ export type TaskEpisodeCleanupSnapshot = {
   runtime?: { cwd: string; idle: boolean };
   worktree?: { path: string; branch: string; head: string; clean: boolean };
   branch?: { name: string; head: string };
+  upstream?: { remote: string; ref: string; head: string };
 };
 export interface TaskEpisodeCleanupAdapter {
   inspect(record: TaskEpisodeOwnershipRecord): Promise<TaskEpisodeCleanupSnapshot>;
   removeRuntime(record: TaskEpisodeOwnershipRecord): Promise<void>;
+  removeUpstream(record: TaskEpisodeOwnershipRecord): Promise<void>;
   removeWorktree(record: TaskEpisodeOwnershipRecord): Promise<void>;
   removeBranch(record: TaskEpisodeOwnershipRecord): Promise<void>;
 }
@@ -339,9 +340,6 @@ export class CliTaskEpisodeCleanupGit implements TaskEpisodeCleanupGit {
   branch(repo: string): string { return runGit(repo, ["symbolic-ref", "--short", "HEAD"]); }
   head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
   upstreamHead(repo: string): string { return runGit(repo, ["rev-parse", "@{upstream}"]); }
-  branchUpstreamHead(repo: string, branch: string): string {
-    return runGit(repo, ["rev-parse", `${branch}@{upstream}`]);
-  }
   assertCleanWorktree(repo: string): void {
     if (runGitRaw(repo, ["status", "--porcelain=v1", "--untracked-files=no"]).trim()) {
       throw new Error("Task Episode cleanup requires canonical main without staged or tracked changes");
@@ -1731,6 +1729,9 @@ function verifyTaskCleanupResources(
   if (snapshot.branch && (snapshot.branch.name !== record.branch || snapshot.branch.head !== episodeHead)) {
     throw new Error("Task Episode cleanup branch is no longer exact");
   }
+  if (snapshot.upstream && snapshot.upstream.head !== episodeHead) {
+    throw new Error("Task Episode cleanup upstream branch is no longer exact");
+  }
 }
 
 function verifyTaskEpisodeTerminalState(
@@ -1808,9 +1809,6 @@ export async function finalizeTaskEpisodeCleanup(
   if (!git.isAncestor(projectRoot, record.baseRef, episodeHead)) {
     throw new Error("Task Episode cleanup head is not descended from the owned Episode base");
   }
-  if (snapshot.branch && git.branchUpstreamHead(projectRoot, record.branch!) !== episodeHead) {
-    throw new Error("Task Episode cleanup requires the exact Episode head to be pushed");
-  }
   git.assertCleanWorktree(projectRoot);
   verifyTaskEpisodeTerminalState(projectRoot, record, episodeHead, outcome, git, resolveTask);
 
@@ -1818,6 +1816,15 @@ export async function finalizeTaskEpisodeCleanup(
     await dependencies.cleanup.removeRuntime(record);
     snapshot = await inspect();
     if (snapshot.runtime) throw new Error("Task Episode cleanup runtime removal was not verified exactly");
+  }
+  // Orca may delete the local branch during worktree removal, so the upstream
+  // must be absent before invoking that provider operation.
+  if (snapshot.upstream) {
+    await dependencies.cleanup.removeUpstream(record);
+    snapshot = await inspect();
+    if (snapshot.runtime || snapshot.upstream) {
+      throw new Error("Task Episode cleanup upstream removal was not verified exactly");
+    }
   }
   if (snapshot.worktree) {
     await dependencies.cleanup.removeWorktree(record);
@@ -1830,7 +1837,7 @@ export async function finalizeTaskEpisodeCleanup(
     await dependencies.cleanup.removeBranch(record);
     snapshot = await inspect();
   }
-  if (snapshot.runtime || snapshot.worktree || snapshot.branch) {
+  if (snapshot.runtime || snapshot.worktree || snapshot.branch || snapshot.upstream) {
     throw new Error("Task Episode cleanup did not remove every exact resource");
   }
   store.removeTask(projectRoot, record);
