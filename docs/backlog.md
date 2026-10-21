@@ -94,8 +94,15 @@ The resulting Episode uses the exact task as its sole durable authority, skips
 bundle copy and promotion, and leaves every later lifecycle status transition
 to the owning Conversation. Continuation uses `handoff_task_episode`. Review,
 status changes, merge, and abandonment use prompt instructions, ordinary Git,
-and the supported Backlog CLI. Cleanup alone uses `finalize_task_episode` as the
-separately confirmed exact-resource boundary.
+and the supported Backlog CLI. Before merge readiness the Conversation verifies
+provider-reported idle completion of the exact Episode and explicitly proven
+descendants; active or unprovably idle work refuses readiness. After the
+operator-authorized terminal outcome is committed and pushed, the Conversation
+automatically calls cleanup-only `finalize_task_episode` without separate
+cleanup confirmation, retaining exact `taskId`, terminal `episodeHead`, and
+truthful `outcome`. It interprets errors and re-reads current ownership,
+provider, Git, and Backlog evidence before any safe re-invocation. The tool
+remains the exact-resource boundary, not a coordinator or retry loop.
 
 ## Retained version-1 compatibility
 

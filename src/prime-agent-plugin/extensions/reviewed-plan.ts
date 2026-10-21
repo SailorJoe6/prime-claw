@@ -434,7 +434,6 @@ type TaskEpisodeCleanupParams = {
   taskId: string;
   episodeHead: string;
   outcome: TaskEpisodeCleanupOutcome;
-  confirmed: boolean;
 };
 
 async function runTaskEpisodeCleanup(
@@ -446,7 +445,6 @@ async function runTaskEpisodeCleanup(
   if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) {
     throw new Error("Task Episode cleanup requires one exact Backlog task ID");
   }
-  if (!params.confirmed) throw new Error("Task Episode cleanup requires separate explicit operator confirmation");
   const cleanupGit = dependencies.taskCleanupGit ?? new CliTaskEpisodeCleanupGit();
   const projectRoot = cleanupGit.repositoryRoot(ctx.cwd);
   const ownedCleanup = dependencies.taskCleanup
@@ -844,12 +842,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       name: "finalize_task_episode",
       label: "Clean up task Episode resources",
       description: "After an operator-authorized merge or abandonment is committed and pushed, remove the exact idle Episode resources and close ownership.",
-      promptSnippet: "Clean up the exact terminal task Episode after separate operator authority",
+      promptSnippet: "Clean up the exact task Episode after its authorized pushed terminal outcome",
       promptGuidelines: [
         "Use finalize_task_episode only for one exact task-native Episode owned by this Conversation. Never use it for retained folder ownership.",
         "Perform review, request changes, merge, abandonment, and Backlog status changes through the Conversation instructions, ordinary Git, and the supported Backlog CLI before cleanup.",
-        "Call this tool only after separate explicit operator cleanup authority, with the exact pushed Episode head and truthful terminal outcome.",
-        "Cleanup removes only the bound idle runtime, worktree, and branch, then closes ownership. It performs no merge, abandonment, task edit, archive, or push.",
+        "Call this tool immediately after the already operator-authorized terminal outcome is committed, pushed, and verified, with the exact pushed Episode head and truthful outcome. No second cleanup confirmation is needed.",
+        "Cleanup removes only the bound idle runtime and explicit descendants, exact upstream branch, provider worktree, and remaining local branch, then deletes the exact owner entry. It performs no merge, abandonment, task edit, archive, or push.",
+        "On error, interpret the provider evidence and re-read current ownership, Prime Agent, provider, and Git state. Re-invoke only when current evidence proves safe progress; ask the operator only when safe progress is impossible.",
       ],
       executionMode: "sequential",
       parameters: {
@@ -858,9 +857,8 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           taskId: { type: "string", description: "Exact canonical Backlog task ID owned by this Conversation" },
           episodeHead: { type: "string", description: "Exact pushed Episode head that was merged or abandoned" },
           outcome: { type: "string", enum: ["merged", "abandoned"], description: "Terminal outcome already committed and pushed on canonical main" },
-          confirmed: { type: "boolean", description: "True only after separate explicit operator authority for destructive cleanup" },
         },
-        required: ["taskId", "episodeHead", "outcome", "confirmed"],
+        required: ["taskId", "episodeHead", "outcome"],
         additionalProperties: false,
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {

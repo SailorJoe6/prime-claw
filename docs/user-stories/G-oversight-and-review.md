@@ -18,7 +18,7 @@ request an in-scope revision, pause, or consult the operator. Repeated
 speculative or adversarial review must stop rather than grow new requirements or
 implementation machinery.
 
-When a task-native candidate is accepted with no fixes remaining, the Conversation revalidates the exact ownership, task ID/path, idle clean Episode worktree, pushed branch/head, diff, tests, and review. It then uses the supported Backlog CLI on canonical main to set only the bound task to `Ready for Merge`, verifies and commits only that task path, pushes, and records `mainHead`. In the idle Episode it uses ordinary Git to integrate `mainHead`, preserves Episode-owned task content while applying only the authorized `Ready for Merge` status, commits if needed, pushes, and verifies the refreshed `candidateHead`. It then shows the operator `(taskId, mainHead, candidateHead)`. This uses no custom status publisher, receipt, digest, or replay protocol.
+When a task-native candidate is accepted with no fixes remaining, the Conversation first verifies provider-reported idle completion of the exact Episode and explicitly proven descendants; active or unprovably idle work refuses merge readiness. It then revalidates the exact ownership, task ID/path, idle clean Episode worktree, pushed branch/head, diff, tests, and review. It then uses the supported Backlog CLI on canonical main to set only the bound task to `Ready for Merge`, verifies and commits only that task path, pushes, and records `mainHead`. In the idle Episode it uses ordinary Git to integrate `mainHead`, preserves Episode-owned task content while applying only the authorized `Ready for Merge` status, commits if needed, pushes, and verifies the refreshed `candidateHead`. It then shows the operator `(taskId, mainHead, candidateHead)`. This uses no custom status publisher, receipt, digest, or replay protocol.
 
 Delay is a no-op. Request Changes requires an explicit operator decision and a concrete in-scope finding. The Conversation returns only the bound main task to `In Progress`, verifies and commits only that path, pushes, then uses ordinary Git in the same Episode to integrate current main as needed while preserving its task content and applying the authorized status before continuing through `handoff_task_episode`.
 
@@ -28,10 +28,12 @@ If the operator explicitly authorizes that tuple, the Conversation runs ordinary
 
 If the operator explicitly confirms abandonment, the Conversation works from clean pushed canonical main, selects only the bound task from the exact pushed Episode head, uses Backlog to preserve the non-`Done` status and record a truthful Final Summary, archives the task, and verifies that the effective diff is only the exact active/archive move. No Episode code enters main. It commits and pushes with ordinary Git. Ownership and resources remain active.
 
-Cleanup is independently explicit. The cleanup-only `finalize_task_episode` call binds the exact task, owner, terminal Episode head, and truthful merged/abandoned outcome; verifies pushed terminal main plus clean idle bound resources; removes only runtime, worktree, and branch; verifies absence; and closes ownership last. It performs no review, status change, merge, abandonment, archive, or push. The durable cleanup head makes same-argument retry idempotent without caller-held receipts.
+Immediately after the operator-authorized terminal merge or abandonment is committed, pushed, and verified, the Conversation automatically calls cleanup-only `finalize_task_episode` without separate cleanup confirmation. The call supplies exact `taskId`, terminal `episodeHead`, and truthful merged/abandoned `outcome`; verifies pushed terminal main plus clean idle bound resources; removes only runtime, worktree, and branch; verifies absence; and closes ownership last. It performs no review, status change, merge, abandonment, archive, or push and stores no cleanup head or progress state. The Conversation interprets errors and re-reads current ownership, provider, Git, and Backlog evidence before any safe re-invocation. It asks the operator for help only when safe autonomous progress is no longer possible. There is no retry loop, classifier, coordinator, or replay result.
 
-Product, scope, merge, abandonment, remote transport, and destructive cleanup
-remain operator decisions.
+Product, scope, merge, abandonment, and remote transport remain operator
+decisions. Task-native cleanup follows an already authorized committed and
+pushed terminal outcome automatically. Retained version-1 destructive cleanup
+still requires separate operator authority.
 
 ## US-20 — Obtain an independent expert review
 

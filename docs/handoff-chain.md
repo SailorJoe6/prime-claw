@@ -78,7 +78,7 @@ The task-native handoff policy reloads that same task in the Episode worktree, k
 
 Candidate review, Delay, Request Changes, Merge, and Abandonment are not handoff. After exact candidate acceptance, the Conversation publishes an exact main-task-only `Ready for Merge` commit, pushes it, uses ordinary Git in the idle Episode to integrate that main head while preserving Episode-owned task content and applying the authorized status, pushes the refreshed candidate, and shows the operator `(taskId, mainHead, candidateHead)`. Delay is a no-op. Request Changes publishes an exact main-task-only `In Progress` commit, integrates current main into the same Episode with ordinary Git as needed while preserving its task content and applying the authorized status, then resumes through ordinary handoff. Merge requires a fresh preflight of the displayed tuple and explicit operator authority, then ordinary canonical-main `git merge --ff-only`, supported Backlog `Done`, an exact task-only commit, and push. Abandonment requires separate explicit confirmation, exact task-only selection from the pushed Episode, supported Backlog Final Summary/archive operations, an exact move commit, and push. There are no Ready receipts, phased progress objects, content digests, custom merge/archive recovery, or replay protocol.
 
-Cleanup is likewise not handoff. After terminal main is pushed and separately authorized, cleanup-only `finalize_task_episode` durably binds the exact terminal Episode head, verifies the exact idle resources, removes runtime, worktree, and branch, verifies absence, and closes ownership. It performs no review or Git/Backlog lifecycle outcome. Same-head retry is idempotent; different or unsafe state blocks.
+Cleanup is likewise not handoff. Before task-native merge readiness, the Conversation verifies provider-reported idle completion of the exact Episode and explicitly proven descendants; active or unprovably idle work refuses readiness. Immediately after an operator-authorized terminal merge or abandonment is committed and pushed, the Conversation automatically calls cleanup-only `finalize_task_episode` without separate cleanup confirmation, passing exact `taskId`, terminal `episodeHead`, and truthful `outcome`. It verifies exact idle resources, removes runtime, worktree, and branch, verifies absence, and closes ownership. It performs no review or Git/Backlog lifecycle outcome and stores no cleanup head or progress state. The Conversation interprets errors and re-reads current ownership, provider, Git, and Backlog evidence before any safe re-invocation; there is no internal retry loop or successful-close replay result.
 
 The initial Episode creation is different: it starts a fresh session with one
 fixed execute assignment after bundle promotion. That assignment carries the
@@ -136,8 +136,11 @@ Episode proof. Copying files or requesting compaction is not proof.
 
 The Conversation may use Episode handoff after accepting an in-scope candidate
 or recording an accepted in-scope revision. Pause, consultation, merge,
-abandonment, destructive cleanup, remote transport, and product or scope changes
-remain operator decisions and must not be routed through handoff.
+abandonment, remote transport, and product or scope changes remain operator
+decisions and must not be routed through handoff. Task-native cleanup follows
+an authorized committed and pushed terminal outcome automatically through the
+Conversation's prompt policy, never through handoff. Retained version-1
+destructive cleanup still requires separate operator authority.
 
 
 ## Validation policy

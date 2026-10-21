@@ -135,24 +135,47 @@ test("task handoff remains disjoint from retained folder handoff", async () => {
   assert.equal(f.created.length, 0);
 });
 
-test("finalize_task_episode exposes only separate cleanup and requires explicit authority", async () => {
-  const f = fixture({ taskStatus: "In Progress" });
-  const tool = f.tools.get("finalize_task_episode");
-  assert.deepEqual(Object.keys(tool.parameters.properties).sort(), ["confirmed", "episodeHead", "outcome", "taskId"]);
-  assert.deepEqual([...tool.parameters.required].sort(), ["confirmed", "episodeHead", "outcome", "taskId"]);
-  const rejected = await tool.execute("cleanup", {
-    taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome: "merged", confirmed: false,
-  }, undefined, undefined, f.ctx);
-  assert.equal(rejected.isError, true);
-  assert.match(rejected.content[0].text, /separate explicit operator confirmation/);
-  assert.deepEqual(f.taskCalls, []);
+test("finalize_task_episode exposes only terminal identity without second confirmation", () => {
+  const f = fixture(); const tool = f.tools.get("finalize_task_episode");
+  assert.deepEqual(Object.keys(tool.parameters.properties).sort(), ["episodeHead", "outcome", "taskId"]);
+  assert.deepEqual([...tool.parameters.required].sort(), ["episodeHead", "outcome", "taskId"]);
+  assert.deepEqual(tool.parameters.properties.outcome.enum, ["merged", "abandoned"]);
+  assert.equal(tool.parameters.additionalProperties, false);
+  assert.doesNotMatch(tool.promptSnippet + tool.promptGuidelines.join(" "), /separate.*authority|confirmed:|explicit operator cleanup authority/);
+  // Retained version-1 bookkeeping remains a distinct, unchanged boundary.
+  const legacy = f.tools.get("finalize_spec_episode");
+  assert.deepEqual(Object.keys(legacy.parameters.properties), ["location"]);
+  assert.deepEqual(legacy.parameters.required, ["location"]);
+  assert.match(legacy.promptGuidelines.join(" "), /operator.*terminal decision/);
+});
 
-  const cleaned = await tool.execute("cleanup", {
-    taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome: "merged", confirmed: true,
-  }, undefined, undefined, f.ctx);
-  assert.equal(cleaned.isError, undefined);
-  assert.equal(cleaned.details.result.ownershipRemoved, true);
-  assert.deepEqual(f.taskCalls, [["cleanup", "PRIMECLAW-10.38", "e".repeat(40), "merged"]]);
+test("finalize_task_episode forwards merged or abandoned identity without confirmed", async () => {
+  for (const outcome of ["merged", "abandoned"]) {
+    const f = fixture(); const tool = f.tools.get("finalize_task_episode");
+    const cleaned = await tool.execute("cleanup", {
+      taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome,
+    }, undefined, undefined, f.ctx);
+    assert.equal(cleaned.isError, undefined);
+    assert.equal(cleaned.details.result.ownershipRemoved, true);
+    assert.deepEqual(f.taskCalls, [["cleanup", "PRIMECLAW-10.38", "e".repeat(40), outcome]]);
+    assert.equal(f.sent.length, 0);
+  }
+});
+
+test("cleanup returns provider error once; only a caller with fresh evidence re-invokes", async () => {
+  const f = fixture(); const tool = f.tools.get("finalize_task_episode"); let calls = 0;
+  f.deps.taskActions.cleanup = async () => { calls += 1; throw new Error("provider removal failed; ownership retained"); };
+  const params = { taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome: "merged" };
+  const failed = await tool.execute("cleanup", params, undefined, undefined, f.ctx);
+  assert.equal(failed.isError, true);
+  assert.deepEqual(failed.details, { taskId: params.taskId, error: "provider removal failed; ownership retained" });
+  assert.match(failed.content[0].text, /Task Episode cleanup failed: provider removal failed/);
+  assert.equal(calls, 1); assert.equal(f.sent.length, 0);
+  // The caller supplies a new inspected state; the tool has no retry policy.
+  f.deps.taskActions.cleanup = async (...args) => { calls += 1; f.taskCalls.push(args.slice(0, 3)); return { ownershipRemoved: true }; };
+  const continued = await tool.execute("cleanup-again", params, undefined, undefined, f.ctx);
+  assert.equal(continued.isError, undefined); assert.equal(calls, 2);
+  assert.deepEqual(f.taskCalls, [[params.taskId, params.episodeHead, params.outcome]]);
 });
 
 test("finalize_task_episode schema rejects lifecycle receipts and action multiplexing", () => {
@@ -261,7 +284,7 @@ test("tool guidance preserves operator authority and fixed fresh assignment", ()
   const taskCreate = f.tools.get("create_task_episode"); const taskHandoff = f.tools.get("handoff_task_episode"); const taskFinalize = f.tools.get("finalize_task_episode");
   assert.match(taskCreate.promptGuidelines.join(" "), /exactly once/); assert.match(taskCreate.promptGuidelines.join(" "), /cannot be overridden/);
   assert.match(taskHandoff.promptGuidelines.join(" "), /Never use ordinary handoff for Blocked, merge/);
-  assert.match(taskFinalize.promptGuidelines.join(" "), /explicit operator cleanup authority/);
+  assert.match(taskFinalize.promptGuidelines.join(" "), /already operator-authorized terminal outcome/);
   assert.match(taskFinalize.promptGuidelines.join(" "), /exact pushed Episode head/);
   assert.match(taskFinalize.promptGuidelines.join(" "), /removes only the bound idle runtime/);
 });
@@ -641,7 +664,7 @@ test("failed, partial, or unrelated dispatches never invoke the compaction check
   assert.equal(planned.details.admitted, true);
   const created = await f.tools.get("create_task_episode").execute("create", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, f.ctx);
   const cleaned = await f.tools.get("finalize_task_episode").execute("cleanup", {
-    taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome: "merged", confirmed: true,
+    taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome: "merged",
   }, undefined, undefined, f.ctx);
   assert.equal(cleaned.isError, undefined);
   assert.equal(calls.length, 0);

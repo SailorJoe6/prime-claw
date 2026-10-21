@@ -128,7 +128,10 @@ def test_task_finalization_surface_is_cleanup_only() -> None:
         assert removed not in support
     assert 'name: "finalize_task_episode"' in extension
     assert 'enum: ["merged", "abandoned"]' in extension
-    assert 'required: ["taskId", "episodeHead", "outcome", "confirmed"]' in extension
+    start = extension.index('name: "finalize_task_episode"')
+    cleanup_surface = extension[start:extension.index("async execute", start)]
+    assert 'required: ["taskId", "episodeHead", "outcome"]' in cleanup_surface
+    assert "confirmed" not in cleanup_surface
     assert "cleanupHead" not in support
     assert "taskCleanupStage" not in support
     assert "ownershipRemoved: true" in support
@@ -248,6 +251,8 @@ def test_traceability_covers_both_episode_schemas_at_creation_recovery_and_finis
     assert "public admission replay fails closed" in rows["US-16"]
 
     assert "finalize_task_episode" in rows["US-24"]
-    assert "separately confirmed" in rows["US-24"]
+    assert "without separate cleanup confirmation" in rows["US-24"]
+    assert "provider-reported idle completion" in rows["US-24"]
+    assert "explicitly proven descendants" in rows["US-24"]
     assert "exact idle resources" in rows["US-24"]
     assert "finalize_spec_episode" in rows["US-24"]

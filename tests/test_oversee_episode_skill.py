@@ -43,12 +43,12 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Do not create lifecycle receipts",
         "set only the bound main task to `Ready for Merge` through the supported Backlog CLI",
         "verify that only the bound task path changed",
-        "git merge --no-edit mainHead",
+        "In the idle Episode worktree, run `git merge --no-edit mainHead`",
         "restore its pre-merge Episode content",
         "apply only the Conversation-authorized `Ready for Merge` status",
         "Let Git block other conflicts",
-        "show the operator `(taskId, mainHead, candidateHead)`",
-        "not a custom status publisher, receipt, digest, or reconciliation transaction",
+        "Show the operator `(taskId, mainHead, candidateHead)`",
+        "Do not create lifecycle receipts or replay protocols",
         "**Delay** is a strict no-op",
         "Set only the bound main task back to `In Progress` through Backlog",
         "git merge --no-edit currentMainHead",
@@ -60,11 +60,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "git merge --ff-only candidateHead",
         "set the exact task to `Done` through Backlog",
         "Apply **Abandon** only after explicit operator confirmation",
-        "cleanup needs separate authority",
         "cleanup-only `finalize_task_episode`",
-        "durably binds that head",
-        "removes exact idle runtime, worktree, and branch",
-        "Same-head retry is idempotent",
         "Review conclusions are evidence",
         "concrete material contract defect",
         "Speculative hardening",
@@ -165,3 +161,41 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
     assert "A task-bound Episode edits only its exact Backlog task content" not in traceability
     assert "retained version-1 compatibility folder Episodes keep their plan workflow" in traceability
     assert "`PRIMECLAW-10.15`, `PRIMECLAW-10.24`, and `PRIMECLAW-10.26`" in traceability
+
+
+def test_task_native_cleanup_is_prompt_led_without_second_confirmation():
+    text = " ".join(GUIDE.read_text().split())
+    task_policy = text.split("The remaining lifecycle and cleanup flow applies only to version 2", 1)[1]
+    lower = task_policy.lower()
+    assert "before merge readiness" in lower
+    assert "provider-reported idle completion" in lower
+    assert "explicitly proven descendant" in lower
+    assert "prime agent list/state responses" in lower
+    assert "active or unprovable-idle sessions block readiness and merge" in lower
+    assert "cleanup independently rechecks before mutation" in lower
+    assert "automatically" in lower and "immediately" in lower
+    assert "second cleanup confirmation" in lower
+    for identifier in ("taskId", "episodeHead", "outcome"):
+        assert identifier in task_policy
+    error_policy = lower.split("on error/interruption", 1)[1]
+    assert "conversation interprets provider evidence" in error_policy
+    assert "re-read current ownership, prime agent, provider, and git state" in error_policy
+    assert "re-invoke only when current evidence proves safe progress" in error_policy
+    assert "consult the operator only when safe progress is impossible" in error_policy
+    for obsolete in (
+        "confirmed: true", "cleanup needs separate authority",
+        "Cleanup** is separately explicit", "Same-head retry is idempotent",
+        "durably binds that head",
+    ):
+        assert obsolete not in task_policy
+
+
+def test_current_task_cleanup_docs_remove_second_confirmation_but_keep_evidence():
+    for path in (DOC, HANDOFF_DOC, REPO / "docs/user-stories/I-episode-finalization.md"):
+        text = " ".join(path.read_text().split())
+        assert "without separate cleanup confirmation" in text, path
+        assert "provider-reported idle completion" in text, path
+        assert "explicitly proven descendants" in text, path
+        assert "current ownership, provider, Git, and Backlog evidence" in text, path
+        assert "durable cleanup head" not in text, path
+        assert "Same-head retry is idempotent" not in text, path

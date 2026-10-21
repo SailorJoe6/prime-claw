@@ -204,9 +204,16 @@ folders, and this task-native builder repository no longer stores a local
 
 A task-native Episode remains available through bounded execute and handoff
 iterations, independent review, refreshed-candidate verification, and explicit
-operator outcomes. Merge, abandonment, and destructive cleanup stay separate
-operator decisions; the active coordinator verifies each outcome and closes
-ownership only after separately authorized cleanup removes the exact resources.
+operator outcomes. Merge and abandonment require explicit operator decisions.
+Before merge readiness, the Conversation verifies provider-reported idle
+completion of the exact Episode and explicitly proven descendants; active or
+unprovably idle work refuses readiness. After an authorized terminal outcome is
+committed and pushed, the Conversation automatically calls cleanup-only
+`finalize_task_episode` without separate cleanup confirmation. It retains the
+exact task ID, terminal Episode head, and truthful outcome. The Conversation
+interprets errors and re-reads current ownership, provider, Git, and Backlog
+evidence before any safe re-invocation. Ownership closes only after exact
+resource absence. No coordinator or retry loop drives this prompt-led policy.
 For a retained version-1 compatibility Episode, archiving completed active plans
 remains its readiness signal and finalization remains bookkeeping-only.
 

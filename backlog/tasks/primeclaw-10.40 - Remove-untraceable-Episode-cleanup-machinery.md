@@ -4,24 +4,42 @@ title: Make task-native Episode cleanup complete and owner-safe
 status: In Progress
 assignee: []
 created_date: '2026-10-20 04:32'
-updated_date: '2026-10-21 19:35'
+updated_date: '2026-10-21 19:46'
 labels: []
 dependencies: []
 references:
   - PRIMECLAW-10.38
 documentation:
-  - docs/user-stories/I-episode-finalization.md
+  - LONG_RANGE_PLAN.md
+  - VISION.md
+  - docs/backlog.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/future-specification-bundles.md
+  - docs/handoff-chain.md
   - docs/user-stories/F-episode-execution.md
+  - docs/user-stories/G-oversight-and-review.md
   - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/I-episode-finalization.md
+  - docs/user-stories/README.md
+  - docs/user-stories/traceability.md
 modified_files:
+  - LONG_RANGE_PLAN.md
+  - VISION.md
+  - docs/backlog.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/future-specification-bundles.md
+  - docs/handoff-chain.md
   - docs/user-stories/F-episode-execution.md
+  - docs/user-stories/G-oversight-and-review.md
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/I-episode-finalization.md
+  - docs/user-stories/README.md
+  - docs/user-stories/traceability.md
   - src/prime-agent-plugin/extension-support/episode-ownership.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
   - tests/reviewed_plan_extension.test.mjs
   - tests/spec_episode_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
@@ -78,7 +96,7 @@ This task changes only version-2 task-native cleanup. It does not change version
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After an operator-authorized merge or abandonment is committed and pushed and its terminal result is verified, the owning Conversation immediately invokes task-native Episode cleanup without a second cleanup confirmation; no event hook or background automation is introduced.
+- [x] #1 After an operator-authorized merge or abandonment is committed and pushed and its terminal result is verified, the owning Conversation immediately invokes task-native Episode cleanup without a second cleanup confirmation; no event hook or background automation is introduced.
 - [ ] #2 Before destructive cleanup, the exact root Episode and every explicitly related descendant are idle. Any active owned session causes zero destructive mutation and a clear report that the Episode has not completed its work.
 - [x] #3 Cleanup recursively selects only sessions connected to the exact Episode by explicit Prime Agent parent ID or canonical parent session-file path edges; shared-worktree sessions, possible siblings, and unrelated sessions are never selected.
 - [x] #4 Cleanup removes the exact owned session tree, provider worktree, local branch, exact upstream remote branch, and ownership entry. Initialized submodules do not block removal of a proven-clean Orca worktree, and unrelated ownership records and resources remain unchanged.
@@ -162,10 +180,23 @@ Boundaries / next: AC4 and AC5 implementation evidence is complete in this candi
 
 Owner accepted Slice 3 commit b29c967f2f18c2a1f9839f40ac1dc136b2997033 with AC4/AC5 evidence. Episode verified clean worktree and HEAD==upstream at that commit. Existing final supported Docker/static provenance remains recorded in the prior notes. Slice 3 is no longer pending acceptance; the whole task is still In Progress and is not complete.
 Next canonical execute authorization: continue this same Episode with ONE bounded Slice 4 for plan step 5 ONLY. Remove the confirmed parameter and separate cleanup-confirmation gate from finalize_task_episode, retaining taskId, exact terminal episodeHead, and truthful merged/abandoned outcome. Update managed prime-claw-oversee-episode guidance so the Conversation verifies provider-reported idle completion, invokes cleanup immediately after the already authorized terminal outcome is committed and pushed, interprets returned errors, and safely re-invokes only from current evidence. Keep cleanup prompt-led: no hook, watcher, worker, retry loop, error classifier, coordinator, receipt, or new state. Do not change any *spec* command or version-1 behavior. Add only focused schema/skill/current-policy tests and docs required by this slice. Preserve accepted steps 1-4 and exact task/owner/resource binding. Leave whole-task final audit and merge readiness to owner review after the pushed slice. Finish one committed/pushed slice, report exact candidate/evidence, then stop; no lifecycle publication or live cleanup authority is granted.
+
+Slice 4 candidate complete: owner-authorized plan step 5 only. Slices 1-3 remain accepted; whole-task audit and merge readiness are deferred to owner review after this pushed slice.
+Implementation:
+- Removed only the finalize_task_episode `confirmed` type/schema field, required-field entry, and separate-confirmation wrapper gate in reviewed-plan.ts. Exact taskId, terminal episodeHead, merged/abandoned enum, additionalProperties=false, sequential execution, task-ID validation, existing terminal/resource checks, and bounded error return remain. The cleanup transport/ownership/session code from accepted slices is unchanged.
+- Updated only managed inert prime-claw-oversee-episode source and task-native tool guidelines: require provider-reported idle completion of the exact Episode and explicitly proven descendants before readiness and again before merge; continue immediately to cleanup after the already operator-authorized terminal outcome is committed, pushed, and verified; supply exact taskId/episodeHead/truthful outcome without a second confirmation. Conversation interprets provider errors, re-reads current ordinary ownership and Prime Agent/provider/Git state, re-invokes only when current evidence proves safe progress, and asks the operator only when safe autonomous progress is impossible. No event hook, watcher, worker, retry loop/classifier/coordinator, receipt, or new state was implemented.
+- Kept the existing managed-skill 950-word bound (unchanged test cap) by shortening version-2 procedural prose without changing the existing Git/Backlog checks. Review caught an ambiguous Episode integration location during shortening; fixed explicitly to `In the idle Episode worktree` before final validation. Version-1 ownership and cutover paragraphs remain byte-identical; all *spec* and transition tool registration blocks are byte-identical to the prior source. Only one TypeScript file changed, at the task-cleanup wrapper/schema/guideline sites.
+- Updated affected current-policy paragraphs in VISION/LONG_RANGE_PLAN, Backlog/future-bundle/handoff/oversight docs, and user-stories F/G/H/I/README/traceability. Removed obsolete task-native separate cleanup confirmation and durable-head/idempotent-replay claims. Retained version-1 policy suffixes and historical evidence remain unchanged. Traceability still records the real task-native terminal-outcome/manual-evidence gap; static Markdown checks are not claimed as operator-outcome UAT.
+Focused evidence:
+- RED before production edits: supported `python3 -m pytest tests/test_reviewed_plan_extension.py -q -m container -k test_reviewed_plan_node_suite` failed against byte-verified original reviewed-plan.ts with new Node assertions. Decisive new exact-three-field schema, merged/abandoned execution without confirmed, and provider-error-forwarding cases failed on the old schema/gate; tool-guideline and existing no-compaction dispatch assertions also detected the old policy. Manifest .test-results/20261021T193829Z-87612-ca6fe3bb/tier1/manifest.json has failure_codes=[tests-failed], offline runtime, clean absent teardown. Log /tmp/primeclaw-10-40-slice4-red.log. No candidate host plugin probe was used.
+- GREEN final supported bridge: `python3 -m pytest tests/test_reviewed_plan_extension.py -q -m container` -> 6 passed, 9 deselected in 148.73s. Includes the four behavior suites and isolated native runtime probes. Manifest .test-results/20261021T194303Z-4746-6821f32e/tier1/manifest.json: passed, no failure codes, source mode; precommit repository base HEAD e11fe2260403349817013746c53dda9db4b4f362, dirty=true for the uncommitted candidate; content_sha256=c604f902587bd7ebe38ac8193497289e0d609263cfd19c8f6652c15fa5b0bcd5; runtime network verified absent; clean absent teardown. Log /tmp/primeclaw-10-40-slice4-green.log. Final source/tests/docs matched the frozen tested bytes after completion; only this task evidence changes afterward.
+- Final focused host-safe static: `python3 -m pytest tests/test_oversee_episode_skill.py tests/test_reviewed_plan_extension.py tests/test_managed_session_protocol.py -q` -> 19 passed, 7 skipped in 0.13s. Log /tmp/primeclaw-10-40-slice4-static.log. Covers no second confirmation schema/prompt policy, explicit idle completion before readiness, same-Episode integration location, current-evidence error/re-invocation policy, lean guidance, current-policy docs, and session contracts. The Node tests also assert retained finalize_spec_episode location-only schema/operator terminal-decision guidance; existing legacy behavior suite remains green. No full-task audit or unrelated baseline repairs were performed in this slice.
+- Independent bounded source review of schema/wrapper, managed guidance, Node test diff, and directly affected lifecycle docs found no concrete material contract defect. It ran no behavior probes: Docker output above is the behavior evidence. Documentation/static worker and read-only reviewer are deleted. `git diff --check` passes; exact active owner binding is unchanged.
+Acceptance and next: AC1 implementation/schema/prompt-policy evidence is recorded and checked, not a claim of real operator-outcome UAT or owner acceptance. AC2/AC6/AC7 and whole-task final audit are intentionally left for the owning Conversation's review rather than opportunistically completing later plan steps. Task remains In Progress. No status publication, merge, abandonment, live runtime/worktree/ref/owner cleanup, user-global activation, host plugin apply/check/probe, installed asset mutation, or Prime Agent upstream change occurred. Push this one bounded slice, report exact candidate/evidence to Beads Replacement, and stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Slices 1-3 accepted; AC3/AC4/AC5 evidence is checked. Slice 3 b29c967f2f18c2a1f9839f40ac1dc136b2997033 has a clean pushed checkpoint and passing supported Docker evidence. Next authorized work is one bounded Slice 4 for plan step 5 only: remove the separate confirmed cleanup gate, update managed Conversation guidance for prompt-led immediate cleanup after the already authorized pushed terminal outcome, and add focused schema/skill/current-policy tests and docs. No hooks, watchers, retry engine, coordinator, receipt, new state, *spec* command, or version-1 change. Whole-task audit and merge readiness remain owner decisions after the pushed slice. Task remains In Progress; do not claim whole-task completion.
+Slices 1-3 accepted. Slice 4 (plan step 5 only) is implemented and validated for owner review: finalize_task_episode now takes only taskId, exact terminal episodeHead, and truthful merged/abandoned outcome; no second cleanup-confirmation gate. Managed Conversation policy verifies provider-reported idle completion before readiness/merge, immediately cleans after the already authorized terminal result is committed/pushed/verified, and interprets errors/re-reads current evidence before safe re-invocation. No coded automation or new state. Managed skill remains within unchanged 950-word bound. Final supported Docker bridge: 6 passed, 9 deselected, offline/clean absent teardown. Focused static: 19 passed, 7 skipped. RED caught old schema/gate; source review found no material defect. Version1/spec/transport behavior unchanged. Exact provenance in latest notes. AC1 implementation evidence checked; remaining whole-task audit, AC2/6/7 reconciliation, manual terminal-outcome evidence, and merge readiness remain owner review after this pushed slice. Task remains In Progress; stop pending owner acceptance.
 <!-- SECTION:FINAL_SUMMARY:END -->
