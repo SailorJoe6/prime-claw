@@ -4,7 +4,7 @@ title: Make task-native Episode cleanup complete and owner-safe
 status: In Progress
 assignee: []
 created_date: '2026-10-20 04:32'
-updated_date: '2026-10-21 19:46'
+updated_date: '2026-10-21 19:55'
 labels: []
 dependencies: []
 references:
@@ -97,12 +97,12 @@ This task changes only version-2 task-native cleanup. It does not change version
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 After an operator-authorized merge or abandonment is committed and pushed and its terminal result is verified, the owning Conversation immediately invokes task-native Episode cleanup without a second cleanup confirmation; no event hook or background automation is introduced.
-- [ ] #2 Before destructive cleanup, the exact root Episode and every explicitly related descendant are idle. Any active owned session causes zero destructive mutation and a clear report that the Episode has not completed its work.
+- [x] #2 Before destructive cleanup, the exact root Episode and every explicitly related descendant are idle. Any active owned session causes zero destructive mutation and a clear report that the Episode has not completed its work.
 - [x] #3 Cleanup recursively selects only sessions connected to the exact Episode by explicit Prime Agent parent ID or canonical parent session-file path edges; shared-worktree sessions, possible siblings, and unrelated sessions are never selected.
 - [x] #4 Cleanup removes the exact owned session tree, provider worktree, local branch, exact upstream remote branch, and ownership entry. Initialized submodules do not block removal of a proven-clean Orca worktree, and unrelated ownership records and resources remain unchanged.
 - [x] #5 Terminal outcome, exact terminal head, clean worktree, branch identity, and remote identity are verified before deletion; dirty, changed, ambiguous, foreign, or mismatched evidence blocks unsafe mutation.
-- [ ] #6 After partial or transient failure, each invocation re-reads ordinary ownership plus actual Prime Agent, provider, and Git state: an absent exact resource is complete, an exact present resource is removable, and changed or ambiguous state blocks. The tool stores no `cleanupHead`, stage, tombstone, receipt, retry registry, error taxonomy, or background reconciliation state; the Conversation decides whether to invoke it again and asks for help only when safe progress is impossible.
-- [ ] #7 Focused tests and living finalization documentation prove the direct version-2 behavior while version-1 `finalize_spec_episode` remains unchanged; command-surface unification remains out of scope.
+- [x] #6 After partial or transient failure, each invocation re-reads ordinary ownership plus actual Prime Agent, provider, and Git state: an absent exact resource is complete, an exact present resource is removable, and changed or ambiguous state blocks. The tool stores no `cleanupHead`, stage, tombstone, receipt, retry registry, error taxonomy, or background reconciliation state; the Conversation decides whether to invoke it again and asks for help only when safe progress is impossible.
+- [x] #7 Focused tests and living finalization documentation prove the direct version-2 behavior while version-1 `finalize_spec_episode` remains unchanged; command-surface unification remains out of scope.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -193,10 +193,21 @@ Focused evidence:
 - Final focused host-safe static: `python3 -m pytest tests/test_oversee_episode_skill.py tests/test_reviewed_plan_extension.py tests/test_managed_session_protocol.py -q` -> 19 passed, 7 skipped in 0.13s. Log /tmp/primeclaw-10-40-slice4-static.log. Covers no second confirmation schema/prompt policy, explicit idle completion before readiness, same-Episode integration location, current-evidence error/re-invocation policy, lean guidance, current-policy docs, and session contracts. The Node tests also assert retained finalize_spec_episode location-only schema/operator terminal-decision guidance; existing legacy behavior suite remains green. No full-task audit or unrelated baseline repairs were performed in this slice.
 - Independent bounded source review of schema/wrapper, managed guidance, Node test diff, and directly affected lifecycle docs found no concrete material contract defect. It ran no behavior probes: Docker output above is the behavior evidence. Documentation/static worker and read-only reviewer are deleted. `git diff --check` passes; exact active owner binding is unchanged.
 Acceptance and next: AC1 implementation/schema/prompt-policy evidence is recorded and checked, not a claim of real operator-outcome UAT or owner acceptance. AC2/AC6/AC7 and whole-task final audit are intentionally left for the owning Conversation's review rather than opportunistically completing later plan steps. Task remains In Progress. No status publication, merge, abandonment, live runtime/worktree/ref/owner cleanup, user-global activation, host plugin apply/check/probe, installed asset mutation, or Prime Agent upstream change occurred. Push this one bounded slice, report exact candidate/evidence to Beads Replacement, and stop for owner review.
+
+Final acceptance reconciliation only. The operator reports that the whole-task owner audit and independent GPT-6 Astra review accepted Slice 4 and the complete implementation candidate c0f755d189ab421f68631905e556daf52875a81d with no material defect. Criteria 2, 6, and 7 are now checked using the already recorded slice evidence: accepted idle/zero-mutation behavior, direct actual-state recovery with Conversation-led re-invocation and no cleanup state, focused current-policy/schema/behavior coverage, and unchanged version-1 behavior. All seven implementation criteria are reconciled; no new implementation or test result is claimed.
+Final evidence remains the recorded focused static run (19 passed, 7 skipped) and final supported Docker bridge (6 passed, 9 deselected; .test-results/20261021T194303Z-4746-6821f32e/tier1/manifest.json, passed, no failure codes, offline runtime, clean absent teardown). The tested implementation source/tests/docs are unchanged from c0f755d. This checkpoint changes only this Episode-owned task through the supported CLI; ID/path/parent/In Progress are verified after edit. No source, tests, living docs, scope, lifecycle status, resources, ownership, or installed generation changes. Commit and push only this task path, report the exact head, and stop. Merge readiness/publication and later operator outcomes remain with the owning Conversation; no further Episode implementation is authorized.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Slices 1-3 accepted. Slice 4 (plan step 5 only) is implemented and validated for owner review: finalize_task_episode now takes only taskId, exact terminal episodeHead, and truthful merged/abandoned outcome; no second cleanup-confirmation gate. Managed Conversation policy verifies provider-reported idle completion before readiness/merge, immediately cleans after the already authorized terminal result is committed/pushed/verified, and interprets errors/re-reads current evidence before safe re-invocation. No coded automation or new state. Managed skill remains within unchanged 950-word bound. Final supported Docker bridge: 6 passed, 9 deselected, offline/clean absent teardown. Focused static: 19 passed, 7 skipped. RED caught old schema/gate; source review found no material defect. Version1/spec/transport behavior unchanged. Exact provenance in latest notes. AC1 implementation evidence checked; remaining whole-task audit, AC2/6/7 reconciliation, manual terminal-outcome evidence, and merge readiness remain owner review after this pushed slice. Task remains In Progress; stop pending owner acceptance.
+Complete implementation candidate c0f755d189ab421f68631905e556daf52875a81d accepted by the whole-task owner audit and independent GPT-6 Astra review, with no material defect (operator-reported). All seven acceptance criteria are reconciled from recorded evidence:
+1. Prompt-led immediate cleanup after the authorized terminal outcome is committed/pushed/verified, without a second confirmation.
+2. Provider-proven idle root and descendants; active or unprovable-idle work blocks destructive mutation.
+3. Explicit recursive parent-ID/canonical parent-file lineage only; unrelated sessions excluded.
+4. Exact runtime tree, upstream, provider worktree, remaining local branch, and unchanged owner removed; clean Orca submodules supported.
+5. Terminal/head/cleanliness/branch/remote identity checks reject changed, foreign, or ambiguous state.
+6. Direct actual-state continuation after partial failure; no cleanup marker/stage/receipt/retry machinery. Conversation re-reads current evidence and decides safe re-invocation/escalation.
+7. Focused tests and living docs updated; version-1 finalize_spec_episode behavior and retained compatibility unchanged.
+Validation: focused static 19 passed/7 skipped; final supported Docker bridge 6 passed/9 deselected, offline runtime and clean absent teardown. Exact commands/provenance are in Implementation Notes. This final checkpoint reconciles only the task; no code, tests, docs, scope, or lifecycle status changes. Task remains In Progress for owning Conversation lifecycle work. No merge, live cleanup, global activation, or real operator-outcome UAT is claimed. Episode stops after the task-only commit/push.
 <!-- SECTION:FINAL_SUMMARY:END -->
