@@ -196,9 +196,9 @@ function evidenceAdvancementFixture() {
     id: taskId, title: "Provider evidence fixture", status: "in_progress",
     design: "Implement the original bounded design", comments: [{ body: "original" }],
   };
-  const reviewedTaskEvidence = {
+  const currentTaskEvidence = {
     ...oldTaskEvidence,
-    design: "Implement the reviewed owner-authored living-plan update",
+    design: "Implement the owner-authored living-plan update",
     updated_at: "2026-10-20T21:00:00Z",
   };
   const owner = parseEpisodeOwnership({
@@ -213,13 +213,26 @@ function evidenceAdvancementFixture() {
   writeEpisodeOwnership(root, unrelated);
   return {
     root, episodeRoot: realpathSync(episodeRoot), taskId, owner, unrelated, reviewedHead,
-    reviewedProviderRevision: "b".repeat(32), publishedProviderRevision: "c".repeat(32), reviewedTaskEvidence,
+    publishedProviderRevision: "c".repeat(32), currentTaskEvidence,
   };
 }
 
 function evidenceAdvancementProvider(f, overrides = {}) {
-  const currentTaskEvidence = overrides.currentTaskEvidence ?? f.reviewedTaskEvidence;
+  const currentTaskEvidence = overrides.currentTaskEvidence ?? f.currentTaskEvidence;
   return {
+    detectProvider: (cwd) => ({
+      kind: "selected",
+      projectRoot: cwd,
+      evidence: {
+        provider: "beads",
+        storeDir: f.root,
+        metadataPath: f.root,
+        configPath: f.root,
+        doltMode: "server",
+        doltDatabase: "evidence",
+      },
+    }),
+    synchronize: () => ({ status: 0, stdout: "synchronized", stderr: "" }),
     prepareTransport: () => ({
       status: "ready",
       evidence: {
@@ -247,19 +260,25 @@ function evidenceAdvancementProvider(f, overrides = {}) {
   };
 }
 
-function advanceEvidence(f, inputOverrides = {}, dependencyOverrides = {}) {
+function prepareEvidence(f, inputOverrides = {}, dependencyOverrides = {}) {
   return advancePublishedBeadsTaskEpisodeEvidence({
     projectRoot: f.root,
     ownerSessionId: f.owner.ownerSessionId,
     taskId: f.taskId,
-    reviewedProviderRevision: f.reviewedProviderRevision,
-    reviewedTaskEvidence: f.reviewedTaskEvidence,
-    reviewedEpisodeHead: f.reviewedHead,
+    previousProviderRevision: f.owner.providerRevision,
+    previousTaskEvidence: f.owner.taskEvidence,
+    episodeHead: f.reviewedHead,
     ...inputOverrides,
   }, {
     ...evidenceAdvancementProvider(f),
     ...dependencyOverrides,
   });
+}
+
+function advanceEvidence(f, inputOverrides = {}, dependencyOverrides = {}) {
+  const prepared = prepareEvidence(f, inputOverrides, dependencyOverrides);
+  prepared.commit();
+  return prepared;
 }
 
 function legacyOwnership(ownerSessionId, sourceLocation) {
@@ -806,22 +825,54 @@ test("Beads receipt evidence may advance without changing ownership identity", (
   );
 });
 
-test("reviewed Beads evidence advances only the same active owner's four evidence fields", () => {
+test("prepared Beads observations preserve the prior record until handoff admission commits them", () => {
   const f = evidenceAdvancementFixture();
+  const prepared = prepareEvidence(f);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
+  assert.deepEqual(prepared.previousTaskEvidence, f.owner.taskEvidence);
+  assert.deepEqual(prepared.currentTaskEvidence, f.currentTaskEvidence);
+  assert.deepEqual(prepared.commit(), prepared.record);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), prepared.record);
+});
+
+test("published Beads evidence refresh synchronizes before proof/read and records current facts without binding drift", () => {
+  const f = evidenceAdvancementFixture();
+  const provider = evidenceAdvancementProvider(f);
   const ancestry = [];
+  const order = [];
   const result = advanceEvidence(f, {}, {
+    ...provider,
+    synchronize: (...args) => {
+      order.push("pull");
+      return provider.synchronize(...args);
+    },
+    prepareTransport: (...args) => {
+      order.push("prepare");
+      return provider.prepareTransport(...args);
+    },
+    resolveTask: (...args) => {
+      order.push("read");
+      return provider.resolveTask(...args);
+    },
+    pairTransport: (...args) => {
+      order.push("pair");
+      return provider.pairTransport(...args);
+    },
     providerRevisionIsAncestor: (cwd, ancestor, descendant) => {
+      order.push("ancestry");
       ancestry.push({ cwd, ancestor, descendant });
       return true;
     },
   });
 
-  assert.equal(result.status, "advanced");
-  assert.equal(result.reviewedProviderRevision, f.reviewedProviderRevision);
+  assert.deepEqual(order, ["pull", "prepare", "read", "pair", "ancestry"]);
+  assert.equal(result.previousProviderRevision, f.owner.providerRevision);
   assert.equal(result.publishedProviderRevision, f.publishedProviderRevision);
+  assert.deepEqual(result.previousTaskEvidence, f.owner.taskEvidence);
+  assert.deepEqual(result.currentTaskEvidence, f.currentTaskEvidence);
   assert.deepEqual(ancestry, [{
     cwd: f.episodeRoot,
-    ancestor: f.reviewedProviderRevision,
+    ancestor: f.owner.providerRevision,
     descendant: f.publishedProviderRevision,
   }]);
   const changed = Object.keys(result.record).filter((key) =>
@@ -829,39 +880,47 @@ test("reviewed Beads evidence advances only the same active owner's four evidenc
   assert.deepEqual(changed.sort(), ["head", "providerRevision", "taskEvidence", "updatedAt"]);
   assert.equal(result.record.head, f.reviewedHead);
   assert.equal(result.record.providerRevision, f.publishedProviderRevision);
-  assert.deepEqual(result.record.taskEvidence, f.reviewedTaskEvidence);
+  assert.deepEqual(result.record.taskEvidence, f.currentTaskEvidence);
   assert.equal(result.record.updatedAt, "2026-10-20T22:00:00.000Z");
   assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), result.record);
   assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
 });
 
-test("post-preparation Beads advance and dirty state returns exact review evidence with zero owner writes", () => {
+test("owner-authored and compatible outside same-task Beads changes both advance as factual observations", () => {
+  const ownerAuthored = evidenceAdvancementFixture();
+  const ownerResult = advanceEvidence(ownerAuthored);
+  assert.deepEqual(ownerResult.previousTaskEvidence, ownerAuthored.owner.taskEvidence);
+  assert.deepEqual(ownerResult.currentTaskEvidence, ownerAuthored.currentTaskEvidence);
+  assert.deepEqual(ownerResult.record.taskEvidence, ownerAuthored.currentTaskEvidence);
+
+  const outside = evidenceAdvancementFixture();
+  const outsideEvidence = {
+    ...outside.owner.taskEvidence,
+    design: "Compatible outside edit within the approved task scope",
+    comments: [...outside.owner.taskEvidence.comments, { body: "outside writer added useful context" }],
+    provider_native_tail: { marker: "outside-compatible-long-tail", opaque: [1, { two: 2 }] },
+  };
+  const outsideResult = advanceEvidence(outside, {}, evidenceAdvancementProvider(outside, {
+    currentTaskEvidence: outsideEvidence,
+  }));
+  assert.deepEqual(outsideResult.previousTaskEvidence, outside.owner.taskEvidence);
+  assert.deepEqual(outsideResult.currentTaskEvidence, outsideEvidence);
+  assert.deepEqual(outsideResult.record.taskEvidence, outsideEvidence);
+});
+
+test("paired publication failure and lifecycle drift fail without ownership writes", () => {
   const f = evidenceAdvancementFixture();
   const provider = evidenceAdvancementProvider(f);
-  const initialResolve = provider.resolveTask;
-  let liveRevision = f.publishedProviderRevision;
-  let dirty = false;
-  let pairingProofCalls = 0;
   let ownerWrites = 0;
-
-  const result = advanceEvidence(f, {}, {
+  assert.throws(() => advanceEvidence(f, {}, {
     ...provider,
-    pairTransport: () => {
-      pairingProofCalls += 1;
-      assert.equal(dirty, true);
-      return {
-        status: "blocked",
-        code: "revision",
-        detail: "the selected Dolt working set has 1 uncommitted table change(s)",
-        remediation: "Review the exact native writer before continuing",
-        observedRevision: liveRevision,
-      };
-    },
-    resolveTask: (...args) => {
-      liveRevision = "d".repeat(32);
-      dirty = true;
-      return initialResolve(...args);
-    },
+    pairTransport: () => ({
+      status: "blocked",
+      code: "revision",
+      detail: "the selected Dolt working set has 1 uncommitted table change(s)",
+      remediation: "Review the exact native writer before continuing",
+      observedRevision: "d".repeat(32),
+    }),
     ownership: {
       read: (root, ownerSessionId) => readEpisodeOwnership(root, ownerSessionId),
       mutate: () => {
@@ -869,49 +928,54 @@ test("post-preparation Beads advance and dirty state returns exact review eviden
         throw new Error("ownership mutation must not run for unpaired evidence");
       },
     },
-  });
-
-  assert.deepEqual(result, {
-    status: "review-required",
-    code: "provider-evidence-mismatch",
-    reviewedProviderRevision: f.reviewedProviderRevision,
-    publishedProviderRevision: f.publishedProviderRevision,
-    observedProviderRevision: "d".repeat(32),
-    acceptedTaskEvidence: f.reviewedTaskEvidence,
-    currentTaskEvidence: f.reviewedTaskEvidence,
-    providerProof: {
-      status: "blocked",
-      code: "revision",
-      detail: "the selected Dolt working set has 1 uncommitted table change(s)",
-    },
-  });
-  assert.equal(pairingProofCalls, 1);
+  }), /paired publication proof is blocked/);
   assert.equal(ownerWrites, 0);
   assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
-  assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
+
+  const lifecycle = evidenceAdvancementFixture();
+  const blockedEvidence = { ...lifecycle.currentTaskEvidence, status: "blocked" };
+  assert.throws(() => advanceEvidence(lifecycle, {}, evidenceAdvancementProvider(lifecycle, {
+    currentTaskEvidence: blockedEvidence,
+    canonicalStatus: "Blocked",
+  })), /current native In Progress task/);
+  assert.deepEqual(readEpisodeOwnership(lifecycle.root, lifecycle.owner.ownerSessionId), lifecycle.owner);
 });
 
-test("same-task Beads mismatch returns exact accepted/current raw evidence with no owner write", () => {
+test("foreign linked provider context is rejected before the sole native pull", () => {
   const f = evidenceAdvancementFixture();
-  const currentTaskEvidence = {
-    ...f.reviewedTaskEvidence,
-    status: "blocked",
-    design: "outside same-task edit requiring managed review",
-    comments: [...f.reviewedTaskEvidence.comments, { body: "outside writer changed authority" }],
-  };
-  const result = advanceEvidence(f, {}, evidenceAdvancementProvider(f, {
-    currentTaskEvidence,
-    canonicalStatus: "Blocked",
-  }));
+  let pulls = 0;
+  assert.throws(() => prepareEvidence(f, {}, {
+    detectProvider: (cwd) => ({
+      kind: "selected",
+      projectRoot: cwd,
+      evidence: {
+        provider: "beads",
+        storeDir: cwd,
+        metadataPath: cwd,
+        configPath: cwd,
+        doltMode: "server",
+        doltDatabase: cwd === f.episodeRoot ? "foreign" : "evidence",
+      },
+    }),
+    synchronize: () => {
+      pulls += 1;
+      return { status: 0, stdout: "must not pull", stderr: "" };
+    },
+  }), /does not resolve the exact canonical provider store and database/);
+  assert.equal(pulls, 0);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
+});
 
-  assert.deepEqual(result, {
-    status: "review-required",
-    code: "task-evidence-mismatch",
-    reviewedProviderRevision: f.reviewedProviderRevision,
-    publishedProviderRevision: f.publishedProviderRevision,
-    acceptedTaskEvidence: f.reviewedTaskEvidence,
-    currentTaskEvidence,
-  });
+test("native synchronization failure is not retried and changes no evidence", () => {
+  const f = evidenceAdvancementFixture();
+  let pulls = 0;
+  assert.throws(() => advanceEvidence(f, {}, {
+    synchronize: () => {
+      pulls += 1;
+      return { status: 1, stdout: "", stderr: "merge conflict" };
+    },
+  }), /native synchronization failed.*merge conflict/);
+  assert.equal(pulls, 1);
   assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
   assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
 });

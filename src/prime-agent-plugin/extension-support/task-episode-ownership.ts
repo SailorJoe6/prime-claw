@@ -27,6 +27,7 @@ import {
   type BacklogTaskSelection,
 } from "./reviewed-plan-support.ts";
 import {
+  detectTaskProvider,
   prepareBeadsWorkspaceTransport,
   requireBacklogTaskSelection,
   resolveProviderTask,
@@ -103,15 +104,15 @@ export interface BeadsTaskEpisodeReservationDependencies {
   now?: () => string;
 }
 
-/** Reviewed provider-native facts that may advance one existing active Beads owner. */
+/** Factual provider-native observations that may refresh one existing active Beads owner. */
 export interface BeadsTaskEvidenceAdvancementInput {
   /** Canonical primary checkout that contains the existing ownership registry. */
   projectRoot: string;
   ownerSessionId: string;
   taskId: string;
-  reviewedProviderRevision: string;
-  reviewedTaskEvidence: Record<string, unknown>;
-  reviewedEpisodeHead: string;
+  previousProviderRevision: string;
+  previousTaskEvidence: Record<string, unknown>;
+  episodeHead: string;
 }
 
 export interface BeadsTaskEvidenceAdvancementGit {
@@ -134,6 +135,8 @@ export interface BeadsTaskEvidenceAdvancementDependencies {
   git?: BeadsTaskEvidenceAdvancementGit;
   ownership?: BeadsTaskEvidenceAdvancementStore;
   runner?: CommandRunner;
+  detectProvider?: typeof detectTaskProvider;
+  synchronize?: (cwd: string, runner: CommandRunner) => { stdout: string; stderr: string; status: number };
   prepareTransport?: (cwd: string, runner: CommandRunner) => BeadsWorkspaceTransportPreparation;
   pairTransport?: (cwd: string, runner: CommandRunner) => BeadsWorkspaceTransportPreparation;
   resolveTask?: (cwd: string, taskId: string, runner: CommandRunner) => ProviderTaskResolution | null;
@@ -143,31 +146,14 @@ export interface BeadsTaskEvidenceAdvancementDependencies {
   now?: () => string;
 }
 
-export type BeadsTaskEvidenceAdvancementResult =
-  | {
-      status: "advanced";
-      record: BeadsTaskEpisodeOwnershipRecord;
-      reviewedProviderRevision: string;
-      publishedProviderRevision: string;
-    }
-  | {
-      status: "review-required";
-      code: "task-evidence-mismatch";
-      reviewedProviderRevision: string;
-      publishedProviderRevision: string;
-      acceptedTaskEvidence: Record<string, unknown>;
-      currentTaskEvidence: Record<string, unknown>;
-    }
-  | {
-      status: "review-required";
-      code: "provider-evidence-mismatch";
-      reviewedProviderRevision: string;
-      publishedProviderRevision: string;
-      observedProviderRevision: string;
-      acceptedTaskEvidence: Record<string, unknown>;
-      currentTaskEvidence: Record<string, unknown>;
-      providerProof: { status: "ready" } | { status: "blocked"; code: string; detail: string };
-    };
+export interface BeadsTaskEvidenceAdvancementResult {
+  record: BeadsTaskEpisodeOwnershipRecord;
+  previousProviderRevision: string;
+  publishedProviderRevision: string;
+  previousTaskEvidence: Record<string, unknown>;
+  currentTaskEvidence: Record<string, unknown>;
+  commit: () => BeadsTaskEpisodeOwnershipRecord;
+}
 
 export interface LegacyTaskOwnershipTransitionInput {
   projectRoot: string;
@@ -822,9 +808,9 @@ function exactBeadsProviderRevisionAncestor(
   return row.merge_base === ancestor;
 }
 
-function proveReviewedBeadsEpisodeCode(
+function proveBeadsEpisodeCodeHead(
   record: BeadsTaskEpisodeOwnershipRecord,
-  reviewedHead: string,
+  episodeHead: string,
   git: BeadsTaskEvidenceAdvancementGit,
 ): void {
   const episodeRoot = realpathSync(record.worktree!);
@@ -840,13 +826,13 @@ function proveReviewedBeadsEpisodeCode(
   const localHead = git.head(episodeRoot);
   const upstreamHead = git.upstreamHead(episodeRoot);
   const directRemoteHead = git.directRemoteHead(episodeRoot, record.branch!);
-  if (localHead !== reviewedHead || upstreamHead !== reviewedHead || directRemoteHead !== reviewedHead) {
-    throw new Error("Beads evidence advancement requires the exact reviewed pushed local/upstream/direct-remote Episode head");
+  if (localHead !== episodeHead || upstreamHead !== episodeHead || directRemoteHead !== episodeHead) {
+    throw new Error("Beads evidence advancement requires the exact pushed local/upstream/direct-remote Episode head");
   }
   if (!record.head || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(record.head)
       || !git.isAncestor(episodeRoot, record.baseRef, record.head)
-      || !git.isAncestor(episodeRoot, record.head, reviewedHead)
-      || !git.isAncestor(episodeRoot, record.baseRef, reviewedHead)) {
+      || !git.isAncestor(episodeRoot, record.head, episodeHead)
+      || !git.isAncestor(episodeRoot, record.baseRef, episodeHead)) {
     throw new Error("Beads evidence advancement found unsafe Episode base/head ancestry");
   }
 }
@@ -864,10 +850,10 @@ function activeForeignBeadsEvidenceCollision(
 }
 
 /**
- * Advance only the reviewed provider/task/code evidence on one retained active
- * Beads owner. This internal primitive creates no owner, task mutation, status
- * transition, lifecycle routing, or retry. Raw same-task drift is returned for
- * managed review without classification or ownership mutation.
+ * Refresh factual provider/task/code observations on one retained active Beads
+ * owner. This internal primitive creates no owner, task mutation, status
+ * transition, lifecycle routing, semantic acceptance, or retry. Exact previous
+ * and current native task views are returned for the existing Episode LLM.
  */
 export function advancePublishedBeadsTaskEpisodeEvidence(
   input: BeadsTaskEvidenceAdvancementInput,
@@ -890,9 +876,9 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
   if (selected.taskId !== input.taskId) {
     throw new Error("Beads evidence advancement task does not match the exact retained owner");
   }
-  if (!BEADS_RESERVATION_REVISION.test(input.reviewedProviderRevision)
-      || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(input.reviewedEpisodeHead)) {
-    throw new Error("Beads evidence advancement requires exact reviewed provider and Episode revisions");
+  if (!BEADS_RESERVATION_REVISION.test(input.previousProviderRevision)
+      || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(input.episodeHead)) {
+    throw new Error("Beads evidence advancement requires exact previous provider and Episode revisions");
   }
   if (!selected.worktree || !selected.branch || !selected.head || !selected.episodeId
       || !selected.episodeSessionFile || !selected.episodeActiveSessionId) {
@@ -901,20 +887,46 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
   assertRegularNonemptyFile(selected.episodeSessionFile, "Owned Beads Episode session transcript");
   const episodeRoot = realpathSync(selected.worktree);
 
-  // Reuse the version-2 parser to reject malformed/mixed reviewed evidence
-  // without inventing a second task model.
+  // Validate the persisted observation without inventing a second task model.
   parseEpisodeOwnership({
     ...selected,
-    providerRevision: input.reviewedProviderRevision,
-    taskEvidence: input.reviewedTaskEvidence,
-    head: input.reviewedEpisodeHead,
-  }, "reviewed Beads evidence advancement input");
-  if (input.reviewedTaskEvidence.id !== input.taskId
-      || input.reviewedTaskEvidence.status !== BEADS_IN_PROGRESS_STATUS) {
-    throw new Error("Beads evidence advancement requires exact reviewed raw in_progress task evidence");
+    providerRevision: input.previousProviderRevision,
+    taskEvidence: input.previousTaskEvidence,
+    head: input.episodeHead,
+  }, "previous Beads evidence advancement input");
+  if (input.previousProviderRevision !== selected.providerRevision
+      || JSON.stringify(input.previousTaskEvidence) !== JSON.stringify(selected.taskEvidence)) {
+    throw new Error("Beads evidence advancement input does not match the exact persisted provider observation");
+  }
+  if (input.previousTaskEvidence.id !== input.taskId
+      || input.previousTaskEvidence.status !== BEADS_IN_PROGRESS_STATUS) {
+    throw new Error("Beads evidence advancement requires exact previous raw in_progress task evidence");
   }
 
   const runner = dependencies.runner ?? new ProcessCommandRunner();
+  const detectProvider = dependencies.detectProvider ?? detectTaskProvider;
+  const primaryProvider = detectProvider(ownershipRoot, runner);
+  const episodeProvider = detectProvider(episodeRoot, runner);
+  const providerIdentityMatches = primaryProvider.kind === "selected"
+    && episodeProvider.kind === "selected"
+    && primaryProvider.evidence.provider === "beads"
+    && episodeProvider.evidence.provider === "beads"
+    && realpathSync(primaryProvider.projectRoot) === ownershipRoot
+    && realpathSync(episodeProvider.projectRoot) === episodeRoot
+    && realpathSync(primaryProvider.evidence.storeDir) === realpathSync(episodeProvider.evidence.storeDir)
+    && realpathSync(primaryProvider.evidence.metadataPath) === realpathSync(episodeProvider.evidence.metadataPath)
+    && realpathSync(primaryProvider.evidence.configPath) === realpathSync(episodeProvider.evidence.configPath)
+    && primaryProvider.evidence.doltMode === episodeProvider.evidence.doltMode
+    && primaryProvider.evidence.doltDatabase === episodeProvider.evidence.doltDatabase;
+  if (!providerIdentityMatches) {
+    throw new Error("Beads evidence advancement linked worktree does not resolve the exact canonical provider store and database");
+  }
+  const synchronization = dependencies.synchronize
+    ? dependencies.synchronize(episodeRoot, runner)
+    : runner.run("bd", ["dolt", "pull"], { cwd: episodeRoot, allowFailure: true });
+  if (synchronization.status !== 0) {
+    throw new Error(`Beads evidence advancement native synchronization failed; no evidence was changed: ${synchronization.stderr.trim() || synchronization.stdout.trim() || `exit ${synchronization.status}`}`);
+  }
   const preparation = (dependencies.prepareTransport ?? prepareBeadsWorkspaceTransport)(ownershipRoot, runner);
   if (preparation.status !== "ready") {
     throw new Error(`Beads evidence advancement native publication proof is blocked (${preparation.code}): ${preparation.detail}`);
@@ -933,24 +945,11 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
   }
 
   // Pair the long raw task read with a second fresh native publication proof.
-  // A writer that advances or dirties the store after the first proof must
-  // produce managed-review evidence rather than a stale revision receipt.
+  // Provider movement or a dirty/unpublished store during that read is a real
+  // transport-integrity failure, not a semantic approval state.
   const pairedPreparation = (dependencies.pairTransport ?? prepareBeadsWorkspaceTransport)(ownershipRoot, runner);
   if (pairedPreparation.status !== "ready") {
-    return {
-      status: "review-required",
-      code: "provider-evidence-mismatch",
-      reviewedProviderRevision: input.reviewedProviderRevision,
-      publishedProviderRevision: prepared.publishedRevision,
-      observedProviderRevision: pairedPreparation.observedRevision ?? prepared.publishedRevision,
-      acceptedTaskEvidence: input.reviewedTaskEvidence,
-      currentTaskEvidence: currentTask.nativeView,
-      providerProof: {
-        status: "blocked",
-        code: pairedPreparation.code,
-        detail: pairedPreparation.detail,
-      },
-    };
+    throw new Error(`Beads evidence advancement paired publication proof is blocked (${pairedPreparation.code}): ${pairedPreparation.detail}`);
   }
   const paired = pairedPreparation.evidence;
   const pairedIdentityMatches = realpathSync(paired.projectRoot) === ownershipRoot
@@ -964,77 +963,66 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
     && paired.publicationRef === prepared.publicationRef
     && paired.publishedRevision === prepared.publishedRevision;
   if (!pairedIdentityMatches) {
-    return {
-      status: "review-required",
-      code: "provider-evidence-mismatch",
-      reviewedProviderRevision: input.reviewedProviderRevision,
-      publishedProviderRevision: prepared.publishedRevision,
-      observedProviderRevision: paired.publishedRevision,
-      acceptedTaskEvidence: input.reviewedTaskEvidence,
-      currentTaskEvidence: currentTask.nativeView,
-      providerProof: { status: "ready" },
-    };
+    throw new Error("Beads evidence advancement publication identity changed during the paired native read");
   }
-  if (JSON.stringify(currentTask.nativeView) !== JSON.stringify(input.reviewedTaskEvidence)) {
-    return {
-      status: "review-required",
-      code: "task-evidence-mismatch",
-      reviewedProviderRevision: input.reviewedProviderRevision,
-      publishedProviderRevision: paired.publishedRevision,
-      acceptedTaskEvidence: input.reviewedTaskEvidence,
-      currentTaskEvidence: currentTask.nativeView,
-    };
-  }
-  if (currentTask.nativeStatus !== BEADS_IN_PROGRESS_STATUS || currentTask.status !== "In Progress") {
-    throw new Error("Beads evidence advancement requires the exact unchanged native In Progress task before ownership mutation");
+  if (currentTask.nativeStatus !== BEADS_IN_PROGRESS_STATUS || currentTask.status !== "In Progress"
+      || !meaningfulTaskImplementationPlan(
+        typeof currentTask.nativeView.design === "string" ? currentTask.nativeView.design : null,
+      )) {
+    throw new Error("Beads evidence advancement requires the exact current native In Progress task with a meaningful design before ownership mutation");
   }
   const revisionIsAncestor = dependencies.providerRevisionIsAncestor ?? exactBeadsProviderRevisionAncestor;
-  if (!revisionIsAncestor(episodeRoot, input.reviewedProviderRevision, paired.publishedRevision, runner)) {
-    throw new Error("Beads evidence advancement reviewed provider revision is not an ancestor of the current published revision");
+  if (!revisionIsAncestor(episodeRoot, input.previousProviderRevision, paired.publishedRevision, runner)) {
+    throw new Error("Beads evidence advancement previous provider revision is not an ancestor of the current published revision");
   }
 
   const git = dependencies.git ?? new CliBeadsTaskEvidenceAdvancementGit();
   const target = parseEpisodeOwnership({
     ...selected,
     providerRevision: paired.publishedRevision,
-    taskEvidence: input.reviewedTaskEvidence,
-    head: input.reviewedEpisodeHead,
+    taskEvidence: currentTask.nativeView,
+    head: input.episodeHead,
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
   }, "advanced Beads Episode evidence") as BeadsTaskEpisodeOwnershipRecord;
 
-  let mutationResult: EpisodeOwnershipRecord | null;
-  try {
-    mutationResult = ownership.mutate(ownershipRoot, input.ownerSessionId, (current, allRecords) => {
-      if (!sameOwnership(current, selected)) {
-        throw new Error("Beads evidence advancement owner or binding drifted before atomic mutation");
+  const commit = (): BeadsTaskEpisodeOwnershipRecord => {
+    let mutationResult: EpisodeOwnershipRecord | null;
+    try {
+      mutationResult = ownership.mutate(ownershipRoot, input.ownerSessionId, (current, allRecords) => {
+        if (!sameOwnership(current, selected)) {
+          throw new Error("Beads evidence advancement owner or binding drifted before atomic mutation");
+        }
+        if (activeForeignBeadsEvidenceCollision(selected, allRecords)) {
+          throw new Error("Beads evidence advancement found a foreign active owner collision");
+        }
+        // Put the pushed-head proof immediately beside the sole ownership write.
+        proveBeadsEpisodeCodeHead(selected, input.episodeHead, git);
+        return target;
+      });
+    } catch (error) {
+      let observed: EpisodeOwnershipRecord | null = null;
+      try { observed = ownership.read(ownershipRoot, input.ownerSessionId); } catch { /* exact uncertainty below */ }
+      if (sameOwnership(observed, target)) mutationResult = target;
+      else if (sameOwnership(observed, selected)) throw error;
+      else {
+        throw new Error(`Beads evidence advancement write is uncertain and made no retry: ${error instanceof Error ? error.message : String(error)}`);
       }
-      if (activeForeignBeadsEvidenceCollision(selected, allRecords)) {
-        throw new Error("Beads evidence advancement found a foreign active owner collision");
-      }
-      // Put the pushed-head proof immediately beside the sole ownership write.
-      proveReviewedBeadsEpisodeCode(selected, input.reviewedEpisodeHead, git);
-      return target;
-    });
-  } catch (error) {
-    let observed: EpisodeOwnershipRecord | null = null;
-    try { observed = ownership.read(ownershipRoot, input.ownerSessionId); } catch { /* exact uncertainty below */ }
-    if (sameOwnership(observed, target)) mutationResult = target;
-    else if (sameOwnership(observed, selected)) throw error;
-    else {
-      throw new Error(`Beads evidence advancement write is uncertain and made no retry: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-  if (!sameOwnership(mutationResult, target)) {
-    throw new Error("Beads evidence advancement atomic store returned unexpected ownership evidence");
-  }
-  const stored = ownership.read(ownershipRoot, input.ownerSessionId);
-  if (!sameOwnership(stored, target)) {
-    throw new Error("Beads evidence advancement could not re-read the exact persisted evidence");
-  }
+    if (!sameOwnership(mutationResult, target)) {
+      throw new Error("Beads evidence advancement atomic store returned unexpected ownership evidence");
+    }
+    const stored = ownership.read(ownershipRoot, input.ownerSessionId);
+    if (!sameOwnership(stored, target)) {
+      throw new Error("Beads evidence advancement could not re-read the exact persisted evidence");
+    }
+    return target;
+  };
   return {
-    status: "advanced",
     record: target,
-    reviewedProviderRevision: input.reviewedProviderRevision,
+    previousProviderRevision: input.previousProviderRevision,
     publishedProviderRevision: paired.publishedRevision,
+    previousTaskEvidence: input.previousTaskEvidence,
+    currentTaskEvidence: currentTask.nativeView,
+    commit,
   };
 }

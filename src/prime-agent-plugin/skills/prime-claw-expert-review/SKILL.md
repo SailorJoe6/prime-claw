@@ -119,7 +119,7 @@ It must also include this review contract:
   implement, steer the candidate, mutate lifecycle state, or perform cleanup.
   Findings are evidence, not approval. For Beads, do not invoke unavailable
   handoff, blocked, status, terminal, finalization, cleanup, or ownership-evidence
-  advancement paths; report the exact accepted evidence and stop instead of
+  advancement paths; report the exact factual provider evidence and stop instead of
   using a Backlog-only route or writing `ownership.json`.
 - Review the exact candidate only against the operator-approved product
   contract and the implementation claims being made. Do not add requirements,

@@ -152,15 +152,15 @@ stop.
 Treat the complete raw Beads view as the durable work contract: description,
 design, acceptance criteria, notes, comments, labels, dependencies, and every
 other provider field all retain their provider-native names, shapes, values,
-and absence. Do not translate them into a normalized task model. Compare the
-persisted raw `taskEvidence` with the synchronized raw view field for field.
-A provider revision advance or unrelated-task change alone does not block this
-Episode. For every outside change to the same task, present the exact raw before
-and current values and reason about their meaning. A compatible change that is
-inside the approved scope may become the new working basis. A genuine semantic
-conflict, scope expansion, or authority change must be escalated without a
-write. Do not use a deterministic semantic classifier and never silently
-overwrite either view.
+and absence. Do not translate them into a normalized task model. Compare the prior
+factual `taskEvidence` observation with the synchronized raw view field for
+field. Inequality is not an approval boundary. A provider revision advance or
+unrelated-task change alone does not block this Episode. For every outside
+change to the same task, use the exact raw before/current values supplied by the
+host and reason about their meaning. Incorporate a compatible change inside the
+approved scope as the current working basis. Escalate a genuine semantic
+conflict, scope expansion, or authority change without a write. Do not use a
+deterministic semantic classifier and never silently overwrite either view.
 
 The Episode may change only owner-authored task content through supported
 `bd update TASK-ID` content fields: description, design, acceptance criteria,
@@ -194,11 +194,11 @@ state instead.
 
 On a candidate or blocker, keep the Beads design/notes and Episode code evidence
 current through the same guarded native flow. Commit and push only the approved
-Episode code-branch changes when appropriate. Report the exact persisted task
-view, synchronized pre-write view, post-write view, final published view,
+Episode code-branch changes when appropriate. Report the exact prior task
+observation, synchronized pre-write view, post-write view, final published view,
 published provider revision/ref, code `HEAD`, and command failures to the owning
-Conversation so it can later advance the existing ownership receipt. The
-Episode never mutates that receipt directly and never publishes lifecycle
+Conversation so it can record current factual provider/task/code observations.
+The Episode never mutates ownership directly and never publishes lifecycle
 status. The Conversation alone decides status, merge, abandonment,
 finalization, and cleanup.
 

@@ -363,8 +363,9 @@ test("tool guidance preserves operator authority and fixed fresh assignment", ()
   const taskCreate = f.tools.get("create_task_episode"); const taskHandoff = f.tools.get("handoff_task_episode"); const taskFinalize = f.tools.get("finalize_task_episode");
   assert.match(taskCreate.promptGuidelines.join(" "), /exactly once/); assert.match(taskCreate.promptGuidelines.join(" "), /cannot be overridden/);
   assert.match(taskHandoff.promptGuidelines.join(" "), /Never use ordinary handoff for Blocked, merge/);
-  assert.match(taskHandoff.promptGuidelines.join(" "), /Guidance never accepts task changes/);
-  assert.match(taskHandoff.promptGuidelines.join(" "), /same-task raw mismatch requires review and delivers neither handoff nor execute/);
+  assert.match(taskHandoff.promptGuidelines.join(" "), /Guidance never supplies provider revision or raw task authority/);
+  assert.match(taskHandoff.promptGuidelines.join(" "), /factual LLM context, not a semantic approval gate/);
+  assert.match(taskHandoff.promptGuidelines.join(" "), /compatible same-task changes and unrelated descendants continue normally/);
   assert.match(taskFinalize.promptGuidelines.join(" "), /explicit operator cleanup authority/);
   assert.match(taskFinalize.promptGuidelines.join(" "), /exact pushed Episode head/);
   assert.match(taskFinalize.promptGuidelines.join(" "), /removes only the bound idle runtime/);

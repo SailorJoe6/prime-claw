@@ -61,7 +61,6 @@ import {
   reservePublishedBeadsTaskEpisodeOwnership,
   reserveTaskEpisodeOwnership,
   transitionLegacyEpisodeOwnershipToTask,
-  type BeadsTaskEvidenceAdvancementResult,
   type LegacyTaskOwnershipTransitionGit,
   type LegacyTaskOwnershipTransitionResult,
   type TaskEpisodeReservationInput,
@@ -140,15 +139,10 @@ export interface BlockedLegacyRestoreResult {
   restored: true; sourceLocation: string; episodeId: string; worktree: string;
   specification: string; implementation: string;
 }
-export type TaskEpisodeHandoffResult =
-  | {
-      admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
-      handoffDelivery: "prompt"; executeDelivery: "followUp";
-    }
-  | ({
-      admitted: false; taskId: string; episodeId: string; episodeActiveSessionId: string;
-      handoffDelivery: "none"; executeDelivery: "none";
-    } & Extract<BeadsTaskEvidenceAdvancementResult, { status: "review-required" }>);
+export type TaskEpisodeHandoffResult = {
+  admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
+  handoffDelivery: "prompt"; executeDelivery: "followUp";
+};
 export interface PublishedSession { activeSessionId: string; sessionId: string; sessionFile: string }
 
 export function episodeResultText(result: EpisodeResult): string {
@@ -1195,6 +1189,14 @@ type PreparedEpisodeHandoff = {
   executePrompt: string;
 };
 
+interface EpisodeHandoffPromptIdentity {
+  legacySnapshot?: boolean;
+  taskId?: string;
+  requireExactCwd?: boolean;
+  /** Exact factual provider observations for the existing Episode LLM. */
+  providerTaskObservation?: string;
+}
+
 async function prepareOwnedEpisodeHandoff(
   record: EpisodeOwnershipRecord,
   guidance: string,
@@ -1205,7 +1207,7 @@ async function prepareOwnedEpisodeHandoff(
   orca: OrcaAdapter,
   publisher: SessionPublisher,
   store: EpisodeOwnershipStore,
-  promptIdentity: { legacySnapshot?: boolean; taskId?: string; requireExactCwd?: boolean },
+  promptIdentity: EpisodeHandoffPromptIdentity,
 ): Promise<PreparedEpisodeHandoff> {
   if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
   validateWorktreeRecord(record, git, filesystem, repo);
@@ -1223,19 +1225,29 @@ async function prepareOwnedEpisodeHandoff(
   const location = promptIdentity.taskId
     ? { tag: "operator-episode-task", value: promptIdentity.taskId }
     : undefined;
-  const handoffPrompt = canonicalWorkflowPrompt(record.worktree!, "handoff", {
+  let handoffPrompt = canonicalWorkflowPrompt(record.worktree!, "handoff", {
     guidance: guidance.trim(),
     legacySnapshot: promptIdentity.legacySnapshot,
     location,
     ownerSessionId: record.ownerSessionId,
   });
   if (!handoffPrompt) throw new Error("Episode worktree is missing .prime-claw/workflows/handoff.md");
-  const executePrompt = canonicalWorkflowPrompt(record.worktree!, "execute", {
+  let executePrompt = canonicalWorkflowPrompt(record.worktree!, "execute", {
     legacySnapshot: promptIdentity.legacySnapshot,
     location,
     ownerSessionId: record.ownerSessionId,
   });
   if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
+  if (promptIdentity.providerTaskObservation) {
+    const observation = `
+
+<provider-task-observation>
+${promptIdentity.providerTaskObservation}
+</provider-task-observation>
+The JSON above is exact factual provider-native before/current context for this continuation. It records observations, not semantic acceptance or a new authority.`;
+    handoffPrompt += observation;
+    executePrompt += observation;
+  }
   const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
   const state = await publisher.getState(route.activeSessionId);
   assertIdleEpisodeState(state, route.record, route.activeSessionId);
@@ -1252,12 +1264,15 @@ async function deliverOwnedEpisodeHandoff(
   orca: OrcaAdapter,
   publisher: SessionPublisher,
   store: EpisodeOwnershipStore,
-  promptIdentity: { legacySnapshot?: boolean; taskId?: string; requireExactCwd?: boolean },
+  promptIdentity: EpisodeHandoffPromptIdentity,
+  onHandoffAdmitted?: () => void | Promise<void>,
 ): Promise<string> {
   const prepared = await prepareOwnedEpisodeHandoff(
     record, guidance, repo, ctx, git, filesystem, orca, publisher, store, promptIdentity,
   );
-  await publisher.deliverHandoff(prepared.activeSessionId, prepared.handoffPrompt, prepared.executePrompt);
+  await publisher.deliverHandoff(
+    prepared.activeSessionId, prepared.handoffPrompt, prepared.executePrompt, onHandoffAdmitted,
+  );
   return prepared.activeSessionId;
 }
 
@@ -1460,7 +1475,7 @@ export async function transitionSpecEpisodeToTaskOwnership(
  * has published the main task's resumable `In Progress` state. This internal
  * seam is the guarded ordinary-continuation path for the public task lifecycle.
  */
-function sameBeadsHandoffBinding(
+function sameBeadsHandoffIdentity(
   before: BeadsTaskEpisodeOwnershipRecord,
   after: BeadsTaskEpisodeOwnershipRecord,
 ): boolean {
@@ -1545,33 +1560,41 @@ export async function handoffTaskEpisode(
         projectRoot: repo,
         ownerSessionId,
         taskId,
-        reviewedProviderRevision: preparedRecord.providerRevision,
-        reviewedTaskEvidence: preparedRecord.taskEvidence,
-        reviewedEpisodeHead: currentEpisodeHead,
+        previousProviderRevision: preparedRecord.providerRevision,
+        previousTaskEvidence: preparedRecord.taskEvidence,
+        episodeHead: currentEpisodeHead,
       });
-      if (advancement.status === "review-required") {
-        return {
-          admitted: false,
-          taskId,
-          episodeId: preparedRecord.episodeId!,
-          episodeActiveSessionId: preparedRecord.episodeActiveSessionId!,
-          handoffDelivery: "none",
-          executeDelivery: "none",
-          ...advancement,
-        };
-      }
-      if (!sameBeadsHandoffBinding(preparedRecord, advancement.record)) {
+      if (!sameBeadsHandoffIdentity(preparedRecord, advancement.record)) {
         throw new Error("Beads evidence advancement changed retained Episode resource identity");
       }
       if (advancement.record.head !== currentEpisodeHead
           || advancement.record.providerRevision !== advancement.publishedProviderRevision
-          || JSON.stringify(advancement.record.taskEvidence) !== JSON.stringify(preparedRecord.taskEvidence)) {
-        throw new Error("Beads evidence advancement returned an unexpected continuation receipt");
+          || JSON.stringify(advancement.record.taskEvidence) !== JSON.stringify(advancement.currentTaskEvidence)) {
+        throw new Error("Beads evidence advancement returned unexpected factual observations");
       }
+      const providerTaskObservation = JSON.stringify({
+        previousProviderRevision: advancement.previousProviderRevision,
+        publishedProviderRevision: advancement.publishedProviderRevision,
+        previousTaskEvidence: advancement.previousTaskEvidence,
+        currentTaskEvidence: advancement.currentTaskEvidence,
+      });
+      let committedRecord: BeadsTaskEpisodeOwnershipRecord | undefined;
       const activeSessionId = await deliverOwnedEpisodeHandoff(
-        advancement.record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
-        { taskId: advancement.record.taskId, requireExactCwd: true },
+        preparedRecord, guidance, repo, ctx, git, filesystem, orca, publisher, store,
+        { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation },
+        () => {
+          const committed = advancement.commit();
+          if (!sameBeadsHandoffIdentity(preparedRecord, committed)
+              || JSON.stringify(committed) !== JSON.stringify(advancement.record)) {
+            throw new Error("Beads evidence advancement committed unexpected factual observations");
+          }
+          committedRecord = committed;
+        },
       );
+      if (!committedRecord) {
+        throw new Error("Beads evidence advancement was not committed after handoff admission");
+      }
+
       return {
         admitted: true,
         taskId: advancement.record.taskId,

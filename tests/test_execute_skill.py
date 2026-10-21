@@ -110,11 +110,12 @@ def test_beads_execute_preserves_raw_contract_and_guards_native_publication() ->
         "exact current Dolt database, branch, revision, publication ref, and a clean working set",
         "description, design, acceptance criteria, notes, comments, labels, dependencies, and every other provider field",
         "provider-native names, shapes, values, and absence",
-        "Compare the persisted raw `taskEvidence` with the synchronized raw view field for field",
+        "Compare the prior factual `taskEvidence` observation with the synchronized raw view field for field",
+        "Inequality is not an approval boundary",
         "provider revision advance or unrelated-task change alone does not block",
-        "present the exact raw before and current values and reason about their meaning",
-        "compatible change that is inside the approved scope may become the new working basis",
-        "genuine semantic conflict, scope expansion, or authority change must be escalated without a write",
+        "use the exact raw before/current values supplied by the host and reason about their meaning",
+        "Incorporate a compatible change inside the approved scope as the current working basis",
+        "Escalate a genuine semantic conflict, scope expansion, or authority change without a write",
         "Do not use a deterministic semantic classifier and never silently overwrite either view",
         "`bd update TASK-ID` content fields: description, design, acceptance criteria, and notes",
         "It must not change status, title, type, priority, assignee, parent, dependencies, labels, comments, metadata, task identity, or lifecycle fields",
@@ -127,9 +128,9 @@ def test_beads_execute_preserves_raw_contract_and_guards_native_publication() ->
         "unrelated-task descendant may advance the final revision",
         "Route any outside same-task change through the reconciliation rule above",
         "not permission to pull again, retry, reset, force, adopt, or overwrite",
-        "exact persisted task view, synchronized pre-write view, post-write view, final published view",
+        "exact prior task observation, synchronized pre-write view, post-write view, final published view",
         "published provider revision/ref, code `HEAD`, and command failures",
-        "never mutates that receipt directly and never publishes lifecycle status",
+        "never mutates ownership directly and never publishes lifecycle status",
     ):
         assert fragment in beads
 

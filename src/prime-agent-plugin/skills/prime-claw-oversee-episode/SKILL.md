@@ -18,16 +18,16 @@ Review one reported slice at a time. Check ownership, pushed head, diff, tests, 
 
 A report, findings, and Review conclusions are evidence, not approval. Choose one disposition:
 
-- **Accept and advance** only when scope and evidence are sound. For Beads, use `handoff_task_episode` only when the complete current raw task still exactly matches the persisted accepted `taskEvidence`; an unrelated published descendant alone is compatible.
-- **Request an in-scope revision** only for a concrete material contract defect. Record it and use canonical handoff via `handoff_task_episode` to the same idle Episode. For Beads, the complete current raw task must still match the persisted receipt; guidance carries only the accepted bounded focus and never accepts task content or supplies revision/raw authority. In task mode, do not edit, copy, or mirror Episode-owned task content.
+- **Accept and advance** when scope and evidence are sound. For Beads, `handoff_task_episode` supplies exact previous/current native context to the existing Episode LLM. Compatible owner-authored, outside same-task, and unrelated descendant changes continue without another authorization interface.
+- **Request an in-scope revision** for a material contract defect. Record it through canonical handoff with `handoff_task_episode`. For Beads, guidance supplies only bounded focus; the host supplies exact factual observations. In task mode, do not edit, copy, or mirror Episode-owned task content.
 - **Pause** without a product decision.
 - **Consult the operator** for scope, product, merge, abandonment, cleanup, conflicting evidence, or blockers.
 
 Never steer through chat or retry uncertain transport.
 
-For Beads, `handoff_task_episode` is active only when the current raw task matches persisted evidence. It selects the exact owner/resources, proves idle plus clean pushed code, and calls the accepted evidence boundary with persisted revision/raw evidence and current head. Only `providerRevision`, `taskEvidence`, `head`, and `updatedAt` may change before one handoff plus one execute follow-up. A raw mismatch sends neither. Do not retry. Newly reviewed same-task acceptance remains deferred.
+For Beads, `handoff_task_episode` selects exact owner/resources, proves idle and pushed code, performs one supported native pull, and pairs an exact raw read with clean publication proofs. It puts exact previous/current data in both prompts, then records only factual `providerRevision`, current `taskEvidence`, code `head`, and `updatedAt` after the first handoff message is admitted and before the sole execute follow-up. Raw inequality is not an approval boundary; the Episode LLM incorporates compatible changes and escalates real conflicts. Provider transport, identity, publication, ancestry, or resource failures still block without retry.
 
-Beads blocker publication, status and terminal transitions, finalization, and cleanup remain inactive. When the next step reaches one of those boundaries, report the exact accepted evidence and stop. Do not call a Backlog-only route, edit Backlog task Markdown, or write `ownership.json` directly.
+Beads blocker publication, status and terminal transitions, finalization, and cleanup remain inactive. When the next step reaches one of those boundaries, report the exact factual provider evidence and stop. Do not call a Backlog-only route, edit Backlog task Markdown, or write `ownership.json` directly.
 
 The remaining lifecycle and cleanup flow applies only to provider-absent or `provider: "backlog"` version 2 ownership. Use ordinary Git and the supported Backlog CLI. Do not create lifecycle receipts, progress objects, task-content digests, or custom replay protocols.
 

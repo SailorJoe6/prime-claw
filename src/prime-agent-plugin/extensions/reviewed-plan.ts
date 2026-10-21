@@ -808,12 +808,12 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "handoff_task_episode",
       label: "Hand off task Episode",
-      description: "Continue one exact owned idle task-native Episode after an accepted in-scope advance or recorded revision.",
+      description: "Continue one exact owned idle task-native Episode within its approved scope.",
       promptSnippet: "Hand off the exact task-native Episode and queue its next execute pass",
       promptGuidelines: [
-        "Call handoff_task_episode only after this exact owner accepts an in-scope advance or recorded revision while the task remains In Progress.",
-        "Pass only the exact canonical task ID and optional bounded focus. Guidance never accepts task changes or supplies provider revision or raw task authority.",
-        "For active Beads ownership, unchanged complete raw task evidence may advance through an already-published unrelated descendant; any same-task raw mismatch requires review and delivers neither handoff nor execute.",
+        "Call handoff_task_episode only when this exact owner selects continuation while the task remains In Progress.",
+        "Pass only the exact canonical task ID and optional bounded focus. Guidance never supplies provider revision or raw task authority.",
+        "For active Beads ownership, exact previous/current native task observations are factual LLM context, not a semantic approval gate; compatible same-task changes and unrelated descendants continue normally.",
         "Never use ordinary handoff for Blocked, merge, abandonment, cleanup, consultation, pause, or scope expansion.",
         "Treat handoff as terminal routing. Never retry uncertain transport or claim compaction or execute completion from admission alone.",
       ],
@@ -831,15 +831,6 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
           const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
-          if (!result.admitted) {
-            return {
-              content: [{
-                type: "text",
-                text: `Task Episode handoff requires provider review for ${result.taskId}; no handoff or execute delivery occurred. Exact provider-native result: ${JSON.stringify(result)}`,
-              }],
-              details: result,
-            };
-          }
           return {
             content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.` }],
             details: result,

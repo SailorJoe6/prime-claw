@@ -82,7 +82,7 @@ def test_expert_skill_sends_provider_native_beads_review_evidence_without_lifecy
         "Do not ask a fake unit test or deterministic classifier to make that judgment",
         "Findings are evidence, not approval",
         "do not invoke unavailable handoff, blocked, status, terminal, finalization, cleanup, or ownership-evidence advancement paths",
-        "report the exact accepted evidence and stop",
+        "report the exact factual provider evidence and stop",
         "using a Backlog-only route or writing `ownership.json`",
     ):
         assert required in text

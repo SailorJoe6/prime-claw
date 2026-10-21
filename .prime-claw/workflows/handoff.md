@@ -69,15 +69,19 @@ Episode worktree, reload and verify identity/path/parent/status, then commit and
 push the single-purpose checkpoint before compacting.
 
 For Beads task-native handoff, use only the exact active owner's persisted
-`providerRevision` and complete raw `taskEvidence`. The public handoff boundary
-has already required a fresh clean published native proof after the raw task
-read and advanced only that receipt plus the current clean pushed Episode code
-head. Require the persisted raw task to remain exact `in_progress` with a
-meaningful `design`. Treat the raw provider fields as the durable task authority.
-Do not use Backlog, translate the task, or mutate Beads during handoff. If task
+`providerRevision` and complete raw `taskEvidence`. Before delivery, the public
+handoff boundary performs one supported native pull, proves a clean published
+provider state, reads the exact current raw task, and pairs that read with a
+second publication proof. Require the current raw task to remain exact
+`in_progress` with a meaningful `design`. The host appends the exact
+previous/current native views and revisions to both canonical prompts as factual
+context, not semantic acceptance or a new authority. Only after the first
+handoff message is admitted does its callback record the current
+provider/task/code observations before queuing execute. Incorporate compatible in-scope owner-authored or outside changes;
+escalate a genuine semantic conflict, authority change, or scope expansion. Do
+not use Backlog, translate the task, or mutate Beads during handoff. If task
 content needs an in-scope update, leave it for the execute workflow's guarded
-native pull/read/update/push cycle. A same-task raw mismatch was not accepted by
-handoff and must never be reconstructed from guidance.
+native pull/read/update/push cycle. Guidance never reconstructs provider facts.
 
 In either task-native branch, guidance is bounded compaction focus only. It
 never accepts task content or supplies provider revision or raw evidence. Never pass `--status`, complete or archive the task, select replacement work,

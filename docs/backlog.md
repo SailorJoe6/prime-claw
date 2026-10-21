@@ -705,93 +705,96 @@ single intended write, proves the exact owner fields, expected provider-generate
 revision/timestamp changes, every other raw field, and clean native revision/ref
 state, then publishes once with `bd dolt push --no-adopt`. It does
 not retry, force, reset, adopt, overwrite, write raw Dolt SQL, or mutate the
-ownership registry. Candidate and blocker reports carry the exact persisted,
+ownership registry. Candidate and blocker reports carry the exact prior,
 pre-write, post-write, and published raw views plus the published revision/ref
-and code head so the owning Conversation can later advance the existing
-receipt. Admission activation, other lifecycle prompts, provider-aware
-allocation, migration, and receipt mutation remain deferred.
+and code head so the owning Conversation can record current factual
+provider/task/code observations. Admission activation, other lifecycle prompts,
+provider-aware allocation, and migration remain deferred.
 
-### Internal same-owner Beads evidence advancement
+### Internal same-owner Beads factual observation advancement
 
-One internal provider-specific primitive advances reviewed published Beads
-evidence on an existing active version-2 owner. It has no independent public
-tool, status transition, or lifecycle authority; the direct active-Beads
-handoff branch below is its sole managed caller. The exact requesting
-Conversation owner is selected before provider or task interpretation;
-provider-absent/Backlog and version-1 records reject unchanged.
+One internal provider-specific primitive refreshes factual published Beads
+observations on an existing active version-2 owner. It has no independent public
+tool, semantic acceptance, status transition, or lifecycle authority; the
+direct active-Beads handoff branch below is its sole managed caller. The exact
+requesting Conversation owner is selected before provider or task
+interpretation; provider-absent/Backlog and version-1 records reject unchanged.
 
-The input binds the exact owner and task, Conversation-reviewed complete raw
-native task view and published Dolt revision, and the reviewed pushed Episode
-code head. Existing native transport preparation from the canonical primary checkout
-proves the selected Beads database, clean published revision, remote publication
-ref, and supported provider authority. Exact native `bd show --json --long
---include-comments` from the recorded linked Episode worktree then reads the
-complete raw target. A second fresh native transport proof immediately after
-that read must match the same database, branch, transport, clean published
-revision, and publication ref before the evidence can be accepted. A provider
-advance, dirty working set, or proof drift in that pairing window returns the
-exact observed revision and raw task evidence for managed review and writes
-nothing. This does not require the reviewed revision itself to remain current:
-an unrelated descendant already clean and published before the paired read is
-accepted when the complete target view remains unchanged. The paired target
-must remain `in_progress`/`In Progress` before any write.
-When the published revision has advanced since review, one read-only native
-Dolt merge-base query must prove the reviewed revision is its ancestor. The
-advance remains valid when the complete raw target view is unchanged, including
-an unrelated-task descendant. A changed target view returns the complete
-accepted and current raw objects plus both revisions as unclassified review
-evidence and writes nothing.
+The input binds the exact owner/task, prior persisted complete raw native task
+view and Dolt revision, and the current pushed Episode code head. The prior
+values must equal the selected ownership record. From the recorded linked
+Episode worktree the boundary runs one supported `bd dolt pull` without force or
+retry. A conflict or transport failure stops with no ownership write. Existing
+native transport preparation then proves the selected Beads database, clean
+published revision, remote publication ref, and supported provider authority.
+Exact native `bd show --json --long --include-comments` reads the complete raw
+target. A second fresh transport proof immediately after that read must match
+the same database, branch, transport, clean published revision, and publication
+ref. Movement, dirt, or proof drift during this pairing window is a real
+transport-integrity failure and writes nothing.
+
+The current target must retain the exact task ID, native `in_progress` and
+canonical `In Progress` status, and meaningful raw `design`. One read-only
+native Dolt merge-base query proves the prior recorded revision is an ancestor
+of the current published revision. Raw inequality with the prior task
+observation is not an approval boundary. Owner-authored living-plan changes,
+compatible outside same-task edits, and unrelated-task descendants all become
+current factual evidence; exact previous/current native objects and revisions
+are returned for the existing Episode LLM.
 
 The recorded Episode worktree must remain the exact repository root and branch,
 with no Git operation, no tracked or untracked changes, and local, upstream, and
-direct-remote heads all equal to the reviewed head. Ordinary Git ancestry must
-prove `baseRef` → prior recorded head → reviewed head. The existing Episode
+direct-remote heads all equal to the supplied head. Ordinary Git ancestry must
+prove `baseRef` → prior recorded head → supplied head. The existing Episode
 session transcript must remain a readable non-empty regular file.
 
-On success, the existing atomic Conversation-keyed ownership mutation checks
-the exact retained owner and foreign active binding collisions beside its sole
-write. Only `providerRevision`, `taskEvidence`, `head`, and `updatedAt` change.
-Every operation, provider/task, base, engine/placement, worktree/branch,
-Episode/session, creation, cleanup, and unrelated-owner field is preserved.
-The primitive re-reads the exact persisted record. Owner drift, collisions,
-unsafe/unpushed code, non-descendant provider evidence, and uncertain writes
-fail closed without reservation, recreation, retry, force, or provider/task
-mutation. The live project registry is not used during development tests.
+After the first canonical handoff message is admitted, its admission callback
+runs the atomic Conversation-keyed ownership mutation before the execute
+follow-up is queued. A rejected or uncertain first send therefore preserves the
+prior observation; a rejected follow-up retains the current observation because
+the responsible LLM already received exact before/current context. The mutation
+checks the exact retained owner and foreign active binding collisions beside its
+sole write. Only factual `providerRevision`, current raw `taskEvidence`, code
+`head`, and `updatedAt` change. Every operation, provider/task, base, engine/placement,
+worktree/branch, Episode/session, creation, cleanup, and unrelated-owner field
+is preserved. The primitive re-reads the exact persisted record. Owner drift,
+collisions, unsafe/unpushed code, non-descendant provider history, publication
+or identity failure, and uncertain writes fail closed without reservation,
+recreation, retry, force, or provider/task mutation. The live project registry
+is not used during development tests.
 
 ### Direct active-Beads task handoff continuation
 
-The existing public `handoff_task_episode(taskId, guidance?)` now has one direct
+The existing public `handoff_task_episode(taskId, guidance?)` has one direct
 provider-specific branch for an exact active version-2 Beads owner. The public
-signature and the retained provider-absent/Backlog and version-1 paths are
+signature and retained provider-absent/Backlog and version-1 paths are
 unchanged. The exact Conversation-keyed owner is selected before provider/task
 interpretation. Guidance is forwarded only into the canonical handoff prompt;
-it never supplies raw task evidence, provider revision authority, or acceptance
-of task changes.
+it never supplies raw task evidence or provider revision authority.
 
 The branch requires canonical-primary `main` Conversation context and preserves
 the exact operation, code base, worktree, branch, Episode/session, and Orca
-resource binding. It requires persisted native `in_progress` evidence with a
+resource binding. It requires prior native `in_progress` evidence with a
 meaningful raw `design`, a clean owned worktree, an exact durable-session CWD,
-and the existing complete idle/quiescent transport proof before evidence
-advancement. It passes only the owner's persisted `providerRevision`, persisted
-complete raw `taskEvidence`, and the current Episode Git head to
-`advancePublishedBeadsTaskEpisodeEvidence`. That accepted boundary independently
-proves the current code head clean and equal to ordinary upstream/direct remote,
-and pairs a fresh clean native publication proof after its raw task read.
+and the existing complete idle/quiescent transport proof before factual
+evidence refresh. The refresh performs the native pull/read/publication pairing and proves the
+current code head clean and equal to ordinary upstream/direct remote. The
+current raw task/revision/code observation is committed only by the first
+handoff message's admission callback, before its execute follow-up.
 
-An already-published unrelated native descendant may advance the existing
-receipt when the complete target raw view remains unchanged. The atomic owner
-write is still limited to `providerRevision`, `taskEvidence`, `head`, and
-`updatedAt`; every resource field remains exact. Any same-task raw change or
-publication pairing mismatch returns the exact managed-review evidence with
-`handoffDelivery: "none"` and `executeDelivery: "none"`. Busy, foreign, dirty,
-unpushed, drifted, or uncertain state fails before delivery and is never
-retried. After a valid advance, the branch repeats the existing resource and
-quiescence proof, then uses the existing canonical delivery once: one handoff
-prompt plus its sole execute follow-up, bound to the exact same task and
-resources.
+Exact previous/current raw task views and revisions are appended to both the
+canonical handoff and execute prompts as factual provider observations, not a
+new authority or semantic approval. The existing Episode LLM incorporates
+compatible owner-authored or outside same-task changes and escalates genuine
+semantic, authority, or scope conflicts. Unrelated published descendants remain
+nonblocking. Publication pairing, identity, lifecycle status, code, resource,
+or transport failure stops with zero delivery and no retry. After a valid
+refresh, the branch repeats the existing resource and quiescence proof, then
+uses the existing canonical delivery once: one handoff prompt plus its sole
+execute follow-up, bound to the exact same task and resources.
 
-This slice does not accept newly reviewed same-task content or add a second
-receipt surface. It introduces no new public parameter/tool/protocol, task or
-status mutation, classifier, retry, force, raw Dolt write, blocked/resume,
+This slice removes the prior raw-equality gate, `review-required` handoff result,
+accepted/current review payload, and wrapper receipt response. It introduces no
+new public parameter/tool, approval phase, classifier, normalized diff, digest,
+persistent packet, sidecar, retry, force, raw Dolt write, blocked/resume,
 terminal/finalization/cleanup, planning/design, migration, or version-3 state.

@@ -81,7 +81,12 @@ function harness(options = {}) {
     async createFresh(args) { calls.push(["fresh", args]); await args.onAllocated?.({ sessionId: published.sessionId, sessionFile: published.sessionFile }); return published; },
     async reopen(args) { calls.push(["reopen", args]); return published; },
     async deliverExecute(_route, prompt) { calls.push(["execute", prompt]); },
-    async deliverHandoff(_route, handoff, execute) { calls.push(["handoff", handoff, execute]); },
+    async deliverHandoff(_route, handoff, execute, onHandoffAdmitted) {
+      if (options.handoffBeforeAdmissionError) throw options.handoffBeforeAdmissionError;
+      calls.push(["handoff", handoff, execute]);
+      await onHandoffAdmitted?.();
+      if (options.handoffAfterAdmissionError) throw options.handoffAfterAdmissionError;
+    },
     close() { calls.push(["close"]); },
   };
   const localSetup = setup();
@@ -678,13 +683,18 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
   assert.equal(f.calls.some((value) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(value[0])), false);
 });
 
-test("registered active Beads handoff tool advances unchanged evidence and delivers exactly one bound handoff plus execute follow-up", async () => {
+test("registered active Beads handoff delivers owner-authored published design and notes observations to the existing workflow", async () => {
   const f = harness({ list: (_count, session) => [session] });
   const initial = activeBeadsTaskRecord(f);
   f.ownership.write(f.root, initial);
   f.calls.length = 0;
   const currentHead = "b".repeat(40);
   const publishedRevision = "b".repeat(32);
+  const currentEvidence = {
+    ...BEADS_TASK_EVIDENCE,
+    design: "Owner-authored published design update.",
+    notes: "Owner-authored published notes update.",
+  };
   f.git.head = (path) => path === f.worktree ? currentHead : "main-head";
   let advanceInput;
   const advanceBeadsEvidence = (input) => {
@@ -693,15 +703,17 @@ test("registered active Beads handoff tool advances unchanged evidence and deliv
     const advanced = parseEpisodeOwnership({
       ...f.record,
       providerRevision: publishedRevision,
-      taskEvidence: input.reviewedTaskEvidence,
-      head: input.reviewedEpisodeHead,
+      taskEvidence: currentEvidence,
+      head: input.episodeHead,
       updatedAt: "2026-10-20T09:00:00.000Z",
     });
-    f.ownership.write(f.root, advanced);
     return {
-      status: "advanced", record: advanced,
-      reviewedProviderRevision: input.reviewedProviderRevision,
+      record: advanced,
+      previousProviderRevision: input.previousProviderRevision,
       publishedProviderRevision: publishedRevision,
+      previousTaskEvidence: input.previousTaskEvidence,
+      currentTaskEvidence: currentEvidence,
+      commit() { f.ownership.write(f.root, advanced); return advanced; },
     };
   };
   const tools = new Map();
@@ -713,7 +725,7 @@ test("registered active Beads handoff tool advances unchanged evidence and deliv
     async sendMessage() {},
   });
   const toolResult = await tools.get("handoff_task_episode").execute(
-    "handoff", { taskId: BEADS_TASK_ID, guidance: "bounded accepted focus" }, undefined, undefined, f.ctx,
+    "handoff", { taskId: BEADS_TASK_ID, guidance: "bounded continuation focus" }, undefined, undefined, f.ctx,
   );
   const result = toolResult.details;
   assert.equal(toolResult.isError, undefined);
@@ -724,12 +736,13 @@ test("registered active Beads handoff tool advances unchanged evidence and deliv
     projectRoot: f.root,
     ownerSessionId: "owner",
     taskId: BEADS_TASK_ID,
-    reviewedProviderRevision: BEADS_REVISION,
-    reviewedTaskEvidence: BEADS_TASK_EVIDENCE,
-    reviewedEpisodeHead: currentHead,
+    previousProviderRevision: BEADS_REVISION,
+    previousTaskEvidence: BEADS_TASK_EVIDENCE,
+    episodeHead: currentHead,
   });
   assert.equal(Object.hasOwn(advanceInput, "guidance"), false);
   assert.equal(f.record.providerRevision, publishedRevision);
+  assert.deepEqual(f.record.taskEvidence, currentEvidence);
   assert.equal(f.record.head, currentHead);
   for (const key of [
     "operationId", "engine", "ownerSessionId", "taskId", "baseRef", "worktreeName", "worktree",
@@ -738,53 +751,59 @@ test("registered active Beads handoff tool advances unchanged evidence and deliv
   const deliveries = f.calls.filter((call) => call[0] === "handoff");
   assert.equal(deliveries.length, 1);
   assert.ok(f.calls.findIndex((call) => call[0] === "advance") < f.calls.findIndex((call) => call[0] === "handoff"));
-  assert.match(deliveries[0][1], /bounded accepted focus/);
+  assert.match(deliveries[0][1], /bounded continuation focus/);
   assert.match(deliveries[0][1], /<operator-episode-task>\s*BEADS-42\s*<\/operator-episode-task>/);
   assert.match(deliveries[0][2], /<operator-episode-task>\s*BEADS-42\s*<\/operator-episode-task>/);
-  assert.doesNotMatch(deliveries[0][2], /bounded accepted focus/);
+  assert.doesNotMatch(deliveries[0][2], /bounded continuation focus/);
+  for (const prompt of [deliveries[0][1], deliveries[0][2]]) {
+    assert.match(prompt, /<provider-task-observation>/);
+    assert.ok(prompt.includes(JSON.stringify(BEADS_TASK_EVIDENCE)));
+    assert.ok(prompt.includes(JSON.stringify(currentEvidence)));
+    assert.match(prompt, /records observations, not semantic acceptance or a new authority/);
+  }
   assert.equal(f.calls.some((call) => ["fresh", "execute", "orca-create"].includes(call[0])), false);
 });
 
-
-test("registered active Beads handoff tool exposes complete unclassified provider review evidence with zero delivery", async () => {
+test("registered active Beads handoff delivers compatible outside same-task native changes without another authorization interface", async () => {
   const f = harness({ list: (_count, session) => [session] });
   const longTailMarker = "provider-native-long-tail-marker-9f6d8d1f";
-  const accepted = {
+  const previous = {
     ...BEADS_TASK_EVIDENCE,
     provider_native_tail: {
       marker: longTailMarker,
-      opaque_values: ["accepted-tail-alpha", { nested: "accepted-tail-omega" }],
+      opaque_values: ["previous-tail-alpha", { nested: "previous-tail-omega" }],
     },
   };
-  const initial = activeBeadsTaskRecord(f, { taskEvidence: accepted });
+  const initial = activeBeadsTaskRecord(f, { taskEvidence: previous });
   f.ownership.write(f.root, initial);
   f.calls.length = 0;
+  const currentHead = "b".repeat(40);
   const publishedProviderRevision = "b".repeat(32);
-  const observedProviderRevision = "c".repeat(32);
   const current = {
-    ...accepted,
-    design: "Outside writer changed the target design.",
+    ...previous,
+    notes: "Compatible outside same-task note for the existing approved scope.",
     provider_native_tail: {
-      ...accepted.provider_native_tail,
+      ...previous.provider_native_tail,
       current_only: "current-tail-zeta",
     },
   };
-  const providerProof = {
-    status: "blocked",
-    code: "publication-ref-mismatch",
-    detail: "provider-proof-detail-retained-without-classification",
-  };
+  f.git.head = (path) => path === f.worktree ? currentHead : "main-head";
   const advanceBeadsEvidence = (input) => {
     f.calls.push(["advance", input]);
+    const advanced = parseEpisodeOwnership({
+      ...f.record,
+      providerRevision: publishedProviderRevision,
+      taskEvidence: current,
+      head: input.episodeHead,
+      updatedAt: "2026-10-20T09:00:00.000Z",
+    });
     return {
-      status: "review-required",
-      code: "provider-evidence-mismatch",
-      reviewedProviderRevision: input.reviewedProviderRevision,
+      record: advanced,
+      previousProviderRevision: input.previousProviderRevision,
       publishedProviderRevision,
-      observedProviderRevision,
-      acceptedTaskEvidence: input.reviewedTaskEvidence,
+      previousTaskEvidence: input.previousTaskEvidence,
       currentTaskEvidence: current,
-      providerProof,
+      commit() { f.ownership.write(f.root, advanced); return advanced; },
     };
   };
   const tools = new Map();
@@ -796,32 +815,82 @@ test("registered active Beads handoff tool exposes complete unclassified provide
     async sendMessage() {},
   });
   const toolResult = await tools.get("handoff_task_episode").execute(
-    "handoff", { taskId: BEADS_TASK_ID, guidance: "must not accept changed content" }, undefined, undefined, f.ctx,
+    "handoff", { taskId: BEADS_TASK_ID, guidance: "continue compatible scope" }, undefined, undefined, f.ctx,
   );
   const result = toolResult.details;
-  const content = toolResult.content[0].text;
   assert.equal(toolResult.isError, undefined);
-  assert.match(content, /requires provider review/);
-  assert.ok(content.endsWith(JSON.stringify(result)));
-  assert.ok(content.includes(JSON.stringify(accepted)));
-  assert.ok(content.includes(JSON.stringify(current)));
-  assert.match(content, new RegExp(longTailMarker));
-  assert.match(content, new RegExp(BEADS_REVISION));
-  assert.match(content, new RegExp(publishedProviderRevision));
-  assert.match(content, new RegExp(observedProviderRevision));
-  assert.match(content, /publication-ref-mismatch/);
-  assert.match(content, /provider-proof-detail-retained-without-classification/);
-  assert.equal(result.admitted, false);
-  assert.equal(result.code, "provider-evidence-mismatch");
-  assert.deepEqual(result.acceptedTaskEvidence, accepted);
-  assert.deepEqual(result.currentTaskEvidence, current);
-  assert.deepEqual(result.providerProof, providerProof);
-  assert.equal(result.handoffDelivery, "none");
-  assert.equal(result.executeDelivery, "none");
-  assert.deepEqual(f.record, initial);
-  assert.equal(f.calls.some((call) => ["handoff", "execute", "reopen"].includes(call[0])), false);
+  assert.match(toolResult.content[0].text, /handoff admitted/);
+  assert.equal(result.admitted, true);
+  assert.equal(result.handoffDelivery, "prompt");
+  assert.equal(result.executeDelivery, "followUp");
+  assert.deepEqual(f.record.taskEvidence, current);
+  const deliveries = f.calls.filter((call) => call[0] === "handoff");
+  assert.equal(deliveries.length, 1);
+  for (const prompt of [deliveries[0][1], deliveries[0][2]]) {
+    assert.ok(prompt.includes(JSON.stringify(previous)));
+    assert.ok(prompt.includes(JSON.stringify(current)));
+    assert.match(prompt, new RegExp(longTailMarker));
+    assert.match(prompt, new RegExp(BEADS_REVISION));
+    assert.match(prompt, new RegExp(publishedProviderRevision));
+  }
+  assert.equal(f.calls.some((call) => ["execute", "reopen"].includes(call[0])), false);
 });
 
+test("active Beads handoff commits factual observations only after the first canonical message is admitted", async (t) => {
+  const scenario = (options) => {
+    const f = harness({ list: (_count, session) => [session], ...options });
+    const initial = activeBeadsTaskRecord(f);
+    f.ownership.write(f.root, initial);
+    f.calls.length = 0;
+    const currentHead = "b".repeat(40);
+    const publishedProviderRevision = "b".repeat(32);
+    const current = { ...BEADS_TASK_EVIDENCE, notes: "outside factual change marker admission-sequence" };
+    f.git.head = (path) => path === f.worktree ? currentHead : "main-head";
+    const advanceBeadsEvidence = (input) => {
+      const advanced = parseEpisodeOwnership({
+        ...f.record,
+        providerRevision: publishedProviderRevision,
+        taskEvidence: current,
+        head: input.episodeHead,
+        updatedAt: "2026-10-20T09:00:00.000Z",
+      });
+      return {
+        record: advanced,
+        previousProviderRevision: input.previousProviderRevision,
+        publishedProviderRevision,
+        previousTaskEvidence: input.previousTaskEvidence,
+        currentTaskEvidence: current,
+        commit() { f.ownership.write(f.root, advanced); return advanced; },
+      };
+    };
+    return { f, initial, current, advanceBeadsEvidence };
+  };
+
+  await t.test("definite first-send rejection preserves the prior observation", async () => {
+    const { f, initial, advanceBeadsEvidence } = scenario({
+      handoffBeforeAdmissionError: new Error("first handoff rejected"),
+    });
+    await assert.rejects(handoffTaskEpisode(BEADS_TASK_ID, "continue", f.ctx, {
+      ...f.deps, advanceBeadsEvidence,
+    }), /first handoff rejected/);
+    assert.deepEqual(f.record, initial);
+    assert.equal(f.calls.some((call) => call[0] === "handoff"), false);
+  });
+
+  await t.test("follow-up rejection retains the current observation after exact handoff delivery", async () => {
+    const { f, current, advanceBeadsEvidence } = scenario({
+      handoffAfterAdmissionError: new Error("execute follow-up rejected"),
+    });
+    await assert.rejects(handoffTaskEpisode(BEADS_TASK_ID, "continue", f.ctx, {
+      ...f.deps, advanceBeadsEvidence,
+    }), /execute follow-up rejected/);
+    assert.deepEqual(f.record.taskEvidence, current);
+    const deliveries = f.calls.filter((call) => call[0] === "handoff");
+    assert.equal(deliveries.length, 1);
+    assert.ok(deliveries[0][1].includes(JSON.stringify(BEADS_TASK_EVIDENCE)));
+    assert.ok(deliveries[0][1].includes(JSON.stringify(current)));
+  });
+});
 
 test("active Beads task handoff rejects foreign, busy, and dirty native evidence before delivery", async (t) => {
   await t.test("foreign owner", async () => {

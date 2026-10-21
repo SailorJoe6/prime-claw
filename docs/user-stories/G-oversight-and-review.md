@@ -35,11 +35,13 @@ If the operator explicitly confirms abandonment, the Conversation works from cle
 
 Cleanup is independently explicit. The cleanup-only `finalize_task_episode` call binds the exact task, owner, terminal Episode head, and truthful merged/abandoned outcome; verifies pushed terminal main plus clean idle bound resources; removes only runtime, worktree, and branch; verifies absence; and closes ownership last. It performs no review, status change, merge, abandonment, archive, or push. The durable cleanup head makes same-argument retry idempotent without caller-held receipts.
 
-Beads review conclusions remain evidence, not lifecycle approval. Beads
-handoff, blocker/status publication, terminal transitions, finalization,
-cleanup, and ownership-evidence advancement are not active yet. At those
-boundaries the Conversation reports exact accepted evidence and stops rather
-than use a Backlog-only route or write the ownership registry.
+Beads review conclusions remain evidence, not lifecycle approval. Beads handoff
+synchronizes and records factual observations, then sends exact previous/current
+native context to the existing Episode LLM without a raw-equality gate. Beads
+blocker/status publication, terminal transitions, finalization, and cleanup are
+not active yet. At those boundaries the Conversation reports exact factual
+provider evidence and stops rather than use a Backlog-only route or write the
+ownership registry.
 
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.
