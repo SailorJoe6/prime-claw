@@ -18,12 +18,15 @@ or Episode admission.
    `In Planning`.
 3. Run `/implement-task TASK-ID`. The compact-first readiness chain binds the
    exact task and placement, then calls `create_task_episode` once.
-4. Trusted admission commits the exact task as `In Progress`, persists
-   version-2 ownership, and creates one isolated Episode from that commit. It
-   copies no bundle and creates no `.ralph/plans` promotion commit.
+4. Trusted admission publishes the exact task as `In Progress` in its selected
+   Backlog topology, persists version-2 ownership, and creates one isolated
+   Episode from the exact clean code base. Independent task history binds its
+   separate published revision/native view. It copies no bundle and creates no
+   `.ralph/plans` promotion commit.
 5. The Episode implements approved code, documentation, and tests in its
-   isolated worktree and exclusively owns the bound task's content there. The
-   Conversation exclusively owns lifecycle status on main and review.
+   isolated worktree and exclusively owns bound task content in the selected
+   branch-local or independent nested store. The Conversation exclusively owns
+   lifecycle status on canonical main or its primary nested task store and review.
    It uses `handoff_task_episode` for continuation, ordinary Git and Backlog
    for terminal outcomes, and cleanup-only `finalize_task_episode` for exact
    resource removal.

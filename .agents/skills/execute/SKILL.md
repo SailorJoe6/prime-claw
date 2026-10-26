@@ -41,9 +41,12 @@ worktree; also accept the retained `EXECUTION_PLAN.md` spelling used by this
 project. If those active files are missing, stop for exact ownership recovery
 instead of switching modes. A valid version-2 ownership record selects
 **task-native Episode mode** and binds its exact task ID. Select its provider
-only from that exact record. A provider-absent record or `provider: "backlog"`
-must retain its exact `taskPath`; it must not carry Beads revision or task
-evidence. A `provider: "beads"` record must have no `taskPath` and must retain
+only from that exact record. A provider-absent record, or `provider: "backlog"`
+without `providerRevision`/`taskEvidence`, is grandfathered branch-local Backlog
+and must retain its exact `taskPath`. An explicit Backlog record with both fields
+selects independent task history: bind its 40-hex revision and complete native
+task view separately from code `baseRef`/`head`. A `provider: "beads"` record
+must have no `taskPath` and must retain
 its exact non-empty `providerRevision`, complete raw `taskEvidence`, `baseRef`,
 worktree, branch, and Episode session identity. Any mixed or missing binding
 stops for ownership recovery. If an `<operator-episode-task>` block is also
@@ -65,12 +68,20 @@ another task, mix the two modes, or copy content between their authorities.
 
 Use the provider selected from the exact version-2 owner. Do not redetect,
 replace, or infer it from repository files. Do not use `.ralph/plans` as
-authority in this mode. A provider-absent record or `provider: "backlog"`
-continues through the Backlog branch below. Only `provider: "beads"` selects
+authority in this mode. A provider-absent or either valid explicit Backlog
+shape continues through the Backlog branch below. Only `provider: "beads"` selects
 the Beads branch. Never mix commands, content, commits, or evidence between the
 two branches.
 
 ### Provider-absent or Backlog task authority
+
+First retain the ownership-selected Backlog topology. Provider-absent and
+explicit Backlog without revision/evidence remain branch-local. Explicit Backlog
+with revision/evidence uses the ignored independent nested clone at the derived
+store path. In independent mode require that clone to be a clean ordinary Git
+clone on `prime-claw/tasks`, at the exact published remote head descended from
+the owned revision; never stage it as a gitlink or place task files in the code
+DAG. A missing, dirty, unpublished, divergent, or foreign nested clone blocks.
 
 Use the exact task ID and path selected above. Do not use `.ralph/plans` as
 authority in this mode. Reload the exact task through the supported structured
@@ -94,34 +105,42 @@ against that contract to determine what remains. Follow referenced artifacts
 only as needed. A handoff continues this same task and Episode; it never selects
 a new task.
 
-The Episode exclusively owns task content on its branch. Update it only through
-supported `backlog task edit` operations, never by editing task Markdown
-directly. In approved scope, the Episode may refine the Implementation Plan,
+The Episode exclusively owns task content. In grandfathered mode it stays on
+the Episode code branch. In independent mode it stays in the Episode nested task
+clone and publishes only to `refs/heads/prime-claw/tasks`; the code branch HEAD
+must remain unchanged by task-only work. Update through supported `backlog task
+edit` operations, never by editing task Markdown directly. In approved scope, the Episode may refine the Implementation Plan,
 append Implementation Notes, record acceptance evidence and checked criteria,
 maintain references, documentation, and modified-file paths, and prepare the
 Final Summary. Reload after each mutation and verify the canonical ID, task
 path, parent identity, and lifecycle status are unchanged.
 
-The owning Conversation exclusively owns lifecycle status on main. The Episode
-must not pass `--status`, call `backlog task complete` or `backlog task archive`,
+The owning Conversation exclusively owns lifecycle status: on canonical main
+for grandfathered Backlog, or in the primary nested task clone for independent
+Backlog. The Episode must not pass `--status`, call `backlog task complete` or `backlog task archive`,
 mark the task `Done`, publish `Blocked` or `Ready for Merge`, or write task
 content in another checkout. Ordinary execution performs no cross-checkout
 copy, mirroring, or dual write.
 
 If blocked after a bounded attempt, append the exact blocker, attempted actions,
 evidence, and unblock condition to this task's Implementation Notes on the
-Episode branch. Verify the task identity and unchanged status, create one
-single-purpose commit containing that exact task update plus only safe in-scope
-resumable changes, push the Episode branch, and report the commit and push
+Episode task authority. Verify the task identity and unchanged status. In
+grandfathered mode create one single-purpose code-branch commit containing that
+task update plus only safe in-scope resumable changes. In independent mode make
+one task-path-only commit in the nested clone and push
+`HEAD:refs/heads/prime-claw/tasks` without force; commit/push code separately only
+when code changed. Report both exact heads and push
 evidence through the existing Episode-to-Conversation channel. Then stop. Do
 not change status or move plan files; the Conversation decides whether to
 publish `Blocked` on main.
 
 When the candidate is complete, ensure the task holds the current plan, notes,
 acceptance evidence, references, documentation, modified files, and a useful
-Final Summary. Leave its status unchanged, commit the task with the implemented
-code and documentation in the same bounded slice, push the Episode branch, and
-report the exact candidate and evidence to the owning Conversation. Do not
+Final Summary. Leave its status unchanged. Grandfathered mode may commit the
+task with implemented code/docs in one bounded code slice. Independent mode
+commits and non-force-pushes task content only in the nested task clone, then
+commits/pushes the code candidate separately. Report both exact published heads
+and evidence to the owning Conversation. Do not
 merge, mark `Ready for Merge` or `Done`, finalize ownership, or clean resources.
 
 ### Beads task authority

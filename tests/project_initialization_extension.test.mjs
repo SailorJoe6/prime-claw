@@ -18,6 +18,7 @@ import {
   hasActiveLegacyPlanFiles,
 } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { createProjectInitializationExtension, summarizeReconcile } from "../src/prime-agent-plugin/extensions/project-initialization.ts";
+import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 import { startTemplateReview } from "../src/prime-agent-plugin/extension-support/template-review.ts";
 import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
@@ -209,7 +210,18 @@ test("lock collision and active Episode skip make no asset mutation",t=>{
 test("extension shares core across command, tool, and awaited startup without a model turn",async t=>{
   const root=repo(t); const runner=new Runner([{id:"exact",path:root,displayName:"preserve"}]); const commands=new Map(),tools=new Map(),events=new Map(),notifications=[];
   const pi={registerCommand(n,d){commands.set(n,d)},registerTool(d){tools.set(d.name,d)},on(n,h){events.set(n,h)}};
-  createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})(pi);
+  createProjectInitializationExtension({
+    pluginRoot:PLUGIN,home:dirname(root),runner,
+    taskHistoryPreparer:({primaryRoot})=>{
+      mkdirSync(join(primaryRoot,".backlog"),{recursive:true});
+      writeFileSync(join(primaryRoot,".backlog","config.yml"),[
+        'project_name: "fixture"', 'default_status: "In Design"',
+        'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]',
+        'auto_commit: false', '',
+      ].join("\n"));
+      return {status:"prepared",storeDir:join(primaryRoot,".backlog"),head:"a".repeat(40)};
+    },
+  })(pi);
   assert.deepEqual([...commands.keys()],["initialize-prime-claw"]); assert.deepEqual([...tools.keys()],["initialize_prime_claw"]); assert.ok(events.has("session_start")); assert.ok(events.has("resources_discover"));
   const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}}; await events.get("session_start")({},ctx); assert.ok(existsSync(join(root,".prime-claw/templates.json"))); assert.equal(notifications.length,1); const discovered=await events.get("resources_discover")({},ctx); assert.equal(discovered.skillPaths.length,7); assert.ok(discovered.skillPaths.every(path=>path.endsWith("SKILL.md"))); assert.equal(await events.get("resources_discover")({},ctx),undefined); await events.get("session_start")({},ctx); assert.equal(notifications.length,1);
   const result=await tools.get("initialize_prime_claw").execute("id",{action:"reconcile"},null,null,ctx); assert.equal(result.isError,undefined); assert.equal(runner.adds,0);
@@ -514,6 +526,67 @@ test("reconcile with the real managed Backlog CLI initializes a lifecycle-ready 
   const second=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
   assert.deepEqual(second.taskProvider,{status:"selected",provider:"backlog"});
   assert.equal(second.changed,false);
+});
+
+test("reconcile blocks an unsafe nested Backlog .git identity instead of grandfathering it", (t) => {
+  const root = repo(t);
+  const outside = mkdtempSync(join(tmpdir(), "pc-unsafe-task-git-"));
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  mkdirSync(join(root, ".backlog"), { recursive: true });
+  writeFileSync(join(root, ".backlog", "config.yml"), 'project_name: "fixture"\n');
+  symlinkSync(outside, join(root, ".backlog", ".git"));
+  let prepares = 0;
+  const result = reconcilePrimeClawProject({
+    cwd: root, pluginRoot: PLUGIN, home: dirname(root), runner: new Runner(),
+    taskHistoryPreparer: () => { prepares += 1; throw new Error("unsafe identity must block before preparation"); },
+  });
+  assert.equal(result.taskProvider.status, "blocked");
+  assert.equal(result.taskProvider.code, "task-history");
+  assert.match(result.taskProvider.detail, /unsafe independent Backlog Git identity/);
+  assert.equal(prepares, 0);
+  assert.equal(lstatSync(join(root, ".backlog", ".git")).isSymbolicLink(), true);
+});
+
+test("production initialization prepares and reuses an independent published .backlog workspace", (t) => {
+  const parent = mkdtempSync(join(tmpdir(), "pc-init-history-"));
+  const root = repo(t, parent);
+  const remote = join(parent, "remote.git");
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  git(root, "remote", "add", "origin", remote);
+  git(root, "push", "-qu", "origin", "main");
+  const backlog = resolve("deps/backlog/dist/backlog");
+  if (!existsSync(backlog)) { t.skip("managed backlog executable unavailable"); return; }
+  const runner = { run(command, args, options = {}) {
+    const executable = command === "backlog" ? backlog : command;
+    try { return { stdout: execFileSync(executable, args, { cwd: options.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }), stderr: "", status: 0 }; }
+    catch (error) { const result = { stdout: String(error.stdout ?? ""), stderr: String(error.stderr ?? error.message ?? error), status: Number.isInteger(error.status) ? error.status : 1 }; if (!options.allowFailure) throw error; return result; }
+  } };
+  const options = { cwd: root, pluginRoot: PLUGIN, home: dirname(root), runner, taskHistoryPreparer: prepareTaskHistoryWorkspace };
+  const codeHead = git(root, "rev-parse", "HEAD").trim();
+  const first = reconcilePrimeClawProject(options);
+  assert.equal(first.taskProvider.status, "initialized");
+  assert.equal(first.taskProvider.provider, "backlog");
+  assert.ok(first.taskProvider.taskHistoryHead);
+  assert.ok(lstatSync(join(root, ".backlog", ".git")).isDirectory());
+  assert.equal(git(root, "rev-parse", "HEAD").trim(), codeHead);
+  assert.equal(git(root, "ls-files", "--", ".backlog").trim(), "");
+  assert.match(git(root, "ls-remote", "--heads", remote, TASK_HISTORY_REF), new RegExp(`^${first.taskProvider.taskHistoryHead}\\s`));
+  const second = reconcilePrimeClawProject(options);
+  assert.equal(second.taskProvider.status, "selected");
+  assert.equal(second.taskProvider.taskHistoryHead, first.taskProvider.taskHistoryHead);
+  assert.equal(second.changed, false);
+});
+
+test("reconcile reports task-history preparation exceptions without losing asset reconciliation", (t) => {
+  const root = repo(t);
+  const result = reconcilePrimeClawProject({
+    cwd: root, pluginRoot: PLUGIN, home: dirname(root), runner: new Runner(),
+    taskHistoryPreparer: () => { throw new Error("fixture preparation failure"); },
+  });
+  assert.equal(result.taskProvider.status, "failed");
+  assert.match(result.taskProvider.detail, /task-history preparation failed: fixture preparation failure/);
+  assert.equal(result.conflicts, 1);
+  assert.ok(existsSync(join(root, ".agents", "skills", "prepare", "SKILL.md")));
 });
 
 test("reconcile returns exact failed evidence when the initialized store is not lifecycle-ready",t=>{

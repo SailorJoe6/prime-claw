@@ -103,13 +103,16 @@ export interface ReconcileOptions {
   registerOrca?: boolean;
   requireOrcaRegistration?: boolean;
   isActiveEpisode?: (projectRoot: string) => boolean;
+  taskHistoryPreparer?: (input: { primaryRoot: string; runner: CommandRunner }) =>
+    | { status: "prepared"; storeDir: string; head: string }
+    | { status: "blocked"; code: string; detail: string; remediation: string };
 }
 
 export type TaskProviderSetup =
   | { status: "not-run"; reason: string }
-  | { status: "initialized"; provider: "backlog"; storeDir: string }
-  | { status: "selected"; provider: "backlog" | "beads" }
-  | { status: "blocked"; code: "dual-providers" | "malformed-evidence"; detail: string; remediation: string }
+  | { status: "initialized"; provider: "backlog"; storeDir: string; taskHistoryHead?: string }
+  | { status: "selected"; provider: "backlog" | "beads"; taskHistoryHead?: string }
+  | { status: "blocked"; code: "dual-providers" | "malformed-evidence" | "task-history"; detail: string; remediation: string }
   | { status: "failed"; detail: string };
 
 export interface ReconcileResult {
@@ -630,15 +633,58 @@ export function isActiveEpisodeWorktree(root: string, runner: CommandRunner = ne
  * initializing. Initialization failures never fail asset reconciliation;
  * they surface as exact evidence on the result.
  */
-function ensureProjectTaskProvider(projectRoot: string, runner: CommandRunner): TaskProviderSetup {
+function ensureProjectTaskProvider(
+  projectRoot: string,
+  runner: CommandRunner,
+  taskHistoryPreparer?: ReconcileOptions["taskHistoryPreparer"],
+): TaskProviderSetup {
   let detection;
   try {
     detection = detectTaskProvider(projectRoot, runner);
   } catch (error) {
     return { status: "not-run", reason: `provider detection unavailable: ${error instanceof Error ? error.message : String(error)}` };
   }
-  if (detection.kind === "selected") return { status: "selected", provider: detection.evidence.provider };
+  if (detection.kind === "selected") {
+    if (detection.evidence.provider !== "backlog" || !taskHistoryPreparer) {
+      return { status: "selected", provider: detection.evidence.provider };
+    }
+    const nestedGit = join(detection.evidence.storeDir, ".git");
+    const entry = lstatIfPresent(nestedGit);
+    if (!entry) {
+      // Existing ordinary/root/custom Backlog authority is grandfathered and
+      // never adopted or normalized during routine initialization.
+      return { status: "selected", provider: "backlog" };
+    }
+    if (!entry.isDirectory() || entry.isSymbolicLink()) {
+      return {
+        status: "blocked", code: "task-history",
+        detail: `unsafe independent Backlog Git identity at ${nestedGit}`,
+        remediation: "restore a real contained ordinary nested clone or remove the unsafe .git entry after review; never follow or adopt it",
+      };
+    }
+    try {
+      const prepared = taskHistoryPreparer({ primaryRoot: projectRoot, runner });
+      return prepared.status === "prepared"
+        ? { status: "selected", provider: "backlog", taskHistoryHead: prepared.head }
+        : { status: "blocked", code: "task-history", detail: `${prepared.code}: ${prepared.detail}`, remediation: prepared.remediation };
+    } catch (error) {
+      return { status: "failed", detail: `task-history preparation failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
+  }
   if (detection.kind === "blocked") return { status: "blocked", code: detection.code, detail: detection.detail, remediation: detection.remediation };
+  if (taskHistoryPreparer) {
+    try {
+      const prepared = taskHistoryPreparer({ primaryRoot: projectRoot, runner });
+      return prepared.status === "prepared"
+        ? { status: "initialized", provider: "backlog", storeDir: prepared.storeDir, taskHistoryHead: prepared.head }
+        : { status: "blocked", code: "task-history", detail: `${prepared.code}: ${prepared.detail}`, remediation: prepared.remediation };
+    } catch (error) {
+      return { status: "failed", detail: `task-history preparation failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
+  }
+  // Compatibility fallback for direct support-module callers that have not
+  // injected the production task-history preparer. The registered extension
+  // always injects it; retained tests and older embedders preserve old behavior.
   // Native initialization: the real managed Backlog executable, invoked
   // non-interactively with the deterministic project name (the repository
   // basename) as the supported positional argument. Upstream writes the
@@ -859,7 +905,7 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
         registration = found ? { status: "reused", id: found.id } : { status: "unavailable", error: "project is not registered with Orca" };
       } catch (error) { registration = { status: "unavailable", error: error instanceof Error ? error.message : String(error) }; }
     }
-    const taskProvider = ensureProjectTaskProvider(project.root, runner);
+    const taskProvider = ensureProjectTaskProvider(project.root, runner, options.taskHistoryPreparer);
     // Provider setup failures and blocked evidence count in the existing
     // conflict decision so command/tool/startup summaries surface them.
     const providerConflicts = taskProvider.status === "blocked" || taskProvider.status === "failed" ? 1 : 0;

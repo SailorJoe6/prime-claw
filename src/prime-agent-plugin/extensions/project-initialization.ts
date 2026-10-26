@@ -9,6 +9,7 @@ import {
   type ReconcileOptions,
   type ReconcileResult,
 } from "../extension-support/project-initialization.ts";
+import { prepareTaskHistoryWorkspace } from "../extension-support/task-history-workspace.ts";
 import {
   finishTemplateReview,
   recoverTemplateReview,
@@ -70,9 +71,16 @@ function toolResult(value: unknown, text?: string, isError = false) {
 
 type ProjectInitializationDependencies = Omit<ReconcileOptions, "cwd" | "registerOrca" | "requireOrcaRegistration">;
 
+function productionReconcileOptions(dependencies: ProjectInitializationDependencies) {
+  return {
+    ...dependencies,
+    taskHistoryPreparer: dependencies.taskHistoryPreparer ?? prepareTaskHistoryWorkspace,
+  };
+}
+
 async function executeAction(action: Action, assetId: string | undefined, ready: boolean, visible: boolean, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies) {
   switch (action) {
-    case "reconcile": return reconcilePrimeClawProject({ ...dependencies, cwd: ctx.cwd, registerOrca: true });
+    case "reconcile": return reconcilePrimeClawProject({ ...productionReconcileOptions(dependencies), cwd: ctx.cwd, registerOrca: true });
     case "accept-override":
       if (!assetId) throw new Error("accept-override requires assetId");
       return { assetId, entry: acceptProjectOverride(ctx.cwd, assetId, dependencies) };
@@ -167,7 +175,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
       try {
         const project = resolveNearestProjectRoot(ctx.cwd, dependencies.home, dependencies.runner);
         if (!isOrcaRegistered(project.root, dependencies.runner)) return;
-        const result = reconcilePrimeClawProject({ ...dependencies, cwd: ctx.cwd, registerOrca: false });
+        const result = reconcilePrimeClawProject({ ...productionReconcileOptions(dependencies), cwd: ctx.cwd, registerOrca: false });
         pendingSkillPaths = result.items
           .filter((item) => ["created", "migrated", "updated", "recovered"].includes(item.action) && item.destination.startsWith(".agents/skills/") && item.destination.endsWith("/SKILL.md"))
           .map((item) => join(result.project.root, item.destination));

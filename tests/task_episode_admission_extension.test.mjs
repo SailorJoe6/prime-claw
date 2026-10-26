@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,12 +12,18 @@ import {
   bundleContentDigest,
   createSpecEpisode,
   createTaskEpisode,
+  handoffTaskEpisode,
   OrcaUnavailableError,
   resolveTaskEpisodePlacement,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import {
   resolveBacklogTask,
 } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
+import {
+  prepareTaskHistoryWorkspace,
+  publishTaskHistoryMutation,
+  TASK_HISTORY_REF,
+} from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 import {
   readAllEpisodeOwnership,
   readEpisodeOwnership,
@@ -117,6 +123,183 @@ function commitPaths(root, ref = "HEAD") {
   const output = git(root, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", ref, "--");
   return output ? output.split(/\r?\n/) : [];
 }
+
+test("independent Backlog admission keeps code and task DAGs separate and prepares task access before session start", async (t) => {
+  if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-independent-admission-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const root = join(dir, "repo");
+  const remote = join(dir, "remote.git");
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  git(root, "config", "user.name", "Prime Claw Test");
+  git(root, "config", "user.email", "prime-claw@example.invalid");
+  mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true });
+  mkdirSync(join(root, ".prime-claw", "workflows"), { recursive: true });
+  copyFileSync(join(ROOT, ".agents", "skills", "execute", "SKILL.md"), join(root, ".agents", "skills", "execute", "SKILL.md"));
+  copyFileSync(join(ROOT, ".prime-claw", "workflows", "handoff.md"), join(root, ".prime-claw", "workflows", "handoff.md"));
+  writeFileSync(join(root, "code.txt"), "code\n");
+  git(root, "add", ".agents/skills/execute/SKILL.md", ".prime-claw/workflows/handoff.md", "code.txt");
+  git(root, "commit", "-qm", "code baseline");
+  git(root, "remote", "add", "origin", remote);
+  git(root, "push", "-qu", "origin", "main");
+  const runner = new FixtureRunner();
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner });
+  assert.equal(prepared.status, "prepared");
+  git(prepared.storeDir, "config", "user.name", "Prime Claw Test");
+  git(prepared.storeDir, "config", "user.email", "prime-claw@example.invalid");
+  const created = execFileSync(BACKLOG, [
+    "task", "create", "Independent admission", "--status", "In Planning",
+    "--description", "Keep task history separate from code",
+    "--plan", "1. Prepare the nested task checkout.\n2. Start execute from the clean code head.", "--plain",
+  ], { cwd: root, encoding: "utf8" });
+  assert.match(created, /created/i);
+  const listed = JSON.parse(execFileSync(BACKLOG, ["task", "list", "--json"], { cwd: root, encoding: "utf8" }));
+  const taskId = listed.tasks?.[0]?.id;
+  assert.ok(taskId);
+  const task = view(root, taskId);
+  git(prepared.storeDir, "add", ".");
+  git(prepared.storeDir, "commit", "-qm", "plan independent task");
+  git(prepared.storeDir, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  const plannedTaskHead = git(prepared.storeDir, "rev-parse", "HEAD");
+  git(root, "add", ".gitignore");
+  git(root, "commit", "-qm", "ignore independent task store");
+  git(root, "push", "-q");
+  const codeHead = git(root, "rev-parse", "HEAD");
+  const records = new Map();
+  const ownership = {
+    read(_root, owner) { return owner ? records.get(owner) ?? null : [...records.values()][0] ?? null; },
+    write(_root, record) { records.set(record.ownerSessionId, record); },
+  };
+  let preSessionView = null;
+  let delivered = 0;
+  const publisher = {
+    async createFresh(options) {
+      assert.ok(existsSync(join(options.worktree, ".backlog", ".git")), "nested task checkout exists before session allocation");
+      preSessionView = view(options.worktree, taskId);
+      const identity = { sessionId: "independent-episode", sessionFile: join(dir, "independent-episode.jsonl") };
+      writeFileSync(identity.sessionFile, "{}\n");
+      await options.onAllocated?.(identity);
+      return { ...identity, activeSessionId: "independent-route" };
+    },
+    async deliverExecute() { delivered += 1; },
+    close() {},
+  };
+  const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+    getSessionId: () => "independent-owner", getSessionFile: () => join(dir, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
+  } };
+  const taskResolver = (cwd, id) => resolveBacklogTask(cwd, id, runner);
+  const result = await createTaskEpisode(taskId, "independent-call", ctx, {
+    admissionGit: new CliTaskEpisodeAdmissionGit(), admissionRunner: runner, taskResolver,
+    ownership, publisher, reservationOperationId: "independent-operation", now: () => "2026-10-26T20:00:00.000Z",
+  }, { engine: "local" });
+  const publishedTaskHead = git(prepared.storeDir, "rev-parse", "HEAD");
+  assert.notEqual(publishedTaskHead, plannedTaskHead);
+  assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
+  assert.equal(git(root, "status", "--porcelain"), "");
+  assert.equal(result.baseRef, codeHead);
+  assert.equal(result.head, codeHead);
+  assert.equal(result.providerRevision, publishedTaskHead);
+  assert.equal(result.taskEvidence.task.id, taskId);
+  assert.equal(result.taskEvidence.task.status, "In Progress");
+  assert.equal(preSessionView.id, taskId);
+  assert.equal(preSessionView.status, "In Progress");
+  assert.equal(delivered, 1);
+  assert.equal(git(result.worktree, "rev-parse", "HEAD"), codeHead);
+  assert.equal(git(join(result.worktree, ".backlog"), "rev-parse", "HEAD"), publishedTaskHead);
+  assert.notEqual(realpathSync(join(root, ".backlog", ".git")), realpathSync(join(result.worktree, ".backlog", ".git")));
+
+  const changedTask = publishTaskHistoryMutation({
+    primaryRoot: root,
+    targetWorktree: result.worktree,
+    taskId,
+    edits: [{ option: "--append-notes", value: "accepted handoff advance" }],
+    runner,
+  });
+  assert.equal(changedTask.status, "published");
+  let handoffs = 0;
+  let activeRoute = "independent-route";
+  const session = () => ({
+    sessionId: "independent-episode", activeSessionId: activeRoute,
+    sessionFile: join(dir, "independent-episode.jsonl"), cwd: result.worktree,
+    isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0,
+  });
+  publisher.list = async () => [session()];
+  publisher.reopen = async () => {
+    activeRoute = "independent-reopened-route";
+    return { sessionId: "independent-episode", sessionFile: join(dir, "independent-episode.jsonl"), activeSessionId: activeRoute };
+  };
+  publisher.getState = async () => ({
+    ...session(), isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
+    unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null },
+  });
+  publisher.deliverHandoff = async (_route, _handoff, _execute, onHandoffAdmitted) => { handoffs += 1; await onHandoffAdmitted?.(); };
+  const handoffDependencies = {
+    admissionRunner: runner, taskRunner: runner, taskResolver, ownership, publisher,
+    now: () => "2026-10-26T20:01:00.000Z",
+  };
+  const beforeUnpushedHandoff = structuredClone(records.get("independent-owner"));
+  await assert.rejects(
+    handoffTaskEpisode(taskId, "continue accepted work", ctx, handoffDependencies),
+    /exact Episode code head to be pushed/,
+  );
+  assert.equal(handoffs, 0);
+  assert.deepEqual(records.get("independent-owner"), beforeUnpushedHandoff);
+  git(result.worktree, "push", "-qu", "origin", result.branch);
+  const continued = await handoffTaskEpisode(taskId, "continue accepted work", ctx, handoffDependencies);
+  assert.equal(continued.admitted, true);
+  assert.equal(handoffs, 1);
+  const advancedOwner = records.get("independent-owner");
+  assert.equal(advancedOwner.providerRevision, changedTask.publishedHead);
+  assert.match(advancedOwner.taskEvidence.task.implementationNotes, /accepted handoff advance/);
+  activeRoute = undefined;
+  const reopened = await handoffTaskEpisode(taskId, "continue after durable route refresh", ctx, handoffDependencies);
+  assert.equal(reopened.admitted, true);
+  assert.equal(reopened.episodeActiveSessionId, "independent-reopened-route");
+  assert.equal(handoffs, 2);
+  assert.equal(records.get("independent-owner").episodeActiveSessionId, "independent-reopened-route");
+  const primaryAdvance = publishTaskHistoryMutation({
+    primaryRoot: root, targetWorktree: root, taskId,
+    edits: [{ option: "--append-notes", value: "ordinary primary advance" }], runner,
+  });
+  assert.equal(primaryAdvance.status, "published");
+  const afterPrimaryAdvance = await handoffTaskEpisode(taskId, "continue after primary task advance", ctx, handoffDependencies);
+  assert.equal(afterPrimaryAdvance.admitted, true);
+  assert.equal(handoffs, 3);
+  assert.equal(git(join(result.worktree, ".backlog"), "rev-parse", "HEAD"), primaryAdvance.publishedHead);
+  assert.equal(records.get("independent-owner").providerRevision, primaryAdvance.publishedHead);
+
+  execFileSync(BACKLOG, [
+    "task", "create", "Independent blocked recovery", "--status", "In Planning",
+    "--description", "Prove failure publication on the task DAG",
+    "--plan", "1. Reserve independent task evidence.\n2. Publish Blocked after allocation failure.", "--plain",
+  ], { cwd: root, encoding: "utf8" });
+  const tasksAfterCreate = JSON.parse(execFileSync(BACKLOG, ["task", "list", "--json"], { cwd: root, encoding: "utf8" })).tasks;
+  const secondTaskId = tasksAfterCreate.find((entry) => entry.id !== taskId)?.id;
+  assert.ok(secondTaskId);
+  const secondTask = view(root, secondTaskId);
+  assert.equal(secondTask.status, "In Planning");
+  git(prepared.storeDir, "add", ".");
+  git(prepared.storeDir, "commit", "-qm", "plan independent blocked task");
+  git(prepared.storeDir, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  const ctx2 = { ...ctx, sessionManager: {
+    getSessionId: () => "independent-owner-2", getSessionFile: () => join(dir, "owner-2.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
+  } };
+  await assert.rejects(
+    createTaskEpisode(secondTaskId, "independent-blocked-call", ctx2, {
+      admissionGit: new CliTaskEpisodeAdmissionGit(), admissionRunner: runner, taskResolver,
+      ownership, reservationOperationId: "independent-operation-2", now: () => "2026-10-26T20:02:00.000Z",
+      allocateTaskEpisode: async () => { throw new Error("fixture allocation failure"); },
+    }, { engine: "local" }),
+    /is Blocked and requires exact recovery/,
+  );
+  const blockedOwner = records.get("independent-owner-2");
+  assert.equal(blockedOwner.provider, "backlog");
+  assert.equal(blockedOwner.providerRevision, git(prepared.storeDir, "rev-parse", "HEAD"));
+  assert.equal(blockedOwner.taskEvidence.task.status, "Blocked");
+  assert.equal(view(root, secondTaskId).status, "Blocked");
+  assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
+});
 
 test("trusted task admission commits In Progress before reservation and allocation despite push failure", async () => {
   const f = fixture();

@@ -30,8 +30,10 @@ for that persisted version-1 record and recorded worktree. A valid version-2
 record selects task mode even when the assignment has no task block.
 Require the exact persisted owner session, a top-level Conversation, the
 repository root of the canonical primary `main` checkout, and the record's exact
-provider and task ID. A provider-absent record or `provider: "backlog"` must
-carry its exact project-relative task path and no Beads evidence. A
+provider and task ID. Provider-absent, or explicit Backlog without
+`providerRevision`/`taskEvidence`, is grandfathered branch-local authority. An
+explicit Backlog record with both fields selects the independent nested task
+branch; both shapes carry the exact project-relative task path. A
 `provider: "beads"` record must carry no task path and must retain its exact
 published `providerRevision`, complete raw `taskEvidence`, code `baseRef`,
 worktree, branch, and Episode session identity. If a task block is present,
@@ -57,14 +59,21 @@ backlog task view --json -- TASK-ID
 ```
 
 Require the returned canonical ID and project-relative task path to match the
-ownership record, and require main status to be exactly `Blocked`. The task is
-the sole lifecycle authority in this branch. Work with the user to satisfy the
+ownership record, and require status to be exactly `Blocked` in the selected
+Backlog store. The task is the sole lifecycle authority in this branch.
+Grandfathered Backlog reads canonical main. Independent Backlog first
+fast-forwards the clean primary nested clone to the directly published
+`refs/heads/prime-claw/tasks`; dirty, local-ahead, divergent, unavailable, or
+foreign history blocks without migration or force. Work with the user to satisfy the
 recorded unblock condition. After the user or accepted
 evidence clears it, only that exact owning Conversation may publish the same
-task as `In Progress`. Preserve the existing one exact-task-only status commit:
-unrelated main dirt is allowed, the task path must match committed `HEAD`, and
-push is prompt best-effort evidence after authoritative local commit success.
-Then continue the same ownership, branch, worktree, and session through
+task as `In Progress`. Grandfathered Backlog preserves the existing one exact-
+task-only main commit: unrelated main dirt is allowed, the task path must match
+committed `HEAD`, and push is prompt best-effort evidence after authoritative
+local commit success. Independent Backlog uses the supported CLI in the primary
+nested clone, commits only the exact task path, pushes
+`HEAD:refs/heads/prime-claw/tasks` without force, proves the direct remote head,
+and proves canonical code HEAD unchanged. Then continue the same ownership, branch, worktree, and session through
 `handoff_task_episode`.
 
 For Beads task mode, current synchronized native state—not the older ownership

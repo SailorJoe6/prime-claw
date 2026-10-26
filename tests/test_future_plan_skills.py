@@ -222,8 +222,9 @@ def test_authoring_skill_publishes_only_through_the_selected_provider_and_stops_
     for fragment in (
         "selected existing task path and Git index to be clean",
         "no path other than that exact returned task path was newly changed",
-        "Commit only the returned task path",
-        "commit contains no other path",
+        "commit only the returned task path",
+        "push `HEAD:refs/heads/prime-claw/tasks` without force",
+        "code HEAD stays unchanged",
         "push failure is transport evidence",
         "one more supported native pull and complete raw reread",
         "bd dolt push --no-adopt",

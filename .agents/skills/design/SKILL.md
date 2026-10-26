@@ -121,10 +121,17 @@ through `backlog task view --json -- TASK-ID` and verify its canonical ID,
 returned regular task path. Verify no path other than that exact returned task
 path was newly changed and do not stage unrelated pre-existing changes.
 
-Commit only the returned task path and prove the commit contains no other path.
-Attempt one prompt push when a remote is available. A push failure is transport
-evidence to report, not permission to undo the valid local specification,
-create another task, or begin planning.
+Preserve the selected store topology. If the selected built-in store is an
+ignored independent ordinary-Git clone, require canonical code HEAD clean and
+upstream-equal, require the nested clone clean at the direct remote
+`refs/heads/prime-claw/tasks` head, commit only the returned task path inside
+that clone, push `HEAD:refs/heads/prime-claw/tasks` without force, and prove the
+direct remote head while code HEAD stays unchanged. Otherwise keep the
+existing branch-local flow: commit only the returned task path in the code
+repository, prove the commit contains no other path, and attempt one prompt
+push when a remote is available. A push failure is transport evidence to
+report, not permission to undo the valid local specification, create another
+task, or begin planning.
 
 ### Beads
 

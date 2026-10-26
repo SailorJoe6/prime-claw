@@ -251,8 +251,9 @@ checkout is never switched, staged, or written:
   EQUAL the direct OID; a failed refresh or a direct/fetched mismatch blocks.
   An unreachable remote fails closed (`remote-unavailable`), never deciding on
   stale or absent evidence. An existing published branch is verified and adopted
-  locally by tracking; a remote ahead blocks (`remote-advanced`, never force);
-  shared code ancestry blocks. A new disconnected history is bootstrapped in a
+  locally by tracking; a clean descendant may fast-forward the unused local task
+  ref with compare-and-swap, while local-ahead or divergent history blocks
+  (`remote-advanced`, never force); shared code ancestry blocks. A new disconnected history is bootstrapped in a
   disposable temporary ordinary-Git repository and published with an ordinary
   non-force push, then proven from a fresh fetch. The primary checkout's branch,
   index, worktree, and untracked files are byte-for-byte unchanged by bootstrap.
@@ -316,10 +317,9 @@ checkout is never switched, staged, or written:
   it.
 
 This foundation serves only the canonical primary checkout (a linked worktree
-blocks with exact remediation). Episode-worktree preparation, the per-task
-fetch/reconcile/commit/push mutation loop, Beads server/Dolt transport,
-ownership and receipt fields, remaining lifecycle UX routing, and task-data
-migration are later slices.
+blocks with exact remediation). The later sections below connect Episode
+preparation, exact mutation/publication, version-2 ownership, handoff, and
+cleanup. Beads transport and task-data migration remain distinct work.
 
 ## Project task workflow
 
@@ -438,9 +438,10 @@ non-empty-folder-store ordering.
 
 ## Backlog sub-slice 2C: exact task mutation and publication
 
-`publishEpisodeTaskHistoryMutation({ primaryRoot, targetWorktree, taskId,
-edits, commitMessage? })` is the direct Backlog-specific write seam for one
-already-prepared Episode clone. `edits` contains native `backlog task edit`
+`publishTaskHistoryMutation({ primaryRoot, targetWorktree, taskId, edits,
+commitMessage? })` is the shared Backlog-specific write seam for either the
+prepared primary nested clone or one prepared Episode clone.
+`publishEpisodeTaskHistoryMutation` remains a compatibility alias. `edits` contains native `backlog task edit`
 option/value pairs; the seam supplies the sole positional task ID itself.
 It does not expose a normalized task model or implement lifecycle routing.
 
@@ -482,6 +483,59 @@ cleanliness, and the same exact canonical ID plus safe task path. The seam
 never decides semantic compatibility or forces/rewrites remote history. Native
 mutation, commit, fetch, merge, push, or direct-proof failure leaves
 recoverable local work in the nested clone and never calls it published.
+
+## Independent Backlog production lifecycle connection
+
+Production initialization now supplies `prepareTaskHistoryWorkspace`. When no
+provider exists it creates the new published independent store; when Backlog
+already selects a valid nested ordinary-Git clone it verifies and cleanly
+fast-forwards it. Existing populated non-Git, root-config, custom, or ordinary
+branch-local Backlog layouts remain grandfathered. They are never adopted,
+moved, normalized, or deleted by routine preparation.
+
+Task admission selects the topology with Git evidence. A task path already
+tracked by the code repository keeps the existing one-path code commit flow. An
+untracked path in a prepared independent store publishes `In Progress` with
+`publishTaskHistoryMutation` from the primary nested clone. Canonical code must
+be operation-free, clean, and equal to upstream before and after that task-only
+publication. Version-2 ownership then binds the clean code `baseRef` separately
+from the published 40-hex `providerRevision` and complete native task view. The
+older provider-absent and explicit Backlog shapes without revision/evidence
+continue to parse and run unchanged.
+
+After the registered Episode code worktree exists, allocation prepares its
+independent nested clone before creating a session, Orca automation, or execute
+delivery. It requires the exact reserved In Progress task and meaningful plan.
+A clean published descendant may fast-forward both nested clones; unrelated
+advances are allowed only when the bound task view is unchanged during initial
+allocation. The handoff boundary later accepts the owner-authorized current
+In Progress task view, proves descendant/directly published history in both
+stores, refreshes any idle durable session route before constructing the factual
+observation, and records only current provider revision, native evidence, code
+head, and time after the first handoff message is admitted.
+
+Conversation and Episode workflow policy preserves two Backlog modes.
+Grandfathered mode keeps task commits in the code DAG. Independent mode performs
+supported native edits in the selected nested clone, commits only task paths,
+and pushes `HEAD:refs/heads/prime-claw/tasks` without force; code and task heads
+are reported separately. Lifecycle status stays Conversation-owned. No public
+tracker/status API, normalized task model, sidecar, receipt, force update, or
+raw task-file write is added.
+
+Cleanup-only finalization preserves terminal Done/archive and code ancestry
+checks. Independent Backlog first proves the clean primary nested clone equals
+one stable direct remote head, reads the terminal task from that exact revision
+(the committed archive file for abandonment), and binds that revision/evidence.
+Native abandonment prepares the built-in `archive/tasks/` directory before the
+archive command. The terminal workflow fast-forwards the Episode nested clone
+to the published Done/archive revision before cleanup. Cleanup then runs a
+separate read-only nested-history proof before deleting anything that contains
+it. The directly published clone head must still descend from the
+ownership-bound provider revision. Dirty, ignored-untracked, local-ahead, remote-ahead,
+divergent, unavailable, foreign, or unreadable history refuses before runtime
+or parent-worktree removal. Only the exact clean fully published nested clone is
+removed; primary task history and unrelated ownership survive. Migration and
+the real repository cutover remain PRIMECLAW-43.1.
 
 ### Beads workspace and transport foundation (slice 2D)
 

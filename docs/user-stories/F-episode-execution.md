@@ -16,6 +16,16 @@ through supported provider commands, publishes exact evidence, commits and
 pushes its code branch, and stops for owner review. It never uses `.ralph/plans`
 as task-native authority.
 
+Backlog ownership preserves two compatible topologies. Provider-absent or
+explicit Backlog without revision/evidence remains branch-local. Explicit
+Backlog with `providerRevision` and `taskEvidence` uses a clean ignored nested
+clone: task content commits and non-force pushes only on
+`refs/heads/prime-claw/tasks`, code commits remain separate, allocation prepares
+the Episode clone before execute starts, and handoff records current published
+task evidence only after admission. All later Backlog status, blocker, readiness,
+completion, and archive references use the ownership-selected topology; they do
+not migrate a grandfathered store.
+
 The Episode owns task content and code in its branch, while the Conversation
 owns lifecycle status. Execute requires current native `In Progress`, never
 changes status, completes, archives, or performs cross-checkout task copies or

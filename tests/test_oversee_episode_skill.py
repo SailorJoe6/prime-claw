@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 1400
+    assert 300 <= len(words) <= 1800
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -21,10 +21,12 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`",
         "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
         "For version 2, select the provider only from that exact owner",
-        "exact Backlog task ID and project-relative task path",
+        "retains its exact task ID/path",
+        "40-hex `providerRevision` and complete native task view",
         "sole durable product and execution contract",
         "Never consult `.ralph/plans` in this mode",
-        "The Episode owns task content on its branch; the Conversation owns lifecycle status on main",
+        "In branch-local mode the Episode owns task content on its code branch and the Conversation owns lifecycle status on main",
+        "task commits/pushes never enter the code DAG",
         "For retained version 1 folder ownership",
         "Keep that pair active through blocking, candidate review, and revision",
         "exact operator-authorized version-1 recovery",
@@ -41,12 +43,17 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Prime Claw abandonment: task TASK-ID; pushed Episode head EPISODE-HEAD; code was not merged.",
         "Beads terminals use native/Git",
         "add no public status API, publisher, protocol, or classifier",
-        "Backlog sets only the bound main task to `Ready for Merge`",
+        "Grandfathered Backlog sets only the bound main task to `Ready for Merge`",
+        "Independent Backlog publishes the exact Ready status on the disconnected task branch",
         "preserving its task content plus authorized status",
-        "Git blocks every other conflict",
+        "Git blocks every other code conflict",
         "git merge --no-edit currentMainHead",
-        "restore its pre-merge Episode task content, apply only the authorized `In Progress` status, let Git block every other conflict, and push the refreshed candidate",
-        "Backlog then publishes its exact task-only `Done` commit, pushes, and rechecks identity/status",
+        "restore its pre-merge Episode task content, apply only the authorized status, let Git block every other conflict, and push the refreshed candidate",
+        "leaves both code heads unchanged",
+        "Independent Backlog publishes `Done` only on `refs/heads/prime-claw/tasks`",
+        "fast-forwards the Episode nested task clone to that exact terminal revision before cleanup",
+        "creates the exact built-in `archive/tasks/` directory inside the nested store when absent",
+        "Both push without force and recheck identity/status",
         "Beads first records current clean pushed canonical code `mainHead` (not a task-status commit)",
         "proves exact branch/upstream/remote `candidateHead` and ancestry",
         "guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`",
@@ -54,14 +61,14 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Show `(taskId, mainHead, candidateHead)` plus factual native evidence",
         "no provider revision or task equality becomes approval authority",
         "**Delay** is a strict no-op",
-        "Backlog returns only the bound main task to `In Progress`",
+        "Grandfathered Backlog returns only the bound main task to `In Progress`",
         "guarded `--if-status ready_for_merge` update to `in_progress`",
         "Then call `handoff_task_episode` for the same Episode",
         "Before **Merge**, re-read ownership and freshly preflight the exact authorized `(taskId, mainHead, candidateHead)`",
         "git merge-base --is-ancestor mainHead candidateHead",
         "git merge --ff-only candidateHead",
         "push main normally and prove main/upstream/direct remote equal `candidateHead`",
-        "Backlog then publishes its exact task-only `Done` commit",
+        "Grandfathered Backlog then publishes its exact task-only `Done` code commit",
         "guarded `--if-status ready_for_merge` update to `done`",
         "truthful final note naming the tuple/code publication",
         "never force, replay, or a fresh transaction",
@@ -100,8 +107,10 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
     text = " ".join(raw.split())
     for phrase in (
         "select the provider only from that exact owner",
-        'provider-absent record or `provider: "backlog"`',
-        "exact Backlog task ID and project-relative task path",
+        "provider-absent record, or `provider: \"backlog\"` without `providerRevision`/`taskEvidence`",
+        "independent Backlog history",
+        "retains its exact task ID/path",
+        "40-hex `providerRevision` and complete native task view",
         'A `provider: "beads"` record has no `taskPath`',
         "published `providerRevision`",
         "complete raw `taskEvidence`",
@@ -142,7 +151,8 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "guarded `--if-status ready_for_merge` update to `in_progress`",
         "guarded `--if-status ready_for_merge` update to `done`",
         "no provider revision or task equality becomes approval authority",
-        'provider-absent record or `provider: "backlog"`',
+        "provider-absent record, or `provider: \"backlog\"` without `providerRevision`/`taskEvidence`",
+        "independent Backlog history",
     ):
         assert phrase in text
     assert text.index("select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`") < text.index("select the provider only from that exact owner")
@@ -209,8 +219,9 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
 
     assert (
         "The Episode implements approved code, documentation, and tests in its isolated worktree "
-        "and exclusively owns the bound task's content there. The Conversation exclusively owns "
-        "lifecycle status on main"
+        "and exclusively owns bound task content in the selected branch-local or independent "
+        "nested store. The Conversation exclusively owns lifecycle status on canonical main or "
+        "its primary nested task store"
     ) in future
     assert "The Episode edits only its bound task content" not in future
 
@@ -223,8 +234,9 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
     traceability = " ".join(TRACEABILITY.read_text().split())
     assert (
         "A task-native Episode implements approved code, documentation, and tests in its isolated "
-        "worktree, exclusively owns the bound task's content there, and leaves lifecycle status "
-        "to the Conversation"
+        "worktree, exclusively owns the bound task's content in the selected branch-local or "
+        "independent nested store, publishes independent task commits separately from code, and "
+        "leaves lifecycle status to the Conversation"
     ) in traceability
     assert "A task-bound Episode edits only its exact Backlog task content" not in traceability
     assert "retained version-1 compatibility folder Episodes keep their plan workflow" in traceability

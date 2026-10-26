@@ -13,6 +13,7 @@ import {
   readEpisodeOwnership,
   writeEpisodeOwnership,
   type BacklogTaskEpisodeOwnershipRecord,
+  type PublishedBacklogTaskEpisodeOwnershipRecord,
   type BeadsTaskEpisodeOwnershipRecord,
   type EpisodeOwnershipMutation,
   type EpisodeOwnershipRecord,
@@ -35,6 +36,7 @@ import {
   type BeadsWorkspaceTransportPreparation,
   type ProviderTaskResolution,
 } from "./task-providers.ts";
+import type { EpisodeTaskHistoryMutation } from "./task-history-workspace.ts";
 
 /**
  * Default resolver: provider-aware task resolution narrowed to the existing
@@ -75,6 +77,25 @@ export interface TaskEpisodeReservationInput {
 
 export interface TaskEpisodeReservationDependencies {
   git?: TaskEpisodeReservationGit;
+  ownership?: TaskEpisodeReservationStore;
+  taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  now?: () => string;
+}
+
+export interface PublishedBacklogTaskEpisodeReservationInput {
+  projectRoot: string;
+  publication: EpisodeTaskHistoryMutation;
+  ownerSessionId: string;
+  engine: "orca" | "local";
+  projectSetupId?: string;
+  routingEnvironmentId?: string;
+  operationId?: string;
+  /** Exact clean code HEAD, separate from the published task-history revision. */
+  baseRef: string;
+}
+
+export interface PublishedBacklogTaskEpisodeReservationDependencies {
+  git?: BeadsTaskEpisodeReservationGit;
   ownership?: TaskEpisodeReservationStore;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   now?: () => string;
@@ -664,6 +685,105 @@ export function reserveTaskEpisodeOwnership(
   };
   parseEpisodeOwnership(record);
   ownership.write(projectRoot, record);
+  return record;
+}
+
+
+/**
+ * Reserve one Backlog Episode whose task status was published on the disconnected
+ * task-history branch while the code base remains the exact clean canonical HEAD.
+ */
+export function reservePublishedBacklogTaskEpisodeOwnership(
+  input: PublishedBacklogTaskEpisodeReservationInput,
+  dependencies: PublishedBacklogTaskEpisodeReservationDependencies = {},
+): PublishedBacklogTaskEpisodeOwnershipRecord {
+  if (input.publication.status !== "published") {
+    throw new Error(`Independent Backlog Episode reservation requires published task-history evidence: ${JSON.stringify(input.publication)}`);
+  }
+  const publication = input.publication;
+  if (!input.ownerSessionId || !publication.taskId || publication.taskId.trim() === "") {
+    throw new Error("Independent Backlog Episode reservation requires exact owner and task identity");
+  }
+  if (!TRANSITION_GIT_OID.test(publication.publishedHead) || !TRANSITION_GIT_OID.test(input.baseRef)) {
+    throw new Error("Independent Backlog Episode reservation requires exact task and code Git revisions");
+  }
+  let taskEvidence: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(publication.nativeAfter) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    taskEvidence = parsed as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(`Independent Backlog Episode reservation received invalid native task evidence: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const rawTask = taskEvidence.task;
+  if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
+      || (rawTask as Record<string, unknown>).id !== publication.taskId
+      || (rawTask as Record<string, unknown>).path !== publication.taskPath
+      || (rawTask as Record<string, unknown>).status !== "In Progress") {
+    throw new Error("Independent Backlog Episode reservation requires exact published In Progress task evidence");
+  }
+
+  const root = realpathSync(input.projectRoot);
+  const selection = (dependencies.taskResolver ?? defaultOwnershipTaskResolver)(root, publication.taskId);
+  if (!selection || selection.taskId !== publication.taskId || realpathSync(selection.projectRoot) !== root
+      || selection.taskPathRelative !== publication.taskPath || selection.status !== "In Progress") {
+    throw new Error("Independent Backlog Episode reservation task no longer matches the published native evidence");
+  }
+  if (!meaningfulTaskImplementationPlan(selection.implementationPlan)) {
+    throw new Error("Independent Backlog Episode reservation requires a meaningful Implementation Plan");
+  }
+  if (input.engine === "orca" && !input.projectSetupId) {
+    throw new Error("Independent Backlog Orca reservation requires an exact project setup");
+  }
+  if (input.engine === "local" && (input.projectSetupId || input.routingEnvironmentId)) {
+    throw new Error("Independent Backlog local reservation cannot carry Orca placement identity");
+  }
+
+  const git = dependencies.git ?? new CliBeadsTaskEpisodeReservationGit();
+  if (git.repositoryRoot(root) !== root || git.head(root) !== input.baseRef || git.status(root) !== "") {
+    throw new Error("Independent Backlog Episode reservation requires the exact clean Git code HEAD/baseRef");
+  }
+  const ownership = dependencies.ownership ?? defaultOwnership;
+  const initial = ownership.read(root, input.ownerSessionId);
+  if (initial && initial.status !== "inactive") {
+    const identity = initial.version === 2 ? initial.taskId : initial.sourceLocation;
+    throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of reserving again`);
+  }
+  const operationId = input.operationId ?? randomUUID();
+  if (!/^[A-Za-z0-9-]+$/.test(operationId)) {
+    throw new Error("Independent Backlog Episode reservation requires a safe operation ID");
+  }
+  const now = dependencies.now?.() ?? new Date().toISOString();
+  const record = parseEpisodeOwnership({
+    version: 2,
+    provider: "backlog",
+    status: "provisioning",
+    operationId,
+    engine: input.engine,
+    ownerSessionId: input.ownerSessionId,
+    taskId: publication.taskId,
+    taskPath: publication.taskPath,
+    providerRevision: publication.publishedHead,
+    taskEvidence,
+    baseRef: input.baseRef,
+    createdAt: now,
+    updatedAt: now,
+    ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
+    ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
+  }) as PublishedBacklogTaskEpisodeOwnershipRecord;
+  if (git.head(root) !== input.baseRef || git.status(root) !== "") {
+    throw new Error("Git code state changed during independent Backlog reservation validation");
+  }
+  const beforeWrite = ownership.read(root, input.ownerSessionId);
+  if ((initial === null) !== (beforeWrite === null)
+      || (initial !== null && beforeWrite !== null && JSON.stringify(initial) !== JSON.stringify(beforeWrite))) {
+    throw new Error("Episode ownership changed during independent Backlog reservation validation");
+  }
+  ownership.write(root, record);
+  const stored = ownership.read(root, input.ownerSessionId);
+  if (!sameOwnership(stored, record)) {
+    throw new Error("Independent Backlog Episode reservation could not verify the exact completed binding");
+  }
   return record;
 }
 

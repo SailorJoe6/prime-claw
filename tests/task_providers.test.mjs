@@ -1672,6 +1672,7 @@ test("conversation status publication preserves the ordinary Backlog mutation an
     calls.push(key);
     const canned = {
       ...BACKLOG_OK,
+      [`git\0ls-files\0--error-unmatch\0--\0${relative}`]: { stdout: `${relative}\n`, stderr: "", status: 0 },
       ["backlog\0task\0edit\0--status\0In Progress\0--append-notes\0admit\0--plain\0--\0TST-1"]: { stdout: "", stderr: "", status: 0 },
     }[key];
     if (canned) {
@@ -1710,6 +1711,41 @@ test("conversation status publication preserves the ordinary Backlog mutation an
     ["commitPaths", root, "c".repeat(40)],
     ["pathStatus", root, relative],
   ]);
+});
+
+test("independent Backlog admission revalidates synchronized source status before mutation", () => {
+  const root = fixtureRoot();
+  writeBacklogFolderConfig(root);
+  mkdirSync(join(root, "backlog", ".git"), { recursive: true });
+  const relative = "backlog/tasks/tst-1.md";
+  const taskPath = writeBacklogTaskFile(root, relative);
+  let status = "In Planning";
+  let publications = 0;
+  const real = new ProcessCommandRunner();
+  const runner = { run(command, args, options = {}) {
+    const key = [command, ...args].join("\0");
+    if (key === "backlog\0--version") return { stdout: "Backlog.md 1.0.0\n", stderr: "", status: 0 };
+    if (key === "backlog\0config\0get\0statuses") return BACKLOG_OK[key];
+    return real.run(command, args, options);
+  } };
+  const selection = () => ({
+    taskId: "TST-1", title: "Fixture task", status, implementationPlan: "One meaningful step",
+    projectRoot: root, taskPath, taskPathRelative: relative,
+  });
+  assert.throws(() => commitConversationTaskStatus({
+    taskId: "TST-1", projectRoot: root, taskPath: relative, status: "In Progress",
+    expectedSourceStatus: "In Planning", requireSourcePlan: true,
+    message: "chore: admit TST-1 episode", runner, git: conversationStatusGit({
+      operationInProgress: () => false, trackedStatus: () => "", upstreamHead: () => "a".repeat(40),
+    }), resolveTask: selection,
+    prepareTaskHistory: () => {
+      status = "Done";
+      return { status: "prepared", storeDir: join(root, "backlog"), remote: "origin", remoteUrl: "unused", branch: "prime-claw/tasks", head: "a".repeat(40), created: false };
+    },
+    publishTaskHistory: () => { publications += 1; throw new Error("must not publish"); },
+  }), /must still be In Planning.*found Done/);
+  assert.equal(publications, 0);
+  assert.equal(status, "Done");
 });
 
 test("conversation status publication returns the exact published Beads evidence without file mutation", () => {

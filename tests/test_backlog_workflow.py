@@ -142,7 +142,9 @@ def test_execute_and_handoff_keep_backlog_authority_while_prepare_discovers_nati
     handoff = " ".join(HANDOFF_TEMPLATE.read_text().split())
 
     assert "Backlog.md-tracked projects" in execute
-    assert "The Episode exclusively owns task content on its branch" in execute
+    assert "The Episode exclusively owns task content" in execute
+    assert "publishes only to `refs/heads/prime-claw/tasks`" in execute
+    assert "code branch HEAD must remain unchanged by task-only work" in execute
     assert "references, not lifecycle authority" in execute
     assert "Use only the commands and tracker the project actually provides" in prepare
     assert "Backlog.md" not in prepare

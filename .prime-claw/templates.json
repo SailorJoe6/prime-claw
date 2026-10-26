@@ -4,10 +4,10 @@
     "project-skill-blocked": {
       "source": "skills/project-templates/blocked.md",
       "destination": ".agents/skills/blocked/SKILL.md",
-      "baselineSha256": "c8f019818fb0d628a8cccf5ab3dbd94d25720e0585c9b7af4fd030fb56f056f3",
-      "installedSha256": "c8f019818fb0d628a8cccf5ab3dbd94d25720e0585c9b7af4fd030fb56f056f3",
+      "baselineSha256": "6cce90f6c46f5a1442d66f4a58db381efe0c333dd16b7a5af300978655ab4179",
+      "installedSha256": "6cce90f6c46f5a1442d66f4a58db381efe0c333dd16b7a5af300978655ab4179",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "c8f019818fb0d628a8cccf5ab3dbd94d25720e0585c9b7af4fd030fb56f056f3",
+      "availableUpstreamSha256": "6cce90f6c46f5a1442d66f4a58db381efe0c333dd16b7a5af300978655ab4179",
       "state": "managed",
       "provenance": {
         "scope": "project",
@@ -19,10 +19,10 @@
     "project-skill-design": {
       "source": "skills/project-templates/design.md",
       "destination": ".agents/skills/design/SKILL.md",
-      "baselineSha256": "12f6128d93b97e113a86181dadcadbc18ffb6569a55717ad1fda6c7d759682e5",
-      "installedSha256": "3917b06bad3d2482a709ff6a274090410e79f8df8b33cae500aa18b659c8ccee",
-      "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "8e27c98e09f22d228be46340d8563ddc992da883f99658b8724a13c0eafe2746",
+      "baselineSha256": "376757f4e66b5a20bf92a4aeaee2fa55cb27cde616824c56518d961d42df00bc",
+      "installedSha256": "376757f4e66b5a20bf92a4aeaee2fa55cb27cde616824c56518d961d42df00bc",
+      "acceptedOverrideSha256": "376757f4e66b5a20bf92a4aeaee2fa55cb27cde616824c56518d961d42df00bc",
+      "availableUpstreamSha256": "35eb46b1cb55d983f0ee32b26928058dee2599ec0119c98a22536f985d3cfbab",
       "state": "customized",
       "provenance": {
         "scope": "project",
@@ -49,10 +49,10 @@
     "project-skill-execute": {
       "source": "skills/project-templates/execute.md",
       "destination": ".agents/skills/execute/SKILL.md",
-      "baselineSha256": "591304285860c6d284a9179724b0b2f0a39a5b53547de1f0230c673248ce90f9",
-      "installedSha256": "591304285860c6d284a9179724b0b2f0a39a5b53547de1f0230c673248ce90f9",
+      "baselineSha256": "2e7523acf2ed3c62f191dd6b77cce7d0f44fbec80100ae173aeaaea79e32ca72",
+      "installedSha256": "2e7523acf2ed3c62f191dd6b77cce7d0f44fbec80100ae173aeaaea79e32ca72",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "591304285860c6d284a9179724b0b2f0a39a5b53547de1f0230c673248ce90f9",
+      "availableUpstreamSha256": "2e7523acf2ed3c62f191dd6b77cce7d0f44fbec80100ae173aeaaea79e32ca72",
       "state": "managed",
       "provenance": {
         "scope": "project",
@@ -79,10 +79,10 @@
     "project-skill-spec-it-out": {
       "source": "skills/project-templates/spec-it-out.md",
       "destination": ".agents/skills/spec-it-out/SKILL.md",
-      "baselineSha256": "c8045a8c4e31e3874432026acbf55ea3cdfe9b9a8fef4a8e948a0c9dd045263f",
-      "installedSha256": "33d11069bec75c115b804e8a9aaae0f6da62197dd85be56db85371755e90336b",
-      "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "3407a524a16b7f174f75ac3294221b949d1afb4613e9d89231a77f48ff18413a",
+      "baselineSha256": "08516d908b38e144b3758ecd0efa1aa2e5ab3cad33b0e941d1926ca3a14dd58a",
+      "installedSha256": "08516d908b38e144b3758ecd0efa1aa2e5ab3cad33b0e941d1926ca3a14dd58a",
+      "acceptedOverrideSha256": "08516d908b38e144b3758ecd0efa1aa2e5ab3cad33b0e941d1926ca3a14dd58a",
+      "availableUpstreamSha256": "4e47597fbf23b894f57cb5f35576be7051ac972aa70b4bf953f8a106269d3dfa",
       "state": "customized",
       "provenance": {
         "scope": "project",
@@ -109,10 +109,10 @@
     "project-workflow-handoff": {
       "source": "workflows/handoff.md",
       "destination": ".prime-claw/workflows/handoff.md",
-      "baselineSha256": "23db2ccf390d88b3d4dea4776c54bc11d94259a754c801db6fb97b23a284d6f4",
-      "installedSha256": "23db2ccf390d88b3d4dea4776c54bc11d94259a754c801db6fb97b23a284d6f4",
+      "baselineSha256": "a6d4a8970ebe3f17a695d8438e92e8d599e023b87e15d32edc7fce539f960aea",
+      "installedSha256": "a6d4a8970ebe3f17a695d8438e92e8d599e023b87e15d32edc7fce539f960aea",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "23db2ccf390d88b3d4dea4776c54bc11d94259a754c801db6fb97b23a284d6f4",
+      "availableUpstreamSha256": "a6d4a8970ebe3f17a695d8438e92e8d599e023b87e15d32edc7fce539f960aea",
       "state": "managed",
       "provenance": {
         "scope": "project",
@@ -199,10 +199,10 @@
     "project-workflow-plan-task": {
       "source": "workflows/plan-task.md",
       "destination": ".prime-claw/workflows/plan-task.md",
-      "baselineSha256": "6b8b4deefda821be39c296340af1a1c94542da4e2ae53499887313d68ee4a246",
-      "installedSha256": "6b8b4deefda821be39c296340af1a1c94542da4e2ae53499887313d68ee4a246",
+      "baselineSha256": "f8cedf0c25941fe444ee54580caca49d49bf7c2242989d8fce3fd2165c8902ad",
+      "installedSha256": "f8cedf0c25941fe444ee54580caca49d49bf7c2242989d8fce3fd2165c8902ad",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "6b8b4deefda821be39c296340af1a1c94542da4e2ae53499887313d68ee4a246",
+      "availableUpstreamSha256": "f8cedf0c25941fe444ee54580caca49d49bf7c2242989d8fce3fd2165c8902ad",
       "state": "managed",
       "provenance": {
         "scope": "project",

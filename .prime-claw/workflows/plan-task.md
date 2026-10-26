@@ -64,10 +64,15 @@ Plan and set or retain status `In Planning` in one supported CLI operation.
 Preserve real newlines and never edit task Markdown directly. Reload through
 `backlog task view --json -- TASK-ID` and verify the exact canonical ID, bound
 path, `In Planning` status, and meaningful non-placeholder Implementation Plan.
-Verify no other path was newly changed, commit only the bound task path, prove
-the commit contains no other path, and attempt a prompt push when a remote is
-available. A push failure is transport evidence, not permission to undo the
-valid local plan or begin implementation.
+Verify no other task path changed and preserve the selected store topology. If
+the built-in store is an ignored independent ordinary-Git clone, require clean
+upstream-equal canonical code, require the clone clean at the direct published
+task head, commit only the bound task path inside the clone, push
+`HEAD:refs/heads/prime-claw/tasks` without force, and prove direct publication
+and unchanged code HEAD. Otherwise keep the existing branch-local flow: commit
+only the bound task path in the code repository, prove the commit contains no
+other path, and attempt one prompt push. A push failure is transport evidence,
+not permission to undo the valid local plan or begin implementation.
 
 ### Beads publication
 

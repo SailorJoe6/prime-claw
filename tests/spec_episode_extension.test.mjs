@@ -1250,6 +1250,104 @@ test("cleanup-only task finalization binds one head, removes exact resources, an
     < h.calls.findIndex((call) => call[0] === "remove-runtime"));
 });
 
+test("independent Backlog merged cleanup binds published terminal evidence and removes nested history first", async () => {
+  const taskPath = "backlog/tasks/primeclaw-10.38.md";
+  const h = cleanupHarness("merged", { record: {
+    provider: "backlog", providerRevision: "e".repeat(40),
+    taskEvidence: { task: { id: "PRIMECLAW-10.38", path: taskPath, status: "In Progress", title: "Task-native lifecycle" } },
+  } });
+  const publishedHead = "f".repeat(40);
+  h.deps.inspectPublishedTaskHistory = () => ({ status: "ready", storeDir: join(h.f.root, "backlog"), head: publishedHead });
+  h.deps.inspectTaskHistory = (input) => {
+    assert.equal(input.expectedRevision, publishedHead);
+    assert.equal(h.calls.some((call) => call[0].startsWith("remove-")), false);
+    return { status: "ready", storeDir: join(h.f.worktree, "backlog"), present: true };
+  };
+  h.deps.cleanupTaskHistory = () => { h.calls.push(["remove-task-history"]); return { status: "cleaned", storeDir: join(h.f.worktree, "backlog") }; };
+  const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
+  assert.equal(result.ownershipStatus, "inactive");
+  assert.equal(h.record.providerRevision, publishedHead);
+  assert.equal(h.record.taskEvidence.task.status, "Done");
+  assert.ok(h.calls.findIndex((call) => call[0] === "remove-task-history") < h.calls.findIndex((call) => call[0] === "remove-runtime"));
+});
+
+test("independent Backlog cleanup refuses dirty or unpublished nested history before parent-resource removal", async (t) => {
+  for (const scenario of [
+    { name: "dirty", code: "uncommitted-task-content", detail: "nested task checkout has uncommitted task content" },
+    { name: "unpublished", code: "unpublished-task-history", detail: "nested task checkout is ahead of the selected remote" },
+  ]) await t.test(scenario.name, async () => {
+    const taskPath = "backlog/tasks/primeclaw-10.38.md";
+    const h = cleanupHarness("merged", { record: {
+      provider: "backlog",
+      providerRevision: "e".repeat(40),
+      taskEvidence: { task: { id: "PRIMECLAW-10.38", path: taskPath, status: "In Progress", title: "Task-native lifecycle" } },
+    } });
+    let cleanupCalls = 0;
+    h.deps.inspectPublishedTaskHistory = () => ({ status: "ready", storeDir: join(h.f.root, "backlog"), head: "f".repeat(40) });
+    h.deps.inspectTaskHistory = (input) => {
+      assert.equal(input.expectedRevision, "f".repeat(40));
+      return { status: "refused", code: scenario.code, detail: scenario.detail, remediation: "publish or clean the exact nested checkout" };
+    };
+    h.deps.cleanupTaskHistory = () => { cleanupCalls += 1; throw new Error("must not clean refused history"); };
+    await assert.rejects(
+      finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
+      new RegExp(`${scenario.code}.*${scenario.detail}`),
+    );
+    assert.equal(cleanupCalls, 0);
+    assert.equal(h.calls.some((call) => call[0].startsWith("remove-")), false);
+    assert.equal(h.record.status, "active");
+  });
+});
+
+test("independent Backlog cleanup refuses an unpublished primary terminal before any removal", async () => {
+  const taskPath = "backlog/tasks/primeclaw-10.38.md";
+  const h = cleanupHarness("merged", { record: {
+    provider: "backlog", providerRevision: "e".repeat(40),
+    taskEvidence: { task: { id: "PRIMECLAW-10.38", path: taskPath, status: "In Progress", title: "Task-native lifecycle" } },
+  } });
+  h.deps.inspectPublishedTaskHistory = () => ({
+    status: "blocked", code: "local-ahead", detail: "primary terminal commit is not directly published", remediation: "publish it",
+  });
+  await assert.rejects(
+    finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps),
+    /clean directly published primary task history.*local-ahead.*not directly published/,
+  );
+  assert.equal(h.calls.some((call) => call[0].startsWith("remove-")), false);
+  assert.equal(h.record.cleanupHead, undefined);
+});
+
+test("independent Backlog abandonment verifies the published archive without active-task resolution", async () => {
+  const taskPath = "backlog/tasks/primeclaw-10.38.md";
+  const h = cleanupHarness("abandoned", { record: {
+    provider: "backlog", providerRevision: "e".repeat(40),
+    taskEvidence: { task: { id: "PRIMECLAW-10.38", path: taskPath, status: "In Progress", title: "Task-native lifecycle" } },
+  } });
+  const publishedHead = "f".repeat(40);
+  h.deps.inspectPublishedTaskHistory = () => ({ status: "ready", storeDir: join(h.f.root, "backlog"), head: publishedHead });
+  h.deps.taskResolver = () => { throw new Error("archived independent task must not use active-task resolution"); };
+  const requiredEvidence = `Prime Claw abandonment: task PRIMECLAW-10.38; pushed Episode head ${h.episodeHead}; code was not merged.`;
+  const summary = `${requiredEvidence}\n\nPreserved operator context explaining why the accepted candidate was abandoned.`;
+  h.deps.taskRunner = { run(command, args) {
+    assert.equal(command, "git");
+    if (args[0] === "show" && args[1].includes(":tasks/")) return { stdout: "", stderr: "missing", status: 128 };
+    if (args[0] === "show" && args[1].includes(":archive/tasks/")) return {
+      stdout: `---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\n\n## Final Summary\n\n<!-- SECTION:FINAL_SUMMARY:BEGIN -->\n${summary}\n<!-- SECTION:FINAL_SUMMARY:END -->\n`,
+      stderr: "", status: 0,
+    };
+    throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+  } };
+  h.deps.inspectTaskHistory = (input) => {
+    assert.equal(input.expectedRevision, publishedHead);
+    return { status: "ready", storeDir: join(h.f.worktree, "backlog"), present: true };
+  };
+  h.deps.cleanupTaskHistory = () => ({ status: "cleaned", storeDir: join(h.f.worktree, "backlog") });
+  const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
+  assert.equal(result.ownershipStatus, "inactive");
+  assert.equal(h.record.providerRevision, publishedHead);
+  assert.equal(h.record.taskEvidence.task.path, "backlog/archive/tasks/primeclaw-10.38.md");
+  assert.equal(h.record.taskEvidence.task.finalSummary, summary);
+});
+
 test("cleanup-only task finalization supports abandonment and same-head idempotence", async () => {
   const h = cleanupHarness("abandoned");
   await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);

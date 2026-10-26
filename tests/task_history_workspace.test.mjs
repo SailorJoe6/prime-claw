@@ -21,6 +21,9 @@ import {
   prepareTaskHistoryWorkspace,
   prepareEpisodeTaskHistoryWorkspace,
   cleanupEpisodeTaskHistoryStore,
+  inspectEpisodeTaskHistoryStore,
+  inspectPublishedPrimaryTaskHistory,
+  publishTaskHistoryMutation,
   publishEpisodeTaskHistoryMutation,
 } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 
@@ -185,7 +188,7 @@ test("bootstrap publishes from the SELECTED remote's transport URL", () => {
   assert.match(ls, /refs\/heads\/prime-claw\/tasks/);
 });
 
-test("a stale remote ref is refreshed by fetch before deciding", () => {
+test("a stale clean local task ref is fast-forwarded after fresh remote proof", () => {
   const { root, remote } = fixtureRepo();
   // Publish v1 and let the primary see it.
   publishTaskBranch(remote, { "TASKS.md": "v1\n" });
@@ -193,10 +196,10 @@ test("a stale remote ref is refreshed by fetch before deciding", () => {
   git(root, "branch", "--track", "prime-claw/tasks", "refs/remotes/origin/prime-claw/tasks");
   // Advance the remote out from under the primary (stale local knowledge).
   publishTaskBranch(remote, { "TASKS.md": "v2\n", "extra.md": "x\n" });
-  // ensureTaskHistoryBranch must fetch and see the advance, not trust stale refs.
+  // Fresh remote proof permits only an ordinary clean fast-forward of the unused local ref.
   const state = ensureTaskHistoryBranch(root, "origin", remote);
-  assert.equal(state.status, "blocked");
-  assert.equal(state.code, "remote-advanced");
+  assert.equal(state.status, "verified");
+  assert.equal(git(root, "rev-parse", TASK_HISTORY_REF), state.head);
 });
 
 test("a local-only branch ahead of the remote blocks (never published implicitly)", () => {
@@ -291,6 +294,7 @@ test("preparation preserves an explicitly selected existing backlog/ store", (t)
   // Untouched.
   assert.equal(readFileSync(join(root, "backlog", "config.yml"), "utf8"), 'project_name: "Kept"\n');
   assert.ok(!existsSync(join(root, "backlog", ".git")));
+  assert.ok(!existsSync(join(root, ".gitignore")), "migration refusal happens before ignore mutation");
 });
 
 test("preparation with no provider evidence defaults to .backlog/, never backlog/", (t) => {
@@ -373,7 +377,7 @@ test("an existing nested clone with an unrelated remote URL blocks", () => {
   assert.match(ws.detail, /canonical URL|not the selected remote/);
 });
 
-test("an existing valid nested clone is verified idempotently; remote advance blocks (mutation is deferred)", (t) => {
+test("an existing valid nested clone is verified idempotently and clean remote advance fast-forwards", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, remote } = fixtureRepo();
   const ws1 = prepareTaskHistoryWorkspace({ primaryRoot: root });
@@ -382,15 +386,12 @@ test("an existing valid nested clone is verified idempotently; remote advance bl
   const again = prepareTaskHistoryWorkspace({ primaryRoot: root });
   assert.equal(again.status, "prepared");
   assert.equal(again.head, ws1.head);
-  // Advancing the remote out from under the local branch blocks: this
-  // foundation never moves the primary's task refs; the later per-task
-  // mutation loop owns fetch/fast-forward. Nothing is overwritten.
-  publishTaskBranch(remote, { "TASKS.md": "history\n", "task-9.md": "# nine\n" });
+  // A clean descendant is repaired with ordinary fast-forwards only.
+  const advanced = publishTaskBranch(remote, { "TASKS.md": "history\n", "task-9.md": "# nine\n" });
   const ws2 = prepareTaskHistoryWorkspace({ primaryRoot: root });
-  assert.equal(ws2.status, "blocked");
-  assert.equal(ws2.code, "remote-advanced");
-  // The local clone and branch are unchanged.
-  assert.equal(git(ws1.storeDir, "rev-parse", "HEAD"), ws1.head);
+  assert.equal(ws2.status, "prepared");
+  assert.equal(ws2.head, advanced);
+  assert.equal(git(ws1.storeDir, "rev-parse", "HEAD"), advanced);
 });
 
 test("a linked worktree blocks", () => {
@@ -440,8 +441,8 @@ test("remote branch deleted by another clone while primary keeps a cached ref ne
   assert.equal(gitAllow(root, "rev-parse", "--verify", "refs/remotes/origin/prime-claw/tasks").status !== 0, true);
 });
 
-// Residual 1: a direct/fetched mismatch (remote moves between probe and fetch) blocks.
-test("a remote that moves between probe and fetch blocks rather than trusting either", () => {
+// A later clean descendant is repaired without force.
+test("a later remote descendant fast-forwards the unused local task ref", () => {
   const { root, remote } = fixtureRepo();
   publishTaskBranch(remote, { "TASKS.md": "v1\n" });
   git(root, "fetch", "-q", "origin", `${TASK_HISTORY_REF}:refs/remotes/origin/prime-claw/tasks`);
@@ -449,9 +450,8 @@ test("a remote that moves between probe and fetch blocks rather than trusting ei
   // Advance the remote; ensureTaskHistoryBranch re-probes and re-fetches.
   publishTaskBranch(remote, { "TASKS.md": "v2\n" });
   const state = ensureTaskHistoryBranch(root, "origin", remote);
-  // Remote advanced ahead of the local branch → blocked (never verified, never force).
-  assert.equal(state.status, "blocked");
-  assert.equal(state.code, "remote-advanced");
+  assert.equal(state.status, "verified");
+  assert.equal(git(root, "rev-parse", TASK_HISTORY_REF), state.head);
 });
 
 // Residual 3: root config + published folder config → block, root bytes unchanged, no native write.
@@ -633,6 +633,24 @@ test("a registered linked Episode worktree gets an independent clean clone with 
   assert.equal(git(target, "status", "--porcelain"), targetStatusBefore);
 });
 
+test("a clean stale Episode task clone fast-forwards only to a stable published descendant", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = episodeFixture();
+  assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+  const before = git(storeDir, "rev-parse", "HEAD");
+  writeFileSync(join(root, ".backlog", "TASKS.md"), "# Tasks\n\npublished descendant\n");
+  git(join(root, ".backlog"), "add", "TASKS.md");
+  git(join(root, ".backlog"), "commit", "-qm", "publish unrelated task-history advance");
+  git(join(root, ".backlog"), "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  const published = git(join(root, ".backlog"), "rev-parse", "HEAD");
+  assert.notEqual(published, before);
+  const reused = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(reused.status, "prepared");
+  assert.equal(reused.head, published);
+  assert.equal(git(storeDir, "rev-parse", "HEAD"), published);
+  assert.equal(git(storeDir, "status", "--porcelain"), "");
+});
+
 test("a foreign (unregistered) target directory blocks before any write", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, target, storeDir } = episodeFixture();
@@ -686,16 +704,37 @@ test("cleanup removes one exact clean published clone and refuses foreign/dirty 
   assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
   // Dirty content -> refuse without deletion.
   writeFileSync(join(storeDir, "dirty.md"), "x\n");
+  const dirtyInspection = inspectEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.equal(dirtyInspection.status, "refused");
+  assert.equal(dirtyInspection.code, "uncommitted-task-content");
   const dirty = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
   assert.equal(dirty.status, "refused");
   assert.equal(dirty.code, "uncommitted-task-content");
   assert.ok(existsSync(storeDir), "dirty clone left in place");
   rmSync(join(storeDir, "dirty.md"));
-  // Clean published clone -> removed, target code untouched.
-  const clean = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  const rewritten = inspectEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision: "f".repeat(40) });
+  assert.equal(rewritten.status, "refused");
+  assert.equal(rewritten.code, "identity-mismatch");
+  assert.ok(existsSync(storeDir), "unproved ancestry preserves the clone");
+  const expectedRevision = git(storeDir, "rev-parse", "HEAD");
+  const cleanInspection = inspectEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision });
+  assert.deepEqual(cleanInspection, { status: "ready", storeDir, present: true });
+  assert.ok(existsSync(storeDir), "read-only cleanup proof preserves the clone");
+  // Clean published clone descended from the owned revision -> removed, target code untouched.
+  const clean = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision });
   assert.equal(clean.status, "cleaned");
   assert.ok(!existsSync(storeDir), "proven clone removed");
   assert.equal(git(target, "status", "--porcelain"), "", "target code worktree untouched");
+  assert.deepEqual(
+    inspectEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision }),
+    { status: "ready", storeDir, present: false },
+    "a partial replay may accept an absent clone only while direct authority still descends from ownership",
+  );
+  const absentAfterRewrite = inspectEpisodeTaskHistoryStore({
+    primaryRoot: root, targetWorktree: target, expectedRevision: "0".repeat(40),
+  });
+  assert.equal(absentAfterRewrite.status, "refused");
+  assert.equal(absentAfterRewrite.code, "identity-mismatch");
 });
 
 test("retained backlog/ and a selected non-origin remote stay exact through prepare, reuse, and cleanup", (t) => {
@@ -995,6 +1034,79 @@ function realRunnerWithPushAction(action) {
 function nativeTask(root, id) {
   return JSON.parse(execFileSync("backlog", ["task", "view", "--json", "--", id], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })).task;
 }
+
+test("native task publication rejects a synchronized source-status mismatch before mutation", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const fixture = mutationFixture();
+  const before = git(fixture.primaryStoreDir, "rev-parse", "HEAD");
+  const result = publishTaskHistoryMutation({
+    primaryRoot: fixture.root, targetWorktree: fixture.root, taskId: "TASK-1",
+    expectedTaskStatus: "In Planning",
+    edits: [{ option: "--status", value: "In Progress" }],
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "identity-mismatch");
+  assert.match(result.detail, /status is "In Progress", not required "In Planning"/);
+  assert.equal(git(fixture.primaryStoreDir, "rev-parse", "HEAD"), before);
+  assert.equal(nativeTask(fixture.root, "TASK-1").status, "In Progress");
+});
+
+test("fresh independent Backlog archive succeeds after preparing its native archive directory", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const fixture = mutationFixture();
+  const archiveDir = join(fixture.primaryStoreDir, "archive", "tasks");
+  assert.equal(existsSync(archiveDir), false);
+  mkdirSync(archiveDir, { recursive: true });
+  execFileSync("backlog", ["task", "archive", "TASK-1"], { cwd: fixture.root, encoding: "utf8" });
+  assert.equal(existsSync(join(fixture.primaryStoreDir, "tasks", "task-1 - Owner.md")), false);
+  assert.equal(existsSync(join(archiveDir, "task-1 - Owner.md")), true);
+});
+
+test("primary nested task mutation publishes only on the task DAG and remains preparable", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const fixture = episodeFixture({ taskFiles: {
+    [OWNER_TASK_PATH]: taskMarkdown("TASK-1", "Owner"),
+  } });
+  git(fixture.primaryStoreDir, "config", "user.email", "t@e.st");
+  git(fixture.primaryStoreDir, "config", "user.name", "t");
+  git(fixture.root, "add", ".gitignore");
+  git(fixture.root, "commit", "-qm", "ignore task workspace");
+  git(fixture.root, "push", "-q", "origin", "main");
+  const codeHead = git(fixture.root, "rev-parse", "HEAD");
+  const taskHead = git(fixture.primaryStoreDir, "rev-parse", "HEAD");
+  const result = publishTaskHistoryMutation({
+    primaryRoot: fixture.root,
+    targetWorktree: fixture.root,
+    taskId: "TASK-1",
+    edits: [{ option: "--append-notes", value: "primary publication" }],
+  });
+  assert.equal(result.status, "published");
+  assert.equal(result.baseHead, taskHead);
+  assert.notEqual(result.publishedHead, taskHead);
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), codeHead);
+  assert.equal(git(fixture.root, "status", "--porcelain"), "");
+  assert.match(nativeTask(fixture.root, "TASK-1").implementationNotes, /primary publication/);
+  assert.match(git(fixture.primaryStoreDir, "ls-remote", "--heads", fixture.remote, TASK_HISTORY_REF), new RegExp(`^${result.publishedHead}\\s`));
+  const preparedAgain = prepareTaskHistoryWorkspace({ primaryRoot: fixture.root });
+  assert.equal(preparedAgain.status, "prepared");
+  assert.equal(preparedAgain.head, result.publishedHead);
+  assert.equal(git(fixture.primaryStoreDir, "rev-parse", "HEAD"), result.publishedHead);
+});
+
+test("published primary inspection rejects a clean local-only terminal commit", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, primaryStoreDir: storeDir } = episodeFixture();
+  const ownedRevision = git(storeDir, "rev-parse", "HEAD");
+  const ready = inspectPublishedPrimaryTaskHistory({ primaryRoot: root, taskId: "PRIMECLAW-1", expectedRevision: ownedRevision });
+  assert.equal(ready.status, "ready");
+  writeFileSync(join(storeDir, "local-terminal.txt"), "Done but not published\n");
+  git(storeDir, "add", "local-terminal.txt");
+  git(storeDir, "commit", "-qm", "local-only terminal evidence");
+  const unpublished = inspectPublishedPrimaryTaskHistory({ primaryRoot: root, taskId: "PRIMECLAW-1", expectedRevision: ownedRevision });
+  assert.equal(unpublished.status, "blocked");
+  assert.equal(unpublished.code, "local-ahead");
+  assert.match(unpublished.detail, /does not equal direct published head/);
+});
 
 test("a tracked native task symlink blocks before mutation without exposing or changing an external sentinel", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }

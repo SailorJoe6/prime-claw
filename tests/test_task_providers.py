@@ -103,7 +103,9 @@ def test_version_two_ownership_keeps_one_discriminated_provider_native_shape() -
         'exactBeadsTaskEvidence(item.taskEvidence, item.taskId)',
     ):
         assert sentinel in ownership
-    assert writer.count('provider: "backlog"') == 2
+    assert writer.count('provider: "backlog"') == 3
+    assert "reservePublishedBacklogTaskEpisodeOwnership" in writer
+    assert "reservePublishedBacklogTaskEpisodeOwnership" in episode
     assert writer.count("reservePublishedBeadsTaskEpisodeOwnership") == 1
     assert 'input.publication.status !== "published"' in writer
     assert 'provider: "beads"' in writer

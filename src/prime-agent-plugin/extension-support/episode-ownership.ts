@@ -56,12 +56,20 @@ export interface LegacyBacklogTaskEpisodeOwnershipRecord extends TaskEpisodeOwne
   taskEvidence?: never;
 }
 
-/** New Backlog ownership carries only its exact task-file identity. */
+/** Existing branch-local Backlog ownership carries only its exact task-file identity. */
 export interface BacklogTaskEpisodeOwnershipRecord extends TaskEpisodeOwnershipBase {
   provider: "backlog";
   taskPath: string;
   providerRevision?: never;
   taskEvidence?: never;
+}
+
+/** Independent Backlog task history binds its published Git revision and exact native task view. */
+export interface PublishedBacklogTaskEpisodeOwnershipRecord extends TaskEpisodeOwnershipBase {
+  provider: "backlog";
+  taskPath: string;
+  providerRevision: string;
+  taskEvidence: Record<string, unknown>;
 }
 
 /** New Beads ownership carries the exact published native revision and task view. */
@@ -75,6 +83,7 @@ export interface BeadsTaskEpisodeOwnershipRecord extends TaskEpisodeOwnershipBas
 export type TaskEpisodeOwnershipRecord =
   | LegacyBacklogTaskEpisodeOwnershipRecord
   | BacklogTaskEpisodeOwnershipRecord
+  | PublishedBacklogTaskEpisodeOwnershipRecord
   | BeadsTaskEpisodeOwnershipRecord;
 
 export type EpisodeOwnershipRecord = LegacyEpisodeOwnershipRecord | TaskEpisodeOwnershipRecord;
@@ -107,7 +116,7 @@ const COMMON_RECORD_FIELDS = new Set<string>([
 ]);
 const LEGACY_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "sourceLocation", "slug", "bundleDigest"]);
 const BACKLOG_TASK_RECORD_FIELDS = new Set<string>([
-  ...COMMON_RECORD_FIELDS, "provider", "taskId", "taskPath", "cleanupHead",
+  ...COMMON_RECORD_FIELDS, "provider", "taskId", "taskPath", "providerRevision", "taskEvidence", "cleanupHead",
 ]);
 const BEADS_TASK_RECORD_FIELDS = new Set<string>([
   ...COMMON_RECORD_FIELDS, "provider", "taskId", "providerRevision", "taskEvidence", "cleanupHead",
@@ -134,6 +143,20 @@ function exactBeadsTaskEvidence(value: unknown, taskId: unknown): value is Recor
     && typeof task.status === "string" && task.status.trim() !== "";
 }
 
+function exactBacklogTaskEvidence(value: unknown, taskId: unknown, taskPath: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const task = (value as Record<string, unknown>).task;
+  const path = task && typeof task === "object" && !Array.isArray(task)
+    ? (task as Record<string, unknown>).path : undefined;
+  const archivedPath = typeof taskPath === "string"
+    ? taskPath.replace(/(^|\/)tasks\//, "$1archive/tasks/") : undefined;
+  return Boolean(task && typeof task === "object" && !Array.isArray(task)
+    && (task as Record<string, unknown>).id === taskId
+    && (path === taskPath || path === archivedPath)
+    && typeof (task as Record<string, unknown>).status === "string"
+    && String((task as Record<string, unknown>).status).trim() !== "");
+}
+
 export function isLegacyEpisodeOwnership(record: EpisodeOwnershipRecord): record is LegacyEpisodeOwnershipRecord {
   return record.version === 1;
 }
@@ -148,8 +171,14 @@ export function taskEpisodeProvider(record: TaskEpisodeOwnershipRecord): "backlo
 
 export function isBacklogTaskEpisodeOwnership(
   record: TaskEpisodeOwnershipRecord,
-): record is LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord {
+): record is LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord | PublishedBacklogTaskEpisodeOwnershipRecord {
   return taskEpisodeProvider(record) === "backlog";
+}
+
+export function isPublishedBacklogTaskEpisodeOwnership(
+  record: TaskEpisodeOwnershipRecord,
+): record is PublishedBacklogTaskEpisodeOwnershipRecord {
+  return record.provider === "backlog" && typeof record.providerRevision === "string" && record.taskEvidence !== undefined;
 }
 
 export function isBeadsTaskEpisodeOwnership(
@@ -191,15 +220,22 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
     const commonTask = canonicalTaskId(item.taskId)
       && GIT_OID.test(String(item.baseRef))
       && (item.cleanupHead === undefined || GIT_OID.test(String(item.cleanupHead)));
-    const backlogTask = (item.provider === undefined || item.provider === "backlog")
+    const legacyBacklogTask = item.provider === undefined
       && safeTaskPath(item.taskPath)
+      && item.providerRevision === undefined && item.taskEvidence === undefined
+      && hasOnlyFields(item, BACKLOG_TASK_RECORD_FIELDS);
+    const backlogTask = item.provider === "backlog"
+      && safeTaskPath(item.taskPath)
+      && ((item.providerRevision === undefined && item.taskEvidence === undefined)
+        || (typeof item.providerRevision === "string" && GIT_OID.test(item.providerRevision)
+          && exactBacklogTaskEvidence(item.taskEvidence, item.taskId, item.taskPath)))
       && hasOnlyFields(item, BACKLOG_TASK_RECORD_FIELDS);
     const beadsTask = item.provider === "beads"
       && typeof item.providerRevision === "string"
       && DOLT_REVISION.test(item.providerRevision)
       && exactBeadsTaskEvidence(item.taskEvidence, item.taskId)
       && hasOnlyFields(item, BEADS_TASK_RECORD_FIELDS);
-    if (!commonTask || (!backlogTask && !beadsTask)) {
+    if (!commonTask || (!legacyBacklogTask && !backlogTask && !beadsTask)) {
       throw new Error(`Episode ownership has an unsupported shape: ${path}`);
     }
   }

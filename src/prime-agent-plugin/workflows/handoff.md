@@ -37,8 +37,10 @@ retained `EXECUTION_PLAN.md` spelling used by this project. If they are absent, 
 exact version-1 blocked-pair recovery through the `blocked` workflow; missing
 files are never live identity and never fall through to task-native mode.
 Version-2 ownership selects task-native handoff and binds its exact task ID and
-provider. A provider-absent record or `provider: "backlog"` also binds its exact
-task path. A `provider: "beads"` record instead binds its exact provider
+provider. Provider-absent, or explicit Backlog without revision/evidence,
+binds grandfathered branch-local task history and its exact path. Explicit
+Backlog with `providerRevision` plus `taskEvidence` binds independent published
+task history separately from code. A `provider: "beads"` record instead binds its exact provider
 revision and complete raw task evidence and must not carry a task path. If an
 `<operator-episode-task>` block is also present, require its entire trimmed
 value to match that persisted task ID. A prompt tag never overrides persisted
@@ -66,7 +68,12 @@ Implementation Notes, acceptance evidence, references, documentation, modified
 files, and Final Summary contain the current resumable context. If an in-scope
 update is needed, use supported `backlog task edit` operations only in this
 Episode worktree, reload and verify identity/path/parent/status, then commit and
-push the single-purpose checkpoint before compacting.
+push the single-purpose checkpoint before compacting. Grandfathered mode commits
+the task on the Episode code branch. Independent mode commits only the task path
+in the ignored nested clone, pushes `HEAD:refs/heads/prime-claw/tasks` without
+force, proves direct publication and unchanged code HEAD, and leaves ownership
+revision/evidence advancement to `handoff_task_episode` after message admission.
+A dirty, unpublished, divergent, or foreign nested clone blocks.
 
 For Beads task-native handoff, use only the exact active owner's persisted
 `providerRevision` and complete raw `taskEvidence`. Before delivery, the public

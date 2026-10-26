@@ -7,6 +7,7 @@ import test from "node:test";
 
 import {
   isBacklogTaskEpisodeOwnership,
+  isPublishedBacklogTaskEpisodeOwnership,
   isBeadsTaskEpisodeOwnership,
   isLegacyEpisodeOwnership,
   isTaskEpisodeOwnership,
@@ -699,6 +700,21 @@ test("version-2 ownership discriminates provider-native identity while preservin
   assert.equal(explicitBacklog.providerRevision, undefined);
   assert.equal(explicitBacklog.taskEvidence, undefined);
 
+  const publishedBacklog = parseEpisodeOwnership({
+    ...explicitBacklog,
+    providerRevision: "e".repeat(40),
+    taskEvidence: { task: { id: "PRIMECLAW-43", path: explicitBacklog.taskPath, status: "In Progress", title: "Independent history" } },
+  });
+  assert.equal(isPublishedBacklogTaskEpisodeOwnership(publishedBacklog), true);
+  assert.equal(publishedBacklog.providerRevision, "e".repeat(40));
+  assert.equal(publishedBacklog.taskEvidence.task.status, "In Progress");
+  const archivedBacklog = parseEpisodeOwnership({
+    ...publishedBacklog,
+    taskEvidence: { task: { id: "PRIMECLAW-43", path: "backlog/archive/tasks/PRIMECLAW-43.md", status: "In Progress", finalSummary: "truthful abandonment" } },
+  });
+  assert.equal(isPublishedBacklogTaskEpisodeOwnership(archivedBacklog), true);
+  assert.equal(archivedBacklog.taskEvidence.task.path, "backlog/archive/tasks/PRIMECLAW-43.md");
+
   const beads = beadsOwnership("beads-owner", "PRIMECLAW-43");
   assert.equal(taskEpisodeProvider(beads), "beads");
   assert.equal(isBeadsTaskEpisodeOwnership(beads), true);
@@ -713,6 +729,10 @@ test("version-2 ownership rejects mixed provider fields, ambiguous identity, and
   const beads = beadsOwnership("owner", "PRIMECLAW-43");
   for (const invalid of [
     { ...legacyBacklog, provider: "backlog", providerRevision: "a".repeat(32) },
+    { ...legacyBacklog, provider: "backlog", providerRevision: "a".repeat(40) },
+    { ...legacyBacklog, provider: "backlog", taskEvidence: { task: { id: "PRIMECLAW-43", path: legacyBacklog.taskPath, status: "In Progress" } } },
+    { ...legacyBacklog, provider: "backlog", providerRevision: "a".repeat(40), taskEvidence: { task: { id: "PRIMECLAW-44", path: legacyBacklog.taskPath, status: "In Progress" } } },
+    { ...legacyBacklog, provider: "backlog", providerRevision: "a".repeat(40), taskEvidence: { task: { id: "PRIMECLAW-43", path: "backlog/tasks/other.md", status: "In Progress" } } },
     { ...legacyBacklog, provider: "backlog", taskEvidence: { id: "PRIMECLAW-43", title: "x", status: "open" } },
     { ...legacyBacklog, provider: "beads", providerRevision: "a".repeat(32), taskEvidence: beads.taskEvidence },
     { ...beads, taskPath: "backlog/tasks/PRIMECLAW-43.md" },

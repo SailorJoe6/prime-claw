@@ -46,13 +46,22 @@ absent and no explicit setup was requested. Malformed or negative inventory
 responses fail closed. Placement selection performs no task, Git,
 ownership, worktree, or session mutation.
 
+For independent Backlog, implementation admission publishes `In Progress` from
+the clean primary nested clone and reserves the published task revision/native
+view separately from the unchanged clean code base. Only then is the registered
+code worktree created. Its nested task clone is prepared and the exact reserved
+task is reread before any session, automation, or execute delivery.
+
 The prep workflow may request focused compaction. It does not wait for a compact
 event, recreate the phase prompt, or control the already queued follow-up. The
 phase workflow performs its own preparation and semantic readiness review after
 the turn boundary.
 
 Task-native planning updates only the selected provider-native task. Backlog
-writes and commits only its native Implementation Plan task path. Beads uses one
+preserves the selected topology: grandfathered stores commit only the native
+Implementation Plan task path in code history, while an independent nested store
+commits only that path on `refs/heads/prime-claw/tasks`, pushes without force,
+proves direct publication, and leaves code HEAD unchanged. Beads uses one
 native synchronization/read, LLM planning over the complete raw view, one
 guarded raw `design` plus `in_planning` update, one non-force publication, and
 exact native reread/publication proof; it never consults the Backlog-only queue,
