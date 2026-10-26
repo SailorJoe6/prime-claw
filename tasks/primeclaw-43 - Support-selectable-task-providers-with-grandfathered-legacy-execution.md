@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 18:53'
+updated_date: '2026-10-26 19:41'
 labels: []
 dependencies: []
 references:
@@ -22,15 +22,23 @@ documentation:
   - docs/prep-chain.md
   - docs/user-stories/D-planning.md
 modified_files:
+  - >-
+    backlog/tasks/primeclaw-43 -
+    Support-selectable-task-providers-with-grandfathered-legacy-execution.md
   - docs/backlog.md
   - docs/conversation-driven-episode-oversight.md
   - docs/handoff-chain.md
   - docs/user-stories/F-episode-execution.md
   - docs/user-stories/G-oversight-and-review.md
   - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/I-episode-finalization.md
   - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - tests/spec_episode_extension.test.mjs
   - tests/task_providers.test.mjs
   - tests/test_oversee_episode_skill.py
 priority: p1
@@ -1213,6 +1221,29 @@ First prove the supported native Beads abandonment/archive semantics. Preserve c
 Extend only the existing provider-native terminal verification and cleanup type/guard branches required for Beads no-taskPath identity. Reuse exact owner/base/code ancestry, local/upstream/direct-remote head, current native task/publication/context, idle session/worktree/branch, and optional Orca proofs. Preserve existing `cleanupHead`, same-head partial-cleanup idempotence, unsafe-gap/busy/dirty/foreign/unpushed refusal, and inactive-last bookkeeping. Remove only the bound idle Episode runtime, linked worktree, and branch; the shared canonical primary Beads store/server/task history and unrelated owners must survive. Current native terminal evidence governs rather than an old task snapshot; existing ownership fields may advance factual final provider/task/code observations only, without new authority.
 
 Preserve all Backlog/version-1 and accepted status/readiness/handoff/blocked/authoring/planning/admission/native/Git behavior. Add no public tool/parameter, custom tracker CLI/publisher/protocol, snapshot/digest, semantic classifier, normalized model/diff, lock/state/framework/sidecar/schema/version 3, retry/force/raw Dolt write, or Prime Agent change. Leave Backlog workspace lifecycle wiring, grandfather inventory/legacy transition, provider migration/cutover, and unrelated fixes out. PRIMECLAW-43.1 repository cutover is a separate task and is not remaining PRIMECLAW-43 implementation scope. Representative merged plus abandoned fixture cleanup/terminal-push/history-preservation and failed-authority/busy/dirty/unpublished/wrong-head cases suffice; avoid a provider×lifecycle matrix. Run focused/full host, Docker tier 1, and practical native disposable UAT; push one clean candidate and stop for owner review.
+
+2026-10-26 native Beads abandonment semantics proved in a disposable Beads 1.3.1 store before implementation. Prime Claw already requires custom native completion status `done:done`; supported `bd close TASK --reason ...` instead writes the different built-in native status `closed` and a first-class `close_reason`, while preserving description, design, acceptance criteria, notes, labels, comments, timestamps, and Dolt/audit history. With Prime Claw leaving `closed` unmapped from canonical `Done`, the composite `closed` plus an exact abandonment reason truthfully distinguishes abandonment from completed native `done` without adding a status, sidecar, mirror, soft delete, or raw write. `bd reopen` clears current `closed_at`/`close_reason` while retaining historical events; `bd delete` destroys live task/comment/event access and is rejected; no `bd archive` command exists. The bounded slice will therefore use existing native `done` for merged completion and built-in `closed` plus exact reason for abandonment, then require current synchronized published raw evidence before cleanup. All probes used disposable fixtures only; live PRIMECLAW-43 and its Episode/store/resources were not mutated.
+
+### Provider-native Beads abandonment and cleanup slice — final validation
+
+Implemented the bounded terminal slice without changing `finalize_task_episode(taskId, episodeHead, outcome, confirmed)`: successful Beads completion remains custom native `done`; explicit abandonment uses built-in native `closed` with exact first-class `close_reason`; cleanup verifies fresh published raw terminal evidence, code/provider ancestry, local/upstream/direct-remote heads, and exact idle resources before binding current facts, removing only Episode runtime/worktree/local branch, and marking ownership inactive last. Canonical status mapping still rejects `closed`; shared Beads store/server/history and unrelated owners remain untouched.
+
+Disposable native Beads 1.3.1/Dolt/Git UAT passed for both paths. The merged task reached raw `done`, its pushed Episode head was in canonical main, cleanup removed the exact Episode resources, and ownership became inactive. The abandoned task reached raw `closed` with reason `Prime Claw abandonment: task UAT-abandoned; pushed Episode head 31d1045ab60d90dc8fa78cede6b86b22e77b0497; code was not merged.`, preserved six history events, kept the candidate out of main, cleaned the exact resources, and accepted same-head inactive replay. The shared `.beads` store, running server, and unrelated `UAT-unrelated` task survived.
+
+Validation on final bytes before review:
+- focused Node terminal/provider/reviewed-plan suites: 211/211 passed;
+- focused Python policy suites: 35 passed, 9 skipped;
+- full Node: 431/431 passed;
+- full Python: 677 passed, 69 skipped, with only the three unchanged canonical-main baselines (missing host-safe marker, missing pytest bridge for `task_episode_admission_extension.test.mjs`, and local Backlog source-pin mismatch);
+- Docker tier 1 with offline RPC probe: passed; teardown verified and manifest published at `.test-results/20261026T192426Z-56477-b52d2d90/tier1`;
+- targeted TypeScript diagnostics reported no errors in the edited terminal/provider ranges (repository-wide pre-existing diagnostics remain outside this slice);
+- `git diff --check`: passed.
+
+### Independent review repair
+
+Independent `openai-codex/gpt-6-astra` review of exact candidate `4f91eaa952edb84c1bea95ac6b916b32e7a56f64` found one material regression and no other material defect: the compressed managed guide had reduced the existing Backlog abandonment branch to a non-`Done` archive, omitting exact Episode-head task selection, truthful Final Summary preservation, and task-only archive publication checks. Restored that existing Backlog procedure while retaining the new Beads `closed`/reason branch; added narrow managed-guide assertions for Episode-head selection, non-`Done`/Final Summary preservation, and exact active-to-archive-only commit/push. The managed guide remains at the enforced 1,400-word limit.
+
+Repair validation on final bytes: focused policy suite 35 passed, 9 skipped; Docker tier 1 plus offline RPC probe passed with teardown verified and manifest at `.test-results/20261026T194001Z-23637-035bab9f/tier1`; `git diff --check` passed. No lifecycle state or live Episode/provider resource was changed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
