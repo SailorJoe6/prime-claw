@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 18:14'
+updated_date: '2026-10-26 18:19'
 labels: []
 dependencies: []
 references:
@@ -1199,6 +1199,10 @@ The discoverable managed blocked skill and Conversation oversight guide now desc
 Real Beads 1.3.1 UAT passed in a disposable server-backed store. UAT-block moved in_progress→blocked at provider revision tovkmt173q70h9pol4p72eiuc9jrd59c / publication head e6a6a37915f815d6ca9b5d1c3df440f1674dd7df, then blocked→in_progress at hc2pvtnlsg9t8r61gqd7pfcmli1o8idt / 0ae956f1b4e9fa4dd4813684ceafe78e32109183. Both truthful notes were preserved; description, design, acceptance criteria, type, priority, owner, labels, creation data, and identity stayed unchanged. A later ready_for_merge state caused status-transition refusal with revision and publication head unchanged. The fixture server was stopped and all disposable resources were removed.
 
 Independent read-only review used openai-codex/gpt-5.6-sol and reported no material findings after the exact-note proof and EXPERT wording repairs. Validation on final bytes: focused Node 208/208; related Node 278/278; focused managed-policy Python 13/13; related Python 28 passed, 4 skipped; full Node 415/415; full Python 677 passed, 69 skipped, with only the same three unrelated host baselines (runtime-connect host-safe marker, task_episode_admission pytest bridge, local Backlog source pin); Docker tier 1 with offline RPC probe passed; git diff --check passed. PRIMECLAW-43 intentionally remains In Progress for owner review.
+
+Owner accepted native Beads Blocked/resume candidate b0282d2177a0c13ddf8727c6f85eb50a570aafca and authorized one next bounded implementation slice: complete Beads merge-readiness and merge-status Conversation behavior through existing managed oversight, native helper, and ordinary Git surfaces. Cover owner acceptance of a complete pushed candidate with one guarded In Progress→ready_for_merge native publication/proof; Delay as a strict no-op; explicit operator Request Changes with one ready_for_merge→in_progress publication followed by same-Episode handoff; and explicit operator-authorized exact `(taskId, mainHead, candidateHead)` Merge with fresh exact preflight, ordinary ff-only main integration/code push, then one ready_for_merge→done native publication carrying truthful native final-outcome notes and exact task/revision/ref/content proof.
+
+This pass is implementation plus disposable UAT only. It must not actually promote PRIMECLAW-43/main to Ready for Merge or merge this candidate before the whole feature is complete and separately reviewed. Preserve public canonical tool signatures and existing owner/provider/task/worktree/branch/session identity. Use supported guarded native status/note mutation, one non-force publication, and current raw/revision/ref proof; keep provider/task/code facts as observations and semantic compatibility with the existing LLM. Add no status API/tool/parameter, receipt/progress/snapshot approval state, custom protocol/publisher/transaction framework, semantic classifier, retry/force/replay, task-file Git mirroring, or immutable revision/equality approval gate. Preserve Backlog/version-1 and all existing authoring/planning/admission/handoff/blocked boundaries. Leave abandonment, finalization/destructive cleanup, Backlog workspace lifecycle wiring, grandfather/legacy transition, complete migration/cutover, and PRIMECLAW-43.1 outside this pass. Representative disposable native readiness→Request Changes→readiness→authorized fixture ff-only merge→Done plus zero-write refusal/drift UAT is sufficient. Run focused/full host and Docker tier 1, push one clean candidate, report remaining approved scope, and stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
