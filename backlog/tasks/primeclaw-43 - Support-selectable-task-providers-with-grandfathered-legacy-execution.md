@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 17:42'
+updated_date: '2026-10-26 18:14'
 labels: []
 dependencies: []
 references:
@@ -22,49 +22,27 @@ documentation:
   - docs/prep-chain.md
   - docs/user-stories/D-planning.md
 modified_files:
-  - src/prime-agent-plugin/extension-support/spec-episode.ts
-  - src/prime-agent-plugin/extensions/reviewed-plan.ts
-  - src/prime-agent-plugin/workflows/handoff.md
-  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
-  - .prime-claw/workflows/handoff.md
+  - .agents/skills/blocked/SKILL.md
   - .prime-claw/templates.json
-  - tests/spec_episode_extension.test.mjs
-  - tests/reviewed_plan_extension.test.mjs
-  - tests/test_handoff_chain_extension.py
-  - tests/test_oversee_episode_skill.py
   - docs/backlog.md
-  - docs/handoff-chain.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/handoff-chain.md
+  - docs/user-stories/F-episode-execution.md
+  - docs/user-stories/G-oversight-and-review.md
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/traceability.md
-  - .agents/skills/execute/SKILL.md
-  - docs/user-stories/G-oversight-and-review.md
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
-  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - tests/spec_episode_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
-  - tests/test_execute_skill.py
+  - tests/task_providers.test.mjs
+  - tests/test_blocked_skill.py
   - tests/test_expert_review_skill.py
-  - .prime-claw/workflows/plan-task-prep.md
-  - .prime-claw/workflows/plan-task.md
-  - VISION.md
-  - docs/prep-chain.md
-  - docs/user-stories/D-planning.md
-  - src/prime-agent-plugin/extension-support/prep-chain.ts
-  - src/prime-agent-plugin/workflows/plan-task-prep.md
-  - src/prime-agent-plugin/workflows/plan-task.md
-  - tests/test_future_plan_skills.py
-  - .agents/skills/design/SKILL.md
-  - .agents/skills/spec-it-out/SKILL.md
-  - LONG_RANGE_PLAN.md
-  - >-
-    backlog/tasks/primeclaw-43 -
-    Support-selectable-task-providers-with-grandfathered-legacy-execution.md
-  - docs/future-specification-bundles.md
-  - docs/user-stories/C-specification.md
-  - src/prime-agent-plugin/skills/project-templates/design.md
-  - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
-  - tests/test_project_initialization.py
+  - tests/test_oversee_episode_skill.py
 priority: p1
 type: epic
 ordinal: 125000
@@ -1211,6 +1189,16 @@ Docker tier 1/offline RPC probe passed with immutable image launch, network abse
 2026-10-26 provider-native authoring slice candidate complete. Managed and customized installed `/design` and `/spec-it-out` now support sole-live-provider Backlog or Beads authoring with no new deterministic adapter/tool/state. `/design` keeps discovery-first orientation and skips the Backlog-only queue when Beads is selected; `/spec-it-out` keeps synthesis-first behavior. Both use one exact native `In Design` identity, living specification updates, later-state refusal, one-attempt uncertain-create safety, provider-native publication/proof, and separate planning/implementation approval. Customized installed assets retain only this repository's explicit-default wording and remain `customized` with exact source/installed hashes. Native UAT proved Beads create `AUTH-d8g`, same-ID guarded revision with unrelated fields unchanged, published revisions/ref, zero-write `in_planning` refusal, and a model-driven ambiguous-create flow with exactly one shimmed create call and no retry/read/push after lost identity. Independent candidate review found no material findings after reloading final bytes. Final validation: focused Python 45 passed, 5 skipped; related Node 113/113; full Node 410/410; full Python 677 passed, 69 skipped, 75 subtests passed with three unchanged unrelated baselines (`test_mocked_runtime_tests_are_host_safe_tier0`, missing bridge for `task_episode_admission_extension.test.mjs`, and Backlog source pin fd20f714 vs 5d556c19); Docker tier 1 passed at `.test-results/20261026T173436Z-53664-3ca744ad/tier1`; `git diff --check` passed. PRIMECLAW-43 remains `In Progress`; this slice does not authorize planning, implementation admission, merge, task lifecycle completion, provider cutover, or PRIMECLAW-43.1.
 
 2026-10-26 owner review ACCEPTED provider-native `/design` and `/spec-it-out` authoring candidate `2f06596f24b3c39c5a27eb9bfdc2fd7e8e47d662`. Next bounded slice: complete native Beads blocker publication and resume through the existing Conversation oversight and blocked workflow surfaces. Reuse `resolveBlockedWorkflowAuthority`, the registered blocked command, managed blocked/oversight guidance, and current native status/publication/factual-observation functions. Only the exact owning top-level canonical-primary Conversation may publish an accepted blocker from native `in_progress` to `blocked`, and only after the actual recorded unblock is cleared by operator/accepted evidence may it restore the same task to `in_progress` and continue the same Episode. Episode authority remains limited to native content and blocker evidence; it never changes lifecycle or creates replacement work/resources. Preserve Backlog's exact ID/path/Git status-only transaction and unchanged provider-independent version-1 blocked-pair recovery. Beads must bind the exact persisted provider/task/owner/worktree/session with no task path, synchronize and reread current native context/raw task, apply one guarded supported status/note mutation, publish once without force, prove exact raw revision/ref/clean state, preserve owner-authored plan/content and unrelated fields/updates, and record only factual provider/task/code observations in existing ownership fields where required. Current native status—not stale observed status—governs continuation. Keep semantic blocker explanation/clearance in managed LLM instructions. Add no status tool/public parameter/receipt/parallel workflow, artificial In Progress snapshot, equality gate, classifier, extra acceptance interface, state machine, sidecar, normalized model, retry/force/raw live-store write, or Prime Agent change. Exclude Ready for Merge/Done/abandonment/finalization/cleanup, Backlog workspace wiring, grandfather inventory/legacy transition, provider migration/cutover, and PRIMECLAW-43.1. Use only necessary provider selector/type/routing changes, customization-safe managed reconciliation, docs/task evidence, representative actual blocked-route/resume/foreign-owner/later-state/native-publication tests/UAT, focused/full host, and Docker tier 1. Push one clean candidate and stop for owner review; report a genuine unsupported-interface constraint rather than inventing a protocol.
+
+2026-10-26 native Beads blocker/resume slice implementation in progress. The discoverable blocked workflow and managed oversight now select exact provider-native version-2 authority: Backlog retains its exact task-path/Git status transaction; Beads binds no task path, uses current synchronized raw state, accepts only guarded `in_progress`→`blocked` publication with truthful blocker/unblock note and guarded cleared `blocked`→`in_progress` publication, then resumes the same Episode through existing handoff/factual-observation advancement. Deterministic support now returns provider-discriminated blocked authority, forwards Beads native notes through the existing publication seam, supports an internal expected-current-status guard, and permits truthful prior `blocked` observation while requiring current native `in_progress` before handoff. Version-1 recovery remains unchanged. Focused Node coverage for provider publication, ownership advancement, blocked routing, later-state refusal, and same-Episode resume passes 207/207; focused managed-policy checks pass 9/9. Actual native Beads publication UAT and independent review are running; full validation remains pending.
+
+2026-10-26 provider-native Beads Blocked/resume slice is complete and independently reviewed. The exact-owner blocked authority now preserves the existing Backlog taskPath branch while returning a path-free Beads branch with exact provider revision and raw task evidence. The native helper accepts only an optional internal expected-current state and truthful appended note, synchronizes once, refuses a later state before update/push, performs one guarded supported status-plus-note update and one non-force publication, and proves the exact note in both the local raw reread and isolated remote row. Same-Episode handoff/evidence advancement now accepts a truthful prior raw blocked observation while still requiring freshly synchronized published in_progress state, meaningful design, clean paired provider evidence, safe ancestry, exact owner/resources, and one four-field factual ownership advance before the existing sole execute follow-up.
+
+The discoverable managed blocked skill and Conversation oversight guide now describe operator/LLM semantic blocker acceptance and clearance, exact native publication proof, preserved unrelated fields/provider-native shapes, and same-resource resume. Backlog, version-1 blocked-pair recovery, and all later Beads lifecycle/finalization/cleanup exclusions remain unchanged. The installed managed blocked asset exactly matches source and all manifest hashes at c8f019818fb0d628a8cccf5ab3dbd94d25720e0585c9b7af4fd030fb56f056f3. Read-only EXPERT wording was corrected to describe blocker/resume as Conversation-owned rather than unavailable.
+
+Real Beads 1.3.1 UAT passed in a disposable server-backed store. UAT-block moved in_progress→blocked at provider revision tovkmt173q70h9pol4p72eiuc9jrd59c / publication head e6a6a37915f815d6ca9b5d1c3df440f1674dd7df, then blocked→in_progress at hc2pvtnlsg9t8r61gqd7pfcmli1o8idt / 0ae956f1b4e9fa4dd4813684ceafe78e32109183. Both truthful notes were preserved; description, design, acceptance criteria, type, priority, owner, labels, creation data, and identity stayed unchanged. A later ready_for_merge state caused status-transition refusal with revision and publication head unchanged. The fixture server was stopped and all disposable resources were removed.
+
+Independent read-only review used openai-codex/gpt-5.6-sol and reported no material findings after the exact-note proof and EXPERT wording repairs. Validation on final bytes: focused Node 208/208; related Node 278/278; focused managed-policy Python 13/13; related Python 28 passed, 4 skipped; full Node 415/415; full Python 677 passed, 69 skipped, with only the same three unrelated host baselines (runtime-connect host-safe marker, task_episode_admission pytest bridge, local Backlog source pin); Docker tier 1 with offline RPC probe passed; git diff --check passed. PRIMECLAW-43 intentionally remains In Progress for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -81,8 +81,9 @@ def test_expert_skill_sends_provider_native_beads_review_evidence_without_lifecy
         "genuine semantic conflict, authority change, scope expansion, or product choice is escalated",
         "Do not ask a fake unit test or deterministic classifier to make that judgment",
         "Findings are evidence, not approval",
-        "do not invoke unavailable handoff, blocked, status, terminal, finalization, cleanup, or ownership-evidence advancement paths",
-        "report the exact factual provider evidence and stop",
+        "EXPERT has no authority to invoke Conversation-owned handoff, blocker publication/resume",
+        "any other status or terminal transition, finalization, cleanup, or ownership-evidence advancement",
+        "report exact factual provider evidence instead of",
         "using a Backlog-only route or writing `ownership.json`",
     ):
         assert required in text

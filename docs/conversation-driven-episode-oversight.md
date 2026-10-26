@@ -310,27 +310,40 @@ through. The tool admits ordinary canonical handoff and queues canonical
 execute as its sole follow-up. Admission is not completion and uncertain
 transport is never retried blindly.
 
-Provider-absent/Backlog version-2 blocker and resume publication are prompt-led Conversation work. After accepting an exact pushed blocker report, the Conversation runs supported `backlog task edit` on canonical main, verifies the bound ID/path and a one-path diff, commits only that task as `Blocked`, and pushes. After the operator accepts the unblock condition, it performs the same exact-task operation to restore `In Progress`, then uses `handoff_task_episode`. The dual-mode blocked skill still selects durable ownership before prompt text; active version-2 ownership forces task mode and never falls back to `.ralph/plans`.
+Blocker publication and resume are prompt-led Conversation work. For provider-absent/Backlog version 2, accepting an exact pushed blocker report still runs supported `backlog task edit` on canonical main, verifies the bound ID/path and a one-path diff, commits only that task as `Blocked`, and pushes. After the operator accepts the unblock condition, the same exact-task operation restores `In Progress`, then uses `handoff_task_episode`. The dual-mode blocked skill selects durable ownership before prompt text; active version-2 ownership forces its persisted provider/task mode and never falls back to `.ralph/plans`.
 
-A Beads report or EXPERT conclusion is evidence, not approval. The narrow
-`handoff_task_episode` path selects the exact owner first, preflights the same
-idle Episode/resources, performs one supported native pull, pairs an exact raw
-read with stable clean publication proofs, and proves the current code head
-clean and pushed. It supplies exact previous/current raw views and revisions to both canonical
-prompts, then records current provider/task/code facts only after the first
-handoff message is admitted. Raw
-inequality is not an approval boundary: compatible owner-authored or outside
-same-task changes and unrelated descendants continue, while the existing
-Episode LLM escalates genuine semantic, authority, or scope conflicts. Guidance
-never supplies native authority. Blocked publication, status/terminal
-transitions, finalization, and cleanup remain unavailable for Beads. At those
-boundaries the Conversation reports the exact factual evidence and stops; it
-does not route through Backlog-only commands or write the ownership registry
-directly.
+A Beads report or EXPERT conclusion is evidence, not approval. Current
+synchronized native status, not the older ownership observation, governs. The
+exact owning top-level canonical-primary Conversation binds the persisted
+provider/task/owner/worktree/session with no task path. After a context check,
+one native pull, complete raw read, and revision/ref/clean proof, it may publish
+an accepted pushed blocker only from current `in_progress`: one supported
+status-plus-note update guarded by `--if-status in_progress`, one non-force
+push, and exact raw `blocked` task/revision/ref/clean proof. The note records the
+truthful blocker evidence and exact unblock condition. Already-blocked state is
+observed without another publication; later state, a foreign owner, or an
+uncertain operation stops without retry, force, raw Dolt writes, or replacement
+work.
+
+Only after the operator or accepted evidence clears that recorded condition may
+one fresh proof cycle guard `blocked` to `in_progress`, append truthful clearance
+evidence, and publish once without force. `handoff_task_episode` then selects the
+same owner/resources, preflights the same idle Episode, performs its supported
+native pull and paired raw publication proof, and proves the current code head
+clean and pushed. It supplies exact previous/current raw views and revisions to
+both canonical prompts, then records only factual provider/task/code observations
+after the first handoff message is admitted. The previous persisted observation
+may truthfully be `blocked`; the current task must be exact `in_progress` with a
+meaningful design. Raw inequality is not an approval boundary: the LLM handles
+compatible changes and escalates genuine semantic, authority, or scope conflicts.
+Guidance never supplies native authority, and no code keeps an artificial
+`in_progress` snapshot. Other Beads status/terminal transitions, finalization,
+and cleanup remain unavailable. The Conversation never routes through
+Backlog-only commands or writes the ownership registry directly.
 
 Persisted active version-1 ownership keeps its specification/plan pair active while blocked and throughout candidate review or revision. An older blocked snapshot with no active pair is not live: only after an explicit operator unblock decision may the blocked skill call `restore_blocked_spec_episode` for the exact owned future folder. The tool restores the exact readable pair without clobber or mode fallback and revalidates the same active identity. No-ownership old in-place blocking remains separate.
 
-For provider-absent/Backlog ownership, `handoff_task_episode` proves canonical primary-main caller context, exact owner/task/path in main and the Episode worktree, committed `In Progress` status, meaningful plans, clean owned worktree, exact Git/Orca and durable-session CWD identity, and quiescence. The Beads branch proves canonical-primary Conversation context, exact active provider/task/operation/base/resource identity, a current meaningful `in_progress` raw design, an idle/quiescent Episode, clean synchronized publication, and a clean pushed current code head; then it records factual current observations and transports exact previous/current native context without a semantic equality gate. Both branches bind both prompts to the exact task and reuse the same resources. Neither performs status, review, or terminal work.
+For provider-absent/Backlog ownership, `handoff_task_episode` proves canonical primary-main caller context, exact owner/task/path in main and the Episode worktree, committed `In Progress` status, meaningful plans, clean owned worktree, exact Git/Orca and durable-session CWD identity, and quiescence. The Beads branch proves canonical-primary Conversation context, exact active provider/task/operation/base/resource identity, any truthful prior raw lifecycle observation with a meaningful design, an exact current `in_progress` raw design, an idle/quiescent Episode, clean synchronized publication, and a clean pushed current code head; then it records factual current observations and transports exact previous/current native context without a semantic equality gate. Both branches bind both prompts to the exact task and reuse the same resources. Handoff itself performs no status, review, or terminal work.
 
 Provider-absent/Backlog candidate review is evidence-led. After accepting an exact pushed candidate with no fixes remaining, the Conversation uses the supported Backlog CLI on canonical main to set only the bound task to `Ready for Merge`, reloads its exact ID/path/parent/status, verifies a one-path diff, commits only that task path, pushes, and records `mainHead`. In the exact idle Episode worktree, it runs ordinary `git merge --no-edit mainHead`; if the task conflicts, it restores the pre-merge Episode task content and applies only the Conversation-authorized `Ready for Merge` status through Backlog, while Git blocks other conflicts. It completes the merge, pushes, and verifies the refreshed `candidateHead`, upstream, task identity/path/parent/status, and clean worktree. It then shows the operator `(taskId, mainHead, candidateHead)`. There is no custom Ready publisher, two-parent reconciliation transaction, content digest, progress receipt, or replay protocol.
 
@@ -358,7 +371,7 @@ remain available; none becomes workspace scheduling or product authority.
 
 ## Task-native terminal outcomes and cleanup
 
-Provider-absent/Backlog version-2 review, Blocked/Resume, Delay, Request Changes, Merge, and Abandonment are Conversation instructions implemented with ordinary Git and the supported Backlog CLI. The only native terminal tool is cleanup-only `finalize_task_episode`, because exact session/worktree/branch removal and ownership closure require a stable host boundary. Cleanup remains a separate explicit operator decision and closes ownership only after every bound resource is absent.
+Provider-absent/Backlog version-2 review, Blocked/Resume, Delay, Request Changes, Merge, and Abandonment are Conversation instructions implemented with ordinary Git and the supported Backlog CLI. Beads version 2 now supports only the bounded native Blocked/Resume pair described above; Ready for Merge, Done, abandonment, finalization, and cleanup stay deferred. The only native terminal tool is cleanup-only `finalize_task_episode` for Backlog-bound ownership, because exact session/worktree/branch removal and ownership closure require a stable host boundary. Cleanup remains a separate explicit operator decision and closes ownership only after every bound resource is absent.
 
 ## Retained version-1 compatibility finalization
 

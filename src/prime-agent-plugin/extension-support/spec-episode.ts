@@ -880,7 +880,15 @@ function samePath(a: string | undefined, b: string): boolean {
   return typeof a === "string" && resolve(a) === resolve(b);
 }
 export type BlockedWorkflowAuthority =
-  | { mode: "task"; taskId: string; taskPath: string; projectRoot: string }
+  | { mode: "task"; provider: "backlog"; taskId: string; taskPath: string; projectRoot: string }
+  | {
+      mode: "task";
+      provider: "beads";
+      taskId: string;
+      projectRoot: string;
+      providerRevision: string;
+      taskEvidence: Record<string, unknown>;
+    }
   | { mode: "folder"; projectRoot: string };
 
 /**
@@ -907,7 +915,7 @@ export function resolveBlockedWorkflowAuthority(
   const requestedTaskId = rawTaskId?.trim();
   if (requestedTaskId !== undefined
     && (!requestedTaskId || /\s/.test(requestedTaskId) || requestedTaskId.startsWith("-"))) {
-    throw new Error("Blocked workflow requires a canonical Backlog task ID");
+    throw new Error("Blocked workflow requires one exact canonical task ID");
   }
   if (!record) {
     if (requestedTaskId !== undefined) {
@@ -919,7 +927,7 @@ export function resolveBlockedWorkflowAuthority(
     throw new Error(`Task-native blocked workflow requires active ownership; found ${record.status}`);
   }
   if (requestedTaskId !== undefined && record.taskId !== requestedTaskId) {
-    throw new Error("Task-bound blocked workflow does not match the exact owned Backlog task");
+    throw new Error("Task-bound blocked workflow does not match the exact owned provider task");
   }
   if (!samePath(projectRoot, realpathSync(ctx.cwd))) {
     throw new Error("Task-native blocked workflow must run from the repository root");
@@ -936,9 +944,23 @@ export function resolveBlockedWorkflowAuthority(
   if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
     throw new Error("Task-native blocked workflow is available only from a top-level project Conversation");
   }
-  exactOwnedTaskRecord(record, record.taskId, ctx.sessionManager.getSessionId());
+  exactAllocatableTaskRecord(record, record.taskId, ctx.sessionManager.getSessionId());
+  if (isBeadsTaskEpisodeOwnership(record)) {
+    return {
+      mode: "task",
+      provider: "beads",
+      taskId: record.taskId,
+      projectRoot,
+      providerRevision: record.providerRevision,
+      taskEvidence: record.taskEvidence,
+    };
+  }
+  if (!isBacklogTaskEpisodeOwnership(record)) {
+    throw new Error("Task-native blocked workflow found unsupported provider ownership");
+  }
   return {
     mode: "task",
+    provider: "backlog",
     taskId: record.taskId,
     taskPath: record.taskPath,
     projectRoot,
@@ -1513,7 +1535,7 @@ export async function handoffTaskEpisode(
   try {
     const taskId = rawTaskId.trim();
     if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) {
-      throw new Error("Task-native Episode handoff requires a canonical Backlog task ID");
+      throw new Error("Task-native Episode handoff requires one exact canonical task ID");
     }
     const repo = git.repositoryRoot(ctx.cwd);
     if (!samePath(repo, realpathSync(ctx.cwd))) {
@@ -1537,11 +1559,10 @@ export async function handoffTaskEpisode(
     git.assertCleanWorktree(record.worktree!);
 
     if (isBeadsTaskEpisodeOwnership(record)) {
-      if (record.taskEvidence.status !== "in_progress"
-          || !meaningfulTaskImplementationPlan(
-            typeof record.taskEvidence.design === "string" ? record.taskEvidence.design : null,
-          )) {
-        throw new Error("Beads task-native Episode handoff requires persisted in_progress evidence with a meaningful raw design");
+      if (!meaningfulTaskImplementationPlan(
+        typeof record.taskEvidence.design === "string" ? record.taskEvidence.design : null,
+      )) {
+        throw new Error("Beads task-native Episode handoff requires persisted raw evidence with a meaningful design");
       }
       publisher ??= new PrimeSessionPublisher();
       const preflight = await prepareOwnedEpisodeHandoff(
@@ -1878,6 +1899,7 @@ export function commitConversationTaskStatus(options: {
       projectRoot: options.projectRoot,
       taskId: options.taskId,
       status: options.status,
+      ...(options.note ? { note: options.note } : {}),
       runner: options.runner,
     });
   }

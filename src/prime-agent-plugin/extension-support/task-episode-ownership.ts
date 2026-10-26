@@ -898,9 +898,8 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
       || JSON.stringify(input.previousTaskEvidence) !== JSON.stringify(selected.taskEvidence)) {
     throw new Error("Beads evidence advancement input does not match the exact persisted provider observation");
   }
-  if (input.previousTaskEvidence.id !== input.taskId
-      || input.previousTaskEvidence.status !== BEADS_IN_PROGRESS_STATUS) {
-    throw new Error("Beads evidence advancement requires exact previous raw in_progress task evidence");
+  if (input.previousTaskEvidence.id !== input.taskId) {
+    throw new Error("Beads evidence advancement requires exact previous raw task identity");
   }
 
   const runner = dependencies.runner ?? new ProcessCommandRunner();

@@ -6,19 +6,21 @@
 per pass, so that every iteration produces bounded, tested, documented,
 reviewable progress.**
 
-A task-native execute assignment carries one exact Backlog task ID. The Episode
-reloads that canonical task and treats its specification fields, Implementation
-Plan, Implementation Notes, acceptance evidence, references, documentation,
-modified files, and Final Summary as the durable work contract and record. It
-implements one slice, updates task content only through supported Backlog CLI
-operations in its own worktree, commits and pushes, reports exact evidence, and
-stops for owner review. It never uses `.ralph/plans` as task-native authority.
+A task-native execute assignment carries one exact selected-provider task ID.
+Backlog reloads its canonical task/path and supported specification, plan, notes,
+evidence, references, documentation, modified-file, and summary fields. Beads
+binds the exact raw task, published revision, code base/head, and native
+`design`/notes plus every other provider field without normalization. The
+Episode implements one slice, keeps only owner-authored native content current
+through supported provider commands, publishes exact evidence, commits and
+pushes its code branch, and stops for owner review. It never uses `.ralph/plans`
+as task-native authority.
 
-The Episode owns task content on its branch, while the Conversation owns status
-on main. Execute therefore verifies that the bound task remains `In Progress`,
-never passes `--status`, never completes or archives the task, and performs no
-cross-checkout task copy or dual write. A candidate remains `In Progress` until
-the Conversation's separate review and status transitions.
+The Episode owns task content and code in its branch, while the Conversation
+owns lifecycle status. Execute requires current native `In Progress`, never
+changes status, completes, archives, or performs cross-checkout task copies or
+dual writes. A candidate remains `In Progress` until the Conversation's separate
+review and status transitions.
 
 Retained folder Episodes without a task-bound assignment continue to use the
 existing specification and execution plan during migration. Both modes remain
@@ -30,7 +32,7 @@ do not become scope, and status-only churn is not progress.
 **As an Episode implementer, I want blockers and completion reflected in durable
 project artifacts, so that the next actor does not depend on transcript memory.**
 
-In task-native mode, blocked work records the exact blocker, attempts, evidence, and unblock condition in the bound task's Implementation Notes, commits and pushes that Episode branch while status remains `In Progress`, reports through the existing Episode-to-Conversation channel, and stops. The Conversation may then publish `Blocked` on canonical main with the supported Backlog CLI, verify and commit only the exact bound task path, and push. After the operator accepts the unblock condition, the Conversation publishes `In Progress` the same way and resumes the same Episode through `handoff_task_episode`.
+In task-native mode, blocked work records the exact blocker, attempts, evidence, and unblock condition in provider-native notes/content, publishes those owner-authored facts, commits and pushes any Episode code branch change while status remains `In Progress`, reports through the existing Episode-to-Conversation channel, and stops. For Backlog, the Conversation then preserves the exact task-path status commit/push transaction. For Beads, only the exact owning canonical-primary Conversation may use one synchronized guarded `in_progress` to `blocked` status-plus-note update and one non-force publication with exact raw revision/ref/clean proof. After the operator or accepted evidence clears the recorded condition, one fresh guarded `blocked` to `in_progress` update records truthful clearance evidence and publishes once. Current native state governs; later states and uncertain operations write nothing and are not retried. Both providers resume the same Episode through `handoff_task_episode`, which records only factual current Beads observations after handoff admission.
 
 Completed candidate work records its plan, notes, acceptance evidence, references, and Final Summary while leaving status unchanged for Conversation review. The Conversation verifies the exact pushed head, worktree, task identity, diff, tests, and review. After acceptance, it sets only the bound main task to `Ready for Merge` through the supported Backlog CLI, verifies and commits only that path, pushes, and records `mainHead`. It then uses ordinary Git in the idle Episode to integrate `mainHead`, preserves Episode-owned task content while applying only the authorized `Ready for Merge` status, pushes and verifies the refreshed `candidateHead`, and shows the operator `(taskId, mainHead, candidateHead)`. Delay changes nothing. Request Changes returns only the main task to `In Progress`, commits and pushes that path, integrates main into the same Episode with ordinary Git as needed while preserving its task content and applying that authorized status, then resumes through ordinary handoff.
 

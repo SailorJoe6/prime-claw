@@ -30,15 +30,27 @@ for that persisted version-1 record and recorded worktree. A valid version-2
 record selects task mode even when the assignment has no task block.
 Require the exact persisted owner session, a top-level Conversation, the
 repository root of the canonical primary `main` checkout, and the record's exact
-task ID and project-relative task path. If a task block is present, require its
-entire trimmed value to equal that task ID. If any owner, depth, checkout,
-status, identity, or optional task-block check fails, stop. Never fall back to
-folder mode while this Conversation has a version-2 ownership record. A task-bound Episode
-session follows its execute policy for blocker recording; it cannot acquire
-Conversation status authority by invoking this skill.
+provider and task ID. A provider-absent record or `provider: "backlog"` must
+carry its exact project-relative task path and no Beads evidence. A
+`provider: "beads"` record must carry no task path and must retain its exact
+published `providerRevision`, complete raw `taskEvidence`, code `baseRef`,
+worktree, branch, and Episode session identity. If a task block is present,
+require its entire trimmed value to equal that task ID. If any owner, depth,
+checkout, provider, status, identity, or optional task-block check fails, stop.
+Never fall back to folder mode while this Conversation has a version-2 ownership
+record. A task-bound Episode session follows its execute policy for blocker
+recording; it cannot acquire Conversation status authority by invoking this skill.
 
-In version-2 task mode, use `/skill:backlog` to load the project task-tracking
-workflow. Reload the exact owned task through the supported structured interface:
+In either version-2 branch, use the accepted Episode-to-Conversation report
+already present in the owning Conversation to explain the exact blocker,
+attempted actions, evidence, and unblock condition. Do not infer missing
+evidence or copy Episode-owned task content across checkouts. If the accepted
+report is unavailable, stop and require recovery of that exact report and
+Episode identity rather than inventing it from task content. Do not inspect or
+move `.ralph/plans`, select replacement work, or start another admission.
+
+For provider-absent/Backlog task mode, use `/skill:backlog`, then reload the
+exact owned task through the supported structured interface:
 
 ```sh
 backlog task view --json -- TASK-ID
@@ -46,25 +58,54 @@ backlog task view --json -- TASK-ID
 
 Require the returned canonical ID and project-relative task path to match the
 ownership record, and require main status to be exactly `Blocked`. The task is
-the sole lifecycle authority in this mode. Do not inspect or move
-`.ralph/plans`, select a replacement task, or start another admission.
+the sole lifecycle authority in this branch. Work with the user to satisfy the
+recorded unblock condition. After the user or accepted
+evidence clears it, only that exact owning Conversation may publish the same
+task as `In Progress`. Preserve the existing one exact-task-only status commit:
+unrelated main dirt is allowed, the task path must match committed `HEAD`, and
+push is prompt best-effort evidence after authoritative local commit success.
+Then continue the same ownership, branch, worktree, and session through
+`handoff_task_episode`.
 
-Use the accepted Episode-to-Conversation report already present in the owning
-Conversation to explain the exact blocker, attempted actions, evidence, and
-unblock condition. Do not infer missing evidence or copy Episode-owned task
-content across checkouts. Work with the user to satisfy the recorded unblock
-condition. If the accepted report is unavailable, stop and require recovery of
-that exact report and Episode identity rather than inventing it from main-task
-content.
+For Beads task mode, current synchronized native state—not the older ownership
+observation—governs. From the canonical-primary Conversation and the exact
+recorded project context, use `bd context --json`, exactly one supported
+`bd dolt pull`, and `bd show TASK-ID --json --long --include-comments`, together
+with the existing native revision, publication-ref, and clean-working-set proof.
+Require the exact canonical ID and complete raw task. Compare the persisted and
+current raw views with LLM judgment: preserve compatible owner-authored or
+outside changes, and stop for a genuine semantic conflict, authority change, or
+scope decision. Raw inequality and an unrelated-task revision advance alone are
+not blockers. Never use a deterministic classifier or equality gate.
 
-After the user or accepted evidence clears the blocker, only that exact owning
-Conversation may publish the same task as `In Progress`. The transition must be
-one exact-task-only commit; unrelated main dirt is allowed, but the exact task
-path must match committed `HEAD`. Push is prompt best-effort evidence and local
-commit success remains authoritative. Then continue the same ownership, branch,
-worktree, and session through the existing handoff channel. Never create a new
-task, admission, Episode resource, or status-sync message, and never mutate
-Episode-owned task content from main.
+An accepted pushed blocker may move only current `in_progress` to `blocked`.
+Use one supported guarded native update:
+`bd --dolt-auto-commit=on update TASK-ID --status blocked --if-status
+in_progress --append-notes "<truthful blocker, evidence, and exact unblock
+condition>" --json`. Then make one `bd dolt push
+--no-adopt`, never force or retry, and prove the exact resulting raw task,
+published revision, `refs/dolt/data`, and clean working set. If current state is
+already `blocked`, do not publish again; use the accepted recorded blocker. If
+it is any later or different state, stop without mutation. A failed or uncertain
+pull, update, push, or proof is raw evidence and never permission to retry,
+reset, adopt, force, or write the live Dolt store directly.
+
+Work with the user to satisfy that actual recorded unblock condition. Only after
+the operator or accepted evidence clears it may this exact Conversation move
+current native `blocked` back to `in_progress`. Repeat one fresh native
+context/pull/raw-read/proof cycle, use
+`bd --dolt-auto-commit=on update TASK-ID --status in_progress --if-status
+blocked --append-notes "<truthful clearance evidence>" --json`, publish once
+without force, and
+prove the exact raw task/revision/ref/clean result. Then call
+`handoff_task_episode`; its existing admitted callback records only factual
+current `providerRevision`, raw `taskEvidence`, code head, and timestamp before
+the sole execute follow-up. Never write `ownership.json` directly.
+
+Both providers resume the same task, ownership, branch, worktree, and durable
+Episode session. Never create a new task, admission, Episode resource,
+status-sync message, status receipt, or replacement assignment, and never mutate Episode-owned product or
+plan content from the Conversation.
 
 Use folder mode for persisted version-1 ownership. When its active pair exists,
 read the blocker from that active execution plan. Work with the user to clear

@@ -886,6 +886,27 @@ test("published Beads evidence refresh synchronizes before proof/read and record
   assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
 });
 
+test("published Beads evidence refresh accepts a prior blocked observation when current native task resumed", () => {
+  const f = evidenceAdvancementFixture();
+  const blockedOwner = parseEpisodeOwnership({
+    ...f.owner,
+    taskEvidence: {
+      ...f.owner.taskEvidence,
+      status: "blocked",
+      notes: "Accepted blocker with exact unblock condition.",
+    },
+  });
+  writeEpisodeOwnership(f.root, blockedOwner);
+  f.owner = blockedOwner;
+  const result = advanceEvidence(f);
+  assert.equal(result.previousTaskEvidence.status, "blocked");
+  assert.equal(result.currentTaskEvidence.status, "in_progress");
+  assert.equal(result.record.taskEvidence.status, "in_progress");
+  const changed = Object.keys(result.record).filter((key) =>
+    JSON.stringify(result.record[key]) !== JSON.stringify(blockedOwner[key]));
+  assert.deepEqual(changed.sort(), ["head", "providerRevision", "taskEvidence", "updatedAt"]);
+});
+
 test("owner-authored and compatible outside same-task Beads changes both advance as factual observations", () => {
   const ownerAuthored = evidenceAdvancementFixture();
   const ownerResult = advanceEvidence(ownerAuthored);

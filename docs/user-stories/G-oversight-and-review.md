@@ -37,11 +37,17 @@ Cleanup is independently explicit. The cleanup-only `finalize_task_episode` call
 
 Beads review conclusions remain evidence, not lifecycle approval. Beads handoff
 synchronizes and records factual observations, then sends exact previous/current
-native context to the existing Episode LLM without a raw-equality gate. Beads
-blocker/status publication, terminal transitions, finalization, and cleanup are
-not active yet. At those boundaries the Conversation reports exact factual
-provider evidence and stops rather than use a Backlog-only route or write the
-ownership registry.
+native context to the existing Episode LLM without a raw-equality gate. The one
+active Beads lifecycle exception is an accepted blocker and cleared-blocker
+resume by the exact owning top-level canonical-primary Conversation. Current
+native status governs: one guarded status-plus-note update and one non-force
+publication may move `in_progress` to `blocked`, and only operator or accepted
+evidence that clears the actual recorded condition permits one fresh guarded
+`blocked` to `in_progress` publication before same-Episode handoff. Exact raw
+task/revision/ref/clean proof is mandatory; later states, foreign authority, and
+uncertain operations stop without retry. Terminal transitions, finalization,
+and cleanup remain inactive. No route writes the ownership registry directly,
+uses Backlog-only commands for Beads, or creates replacement work/resources.
 
 Product, scope, merge, abandonment, remote transport, and destructive cleanup
 remain operator decisions.

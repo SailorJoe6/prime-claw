@@ -1579,7 +1579,7 @@ export type BeadsTaskMutationPublication =
     }
   | {
       status: "blocked";
-      code: "preparation" | "task-identity";
+      code: "preparation" | "task-identity" | "status-transition";
       detail: string;
       evidence: BeadsTaskMutationReviewEvidence;
     };
@@ -1761,9 +1761,9 @@ function readIsolatedBeadsRemoteTask(
 }
 
 /**
- * Publish one exact Beads status mutation with the smallest provider-native
- * transport flow. Deterministic code proves only exact task/status and
- * revision/ref identities. Any concurrent advance or rejected operation is
+ * Publish one exact Beads status and optional appended-note mutation with the
+ * smallest provider-native transport flow. Deterministic code proves only the
+ * exact task/status/note and revision/ref identities. Any concurrent advance or rejected operation is
  * preserved and returned as raw provider evidence for managed review; this
  * function never classifies task semantics, pulls twice, retries, or forces.
  */
@@ -1771,6 +1771,8 @@ export function mutateAndPublishBeadsTaskStatus(options: {
   projectRoot: string;
   taskId: string;
   status: CanonicalLifecycleStatus;
+  expectedCurrentStatus?: CanonicalLifecycleStatus;
+  note?: string;
   runner?: CommandRunner;
 }): BeadsTaskMutationPublication {
   const runner = options.runner ?? new ProcessCommandRunner();
@@ -1832,23 +1834,38 @@ export function mutateAndPublishBeadsTaskStatus(options: {
     };
   }
 
+  if (options.expectedCurrentStatus && afterPull.task.canonicalStatus !== options.expectedCurrentStatus) {
+    return {
+      status: "blocked", code: "status-transition",
+      detail: `Beads task ${taskId} is currently ${afterPull.task.canonicalStatus}/${afterPull.task.nativeStatus}, not required ${options.expectedCurrentStatus}/${BEADS_STATUS_MAP[options.expectedCurrentStatus].name}; no mutation was attempted`,
+      evidence: { ...evidence, observedRevision: synchronized.revision, revisionProof: synchronized, taskBefore: before, taskObserved: afterPull, operation: pull },
+    };
+  }
+
+  const expectedNotes = options.note
+    ? `${typeof afterPull.task.nativeView.notes === "string" && afterPull.task.nativeView.notes
+      ? `${afterPull.task.nativeView.notes}\n` : ""}${options.note}`
+    : undefined;
   const nativeStatus = BEADS_STATUS_MAP[options.status].name;
   const mutationArgs = [
     "--dolt-auto-commit=on", "update", taskId, "--status", nativeStatus,
-    "--if-status", afterPull.task.nativeStatus, "--json",
+    "--if-status", afterPull.task.nativeStatus,
   ];
+  if (options.note) mutationArgs.push("--append-notes", options.note);
+  mutationArgs.push("--json");
   const mutationResult = runner.run("bd", mutationArgs, { cwd: prepared.projectRoot, allowFailure: true });
   const mutation = rawCommand("bd", mutationArgs, mutationResult);
   const committed = readBeadsMutationRevision(prepared.projectRoot, prepared, runner);
   const afterMutation = readExactBeadsTaskEvidence(prepared.projectRoot, taskId, runner);
   if (mutationResult.status !== 0 || !committed.revision || committed.revision === prepared.revision || !afterMutation.task
       || afterMutation.task.taskId !== taskId || afterMutation.task.nativeStatus !== nativeStatus
-      || afterMutation.task.canonicalStatus !== options.status) {
+      || afterMutation.task.canonicalStatus !== options.status
+      || (expectedNotes !== undefined && afterMutation.task.nativeView.notes !== expectedNotes)) {
     return {
       status: "review-required", code: "guarded-mutation-failed", phase: "mutation",
       detail: mutationResult.status !== 0
         ? "the guarded provider-native mutation failed"
-        : committed.error ?? afterMutation.error ?? "the guarded mutation did not prove the exact requested task status",
+        : committed.error ?? afterMutation.error ?? "the guarded mutation did not prove the exact requested task status and appended note",
       evidence: {
         ...evidence, observedRevision: committed.revision, revisionProof: committed,
         taskBefore: afterPull, taskObserved: afterMutation, operation: mutation,
@@ -1903,12 +1920,14 @@ export function mutateAndPublishBeadsTaskStatus(options: {
   if (published.revision !== committed.revision || published.parentRevision !== prepared.revision || published.clean !== true
       || !publishedTask.task || publishedTask.task.taskId !== taskId || publishedTask.task.nativeStatus !== nativeStatus
       || publishedTask.task.canonicalStatus !== options.status
+      || (expectedNotes !== undefined && publishedTask.task.nativeView.notes !== expectedNotes)
       || remoteTask.revision !== committed.revision || remoteTask.taskRow?.status !== nativeStatus
+      || (expectedNotes !== undefined && remoteTask.taskRow?.notes !== expectedNotes)
       || !remoteTask.publicationHead || remoteTask.publicationHead === prepared.publicationHead) {
     return {
       status: "review-required", code: "publication-proof-failed", phase: "publication-proof",
       detail: published.error ?? publishedTask.error ?? remoteTask.error
-        ?? "isolated publication proof did not preserve the exact committed revision and requested task status",
+        ?? "isolated publication proof did not preserve the exact committed revision, requested task status, and appended note",
       evidence: {
         ...evidence, observedRevision: remoteTask.revision ?? published.revision, revisionProof: published,
         taskBefore: afterPull, taskObserved: publishedTask, operation: push,

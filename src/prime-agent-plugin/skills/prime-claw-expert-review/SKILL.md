@@ -117,10 +117,11 @@ It must also include this review contract:
 
 - Act as the independent EXPERT reviewer. Review read-only and do not edit,
   implement, steer the candidate, mutate lifecycle state, or perform cleanup.
-  Findings are evidence, not approval. For Beads, do not invoke unavailable
-  handoff, blocked, status, terminal, finalization, cleanup, or ownership-evidence
-  advancement paths; report the exact factual provider evidence and stop instead of
-  using a Backlog-only route or writing `ownership.json`.
+  Findings are evidence, not approval. For Beads, EXPERT has no authority to
+  invoke Conversation-owned handoff, blocker publication/resume, any other status
+  or terminal transition, finalization, cleanup, or ownership-evidence advancement;
+  report exact factual provider evidence instead of using a Backlog-only route or
+  writing `ownership.json`.
 - Review the exact candidate only against the operator-approved product
   contract and the implementation claims being made. Do not add requirements,
   expand scope, or substitute the reviewer's preferred architecture.

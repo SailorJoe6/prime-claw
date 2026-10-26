@@ -596,8 +596,9 @@ Focused integration coverage is deliberately limited to three representative
 contracts: Backlog behavior and return shape stay unchanged, Beads publication
 returns the exact published evidence without task-file Git operations, and a
 Beads concurrent advance propagates raw review evidence without mutation or
-classification. Other mutation callers plus handoff, finalization, cleanup, migration,
-cutover, and legacy routing remain deferred. The one direct admission caller is
+classification. Other mutation callers plus finalization, cleanup, migration,
+cutover, and legacy routing remain deferred. Direct admission, handoff, and the
+bounded blocker/resume route are described below. The one direct admission caller is
 bounded separately below.
 Provider-neutral mutation, PRIMECLAW-43.1, locks, mirrors, registries,
 frameworks, persistent Prime Claw state, automatic retry, force, and raw
@@ -630,10 +631,10 @@ The parser rejects unknown providers, provider/path/revision mixtures, missing
 or mismatched native task evidence, and malformed Dolt revisions. Active
 binding uniqueness preserves canonical task-ID uniqueness across providers and
 exact Backlog path uniqueness; advancing a Beads revision does not change the owned
-Episode identity. Existing Backlog lifecycle entry points explicitly keep requiring a Backlog
-ownership branch. The public creation boundary below is the sole Beads admission
-exception; handoff, oversight, finalization, cleanup, migration, and legacy
-transition still reject Beads ownership and never rewrite another owner.
+Episode identity. Backlog path-bound lifecycle entry points explicitly keep requiring a Backlog
+ownership branch. The public creation, handoff, and bounded blocker/resume
+boundaries below are the Beads exceptions; finalization, cleanup, migration, and
+legacy transition still reject Beads ownership and never rewrite another owner.
 
 ### Direct Beads task Episode admission
 
@@ -683,10 +684,10 @@ its existing compact-first two-message flow, expiry and single-use behavior, and
 preselected placement. It binds the exact owner, provider, task, and project
 root (plus the exact task path for Backlog), re-resolves live provider-native
 status and plan/design evidence, rejects drift, and calls the accepted admission
-once. `/plan` and `plan_task` remain Backlog-only. The later sections activate
-provider-aware execute, oversight, receipt advancement, and unchanged-task
-handoff in bounded slices; blocked, finalization, cleanup, and the remaining
-lifecycle routes stay deferred.
+once. `/plan` and `plan_task` now publish the selected provider's native living plan.
+The later sections activate provider-aware execute, oversight, factual observation
+advancement, unchanged-task handoff, and bounded blocker/resume handling;
+finalization, cleanup, and the remaining lifecycle routes stay deferred.
 No provider matrix, normalized task model, snapshot/digest protocol, sidecar
 receipt, workspace-copy machinery, raw Dolt write, force, or automatic retry is
 introduced.
@@ -786,8 +787,8 @@ it never supplies raw task evidence or provider revision authority.
 
 The branch requires canonical-primary `main` Conversation context and preserves
 the exact operation, code base, worktree, branch, Episode/session, and Orca
-resource binding. It requires prior native `in_progress` evidence with a
-meaningful raw `design`, a clean owned worktree, an exact durable-session CWD,
+resource binding. It requires prior raw evidence with a meaningful `design`, a
+clean owned worktree, an exact durable-session CWD,
 and the existing complete idle/quiescent transport proof before factual
 evidence refresh. The refresh performs the native pull/read/publication pairing and proves the
 current code head clean and equal to ordinary upstream/direct remote. The
@@ -808,5 +809,37 @@ execute follow-up, bound to the exact same task and resources.
 This slice removes the prior raw-equality gate, `review-required` handoff result,
 accepted/current review payload, and wrapper receipt response. It introduces no
 new public parameter/tool, approval phase, classifier, normalized diff, digest,
-persistent packet, sidecar, retry, force, raw Dolt write, blocked/resume,
-terminal/finalization/cleanup, planning/design, migration, or version-3 state.
+persistent packet, sidecar, retry, force, raw Dolt write,
+terminal/finalization/cleanup, migration, or version-3 state.
+
+### Beads blocker publication and same-Episode resume
+
+The discoverable `blocked` skill and ordinary Conversation oversight now cover
+one bounded Beads lifecycle pair without adding a status tool or receipt. The
+exact owning top-level canonical-primary Conversation selects the persisted
+version-2 Beads owner before prompt task text and binds its provider, canonical
+task ID, prior published revision/raw task observation, code base, worktree,
+branch, and Episode session. The Beads branch has no task path. Backlog keeps its
+existing exact-path native edit plus task-only Git commit, and version-1 blocked
+pair recovery is unchanged.
+
+Current synchronized native state governs Beads, not a stale ownership status.
+After one context/pull/complete raw-read and clean revision/ref proof, an accepted
+pushed blocker may make one guarded `in_progress` to `blocked` status-and-note
+update. The note truthfully records the accepted blocker evidence and exact
+unblock condition. The Conversation publishes once without force and proves the
+exact raw task, revision, `refs/dolt/data`, and clean working set. Already-blocked
+state is observed without another write; later state, a foreign owner, or any
+uncertain native operation stops without retry.
+
+After the operator or accepted evidence clears that actual condition, one fresh
+proof cycle may make one guarded `blocked` to `in_progress` update with truthful
+clearance evidence and one non-force publication. `handoff_task_episode` then
+continues the same idle Episode and its existing callback advances only factual
+provider revision, raw task evidence, code head, and timestamp after first-message
+admission. Previous raw evidence may truthfully be `blocked`; the freshly
+synchronized current task must be exact `in_progress` with meaningful design.
+No artificial snapshot, equality gate, semantic classifier, alternate acceptance
+interface, state machine, sidecar, raw live-store write, replacement resource, or
+parallel workflow is introduced. Ready-for-Merge, Done, abandonment,
+finalization, and cleanup remain outside this Beads slice.

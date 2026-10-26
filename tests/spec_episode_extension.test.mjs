@@ -836,6 +836,54 @@ test("registered active Beads handoff delivers compatible outside same-task nati
   assert.equal(f.calls.some((call) => ["execute", "reopen"].includes(call[0])), false);
 });
 
+test("active Beads handoff resumes from a factual blocked observation when current native state is in progress", async () => {
+  const f = harness({ list: (_count, session) => [session] });
+  const previous = {
+    ...BEADS_TASK_EVIDENCE,
+    status: "blocked",
+    notes: "Accepted blocker: wait for exact native dependency. Unblock when the dependency is published.",
+  };
+  const initial = activeBeadsTaskRecord(f, { taskEvidence: previous });
+  f.ownership.write(f.root, initial);
+  f.calls.length = 0;
+  const publishedProviderRevision = "b".repeat(32);
+  const current = {
+    ...previous,
+    status: "in_progress",
+    notes: `${previous.notes}
+Cleared: exact native dependency is published.`,
+  };
+  f.git.head = (path) => path === f.worktree ? "b".repeat(40) : "main-head";
+  const advanceBeadsEvidence = (input) => {
+    assert.equal(input.previousTaskEvidence.status, "blocked");
+    const advanced = parseEpisodeOwnership({
+      ...f.record,
+      providerRevision: publishedProviderRevision,
+      taskEvidence: current,
+      head: input.episodeHead,
+      updatedAt: "2026-10-20T09:00:00.000Z",
+    });
+    return {
+      record: advanced,
+      previousProviderRevision: input.previousProviderRevision,
+      publishedProviderRevision,
+      previousTaskEvidence: input.previousTaskEvidence,
+      currentTaskEvidence: current,
+      commit() { f.ownership.write(f.root, advanced); return advanced; },
+    };
+  };
+
+  const result = await handoffTaskEpisode(
+    BEADS_TASK_ID, "resume after accepted unblock", f.ctx, { ...f.deps, advanceBeadsEvidence },
+  );
+  assert.equal(result.admitted, true);
+  assert.equal(f.record.providerRevision, publishedProviderRevision);
+  assert.equal(f.record.taskEvidence.status, "in_progress");
+  assert.equal(f.record.worktree, initial.worktree);
+  assert.equal(f.record.episodeId, initial.episodeId);
+  assert.equal(f.calls.filter((call) => call[0] === "handoff").length, 1);
+});
+
 test("active Beads handoff commits factual observations only after the first canonical message is admitted", async (t) => {
   const scenario = (options) => {
     const f = harness({ list: (_count, session) => [session], ...options });
@@ -937,6 +985,7 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
     resolveBlockedWorkflowAuthority(undefined, f.ctx, f.deps),
     {
       mode: "task",
+      provider: "backlog",
       taskId: "PRIMECLAW-10.38",
       taskPath: "backlog/tasks/primeclaw-10.38.md",
       projectRoot: f.root,
@@ -945,7 +994,7 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
   assert.equal(resolveBlockedWorkflowAuthority("PRIMECLAW-10.38", f.ctx, f.deps).mode, "task");
   assert.throws(
     () => resolveBlockedWorkflowAuthority("OTHER-1", f.ctx, f.deps),
-    /does not match the exact owned Backlog task/,
+    /does not match the exact owned provider task/,
   );
   f.ownership.write(f.root, activeTaskRecord(f, {
     ownerSessionId: "foreign", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md",
@@ -957,11 +1006,29 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
     sessionManager: { ...f.ctx.sessionManager, getSessionId: () => "foreign" },
   };
   assert.deepEqual(resolveBlockedWorkflowAuthority(undefined, foreign, f.deps), {
-    mode: "task", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md", projectRoot: f.root,
+    mode: "task", provider: "backlog", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md", projectRoot: f.root,
   });
+
+  f.ownership.write(f.root, activeBeadsTaskRecord(f));
+  assert.deepEqual(resolveBlockedWorkflowAuthority(BEADS_TASK_ID, f.ctx, f.deps), {
+    mode: "task", provider: "beads", taskId: BEADS_TASK_ID, projectRoot: f.root,
+    providerRevision: BEADS_REVISION, taskEvidence: BEADS_TASK_EVIDENCE,
+  });
+  assert.throws(
+    () => resolveBlockedWorkflowAuthority("OTHER-1", f.ctx, f.deps),
+    /does not match the exact owned provider task/,
+  );
+  const foreignBeads = {
+    ...f.ctx,
+    sessionManager: { ...f.ctx.sessionManager, getSessionId: () => "foreign" },
+  };
+  assert.throws(
+    () => resolveBlockedWorkflowAuthority(BEADS_TASK_ID, foreignBeads, f.deps),
+    /does not match the exact owned provider task/,
+  );
   const episode = { ...f.ctx, cwd: f.worktree };
   assert.throws(
-    () => resolveBlockedWorkflowAuthority("PRIMECLAW-10.38", episode, f.deps),
+    () => resolveBlockedWorkflowAuthority(BEADS_TASK_ID, episode, f.deps),
     /repository root/,
   );
 
