@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 16:53'
+updated_date: '2026-10-26 17:15'
 labels: []
 dependencies: []
 references:
@@ -18,6 +18,9 @@ documentation:
   - docs/conversation-driven-episode-oversight.md
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/traceability.md
+  - VISION.md
+  - docs/prep-chain.md
+  - docs/user-stories/D-planning.md
 modified_files:
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
@@ -42,9 +45,15 @@ modified_files:
   - tests/task_episode_ownership_extension.test.mjs
   - tests/test_execute_skill.py
   - tests/test_expert_review_skill.py
-  - >-
-    "backlog/tasks/primeclaw-43 -
-    Support-selectable-task-providers-with-grandfathered-legacy-execution.md"
+  - .prime-claw/workflows/plan-task-prep.md
+  - .prime-claw/workflows/plan-task.md
+  - VISION.md
+  - docs/prep-chain.md
+  - docs/user-stories/D-planning.md
+  - src/prime-agent-plugin/extension-support/prep-chain.ts
+  - src/prime-agent-plugin/workflows/plan-task-prep.md
+  - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/test_future_plan_skills.py
 priority: p1
 type: epic
 ordinal: 125000
@@ -1167,6 +1176,22 @@ Next bounded slice: complete provider-aware `/plan TASK-ID` and public `plan_tas
 Planning remains managed LLM judgment: synchronize and read natively; write an actionable design through supported `bd` content fields; publish the native `In Planning` transition; prove exact re-read and publication; then stop for separate implementation approval. Task/revision observations are facts, not approval locks. Normal owner-authored planning refinement and compatible outside same-task changes require no new authorization interface; expose exact changes to the responsible LLM and escalate only genuine semantic, authority, or scope conflicts. Do not mix the Backlog-only prepare queue into Beads readiness.
 
 Preserve compact-first two-message semantics, exact phase input with no search/substitution, every existing implement-task approval/admission boundary, execute/handoff factual-change transport, version-1 recovery, and unrelated-task behavior. Add no public tool/parameter, snapshot/digest/receipt, state/sidecar/registry, classifier/semantic diff engine, retry/force/raw live-store Dolt write, or Prime Agent change. Do not expand into design/spec-it-out authoring, later lifecycle/terminal/cleanup, Backlog workspace wiring, grandfather inventory/legacy transition, provider migration/cutover, or PRIMECLAW-43.1. Use existing Node/Python fixtures with an actual registered planning-route regression and representative native Beads publication UAT. Automated tests prove deterministic admission, identity, and transport—not semantic reasoning. Update task notes/plan/acceptance evidence only through supported Backlog edits and check whole criteria only when genuinely complete. Run focused/full host and Docker tier 1 after source changes, identify current baselines afresh, push one clean candidate, report exact evidence plus remaining approved work, and stop. Keep the order: supported native behavior, concise managed LLM instructions, then only indispensable deterministic integrity/transport code; remove self-imposed gates instead of adding workarounds.
+
+2026-10-26 provider-aware planning slice implementation checkpoint. `/plan TASK-ID` and `plan_task` now use the existing discriminated provider resolver rather than the Backlog-only admission helper. Both canonical planning messages receive the exact selected provider/project root; only Backlog receives its exact project-relative task path. Beads admission requires the entire selected canonical ID and exact native `in_design`/`in_planning` mapping before delivery. Compact-first delivery and all implementation approval/admission behavior remain unchanged.
+
+Managed `plan-task-prep` and `plan-task` now branch explicitly. Backlog keeps the existing structured view, Implementation Plan, task-only commit, and push behavior. Beads skips the Backlog-only prepare queue, retains its complete raw view and raw `design`, uses one native sync/read, LLM semantic planning over compatible same-task refinements, one guarded supported `design` + `in_planning` update, one non-force publication, and exact raw reread/provider-revision/ref/clean-working-set proof. It creates no task path, mirror, normalized model, receipt, state, or implementation authority. Source and installed planning assets match exactly and their managed manifest hashes were reconciled.
+
+Focused route/static tests pass (Node 32/32; Python 34 passed/5 skipped). Representative disposable native Beads/Dolt UAT passed through the actual registered `plan_task` route: exact Beads/root tags in two messages, no task-path binding; one guarded `in_design` -> `in_planning` update; only `design`, `status`, `updated_at`, and provider revision changed; final raw view equaled post-write; pre/post/final working-set counts were zero; published revision remained stable after the post-publication pull; `refs/dolt/data` was present. Broader related/full host and Docker validation remain pending.
+
+2026-10-26 provider-aware planning slice complete. Deterministic routing now sends `/plan TASK-ID` and `plan_task` through the existing discriminated provider resolver. The exact selected provider/project root is appended to both compact-first planning messages; Backlog alone also carries its exact validated project-relative task path. Beads accepts only the entire canonical ID with exact native `in_design` or `in_planning` mapped to canonical `In Design` or `In Planning`. Missing, ambiguous, disallowed, shorthand-resolved, or drifted provider/task state rejects before message delivery. The public tool schema remains exactly `{taskId}` and the existing two-message transport, implementation approval/admission, execute/handoff, and version-1 routes are unchanged.
+
+Managed `plan-task-prep`/`plan-task` source and installed assets now branch on that exact binding. Backlog preserves structured task reload, native Implementation Plan, supported task edit, exact task-only commit, and prompt push. Beads performs provider-appropriate orientation without the Backlog-only queue, one native sync/read, semantic planning over the complete raw view and living `design`, compatible same-task refinement through LLM judgment, one guarded supported `design` + `in_planning` update, one non-force publication, and exact raw reread/revision/ref/clean-working-set proof. It creates no task path, mirror, normalized model, public parameter, receipt, sidecar, registry state, classifier, retry, force, or raw live-store write. Both managed assets equal their tracked installed copies and `.prime-claw/templates.json` records exact managed source hashes.
+
+Representative native Beads/Dolt UAT used the actual registered `plan_task` route and real provider discovery. It delivered exactly `steer` + sole `followUp`, bound provider `beads` and the exact root in both prompts, and carried no task-path block. The guarded provider update moved `PLAN-uat` from `in_design` at revision `qlf0fr3fqpf01ldqej5jniqhl83hcotl` to `in_planning` at `puu5945fkad738040merr959hqh9v1gp`; exact changed raw fields were only `design`, `status`, `updated_at`, and provider `revision`. Pre/post/final `dolt_status` counts were zero, final raw view equaled the verified post-write view, the revision stayed stable after post-publication pull, and published `refs/dolt/data` was `b6142a6867b427ac94865293862fe748aefbc420`.
+
+Validation before Docker: focused registered-route Node 32/32; managed workflow/static Python 34 passed/5 skipped; related provider/reconcile Node 145/145; full Node 410/410; full Python 676 passed/69 skipped/75 subtests with only the same four unrelated baselines (host-safe marker, missing admission-suite pytest bridge, project-skill-design manifest/source hash, local Backlog source pin); `git diff --check` passed. No composite acceptance criterion was checked because AC 7/8/14/15/20 include broader design/spec, lifecycle, reconciliation, or whole-feature behavior outside this slice.
+
+Docker tier 1/offline RPC probe passed with immutable image launch, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261026T171332Z-76905-a1abd6a3/tier1`.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1267,4 +1292,6 @@ Current authorized next slice supersedes the prior frozen-snapshot interpretatio
 Operator-authorized simplification supersedes candidates `0d1a207` and `c3d4001` wherever they froze active-Beads continuation to older raw `taskEvidence`. Handoff now validates the exact owner/provider/task/status/resources, proves the linked context before one native pull, pairs the exact current raw task with stable published state, proves provider/code ancestry, and prepares factual previous/current observations without classifying their meaning. Both canonical prompts receive exact native before/current views and revisions. The first admitted handoff atomically records current `providerRevision`, raw `taskEvidence`, code `head`, and `updatedAt` before the sole execute follow-up. Compatible owner-authored and outside same-task edits and unrelated descendants therefore continue through the existing Episode LLM; genuine semantic, authority, or scope conflicts are escalated there. The raw-equality gate, handoff review-required types/results/payload, wrapper receipt response, and approval-lock prose/tests are removed. Backlog/version-1 behavior, public `taskId,guidance?`, same Episode/resources, identity/publication/no-silent-overwrite/transport safeguards, and later lifecycle boundaries remain unchanged. Focused/full host, native Beads/Dolt UAT, and Docker tier 1 pass apart from four unchanged unrelated Python baselines.
 
 Next authorized bounded slice after `6f23dd8`: make `/plan TASK-ID` and `plan_task` provider-aware through the existing discriminated native provider path. Preserve Backlog planning unchanged. For Beads, bind only the exact selected task/root in native `in_design`/`in_planning`, use its complete raw view and `design` as the living plan, route compact-first prep plus one planning follow-up, and instruct the existing LLM to synchronize/read, write actionable design with supported `bd` fields, publish native `In Planning`, prove exact reread/publication, and stop for separate implementation approval. Factual revisions and compatible same-task changes are not approval locks. Preserve all implementation/handoff/version-1 boundaries and avoid new APIs, models, receipts, state, retries, raw writes, lifecycle scope, migration, or PRIMECLAW-43.1. One candidate, complete validation/UAT, owner review stop.
+
+Completed the bounded provider-aware planning route. `/plan TASK-ID` and `plan_task` now resolve the sole live native provider before compact-first admission, bind the exact provider/root into both canonical messages, preserve Backlog's exact task-path/Implementation-Plan flow, and give Beads a path-free native `in_design`/`in_planning` flow over its complete raw task and living `design`. Managed planning instructions perform native sync/read, LLM semantic planning, one guarded design plus `in_planning` update, one non-force publication, exact raw/revision/ref proof, and stop for separate implementation approval. Compatible same-task refinements remain factual LLM input rather than approval locks. Exact managed asset copies/hashes, registered-route regressions, real Beads/Dolt publication UAT, focused/full host validation, and Docker tier 1 cover the slice. No new public tool parameter, provider framework, normalized task model, task mirror/path for Beads, persistent state, semantic classifier, retry/force/raw write, implementation approval, later lifecycle, legacy migration, or PRIMECLAW-43.1 work was added. Remaining whole-feature work includes provider-native design/spec authoring and the explicitly deferred lifecycle, grandfather/migration, terminal, cleanup, and cutover slices; this candidate stops for owner review.
 <!-- SECTION:FINAL_SUMMARY:END -->
