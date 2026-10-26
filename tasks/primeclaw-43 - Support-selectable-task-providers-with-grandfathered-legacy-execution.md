@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 22:40'
+updated_date: '2026-10-26 23:15'
 labels: []
 dependencies: []
 references:
@@ -24,11 +24,17 @@ documentation:
   - docs/user-stories/traceability.md
 modified_files:
   - .agents/skills/blocked/SKILL.md
+  - .agents/skills/design-legacy/SKILL.md
   - .agents/skills/design/SKILL.md
   - .agents/skills/execute/SKILL.md
+  - .agents/skills/spec-it-out-legacy/SKILL.md
   - .agents/skills/spec-it-out/SKILL.md
   - .prime-claw/templates.json
   - .prime-claw/workflows/handoff.md
+  - .prime-claw/workflows/implement-prep.md
+  - .prime-claw/workflows/implement-spec.md
+  - .prime-claw/workflows/plan-prep.md
+  - .prime-claw/workflows/plan-spec.md
   - .prime-claw/workflows/plan-task.md
   - >-
     backlog/tasks/primeclaw-43 -
@@ -38,13 +44,20 @@ modified_files:
   - docs/future-specification-bundles.md
   - docs/handoff-chain.md
   - docs/prep-chain.md
+  - docs/user-stories/B-project-initialization.md
   - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/F-episode-execution.md
   - docs/user-stories/G-oversight-and-review.md
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/I-episode-finalization.md
   - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/conversation-oversight.ts
+  - src/prime-agent-plugin/extension-support/episode-close.ts
   - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts
+  - src/prime-agent-plugin/extension-support/legacy-workflow.ts
+  - src/prime-agent-plugin/extension-support/prep-chain.ts
   - src/prime-agent-plugin/extension-support/project-initialization.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
@@ -52,14 +65,24 @@ modified_files:
   - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/extensions/project-initialization.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
   - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/design-legacy.md
   - src/prime-agent-plugin/skills/project-templates/design.md
   - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out-legacy.md
   - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
   - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/workflows/implement-prep.md
+  - src/prime-agent-plugin/workflows/implement-spec.md
+  - src/prime-agent-plugin/workflows/plan-prep.md
+  - src/prime-agent-plugin/workflows/plan-spec.md
   - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/episode_close_extension.test.mjs
+  - tests/project_conversation_extension.test.mjs
   - tests/project_initialization_extension.test.mjs
+  - tests/reviewed_plan_extension.test.mjs
   - tests/spec_episode_extension.test.mjs
   - tests/task_episode_admission_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
@@ -69,6 +92,7 @@ modified_files:
   - tests/test_blocked_skill.py
   - tests/test_execute_skill.py
   - tests/test_future_plan_skills.py
+  - tests/test_managed_session_protocol.py
   - tests/test_oversee_episode_skill.py
   - tests/test_task_providers.py
 priority: p1
@@ -208,7 +232,7 @@ Managed Markdown instructions receive content review, reconciliation checks, and
 - [ ] #13 Beads acceptance uses one repository-associated Dolt store in native per-project server mode, validates supported `bd` auto-start/lifecycle or an operator-managed external server, rejects unsupported concurrency, uses supported Dolt transport including `refs/dolt/data` when configured, and never treats `.beads/issues.jsonl` as authority.
 - [ ] #14 Revision acceptance proves unrelated-task advances and owner-authored iterative task or living-plan updates do not block; receipts advance after publication, and outside same-task changes are synchronized and delivered as exact evidence to the responsible LLM rather than decided by a deterministic semantic merge state machine.
 - [ ] #15 Managed Episode and Conversation instructions require LLM reasoning to incorporate compatible in-scope task changes, keep the task and plan current, and escalate only genuine semantic conflicts, authority changes, or product/scope decisions; representative UAT covers this behavior while automated tests cover only deterministic transport and integrity.
-- [ ] #16 Upgrade records the exact unfinished grandfathered set and accepted specification digests, rejects new or materially revised legacy specifications, excludes archive-only history from reminders, and preserves provider-independent version-1 planning, execution, review, recovery, and finalization with frozen specifications and living plans.
+- [x] #16 Upgrade records the exact unfinished grandfathered set and accepted specification digests, rejects new or materially revised legacy specifications, excludes archive-only history from reminders, and preserves provider-independent version-1 planning, execution, review, recovery, and finalization with frozen specifications and living plans.
 - [ ] #17 Legacy-to-task migration is explicit, reviewed, one-way, and lossless; it targets the selected provider, preserves provenance and exact active Episode identity, establishes one task authority before retiring legacy authority, and leaves version-1 recovery intact on failure.
 - [ ] #18 Provider-switch acceptance uses a bounded mutation-free maintenance window and migrates every open and closed task with all fields, relationships, comments, lifecycle state, history, and provenance, preserving any non-native value losslessly in destination-supported metadata or provenance; IDs are preserved when safely supported and otherwise receive immutable source-to-destination mappings.
 - [ ] #19 Cutover verification binds exact source and destination revisions, complete counts and digests, ID mappings, ownership transitions, actor, and timestamp. Any pre-cutover failure keeps the source intact and authoritative; only complete verification and ownership transition activate the destination and immediately delete the source store.
@@ -1344,6 +1368,14 @@ Preserve provider-independent retained version-1 planning, execution, expert/own
 Apply the inventory guard at existing managed/canonical seams. Prefer concise managed instructions and native behavior before indispensable identity/integrity code. Do not add a public command/tool, workflow engine, classifier, shadow tracker, coordinator/phase state, or separate approval protocol. The digest freezes only explicitly grandfathered legacy specifications—never living plans or provider task content—and must not revive old-raw-equals-current approval gates. Reuse template reconciliation and preserve customized copies.
 
 Use code and disposable fixtures only. Do not enroll live inventory, migrate registry/store/resources, alter existing live plans, apply globally, implement AC17/AC18/AC19, perform PRIMECLAW-43.1 cutover, merge, abandon, finalize, or clean up. Add focused deterministic inventory/path/digest/compatibility checks and representative real retained-v1 route/recovery coverage; review managed prose/reconciliation rather than inventing a Cartesian matrix. Run relevant host suites and Docker tier 1, update docs/task truthfully, push one clean candidate, and stop for owner review.
+
+### 2026-10-26 — AC16 grandfathered legacy compatibility slice
+
+Implemented one durable `.prime-claw/legacy-specifications.json` allowlist created only by explicit initialization/upgrade. It records sorted exact retained future-folder locations and SHA-256 digests of accepted `SPECIFICATION.md` bytes. Startup and ordinary reconciliation are verification-only: they never enroll or rebaseline specifications. Strict parsing and path checks reject malformed, duplicate, partial, symlinked, unsafe, changed, or newly introduced legacy candidates. Archive and inactive version-1 history remain completed and cannot be revived by recreation.
+
+Retained version-1 planning/admission now requires an allowlisted unchanged specification. Fresh promotion, exact replay, Conversation oversight, handoff, blocked-pair recovery, and active bookkeeping close recheck the frozen digest. The implementation plan remains living and outside the inventory digest. Persisted ownership continues to authorize provider-independent version-1 work when the obsolete future source is absent; it never switches that work to task-native mode. Managed legacy authoring and execution guidance, docs, traceability, and reconciliation behavior now describe the same boundary while preserving customized copies.
+
+Focused initialization, planning, promotion/replay, oversight, handoff/recovery, close, managed-policy, installation, and mixed retained/task admission coverage passes. Full validation evidence is recorded in the final summary. This slice implements AC16 only; AC17–AC19, migration/cutover, live enrollment, global application, merge, abandonment, finalization, and cleanup remain outside this candidate.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1450,4 +1482,6 @@ Completed the bounded provider-aware planning route. `/plan TASK-ID` and `plan_t
 Completed the bounded provider-native Beads merge-readiness and merge-status Conversation slice. Accepted pushed Beads candidates can now publish guarded `ready_for_merge`; Delay changes nothing; explicit Request Changes publishes guarded `in_progress` then reuses the existing same-Episode handoff; and an explicitly authorized exact code tuple uses fresh native/code preflight, ordinary ff-only main integration plus normal code push, then guarded native `done` with truthful tuple/code evidence. No public lifecycle surface, receipt, snapshot, ownership state, semantic classifier, custom publisher/protocol, retry/force/replay, task-file mirror, or immutable provider-revision approval gate was added. Backlog Request Changes conflict preservation was independently reviewed and explicitly retained. Representative real Beads/Dolt/Git UAT, focused suites, full Node/Python, and Docker tier 1 pass apart from the same three unrelated host-Python baselines. PRIMECLAW-43 remains In Progress for owner review; abandonment, finalization/cleanup, workspace wiring, grandfather/legacy transition, migration/cutover, and PRIMECLAW-43.1 remain outside this candidate.
 
 Owner-requested follow-up to c82debb repairs the nullable selected root-config path and removes old Backlog snapshot equality from pre-session authorization. Current semantic/identity/publication/resource gates remain authoritative; compatible published descendants refresh factual evidence and reach the initial execute assignment with complete previous/current provider observations. Both exact reproductions, full Node/Python, and Docker tier 1 pass apart from the same three unrelated host-Python baselines. PRIMECLAW-43 remains In Progress for owner review; no migration, cutover, merge, abandonment, finalization, or cleanup occurred.
+
+AC16 now has a single explicit-upgrade grandfathered allowlist of exact retained locations and frozen specification digests. Startup never enrolls or rebaselines; new, changed, unsafe, completed, or malformed legacy candidates fail closed and route new work to selected-provider tasks. Living plans and the full provider-independent retained version-1 lifecycle remain supported, including source-absent replay and blocked recovery. Final validation: full Node 459/459; full Python 678 passed and 69 skipped with only the same three unrelated established baseline failures; Docker tier 1 passed. PRIMECLAW-43 remains In Progress for owner review, and no live migration, provider-store/resource change, global application, merge, abandonment, finalization, or cleanup occurred.
 <!-- SECTION:FINAL_SUMMARY:END -->
