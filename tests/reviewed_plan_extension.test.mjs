@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -12,6 +12,7 @@ import {
 } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
 import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
+import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 
 function fixture({ throwOnSend = 0, taskStatus = "In Design", providerTaskResolver, placementResolver } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-reviewed-")); execFileSync("git", ["init", "-q", root]);
@@ -90,6 +91,16 @@ test("retained planning admits only the inventoried frozen specification while p
   mkdirSync(gamma, { recursive: true }); writeFileSync(join(gamma, "SPECIFICATION.md"), "new legacy work\n");
   const rejected = await later.tools.get("plan_spec").execute("new", { location: ".ralph/plans/future/gamma" }, undefined, undefined, later.ctx);
   assert.equal(rejected.isError, true); assert.equal(later.sent.length, 0); assert.match(rejected.content[0].text, /not grandfathered.*selected-provider task UX/);
+});
+
+test("registered retained routes reject a symlinked source directory before delivery", async () => {
+  const f = fixture(), future = join(f.root, ".ralph", "plans", "future");
+  renameSync(join(future, "alpha"), join(future, ".alpha-storage"));
+  symlinkSync(join(future, ".alpha-storage"), join(future, "alpha"), "dir");
+  const planned = await f.tools.get("plan_spec").execute("unsafe", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(planned.isError, true); assert.equal(f.sent.length, 0); assert.match(planned.content[0].text, /must be a real directory/);
+  await f.commands.get("implement-spec").handler(".ralph/plans/future/alpha", f.ctx);
+  assert.equal(f.sent.length, 1); assert.match(f.sent[0].notify, /must be a real directory/);
 });
 
 test("native plan resolves one exact task and preserves prep then sole phase follow-up", async () => {
@@ -191,6 +202,40 @@ test("implement-spec queues full ordinary guide in post-prep phase before semant
   assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
 });
 
+
+test("registered implement-spec replays the exact active Episode after its source folder is absent", async () => {
+  const f = fixture();
+  const plans = join(f.episode.worktree, ".ralph", "plans"); mkdirSync(plans, { recursive: true });
+  writeFileSync(join(plans, "SPECIFICATION.md"), "alpha specification\n");
+  writeFileSync(join(plans, "EXECUTION_PLAN.md"), "living replay plan\n");
+  const { reused: _reused, ...record } = f.episode;
+  writeEpisodeOwnership(f.root, record);
+  rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true });
+  f.deps.createEpisode = async (location, toolCallId, callCtx, _deps, options) => {
+    f.created.push({ location, toolCallId, callCtx, options });
+    return { ...record, reused: true };
+  };
+
+  await f.commands.get("implement-spec").handler(record.sourceLocation, f.ctx);
+  assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
+  assert.match(f.sent[1].message, /IMPLEMENT-SPEC POLICY/);
+  await f.events.get("agent_end")({}, f.ctx);
+  const result = await f.tools.get("create_spec_episode").execute("replay", { location: record.sourceLocation }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined, JSON.stringify(result)); assert.equal(result.details.reused, true);
+  assert.equal(f.created.length, 1); assert.equal(f.created[0].location, record.sourceLocation);
+  assert.equal(f.created[0].options.approvedBundleDigest, record.bundleDigest);
+});
+
+test("source-absent replay rejects promoted specification drift before workflow delivery", async () => {
+  const f = fixture();
+  const plans = join(f.episode.worktree, ".ralph", "plans"); mkdirSync(plans, { recursive: true });
+  writeFileSync(join(plans, "SPECIFICATION.md"), "changed promoted specification\n");
+  writeFileSync(join(plans, "EXECUTION_PLAN.md"), "living replay plan\n");
+  const { reused: _reused, ...record } = f.episode; writeEpisodeOwnership(f.root, record);
+  rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true });
+  await f.commands.get("implement-spec").handler(record.sourceLocation, f.ctx);
+  assert.equal(f.sent.length, 1); assert.match(f.sent[0].notify, /changed after grandfathering/);
+});
 
 test("public implement-task approval creates one task Episode with its bound placement", async () => {
   const f = fixture({ taskStatus: "In Planning" });

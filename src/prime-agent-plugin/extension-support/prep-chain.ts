@@ -39,6 +39,10 @@ export type ProviderTaskPrepChainAdmissionResult =
   | { ok: false; message: string; level: "warning" | "error" };
 
 type BacklogTaskResolver = (cwd: string, rawTaskId: string) => BacklogTaskSelection | null;
+export type LegacySourceAbsentSelectionResolver = (
+  ctx: ExtensionContext,
+  rawLocation: string,
+) => { projectRoot: string; location: string } | null;
 export type ProviderTaskResolver = (cwd: string, rawTaskId: string) => ProviderTaskResolution | null;
 
 function planningProviderPromptContext(selection: ProviderTaskResolution): string {
@@ -143,18 +147,32 @@ export async function admitPrepChain(
   source: "native" | "tool",
   preflight?: (ctx: ExtensionContext, location: string) => void,
   phasePreamble?: string,
+  sourceAbsentReplay?: LegacySourceAbsentSelectionResolver,
 ): Promise<PrepChainAdmissionResult> {
   let selected;
+  let replay = false;
   try {
     selected = validateFutureLocation(ctx.cwd, rawLocation);
   } catch {
     selected = null;
   }
+  if (!selected && sourceAbsentReplay) {
+    try {
+      selected = sourceAbsentReplay(ctx, rawLocation);
+      replay = selected !== null;
+    } catch (error) {
+      return {
+        ok: false,
+        message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
+        level: "error",
+      };
+    }
+  }
   if (!selected) {
     return { ok: false, message: workflow.usage, level: "warning" };
   }
   try {
-    assertGrandfatheredLegacySpecification(selected.projectRoot, selected.location);
+    if (!replay) assertGrandfatheredLegacySpecification(selected.projectRoot, selected.location);
   } catch (error) {
     return {
       ok: false,

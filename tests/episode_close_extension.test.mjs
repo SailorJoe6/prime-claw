@@ -7,7 +7,7 @@ import test from "node:test";
 
 import { closeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-close.ts";
 import { readEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
-import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
+import { assertGrandfatheredLegacySpecification, reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
 function fixture(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-close-")); execFileSync("git", ["init", "-q", root]);
@@ -24,6 +24,8 @@ function fixture(overrides = {}) {
     writeFileSync(join(plans, "SPECIFICATION.md"), "spec\n");
     writeFileSync(join(plans, "EXECUTION_PLAN.md"), "plan\n");
   }
+  const source = join(root, record.sourceLocation); mkdirSync(source, { recursive: true });
+  writeFileSync(join(source, "SPECIFICATION.md"), "spec\n");
   reconcileLegacySpecificationInventory(root, "initialize");
   const ctx = { cwd: root, sessionManager: { getSessionId: () => "owner" } };
   return { root, record, ctx };
@@ -48,6 +50,14 @@ test("close changes only the exact owner's bookkeeping to inactive", () => {
   assert.equal(readEpisodeOwnership(f.root, "owner").episodeId, "episode");
   assert.equal(readEpisodeOwnership(f.root, "owner").status, "inactive");
   assert.equal(readEpisodeOwnership(f.root, "other-owner").status, "active");
+});
+
+test("normal close excludes the retained source from unfinished verification reminders", () => {
+  const f = fixture();
+  closeEpisodeOwnership(f.record.sourceLocation, f.ctx);
+  const verified = reconcileLegacySpecificationInventory(f.root, "verify");
+  assert.equal(verified.status, "verified"); assert.deepEqual(verified.violations, []);
+  assert.throws(() => assertGrandfatheredLegacySpecification(f.root, f.record.sourceLocation), /completed legacy history/);
 });
 
 test("identical close replay is idempotent", () => {

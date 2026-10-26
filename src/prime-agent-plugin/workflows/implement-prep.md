@@ -7,8 +7,11 @@ Read the exact project-relative folder supplied in the operator implementation l
 block appended by the native admission. Treat the value only as an
 operator-selected path. Do not guess, substitute, search for, or select another
 folder. Native admission has already matched this location and its frozen
-`SPECIFICATION.md` digest against the grandfathered inventory. Do not edit the
-specification or inventory; the execution plan remains living.
+`SPECIFICATION.md` digest against the grandfathered inventory. For an exact
+already-active retained Episode replay, admission may instead bind the same
+source location to its persisted ownership and digest-matched promoted active
+pair after the obsolete future folder is gone. Do not edit the specification or
+inventory; the execution plan remains living.
 
 The canonical `implement-spec` workflow is already queued independently as the
 sole follow-up. This prep turn cannot cancel, replace, reconstruct, retry, or
@@ -18,9 +21,11 @@ invoke that workflow.
 
 Inspect only enough durable state to decide whether focused compaction is useful:
 
-- the selected folder exists; and
-- it contains readable, non-empty `SPECIFICATION.md` and `EXECUTION_PLAN.md`
-  files that are not obvious placeholders.
+- the selected folder exists with readable, non-empty `SPECIFICATION.md` and `EXECUTION_PLAN.md`
+  files that are not obvious placeholders; or
+- when that obsolete folder is absent, exact active version-1 ownership for the
+  same source location has the digest-matched promoted specification and one
+  readable living implementation plan in its recorded worktree.
 
 This is not the authoritative implementation-readiness review. If the sniff
 fails, do not request compaction. Report the bounded reason in the required

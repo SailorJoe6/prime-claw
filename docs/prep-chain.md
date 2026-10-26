@@ -18,7 +18,10 @@ its exact returned task path; Beads keeps its exact project root, entire
 canonical ID, native status, and complete raw view without inventing a path.
 Both planning messages carry the exact provider/root binding selected by the
 same discriminated resolver used by implementation admission. Folder-compatible
-admission validates one exact project-relative future folder. Every path
+admission validates one exact project-relative future folder. The sole
+source-absent exception is implementation replay for the exact already-active
+version-1 owner: deterministic admission verifies its source identity, promoted
+active pair, and frozen digest before queueing the same workflows. Every path
 preloads both project-owned workflow files before sending either message.
 Planning, implementation preparation, ordinary handoff, and owned-Episode
 handoff use one internal prompt loader and one two-message admission sequence.
@@ -71,9 +74,13 @@ planning updates only the selected future bundle. Both stop for operator review
 and never authorize implementation.
 
 Retained implementation admission records a minimal in-memory guard for the
-current owner session, exact folder, and optional stable setup ID. The guard
-survives the prep turn, is consumed by one exact `create_spec_episode` call
-during the phase turn, and is cleared if that turn ends without creation.
+current owner session, exact source location, and optional stable setup ID. For
+fresh work it also binds the complete bundle digest. For source-absent replay it
+binds the persisted digest of the exact active owner and can dispatch only to
+the same idempotent Episode branch, which creates no resource and sends no
+assignment. The guard survives the prep turn, is consumed by one exact
+`create_spec_episode` call during the phase turn, and is cleared if that turn
+ends without creation.
 
 The task-native chain records the same kind of ephemeral authority only
 after exact placement and both workflow messages succeed. It binds owner
@@ -83,8 +90,9 @@ the prep turn, consumable once only for the same re-resolved task during the
 semantic phase, and cleared on phase end, session start, or shutdown. Neither
 guard is a durable approval or guide receipt.
 
-`create_spec_episode` remains the retained folder promotion boundary, while
-`create_task_episode` consumes only the exact matching task approval. Semantic
+`create_spec_episode` remains the retained folder promotion boundary or exact
+active replay return, while `create_task_episode` consumes only the exact
+matching task approval. Semantic
 readiness stays in the corresponding phase workflow; deterministic code owns
 placement, status publication, reservation, session binding, and one fixed
 execute assignment. Missing or mismatched admission fails before lifecycle

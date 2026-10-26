@@ -16,8 +16,12 @@ For retained version-1 compatibility, `/implement-spec
 .ralph/plans/future/<slug>` performs the same final review for one existing
 bundle only when its exact location and current `SPECIFICATION.md` bytes match
 the explicit-upgrade grandfathered inventory. The specification is frozen; its
-plan remains living. Its approval binds the exact session, folder, optional
-host, and complete bundle digest and is consumable once.
+plan remains living. Its approval binds the exact session, source location,
+optional host, and complete bundle digest and is consumable once. When that
+obsolete source folder is absent, the same registered route admits only the
+exact already-active version-1 owner after verifying its promoted frozen
+specification; the creation call can then return only that same Episode with no
+new assignment.
 
 ## US-14 — Create one isolated implementation Episode
 

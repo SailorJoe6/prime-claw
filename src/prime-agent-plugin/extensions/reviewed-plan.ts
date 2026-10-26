@@ -37,9 +37,16 @@ import {
 } from "../extension-support/conversation-oversight.ts";
 import { closeEpisodeOwnership } from "../extension-support/episode-close.ts";
 import {
+  resolveFutureLocationSyntax,
   validateFutureLocation,
   type BacklogTaskSelection,
 } from "../extension-support/reviewed-plan-support.ts";
+import { isLegacyEpisodeOwnership, readEpisodeOwnership, type LegacyEpisodeOwnershipRecord } from "../extension-support/episode-ownership.ts";
+import {
+  assertGrandfatheredLegacySpecificationFile,
+  assertSafeLegacyFutureLocation,
+} from "../extension-support/legacy-specification-inventory.ts";
+import { assertLiveLegacyEpisodeFiles } from "../extension-support/legacy-workflow.ts";
 import {
   resolveProviderTask,
   type ProviderTaskResolution,
@@ -126,6 +133,21 @@ type ImplementationApproval = {
   bundleDigest: string;
   skipNextAgentEnd: boolean;
 };
+
+function activeLegacyReplay(
+  ctx: ExtensionContext,
+  rawLocation: string,
+): { projectRoot: string; location: string; record: LegacyEpisodeOwnershipRecord } | null {
+  const selected = resolveFutureLocationSyntax(ctx.cwd, rawLocation);
+  if (!selected) return null;
+  assertSafeLegacyFutureLocation(selected.projectRoot, selected.location, true);
+  const record = readEpisodeOwnership(selected.projectRoot, ctx.sessionManager.getSessionId());
+  if (!record || !isLegacyEpisodeOwnership(record) || record.status !== "active"
+    || record.sourceLocation !== selected.location) return null;
+  const files = assertLiveLegacyEpisodeFiles(record, "Retained Episode replay");
+  assertGrandfatheredLegacySpecificationFile(selected.projectRoot, record.sourceLocation, files.specification);
+  return { projectRoot: selected.projectRoot, location: selected.location, record };
+}
 
 type TaskImplementationApprovalBase = {
   ownerSessionId: string;
@@ -284,6 +306,7 @@ function registerPrepChainCommand(
     preflight?: (ctx: ExtensionContext, location: string) => string | undefined;
     phasePreamble?: () => string;
     parseArgs?: (args: string) => CommandSelection | null;
+    sourceAbsentReplay?: (ctx: ExtensionContext, rawLocation: string) => { projectRoot: string; location: string } | null;
   },
 ): void {
   pi.registerCommand(options.command, {
@@ -305,6 +328,7 @@ function registerPrepChainCommand(
           preflightValue = options.preflight!(callCtx, location);
         } : undefined,
         options.phasePreamble?.(),
+        options.sourceAbsentReplay,
       );
       if (!result.ok) {
         ctx.ui.notify(result.message, result.level);
@@ -445,12 +469,18 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       workflow: IMPLEMENT_PREP_WORKFLOW,
       preflight: (ctx, location) => {
         assertConversationPromotionReady(ctx, location);
+        const replay = activeLegacyReplay(ctx, location);
+        if (replay) return replay.record.bundleDigest;
         const selected = validateFutureLocation(ctx.cwd, location);
         if (!selected) throw new Error("Validated implementation folder disappeared");
         return bundleContentDigest(selected.folder);
       },
       phasePreamble: () => conversationGuideText(oversightOptions),
       parseArgs: parseImplementationArgs,
+      sourceAbsentReplay: (ctx, location) => {
+        const replay = activeLegacyReplay(ctx, location);
+        return replay ? { projectRoot: replay.projectRoot, location: replay.location } : null;
+      },
       onValidated: (ctx, location, selection, bundleDigest) => {
         if (!bundleDigest) throw new Error("Implementation preflight did not bind the approved bundle");
         implementationApprovalBySession.set(ctx.sessionManager.getSessionId(), {
@@ -600,11 +630,11 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       name: "create_spec_episode",
       label: "Create specification episode",
       description: "Create or return the one worktree-isolated episode for the exact implementation-ready future-plan folder admitted by the current /implement-spec chain.",
-      promptSnippet: "Promote one reviewed future-plan folder into one fresh isolated Episode",
+      promptSnippet: "Promote one reviewed future-plan folder or return its exact active retained Episode",
       promptGuidelines: [
-        "Call create_spec_episode only after the current implement-spec readiness workflow finds its exact selected bundle complete and implementation-ready.",
-        "Pass create_spec_episode only the exact operator-selected future-folder location.",
-        "The host creates one fresh Episode with one fixed execute assignment; never send an initial handoff or a second assignment.",
+        "Call create_spec_episode only after the current implement-spec readiness workflow finds its exact selected bundle complete and implementation-ready, or verifies an exact active retained replay whose obsolete source folder is absent.",
+        "Pass create_spec_episode only the exact operator-selected future-folder source location.",
+        "Fresh creation makes one fresh Episode with one fixed execute assignment; an exact active replay preserves its resources and sends no assignment; never send an initial handoff or a second assignment.",
       ],
       executionMode: "sequential",
       parameters: {

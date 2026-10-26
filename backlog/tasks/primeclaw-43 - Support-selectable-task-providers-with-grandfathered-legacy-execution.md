@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 23:15'
+updated_date: '2026-10-26 23:41'
 labels: []
 dependencies: []
 references:
@@ -1376,6 +1376,12 @@ Implemented one durable `.prime-claw/legacy-specifications.json` allowlist creat
 Retained version-1 planning/admission now requires an allowlisted unchanged specification. Fresh promotion, exact replay, Conversation oversight, handoff, blocked-pair recovery, and active bookkeeping close recheck the frozen digest. The implementation plan remains living and outside the inventory digest. Persisted ownership continues to authorize provider-independent version-1 work when the obsolete future source is absent; it never switches that work to task-native mode. Managed legacy authoring and execution guidance, docs, traceability, and reconciliation behavior now describe the same boundary while preserving customized copies.
 
 Focused initialization, planning, promotion/replay, oversight, handoff/recovery, close, managed-policy, installation, and mixed retained/task admission coverage passes. Full validation evidence is recorded in the final summary. This slice implements AC16 only; AC17–AC19, migration/cutover, live enrollment, global application, merge, abandonment, finalization, and cleanup remain outside this candidate.
+
+### 2026-10-26 — AC16 independent-review repairs
+
+GPT-6 Astra reviewed pushed candidate `1b1f53da548707c8d45b9d1519e0f34f7e04fe6f` and reported three material in-scope gaps. All were accepted and repaired. Enrollment and exact-source admission now share lexical non-symlink checks for `.ralph`, `plans`, `future`, and the selected folder, so intermediate and source-directory symlinks both fail before delivery. Inactive ownership and archive evidence now remove completed locations from the discovered unfinished set instead of blocking initialization or creating reminders; planning/admission still reject them as completed history. The registered `/implement-spec` approval route now recognizes a source-absent replay only for the exact active version-1 owner with a digest-matched promoted pair, then allows `create_spec_episode` to dispatch only to the existing idempotent replay branch with no new assignment.
+
+The reviewer’s disposable reproduction now shows intermediate enrollment blocked, source-directory planning blocked with zero sends, normal inactive history verified/excluded, first upgrade enrolling only the unfinished source, and the registered source-absent route delivering both workflows and one creation dispatch. Focused initialization, close, registered admission, and retained lifecycle suites pass 205/205. Final repaired-candidate validation passed: full Node 463/463, full Python 678 passed and 69 skipped with only the same three established unrelated baselines, and Docker tier 1 passed. Exact-commit re-review follows after publication.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1484,4 +1490,6 @@ Completed the bounded provider-native Beads merge-readiness and merge-status Con
 Owner-requested follow-up to c82debb repairs the nullable selected root-config path and removes old Backlog snapshot equality from pre-session authorization. Current semantic/identity/publication/resource gates remain authoritative; compatible published descendants refresh factual evidence and reach the initial execute assignment with complete previous/current provider observations. Both exact reproductions, full Node/Python, and Docker tier 1 pass apart from the same three unrelated host-Python baselines. PRIMECLAW-43 remains In Progress for owner review; no migration, cutover, merge, abandonment, finalization, or cleanup occurred.
 
 AC16 now has a single explicit-upgrade grandfathered allowlist of exact retained locations and frozen specification digests. Startup never enrolls or rebaselines; new, changed, unsafe, completed, or malformed legacy candidates fail closed and route new work to selected-provider tasks. Living plans and the full provider-independent retained version-1 lifecycle remain supported, including source-absent replay and blocked recovery. Final validation: full Node 459/459; full Python 678 passed and 69 skipped with only the same three unrelated established baseline failures; Docker tier 1 passed. PRIMECLAW-43 remains In Progress for owner review, and no live migration, provider-store/resource change, global application, merge, abandonment, finalization, or cleanup occurred.
+
+Independent review of `1b1f53d` found three AC16 gaps: unsafe symlink ancestors, inactive retained sources blocking upgrade, and source-absent replay unreachable through registered admission. The revised candidate fixes all three with shared exact-path guards, completed-history exclusion, and exact-owner replay admission while preserving fresh readiness gates and zero-assignment replay. Reviewer reproductions pass; full Node is 463/463, full Python is 678 passed and 69 skipped with only the same three unrelated established baselines, and Docker tier 1 passes. Exact-commit re-review follows on the revised commit.
 <!-- SECTION:FINAL_SUMMARY:END -->

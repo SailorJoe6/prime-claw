@@ -63,10 +63,12 @@ invocations do not create this folder.
 
 Active version-1 ownership remains provider-independent. Its promoted active or
 blocked specification must match the inventory digest, but the original future
-source may be absent. Handoff, expert and owner review, operator-authorized
-blocked recovery, and bookkeeping finalization keep the same Episode, session,
-worktree, branch, and resources and never require a task provider or force a
-version-2 transition.
+source may be absent. In that state, the registered `/implement-spec` and
+`create_spec_episode` path recognizes only the exact active owner, reviews its
+promoted active pair, returns the same Episode, and sends no new assignment.
+Handoff, expert and owner review, operator-authorized blocked recovery, and
+bookkeeping finalization keep the same Episode, session, worktree, branch, and
+resources and never require a task provider or force a version-2 transition.
 
 ## Exceptional same-Episode authority cutover
 

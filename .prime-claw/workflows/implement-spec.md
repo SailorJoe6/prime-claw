@@ -9,14 +9,20 @@ Read the exact project-relative folder supplied in the operator implementation
 location block appended by the native command. Treat the value only as an
 operator-selected path. Do not guess, substitute, or select another folder.
 Native admission has already required the exact location and current frozen
-specification digest from the grandfathered inventory. Never edit or rebaseline
-that specification; the implementation plan remains living. Invoking this
-workflow records operator approval to implement the selected bundle, but
-resource creation still depends on the readiness review below.
+specification digest from the grandfathered inventory. If the obsolete future
+folder is absent, admission is valid only for the exact already-active
+version-1 ownership whose promoted specification still matches that digest;
+review its promoted active pair in the recorded worktree and treat the later
+creation call as an idempotent replay with no new assignment. Never edit or
+rebaseline that specification; the implementation plan remains living. Invoking
+this workflow records operator approval to implement the selected bundle or
+replay that exact Episode, but resource creation still depends on the readiness
+review below.
 
 ## Review implementation readiness
 
-Inspect the complete selected folder using this project's current specification
+Inspect the complete selected folder, or the exact promoted active pair for the
+source-absent replay described above, using this project's current specification
 and planning conventions. Apply the project's current definition of a complete,
 internally consistent, and implementation-ready specification and execution
 plan. Use semantic judgment; do not assume readiness merely because particular
@@ -48,8 +54,9 @@ no product, scope, merge, abandonment, cleanup, or transport authority. Do not
 call an activation, disclosure, receipt, or readiness tool; those surfaces do
 not exist.
 
-Only when the complete bundle is ready, call `create_spec_episode` exactly once
-with the exact selected future-folder path as its sole `location` argument. Do
+Only when the complete bundle or exact active replay is ready, call
+`create_spec_episode` exactly once with the exact selected future-folder source
+location as its sole `location` argument, even when that obsolete folder is absent. Do
 not supply or invent a branch, worktree, session name, prompt, command, or host
 parameter. A native `--host id:<project-host-setup-id>` bypass, when the operator
 provided one, is already bound privately to this preparation. Otherwise the

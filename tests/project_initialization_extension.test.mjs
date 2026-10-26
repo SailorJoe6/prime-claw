@@ -142,12 +142,16 @@ test("explicit inventory captures source-absent active and blocked version-one o
       episodeSessionFile: join(worktree, `${slug}.jsonl`), episodeActiveSessionId: `${slug}-route`,
     });
   }
+  const completedSource = join(root, ".ralph/plans/future/done");
+  mkdirSync(completedSource, { recursive: true });
+  writeFileSync(join(completedSource, "SPECIFICATION.md"), "completed\n");
   const created = reconcileLegacySpecificationInventory(root, "initialize");
   assert.equal(created.status, "created"); assert.equal(created.accepted, 2);
   const inventory = JSON.parse(readFileSync(join(root, LEGACY_SPECIFICATION_INVENTORY), "utf8"));
   assert.deepEqual(inventory.specifications.map((item) => item.location), [
     ".ralph/plans/future/alpha", ".ralph/plans/future/beta",
   ]);
+  assert.throws(() => assertGrandfatheredLegacySpecification(root, ".ralph/plans/future/done"), /completed legacy history/);
   assert.doesNotThrow(() => assertGrandfatheredLegacySpecificationFile(
     root, ".ralph/plans/future/alpha", join(dirname(root), "alpha-worktree", ".ralph/plans/SPECIFICATION.md"),
   ));
@@ -181,6 +185,14 @@ test("inventory rejects unsafe candidate paths and noncanonical durable rows", (
   symlinkSync(external, join(future, "alpha"), "dir");
   const unsafeResult = reconcileLegacySpecificationInventory(unsafe, "initialize");
   assert.equal(unsafeResult.status, "blocked"); assert.match(unsafeResult.detail, /must be a real directory/);
+
+  const unsafeParent = repo(t, mkdtempSync(join(tmpdir(), "pc-init-unsafe-parent-")));
+  const outsideRalph = join(unsafeParent, "outside-ralph");
+  const externalFuture = join(outsideRalph, "plans", "future", "alpha");
+  mkdirSync(externalFuture, { recursive: true }); writeFileSync(join(externalFuture, "SPECIFICATION.md"), "external parent\n");
+  symlinkSync(outsideRalph, join(unsafeParent, ".ralph"), "dir");
+  const parentResult = reconcileLegacySpecificationInventory(unsafeParent, "initialize");
+  assert.equal(parentResult.status, "blocked"); assert.match(parentResult.detail, /legacy \.ralph root must be a real directory/);
 
   const unsafeArchive = repo(t, mkdtempSync(join(tmpdir(), "pc-init-unsafe-archive-")));
   const outsideArchive = join(unsafeArchive, "outside-archive"); mkdirSync(outsideArchive);

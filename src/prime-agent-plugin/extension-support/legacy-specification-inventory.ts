@@ -92,6 +92,45 @@ function ownedSpecificationBytes(worktree: string): { active: Buffer | null; blo
   return { active, blocked };
 }
 
+function requireSafeFutureRoot(projectRoot: string): string {
+  const ralph = join(projectRoot, ".ralph");
+  const plans = join(ralph, "plans");
+  const future = join(plans, "future");
+  requireRealDirectory(ralph, "legacy .ralph root");
+  requireRealDirectory(plans, "legacy plan root");
+  requireRealDirectory(future, "legacy future-plan root");
+  return future;
+}
+
+export function assertSafeLegacyFutureLocation(
+  projectRoot: string,
+  location: string,
+  allowMissing = false,
+): void {
+  const match = SAFE_LOCATION.exec(location);
+  if (!match) throw new Error(`${location} is not a supported retained legacy location`);
+  const ralph = join(projectRoot, ".ralph");
+  const plans = join(ralph, "plans");
+  const future = join(plans, "future");
+  const folder = join(future, match[1]);
+  if (!containedBy(future, folder) || !containedBy(projectRoot, folder)) {
+    throw new Error(`${location} escapes the legacy future-plan root`);
+  }
+  for (const [path, label] of [[ralph, "legacy .ralph root"], [plans, "legacy plan root"],
+    [future, "legacy future-plan root"], [folder, location]] as const) {
+    try { requireRealDirectory(path, label); }
+    catch (error) {
+      if (allowMissing && (error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+  }
+}
+
+function requireSafeFutureLocation(projectRoot: string, location: string): string {
+  assertSafeLegacyFutureLocation(projectRoot, location);
+  return join(projectRoot, location);
+}
+
 /** Inventory only unfinished, syntactically supported future-folder specifications.
  * Archive and blocked history are outside this exact root and are never reminders. */
 export function discoverGrandfatherableLegacySpecifications(
@@ -109,6 +148,7 @@ export function discoverGrandfatherableLegacySpecifications(
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
       throw new Error("legacy future-plan root must be a real directory");
     }
+    requireSafeFutureRoot(projectRoot);
     for (const entry of readdirSync(futureRoot, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const location = `.ralph/plans/future/${entry.name}`;
       if (!SAFE_LOCATION.test(location)) continue;
@@ -126,9 +166,12 @@ export function discoverGrandfatherableLegacySpecifications(
   }
 
   const retired = new Set<string>();
+  const nonInactive = new Set<string>();
   const archiveRoot = join(projectRoot, ".ralph", "plans", "archive");
   try {
     const archiveStat = lstatSync(archiveRoot);
+    requireRealDirectory(join(projectRoot, ".ralph"), "legacy .ralph root");
+    requireRealDirectory(join(projectRoot, ".ralph", "plans"), "legacy plan root");
     if (!archiveStat.isDirectory() || archiveStat.isSymbolicLink()) {
       throw new Error("legacy archive root must be a real directory");
     }
@@ -147,6 +190,7 @@ export function discoverGrandfatherableLegacySpecifications(
   for (const record of ownershipRecords) {
     if (record.version !== 1) continue;
     if (record.status === "inactive") { retired.add(record.sourceLocation); continue; }
+    nonInactive.add(record.sourceLocation);
     if (!record.worktree) throw new Error(`non-inactive legacy ownership for ${record.sourceLocation} has no worktree`);
     const { active, blocked } = ownedSpecificationBytes(record.worktree);
     if (active && blocked) throw new Error(`legacy ownership for ${record.sourceLocation} has both active and blocked specifications`);
@@ -167,7 +211,8 @@ export function discoverGrandfatherableLegacySpecifications(
   }
 
   for (const location of retired) {
-    if (byLocation.has(location)) throw new Error(`${location} collides with completed legacy history`);
+    if (nonInactive.has(location)) throw new Error(`${location} has both completed and non-terminal legacy ownership`);
+    byLocation.delete(location);
   }
   return [...byLocation.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
@@ -313,9 +358,10 @@ export function assertGrandfatheredLegacySpecificationFile(
 }
 
 export function assertGrandfatheredLegacySpecification(projectRoot: string, location: string): void {
+  const folder = requireSafeFutureLocation(projectRoot, location);
   assertGrandfatheredLegacySpecificationFile(
     projectRoot,
     location,
-    join(projectRoot, location, "SPECIFICATION.md"),
+    join(folder, "SPECIFICATION.md"),
   );
 }
