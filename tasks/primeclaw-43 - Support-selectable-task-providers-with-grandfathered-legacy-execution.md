@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 22:24'
+updated_date: '2026-10-26 22:40'
 labels: []
 dependencies: []
 references:
@@ -1332,6 +1332,18 @@ Do not add approval steps, caller parameters, receipt/snapshot authority, semant
 2. Pre-session independent Backlog allocation no longer compares current raw task JSON to the reservation snapshot as approval. It keeps exact task ID/path, `In Progress`, meaningful-plan, descendant, paired publication, clean-store, and resource gates; refreshes the factual provider revision/native task evidence; and appends exact previous/current revisions and complete native views to the sole initial canonical execute assignment using the existing `<provider-task-observation>` block. The production vertical admission regression publishes a compatible notes advance between reservation and session preparation, then proves the same task/session/one assignment and exact before/current context. Status, identity, missing-plan, ancestry, publication, cleanliness, and resource failures remain fail-closed.
 
 Exact reproductions: the root-config reconcile test passes without path failure or mutation; `/tmp/primeclaw43-backlog-pre-session-observation.mjs` now returns `RESULT active`. Focused related Node: 176/176; final full Node: 448/448. Focused Python: 17 passed/10 skipped. Final Python: 677 passed/69 skipped with only the same three pre-existing baseline failures. Docker tier 1/offline probe passed with teardown and manifest publication. Modified TypeScript imports and `git diff --check` pass. No Beads, provider-absent Backlog, version-1, ownership, Episode resource, live registry/store migration, cleanup, merge, abandonment, or PRIMECLAW-43.1 cutover behavior was changed.
+
+2026-10-26 — Owner accepted 92ef7d1 and authorized the next bounded AC16 slice
+
+`92ef7d1e30fdbe66f3280519429695056e9b82af` is the latest accepted base. The whole feature is not Ready for Merge. Implement only the first portion of approved plan step 5: grandfathered legacy inventory and provider-independent version-1 compatibility.
+
+At the explicit initialization/upgrade boundary, record only the exact unfinished supported legacy locations and accepted specification digests in one simple inventory—the durable allowlist expressly permitted by AC16. Never silently enroll or rebaseline later locations or changed specifications during startup, prep, or repeated reconciliation. Specifications are frozen; implementation plans remain living. Reject new or materially revised legacy specifications and route new work to the selected provider task UX. Archive-only/completed history must not create unfinished-work reminders.
+
+Preserve provider-independent retained version-1 planning, execution, expert/owner review, blocked recovery, handoff, and finalization. Preserve exact old admitted-v1 ownership/resource bindings, including promoted work whose original future source is absent and exact blocked-pair recovery. Version 1 must not require a live task provider or switch to task-native merely to run or recover.
+
+Apply the inventory guard at existing managed/canonical seams. Prefer concise managed instructions and native behavior before indispensable identity/integrity code. Do not add a public command/tool, workflow engine, classifier, shadow tracker, coordinator/phase state, or separate approval protocol. The digest freezes only explicitly grandfathered legacy specifications—never living plans or provider task content—and must not revive old-raw-equals-current approval gates. Reuse template reconciliation and preserve customized copies.
+
+Use code and disposable fixtures only. Do not enroll live inventory, migrate registry/store/resources, alter existing live plans, apply globally, implement AC17/AC18/AC19, perform PRIMECLAW-43.1 cutover, merge, abandon, finalize, or clean up. Add focused deterministic inventory/path/digest/compatibility checks and representative real retained-v1 route/recovery coverage; review managed prose/reconciliation rather than inventing a Cartesian matrix. Run relevant host suites and Docker tier 1, update docs/task truthfully, push one clean candidate, and stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
