@@ -38,9 +38,9 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Pause",
         "Consult the operator",
         "canonical handoff",
-        "Beads abandonment, finalization, and cleanup remain inactive",
-        "Readiness and merge status use the existing native helper and ordinary Git",
-        "no public status surface, receipt, snapshot, publisher, protocol, classifier, or replacement resource",
+        "Prime Claw abandonment: task TASK-ID; pushed Episode head EPISODE-HEAD; code was not merged.",
+        "Beads terminals use native/Git",
+        "add no public status API, publisher, protocol, or classifier",
         "Backlog sets only the bound main task to `Ready for Merge`",
         "preserving its task content plus authorized status",
         "Git blocks every other conflict",
@@ -66,11 +66,14 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "truthful final note naming the tuple/code publication",
         "never force, replay, or a fresh transaction",
         "Apply **Abandon** only after explicit operator confirmation",
-        "cleanup needs separate authority",
-        "cleanup-only `finalize_task_episode`",
-        "durably binds that head",
-        "removes exact idle runtime, worktree, and branch",
-        "Same-head retry is idempotent",
+        "selects only the bound task file from that Episode head",
+        "reapplies its non-`Done` status and truthful Final Summary through the supported CLI",
+        "verifies only the active/archive task move and no Episode code, commits, and pushes",
+        "Keep resources pending cleanup authority",
+        "Cleanup** calls `finalize_task_episode`",
+        "binds `cleanupHead` plus facts",
+        "removes idle runtime/worktree/local branch",
+        "Replay is idempotent",
         "Review conclusions are evidence",
         "material contract defect",
         "Speculative hardening",
@@ -134,7 +137,7 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "then `handoff_task_episode`",
         "callback records only `providerRevision`, raw `taskEvidence`, code `head`, and `updatedAt`",
         "Never write `ownership.json` directly or keep an artificial `in_progress` snapshot",
-        "Beads abandonment, finalization, and cleanup remain inactive",
+        "Custom `done` means completion; never map `closed` to canonical `Done`",
         "guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`",
         "guarded `--if-status ready_for_merge` update to `in_progress`",
         "guarded `--if-status ready_for_merge` update to `done`",
@@ -213,7 +216,7 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
 
     assert "stores no review, progress, merge, or abandonment receipts" in current
     assert "optional `cleanupHead`" in current
-    assert "cleanup-only `finalize_task_episode`" in current
+    assert "Cleanup-only `finalize_task_episode(taskId, episodeHead, outcome, confirmed)`" in current
     assert "ordinary Git and the supported Backlog CLI" in current
     assert "placement, and task-native lifecycle receipts" not in current
 

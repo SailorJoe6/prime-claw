@@ -19,6 +19,7 @@ import {
   mutateAndPublishBeadsTaskStatus,
   mutateProviderTaskStatus,
   prepareBeadsWorkspaceTransport,
+  readBeadsNativeTask,
   requireBacklogTaskSelection,
   resolveProviderTask,
 } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
@@ -1324,6 +1325,40 @@ test("provider task resolution returns the exact long Beads native view with can
   assert.equal("taskPathRelative" in selection, false);
   assert.equal("implementationPlan" in selection, false);
   assert.equal("references" in selection, false);
+});
+
+test("raw Beads task read preserves built-in closed abandonment evidence without mapping it to Done", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  const nativeView = {
+    id: "TST-closed",
+    title: "Abandoned fixture",
+    status: "closed",
+    design: "Keep the complete provider-native design.",
+    closed_at: "2026-10-26T19:00:08Z",
+    close_reason: "Prime Claw abandonment: task TST-closed; pushed Episode head "
+      + `${"b".repeat(40)}; code was not merged.`,
+    comments: [{ id: 7, text: "retained history", author: "fixture" }],
+  };
+  const runner = detectionRunner({
+    ["bd\0show\0TST-closed\0--json\0--long\0--include-comments"]: {
+      stdout: JSON.stringify([nativeView]) + "\n", stderr: "", status: 0,
+    },
+  });
+  assert.deepEqual(readBeadsNativeTask(root, "TST-closed", runner), {
+    provider: "beads",
+    taskId: "TST-closed",
+    title: "Abandoned fixture",
+    nativeStatus: "closed",
+    projectRoot: root,
+    nativeView,
+  });
+  assert.throws(() => resolveProviderTask(root, "TST-closed", detectionRunner({
+    ...BEADS_OK,
+    ["bd\0show\0TST-closed\0--json\0--long\0--include-comments"]: {
+      stdout: JSON.stringify([nativeView]) + "\n", stderr: "", status: 0,
+    },
+  })), /unmapped status closed/);
 });
 
 test("provider task resolution fails closed on a Beads task with an unmapped status", () => {

@@ -865,5 +865,4 @@ native `ready_for_merge` preflight. Canonical main uses ordinary
 may one guarded native transition publish `done` with a truthful final note
 naming the authorized tuple and code outcome. Failure preserves exact evidence;
 there is no retry, force, replay, custom publisher, receipt, snapshot, or new
-transaction. Beads abandonment, finalization, cleanup, migration/cutover, and
-provider-independent task-history changes remain outside this slice.
+transaction. Beads abandonment and cleanup now use only existing native/Git boundaries. Successful merge stays custom native `done`. Explicit abandonment uses supported built-in `closed` plus an exact task/Episode-head `close_reason`, one non-force publication, and complete raw/history proof; `closed` is never mapped to canonical `Done`. Separately confirmed `finalize_task_episode` verifies the current published native outcome, code inclusion or exclusion, direct-remote heads, and ancestry before binding `cleanupHead`, removing only the idle Episode runtime/worktree/local branch, and marking ownership inactive last. The shared Beads store/server/history and unrelated owners survive. Migration/cutover and provider-independent task-history changes remain outside this slice.

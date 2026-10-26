@@ -217,30 +217,34 @@ export class CliBeadsTaskEpisodeReservationGit implements BeadsTaskEpisodeReserv
   status(repo: string): string { return runGit(repo, ["status", "--porcelain=v1", "--untracked-files=no"]); }
 }
 
+export function exactDirectRemoteBranchHead(repo: string, branch: string, action = "Beads lifecycle"): string {
+  const remote = runGit(repo, ["config", "--get", `branch.${branch}.remote`]);
+  const mergeRef = runGit(repo, ["config", "--get", `branch.${branch}.merge`]);
+  if (!remote || !mergeRef || mergeRef !== `refs/heads/${branch}`) {
+    throw new Error(`${action} requires the recorded branch's exact ordinary upstream`);
+  }
+  const urls = runGit(repo, ["remote", "get-url", "--all", remote]).split(/\r?\n/).filter(Boolean);
+  if (urls.length !== 1) {
+    throw new Error(`${action} requires one exact code remote transport`);
+  }
+  const rows = runGit(repo, ["ls-remote", "--exit-code", "--heads", urls[0]!, mergeRef])
+    .split(/\r?\n/).filter(Boolean);
+  const match = rows.length === 1
+    ? /^([0-9a-f]{40}|[0-9a-f]{64})\s+refs\/heads\/(.+)$/.exec(rows[0]!)
+    : null;
+  if (!match || match[2] !== branch) {
+    throw new Error(`${action} could not prove the exact direct-remote code head`);
+  }
+  return match[1]!;
+}
+
 export class CliBeadsTaskEvidenceAdvancementGit implements BeadsTaskEvidenceAdvancementGit {
   repositoryRoot(cwd: string): string { return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"])); }
   branch(repo: string): string { return runGit(repo, ["symbolic-ref", "--short", "HEAD"]); }
   head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
   upstreamHead(repo: string): string { return runGit(repo, ["rev-parse", "@{upstream}"]); }
   directRemoteHead(repo: string, branch: string): string {
-    const remote = runGit(repo, ["config", "--get", `branch.${branch}.remote`]);
-    const mergeRef = runGit(repo, ["config", "--get", `branch.${branch}.merge`]);
-    if (!remote || !mergeRef || mergeRef !== `refs/heads/${branch}`) {
-      throw new Error("Beads evidence advancement requires the recorded branch's exact ordinary upstream");
-    }
-    const urls = runGit(repo, ["remote", "get-url", "--all", remote]).split(/\r?\n/).filter(Boolean);
-    if (urls.length !== 1) {
-      throw new Error("Beads evidence advancement requires one exact code remote transport");
-    }
-    const rows = runGit(repo, ["ls-remote", "--exit-code", "--heads", urls[0]!, mergeRef])
-      .split(/\r?\n/).filter(Boolean);
-    const match = rows.length === 1
-      ? /^([0-9a-f]{40}|[0-9a-f]{64})\s+refs\/heads\/(.+)$/.exec(rows[0]!)
-      : null;
-    if (!match || match[2] !== branch) {
-      throw new Error("Beads evidence advancement could not prove the exact direct-remote code head");
-    }
-    return match[1]!;
+    return exactDirectRemoteBranchHead(repo, branch, "Beads evidence advancement");
   }
   status(repo: string): string { return runGit(repo, ["status", "--porcelain=v1", "--untracked-files=all"]); }
   operationInProgress(repo: string): boolean {
@@ -781,7 +785,7 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
 }
 
 
-function exactBeadsProviderRevisionAncestor(
+export function exactBeadsProviderRevisionAncestor(
   cwd: string,
   ancestor: string,
   descendant: string,

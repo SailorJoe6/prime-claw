@@ -2031,6 +2031,40 @@ function readBeadsIssue(
   return parseBeadsIssueView(result.stdout, selectedTaskId);
 }
 
+/** Exact provider-native Beads task read without canonical status conversion. */
+export type BeadsNativeTaskResolution = {
+  provider: "beads";
+  taskId: string;
+  title: string;
+  nativeStatus: string;
+  projectRoot: string;
+  nativeView: JsonRecord;
+};
+
+export function readBeadsNativeTask(
+  cwd: string,
+  rawTaskId: string,
+  runner: CommandRunner = new ProcessCommandRunner(),
+): BeadsNativeTaskResolution {
+  const taskId = rawTaskId.trim();
+  if (!taskId || taskId !== rawTaskId || /\s/.test(taskId) || taskId.startsWith("-")) {
+    throw new Error("Beads native task read requires one exact canonical task ID");
+  }
+  const projectRoot = resolve(cwd);
+  const issue = readBeadsIssue(projectRoot, taskId, runner);
+  if (issue.taskId !== taskId) {
+    throw new Error(`Beads resolved ${taskId} to a different task ID ${issue.taskId}`);
+  }
+  return {
+    provider: "beads",
+    taskId: issue.taskId,
+    title: issue.title,
+    nativeStatus: issue.status,
+    projectRoot,
+    nativeView: issue.nativeView,
+  };
+}
+
 /** Canonical lifecycle status for a Beads issue, at the exact use boundary. */
 function beadsCanonicalStatus(taskId: string, nativeStatus: string): CanonicalLifecycleStatus {
   const canonical = Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === nativeStatus)?.[0];
@@ -2064,18 +2098,10 @@ export function resolveProviderTask(
     if (!selection) return null;
     return { provider: "backlog", ...selection };
   }
-  const issue = readBeadsIssue(detection.projectRoot, selectedTaskId, runner);
-  if (issue.taskId !== selectedTaskId) {
-    throw new Error(`Beads resolved ${selectedTaskId} to a different task ID ${issue.taskId}`);
-  }
+  const issue = readBeadsNativeTask(detection.projectRoot, selectedTaskId, runner);
   return {
-    provider: "beads",
-    taskId: issue.taskId,
-    title: issue.title,
-    nativeStatus: issue.status,
-    status: beadsCanonicalStatus(issue.taskId, issue.status),
-    projectRoot: detection.projectRoot,
-    nativeView: issue.nativeView,
+    ...issue,
+    status: beadsCanonicalStatus(issue.taskId, issue.nativeStatus),
   };
 }
 

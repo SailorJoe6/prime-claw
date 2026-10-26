@@ -338,6 +338,9 @@ type ReviewedPlanDependencies = EpisodeDependencies & EpisodeOwnershipTransition
   taskActions?: Partial<TaskEpisodePublicActions>;
   taskCleanup?: TaskEpisodeCleanupDependencies["cleanup"];
   taskCleanupGit?: TaskEpisodeCleanupDependencies["cleanupGit"];
+  taskCleanupBeadsTransport?: TaskEpisodeCleanupDependencies["beadsTransport"];
+  taskCleanupBeadsTaskReader?: TaskEpisodeCleanupDependencies["beadsTaskReader"];
+  taskCleanupBeadsRevisionIsAncestor?: TaskEpisodeCleanupDependencies["beadsRevisionIsAncestor"];
 };
 
 type TaskEpisodeCleanupParams = {
@@ -382,7 +385,7 @@ async function runTaskEpisodeCleanup(
 ): Promise<Record<string, unknown>> {
   const taskId = params.taskId.trim();
   if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) {
-    throw new Error("Task Episode cleanup requires one exact Backlog task ID");
+    throw new Error("Task Episode cleanup requires one exact provider-native task ID");
   }
   if (!params.confirmed) throw new Error("Task Episode cleanup requires separate explicit operator confirmation");
   const cleanupGit = dependencies.taskCleanupGit ?? new CliTaskEpisodeCleanupGit();
@@ -404,6 +407,10 @@ async function runTaskEpisodeCleanup(
         ...(dependencies.ownership ? { ownership: dependencies.ownership } : {}),
         ...(dependencies.taskRunner ? { taskRunner: dependencies.taskRunner } : {}),
         ...(dependencies.taskResolver ? { taskResolver: dependencies.taskResolver } : {}),
+        ...(dependencies.taskCleanupBeadsTransport ? { beadsTransport: dependencies.taskCleanupBeadsTransport } : {}),
+        ...(dependencies.taskCleanupBeadsTaskReader ? { beadsTaskReader: dependencies.taskCleanupBeadsTaskReader } : {}),
+        ...(dependencies.taskCleanupBeadsRevisionIsAncestor
+          ? { beadsRevisionIsAncestor: dependencies.taskCleanupBeadsRevisionIsAncestor } : {}),
         ...(dependencies.now ? { now: dependencies.now } : {}),
       },
     );
@@ -789,15 +796,15 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       promptSnippet: "Clean up the exact terminal task Episode after separate operator authority",
       promptGuidelines: [
         "Use finalize_task_episode only for one exact task-native Episode owned by this Conversation. Never use it for retained folder ownership.",
-        "Perform review, request changes, merge, abandonment, and Backlog status changes through the Conversation instructions, ordinary Git, and the supported Backlog CLI before cleanup.",
-        "Call this tool only after separate explicit operator cleanup authority, with the exact pushed Episode head and truthful terminal outcome.",
-        "Cleanup removes only the bound idle runtime, worktree, and branch, then closes ownership. It performs no merge, abandonment, task edit, archive, or push.",
+        "Perform review, request changes, merge, abandonment, and provider-native terminal publication through the Conversation instructions, ordinary Git, and the selected provider's supported CLI before cleanup.",
+        "Call this tool only after separate explicit operator cleanup authority, with the exact pushed Episode head and truthful terminal outcome. Backlog requires its pushed Done/archive terminal evidence; Beads requires current clean published native done completion or closed plus the exact abandonment reason.",
+        "Cleanup removes only the bound idle runtime, worktree, and branch, then closes ownership. It performs no merge, abandonment, task edit, archive, provider push, shared-store removal, or server shutdown.",
       ],
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
-          taskId: { type: "string", description: "Exact canonical Backlog task ID owned by this Conversation" },
+          taskId: { type: "string", description: "Exact canonical provider-native task ID owned by this Conversation" },
           episodeHead: { type: "string", description: "Exact pushed Episode head that was merged or abandoned" },
           outcome: { type: "string", enum: ["merged", "abandoned"], description: "Terminal outcome already committed and pushed on canonical main" },
           confirmed: { type: "boolean", description: "True only after separate explicit operator authority for destructive cleanup" },

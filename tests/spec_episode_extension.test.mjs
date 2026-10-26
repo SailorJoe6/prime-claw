@@ -1143,6 +1143,97 @@ function cleanupHarness(outcome = "merged", options = {}) {
   };
 }
 
+function beadsCleanupHarness(outcome = "merged", options = {}) {
+  const f = harness({ list: (_count, session) => [session] });
+  const episodeHead = "b".repeat(40);
+  const mainHead = "c".repeat(40);
+  const providerRevision = "c".repeat(32);
+  const record = activeBeadsTaskRecord(f, { head: "9".repeat(40), ...(options.record ?? {}) });
+  const records = new Map([[record.ownerSessionId, record]]);
+  const calls = [];
+  let stage = options.stage ?? 0;
+  const ownership = {
+    read(_root, ownerSessionId) { return structuredClone(records.get(ownerSessionId) ?? null); },
+    write(_root, value) { records.set(value.ownerSessionId, structuredClone(value)); calls.push(["ownership", value.status, value.cleanupHead]); },
+  };
+  const cleanupGit = {
+    repositoryRoot: () => f.root,
+    branch: () => "main",
+    head: () => mainHead,
+    upstreamHead: () => options.unpushedMain ? "d".repeat(40) : mainHead,
+    branchUpstreamHead: () => options.unpushedEpisode ? "d".repeat(40) : episodeHead,
+    directRemoteHead(_repo, branch) {
+      calls.push(["direct-remote", branch]);
+      if (branch === "main") return options.remoteMainHead ?? mainHead;
+      return options.remoteEpisodeHead ?? episodeHead;
+    },
+    assertCleanWorktree() { calls.push(["clean"]); if (options.dirty) throw new Error("dirty main"); },
+    isAncestor(_repo, ancestor, descendant) {
+      if (ancestor === TASK_BASE && descendant === record.head) return true;
+      if (ancestor === TASK_BASE && descendant === episodeHead) return true;
+      if (ancestor === record.head && descendant === episodeHead) return !options.unsafeAncestry;
+      if (ancestor === episodeHead && descendant === mainHead) return outcome === "merged";
+      return false;
+    },
+    pathTrackedAtRef() { throw new Error("Beads cleanup must not inspect a task path"); },
+  };
+  const snapshots = () => ({
+    ...(stage === 0 ? { runtime: { cwd: f.worktree, idle: !options.busy } } : {}),
+    ...(stage <= 1 ? { worktree: { path: f.worktree, branch: f.wt.branch, head: options.wrongHead ? "d".repeat(40) : episodeHead, clean: !options.dirtyEpisode } } : {}),
+    ...(stage <= 2 ? { branch: { name: f.wt.branch, head: episodeHead } } : {}),
+  });
+  const cleanup = {
+    async inspect() { calls.push(["inspect", stage]); return snapshots(); },
+    async removeRuntime() { calls.push(["remove-runtime"]); stage = 1; },
+    async removeWorktree() { calls.push(["remove-worktree"]); stage = 2; },
+    async removeBranch() { calls.push(["remove-branch"]); stage = 3; },
+  };
+  const transportEvidence = {
+    provider: "beads", projectRoot: f.root, storeDir: join(f.root, ".beads"), bdVersion: "1.3.1",
+    doltVersion: "2.5.0", serverAuthority: "operator-managed", serverHost: "127.0.0.1", serverPort: 3307,
+    database: "fixture", branch: "main", revision: providerRevision, remoteName: "origin",
+    remoteUrl: "/fixture/remote", publicationRef: "refs/dolt/data", publicationHead: "e".repeat(40),
+    publishedRevision: providerRevision,
+  };
+  let transportReads = 0;
+  const beadsTransport = () => {
+    transportReads += 1;
+    if (options.providerBlocked) return { status: "blocked", code: "publication-authority", detail: "unpublished", remediation: "publish" };
+    if (options.providerDrift && transportReads === 2) {
+      return { status: "ready", evidence: { ...transportEvidence, revision: "d".repeat(32), publishedRevision: "d".repeat(32), publicationHead: "f".repeat(40) } };
+    }
+    return { status: "ready", evidence: transportEvidence };
+  };
+  const abandonReason = `Prime Claw abandonment: task ${BEADS_TASK_ID}; pushed Episode head ${episodeHead}; code was not merged.`;
+  const nativeView = {
+    ...BEADS_TASK_EVIDENCE,
+    status: outcome === "merged" ? "done" : "closed",
+    ...(outcome === "abandoned" ? {
+      closed_at: "2026-10-26T19:00:08Z",
+      close_reason: options.wrongReason ? "Abandoned without exact authority evidence" : abandonReason,
+    } : {}),
+    comments: [{ id: 7, text: "retained provider history", author: "fixture" }],
+  };
+  const beadsTaskReader = () => ({
+    provider: "beads", taskId: BEADS_TASK_ID, title: nativeView.title,
+    nativeStatus: options.wrongNativeStatus ?? nativeView.status, projectRoot: f.root, nativeView,
+  });
+  const beadsRevisionIsAncestor = () => !options.providerRewrite;
+  mkdirSync(join(f.root, ".beads"), { recursive: true });
+  const sentinel = join(f.root, ".beads", "shared-store-sentinel");
+  writeFileSync(sentinel, "preserve shared provider state\n");
+  return {
+    f, episodeHead, calls, ownership, cleanupGit, cleanup, beadsTransport, beadsTaskReader,
+    beadsRevisionIsAncestor, sentinel,
+    get record() { return records.get("owner"); },
+    deps: {
+      ownership, cleanupGit, cleanup, beadsTransport, beadsTaskReader, beadsRevisionIsAncestor,
+      taskResolver: () => { throw new Error("Beads cleanup must not use Backlog task resolution"); },
+      now: () => "2026-10-26T19:01:00.000Z",
+    },
+  };
+}
+
 test("cleanup-only task finalization binds one head, removes exact resources, and closes ownership", async () => {
   const h = cleanupHarness("merged");
   const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
@@ -1165,6 +1256,73 @@ test("cleanup-only task finalization supports abandonment and same-head idempote
   const replay = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
   assert.equal(replay.reused, true);
   assert.equal(h.record.status, "inactive");
+});
+
+test("cleanup-only finalization verifies merged Beads terminal publication without a task path", async () => {
+  const h = beadsCleanupHarness("merged");
+  const result = await finalizeTaskEpisodeCleanup(BEADS_TASK_ID, h.episodeHead, "merged", h.f.ctx, h.deps);
+  assert.equal(result.ownershipStatus, "inactive");
+  assert.equal(h.record.provider, "beads");
+  assert.equal("taskPath" in h.record, false);
+  assert.equal(h.record.cleanupHead, h.episodeHead);
+  assert.equal(h.record.head, h.episodeHead);
+  assert.equal(h.record.providerRevision, "c".repeat(32));
+  assert.equal(h.record.taskEvidence.status, "done");
+  assert.equal(existsSync(h.sentinel), true);
+  assert.deepEqual(h.calls.filter((call) => call[0] === "direct-remote"), [
+    ["direct-remote", h.f.wt.branch], ["direct-remote", "main"],
+  ]);
+});
+
+test("cleanup-only finalization verifies exact closed Beads abandonment and same-head replay", async () => {
+  const h = beadsCleanupHarness("abandoned");
+  await finalizeTaskEpisodeCleanup(BEADS_TASK_ID, h.episodeHead, "abandoned", h.f.ctx, h.deps);
+  assert.equal(h.record.taskEvidence.status, "closed");
+  assert.match(h.record.taskEvidence.close_reason, new RegExp(BEADS_TASK_ID));
+  assert.equal(h.record.taskEvidence.comments[0].text, "retained provider history");
+  assert.equal(existsSync(h.sentinel), true);
+  const replay = await finalizeTaskEpisodeCleanup(BEADS_TASK_ID, h.episodeHead, "abandoned", h.f.ctx, h.deps);
+  assert.equal(replay.reused, true);
+  assert.equal(h.calls.filter((call) => call[0].startsWith("remove-")).length, 3);
+});
+
+test("Beads cleanup preserves bound partial idempotence and refuses unsafe missing-resource gaps", async () => {
+  const resumable = beadsCleanupHarness("merged", { stage: 2, record: { cleanupHead: "b".repeat(40) } });
+  const result = await finalizeTaskEpisodeCleanup(BEADS_TASK_ID, resumable.episodeHead, "merged", resumable.f.ctx, resumable.deps);
+  assert.equal(result.ownershipStatus, "inactive");
+  assert.deepEqual(resumable.calls.filter((call) => call[0].startsWith("remove-")), [["remove-branch"]]);
+
+  const unsafe = beadsCleanupHarness("merged", { stage: 2 });
+  await assert.rejects(
+    finalizeTaskEpisodeCleanup(BEADS_TASK_ID, unsafe.episodeHead, "merged", unsafe.f.ctx, unsafe.deps),
+    /resources already missing without the durable cleanup head/,
+  );
+  assert.equal(unsafe.calls.some((call) => call[0].startsWith("remove-")), false);
+});
+
+test("Beads cleanup refuses wrong terminal, publication, ancestry, and direct-remote evidence", async (t) => {
+  const cases = [
+    { name: "wrong abandonment reason", outcome: "abandoned", options: { wrongReason: true }, pattern: /exact native closed abandonment evidence/ },
+    { name: "unpublished provider", outcome: "merged", options: { providerBlocked: true }, pattern: /publication proof is blocked/ },
+    { name: "provider read drift", outcome: "merged", options: { providerDrift: true }, pattern: /publication identity changed/ },
+    { name: "provider history rewrite", outcome: "merged", options: { providerRewrite: true }, pattern: /not an ancestor/ },
+    { name: "wrong main remote head", outcome: "merged", options: { remoteMainHead: "d".repeat(40) }, pattern: /local\/upstream\/direct-remote canonical main/ },
+    { name: "wrong Episode remote head", outcome: "merged", options: { remoteEpisodeHead: "d".repeat(40) }, pattern: /direct-remote Beads Episode head/ },
+    { name: "unsafe code ancestry", outcome: "merged", options: { unsafeAncestry: true }, pattern: /unsafe Beads base\/recorded\/terminal code ancestry/ },
+    { name: "dirty canonical main", outcome: "merged", options: { dirty: true }, pattern: /dirty main/ },
+    { name: "dirty Episode worktree", outcome: "merged", options: { dirtyEpisode: true }, pattern: /worktree is dirty or no longer exact/ },
+    { name: "wrong resource head", outcome: "merged", options: { wrongHead: true }, pattern: /worktree is dirty or no longer exact/ },
+  ];
+  for (const scenario of cases) await t.test(scenario.name, async () => {
+    const h = beadsCleanupHarness(scenario.outcome, scenario.options);
+    await assert.rejects(
+      finalizeTaskEpisodeCleanup(BEADS_TASK_ID, h.episodeHead, scenario.outcome, h.f.ctx, h.deps),
+      scenario.pattern,
+    );
+    assert.equal(h.calls.some((call) => call[0].startsWith("remove-")), false);
+    assert.equal(h.record.status, "active");
+    assert.equal(existsSync(h.sentinel), true);
+  });
 });
 
 test("cleanup-only task finalization resumes from branch-only partial cleanup", async () => {
