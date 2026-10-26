@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 19:41'
+updated_date: '2026-10-26 21:45'
 labels: []
 dependencies: []
 references:
@@ -22,25 +22,53 @@ documentation:
   - docs/prep-chain.md
   - docs/user-stories/D-planning.md
 modified_files:
+  - .agents/skills/blocked/SKILL.md
+  - .agents/skills/design/SKILL.md
+  - .agents/skills/execute/SKILL.md
+  - .agents/skills/spec-it-out/SKILL.md
+  - .prime-claw/templates.json
+  - .prime-claw/workflows/handoff.md
+  - .prime-claw/workflows/plan-task.md
   - >-
     backlog/tasks/primeclaw-43 -
     Support-selectable-task-providers-with-grandfathered-legacy-execution.md
   - docs/backlog.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/future-specification-bundles.md
   - docs/handoff-chain.md
+  - docs/prep-chain.md
   - docs/user-stories/F-episode-execution.md
   - docs/user-stories/G-oversight-and-review.md
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/I-episode-finalization.md
   - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/project-initialization.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
+  - src/prime-agent-plugin/extensions/project-initialization.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/design.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
+  - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/project_initialization_extension.test.mjs
   - tests/spec_episode_extension.test.mjs
+  - tests/task_episode_admission_extension.test.mjs
+  - tests/task_episode_ownership_extension.test.mjs
+  - tests/task_history_workspace.test.mjs
   - tests/task_providers.test.mjs
+  - tests/test_backlog_workflow.py
+  - tests/test_blocked_skill.py
+  - tests/test_execute_skill.py
+  - tests/test_future_plan_skills.py
   - tests/test_oversee_episode_skill.py
+  - tests/test_task_providers.py
 priority: p1
 type: epic
 ordinal: 125000
@@ -1244,6 +1272,49 @@ Validation on final bytes before review:
 Independent `openai-codex/gpt-6-astra` review of exact candidate `4f91eaa952edb84c1bea95ac6b916b32e7a56f64` found one material regression and no other material defect: the compressed managed guide had reduced the existing Backlog abandonment branch to a non-`Done` archive, omitting exact Episode-head task selection, truthful Final Summary preservation, and task-only archive publication checks. Restored that existing Backlog procedure while retaining the new Beads `closed`/reason branch; added narrow managed-guide assertions for Episode-head selection, non-`Done`/Final Summary preservation, and exact active-to-archive-only commit/push. The managed guide remains at the enforced 1,400-word limit.
 
 Repair validation on final bytes: focused policy suite 35 passed, 9 skipped; Docker tier 1 plus offline RPC probe passed with teardown verified and manifest at `.test-results/20261026T194001Z-23637-035bab9f/tier1`; `git diff --check` passed. No lifecycle state or live Episode/provider resource was changed.
+
+2026-10-26 — Independent Backlog task-history production lifecycle slice
+
+Implemented the bounded production path for new or already-independent Backlog stores without cutting over this repository’s grandfathered branch-local store:
+- Initialization now prepares or verifies the disconnected `refs/heads/prime-claw/tasks` authority, reports its selected head, blocks populated non-Git stores before mutation, and rejects unsafe nested `.git` identities.
+- Admission publishes the native `In Progress` mutation in the primary nested clone, binds exact provider revision plus native evidence in compatible version-2 ownership, creates the Episode nested clone before session/execute delivery, and keeps the Episode code base at the exact clean upstream-equal code HEAD.
+- Handoff proves the Episode code head is pushed, reconciles primary/Episode task clones, requires paired published heads and exact native `In Progress` evidence, and advances ownership evidence only after handoff admission.
+- Admission failure publishes native `Blocked` evidence on the task DAG and verifies the updated ownership record.
+- Cleanup performs read-only nested-history proof before parent removal, rejects dirt/unpublished/diverged/foreign/rewritten history, requires the published head to descend from the owned provider revision, and supports only ancestry-proved absent-clone replay.
+- Existing branch-local/provider-absent Backlog ownership, version 1, and Beads behavior remain supported. General repository cutover remains deferred to PRIMECLAW-43.1.
+
+Validation on final bytes before this note:
+- Focused production lifecycle and real-Git/native Backlog tests passed, including initialization, admission, pushed-code handoff, evidence advancement, Blocked recovery, cleanup refusal/removal, and unsafe nested-Git refusal.
+- Full Node suite: 439/439 passed.
+- Full Python suite: 677 passed, 69 skipped; only the same three repository baseline failures remained (`test_mocked_runtime_tests_are_host_safe_tier0`, missing pytest bridge for `task_episode_admission_extension.test.mjs`, and local Backlog source identity mismatch).
+- Docker tier 1 with offline probe passed; teardown and manifest publication were verified.
+- Modified TypeScript modules import successfully and `git diff --check` passes.
+
+2026-10-26 — Independent review repair of candidate e02dd9f
+
+GPT-6 Astra reproduced five material defects; e02dd9f was not accepted. This repair closes exactly those findings:
+1. Admission, Blocked recovery, and rollback now require the exact synchronized native source status (and admission plan) inside the publication seam, so stale primary state cannot reopen a remotely completed task and a pre-mutation mismatch does not trigger rollback.
+2. A clean stale Episode task clone performs a result-checked non-force fetch plus `merge --ff-only` only when its HEAD is a proven ancestor of one stable direct published head; local-ahead, dirty, divergence, rewrite, identity, and transport failures still block.
+3. Independent handoff runs the existing idle/reopen preflight first, then builds and commits evidence against the refreshed ownership route. A durable route refresh now delivers exactly one handoff and one execute follow-up.
+4. Cleanup now proves the clean primary task clone equals one stable direct remote head before and after terminal task evidence, binds that published revision/evidence, and refuses local-only terminal commits before cleanup bookkeeping or resource removal. Partial replay repeats the proof.
+5. Abandonment cleanup reads the exact archived task file at the proved published Git revision instead of active-task lookup, verifies non-Done status plus the exact task/head/no-merge Final Summary, and accepts archived evidence in compatible version-2 ownership. Managed terminal procedure prepares the native `archive/tasks/` directory and fast-forwards the Episode clone to the terminal revision before cleanup.
+
+Repair evidence:
+- The reviewer’s four executable reproductions now show: stale Done admission rejected with remote Done preserved; stale Episode clone fast-forwarded with one handoff/one execute; reopened route retained with one handoff/one execute; unpublished local Done cleanup rejected with zero removal and active ownership preserved.
+- Fresh independent native archive regression passes after preparing the built-in archive directory, and cleanup regression proves archived evidence without active-task resolution.
+- Complete related Node suites: 306/306 passed.
+- Exact full Node suite: 447/447 passed.
+- Full Python suite: 677 passed, 69 skipped with only the same three pre-existing repository baselines.
+- Docker tier 1 plus offline probe passed; teardown and manifest publication verified.
+- Modified TypeScript imports and `git diff --check` passed.
+
+PRIMECLAW-43 remains In Progress. The live grandfathered store, Episode identity, ownership, code branch/worktree/session, and resources were not migrated or replaced.
+
+2026-10-26 — Final abandonment-summary rereview repair
+
+Focused rereview of 28ab90a confirmed all earlier five repairs, including stale recovery/rollback and removed-plan preservation, and found one remaining cleanup mismatch: independent Backlog abandonment required the entire preserved Final Summary to equal the evidence sentence. The final repair now preserves explanatory context while requiring that the exact task ID, pushed Episode head, and no-merge sentence appear as one exact Final Summary paragraph. Missing or altered evidence still blocks.
+
+The reviewer’s real native archive reproduction now succeeds for both the exact one-sentence summary and the same exact evidence paragraph followed by preserved truthful context. The repository regression covers the contextual form. Final validation after this change: full Node 447/447; Python 677 passed and 69 skipped with the same three baselines; Docker tier 1/offline probe passed with teardown and manifest publication; import smoke and `git diff --check` passed. No live provider, Episode, ownership, code, or cleanup resource changed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
