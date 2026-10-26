@@ -835,7 +835,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       parameters: {
         type: "object",
         properties: {
-          taskId: { type: "string", description: "Exact canonical Backlog task ID bound to the owned Episode" },
+          taskId: { type: "string", description: "Exact canonical provider-native task ID bound to the owned Episode" },
           guidance: { type: "string", description: "Optional bounded compaction focus inside the accepted scope" },
         },
         required: ["taskId"],

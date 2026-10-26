@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 1300
+    assert 300 <= len(words) <= 1400
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -38,27 +38,33 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Pause",
         "Consult the operator",
         "canonical handoff",
-        "Later lifecycle/cleanup is Backlog-only",
-        "Backlog keeps its exact-path status commit/push",
-        "No Backlog-only route, receipt, parallel workflow",
-        "set only the bound main task to `Ready for Merge` through the supported Backlog CLI",
-        "verify that only the bound task path changed",
-        "git merge --no-edit mainHead",
-        "restore its pre-merge Episode content",
-        "apply only the Conversation-authorized `Ready for Merge` status",
-        "Let Git block other conflicts",
-        "show the operator `(taskId, mainHead, candidateHead)`",
-        "not a custom status publisher, receipt, digest, or reconciliation transaction",
-        "**Delay** is a strict no-op",
-        "Set only the bound main task back to `In Progress` through Backlog",
+        "Beads abandonment, finalization, and cleanup remain inactive",
+        "Readiness and merge status use the existing native helper and ordinary Git",
+        "no public status surface, receipt, snapshot, publisher, protocol, classifier, or replacement resource",
+        "Backlog sets only the bound main task to `Ready for Merge`",
+        "preserving its task content plus authorized status",
+        "Git blocks every other conflict",
         "git merge --no-edit currentMainHead",
-        "pre-merge Episode content plus only the authorized `In Progress` status",
-        "then call `handoff_task_episode`",
-        "Before **Merge**, re-read ownership and freshly preflight the exact `(taskId, mainHead, candidateHead)`",
-        "its bound task must also be `Ready for Merge`",
-        "no staged or tracked changes",
+        "restore its pre-merge Episode task content, apply only the authorized `In Progress` status, let Git block every other conflict, and push the refreshed candidate",
+        "Backlog then publishes its exact task-only `Done` commit, pushes, and rechecks identity/status",
+        "Beads first records current clean pushed canonical code `mainHead` (not a task-status commit)",
+        "proves exact branch/upstream/remote `candidateHead` and ancestry",
+        "guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`",
+        "exact local/remote raw content, revision, ref, and preserved unrelated fields",
+        "Show `(taskId, mainHead, candidateHead)` plus factual native evidence",
+        "no provider revision or task equality becomes approval authority",
+        "**Delay** is a strict no-op",
+        "Backlog returns only the bound main task to `In Progress`",
+        "guarded `--if-status ready_for_merge` update to `in_progress`",
+        "Then call `handoff_task_episode` for the same Episode",
+        "Before **Merge**, re-read ownership and freshly preflight the exact authorized `(taskId, mainHead, candidateHead)`",
+        "git merge-base --is-ancestor mainHead candidateHead",
         "git merge --ff-only candidateHead",
-        "set the exact task to `Done` through Backlog",
+        "push main normally and prove main/upstream/direct remote equal `candidateHead`",
+        "Backlog then publishes its exact task-only `Done` commit",
+        "guarded `--if-status ready_for_merge` update to `done`",
+        "truthful final note naming the tuple/code publication",
+        "never force, replay, or a fresh transaction",
         "Apply **Abandon** only after explicit operator confirmation",
         "cleanup needs separate authority",
         "cleanup-only `finalize_task_episode`",
@@ -128,13 +134,17 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "then `handoff_task_episode`",
         "callback records only `providerRevision`, raw `taskEvidence`, code `head`, and `updatedAt`",
         "Never write `ownership.json` directly or keep an artificial `in_progress` snapshot",
-        "Other Beads status/terminal transitions, finalization, and cleanup remain inactive",
-        "No Backlog-only route",
+        "Beads abandonment, finalization, and cleanup remain inactive",
+        "guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`",
+        "guarded `--if-status ready_for_merge` update to `in_progress`",
+        "guarded `--if-status ready_for_merge` update to `done`",
+        "no provider revision or task equality becomes approval authority",
         'provider-absent record or `provider: "backlog"`',
     ):
         assert phrase in text
     assert text.index("select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`") < text.index("select the provider only from that exact owner")
     assert text.index("For retained version 1 folder ownership") < text.index("Review one reported slice at a time")
+    assert text.index("push main normally and prove main/upstream/direct remote equal `candidateHead`") < text.index("guarded `--if-status ready_for_merge` update to `done`")
 
 def test_managed_conversation_guide_has_no_authentication_metadata_or_policy_copy():
     assert not (REPO / "src/prime-agent-plugin/extension-support/conversation-guide-metadata.ts").exists()

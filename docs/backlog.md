@@ -841,5 +841,29 @@ admission. Previous raw evidence may truthfully be `blocked`; the freshly
 synchronized current task must be exact `in_progress` with meaningful design.
 No artificial snapshot, equality gate, semantic classifier, alternate acceptance
 interface, state machine, sidecar, raw live-store write, replacement resource, or
-parallel workflow is introduced. Ready-for-Merge, Done, abandonment,
-finalization, and cleanup remain outside this Beads slice.
+parallel workflow is introduced.
+
+### Beads merge readiness and merge status
+
+Accepted complete pushed Beads candidates now use the same native status helper
+and ordinary Git surfaces without a public status tool or task-file mirror. The
+Conversation treats `mainHead` as the current clean pushed canonical code head,
+ordinarily integrates it into the idle Episode when needed, pushes and proves an
+exact descendant `candidateHead`, then makes one guarded
+`in_progress`→`ready_for_merge` status-plus-note publication. One native pull,
+complete raw read, source-status guard, non-force push, and exact local/isolated
+remote task/revision/ref/note/clean proof apply. The operator sees the unchanged
+`(taskId, mainHead, candidateHead)` authority tuple plus factual native evidence;
+provider revision and raw equality remain observations for LLM judgment.
+
+Delay performs no write. Explicit Request Changes freshly proves current
+`ready_for_merge`, publishes one guarded transition back to `in_progress` with a
+truthful accepted-finding note, and resumes the same Episode through existing
+handoff. Explicit Merge requires a fresh exact tuple, code, owner/resource, and
+native `ready_for_merge` preflight. Canonical main uses ordinary
+`git merge --ff-only` and a normal push first. Only after direct-remote code proof
+may one guarded native transition publish `done` with a truthful final note
+naming the authorized tuple and code outcome. Failure preserves exact evidence;
+there is no retry, force, replay, custom publisher, receipt, snapshot, or new
+transaction. Beads abandonment, finalization, cleanup, migration/cutover, and
+provider-independent task-history changes remain outside this slice.

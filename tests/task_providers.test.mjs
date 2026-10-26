@@ -1392,6 +1392,54 @@ test("Beads mutation publishes one guarded provider-native update without retry 
   assert.equal(runner.calls.some((call) => call.includes("--force")), false);
 });
 
+test("Beads merge lifecycle publishes only guarded readiness, revision, and done transitions", () => {
+  const transitions = [
+    { from: "in_progress", expected: "In Progress", to: "Ready for Merge", native: "ready_for_merge", note: "Accepted complete pushed candidate for exact review tuple." },
+    { from: "ready_for_merge", expected: "Ready for Merge", to: "In Progress", native: "in_progress", note: "Request Changes accepted: repair the exact in-scope finding." },
+    { from: "ready_for_merge", expected: "Ready for Merge", to: "Done", native: "done", note: "Merged exact authorized tuple and proved canonical code publication." },
+  ];
+  for (const transition of transitions) {
+    const root = fixtureRoot();
+    writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+    const runner = beadsMutationRunner(root, { initialStatus: transition.from });
+    const result = mutateAndPublishBeadsTaskStatus({
+      projectRoot: root, taskId: "TST-1", status: transition.to,
+      expectedCurrentStatus: transition.expected, note: transition.note, runner,
+    });
+    assert.equal(result.status, "published");
+    assert.equal(result.evidence.taskBefore.nativeStatus, transition.from);
+    assert.equal(result.evidence.taskPublished.nativeStatus, transition.native);
+    assert.equal(result.evidence.taskPublished.nativeView.design, result.evidence.taskBefore.nativeView.design);
+    assert.deepEqual(result.evidence.taskPublished.nativeView.native_tail, result.evidence.taskBefore.nativeView.native_tail);
+    assert.equal(result.evidence.taskPublished.nativeView.notes.includes(transition.note), true);
+    assert.equal(result.evidence.remotePublishedTask.taskRow.status, transition.native);
+    assert.equal(result.evidence.remotePublishedTask.taskRow.notes.includes(transition.note), true);
+    assert.equal(result.evidence.publishedRevision, "d".repeat(32));
+    assert.equal(result.evidence.publicationHead, "e".repeat(40));
+    const update = runner.calls.find((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on");
+    assert.deepEqual(update.slice(2), [
+      "update", "TST-1", "--status", transition.native, "--if-status", transition.from,
+      "--append-notes", transition.note, "--json",
+    ]);
+    assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
+    assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
+    assert.equal(runner.calls.some((call) => call.includes("--force")), false);
+  }
+
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const drifted = beadsMutationRunner(root, { initialStatus: "blocked" });
+  const refused = mutateAndPublishBeadsTaskStatus({
+    projectRoot: root, taskId: "TST-1", status: "Ready for Merge",
+    expectedCurrentStatus: "In Progress", note: "must remain unwritten", runner: drifted,
+  });
+  assert.equal(refused.status, "blocked");
+  assert.equal(refused.code, "status-transition");
+  assert.equal(refused.evidence.taskObserved.task.nativeStatus, "blocked");
+  assert.equal(drifted.calls.some((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on"), false);
+  assert.equal(drifted.calls.some((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push"), false);
+});
+
 test("Beads blocker publication and resume append truthful notes in one guarded native update", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
