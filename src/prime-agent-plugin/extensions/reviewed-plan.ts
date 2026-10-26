@@ -25,7 +25,6 @@ import { CliTaskEpisodeCleanupAdapter } from "../extension-support/task-episode-
 import {
   admitPrepChain,
   admitProviderTaskPrepChain,
-  admitTaskPrepChain,
   type PrepChainWorkflow,
   type ProviderTaskPrepChainAdmissionResult,
   type ProviderTaskResolver,
@@ -55,7 +54,7 @@ function asBacklogProviderResolver(
   };
 }
 
-function implementationTaskResolver(
+function taskProviderResolver(
   dependencies: TaskImplementationAdmissionDependencies,
 ): ProviderTaskResolver {
   if (dependencies.providerTaskResolver) return dependencies.providerTaskResolver;
@@ -203,6 +202,35 @@ export interface TaskImplementationAdmissionDependencies {
   guideRoot?: string;
 }
 
+/** Admit the provider-native compact-first planning chain for one exact task. */
+export async function admitTaskPlanningPrepChain(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  rawTaskId: string,
+  source: "native" | "tool",
+  dependencies: Pick<TaskImplementationAdmissionDependencies, "taskResolver" | "providerTaskResolver"> = {},
+): Promise<ProviderTaskPrepChainAdmissionResult> {
+  const exactInput = rawTaskId.trim();
+  return admitProviderTaskPrepChain(
+    pi,
+    ctx,
+    rawTaskId,
+    PLAN_TASK_PREP_WORKFLOW,
+    source,
+    taskProviderResolver(dependencies),
+    async (_callCtx, task) => {
+      if (task.provider === "beads" && task.taskId !== exactInput) {
+        throw new Error(`Beads task ${exactInput} resolved to a different canonical ID ${task.taskId}`);
+      }
+      if (task.provider === "beads" && task.nativeStatus !== "in_design" && task.nativeStatus !== "in_planning") {
+        throw new Error(`Beads task ${task.taskId} must be In Design/in_design or In Planning/in_planning for planning`);
+      }
+    },
+    undefined,
+    "planning",
+  );
+}
+
 /**
  * Admit the task-native compact-first implementation chain. Placement is
  * resolved before either workflow message, and approval is recorded only after
@@ -225,7 +253,7 @@ export async function admitTaskImplementationPrepChain(
     parsed.taskId,
     IMPLEMENT_TASK_PREP_WORKFLOW,
     "native",
-    implementationTaskResolver(dependencies),
+    taskProviderResolver(dependencies),
     async (callCtx, task) => {
       if (task.provider === "beads" && task.taskId !== parsed.taskId) {
         throw new Error(`Beads task ${parsed.taskId} resolved to a different canonical ID ${task.taskId}`);
@@ -398,16 +426,9 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       workflow: PLAN_PREP_WORKFLOW,
     });
     pi.registerCommand("plan", {
-      description: "Plan one exact reviewed Backlog task in In Design or In Planning",
+      description: "Plan one exact reviewed provider-native task in In Design or In Planning",
       handler: async (args, ctx) => {
-        const result = await admitTaskPrepChain(
-          pi,
-          ctx,
-          args,
-          PLAN_TASK_PREP_WORKFLOW,
-          "native",
-          dependencies?.taskResolver,
-        );
+        const result = await admitTaskPlanningPrepChain(pi, ctx, args, "native", dependencies);
         if (!result.ok) ctx.ui.notify(result.message, result.level);
       },
     });
@@ -503,11 +524,11 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
 
     pi.registerTool({
       name: "plan_task",
-      label: "Plan reviewed Backlog task",
-      description: "Queue the canonical task-native planning workflow for one exact Backlog task in In Design or In Planning. This creates or revises a plan only and never authorizes implementation.",
-      promptSnippet: "Queue canonical planning for one exact reviewed Backlog task",
+      label: "Plan reviewed provider-native task",
+      description: "Queue the canonical task-native planning workflow for one exact provider-native task in In Design or In Planning. This creates or revises a plan only and never authorizes implementation.",
+      promptSnippet: "Queue canonical planning for one exact reviewed provider-native task",
       promptGuidelines: [
-        "Call plan_task only when the operator clearly asks to plan one exact Backlog task ID.",
+        "Call plan_task only when the operator clearly asks to plan one exact provider-native task ID.",
         "Before calling plan_task, ask the operator if the task ID is missing or materially ambiguous; never search for, select, or invent a task.",
         "plan_task accepts only In Design or In Planning and never authorizes implementation or creates Episode resources.",
         "Treat plan_task as a terminal routing action: after successful admission, do not continue planning in the current turn.",
@@ -518,21 +539,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         properties: {
           taskId: {
             type: "string",
-            description: "Exact Backlog task ID selected by the operator",
+            description: "Exact provider-native task ID selected by the operator",
           },
         },
         required: ["taskId"],
         additionalProperties: false,
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-        const result = await admitTaskPrepChain(
-          pi,
-          ctx,
-          params.taskId,
-          PLAN_TASK_PREP_WORKFLOW,
-          "tool",
-          dependencies?.taskResolver,
-        );
+        const result = await admitTaskPlanningPrepChain(pi, ctx, params.taskId, "tool", dependencies);
         if (!result.ok) {
           return {
             content: [{ type: "text", text: result.message }],
@@ -645,7 +659,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         additionalProperties: false,
       } as any,
       async execute(toolCallId, params, _signal, _onUpdate, ctx) {
-        const resolver = implementationTaskResolver(dependencies ?? {});
+        const resolver = taskProviderResolver(dependencies ?? {});
         try {
           const task = resolver(ctx.cwd, params.taskId);
           if (!task) throw new Error(`Task ${params.taskId} is unavailable through the live provider`);

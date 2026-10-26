@@ -76,14 +76,19 @@ Documentation fields, commit only the returned task path, and stop for operator
 review. Later states reject without mutation; neither skill writes an
 Implementation Plan or authorizes an Episode.
 
-The `/plan TASK-ID` command and `plan_task({"taskId":"TASK-ID"})` tool admit one
-exact task only when its current status is `In Design` or `In Planning`. They
-preload the project-customizable `plan-task-prep` and `plan-task` workflows,
-request focused compaction on a best-effort basis, queue the semantic planning
-turn as the sole follow-up, and stop without authorizing implementation. The
-semantic workflow writes a meaningful native Implementation Plan, changes or
-retains `In Planning`, commits only the exact returned task path, and treats
-push failure as transport evidence.
+The `/plan TASK-ID` command and `plan_task({"taskId":"TASK-ID"})` tool resolve
+one exact task through the live native provider and admit it only in canonical
+`In Design` or `In Planning`. They preload the project-customizable
+`plan-task-prep` and `plan-task` workflows, bind the exact provider/project root
+(and a task path only for Backlog) into both messages, request focused
+compaction on a best-effort basis, queue the semantic planning turn as the sole
+follow-up, and stop without authorizing implementation. Backlog preserves its
+meaningful native Implementation Plan, exact task-only commit, and prompt push.
+Beads uses the complete raw task view and raw `design` as the living plan,
+publishes one guarded `in_planning` transition plus design update through the
+supported native CLI, and proves the exact provider revision, publication ref,
+raw reread, and clean working set without a task path or mirror. Compatible
+same-task refinements are factual LLM context rather than an approval lock.
 
 After separate operator approval, `/implement-task TASK-ID` is the primary
 implementation path. It resolves one exact `In Planning` task through the live
@@ -180,19 +185,20 @@ category (`in_design:active`, `in_planning:active`, built-in `in_progress` and
 smoke-checks the exact Backlog version; these runtime gates are behavioral
 capability checks, not version assertions.
 
-The existing exact task-resolution call sites (`/plan` admission, task
-Episode creation and ownership reservation/transition) resolve through
-`resolveProviderTask`, which returns a discriminated native result: the
-Backlog branch is the existing `BacklogTaskSelection` plus provider identity,
-and the Beads branch is the validated native `bd show --json` issue view
-(id/title/status; no task file, plan, or references are invented — Beads
-stores none). Detection plus the capability gate run first; none, dual,
-malformed, or unavailable evidence fails closed, and Beads statuses map onto
-the canonical lifecycle only at the use boundary with unmapped statuses
-refused. These file-bound lifecycle paths narrow the result through
-`requireBacklogTaskSelection` and reject a Beads-resolved task explicitly
-until their sync, publication, and archive behavior lands in the later
-workspace slices; a Backlog repository's behavior is unchanged.
+The exact provider-aware task-resolution call sites (`/plan` admission,
+`/implement-task`, task Episode creation, ownership reservation, and
+transition) resolve through `resolveProviderTask`, which returns a
+discriminated native result: the Backlog branch is the existing
+`BacklogTaskSelection` plus provider identity, and the Beads branch is the
+validated complete native `bd show --json --long --include-comments` issue
+view (no task file, path, normalized plan, or references are invented).
+Detection plus the capability gate run first; none, dual, malformed, or
+unavailable evidence fails closed, and Beads statuses map onto the canonical
+lifecycle only at the use boundary with unmapped statuses refused. Planning
+uses that discriminated result directly and carries the exact provider/root
+binding into both managed messages. Backlog-only compatibility call sites may
+still narrow through `requireBacklogTaskSelection`; a Backlog repository's
+behavior is unchanged.
 
 The Conversation task-admission status transition mutates through
 `mutateProviderTaskStatus`. It proves exact provider/task identity BEFORE any

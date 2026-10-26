@@ -8,14 +8,27 @@ authorizing implementation.**
 
 `/plan TASK-ID` and `plan_task(taskId=...)`:
 
-1. resolve the exact operator-selected task through Backlog's structured CLI;
-2. admit only a task in `In Design` or `In Planning`;
-3. load the canonical task-planning preparation and planning workflows;
-4. request focused compaction on a best-effort basis;
-5. write a meaningful native Implementation Plan and leave the task in
-   `In Planning`; and
-6. commit only that exact task path, attempt a prompt push, and stop for
-   operator review.
+1. resolve the exact operator-selected task through the repository's one live
+   provider and admit only canonical `In Design` or `In Planning`;
+2. bind the exact provider and project root into both canonical task-planning
+   messages (plus the exact task path only for Backlog);
+3. request focused compaction on a best-effort basis;
+4. use semantic planning judgment over Backlog's native specification fields or
+   Beads' complete raw native view and living `design`;
+5. publish the reviewable plan and native `In Planning` transition through that
+   same provider; and
+6. prove the exact native task/publication, then stop for operator review.
+
+Backlog preserves its structured task view, native Implementation Plan, exact
+returned path, task-only commit, and prompt push. Beads binds the entire exact
+canonical ID and root, maps native `in_design`/`in_planning` to the canonical
+states, performs one supported synchronization, writes only the raw `design`
+and guarded `in_planning` transition, publishes once without force, and proves
+the exact reread, provider revision, publication ref, and clean working set. It
+has no task path, task-file commit, mirror, or normalized task projection.
+Compatible owner-authored or outside same-task planning refinements become the
+current LLM planning basis; genuine semantic, authority, or scope conflicts
+stop without a second authorization protocol.
 
 In initialized projects that still retain version-1 bundles, `/plan-spec
 .ralph/plans/future/<slug>` and `plan_spec(location=...)` keep the established

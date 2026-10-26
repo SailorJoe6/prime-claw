@@ -40,11 +40,27 @@ export type ProviderTaskPrepChainAdmissionResult =
 type BacklogTaskResolver = (cwd: string, rawTaskId: string) => BacklogTaskSelection | null;
 export type ProviderTaskResolver = (cwd: string, rawTaskId: string) => ProviderTaskResolution | null;
 
+function planningProviderPromptContext(selection: ProviderTaskResolution): string {
+  const common = `<operator-plan-task-provider>
+${selection.provider}
+</operator-plan-task-provider>
+
+<operator-plan-task-project-root>
+${selection.projectRoot}
+</operator-plan-task-project-root>`;
+  return selection.provider === "backlog"
+    ? `${common}
+
+<operator-plan-task-path>
+${selection.taskPathRelative}
+</operator-plan-task-path>`
+    : common;
+}
+
 /**
- * Default task resolver: provider-aware resolution narrowed at the use
- * boundary to the existing Backlog selection the planning chain consumes.
- * A Beads store resolves the task natively; the file-bound planning
- * preflights reject it explicitly until their provider slice lands.
+ * Backlog-only compatibility resolver retained for callers that still need the
+ * exact file-bound selection shape. Provider-aware planning uses the
+ * discriminated resolver below.
  */
 const defaultTaskResolver: BacklogTaskResolver = (cwd, rawTaskId) =>
   requireBacklogTaskSelection(
@@ -65,6 +81,7 @@ async function admitResolvedPrepChain(
   source: "native" | "tool",
   preflight?: (ctx: ExtensionContext, selection: string) => void,
   phasePreamble?: string,
+  promptContext?: string,
 ): Promise<PrepChainAdmissionResult> {
   // Preflight both project-owned workflows before beginning a partial
   // transition. Loading them here also keeps every model instruction in the
@@ -90,13 +107,15 @@ async function admitResolvedPrepChain(
     };
   }
 
-  const phasePrompt = phasePreamble ? `${phasePreamble}\n\n${canonicalPhasePrompt}` : canonicalPhasePrompt;
+  const contextualPrepPrompt = promptContext ? `${prepPrompt}\n\n${promptContext}` : prepPrompt;
+  const contextualPhasePrompt = promptContext ? `${canonicalPhasePrompt}\n\n${promptContext}` : canonicalPhasePrompt;
+  const phasePrompt = phasePreamble ? `${phasePreamble}\n\n${contextualPhasePrompt}` : contextualPhasePrompt;
   preflight?.(ctx, selection);
 
   const admission = await admitWorkflowChain({
     deliverFirst: () => source === "tool"
-      ? pi.sendUserMessage(prepPrompt, { deliverAs: "steer" })
-      : pi.sendUserMessage(prepPrompt),
+      ? pi.sendUserMessage(contextualPrepPrompt, { deliverAs: "steer" })
+      : pi.sendUserMessage(contextualPrepPrompt),
     deliverFollowUp: () => pi.sendUserMessage(phasePrompt, { deliverAs: "followUp" }),
   });
   if (!admission.ok) return {
@@ -204,9 +223,9 @@ export async function admitTaskPrepChain(
 }
 
 /**
- * Admit implementation for one exact task through its live provider. Planning
- * intentionally keeps using the Backlog-only function above until its own
- * provider slice. The native provider result stays discriminated and raw.
+ * Admit one exact task through its live provider. The native provider result
+ * stays discriminated and raw. Planning also appends the exact provider/root
+ * binding to both managed prompts; implementation retains its existing prompt.
  */
 export async function admitProviderTaskPrepChain(
   pi: ExtensionAPI,
@@ -220,6 +239,7 @@ export async function admitProviderTaskPrepChain(
     selection: ProviderTaskResolution,
   ) => void | Promise<void>,
   phasePreamble?: string,
+  purpose: "planning" | "implementation" = "implementation",
 ): Promise<ProviderTaskPrepChainAdmissionResult> {
   let selected: ProviderTaskResolution | null;
   try {
@@ -235,7 +255,7 @@ export async function admitProviderTaskPrepChain(
   if (!workflow.allowedStatuses.includes(selected.status)) {
     return {
       ok: false,
-      message: `Task ${selected.taskId} is ${selected.status}; implementation accepts only ${workflow.allowedStatuses.join(" or ")}.`,
+      message: `Task ${selected.taskId} is ${selected.status}; ${purpose === "planning" ? "/plan" : "implementation"} accepts only ${workflow.allowedStatuses.join(" or ")}.`,
       level: "warning",
     };
   }
@@ -259,6 +279,7 @@ export async function admitProviderTaskPrepChain(
     source,
     undefined,
     phasePreamble,
+    purpose === "planning" ? planningProviderPromptContext(selected) : undefined,
   );
   return result.ok ? { ok: true, ...selected } : result;
 }

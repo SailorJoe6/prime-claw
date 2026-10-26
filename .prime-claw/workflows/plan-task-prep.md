@@ -1,43 +1,52 @@
 ---
 name: plan-task-prep
-description: Request focused compaction before task-native Ralph planning without controlling its queued continuation.
+description: Request focused compaction before provider-native Ralph planning without controlling its queued continuation.
 ---
 
-Read the canonical task ID from the `<operator-plan-task-id>` block appended by
-native admission. Treat it only as an operator-selected Backlog task. Do not
-guess, substitute, search for, or select another task.
+Read the canonical task ID from `<operator-plan-task-id>`, the exact selected
+provider from `<operator-plan-task-provider>`, and its exact project root from
+`<operator-plan-task-project-root>`. Backlog also carries
+`<operator-plan-task-path>`; Beads must not. These bindings were selected by
+native admission. Verify that the bound provider remains the sole unambiguous
+live provider, but never reselect or substitute it. Do not guess or search for a
+task, invent a task path, or leave the exact root.
 
 The canonical `plan-task` workflow is already queued independently as the sole
 follow-up. This prep turn cannot cancel, replace, reconstruct, retry, or invoke
-that workflow. Do not run `prepare`; the queued planning turn does that after
-the context boundary.
+that workflow. Do not run `prepare`; the queued planning turn performs the
+provider-appropriate orientation after the context boundary.
 
 ## Light readiness sniff
 
-Resolve the exact task through the supported structured interface:
+Inspect only enough native state to decide whether focused compaction is useful:
 
-```sh
-backlog task view --json -- TASK-ID
-```
+- **Backlog:** from the exact root run `backlog task view --json -- TASK-ID`.
+  Require the returned canonical ID and project-relative path to equal the bound
+  values, status exactly `In Design` or `In Planning`, and Description plus the
+  other supported specification fields not all empty or obvious placeholders.
+- **Beads:** from the exact root run `bd context --json` and
+  `bd show TASK-ID --json --long --include-comments`. Require the context to
+  identify that exact root and its live Dolt store with no redirect, the
+  returned canonical ID to equal the entire selected ID, native status exactly
+  `in_design` or `in_planning` mapped to canonical `In Design` or `In Planning`,
+  and the provider-native specification fields not all empty or obvious
+  placeholders. Retain the complete raw view and raw `design`; do not translate
+  it into a normalized task or use a Backlog queue as Beads readiness evidence.
 
-Inspect only enough returned task state to decide whether focused compaction is
-useful:
-
-- the returned canonical ID matches the admitted task identity;
-- status is exactly `In Design` or `In Planning`; and
-- the task Description and other supported specification fields are not all
-  empty or obvious placeholders.
-
-This is not the authoritative planning-readiness review. If the lookup fails or
-the sniff fails, do not request compaction. Report the bounded reason in the
-required format and end the turn. The queued `plan-task` workflow remains
-responsible for the complete semantic readiness decision.
+This is not the authoritative planning-readiness review. If the bound provider,
+root, lookup, identity, path (when applicable), status, or sniff fails, do not
+request compaction. Report the bounded reason in the required format and end the
+turn. The queued `plan-task` workflow remains responsible for the complete
+semantic readiness decision.
 
 ## Standard compaction request
 
-If the sniff passes, reason from your current conversation context and compose a
-concise `focus_hint` that best prepares you to plan the selected task.
-Use your judgment to decide what context will be most useful for that mission.
+If the sniff passes, reason from your current conversation context and compose
+a concise `focus_hint` to plan the selected task. Keep the selected provider,
+project root, canonical ID, native status, relevant specification context, and
+complete raw Beads view when applicable. Provider observations are factual
+context, not semantic acceptance. Use your judgment to decide what context will
+be most useful for that mission.
 
 Then call exactly once:
 

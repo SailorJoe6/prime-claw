@@ -476,12 +476,19 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
 
     for fragment in (
         "<operator-plan-task-id>",
+        "<operator-plan-task-provider>",
+        "<operator-plan-task-project-root>",
+        "<operator-plan-task-path>",
         "backlog task view --json -- TASK-ID",
+        "bd context --json",
+        "bd show TASK-ID --json --long --include-comments",
         "In Design",
         "In Planning",
         "not the authoritative planning-readiness review",
         "sole follow-up",
         "cannot cancel, replace, reconstruct, retry, or invoke",
+        "complete raw view",
+        "not semantic acceptance",
         "Status",
         "Evidence",
         "Next Step",
@@ -494,28 +501,36 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
 
     for fragment in (
         "<operator-plan-task-id>",
+        "<operator-plan-task-provider>",
+        "<operator-plan-task-project-root>",
+        "<operator-plan-task-path>",
         "backlog task view --json -- TASK-ID",
-        "status to be exactly `In Design` or `In Planning`",
-        "Reject any later status without mutation",
+        "bd dolt pull",
+        "bd show TASK-ID --json --long --include-comments",
+        "native status exactly `in_design` or `in_planning`",
+        "Reject any later status",
         "Description, Acceptance Criteria",
+        "complete raw view",
         "without guessing material product decisions",
         "Do not demand standard risk, recovery, architecture, or process sections",
-        "concise, actionable Implementation Plan",
+        "concise, actionable plan",
         "Small changes may need only a few ordered steps",
         "backlog task edit",
         "set or retain status `In Planning`",
-        "do not edit task Markdown directly",
-        "no path other than that exact returned task path was newly changed",
-        "Commit only the returned task path",
+        "never edit task Markdown directly",
+        "commit only the bound task path",
         "commit contains no other path",
         "push failure is transport evidence",
+        '--design "$PLAN" --status in_planning --if-status CURRENT_NATIVE_STATUS',
+        "bd dolt push --no-adopt",
+        "compatible owner-authored refinement or outside same-task planning change",
         "does not authorize implementation",
         "/implement-task",
     ):
         assert fragment in plan
 
-    # Installed prep policy may differ until deliberate candidate activation.
-    for name in ("plan-task",):
+    # Both managed planning assets are reconciled exactly in this project.
+    for name in ("plan-task-prep", "plan-task"):
         source = workflow(name)
         tracked = ROOT / ".prime-claw" / "workflows" / f"{name}.md"
         assert tracked.read_bytes() == source.read_bytes()

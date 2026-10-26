@@ -182,10 +182,12 @@ workflow commits only the task, asks the operator to review it, and allocates no
 Episode. The operator may request as many specification revisions as needed.
 
 When the specification is ready for planning, the operator invokes `/plan
-TASK-ID`. Native command code resolves the exact task and accepts only `In
-Design` or `In Planning`; the project-customizable workflow writes the native
-Implementation Plan, leaves the task `In Planning`, and stops for a separate
-operator review. Specification approval authorizes planning only.
+TASK-ID`. Native command code resolves the exact task through the repository's
+selected provider and accepts only canonical `In Design` or `In Planning`; the
+project-customizable workflow writes Backlog's native Implementation Plan or
+Beads' raw living `design`, publishes native `In Planning`, proves the exact
+provider result, and stops for a separate operator review. Beads carries no task
+path or mirrored task model. Specification approval authorizes planning only.
 
 The primary implementation boundary is the active `/implement-task TASK-ID`
 path. It resolves one exact approved `In Planning` task, performs the final

@@ -51,6 +51,9 @@ test("registers complete task lifecycle beside retained folder compatibility", (
   assert.equal(f.tools.has("ralph_plan"), false);
   assert.equal(f.tools.has("prime_claw_activate_conversation_guide"), false);
   assert.equal(f.tools.has("prime_claw_conversation_guide_status"), false);
+  const planTaskSchema = f.tools.get("plan_task").parameters;
+  assert.deepEqual(Object.keys(planTaskSchema.properties), ["taskId"]);
+  assert.deepEqual(planTaskSchema.required, ["taskId"]);
 });
 
 test("native plan-spec preserves prep then sole phase follow-up", async () => {
@@ -70,7 +73,69 @@ test("native plan resolves one exact task and preserves prep then sole phase fol
   assert.deepEqual(f.resolved, [{ cwd: f.root, rawTaskId: "10.38" }]);
   assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /PLAN-TASK-PREP POLICY/); assert.equal(f.sent[0].options, undefined);
   assert.ok(f.sent[0].message.includes("<operator-plan-task-id>\nPRIMECLAW-10.38\n</operator-plan-task-id>"));
+  for (const message of f.sent.map(({ message }) => message)) {
+    assert.ok(message.includes("<operator-plan-task-provider>\nbacklog\n</operator-plan-task-provider>"));
+    assert.ok(message.includes(`<operator-plan-task-project-root>\n${f.root}\n</operator-plan-task-project-root>`));
+    assert.ok(message.includes("<operator-plan-task-path>\ntask.md\n</operator-plan-task-path>"));
+  }
   assert.match(f.sent[1].message, /PLAN-TASK POLICY/); assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
+});
+
+test("registered Beads planning route binds exact provider/root with no invented task path", async () => {
+  const calls = [];
+  const providerTaskResolver = (cwd, taskId) => {
+    calls.push({ cwd, taskId });
+    return {
+      provider: "beads", taskId: "BEADS-42", title: "Native planning fixture",
+      nativeStatus: "in_design", status: "In Design", projectRoot: cwd,
+      nativeView: {
+        id: "BEADS-42", title: "Native planning fixture", status: "in_design",
+        description: "Reviewed outcome", design: "Current living plan", comments: [],
+      },
+    };
+  };
+  const native = fixture({ providerTaskResolver });
+  await native.commands.get("plan").handler("BEADS-42", native.ctx);
+  assert.deepEqual(calls, [{ cwd: native.root, taskId: "BEADS-42" }]);
+  assert.equal(native.sent.length, 2);
+  assert.equal(native.sent[0].options, undefined);
+  assert.deepEqual(native.sent[1].options, { deliverAs: "followUp" });
+  for (const message of native.sent.map(({ message }) => message)) {
+    assert.ok(message.includes("<operator-plan-task-id>\nBEADS-42\n</operator-plan-task-id>"));
+    assert.ok(message.includes("<operator-plan-task-provider>\nbeads\n</operator-plan-task-provider>"));
+    assert.ok(message.includes(`<operator-plan-task-project-root>\n${native.root}\n</operator-plan-task-project-root>`));
+    assert.doesNotMatch(message, /<operator-plan-task-path>\n/);
+  }
+
+  const tool = fixture({ providerTaskResolver });
+  const result = await tool.tools.get("plan_task").execute(
+    "plan-beads", { taskId: "BEADS-42" }, undefined, undefined, tool.ctx,
+  );
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(result.details, { admitted: true, taskId: "BEADS-42" });
+  assert.deepEqual(tool.sent[0].options, { deliverAs: "steer" });
+  assert.deepEqual(tool.sent[1].options, { deliverAs: "followUp" });
+});
+
+test("registered Beads planning rejects shorthand identity and later status before delivery", async () => {
+  for (const drift of ["identity", "status"]) {
+    const f = fixture({
+      providerTaskResolver(cwd) {
+        return {
+          provider: "beads", taskId: drift === "identity" ? "BEADS-42-full" : "BEADS-42",
+          title: "Native planning fixture", nativeStatus: drift === "status" ? "in_progress" : "in_design",
+          status: drift === "status" ? "In Progress" : "In Design", projectRoot: cwd,
+          nativeView: { id: "BEADS-42", title: "Native planning fixture", status: "in_design", design: "Plan" },
+        };
+      },
+    });
+    const result = await f.tools.get("plan_task").execute(
+      `plan-beads-${drift}`, { taskId: "BEADS-42" }, undefined, undefined, f.ctx,
+    );
+    assert.equal(result.isError, true, drift);
+    assert.equal(f.sent.length, 0, drift);
+    assert.match(result.content[0].text, drift === "identity" ? /different canonical ID/ : /accepts only In Design or In Planning/);
+  }
 });
 
 test("plan_task steers prep, queues sole phase follow-up, and returns canonical identity", async () => {

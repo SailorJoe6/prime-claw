@@ -12,13 +12,18 @@ plan_spec({"location":".ralph/plans/future/<slug>"})
 /implement-task TASK-ID [--host id:<project-host-setup-id>]
 ```
 
-Task planning resolves one exact task through Backlog's structured CLI and
-admits only `In Design` or `In Planning`. Folder-compatible admission validates
-one exact project-relative future folder. Every path preloads both project-owned
-workflow files before sending either message. Planning, implementation
-preparation, ordinary handoff, and owned-Episode handoff use one internal prompt
-loader and one two-message admission sequence. Their public entry points,
-validation, authority, and delivery transports remain separate.
+Task planning resolves one exact task through the repository's selected native
+provider and admits only canonical `In Design` or `In Planning`. Backlog keeps
+its exact returned task path; Beads keeps its exact project root, entire
+canonical ID, native status, and complete raw view without inventing a path.
+Both planning messages carry the exact provider/root binding selected by the
+same discriminated resolver used by implementation admission. Folder-compatible
+admission validates one exact project-relative future folder. Every path
+preloads both project-owned workflow files before sending either message.
+Planning, implementation preparation, ordinary handoff, and owned-Episode
+handoff use one internal prompt loader and one two-message admission sequence.
+Their public entry points, validation, authority, and delivery transports remain
+separate.
 Read-only legacy lookup is limited to `handoff` and `execute` so an active
 old-layout Episode can finish from its unchanged snapshot.
 
@@ -46,9 +51,15 @@ event, recreate the phase prompt, or control the already queued follow-up. The
 phase workflow performs its own preparation and semantic readiness review after
 the turn boundary.
 
-Task-native planning updates only the selected task; folder-compatible planning
-updates only the selected future bundle. Both stop for operator review and never
-authorize implementation.
+Task-native planning updates only the selected provider-native task. Backlog
+writes and commits only its native Implementation Plan task path. Beads uses one
+native synchronization/read, LLM planning over the complete raw view, one
+guarded raw `design` plus `in_planning` update, one non-force publication, and
+exact native reread/publication proof; it never consults the Backlog-only queue,
+creates a task path, or mirrors content. Compatible same-task refinements are
+facts for the planning LLM rather than approval locks. Folder-compatible
+planning updates only the selected future bundle. Both stop for operator review
+and never authorize implementation.
 
 Retained implementation admission records a minimal in-memory guard for the
 current owner session, exact folder, and optional stable setup ID. The guard
