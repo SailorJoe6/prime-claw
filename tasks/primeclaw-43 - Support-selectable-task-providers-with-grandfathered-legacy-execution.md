@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 17:19'
+updated_date: '2026-10-26 17:38'
 labels: []
 dependencies: []
 references:
@@ -54,6 +54,17 @@ modified_files:
   - src/prime-agent-plugin/workflows/plan-task-prep.md
   - src/prime-agent-plugin/workflows/plan-task.md
   - tests/test_future_plan_skills.py
+  - .agents/skills/design/SKILL.md
+  - .agents/skills/spec-it-out/SKILL.md
+  - LONG_RANGE_PLAN.md
+  - >-
+    backlog/tasks/primeclaw-43 -
+    Support-selectable-task-providers-with-grandfathered-legacy-execution.md
+  - docs/future-specification-bundles.md
+  - docs/user-stories/C-specification.md
+  - src/prime-agent-plugin/skills/project-templates/design.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
+  - tests/test_project_initialization.py
 priority: p1
 type: epic
 ordinal: 125000
@@ -1194,6 +1205,10 @@ Validation before Docker: focused registered-route Node 32/32; managed workflow/
 Docker tier 1/offline RPC probe passed with immutable image launch, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261026T171332Z-76905-a1abd6a3/tier1`.
 
 2026-10-26 owner review accepted selected-provider planning candidate `d60fe6f9090d56e0babec600cf40f23707796dc3`. Next bounded slice: make managed `/design` and `/spec-it-out` create or revise exactly one native `In Design` task through the selected live provider while preserving discovery-first versus conversation-synthesis behavior, one-at-a-time material questions, living specification updates, and separate planning/implementation approval. Backlog retains exact canonical ID/path and native Description, Acceptance Criteria, References, and Documentation semantics, with no plan/notes/final-summary authoring in design. Beads uses provider/root-native context and supported `bd` create/show/update fields; create explicitly `in_design` or revise only the exact selected canonical `in_design` ID, preserve all other provider-native fields and reference/documentation meaning without normalization or mirroring, and prove native sync/read, one guarded mutation/publication, exact raw/status/revision/ref/clean state. Uncertain creation is never authority to create again; later states reject before mutation. Preserve customized installed skills and reconcile only affected managed assets. Exclude provider initialization/switching, planning/Episode creation, new public tools/params/tracker CLI, approval state/digests/sidecars/registry/framework/classifier/retries/force/raw writes, Prime Agent changes, unrelated lifecycle/workspace/cleanup, grandfather/migration/cutover, and PRIMECLAW-43.1. Validate representative native create, revise, later-state refusal, and uncertain-single-create behavior plus focused/full host and Docker tier 1; push one clean candidate and stop for owner review.
+
+2026-10-26 Episode provider-native authoring slice in progress: updated managed and repository-customized `/design` and `/spec-it-out` Markdown only (no new TypeScript/tool/state) so each selects the sole live provider, preserves discovery-first versus synthesis-first questioning, creates exactly one explicit native `In Design` task or revises only one exact native `In Design` ID, maintains the living specification, rejects later states, and stops at separate specification review. Backlog retains native Description/Acceptance Criteria/References/Documentation and exact task-only commit/push. Beads uses raw description/acceptance, lossless human-readable reference/documentation prose when needed, complete raw views, guarded `--if-status in_design` revision, one non-force Dolt publication, exact revision/ref/clean proof, and no `design` plan. Uncertain creation has one attempt and never retries or guesses identity. Customized installed assets retain their repository-specific explicit-default wording and remain `state: customized`; source/installed hashes were reconciled without accept/reset. Representative native Beads/Dolt UAT: create `AUTH-d8g` at revision `fi6kahd86188dhamdcrprlobs57t0lmp`, revise same ID to `2uf187qce43klqcvmt88qapmg2srnbv7` with title/notes/status/priority/type/owner/labels/creation data unchanged, publish `refs/dolt/data` `f4d2c9f3fea223f6718be14ce24e79e6e4ee362a`, then advance to `in_planning` and prove guarded authoring refusal exit 13 with identical raw view and revision. Shimmed ambiguous-create model UAT executed exactly one create call, received exit 1 with no identity, stopped with no reread/push/retry, and the native store later proved exactly one resulting `in_design` task (`AUTH-h4t`). Focused Python 45/45 and related Node 113/113 passed; independent final candidate review and full/Docker validation remain pending.
+
+2026-10-26 provider-native authoring slice candidate complete. Managed and customized installed `/design` and `/spec-it-out` now support sole-live-provider Backlog or Beads authoring with no new deterministic adapter/tool/state. `/design` keeps discovery-first orientation and skips the Backlog-only queue when Beads is selected; `/spec-it-out` keeps synthesis-first behavior. Both use one exact native `In Design` identity, living specification updates, later-state refusal, one-attempt uncertain-create safety, provider-native publication/proof, and separate planning/implementation approval. Customized installed assets retain only this repository's explicit-default wording and remain `customized` with exact source/installed hashes. Native UAT proved Beads create `AUTH-d8g`, same-ID guarded revision with unrelated fields unchanged, published revisions/ref, zero-write `in_planning` refusal, and a model-driven ambiguous-create flow with exactly one shimmed create call and no retry/read/push after lost identity. Independent candidate review found no material findings after reloading final bytes. Final validation: focused Python 45 passed, 5 skipped; related Node 113/113; full Node 410/410; full Python 677 passed, 69 skipped, 75 subtests passed with three unchanged unrelated baselines (`test_mocked_runtime_tests_are_host_safe_tier0`, missing bridge for `task_episode_admission_extension.test.mjs`, and Backlog source pin fd20f714 vs 5d556c19); Docker tier 1 passed at `.test-results/20261026T173436Z-53664-3ca744ad/tier1`; `git diff --check` passed. PRIMECLAW-43 remains `In Progress`; this slice does not authorize planning, implementation admission, merge, task lifecycle completion, provider cutover, or PRIMECLAW-43.1.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
