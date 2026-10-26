@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.40
 title: Make task-native Episode cleanup complete and owner-safe
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-10-20 04:32'
-updated_date: '2026-10-21 19:58'
+updated_date: '2026-10-26 16:50'
 labels: []
 dependencies: []
 references:
