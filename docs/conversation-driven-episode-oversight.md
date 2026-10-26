@@ -349,8 +349,11 @@ explicit Backlog without revision/evidence remains branch-local. Explicit
 Backlog with both fields binds the disconnected published task head and native
 view separately from code. Admission publishes In Progress in the primary
 nested clone, allocation prepares the Episode nested clone before session
-creation, and handoff proves descendant/direct publication in both clones before
-recording current evidence after message admission. Conversation lifecycle
+creation, refreshes clean descendant task facts without treating raw snapshot
+inequality as approval, and gives the initial execute assignment the complete
+previous/current native views and revisions. Handoff likewise proves
+descendant/direct publication in both clones before recording current evidence
+after message admission. Conversation lifecycle
 updates use the primary nested clone and Episode content updates use its own
 nested clone; both commit only task paths and non-force-push
 `HEAD:refs/heads/prime-claw/tasks`, while code heads remain separate. Cleanup

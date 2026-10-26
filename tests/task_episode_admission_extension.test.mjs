@@ -20,6 +20,7 @@ import {
   resolveBacklogTask,
 } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
 import {
+  prepareEpisodeTaskHistoryWorkspace,
   prepareTaskHistoryWorkspace,
   publishTaskHistoryMutation,
   TASK_HISTORY_REF,
@@ -173,6 +174,7 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   };
   let preSessionView = null;
   let delivered = 0;
+  let deliveredExecutePrompt = "";
   const publisher = {
     async createFresh(options) {
       assert.ok(existsSync(join(options.worktree, ".backlog", ".git")), "nested task checkout exists before session allocation");
@@ -182,16 +184,36 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
       await options.onAllocated?.(identity);
       return { ...identity, activeSessionId: "independent-route" };
     },
-    async deliverExecute() { delivered += 1; },
+    async deliverExecute(_route, prompt) { delivered += 1; deliveredExecutePrompt = prompt; },
     close() {},
   };
   const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
     getSessionId: () => "independent-owner", getSessionFile: () => join(dir, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
   } };
   const taskResolver = (cwd, id) => resolveBacklogTask(cwd, id, runner);
+  let preparationCalls = 0;
+  let interleavedAdvance = null;
+  let reservedProviderRevision = "";
+  let reservedTaskEvidence = null;
+  const prepareEpisodeTaskHistory = (input) => {
+    preparationCalls += 1;
+    if (preparationCalls === 1) {
+      const reserved = records.get("independent-owner");
+      reservedProviderRevision = reserved.providerRevision;
+      reservedTaskEvidence = structuredClone(reserved.taskEvidence);
+      interleavedAdvance = publishTaskHistoryMutation({
+        primaryRoot: root, targetWorktree: root, taskId,
+        edits: [{ option: "--append-notes", value: "compatible pre-session observation marker" }],
+        runner,
+      });
+      assert.equal(interleavedAdvance.status, "published");
+    }
+    return prepareEpisodeTaskHistoryWorkspace(input);
+  };
   const result = await createTaskEpisode(taskId, "independent-call", ctx, {
     admissionGit: new CliTaskEpisodeAdmissionGit(), admissionRunner: runner, taskResolver,
-    ownership, publisher, reservationOperationId: "independent-operation", now: () => "2026-10-26T20:00:00.000Z",
+    prepareEpisodeTaskHistory, ownership, publisher,
+    reservationOperationId: "independent-operation", now: () => "2026-10-26T20:00:00.000Z",
   }, { engine: "local" });
   const publishedTaskHead = git(prepared.storeDir, "rev-parse", "HEAD");
   assert.notEqual(publishedTaskHead, plannedTaskHead);
@@ -200,11 +222,23 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   assert.equal(result.baseRef, codeHead);
   assert.equal(result.head, codeHead);
   assert.equal(result.providerRevision, publishedTaskHead);
+  assert.equal(result.providerRevision, interleavedAdvance.publishedHead);
   assert.equal(result.taskEvidence.task.id, taskId);
   assert.equal(result.taskEvidence.task.status, "In Progress");
+  assert.match(result.taskEvidence.task.implementationNotes, /compatible pre-session observation marker/);
   assert.equal(preSessionView.id, taskId);
   assert.equal(preSessionView.status, "In Progress");
   assert.equal(delivered, 1);
+  assert.equal(result.taskId, taskId);
+  assert.equal(result.episodeId, "independent-episode");
+  assert.equal(result.episodeActiveSessionId, "independent-route");
+  assert.equal(preparationCalls, 2);
+  assert.match(deliveredExecutePrompt, /<provider-task-observation>/);
+  assert.ok(deliveredExecutePrompt.includes(JSON.stringify(reservedTaskEvidence)));
+  assert.ok(deliveredExecutePrompt.includes(JSON.stringify(result.taskEvidence)));
+  assert.match(deliveredExecutePrompt, new RegExp(reservedProviderRevision));
+  assert.match(deliveredExecutePrompt, new RegExp(interleavedAdvance.publishedHead));
+  assert.match(deliveredExecutePrompt, /records observations, not semantic acceptance or a new authority/);
   assert.equal(git(result.worktree, "rev-parse", "HEAD"), codeHead);
   assert.equal(git(join(result.worktree, ".backlog"), "rev-parse", "HEAD"), publishedTaskHead);
   assert.notEqual(realpathSync(join(root, ".backlog", ".git")), realpathSync(join(result.worktree, ".backlog", ".git")));

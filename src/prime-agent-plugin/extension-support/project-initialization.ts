@@ -648,11 +648,26 @@ function ensureProjectTaskProvider(
     if (detection.evidence.provider !== "backlog" || !taskHistoryPreparer) {
       return { status: "selected", provider: detection.evidence.provider };
     }
+    const prepareSelectedBacklog = (): TaskProviderSetup => {
+      try {
+        const prepared = taskHistoryPreparer({ primaryRoot: projectRoot, runner });
+        return prepared.status === "prepared"
+          ? { status: "selected", provider: "backlog", taskHistoryHead: prepared.head }
+          : { status: "blocked", code: "task-history", detail: `${prepared.code}: ${prepared.detail}`, remediation: prepared.remediation };
+      } catch (error) {
+        return { status: "failed", detail: `task-history preparation failed: ${error instanceof Error ? error.message : String(error)}` };
+      }
+    };
+    // A selected root configuration is valid Backlog evidence but has no
+    // materialized store path. Route it through native preparation before any
+    // path operation so the existing root-authority preservation block is
+    // surfaced without rewriting configuration or migrating task data.
+    if (detection.evidence.storeDir === null) return prepareSelectedBacklog();
     const nestedGit = join(detection.evidence.storeDir, ".git");
     const entry = lstatIfPresent(nestedGit);
     if (!entry) {
-      // Existing ordinary/root/custom Backlog authority is grandfathered and
-      // never adopted or normalized during routine initialization.
+      // Existing ordinary/custom Backlog authority is grandfathered and never
+      // adopted or normalized during routine initialization.
       return { status: "selected", provider: "backlog" };
     }
     if (!entry.isDirectory() || entry.isSymbolicLink()) {
@@ -662,14 +677,7 @@ function ensureProjectTaskProvider(
         remediation: "restore a real contained ordinary nested clone or remove the unsafe .git entry after review; never follow or adopt it",
       };
     }
-    try {
-      const prepared = taskHistoryPreparer({ primaryRoot: projectRoot, runner });
-      return prepared.status === "prepared"
-        ? { status: "selected", provider: "backlog", taskHistoryHead: prepared.head }
-        : { status: "blocked", code: "task-history", detail: `${prepared.code}: ${prepared.detail}`, remediation: prepared.remediation };
-    } catch (error) {
-      return { status: "failed", detail: `task-history preparation failed: ${error instanceof Error ? error.message : String(error)}` };
-    }
+    return prepareSelectedBacklog();
   }
   if (detection.kind === "blocked") return { status: "blocked", code: detection.code, detail: detection.detail, remediation: detection.remediation };
   if (taskHistoryPreparer) {

@@ -1265,6 +1265,15 @@ interface EpisodeHandoffPromptIdentity {
   providerTaskObservation?: string;
 }
 
+function providerTaskObservationBlock(observation: string): string {
+  return `
+
+<provider-task-observation>
+${observation}
+</provider-task-observation>
+The JSON above is exact factual provider-native before/current context for this continuation. It records observations, not semantic acceptance or a new authority.`;
+}
+
 async function prepareOwnedEpisodeHandoff(
   record: EpisodeOwnershipRecord,
   guidance: string,
@@ -1307,12 +1316,7 @@ async function prepareOwnedEpisodeHandoff(
   });
   if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
   if (promptIdentity.providerTaskObservation) {
-    const observation = `
-
-<provider-task-observation>
-${promptIdentity.providerTaskObservation}
-</provider-task-observation>
-The JSON above is exact factual provider-native before/current context for this continuation. It records observations, not semantic acceptance or a new authority.`;
+    const observation = providerTaskObservationBlock(promptIdentity.providerTaskObservation);
     handoffPrompt += observation;
     executePrompt += observation;
   }
@@ -1867,8 +1871,8 @@ function preparePublishedBacklogEpisodeWorkspace(
   repo: string,
   dependencies: TaskEpisodeAllocationDependencies,
   store: EpisodeOwnershipStore,
-): TaskEpisodeOwnershipRecord {
-  if (!isPublishedBacklogTaskEpisodeOwnership(record)) return record;
+): { record: TaskEpisodeOwnershipRecord; providerTaskObservation?: string } {
+  if (!isPublishedBacklogTaskEpisodeOwnership(record)) return { record };
   const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
   const prepared = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
     primaryRoot: repo,
@@ -1897,12 +1901,16 @@ function preparePublishedBacklogEpisodeWorkspace(
   } catch (error) {
     throw new EpisodeStateUncertainError(`Independent Backlog task was unreadable before Episode session start: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (JSON.stringify(evidence.task) !== JSON.stringify(record.taskEvidence.task)) {
-    throw new EpisodeStateUncertainError("Independent Backlog target task changed after reservation and before Episode session start");
-  }
-  const resolved = (dependencies.taskResolver ?? defaultEpisodeTaskResolver(runner))(record.worktree!, record.taskId);
-  if (!resolved || resolved.taskId !== record.taskId || resolved.taskPathRelative !== record.taskPath
-      || resolved.status !== "In Progress" || !meaningfulTaskImplementationPlan(resolved.implementationPlan)) {
+  const rawTask = evidence.task;
+  if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
+      || (rawTask as Record<string, unknown>).id !== record.taskId
+      || (rawTask as Record<string, unknown>).path !== record.taskPath
+      || (rawTask as Record<string, unknown>).status !== "In Progress"
+      || !meaningfulTaskImplementationPlan(
+        typeof (rawTask as Record<string, unknown>).implementationPlan === "string"
+          ? (rawTask as Record<string, unknown>).implementationPlan as string
+          : null,
+      )) {
     throw new EpisodeStateUncertainError("Independent Backlog Episode task checkout does not expose the exact reserved In Progress task");
   }
   const paired = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
@@ -1913,7 +1921,13 @@ function preparePublishedBacklogEpisodeWorkspace(
   if (paired.status !== "prepared" || paired.head !== prepared.head) {
     throw new EpisodeStateUncertainError("Independent Backlog task history changed during pre-session publication proof");
   }
-  if (prepared.head === record.providerRevision) return record;
+  if (prepared.head === record.providerRevision) return { record };
+  const providerTaskObservation = JSON.stringify({
+    previousProviderRevision: record.providerRevision,
+    publishedProviderRevision: prepared.head,
+    previousTaskEvidence: record.taskEvidence,
+    currentTaskEvidence: evidence,
+  });
   const advanced = updated(record, {
     providerRevision: prepared.head,
     taskEvidence: evidence,
@@ -1924,7 +1938,7 @@ function preparePublishedBacklogEpisodeWorkspace(
   if (!verified || JSON.stringify(verified) !== JSON.stringify(advanced)) {
     throw new EpisodeStateUncertainError("Independent Backlog Episode could not persist current task-history evidence before session start");
   }
-  return advanced;
+  return { record: advanced, providerTaskObservation };
 }
 
 export async function allocateReservedTaskEpisode(
@@ -1995,12 +2009,16 @@ export async function allocateReservedTaskEpisode(
       git.createWorktree(repo, branch, worktree, record.baseRef);
       git.assertCleanWorktree(worktree);
       if (git.head(worktree) !== record.baseRef) throw new EpisodeStateUncertainError("Local task-native Episode did not start at the reserved code head");
-      record = preparePublishedBacklogEpisodeWorkspace(record, repo, dependencies, store);
-      const executePrompt = canonicalWorkflowPrompt(worktree, "execute", {
+      const preparedWorkspace = preparePublishedBacklogEpisodeWorkspace(record, repo, dependencies, store);
+      record = preparedWorkspace.record;
+      let executePrompt = canonicalWorkflowPrompt(worktree, "execute", {
         location: { tag: "operator-episode-task", value: record.taskId },
         ownerSessionId: record.ownerSessionId,
       });
       if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
+      if (preparedWorkspace.providerTaskObservation) {
+        executePrompt += providerTaskObservationBlock(preparedWorkspace.providerTaskObservation);
+      }
       const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
       const published = await publisher.createFresh({
         worktree, sessionName: `${taskLabel}-episode`, model,
@@ -2037,12 +2055,16 @@ export async function allocateReservedTaskEpisode(
     });
     store.write(repo, record);
     git.assertCleanWorktree(worktree.path);
-    record = preparePublishedBacklogEpisodeWorkspace(record, repo, dependencies, store);
-    const executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
+    const preparedWorkspace = preparePublishedBacklogEpisodeWorkspace(record, repo, dependencies, store);
+    record = preparedWorkspace.record;
+    let executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
       location: { tag: "operator-episode-task", value: record.taskId },
       ownerSessionId: record.ownerSessionId,
     });
     if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
+    if (preparedWorkspace.providerTaskObservation) {
+      executePrompt += providerTaskObservationBlock(preparedWorkspace.providerTaskObservation);
+    }
     const before = new Set((await publisher.list()).map((session) => session.sessionId).filter((value): value is string => Boolean(value)));
     const launchAutomationName = `prime-claw-launch-${record.operationId}`;
     record = updated(record, { launchAutomationName });

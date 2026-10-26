@@ -547,6 +547,32 @@ test("reconcile blocks an unsafe nested Backlog .git identity instead of grandfa
   assert.equal(lstatSync(join(root, ".backlog", ".git")).isSymbolicLink(), true);
 });
 
+test("reconcile routes selected root Backlog evidence with no materialized store through safe preparation", (t) => {
+  const parent = mkdtempSync(join(tmpdir(), "pc-init-root-config-"));
+  const root = repo(t, parent);
+  const remote = join(parent, "remote.git");
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  git(root, "remote", "add", "origin", remote);
+  git(root, "push", "-qu", "origin", "main");
+  const rootConfig = join(root, "backlog.config.yml");
+  const originalConfig = "project_name: Fixture\n";
+  writeFileSync(rootConfig, originalConfig);
+  const runner = new Runner([{ id: "registered", path: root, displayName: "fixture" }]);
+  let prepares = 0;
+  const result = reconcilePrimeClawProject({
+    cwd: root, pluginRoot: PLUGIN, home: dirname(root), runner,
+    taskHistoryPreparer: (input) => { prepares += 1; return prepareTaskHistoryWorkspace(input); },
+  });
+  assert.equal(prepares, 1);
+  assert.equal(result.taskProvider.status, "blocked");
+  assert.equal(result.taskProvider.code, "task-history");
+  assert.match(result.taskProvider.detail, /config-not-preserved/);
+  assert.match(result.taskProvider.detail, /root configuration/);
+  assert.equal(readFileSync(rootConfig, "utf8"), originalConfig);
+  assert.equal(existsSync(join(root, "backlog")), false);
+  assert.equal(existsSync(join(root, ".backlog")), false);
+});
+
 test("production initialization prepares and reuses an independent published .backlog workspace", (t) => {
   const parent = mkdtempSync(join(tmpdir(), "pc-init-history-"));
   const root = repo(t, parent);

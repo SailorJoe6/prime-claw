@@ -505,14 +505,18 @@ continue to parse and run unchanged.
 
 After the registered Episode code worktree exists, allocation prepares its
 independent nested clone before creating a session, Orca automation, or execute
-delivery. It requires the exact reserved In Progress task and meaningful plan.
-A clean published descendant may fast-forward both nested clones; unrelated
-advances are allowed only when the bound task view is unchanged during initial
-allocation. The handoff boundary later accepts the owner-authorized current
-In Progress task view, proves descendant/directly published history in both
-stores, refreshes any idle durable session route before constructing the factual
-observation, and records only current provider revision, native evidence, code
-head, and time after the first handoff message is admitted.
+delivery. It requires the exact reserved task ID/path, current `In Progress`
+status, meaningful plan, clean published descendant history, and unchanged
+resource identity. A prior/current raw-task difference is factual context, not
+an approval gate: allocation refreshes the ownership revision/evidence and
+appends the complete exact previous/current native views and revisions to the
+initial canonical execute assignment through the same provider-observation
+block used by handoff. Status, identity, removed-plan, ancestry, publication,
+and cleanliness failures still stop before assignment. The handoff boundary
+later applies the same factual-observation rule, proves descendant/directly
+published history in both stores, refreshes any idle durable session route, and
+records only current provider revision, native evidence, code head, and time
+after the first handoff message is admitted.
 
 Conversation and Episode workflow policy preserves two Backlog modes.
 Grandfathered mode keeps task commits in the code DAG. Independent mode performs

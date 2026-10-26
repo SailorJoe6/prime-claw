@@ -38,7 +38,10 @@ fresh task-native Episode receives:
 - a fresh durable Prime Agent session rooted at that worktree;
 - a visible writable Orca Prime Agent tab when Orca placement is selected;
 - exactly one fixed execute assignment bound to the task ID and carrying the
-  originating Conversation's exact registry key; and
+  originating Conversation's exact registry key; for independent Backlog, a
+  clean published descendant refreshes factual task/revision evidence and adds
+  complete exact previous/current native views to that same assignment rather
+  than treating old raw JSON as approval; and
 - durable ownership by that originating Conversation, which the Episode resolves
   by the supplied key rather than its own session ID.
 
