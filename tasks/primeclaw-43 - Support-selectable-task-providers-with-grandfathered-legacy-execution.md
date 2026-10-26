@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 22:01'
+updated_date: '2026-10-26 22:24'
 labels: []
 dependencies: []
 references:
@@ -13,14 +13,15 @@ references:
     https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md
   - 'https://www.dolthub.com/docs/concepts/dolt/git/remotes/'
 documentation:
-  - docs/backlog.md
-  - docs/handoff-chain.md
-  - docs/conversation-driven-episode-oversight.md
-  - docs/user-stories/H-handoff-and-continuation.md
-  - docs/user-stories/traceability.md
   - VISION.md
+  - docs/backlog.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/handoff-chain.md
   - docs/prep-chain.md
   - docs/user-stories/D-planning.md
+  - docs/user-stories/E-episode-promotion.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/traceability.md
 modified_files:
   - .agents/skills/blocked/SKILL.md
   - .agents/skills/design/SKILL.md
@@ -37,6 +38,7 @@ modified_files:
   - docs/future-specification-bundles.md
   - docs/handoff-chain.md
   - docs/prep-chain.md
+  - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/F-episode-execution.md
   - docs/user-stories/G-oversight-and-review.md
   - docs/user-stories/H-handoff-and-continuation.md
@@ -1323,6 +1325,13 @@ Repair only these two confirmed contract defects while preserving every other ac
 2. `preparePublishedBacklogEpisodeWorkspace` in `spec-episode.ts` rejects a clean published descendant when only compatible task content such as implementationNotes/design changed after reservation because it compares the full current task JSON to the old ownership snapshot. Remove that old-snapshot approval gate. Keep exact ID/path/In Progress/meaningful-plan, provider/task/code ancestry, paired publication, cleanliness, and resource-identity gates. Refresh factual revision/task evidence and deliver complete exact previous/current native task views and revisions to the initial canonical execute assignment through the existing observation mechanism, so the new Episode LLM can incorporate compatible content or escalate a real semantic conflict before task writes. Add a production/vertical admission interleaving regression for compatible content change and successful one-session/one-assignment delivery with exact before/current context. Preserve status, identity, and removed-plan failures.
 
 Do not add approval steps, caller parameters, receipt/snapshot authority, semantic classifiers, or state machinery. Keep Beads, branch-local/provider-absent Backlog, and version 1 unchanged. No live registry/store migration, Episode cleanup, merge, abandonment, destructive cleanup, or PRIMECLAW-43.1 cutover. Run focused/full host validation, Docker tier 1, both exact reproductions, independent review, and push one clean repaired candidate. Stop for owner review.
+
+2026-10-26 — Owner-requested two-defect repair implemented and validated
+
+1. Project initialization now checks selected Backlog `storeDir: null` before any path operation and routes root-config evidence through the existing task-history preparer. Its existing `config-not-preserved` block is surfaced as task-history remediation without overwriting `backlog.config.yml`, creating a store, or migrating data. The exact registered-style root-config regression proves one preparer call, no exception, unchanged config bytes, and no `backlog/` or `.backlog/` creation.
+2. Pre-session independent Backlog allocation no longer compares current raw task JSON to the reservation snapshot as approval. It keeps exact task ID/path, `In Progress`, meaningful-plan, descendant, paired publication, clean-store, and resource gates; refreshes the factual provider revision/native task evidence; and appends exact previous/current revisions and complete native views to the sole initial canonical execute assignment using the existing `<provider-task-observation>` block. The production vertical admission regression publishes a compatible notes advance between reservation and session preparation, then proves the same task/session/one assignment and exact before/current context. Status, identity, missing-plan, ancestry, publication, cleanliness, and resource failures remain fail-closed.
+
+Exact reproductions: the root-config reconcile test passes without path failure or mutation; `/tmp/primeclaw43-backlog-pre-session-observation.mjs` now returns `RESULT active`. Focused related Node: 176/176; final full Node: 448/448. Focused Python: 17 passed/10 skipped. Final Python: 677 passed/69 skipped with only the same three pre-existing baseline failures. Docker tier 1/offline probe passed with teardown and manifest publication. Modified TypeScript imports and `git diff --check` pass. No Beads, provider-absent Backlog, version-1, ownership, Episode resource, live registry/store migration, cleanup, merge, abandonment, or PRIMECLAW-43.1 cutover behavior was changed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1427,4 +1436,6 @@ Next authorized bounded slice after `6f23dd8`: make `/plan TASK-ID` and `plan_ta
 Completed the bounded provider-aware planning route. `/plan TASK-ID` and `plan_task` now resolve the sole live native provider before compact-first admission, bind the exact provider/root into both canonical messages, preserve Backlog's exact task-path/Implementation-Plan flow, and give Beads a path-free native `in_design`/`in_planning` flow over its complete raw task and living `design`. Managed planning instructions perform native sync/read, LLM semantic planning, one guarded design plus `in_planning` update, one non-force publication, exact raw/revision/ref proof, and stop for separate implementation approval. Compatible same-task refinements remain factual LLM input rather than approval locks. Exact managed asset copies/hashes, registered-route regressions, real Beads/Dolt publication UAT, focused/full host validation, and Docker tier 1 cover the slice. No new public tool parameter, provider framework, normalized task model, task mirror/path for Beads, persistent state, semantic classifier, retry/force/raw write, implementation approval, later lifecycle, legacy migration, or PRIMECLAW-43.1 work was added. Remaining whole-feature work includes provider-native design/spec authoring and the explicitly deferred lifecycle, grandfather/migration, terminal, cleanup, and cutover slices; this candidate stops for owner review.
 
 Completed the bounded provider-native Beads merge-readiness and merge-status Conversation slice. Accepted pushed Beads candidates can now publish guarded `ready_for_merge`; Delay changes nothing; explicit Request Changes publishes guarded `in_progress` then reuses the existing same-Episode handoff; and an explicitly authorized exact code tuple uses fresh native/code preflight, ordinary ff-only main integration plus normal code push, then guarded native `done` with truthful tuple/code evidence. No public lifecycle surface, receipt, snapshot, ownership state, semantic classifier, custom publisher/protocol, retry/force/replay, task-file mirror, or immutable provider-revision approval gate was added. Backlog Request Changes conflict preservation was independently reviewed and explicitly retained. Representative real Beads/Dolt/Git UAT, focused suites, full Node/Python, and Docker tier 1 pass apart from the same three unrelated host-Python baselines. PRIMECLAW-43 remains In Progress for owner review; abandonment, finalization/cleanup, workspace wiring, grandfather/legacy transition, migration/cutover, and PRIMECLAW-43.1 remain outside this candidate.
+
+Owner-requested follow-up to c82debb repairs the nullable selected root-config path and removes old Backlog snapshot equality from pre-session authorization. Current semantic/identity/publication/resource gates remain authoritative; compatible published descendants refresh factual evidence and reach the initial execute assignment with complete previous/current provider observations. Both exact reproductions, full Node/Python, and Docker tier 1 pass apart from the same three unrelated host-Python baselines. PRIMECLAW-43 remains In Progress for owner review; no migration, cutover, merge, abandonment, finalization, or cleanup occurred.
 <!-- SECTION:FINAL_SUMMARY:END -->
