@@ -26,7 +26,9 @@ non-empty active `SPECIFICATION.md` and `IMPLEMENTATION_PLAN.md` files in its
 recorded Episode worktree, accepting the retained `EXECUTION_PLAN.md` spelling.
 Missing active files are not live identity and never permit task-native or
 no-ownership fallback. They permit only the exact blocked-pair recovery below
-for that persisted version-1 record and recorded worktree. A valid version-2
+for that persisted version-1 record and recorded worktree. That recovery binds
+persisted ownership and does not require the original future source folder or a
+live task provider. A valid version-2
 record selects task mode even when the assignment has no task block.
 Require the exact persisted owner session, a top-level Conversation, the
 repository root of the canonical primary `main` checkout, and the record's exact

@@ -12,8 +12,10 @@ The operator alone decides product direction, scope changes, merge,
 abandonment, destructive cleanup, and any future remote transport. The
 Conversation may review evidence, accept an in-scope candidate, record a bounded
 revision, pause, or consult the operator. It does not implement Episode work.
-A retained version-1 Episode implements only its promoted specification and
-execution plan. A version-2 Episode implements only the exact provider-native
+A retained version-1 Episode implements only its promoted frozen specification
+and living execution plan. The active specification must match its exact
+location and accepted digest in `.prime-claw/legacy-specifications.json`, while
+the original future source may be absent. A version-2 Episode implements only the exact provider-native
 task selected by its owner record. Provider-absent or `provider: "backlog"`
 retains the canonical ID, project-relative task path, and supported Backlog
 contract. `provider: "beads"` instead has no task path and binds the canonical
@@ -342,7 +344,7 @@ guarded native publication proof described below; abandonment, finalization,
 and cleanup remain unavailable. The Conversation never routes through
 Backlog-only commands for Beads or writes the ownership registry directly.
 
-Persisted active version-1 ownership keeps its specification/plan pair active while blocked and throughout candidate review or revision. An older blocked snapshot with no active pair is not live: only after an explicit operator unblock decision may the blocked skill call `restore_blocked_spec_episode` for the exact owned future folder. The tool restores the exact readable pair without clobber or mode fallback and revalidates the same active identity. No-ownership old in-place blocking remains separate.
+Persisted active version-1 ownership keeps its frozen-specification/living-plan pair active while blocked and throughout candidate review or revision. An older blocked snapshot with no active pair is not live: only after an explicit operator unblock decision may the blocked skill call `restore_blocked_spec_episode` for the exact owned future-folder identity. The tool requires the blocked specification to match the accepted inventory digest before either file moves, works without the original future source or a task provider, restores the exact readable pair without clobber or mode fallback, and revalidates the same active identity. No-ownership old in-place blocking remains separate.
 
 Backlog version-2 ownership has two compatible topologies. Provider-absent or
 explicit Backlog without revision/evidence remains branch-local. Explicit
@@ -396,8 +398,9 @@ Cleanup-only `finalize_task_episode(taskId, episodeHead, outcome, confirmed)` no
 
 After the operator's terminal decision has been carried out and verified,
 `finalize_spec_episode(location)` changes only the exact active version-1
-ownership record to `inactive`. The active plan pair remains in place until that
-close succeeds. The tool performs no Git operation, plan archival, merge,
+ownership record to `inactive`. Active close first verifies the promoted
+specification against its accepted inventory digest. The active plan pair remains
+in place until that close succeeds. The tool performs no Git operation, plan archival, merge,
 abandonment, session stop, worktree removal, branch deletion, or cleanup. Any
 legacy plan archival requires separate explicit post-terminal authority. This
 repair adds no archival tool, so the plans remain until a later action is

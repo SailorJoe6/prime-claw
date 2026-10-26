@@ -33,7 +33,10 @@ dual writes. A candidate remains `In Progress` until the Conversation's separate
 review and status transitions.
 
 Retained folder Episodes without a task-bound assignment continue to use the
-existing specification and execution plan during migration. Both modes remain
+existing specification and execution plan during migration. Their promoted
+specification must keep the accepted inventory digest and is never revised or
+rebaselined; the execution plan remains living and records accepted in-scope
+execution and review facts. Both modes remain
 inside the operator-approved product contract. Expert or reviewer suggestions
 do not become scope, and status-only churn is not progress.
 

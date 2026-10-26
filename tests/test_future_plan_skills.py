@@ -672,3 +672,29 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     assert 'name: "create_spec_episode"' in extension
     assert 'name: "handoff_spec_episode"' in extension
     assert 'name: "finalize_spec_episode"' in extension
+
+
+def test_grandfathered_legacy_managed_policy_freezes_specs_but_keeps_plans_living() -> None:
+    design = " ".join(project_skill("design-legacy").read_text().split())
+    synthesis = " ".join(project_skill("spec-it-out-legacy").read_text().split())
+    plan_prep = " ".join(workflow("plan-prep").read_text().split())
+    plan = " ".join(workflow("plan-spec").read_text().split())
+    implement_prep = " ".join(workflow("implement-prep").read_text().split())
+    implement = " ".join(workflow("implement-spec").read_text().split())
+    execute = " ".join(project_skill("execute").read_text().split())
+    blocked = " ".join(project_skill("blocked").read_text().split())
+    handoff = " ".join(workflow("handoff").read_text().split())
+    expert = " ".join((ROOT / "src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md").read_text().split())
+    oversee = " ".join((ROOT / "src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md").read_text().split())
+
+    assert ".prime-claw/legacy-specifications.json" in design
+    assert "selected provider's ordinary `/design` or `/spec-it-out` task UX" in design
+    assert "shared `design-legacy` guard stops" in synthesis
+    for text in (plan_prep, plan, implement_prep, implement):
+        assert "frozen" in text
+        assert "living" in text
+    assert "original future source is absent" in execute
+    assert "does not require the original future source folder or a live task provider" in blocked
+    assert "original future source is absent" in handoff
+    assert ".prime-claw/legacy-specifications.json" in expert
+    assert ".prime-claw/legacy-specifications.json" in oversee

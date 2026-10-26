@@ -47,9 +47,26 @@ lets a Conversation finish work already stored at:
 .ralph/plans/future/<slug>/
 ```
 
+At the first explicit initialization or upgrade boundary, Prime Claw writes one
+`.prime-claw/legacy-specifications.json` allowlist. It contains only exact
+unfinished `.ralph/plans/future/<slug>` locations and SHA-256 digests of their
+accepted `SPECIFICATION.md` bytes. Archive-only history and inactive version-1
+ownership are excluded. Later startup and reconciliation verify this inventory;
+they never add a location or replace an accepted digest.
+
 A retained bundle contains `SPECIFICATION.md` and `EXECUTION_PLAN.md`, plus any
-supporting artifacts needed to make the work self-contained. New `/design` and
-`/spec-it-out` invocations do not create this folder.
+supporting artifacts needed to make the work self-contained. The accepted
+specification is frozen, while its execution plan remains living. Planning and
+fresh admission reject a later location or changed specification and direct new
+work to the selected-provider task UX. New `/design` and `/spec-it-out`
+invocations do not create this folder.
+
+Active version-1 ownership remains provider-independent. Its promoted active or
+blocked specification must match the inventory digest, but the original future
+source may be absent. Handoff, expert and owner review, operator-authorized
+blocked recovery, and bookkeeping finalization keep the same Episode, session,
+worktree, branch, and resources and never require a task provider or force a
+version-2 transition.
 
 ## Exceptional same-Episode authority cutover
 

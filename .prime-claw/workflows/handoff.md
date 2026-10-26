@@ -95,8 +95,10 @@ never accepts task content or supplies provider revision or raw evidence. Never 
 consult `.ralph/plans`, or copy task content across checkouts. The owning
 Conversation alone publishes lifecycle status on main.
 
-In retained folder-plan handoff, ensure the active specification and plan
-contain the context needed to resume cleanly. Persisted active version-1
+In retained folder-plan handoff, keep the promoted specification frozen even
+when its original future source is absent. Put accepted in-scope execution and
+review learning in the living implementation plan, then ensure the active pair
+contains the context needed to resume cleanly. Persisted active version-1
 ownership keeps that pair active through blockers, candidate review, and
 revisions; handoff must not archive or move it. Related Backlog tasks are
 references only; do not mutate their status, completion, archival,

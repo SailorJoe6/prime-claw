@@ -25,7 +25,9 @@ function readableNonEmptyRegularFile(path: string): boolean {
 /** Resolve the promoted active legacy pair. IMPLEMENTATION_PLAN.md is the
  * compatibility name; EXECUTION_PLAN.md is the retained Prime Claw spelling. */
 export function activeLegacyPlanFiles(worktreeRoot: string): LegacyPlanFiles | null {
-  const plans = join(worktreeRoot, ".ralph", "plans");
+  const ralph = join(worktreeRoot, ".ralph");
+  const plans = join(ralph, "plans");
+  if (![worktreeRoot, ralph, plans].every(readableDirectoryWithoutSymlink)) return null;
   const specification = join(plans, "SPECIFICATION.md");
   if (!readableNonEmptyRegularFile(specification)) return null;
   for (const name of ["IMPLEMENTATION_PLAN.md", "EXECUTION_PLAN.md"]) {

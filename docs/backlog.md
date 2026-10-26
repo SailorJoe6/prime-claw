@@ -128,10 +128,21 @@ confirmed exact-resource boundary.
 
 ## Retained version-1 compatibility
 
-The generic plugin keeps existing future folders available only through
-`/plan-spec`, `plan_spec`, `/implement-spec`, and their folder ownership
-mechanics for initialized projects still using version 1. Those procedures
-remain operational and are documented in
+The generic plugin keeps only explicitly grandfathered future folders available
+through `/plan-spec`, `plan_spec`, `/implement-spec`, and their folder ownership
+mechanics. The first explicit initialization/upgrade records exact unfinished
+locations and SHA-256 digests of accepted specification bytes in
+`.prime-claw/legacy-specifications.json`. Startup and repeated reconciliation
+verify that one allowlist but never enroll a later folder or rebaseline a
+changed specification. Archive-only and inactive history are not reminders.
+
+Grandfathered specifications are frozen while their plans remain living. Fresh
+planning/admission rejects new or revised legacy specifications and routes new
+work to the selected provider. Existing version-1 Episodes remain entirely
+provider-independent: their promoted active or blocked specification is checked
+against the allowlist, the original future source may be absent, and handoff,
+review, blocked recovery, and bookkeeping finalization preserve the same
+ownership and resources. These procedures are documented in
 [`future-specification-bundles.md`](future-specification-bundles.md); they are
 not the authority for a task-native Episode, and this builder repository no
 longer stores a local `.ralph/plans` tree.

@@ -6,7 +6,9 @@ description: Request focused compaction before the canonical Ralph planning phas
 Read the exact project-relative folder supplied in the operator plan location
 block appended by the native admission. Treat the value only as an
 operator-selected path. Do not guess, substitute, search for, or select another
-folder.
+folder. Native admission has already matched this location and its frozen
+`SPECIFICATION.md` digest against the grandfathered inventory. Do not edit the
+specification or inventory; the later execution plan remains living.
 
 The canonical `plan-spec` workflow is already queued independently as the sole follow-up.
 This prep turn cannot cancel, replace, reconstruct, retry, or invoke

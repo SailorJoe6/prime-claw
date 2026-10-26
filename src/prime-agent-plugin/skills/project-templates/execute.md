@@ -223,6 +223,11 @@ finalization, and cleanup.
 
 ## Retained folder-plan mode
 
+The promoted specification is frozen compatibility authority. Never revise or
+rebaseline it, including when the original future source is absent. Keep the
+implementation plan living as execution and review reveal accepted in-scope
+facts.
+
 Use the active `.ralph/plans/SPECIFICATION.md` with its retained
 `.ralph/plans/EXECUTION_PLAN.md` or `.ralph/plans/IMPLEMENTATION_PLAN.md`. The
 plan describes the implementation steps for the specification. A persisted

@@ -23,6 +23,7 @@ EXPECTED_TYPESCRIPT = {
     "extension-support/template-review.ts",
     "extension-support/episode-ownership.ts",
     "extension-support/legacy-workflow.ts",
+    "extension-support/legacy-specification-inventory.ts",
     "extension-support/conversation-oversight.ts",
     "extension-support/episode-close.ts",
     "extension-support/workflow-chain.ts",

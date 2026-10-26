@@ -26,7 +26,9 @@ root plan pair, Git/Orca worktree, durable session, active route, and idle queue
 remain mandatory. That pair stays active through
 blocked, candidate-review, and revision states. An older already-blocked pair
 requires the separate operator-authorized exact version-1 restore and
-live-identity revalidation before handoff. Missing files never switch modes. It
+live-identity revalidation before handoff. Its blocked specification must match
+the same grandfathered digest before either file moves; recovery remains
+provider-independent and works when the original future source is absent. Missing files never switch modes. It
 may refresh a stale route but never replays an uncertain transport.
 
 `handoff_task_episode(taskId, guidance?)` exposes the same continuation for strict version-2 ownership. It selects the exact requesting owner before provider/task interpretation and keeps the public signature unchanged. The provider-absent/Backlog branch still requires canonical primary `main`, exact owner/task/path, a committed main task path, `In Progress` on main and in the Episode, meaningful plans, a clean owned worktree, exact durable-session CWD, and a quiescent queue.

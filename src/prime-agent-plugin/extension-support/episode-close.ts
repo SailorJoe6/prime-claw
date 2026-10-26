@@ -8,6 +8,8 @@ import {
   type LegacyEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 import { resolveNearestProjectRoot } from "./project-initialization.ts";
+import { assertLiveLegacyEpisodeFiles } from "./legacy-workflow.ts";
+import { assertGrandfatheredLegacySpecificationFile } from "./legacy-specification-inventory.ts";
 
 export type EpisodeCloseResult = {
   reused: boolean;
@@ -38,6 +40,8 @@ export function closeEpisodeOwnership(
   if (record.status !== "active") {
     throw new Error(`Episode bookkeeping cannot close ${record.status} ownership`);
   }
+  const files = assertLiveLegacyEpisodeFiles(record, "Episode bookkeeping");
+  assertGrandfatheredLegacySpecificationFile(root, record.sourceLocation, files.specification);
   const closed: LegacyEpisodeOwnershipRecord = {
     ...record,
     status: "inactive",

@@ -4,6 +4,7 @@ import {
   type BacklogTaskSelection,
   validateFutureLocation,
 } from "./reviewed-plan-support.ts";
+import { assertGrandfatheredLegacySpecification } from "./legacy-specification-inventory.ts";
 import {
   requireBacklogTaskSelection,
   resolveProviderTask,
@@ -151,6 +152,15 @@ export async function admitPrepChain(
   }
   if (!selected) {
     return { ok: false, message: workflow.usage, level: "warning" };
+  }
+  try {
+    assertGrandfatheredLegacySpecification(selected.projectRoot, selected.location);
+  } catch (error) {
+    return {
+      ok: false,
+      message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
+      level: "error",
+    };
   }
   return admitResolvedPrepChain(
     pi,

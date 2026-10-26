@@ -61,6 +61,10 @@ import {
 } from "./project-initialization.ts";
 import { activeLegacyPlanFiles, restoreBlockedLegacyPlanFiles } from "./legacy-workflow.ts";
 import {
+  assertGrandfatheredLegacySpecification,
+  assertGrandfatheredLegacySpecificationFile,
+} from "./legacy-specification-inventory.ts";
+import {
   cleanupEpisodeTaskHistoryStore,
   inspectEpisodeTaskHistoryStore,
   inspectPublishedPrimaryTaskHistory,
@@ -1079,8 +1083,12 @@ function validateWorktreeBinding(record: EpisodeOwnershipRecord, git: GitAdapter
 }
 function validateWorktreeRecord(record: EpisodeOwnershipRecord, git: GitAdapter, filesystem: FilesystemAdapter, repo: string): void {
   validateWorktreeBinding(record, git, filesystem, repo);
-  if (isLegacyEpisodeOwnership(record) && record.status === "active" && !filesystem.hasActiveLegacyPlanFiles(record.worktree!)) {
-    throw new Error("Legacy Episode ownership is not live: the recorded worktree is missing its readable non-empty active specification and implementation plan");
+  if (isLegacyEpisodeOwnership(record) && record.status === "active") {
+    const files = activeLegacyPlanFiles(record.worktree!);
+    if (!filesystem.hasActiveLegacyPlanFiles(record.worktree!) || !files) {
+      throw new Error("Legacy Episode ownership is not live: the recorded worktree is missing its readable non-empty active specification and implementation plan");
+    }
+    assertGrandfatheredLegacySpecificationFile(repo, record.sourceLocation, files.specification);
   }
 }
 async function durableSession(record: EpisodeOwnershipRecord, publisher: SessionPublisher): Promise<SessionSummary> {
@@ -1359,8 +1367,8 @@ export async function restoreBlockedSpecEpisode(
   const store = dependencies?.ownership ?? defaultOwnershipStore;
   const orca = dependencies?.orca ?? new CliOrcaAdapter();
   if (operatorConfirmed !== true) throw new Error("Blocked legacy recovery requires the operator's explicit unblock decision");
-  const selected = validateFutureLocation(ctx.cwd, rawLocation);
-  if (!selected) throw new Error("Invalid future-plan folder");
+  const selected = resolveFutureLocationSyntax(ctx.cwd, rawLocation);
+  if (!selected) throw new Error("Invalid future-plan source location");
   const repo = git.repositoryRoot(selected.projectRoot);
   if (!samePath(repo, realpathSync(ctx.cwd)) || git.branch(repo) !== "main") {
     throw new Error("Blocked legacy recovery must run from the canonical primary main checkout");
@@ -1384,7 +1392,13 @@ export async function restoreBlockedSpecEpisode(
   }
 
   const exactRecord = JSON.stringify(record);
+  assertGrandfatheredLegacySpecificationFile(
+    repo,
+    record.sourceLocation,
+    join(record.worktree!, ".ralph", "plans", "blocked", "SPECIFICATION.md"),
+  );
   const restored = restoreBlockedLegacyPlanFiles(record.worktree!);
+  assertGrandfatheredLegacySpecificationFile(repo, record.sourceLocation, restored.specification);
   const reloaded = store.read(repo, ctx.sessionManager.getSessionId());
   if (!reloaded) throw new Error("Episode ownership disappeared during blocked recovery");
   exactOwnedRecord(reloaded, selected.location, ctx.sessionManager.getSessionId());
@@ -3305,17 +3319,17 @@ export async function createSpecEpisode(
   let record: LegacyEpisodeOwnershipRecord | undefined;
   let repo = "";
   try {
-    const selected = validateFutureLocation(ctx.cwd, rawLocation);
-    if (!selected) throw new Error("Invalid future-plan folder");
-    repo = git.repositoryRoot(selected.projectRoot);
-    if (resolve(repo) !== resolve(selected.projectRoot)) throw new Error("The command must run from the repository root");
+    const source = resolveFutureLocationSyntax(ctx.cwd, rawLocation);
+    if (!source) throw new Error("Invalid future-plan source location");
+    repo = git.repositoryRoot(source.projectRoot);
+    if (resolve(repo) !== resolve(source.projectRoot)) throw new Error("The command must run from the repository root");
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) throw new Error("Episode creation is available only from a top-level project Conversation");
     const ownerSessionId = ctx.sessionManager.getSessionId();
     publisher ??= new PrimeSessionPublisher(undefined, runtimeSessionManagerClass(ctx.sessionManager));
     const existing = store.read(repo, ownerSessionId);
     if (existing && existing.status !== "inactive") {
-      exactOwnedRecord(existing, selected.location, ownerSessionId);
+      exactOwnedRecord(existing, source.location, ownerSessionId);
       if (existing.status !== "active") throw new EpisodeStateUncertainError(`Existing Episode ownership is ${existing.status}; inspect exact resources before continuing. No assignment was replayed.`);
       validateWorktreeRecord(existing, git, filesystem, repo);
       if (existing.engine === "orca") {
@@ -3326,6 +3340,9 @@ export async function createSpecEpisode(
       const route = await reopenIfNeeded(existing, session, ctx, publisher, store, repo);
       return { ...route.record, reused: true };
     }
+    const selected = validateFutureLocation(ctx.cwd, rawLocation);
+    if (!selected) throw new Error("Invalid future-plan folder");
+    assertGrandfatheredLegacySpecification(selected.projectRoot, selected.location);
     const approvedBundleDigest = options.approvedBundleDigest;
     if (!approvedBundleDigest || !/^[0-9a-f]{64}$/.test(approvedBundleDigest)) throw new Error("Episode creation is missing the exact approved-bundle digest");
     if (bundleContentDigest(selected.folder) !== approvedBundleDigest) throw new Error("Approved bundle changed after /implement-spec admission; rerun readiness review");

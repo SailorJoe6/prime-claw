@@ -15,6 +15,7 @@ import {
 import { parseEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import { CliTaskEpisodeCleanupAdapter } from "../src/prime-agent-plugin/extension-support/task-episode-cleanup.ts";
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
+import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
 const LOCATION = ".ralph/plans/future/alpha";
 function diskFixture() {
@@ -24,6 +25,7 @@ function diskFixture() {
   mkdirSync(join(root, ".ralph", "plans", "future", "alpha"), { recursive: true });
   writeFileSync(join(root, ".ralph", "plans", "future", "alpha", "SPECIFICATION.md"), "spec");
   writeFileSync(join(root, ".ralph", "plans", "future", "alpha", "EXECUTION_PLAN.md"), "plan");
+  reconcileLegacySpecificationInventory(root, "initialize");
   mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true });
   writeFileSync(join(root, ".agents", "skills", "execute", "SKILL.md"), `---
 name: execute
@@ -67,7 +69,16 @@ function harness(options = {}) {
     pathStatus(path, taskPath) { calls.push(["path-status", path, taskPath]); return ""; },
     commitPromotion(path) { calls.push(["commit", path]); return "promoted"; },
   };
-  const filesystem = { exists: (path) => options.unavailable ? !String(path).includes("-alpha-episode-") : true, hasActiveLegacyPlanFiles: () => options.legacyPlanFiles !== false, promoteBundle(path) { calls.push(["promote", path]); } };
+  const filesystem = {
+    exists: (path) => options.unavailable ? !String(path).includes("-alpha-episode-") : true,
+    hasActiveLegacyPlanFiles: () => options.legacyPlanFiles !== false,
+    promoteBundle(path) {
+      calls.push(["promote", path]);
+      const plans = join(path, ".ralph", "plans"); mkdirSync(plans, { recursive: true });
+      writeFileSync(join(plans, "SPECIFICATION.md"), readFileSync(join(disk.root, LOCATION, "SPECIFICATION.md")));
+      writeFileSync(join(plans, "EXECUTION_PLAN.md"), readFileSync(join(disk.root, LOCATION, "EXECUTION_PLAN.md")));
+    },
+  };
   const ownership = {
     read(_root, ownerSessionId) { return ownerSessionId ? records.get(ownerSessionId) ?? null : (records.size <= 1 ? [...records.values()][0] ?? null : null); },
     write(_root, value) { records.set(value.ownerSessionId, structuredClone(value)); calls.push(["ownership", value.status]); },
@@ -216,6 +227,10 @@ function commitMainTask(f, status) {
 
 
 function activeLegacyTransitionRecord(f, overrides = {}) {
+  const plans = join(f.worktree, ".ralph", "plans");
+  mkdirSync(plans, { recursive: true });
+  writeFileSync(join(plans, "SPECIFICATION.md"), readFileSync(join(f.root, LOCATION, "SPECIFICATION.md")));
+  writeFileSync(join(plans, "EXECUTION_PLAN.md"), readFileSync(join(f.root, LOCATION, "EXECUTION_PLAN.md")));
   return parseEpisodeOwnership({
     version: 1, status: "active", operationId: "legacy-transition", engine: "orca", ownerSessionId: "owner",
     sourceLocation: LOCATION, slug: "alpha", baseRef: "a".repeat(40), bundleDigest: "c".repeat(64),
@@ -451,12 +466,13 @@ for (const [name, option, value] of [
   if (option === "removeError") { assert.equal(f.record.episodeId, "episode"); assert.equal(f.record.launchAutomationId, "automation"); }
 });
 
-test("active replay refreshes route without replaying assignment", async () => {
+test("active replay refreshes route without source-folder dependence or assignment replay", async () => {
   const f0 = harness(); const active = await createApproved(f0);
   const f = harness({ record: { ...active, reused: undefined }, list: () => [{ sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree }] });
   f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
   f.filesystem.exists = () => true; f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
-  const result = await createApproved(f);
+  rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true, force: true });
+  const result = await createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { approvedBundleDigest: "0".repeat(64) });
   assert.equal(result.reused, true); assert.equal(f.calls.some((call) => ["auto-run", "execute", "handoff"].includes(call[0])), false);
   assert.equal(f.calls.some((call) => call[0] === "reopen"), true);
 });
@@ -514,7 +530,7 @@ test("retained handoff uses exact ownership when the obsolete promoted source fo
   f.publisher.getState = async () => ({ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, isSessionActive: false, isStreaming: false, isCompacting: false, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } });
   useDiskLegacyGate(f);
   mkdirSync(join(active.worktree, ".ralph", "plans"), { recursive: true });
-  writeFileSync(join(active.worktree, ".ralph", "plans", "SPECIFICATION.md"), "active spec\n");
+  writeFileSync(join(active.worktree, ".ralph", "plans", "SPECIFICATION.md"), "spec");
   writeFileSync(join(active.worktree, ".ralph", "plans", "EXECUTION_PLAN.md"), "active plan\n");
   rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true, force: true });
   assert.equal(existsSync(join(f.root, ".ralph", "plans", "future", "alpha")), false);
@@ -532,6 +548,16 @@ test("retained handoff uses exact ownership when the obsolete promoted source fo
   const missing = harness({ record: null });
   rmSync(join(missing.root, ".ralph", "plans", "future", "alpha"), { recursive: true, force: true });
   await assert.rejects(handoffSpecEpisode(LOCATION, "missing ownership", missing.ctx, missing.deps), /No durable episode ownership exists/);
+});
+
+test("retained handoff rejects a changed promoted specification before delivery", async () => {
+  const created = harness(); const active = await createApproved(created);
+  const f = harness({ record: { ...active, reused: undefined }, list: () => [{ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree, isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 }] });
+  f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
+  f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
+  writeFileSync(join(active.worktree, ".ralph", "plans", "SPECIFICATION.md"), "changed\n");
+  await assert.rejects(handoffSpecEpisode(LOCATION, "continue", f.ctx, f.deps), /changed after grandfathering/);
+  assert.equal(f.calls.some((call) => call[0] === "handoff"), false);
 });
 
 test("legacy active replay and handoff require the promoted active plan pair", async () => {
@@ -554,19 +580,22 @@ function useDiskLegacyGate(f) {
     && (existsSync(join(worktree,".ralph/plans/IMPLEMENTATION_PLAN.md")) || existsSync(join(worktree,".ralph/plans/EXECUTION_PLAN.md")));
 }
 function writeBlockedLegacyPair(f, planName = "EXECUTION_PLAN.md") {
-  const blocked=join(f.worktree,".ralph/plans/blocked");mkdirSync(blocked,{recursive:true});
-  writeFileSync(join(blocked,"SPECIFICATION.md"),"blocked spec\n");
+  const plans=join(f.worktree,".ralph/plans");
+  for (const name of ["SPECIFICATION.md","IMPLEMENTATION_PLAN.md","EXECUTION_PLAN.md"]) rmSync(join(plans,name),{force:true});
+  const blocked=join(plans,"blocked");mkdirSync(blocked,{recursive:true});
+  writeFileSync(join(blocked,"SPECIFICATION.md"),"spec");
   writeFileSync(join(blocked,planName),"recorded blocker and unblock condition\n");
 }
 function writeActiveLegacyPair(f) {
   const plans=join(f.worktree,".ralph/plans");mkdirSync(plans,{recursive:true});
-  writeFileSync(join(plans,"SPECIFICATION.md"),"active spec\n");
+  writeFileSync(join(plans,"SPECIFICATION.md"),"spec");
   writeFileSync(join(plans,"EXECUTION_PLAN.md"),"active plan\n");
 }
 
-test("operator-cleared blocked pair restores and continues the same version-one Episode", async () => {
+test("operator-cleared blocked pair restores and continues the same version-one Episode after its source is absent", async () => {
   const f=harness();await createApproved(f);f.calls.length=0;useDiskLegacyGate(f);writeBlockedLegacyPair(f);
   const identity=structuredClone(f.record);
+  rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true, force: true });
   const restored=await restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps);
   assert.equal(restored.restored,true);assert.equal(restored.episodeId,identity.episodeId);assert.equal(restored.worktree,identity.worktree);
   assert.equal(existsSync(join(f.worktree,".ralph/plans/SPECIFICATION.md")),true);
@@ -600,6 +629,13 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,false,f.ctx,f.deps),/explicit unblock decision/);
     assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
   });
+  await t.test("changed blocked specification is rejected before either file moves",async()=>{
+    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);
+    writeFileSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"),"changed\n");
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/changed after grandfathering/);
+    assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
+    assert.equal(existsSync(join(f.worktree,".ralph/plans/SPECIFICATION.md")),false);
+  });
   await t.test("missing ownership never falls through",async()=>{
     const f=harness();useDiskLegacyGate(f);writeBlockedLegacyPair(f);
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/No durable episode ownership/);
@@ -628,10 +664,10 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
     assert.equal(existsSync(join(wrongOrca.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
   });
   await t.test("incomplete or empty blocked pair is rejected",async()=>{
-    const incomplete=harness();await createApproved(incomplete);useDiskLegacyGate(incomplete);const blocked=join(incomplete.worktree,".ralph/plans/blocked");mkdirSync(blocked,{recursive:true});writeFileSync(join(blocked,"SPECIFICATION.md"),"blocked spec\n");
+    const incomplete=harness();await createApproved(incomplete);useDiskLegacyGate(incomplete);writeBlockedLegacyPair(incomplete);const blocked=join(incomplete.worktree,".ralph/plans/blocked");rmSync(join(blocked,"EXECUTION_PLAN.md"),{force:true});
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,incomplete.ctx,incomplete.deps),/exactly one implementation plan/);
     const empty=harness();await createApproved(empty);useDiskLegacyGate(empty);writeBlockedLegacyPair(empty);writeFileSync(join(empty.worktree,".ralph/plans/blocked/EXECUTION_PLAN.md"),"");
-    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,empty.ctx,empty.deps),/readable non-empty regular specification/);
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,empty.ctx,empty.deps),/(?:readable non-empty regular specification|changed after grandfathering)/);
   });
   await t.test("ambiguous plan spelling is rejected",async()=>{
     const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);writeFileSync(join(f.worktree,".ralph/plans/blocked/IMPLEMENTATION_PLAN.md"),"second plan\n");
@@ -639,11 +675,11 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
   });
   await t.test("symlinked blocked input is rejected",async()=>{
     const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);unlinkSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"));symlinkSync(join(f.root,".ralph/plans/future/alpha/SPECIFICATION.md"),join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"));
-    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/readable non-empty regular specification/);
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/(?:readable non-empty regular specification|changed after grandfathering)/);
   });
   await t.test("symlinked lifecycle directory is rejected",async()=>{
     const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);const blocked=join(f.worktree,".ralph/plans/blocked"), external=join(f.root,"external-blocked");rmSync(blocked,{recursive:true,force:true});mkdirSync(external);writeFileSync(join(external,"SPECIFICATION.md"),"blocked spec\n");writeFileSync(join(external,"EXECUTION_PLAN.md"),"blocked plan\n");symlinkSync(external,blocked,"dir");
-    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/real in-worktree lifecycle directories/);
+    await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/(?:real in-worktree lifecycle directories|changed after grandfathering)/);
     assert.equal(existsSync(join(external,"SPECIFICATION.md")),true);
   });
   await t.test("active destination collision is rejected without overwrite",async()=>{
@@ -1632,7 +1668,7 @@ test("bundle bytes are bound before any ownership or external mutation", async (
   const folder = join(f.root, ".ralph", "plans", "future", "alpha");
   const approvedBundleDigest = bundleContentDigest(folder);
   writeFileSync(join(folder, "SPECIFICATION.md"), "changed after approval");
-  await assert.rejects(createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { approvedBundleDigest }), /Approved bundle changed/);
+  await assert.rejects(createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { approvedBundleDigest }), /changed after grandfathering/);
   assert.deepEqual(f.calls, [["close"]]); assert.equal(f.record, null);
 });
 

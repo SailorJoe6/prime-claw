@@ -11,6 +11,7 @@ import {
   registerConversationOversight,
 } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
 import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
+import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
 function fixture({ status = "active", owner = "owner", taskNative = false, legacyFiles = true, mainLegacyFiles = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-oversight-"));
@@ -31,6 +32,7 @@ function fixture({ status = "active", owner = "owner", taskNative = false, legac
     worktree, branch: "actual-branch", head: "head",
     episodeId: "episode", episodeSessionFile: join(root, "episode.jsonl"), episodeActiveSessionId: "route",
   });
+  reconcileLegacySpecificationInventory(root, "initialize");
   const events = new Map(); const tools = new Map(); const sent = [];
   const pi = {
     on(name, handler) { events.set(name, handler); },
@@ -62,6 +64,13 @@ test("each qualifying compact appends one full non-turn guide message", async ()
     assert.equal(sent.message.display, false);
     assert.deepEqual(sent.options, { triggerTurn: false });
   }
+});
+
+test("retained oversight rejects a changed promoted specification without requiring its source or a provider", async () => {
+  const f = fixture();
+  writeFileSync(join(f.worktree, ".ralph", "plans", "SPECIFICATION.md"), "changed\n");
+  await f.events.get("session_compact")({ type: "session_compact", compactionEntry: { id: "changed" } }, f.ctx);
+  assert.equal(f.sent.length, 0);
 });
 
 test("compaction selects only the exact Conversation's registry record", async () => {

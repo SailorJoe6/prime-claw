@@ -13,6 +13,12 @@ install or reconcile the project-owned `prepare`, `design`, `spec-it-out`,
 `plan-prep`, `plan-spec`, `implement-prep`, and `implement-spec` runtime
 workflows. Reconciliation never stages or commits project files.
 
+The first explicit initialization or upgrade also records the exact unfinished
+retained-legacy locations and accepted specification digests in one
+`.prime-claw/legacy-specifications.json` allowlist. Startup is verification-only:
+it does not create, extend, or rebaseline the inventory. Empty and archive-only
+projects produce no unfinished-work warning.
+
 ## US-04 — Upgrade templates without destroying customization
 
 **As a project operator, I want safe template reconciliation, so that untouched

@@ -40,14 +40,33 @@ export function summarizeReconcile(result: ReconcileResult, detailed = false): s
         : result.taskProvider.status === "failed"
           ? `provider=failed(${result.taskProvider.detail})`
           : "provider=not-run";
-  const base = `Prime Claw project ${result.project.root} (${result.project.kind}): ${actions || "no-assets"} conflicts=${result.conflicts} ${registration} ${provider}`;
+  const legacy = result.legacySpecifications.status === "created"
+    ? `legacy-specs=created(${result.legacySpecifications.accepted})`
+    : result.legacySpecifications.status === "verified"
+      ? `legacy-specs=verified(${result.legacySpecifications.accepted})`
+      : result.legacySpecifications.status === "required"
+        ? "legacy-specs=explicit-initialization-required"
+        : result.legacySpecifications.status === "blocked"
+          ? `legacy-specs=blocked(${result.legacySpecifications.detail})`
+          : `legacy-specs=${result.legacySpecifications.status}`;
+  const base = `Prime Claw project ${result.project.root} (${result.project.kind}): ${actions || "no-assets"} conflicts=${result.conflicts} ${registration} ${provider} ${legacy}`;
   if (!detailed || result.conflicts === 0) return base;
-  const unresolved = result.items.filter((item) => item.action === "preserved" || item.action === "blocked").slice(0, 8);
+  const unresolved = result.items.filter((item) => item.action === "preserved" || item.action === "blocked");
   const lines = unresolved.map((item) => item.action === "preserved"
     ? `- ${item.assetId} (${item.destination}): ${item.reason ?? item.action}; review with /initialize-prime-claw --review ${item.assetId}`
     : `- ${item.assetId} (${item.destination}): ${item.reason ?? item.action}; resolve the collision, then rerun /initialize-prime-claw`);
-  const omitted = result.conflicts - unresolved.length;
-  return `${base}\n${lines.join("\n")}${omitted > 0 ? `\n- ${omitted} more unresolved item(s); use initialize_prime_claw action=reconcile for full details` : ""}`;
+  if (result.legacySpecifications.status === "required") {
+    lines.push("- unfinished retained legacy specifications are not inventoried; run explicit /initialize-prime-claw once, then use selected-provider tasks for new work");
+  } else if (result.legacySpecifications.status === "blocked") {
+    lines.push(`- ${result.legacySpecifications.path}: ${result.legacySpecifications.detail}; repair the inventory without rebaselining specifications`);
+  } else if (result.legacySpecifications.status === "verified") {
+    for (const violation of result.legacySpecifications.violations) {
+      lines.push(`- ${violation.location}: ${violation.reason === "specification-changed" ? "grandfathered specification changed; restore its accepted digest" : "not grandfathered; use the selected-provider task UX"}`);
+    }
+  }
+  const visible = lines.slice(0, 8);
+  const omitted = Math.max(0, result.conflicts - visible.length);
+  return `${base}\n${visible.join("\n")}${omitted > 0 ? `\n- ${omitted} more unresolved item(s); use initialize_prime_claw action=reconcile for full details` : ""}`;
 }
 
 function actionSummary(value: unknown, detailed = true): string {
@@ -80,7 +99,9 @@ function productionReconcileOptions(dependencies: ProjectInitializationDependenc
 
 async function executeAction(action: Action, assetId: string | undefined, ready: boolean, visible: boolean, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies) {
   switch (action) {
-    case "reconcile": return reconcilePrimeClawProject({ ...productionReconcileOptions(dependencies), cwd: ctx.cwd, registerOrca: true });
+    case "reconcile": return reconcilePrimeClawProject({
+      ...productionReconcileOptions(dependencies), cwd: ctx.cwd, registerOrca: true, legacyInventoryMode: "initialize",
+    });
     case "accept-override":
       if (!assetId) throw new Error("accept-override requires assetId");
       return { assetId, entry: acceptProjectOverride(ctx.cwd, assetId, dependencies) };
@@ -140,7 +161,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
       description: "Initialize or safely reconcile Prime Claw project templates, accept/reset an exact asset, or drive the explicitly confirmed template-review lifecycle.",
       promptSnippet: "Initialize or reconcile Prime Claw assets in the current Git project",
       promptGuidelines: [
-        "Use initialize_prime_claw action=reconcile for explicit initialization or upgrade; it never commits.",
+        "Use initialize_prime_claw action=reconcile for explicit initialization or upgrade; it never commits. The first explicit run records the exact unfinished retained-legacy specification allowlist, and later runs never enroll or rebaseline legacy specifications.",
         "For review, call review-request first, explain the temporary overwrite and foreground switch exactly, and wait for the operator to say ready or cancel.",
         "Call review-start only after literal operator readiness. After it opens the focused Orca diff, ask whether the comparison is visible and keep the overwrite held.",
         "Call review-complete only after visible confirmation and explicit completion; call review-cancel on cancellation. Never invoke Computer Use, Accessibility, or another GUI-control surface.",
@@ -175,7 +196,12 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
       try {
         const project = resolveNearestProjectRoot(ctx.cwd, dependencies.home, dependencies.runner);
         if (!isOrcaRegistered(project.root, dependencies.runner)) return;
-        const result = reconcilePrimeClawProject({ ...productionReconcileOptions(dependencies), cwd: ctx.cwd, registerOrca: false });
+        const result = reconcilePrimeClawProject({
+          ...productionReconcileOptions(dependencies),
+          cwd: ctx.cwd,
+          registerOrca: false,
+          legacyInventoryMode: "verify",
+        });
         pendingSkillPaths = result.items
           .filter((item) => ["created", "migrated", "updated", "recovered"].includes(item.action) && item.destination.startsWith(".agents/skills/") && item.destination.endsWith("/SKILL.md"))
           .map((item) => join(result.project.root, item.destination));

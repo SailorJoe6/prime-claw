@@ -14,8 +14,10 @@ semantic review creates no Episode.
 
 For retained version-1 compatibility, `/implement-spec
 .ralph/plans/future/<slug>` performs the same final review for one existing
-bundle. Its approval binds the exact session, folder, optional host, and complete
-bundle digest and is consumable once.
+bundle only when its exact location and current `SPECIFICATION.md` bytes match
+the explicit-upgrade grandfathered inventory. The specification is frozen; its
+plan remains living. Its approval binds the exact session, folder, optional
+host, and complete bundle digest and is consumable once.
 
 ## US-14 — Create one isolated implementation Episode
 
@@ -46,7 +48,10 @@ fresh task-native Episode receives:
   by the supplied key rather than its own session ID.
 
 For retained version-1 compatibility, `create_spec_episode(location=...)`
-creates or returns the matching folder Episode. That path promotes the approved
+creates a matching folder Episode only after rechecking the inventory's exact
+specification digest. An already-owned exact Episode replays from persisted
+ownership and its promoted frozen specification even when the obsolete future
+source is absent; it does not require a task provider. Fresh admission promotes the approved
 bundle into active `.ralph/plans` from its captured base and records its
 promotion commit before the same fresh-session and one-assignment boundary.
 Unrelated task-only main advancement does not invalidate that promotion while

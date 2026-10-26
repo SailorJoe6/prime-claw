@@ -11,10 +11,16 @@ import {
   TaskImplementationApprovalStore,
 } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
+import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
 function fixture({ throwOnSend = 0, taskStatus = "In Design", providerTaskResolver, placementResolver } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-reviewed-")); execFileSync("git", ["init", "-q", root]);
-  for (const slug of ["alpha", "beta"]) mkdirSync(join(root, ".ralph", "plans", "future", slug), { recursive: true });
+  for (const slug of ["alpha", "beta"]) {
+    const folder = join(root, ".ralph", "plans", "future", slug);
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, "SPECIFICATION.md"), `${slug} specification\n`);
+  }
+  reconcileLegacySpecificationInventory(root, "initialize");
   mkdirSync(join(root, ".prime-claw", "workflows"), { recursive: true });
   for (const name of ["plan-prep", "plan-spec", "plan-task-prep", "plan-task", "implement-prep", "implement-spec", "implement-task-prep", "implement-task", "handoff"]) writeFileSync(join(root, ".prime-claw", "workflows", `${name}.md`), `---
 name: ${name}
@@ -66,6 +72,24 @@ test("plan_spec tool steers prep and queues sole plan-spec follow-up", async () 
   const f = fixture(); const result = await f.tools.get("plan_spec").execute("tool", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
   assert.equal(result.details.admitted, true); assert.deepEqual(f.sent[0].options, { deliverAs: "steer" }); assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
   assert.match(result.content[0].text, /Planning admitted/);
+});
+
+test("retained planning admits only the inventoried frozen specification while plans remain living", async () => {
+  const living = fixture();
+  writeFileSync(join(living.root, ".ralph", "plans", "future", "alpha", "EXECUTION_PLAN.md"), "living plan changed after upgrade\n");
+  const admitted = await living.tools.get("plan_spec").execute("living", { location: ".ralph/plans/future/alpha" }, undefined, undefined, living.ctx);
+  assert.equal(admitted.details.admitted, true);
+
+  const revised = fixture();
+  writeFileSync(join(revised.root, ".ralph", "plans", "future", "alpha", "SPECIFICATION.md"), "revised after upgrade\n");
+  const changed = await revised.tools.get("plan_spec").execute("changed", { location: ".ralph/plans/future/alpha" }, undefined, undefined, revised.ctx);
+  assert.equal(changed.isError, true); assert.equal(revised.sent.length, 0); assert.match(changed.content[0].text, /changed after grandfathering/);
+
+  const later = fixture();
+  const gamma = join(later.root, ".ralph", "plans", "future", "gamma");
+  mkdirSync(gamma, { recursive: true }); writeFileSync(join(gamma, "SPECIFICATION.md"), "new legacy work\n");
+  const rejected = await later.tools.get("plan_spec").execute("new", { location: ".ralph/plans/future/gamma" }, undefined, undefined, later.ctx);
+  assert.equal(rejected.isError, true); assert.equal(later.sent.length, 0); assert.match(rejected.content[0].text, /not grandfathered.*selected-provider task UX/);
 });
 
 test("native plan resolves one exact task and preserves prep then sole phase follow-up", async () => {

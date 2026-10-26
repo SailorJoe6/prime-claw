@@ -30,6 +30,7 @@ import {
   readEpisodeOwnership,
   writeEpisodeOwnership,
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
+import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
 const ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const BACKLOG = join(ROOT, "deps", "backlog", "dist", "backlog");
@@ -887,9 +888,10 @@ test("retained promotion tolerates an unrelated task admission while selecting i
   mkdirSync(join(f.root, location), { recursive: true });
   writeFileSync(join(f.root, location, "SPECIFICATION.md"), "Bounded retained specification.\n");
   writeFileSync(join(f.root, location, "IMPLEMENTATION_PLAN.md"), "1. Promote exact source.\n2. Verify it.\n");
+  assert.equal(reconcileLegacySpecificationInventory(f.root, "initialize").status, "created");
   mkdirSync(join(f.root, ".agents", "skills", "execute"), { recursive: true });
   writeFileSync(join(f.root, ".agents", "skills", "execute", "SKILL.md"), "Retained execute fixture.\n");
-  git(f.root, "add", "--", location, ".agents/skills/execute/SKILL.md");
+  git(f.root, "add", "--", location, ".prime-claw/legacy-specifications.json", ".agents/skills/execute/SKILL.md");
   git(f.root, "commit", "-q", "-m", "add retained source");
   const capturedBase = git(f.root, "rev-parse", "HEAD");
   const digest = bundleContentDigest(join(f.root, location));

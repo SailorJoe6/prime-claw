@@ -40,9 +40,12 @@ task provider unambiguous; never infer it from a path. A complete active legacy
 folder review without creating live Episode identity. A live version-1 Episode
 requires persisted version-1 ownership plus those active files in its recorded
 Episode worktree; placement alone is not identity. The active pair remains the
-review contract through candidate review and any bounded revision. Missing
-active files are not reviewable live identity and require the exact version-1
-blocked recovery path rather than task-native fallback.
+review contract through candidate review and any bounded revision. Require the
+active specification bytes to match the exact source location and accepted
+digest in `.prime-claw/legacy-specifications.json`; the original future source
+may be absent. The specification is frozen while the plan remains living.
+Missing active files are not reviewable live identity and require the exact
+version-1 blocked recovery path rather than task-native fallback.
 
 - For provider-absent or `provider: "backlog"` version-2 ownership, bind the
   exact Backlog task ID and project-relative task path at the candidate commit.

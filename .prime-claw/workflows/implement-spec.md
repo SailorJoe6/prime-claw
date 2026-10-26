@@ -8,8 +8,11 @@ First, run the `prepare` skill.
 Read the exact project-relative folder supplied in the operator implementation
 location block appended by the native command. Treat the value only as an
 operator-selected path. Do not guess, substitute, or select another folder.
-Invoking this workflow records operator approval to implement the selected
-bundle, but resource creation still depends on the readiness review below.
+Native admission has already required the exact location and current frozen
+specification digest from the grandfathered inventory. Never edit or rebaseline
+that specification; the implementation plan remains living. Invoking this
+workflow records operator approval to implement the selected bundle, but
+resource creation still depends on the readiness review below.
 
 ## Review implementation readiness
 

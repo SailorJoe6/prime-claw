@@ -5,6 +5,15 @@ description: Retained folder-based discovery workflow for repositories that stil
 
 First, run the `prepare` skill.
 
+## Respect the upgrade boundary
+
+If `.prime-claw/legacy-specifications.json` exists, stop this authoring workflow.
+Do not create a later future folder, revise a listed specification, or edit the
+inventory. The listed specifications are frozen compatibility inputs; their
+plans may still evolve through `/plan-spec`. Route new or materially revised
+work through the selected provider's ordinary `/design` or `/spec-it-out` task
+UX instead.
+
 The operator wants to propose new work to do in this project. Discuss the
 proposed work with the operator. Do not start implementation. Ask requirements
 questions one at a time so the operator is not overwhelmed. Keep the

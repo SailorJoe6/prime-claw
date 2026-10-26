@@ -21,6 +21,10 @@ import { execFileSync } from "node:child_process";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { activeLegacyPlanFiles } from "./legacy-workflow.ts";
+import {
+  reconcileLegacySpecificationInventory,
+  type LegacySpecificationInventoryResult,
+} from "./legacy-specification-inventory.ts";
 import { readAllEpisodeOwnership } from "./episode-ownership.ts";
 import { CANONICAL_LIFECYCLE_STATUSES, checkBacklogCapabilities, detectTaskProvider } from "./task-providers.ts";
 
@@ -103,6 +107,7 @@ export interface ReconcileOptions {
   registerOrca?: boolean;
   requireOrcaRegistration?: boolean;
   isActiveEpisode?: (projectRoot: string) => boolean;
+  legacyInventoryMode?: "initialize" | "verify";
   taskHistoryPreparer?: (input: { primaryRoot: string; runner: CommandRunner }) =>
     | { status: "prepared"; storeDir: string; head: string }
     | { status: "blocked"; code: string; detail: string; remediation: string };
@@ -126,6 +131,7 @@ export interface ReconcileResult {
   skippedActiveEpisode: boolean;
   skipReason?: "active-episode" | "uncertain-episode-activity";
   taskProvider: TaskProviderSetup;
+  legacySpecifications: LegacySpecificationInventoryResult | { status: "not-run"; reason: string };
 }
 
 export class ProcessCommandRunner implements CommandRunner {
@@ -790,6 +796,7 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
       skippedActiveEpisode: true,
       skipReason: activity === "active" ? "active-episode" : "uncertain-episode-activity",
       taskProvider: { status: "not-run", reason: "episode-activity" },
+      legacySpecifications: { status: "not-run", reason: "episode-activity" },
     };
   }
   const inventory = loadAssetInventory(pluginRoot);
@@ -913,12 +920,28 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
         registration = found ? { status: "reused", id: found.id } : { status: "unavailable", error: "project is not registered with Orca" };
       } catch (error) { registration = { status: "unavailable", error: error instanceof Error ? error.message : String(error) }; }
     }
+    const legacySpecifications = reconcileLegacySpecificationInventory(
+      project.root,
+      options.legacyInventoryMode ?? "verify",
+    );
     const taskProvider = ensureProjectTaskProvider(project.root, runner, options.taskHistoryPreparer);
-    // Provider setup failures and blocked evidence count in the existing
-    // conflict decision so command/tool/startup summaries surface them.
+    // Provider and frozen-legacy failures count in the existing conflict
+    // decision so explicit initialization and startup verification surface
+    // exact remediation without silently enrolling or rebaselining anything.
     const providerConflicts = taskProvider.status === "blocked" || taskProvider.status === "failed" ? 1 : 0;
-    const conflicts = items.filter((item) => item.action === "preserved" || item.action === "blocked").length + remaining.length + (registration.status === "unavailable" ? 1 : 0) + providerConflicts;
-    return { project, registration, items, manifestWritten, changed: manifestWritten || items.some((item) => ["created", "migrated", "updated", "recovered", "retired"].includes(item.action)) || taskProvider.status === "initialized", conflicts, legacyRemaining: remaining, skippedActiveEpisode: false, taskProvider };
+    const legacyConflicts = legacySpecifications.status === "blocked"
+      ? 1
+      : "violations" in legacySpecifications ? legacySpecifications.violations.length : 0;
+    const conflicts = items.filter((item) => item.action === "preserved" || item.action === "blocked").length
+      + remaining.length + (registration.status === "unavailable" ? 1 : 0) + providerConflicts + legacyConflicts;
+    return {
+      project, registration, items, manifestWritten,
+      changed: manifestWritten
+        || items.some((item) => ["created", "migrated", "updated", "recovered", "retired"].includes(item.action))
+        || taskProvider.status === "initialized"
+        || legacySpecifications.status === "created",
+      conflicts, legacyRemaining: remaining, skippedActiveEpisode: false, taskProvider, legacySpecifications,
+    };
   } finally { release(); }
 }
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -7,6 +7,7 @@ import test from "node:test";
 
 import { closeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-close.ts";
 import { readEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
+import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
 function fixture(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-close-")); execFileSync("git", ["init", "-q", root]);
@@ -18,6 +19,12 @@ function fixture(overrides = {}) {
     episodeSessionFile: join(root, "episode.jsonl"), episodeActiveSessionId: "route", ...overrides,
   };
   writeEpisodeOwnership(root, record);
+  if (record.worktree) {
+    const plans = join(record.worktree, ".ralph", "plans"); mkdirSync(plans, { recursive: true });
+    writeFileSync(join(plans, "SPECIFICATION.md"), "spec\n");
+    writeFileSync(join(plans, "EXECUTION_PLAN.md"), "plan\n");
+  }
+  reconcileLegacySpecificationInventory(root, "initialize");
   const ctx = { cwd: root, sessionManager: { getSessionId: () => "owner" } };
   return { root, record, ctx };
 }
@@ -46,6 +53,17 @@ test("close changes only the exact owner's bookkeeping to inactive", () => {
 test("identical close replay is idempotent", () => {
   const f = fixture({ status: "inactive" }); const result = closeEpisodeOwnership(f.record.sourceLocation, f.ctx);
   assert.equal(result.reused, true); assert.equal(result.record.status, "inactive");
+});
+
+test("active close rejects a changed frozen specification while inactive replay stays idempotent", () => {
+  const active = fixture();
+  writeFileSync(join(active.record.worktree, ".ralph", "plans", "SPECIFICATION.md"), "changed\n");
+  assert.throws(() => closeEpisodeOwnership(active.record.sourceLocation, active.ctx), /changed after grandfathering/);
+  assert.equal(readEpisodeOwnership(active.root, "owner").status, "active");
+
+  const inactive = fixture({ status: "inactive" });
+  writeFileSync(join(inactive.record.worktree, ".ralph", "plans", "SPECIFICATION.md"), "changed after close\n");
+  assert.equal(closeEpisodeOwnership(inactive.record.sourceLocation, inactive.ctx).reused, true);
 });
 
 test("close rejects owner and location mismatches", () => {

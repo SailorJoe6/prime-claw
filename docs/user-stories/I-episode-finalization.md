@@ -29,7 +29,9 @@ version 1, and Beads storage behavior is unchanged.
 exact matching active folder Episode. It changes the version-1 ownership record
 to `inactive`; identical replay is idempotent, while missing, mismatched,
 `provisioning`, or `uncertain` ownership blocks closure. The active plan pair is
-retained until that close succeeds. It performs no Git operation, plan archival,
+retained until that close succeeds. An active close verifies that its promoted
+specification still matches the grandfathered digest; an already-inactive exact
+replay remains idempotent after the files are gone. It performs no Git operation, plan archival,
 merge, abandonment, session termination, worktree or branch removal, or
 destructive cleanup. Legacy archival requires separate explicit post-terminal
 authority; this repair adds no archival tool, so the plans remain until a later

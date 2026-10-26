@@ -4,7 +4,9 @@ description: Retained folder-based synthesis workflow when the conversation alre
 ---
 
 Use the current conversation to specify the proposed legacy-folder work. Do not
-start implementation. Ask only the remaining questions that need operator input,
+start implementation. If `.prime-claw/legacy-specifications.json` exists, the
+shared `design-legacy` guard stops this compatibility authoring path and routes
+new or revised work to the selected-provider task UX. Ask only the remaining questions that need operator input,
 one at a time. For small details that are already clear, use your best judgment.
 
 Before saving, read the project-local `design-legacy` skill and apply its shared
