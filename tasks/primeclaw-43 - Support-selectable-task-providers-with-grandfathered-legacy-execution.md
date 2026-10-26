@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 21:45'
+updated_date: '2026-10-26 22:01'
 labels: []
 dependencies: []
 references:
@@ -1315,6 +1315,14 @@ PRIMECLAW-43 remains In Progress. The live grandfathered store, Episode identity
 Focused rereview of 28ab90a confirmed all earlier five repairs, including stale recovery/rollback and removed-plan preservation, and found one remaining cleanup mismatch: independent Backlog abandonment required the entire preserved Final Summary to equal the evidence sentence. The final repair now preserves explanatory context while requiring that the exact task ID, pushed Episode head, and no-merge sentence appear as one exact Final Summary paragraph. Missing or altered evidence still blocks.
 
 The reviewer’s real native archive reproduction now succeeds for both the exact one-sentence summary and the same exact evidence paragraph followed by preserved truthful context. The repository regression covers the contextual form. Final validation after this change: full Node 447/447; Python 677 passed and 69 skipped with the same three baselines; Docker tier 1/offline probe passed with teardown and manifest publication; import smoke and `git diff --check` passed. No live provider, Episode, ownership, code, or cleanup resource changed.
+
+2026-10-26 — Owner-requested bounded repair after candidate c82debb (not accepted)
+
+Repair only these two confirmed contract defects while preserving every other accepted task-history lifecycle, publication, cleanup, compatibility, and safety behavior:
+1. `ensureProjectTaskProvider` in `project-initialization.ts` assumes selected Backlog `storeDir` is non-null before `join(..., ".git")`. Supported root configuration (`backlog.config.yml` with project_name and no materialized store) selects Backlog with `storeDir: null` and currently throws before invoking the preparer. Handle nullable selected evidence before path operations. Use existing native preparation or an explicit selected/blocked result as appropriate. Do not overwrite root config, guess authority, or migrate live data. Add the exact root-config regression; initialization must not crash.
+2. `preparePublishedBacklogEpisodeWorkspace` in `spec-episode.ts` rejects a clean published descendant when only compatible task content such as implementationNotes/design changed after reservation because it compares the full current task JSON to the old ownership snapshot. Remove that old-snapshot approval gate. Keep exact ID/path/In Progress/meaningful-plan, provider/task/code ancestry, paired publication, cleanliness, and resource-identity gates. Refresh factual revision/task evidence and deliver complete exact previous/current native task views and revisions to the initial canonical execute assignment through the existing observation mechanism, so the new Episode LLM can incorporate compatible content or escalate a real semantic conflict before task writes. Add a production/vertical admission interleaving regression for compatible content change and successful one-session/one-assignment delivery with exact before/current context. Preserve status, identity, and removed-plan failures.
+
+Do not add approval steps, caller parameters, receipt/snapshot authority, semantic classifiers, or state machinery. Keep Beads, branch-local/provider-absent Backlog, and version 1 unchanged. No live registry/store migration, Episode cleanup, merge, abandonment, destructive cleanup, or PRIMECLAW-43.1 cutover. Run focused/full host validation, Docker tier 1, both exact reproductions, independent review, and push one clean repaired candidate. Stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
