@@ -175,10 +175,15 @@ requirements discovery; `/spec-it-out` is for work whose design is already
 substantially present in the conversation. Their exact questions and mutation
 policy remain project-customizable Markdown under `.agents/skills/`.
 
-Both skills create one explicit `In Design` Backlog task or revise one exact
-operator-selected task already in `In Design`. Description, native Acceptance
-Criteria, References, and Documentation hold the living specification. Each
-workflow commits only the task, asks the operator to review it, and allocates no
+Both skills use the repository's sole live provider to create one explicit
+native `In Design` task or revise one exact operator-selected task already in
+`In Design`. Backlog keeps Description, native Acceptance Criteria, References,
+and Documentation and publishes only the exact task path. Beads keeps raw
+`description` and acceptance criteria, preserves reference/documentation
+meaning losslessly in ordinary specification prose, and proves one guarded
+native publication with the exact canonical ID, raw rereads, revision/ref, and
+clean working set. Uncertain creation never permits another create. Each
+workflow asks the operator to review the living specification and allocates no
 Episode. The operator may request as many specification revisions as needed.
 
 When the specification is ready for planning, the operator invokes `/plan

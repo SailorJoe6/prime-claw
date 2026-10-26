@@ -75,7 +75,9 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
             assert "This repository now defaults to `In Design`" in customized
             assert "temporary default" not in customized
             assert installed["state"]=="customized"
-            assert installed["installedSha256"]==hashlib.sha256(source.read_bytes()).hexdigest()
+            assert installed["installedSha256"]==hashlib.sha256(destination.read_bytes()).hexdigest()
+            assert installed["availableUpstreamSha256"]==hashlib.sha256(source.read_bytes()).hexdigest()
+            assert installed["baselineSha256"]!=installed["availableUpstreamSha256"]
         else:
             assert installed["state"]=="managed"
             assert hashlib.sha256(destination.read_bytes()).hexdigest()==installed["installedSha256"]

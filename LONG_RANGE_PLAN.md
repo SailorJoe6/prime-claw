@@ -175,12 +175,12 @@ builder repository removes its own tree at the final task-native cutover.
   transition, implemented and regression-tested as native `/handoff` → focused
   compaction → execute; see [docs/handoff-chain.md](docs/handoff-chain.md).
   Folder-based `/plan-spec` was delivered first. `/design` and `/spec-it-out` now
-  author or revise an exact `In Design` Backlog task and `/plan TASK-ID` plans
-  it. The generic plugin retains folder compatibility for initialized projects
+  author or revise an exact selected-provider `In Design` task and `/plan
+  TASK-ID` writes its native Backlog Implementation Plan or Beads `design`. The generic plugin retains folder compatibility for initialized projects
   that still use version 1; this builder repository no longer carries a local
   plan tree.
 - **4b — episode mechanics.** `/implement-task TASK-ID` now creates a
-  worktree-rooted Episode from one meaningful native Implementation Plan and
+  worktree-rooted Episode from one meaningful provider-native plan and
   exact-task ownership. `handoff_task_episode` continues that exact durable
   session. Conversation instructions use ordinary Git and Backlog for review
   outcomes; cleanup-only `finalize_task_episode` handles separately authorized
@@ -202,9 +202,10 @@ builder repository removes its own tree at the final task-native cutover.
   codex/claude-skills project to prime-agent skills without manual copy-paste;
   dogfood on the ralph repo.
 
-Done when: a project conversation has created or revised one `In Design` task
-through `/design` or `/spec-it-out`, received operator specification approval,
-written and reviewed its native Implementation Plan through `/plan TASK-ID`,
+Done when: a project conversation has created or revised one provider-native
+`In Design` task through `/design` or `/spec-it-out`, received operator
+specification approval, written and reviewed its native Backlog Implementation
+Plan or Beads `design` through `/plan TASK-ID`,
 and promoted it through `/implement-task TASK-ID` into a worktree-rooted Episode
 that shipped a real feature through bounded execute/handoff iterations, merge,
 and safe cleanup. The task-native cutover candidate removes this builder

@@ -68,13 +68,19 @@ ID normalization without allowing an ID to become a command option.
 
 ## Primary task-native lifecycle
 
-Specification authoring is task-native. `/design` and `/spec-it-out` create
-exactly one task with explicit `In Design` status when no task was selected, or
-revise only one exact operator-selected task already in `In Design`. They use
-the supported Description, native Acceptance Criteria, References, and
-Documentation fields, commit only the returned task path, and stop for operator
-review. Later states reject without mutation; neither skill writes an
-Implementation Plan or authorizes an Episode.
+Specification authoring is provider-native. `/design` and `/spec-it-out`
+select only the repository's sole valid live provider, then create exactly one
+native task with explicit `In Design` status or revise only one exact
+operator-selected task already in `In Design`. Backlog uses Description, native
+Acceptance Criteria, References, and Documentation and publishes an exact
+task-only Git commit. Beads uses raw `description` and acceptance criteria,
+preserves material reference/documentation meaning in ordinary specification
+prose, and performs a guarded native update plus one Dolt publication with raw
+reread, revision/ref, and clean-working-set proof. A successful Beads create
+binds only its exact returned canonical ID; uncertain creation never permits a
+second create. Both paths preserve every unrelated native field, reject later
+states before mutation, keep a living specification, and stop for operator
+review without writing a plan or authorizing an Episode.
 
 The `/plan TASK-ID` command and `plan_task({"taskId":"TASK-ID"})` tool resolve
 one exact task through the live native provider and admit it only in canonical

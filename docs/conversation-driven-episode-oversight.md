@@ -30,10 +30,12 @@ work but do not create Episode identity.
 ### Primary task-native path
 
 Use `/plan TASK-ID` or `plan_task({"taskId":"TASK-ID"})` to plan one exact
-Backlog `In Design` or `In Planning` task. Planning remains Backlog-only. The
-compact-first chain writes the native Implementation Plan, retains or publishes
-`In Planning`, and stops for separate operator approval without creating
-implementation resources.
+selected-provider `In Design` or `In Planning` task. The compact-first chain
+binds the exact provider and root, writes Backlog's native Implementation Plan
+or Beads' raw `design`, retains or publishes native `In Planning`, and stops for
+separate operator approval without creating implementation resources. The
+preceding `/design` or `/spec-it-out` review remains a separate provider-native
+specification gate and never authorizes this planning step implicitly.
 
 After approval, use `/implement-task TASK-ID`. Before either workflow message,
 it resolves one exact selected live provider and one exact ready local Orca

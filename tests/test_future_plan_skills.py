@@ -156,45 +156,50 @@ def test_documented_task_authoring_cli_sequence_is_atomic_and_task_only(tmp_path
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_binds_one_exact_in_design_task(skill_name: str) -> None:
+def test_authoring_skill_binds_one_exact_provider_native_in_design_task(skill_name: str) -> None:
     text = " ".join(project_skill(skill_name).read_text().split())
 
     for fragment in (
+        "sole live task provider",
+        "a valid Backlog configuration selects Backlog",
+        "a valid `.beads/` Dolt store selects Beads",
+        "absent, malformed, dual, redirected, or unavailable",
         "operator explicitly selected an existing task",
         "ask the operator before mutation",
         "backlog task view --json -- TASK-ID",
-        "returned canonical ID to match the selected task",
-        "status to be exactly `In Design`",
-        "`In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, or `Done`",
-        "stop without mutation",
-        "create exactly one new task",
+        "bd show TASK-ID --json --long --include-comments",
+        "returned canonical ID to equal the entire selected ID",
+        "native status exactly `in_design`",
+        "Reject `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and `Done`",
+        "create exactly one task",
         '--status "In Design"',
-        "do not rely on the project's temporary default status",
-        "Treat this as one mutation attempt",
+        "--status in_design",
+        "Creation is one mutation attempt",
         "do not issue another create",
-        "retry only after proving that no task was created",
-        "Never create a folder under `.ralph/plans`",
+        "This invocation never issues a second create after uncertainty",
+        "Never search either provider's queue",
     ):
         assert fragment in text
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_uses_supported_backlog_specification_fields(skill_name: str) -> None:
+def test_authoring_skill_uses_supported_provider_native_specification_fields(skill_name: str) -> None:
     text = " ".join(project_skill(skill_name).read_text().split())
 
     for fragment in (
-        "Description: the current system or context",
-        "Acceptance Criteria: one or more observable outcomes",
-        "References: related task IDs or source artifacts",
-        "Documentation: relevant living project documentation",
+        "current context, intended outcome, scope, required behavior",
+        "Description, native Acceptance Criteria, References, and Documentation",
         "backlog task create",
         "--description",
         "--ac",
         "backlog task edit",
         "--acceptance-criteria",
         "pass its complete desired value from the reloaded task",
-        "Do not edit task Markdown directly",
-        "meaningful Description, native Acceptance Criteria",
+        "raw `description` and raw acceptance criteria",
+        "`## References` and `## Documentation` sections in the description",
+        "Do not invent metadata, relations, paths, or a conversion format",
+        "Do not write a Beads `design` plan",
+        "Implementation Plan, Implementation Notes, or Final Summary",
     ):
         assert fragment in text
 
@@ -203,12 +208,13 @@ def test_authoring_skill_uses_supported_backlog_specification_fields(skill_name:
         ".ralph/plans/future/<slug>",
         "REQUIREMENTS.md",
         "DECISIONS.md",
+        "ProviderTaskSelection",
     ):
         assert forbidden not in text
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_commits_only_the_task_and_stops_for_review(
+def test_authoring_skill_publishes_only_through_the_selected_provider_and_stops_for_review(
     skill_name: str,
 ) -> None:
     text = " ".join(project_skill(skill_name).read_text().split())
@@ -219,10 +225,15 @@ def test_authoring_skill_commits_only_the_task_and_stops_for_review(
         "Commit only the returned task path",
         "commit contains no other path",
         "push failure is transport evidence",
-        "report the canonical task ID and exact task path",
+        "one more supported native pull and complete raw reread",
+        "bd dolt push --no-adopt",
+        "one native post-publication pull/read cycle",
+        "every unrelated raw field unchanged",
+        "Beads authoring performs no Backlog command or Git task-file commit",
+        "report the selected provider, canonical task ID, exact project root",
         "explicitly ask the operator to review the saved specification",
-        "stop without planning, writing an Implementation Plan",
-        "Apply requested specification revisions to the same `In Design` task",
+        "stop without planning, writing an implementation plan",
+        "same exact native `In Design` task",
         "/plan TASK-ID",
         "never authorizes implementation",
     ):
@@ -290,7 +301,9 @@ def test_design_and_spec_it_out_keep_distinct_discovery_modes() -> None:
     design = project_skill("design").read_text()
     spec_it_out = project_skill("spec-it-out").read_text()
 
-    assert "First, run the `prepare` skill" in design
+    normalized_design = " ".join(design.split())
+    assert "For Backlog, run the `prepare` skill normally" in normalized_design
+    assert "skip its Backlog-only queue inventory" in normalized_design
     assert "requirements" in design
     assert "one at a time" in design
 
@@ -299,24 +312,30 @@ def test_design_and_spec_it_out_keep_distinct_discovery_modes() -> None:
     assert "Ask only the remaining questions" in spec_it_out
 
 
-def test_prime_skill_exposure_preserves_canonical_policy_with_repository_cutover_wording() -> None:
+def test_project_customized_authoring_skills_are_preserved_while_new_upstream_is_advertised() -> None:
+    import hashlib
+
     manifest = json.loads((ROOT / ".prime-claw/templates.json").read_text())
-    source_wording = """Choose a concise title and pass
-`--status "In Design"` explicitly; do not rely on the project's temporary
-default status. Use the supported `backlog task create --plain` interface and
-"""
-    repository_wording = """Choose a concise title and pass
-`--status "In Design"` explicitly. This repository now defaults to `In Design`,
-but the explicit status keeps the authoring command self-contained and auditable.
-Use the supported `backlog task create --plain` interface and
-"""
     for skill_name in SKILLS:
         exposed = ROOT / ".agents" / "skills" / skill_name / "SKILL.md"
         canonical = project_skill(skill_name)
+        entry = manifest["assets"][f"project-skill-{skill_name}"]
+        installed = hashlib.sha256(exposed.read_bytes()).hexdigest()
+        upstream = hashlib.sha256(canonical.read_bytes()).hexdigest()
+
         assert exposed.is_file() and not exposed.is_symlink()
-        expected = canonical.read_text().replace(source_wording, repository_wording)
-        assert exposed.read_text() == expected
-        assert manifest["assets"][f"project-skill-{skill_name}"]["state"] == "customized"
+        source = canonical.read_text()
+        source_fragment = """- **Backlog:** use one supported `backlog task create --plain` command with
+  `--status \"In Design\"`, then bind the exact created task ID from its output.
+"""
+        installed_fragment = source_fragment + """  This repository now defaults to `In Design`, but the explicit status keeps
+  the authoring command self-contained and auditable.
+"""
+        assert exposed.read_text() == source.replace(source_fragment, installed_fragment)
+        assert entry["state"] == "customized"
+        assert entry["installedSha256"] == installed
+        assert entry["availableUpstreamSha256"] == upstream
+        assert entry["baselineSha256"] != upstream
 
 
 @pytest.mark.parametrize(

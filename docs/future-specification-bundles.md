@@ -1,17 +1,21 @@
 # Future specification bundles — migration compatibility
 
-New specification authoring is task-native. `/design` and `/spec-it-out` create
-one explicit `In Design` Backlog task or revise one exact operator-selected task
-already in `In Design`. The task Description, native Acceptance Criteria,
-References, and Documentation are the living specification. Both authoring
-skills make an exact task-only commit, attempt a prompt push, and stop for
-operator review without planning or Episode admission.
+New specification authoring is provider-native. `/design` and `/spec-it-out`
+use the repository's sole live provider to create one explicit native
+`In Design` task or revise one exact operator-selected task already in
+`In Design`. Backlog publishes Description, native Acceptance Criteria,
+References, and Documentation through an exact task-only Git commit. Beads
+publishes raw `description` and acceptance criteria through one guarded native
+Dolt mutation while preserving the complete raw task view and any material
+reference/documentation meaning. Both stop for operator review without planning
+or Episode admission.
 
 ## Primary task-native lifecycle
 
 1. Create or revise one exact `In Design` task with `/design` or `/spec-it-out`.
-2. Run `/plan TASK-ID`; review the native Implementation Plan and approve it
-   separately while the task remains `In Planning`.
+2. Run `/plan TASK-ID`; review the provider-native Backlog Implementation Plan
+   or Beads raw `design`, and approve it separately while the task remains
+   `In Planning`.
 3. Run `/implement-task TASK-ID`. The compact-first readiness chain binds the
    exact task and placement, then calls `create_task_episode` once.
 4. Trusted admission commits the exact task as `In Progress`, persists

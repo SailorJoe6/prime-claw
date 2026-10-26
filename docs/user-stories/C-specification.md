@@ -6,9 +6,10 @@
 discovery, so that the conversation produces a bounded, reviewable
 specification without beginning implementation.**
 
-`/design` keeps its discovery-first posture. It either creates exactly one new
-Backlog task with explicit `In Design` status or revises one exact
-operator-selected task that is already `In Design`.
+`/design` keeps its discovery-first posture. It uses the repository's sole
+valid live task provider to create exactly one native task with explicit
+`In Design` status or revise one exact operator-selected native task that is
+already `In Design`.
 
 ## US-09 — Turn an existing conversation into a specification
 
@@ -19,13 +20,17 @@ answer the remaining material questions.**
 `/spec-it-out` uses the same exact-task contract with a synthesis-first posture.
 It asks only the material questions that remain.
 
-Both paths store the living product contract in supported Backlog fields:
-Description, native Acceptance Criteria, References, and Documentation. They
-reject `In Planning`, `In Progress`, `Blocked`, `Ready for Merge`, and `Done`
-without mutation. New tasks spell out `In Design` rather than relying on the
-configured project default. After a verified task-only commit and prompt push
-attempt, both stop for operator review. Neither writes an Implementation Plan,
-allocates an Episode, or authorizes implementation.
+Both paths store the living product contract in supported provider-native
+fields. Backlog uses Description, native Acceptance Criteria, References, and
+Documentation and publishes only the exact task path. Beads uses raw
+`description` and acceptance criteria, preserves material references and
+documentation losslessly in ordinary specification prose, and publishes one
+guarded native mutation with exact raw identity/status/field, revision/ref, and
+clean-working-set proof. New tasks spell out native `In Design`; uncertain
+creation never permits a second create. Both reject `In Planning`, `In Progress`,
+`Blocked`, `Ready for Merge`, and `Done` before mutation, stop for operator
+review, and neither writes an implementation plan, allocates an Episode, or
+authorizes implementation.
 
 The specification captures the outcome, scope, required behavior, material
 constraints, and observable acceptance at a level proportional to the work. It
