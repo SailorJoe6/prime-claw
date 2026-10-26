@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 17:15'
+updated_date: '2026-10-26 17:19'
 labels: []
 dependencies: []
 references:
@@ -1192,6 +1192,8 @@ Representative native Beads/Dolt UAT used the actual registered `plan_task` rout
 Validation before Docker: focused registered-route Node 32/32; managed workflow/static Python 34 passed/5 skipped; related provider/reconcile Node 145/145; full Node 410/410; full Python 676 passed/69 skipped/75 subtests with only the same four unrelated baselines (host-safe marker, missing admission-suite pytest bridge, project-skill-design manifest/source hash, local Backlog source pin); `git diff --check` passed. No composite acceptance criterion was checked because AC 7/8/14/15/20 include broader design/spec, lifecycle, reconciliation, or whole-feature behavior outside this slice.
 
 Docker tier 1/offline RPC probe passed with immutable image launch, network absent, checks passed, teardown verified, and manifest published at `.test-results/20261026T171332Z-76905-a1abd6a3/tier1`.
+
+2026-10-26 owner review accepted selected-provider planning candidate `d60fe6f9090d56e0babec600cf40f23707796dc3`. Next bounded slice: make managed `/design` and `/spec-it-out` create or revise exactly one native `In Design` task through the selected live provider while preserving discovery-first versus conversation-synthesis behavior, one-at-a-time material questions, living specification updates, and separate planning/implementation approval. Backlog retains exact canonical ID/path and native Description, Acceptance Criteria, References, and Documentation semantics, with no plan/notes/final-summary authoring in design. Beads uses provider/root-native context and supported `bd` create/show/update fields; create explicitly `in_design` or revise only the exact selected canonical `in_design` ID, preserve all other provider-native fields and reference/documentation meaning without normalization or mirroring, and prove native sync/read, one guarded mutation/publication, exact raw/status/revision/ref/clean state. Uncertain creation is never authority to create again; later states reject before mutation. Preserve customized installed skills and reconcile only affected managed assets. Exclude provider initialization/switching, planning/Episode creation, new public tools/params/tracker CLI, approval state/digests/sidecars/registry/framework/classifier/retries/force/raw writes, Prime Agent changes, unrelated lifecycle/workspace/cleanup, grandfather/migration/cutover, and PRIMECLAW-43.1. Validate representative native create, revise, later-state refusal, and uncertain-single-create behavior plus focused/full host and Docker tier 1; push one clean candidate and stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
