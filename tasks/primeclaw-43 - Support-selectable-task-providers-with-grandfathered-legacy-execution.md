@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 18:50'
+updated_date: '2026-10-26 18:53'
 labels: []
 dependencies: []
 references:
@@ -1205,6 +1205,14 @@ Independent read-only review used openai-codex/gpt-5.6-sol. It found one materia
 Final validation on repaired bytes: focused provider Node 71/71; reviewed-plan Node 32/32; focused managed oversight/review/handoff/provider Python 35 passed, 9 skipped; full Node 416/416; full Python 677 passed, 69 skipped with only the same three unrelated host baselines (runtime-connect host-safe marker, missing task_episode_admission pytest bridge, local Backlog source-pin mismatch); Docker tier 1 with offline RPC probe, teardown, and manifest publication passed; `git diff --check` passed. Real disposable Beads 1.3.1/Dolt 2.5.0 plus ordinary Git UAT passed readiness→Delay→Request Changes→readiness→exact authorized fixture ff-only merge/code push→done, preserved all unrelated task fields and notes, and proved wrong-native-state and stale-tuple zero-write refusals. PRIMECLAW-43 itself remains exactly In Progress and was never promoted or merged.
 
 Remaining approved whole-feature scope stays outside this candidate: Beads abandonment/finalization/destructive cleanup, Backlog workspace lifecycle wiring, grandfather inventory and legacy transition, complete provider migration/cutover, and PRIMECLAW-43.1. This slice stops for owner review.
+
+Owner accepted Beads merge lifecycle candidate a8022815e5f16361f37e34f8061558f8c5f79cc2 and authorized one next bounded implementation slice: add Beads abandonment and cleanup through existing Conversation/provider-native guidance and unchanged `finalize_task_episode(taskId, episodeHead, outcome, confirmed)` only. This pass is code plus disposable UAT and does not authorize abandoning, merging, marking terminal, finalizing, deleting, or cleaning the live PRIMECLAW-43 task, Episode, store, or resources.
+
+First prove the supported native Beads abandonment/archive semantics. Preserve complete task/history and a truthful abandoned-versus-completed distinction without inventing a new canonical status, archive sidecar, soft-delete scheme, universal task model, or mapping abandonment to `Done`. Use only supported native status/reason/notes/history if it actually satisfies the approved lifecycle; if no supported interface can do so, stop with the exact proven product constraint rather than fabricating behavior. Actual abandonment still requires explicit operator authority for the exact task and pushed Episode head, never merges abandoned code, and must publish truthful native outcome proof. Cleanup remains separately explicit only after proved pushed merged/Done or abandoned terminal state.
+
+Extend only the existing provider-native terminal verification and cleanup type/guard branches required for Beads no-taskPath identity. Reuse exact owner/base/code ancestry, local/upstream/direct-remote head, current native task/publication/context, idle session/worktree/branch, and optional Orca proofs. Preserve existing `cleanupHead`, same-head partial-cleanup idempotence, unsafe-gap/busy/dirty/foreign/unpushed refusal, and inactive-last bookkeeping. Remove only the bound idle Episode runtime, linked worktree, and branch; the shared canonical primary Beads store/server/task history and unrelated owners must survive. Current native terminal evidence governs rather than an old task snapshot; existing ownership fields may advance factual final provider/task/code observations only, without new authority.
+
+Preserve all Backlog/version-1 and accepted status/readiness/handoff/blocked/authoring/planning/admission/native/Git behavior. Add no public tool/parameter, custom tracker CLI/publisher/protocol, snapshot/digest, semantic classifier, normalized model/diff, lock/state/framework/sidecar/schema/version 3, retry/force/raw Dolt write, or Prime Agent change. Leave Backlog workspace lifecycle wiring, grandfather inventory/legacy transition, provider migration/cutover, and unrelated fixes out. PRIMECLAW-43.1 repository cutover is a separate task and is not remaining PRIMECLAW-43 implementation scope. Representative merged plus abandoned fixture cleanup/terminal-push/history-preservation and failed-authority/busy/dirty/unpublished/wrong-head cases suffice; avoid a provider×lifecycle matrix. Run focused/full host, Docker tier 1, and practical native disposable UAT; push one clean candidate and stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
