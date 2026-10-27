@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-26 23:52'
+updated_date: '2026-10-27 00:04'
 labels: []
 dependencies: []
 references:
@@ -1391,6 +1391,12 @@ Candidate `a66a295e71fa829d4645d94a5197b66b53e96ad9` is not accepted. The accept
 2. Completed/archive history must be excluded before requiring future `SPECIFICATION.md` bytes. `/tmp/primeclaw43-ac16-completed-partial.mjs` currently proves that inactive version-1 plus real archive evidence and a residual empty future folder blocks initialization. After existing safe-directory checks, use the existing `retired`/`nonInactive` sets so first upgrade creates the normal empty frozen set, verification is clean, and planning/admission still reject the retired location. Preserve conflict blocking for a same-source nonterminal owner and failures for unknown partial/new/changed candidates.
 
 Do not widen scope. Keep all prior retained-v1 lifecycle, registered replay, provider independence, frozen-spec/living-plan, task/Beads, and customizable-template behavior. No AC17–AC19, migration/cutover, live mutation, global apply, merge, abandonment, finalization, or cleanup. Rerun both reproductions, focused and relevant full host suites, and Docker tier 1; push one repaired candidate and stop for owner review.
+
+### 2026-10-27 — AC16 owner revision implemented
+
+The two owner-reproduced defects are repaired without widening AC16. `ownedSpecificationBytes` now validates the recorded worktree’s intermediate `.ralph` directory as a real non-symlink before reading active or blocked specifications. Grandfathered discovery now validates candidate directory identity first, builds the existing retired/non-inactive evidence sets, rejects same-source terminal/nonterminal conflicts, and excludes safely proven completed/archive locations before requiring residual future specification bytes. Unknown partial/new/changed candidates still fail closed.
+
+Both owner reproductions now pass: `/tmp/primeclaw43-ac16-owned-ancestor.mjs` returns blocked with no inventory, and `/tmp/primeclaw43-ac16-completed-partial.mjs` creates the normal empty accepted inventory. New regressions also prove clean verification, retired admission rejection, and preserved same-source nonterminal conflict blocking. Focused regressions pass 4/4; related Node passes 208/208; related Python passes 49 with 9 skipped. Final Node passes 465/465. Final Python reports 678 passed and 69 skipped with only the same three established unrelated baseline failures. Docker tier 1 passes. AC16 remains unchecked pending independent review and owner acceptance; AC17–AC19 and all live mutation, cutover, merge, finalization, and cleanup remain out of scope.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1503,4 +1509,6 @@ AC16 now has a single explicit-upgrade grandfathered allowlist of exact retained
 Independent review of `1b1f53d` found three AC16 gaps: unsafe symlink ancestors, inactive retained sources blocking upgrade, and source-absent replay unreachable through registered admission. The revised candidate fixes all three with shared exact-path guards, completed-history exclusion, and exact-owner replay admission while preserving fresh readiness gates and zero-assignment replay. Reviewer reproductions pass; full Node is 463/463, full Python is 678 passed and 69 skipped with only the same three unrelated established baselines, and Docker tier 1 passes. Exact-commit re-review follows on the revised commit.
 
 Owner review did not accept `a66a295e71fa829d4645d94a5197b66b53e96ad9`. AC16 is pending one narrow two-defect revision: reject symlinked owned `.ralph` ancestors before enrollment, and exclude safely proven inactive/archive history before validating residual future bundle contents. Latest accepted implementation base remains `92ef7d1e30fdbe66f3280519429695056e9b82af`; all prior three expert repairs and non-AC16 behavior must remain unchanged.
+
+The owner-requested AC16 two-defect revision is implemented and fully validated: owned reads now reject a symlinked worktree `.ralph` ancestor, and safely proven completed/archive history is excluded before residual future specification bytes are required. Both exact reproductions pass; full Node is 465/465, Python is 678 passed and 69 skipped with only the same three unrelated baselines, and Docker tier 1 passes. The prior three expert repairs and provider-independent retained-v1 behavior remain intact. AC16 is pending independent review and owner acceptance.
 <!-- SECTION:FINAL_SUMMARY:END -->
