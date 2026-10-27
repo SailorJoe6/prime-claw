@@ -593,6 +593,23 @@ test("canonical-primary Beads cutover ignores only stale linked Backlog snapshot
   }
 });
 
+test("linked Beads Episode blocks ordinary mutation when only canonical primary has dual provider evidence", () => {
+  const fixture = linkedWorktreeFixture();
+  try {
+    writeBacklogFolderConfig(fixture.primary);
+    const context = linkedBeadsContext(fixture.primary, fixture.linked);
+    const runner = linkedBeadsRunner({ stdout: JSON.stringify(context) + "\n", stderr: "", status: 0 });
+    const detection = detectTaskProvider(fixture.linked, runner);
+    assert.equal(detection.kind, "blocked");
+    assert.equal(detection.code, "dual-providers");
+    assert.equal(existsSync(join(fixture.linked, "backlog", "config.yml")), false);
+    assert.throws(() => mutateProviderTaskStatus({ projectRoot: fixture.linked, taskId: "TST-1", status: "Blocked", runner }), /both Backlog.*Beads|canonical primary has both/);
+    assert.equal(runner.calls.some((call) => call.command === "bd" && call.args[0] === "update"), false);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("canonical-primary Backlog cutover ignores only stale linked Beads snapshot evidence", () => {
   const fixture = linkedWorktreeFixture();
   try {

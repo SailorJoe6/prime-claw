@@ -956,9 +956,13 @@ semantic-placement prose, and literal operator approval. Backlog source capture
 retains each committed Markdown file, full Git history with actor/timestamp and
 binary changes, and the native structured view. Archived Markdown is moved only
 inside a disposable clone of the exact revision so the native Backlog reader can
-interpret it; live source bytes never move. Beads source capture uses the clean,
-directly published Dolt revision and retains complete long/comment views,
-native history, provenance, and relationship rows. Pair-specific native create
+interpret it; live source bytes never move. Native status, rather than physical
+folder alone, classifies Backlog completion while archive placement remains
+abandonment evidence. Beads source capture uses the clean, directly published
+Dolt revision, rejects effective export-owner filters, and requires a complete
+`--all` export to equal an independent read-only issue inventory before it
+retains long/comment views, native history, provenance, and relationship rows.
+Pair-specific native create
 paths project exact equivalent fields and use the supplied managed prose only
 for non-equivalent placement. Safe source IDs are reused; every generated ID is
 recorded by an immutable mapping. Deterministic re-reads prove every destination
@@ -971,18 +975,26 @@ semantic-placement prose, and cutover timestamp. Only after destination proof
 does one atomic registry mutation remap active version-2 records. It preserves
 the exact owner, operation, code base/head, worktree, branch, Episode/session,
 runtime route, resource, and creation identity while replacing only
-provider-native task binding/evidence using the verified mapping. Missing
-mappings, foreign/provider drift, collisions, or concurrent registry changes
-refuse without a partial write; exact rollback is attempted before cutover if a
-later pre-cutover proof fails.
+provider-native task binding/evidence using the verified mapping. Exact idle
+durable-session/current-route proof and Orca worktree/terminal proof apply before
+and after that replacement. Missing mappings, foreign/provider drift,
+collisions, runtime loss, or concurrent registry changes refuse without a
+partial write; exact rollback is attempted before cutover if a later pre-cutover
+proof fails.
 
-A second source revision/digest/count proof and a fresh target publication proof
-precede deletion. Backlog-to-Beads initializes an excluded `--stealth` store so
-Beads setup cannot advance the still-authoritative code-backed Backlog revision.
-Deletion uses provider-native stop/removal plus the provider's existing history
-publication surface, then proves source absence and sole target selection. Any
-pre-cutover error keeps source authority and reports exact source-preserving
-cleanup or same-destination retry conditions. There is no duplicate target,
+Repeated source revision/digest/count proof and fresh target publication proof
+precede deletion. Backlog destinations stay bound to the originally selected
+remote URL and task-history ref. The existing ownership lock encloses the final
+registry comparison, active-code proof, and destructive boundary.
+Backlog-to-Beads initializes an excluded `--stealth` store so Beads setup cannot
+advance the still-authoritative code-backed Backlog revision. Deletion uses
+provider-native stop/removal plus the provider's existing history publication
+surface, then proves source absence and sole target selection. Any pre-cutover
+error keeps source authority and reports exact source-preserving cleanup or
+same-destination retry conditions. A reconfirmed retry can cross the otherwise
+blocked dual-store window only after exact source and existing target markers,
+mappings, receipt, digest, and publication prove the same destination; ordinary
+lifecycle mutation remains blocked. There is no duplicate target,
 automatic retry, dual write, mirror, universal task model, provider-selection
 file, sidecar receipt, persistent lock, coordinator, phase file, checkpoint, or
 resume state. The real `PRIMECLAW-43.1` repository migration remains separately

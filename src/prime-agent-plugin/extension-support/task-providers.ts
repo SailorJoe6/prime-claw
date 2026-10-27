@@ -703,10 +703,22 @@ function linkedPrimaryRoot(projectRoot: string, runner: CommandRunner): string |
   catch { return null; }
 }
 
-function linkedPrimaryHasBeadsEvidence(projectRoot: string, runner: CommandRunner): boolean {
-  const primaryRoot = linkedPrimaryRoot(projectRoot, runner);
-  return primaryRoot !== null && (isFile(join(primaryRoot, BEADS_DIR, "metadata.json"))
-    || isFile(join(primaryRoot, BEADS_DIR, "config.yaml")));
+
+/** Read one exact native provider store without deciding repository-wide sole
+ * authority. This narrow maintenance primitive exists only so an explicitly
+ * confirmed migration can validate and reuse its already-created destination;
+ * ordinary lifecycle paths must use detectTaskProvider and remain fail-closed
+ * whenever both stores exist. */
+export function detectExplicitTaskProvider(
+  cwd: string,
+  provider: TaskProviderId,
+  runner: CommandRunner = new ProcessCommandRunner(),
+): TaskProviderDetection {
+  const project = resolveNearestProjectRoot(cwd, process.env.HOME ?? "", runner);
+  const scanned = provider === "backlog" ? scanBacklog(project.root) : scanBeads(project.root, runner);
+  if (!scanned) return { kind: "none", projectRoot: project.root };
+  if ("blocked" in scanned) return { kind: "blocked", projectRoot: project.root, ...scanned.blocked };
+  return { kind: "selected", projectRoot: project.root, evidence: scanned.evidence };
 }
 
 /**
@@ -733,7 +745,18 @@ export function detectTaskProvider(
   const primaryRoot = project.kind === "linked-worktree" ? linkedPrimaryRoot(projectRoot, runner) : null;
   const primaryBacklog = primaryRoot ? scanBacklog(primaryRoot) : null;
   if (primaryBacklog && "blocked" in primaryBacklog) return { kind: "blocked", projectRoot, ...primaryBacklog.blocked };
-  const primaryHasBeads = project.kind === "linked-worktree" && linkedPrimaryHasBeadsEvidence(projectRoot, runner);
+  const primaryBeads = primaryRoot ? scanBeads(primaryRoot, runner) : null;
+  if (primaryBeads && "blocked" in primaryBeads) return { kind: "blocked", projectRoot, ...primaryBeads.blocked };
+  const primaryHasBeads = Boolean(primaryBeads);
+  if (primaryBacklog && primaryBeads) {
+    return {
+      kind: "blocked",
+      projectRoot,
+      code: "dual-providers",
+      detail: `canonical primary has both Backlog (${primaryBacklog.evidence.configPath}) and Beads (${primaryBeads.evidence.storeDir}) live evidence; this is an incomplete migration`,
+      remediation: "Complete the provider migration so exactly one live store remains; Prime Claw blocks task lifecycle mutation from primary and linked worktrees until then",
+    };
+  }
   if (primaryHasBeads && !primaryBacklog) backlog = null;
   const primaryHasSoleBacklog = project.kind === "linked-worktree" && !!primaryBacklog && !primaryHasBeads;
   const linkedBeadsCandidate = project.kind === "linked-worktree" && !primaryHasSoleBacklog

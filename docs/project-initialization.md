@@ -211,12 +211,28 @@ Backlog code revision.
 Before destination creation, every active Episode is re-proved as the exact
 clean, directly published linked code worktree/branch/head in ownership. Its
 branch-local Backlog task bytes or shared provider revision must equal the
-captured source; the check repeats before ownership replacement and at final
-proof.
+captured source. The migration also reuses the ordinary Episode continuity
+checks: one exact idle durable session, current runtime route, and exact Orca
+worktree/terminal resources when applicable. Those code, source, registry, and
+runtime checks repeat beside the atomic ownership replacement and guarded
+source-deletion boundary. The existing ownership lock refuses deletion if the
+complete switched registry changes.
+
+Beads capture rejects any effective `export.exclude_owners` filter, exports all
+native issue records, and requires its duplicate-free IDs to equal an
+independent read-only `issues` inventory before either counts or deletion can be
+certified. Backlog completion counts come from exact native lifecycle status;
+physical archive placement remains separate abandonment evidence. A Backlog
+destination is repeatedly proved against the originally selected remote URL and
+`refs/heads/prime-claw/tasks`, not a mutable local upstream alias.
 
 A pre-cutover failure restores any ownership change, leaves the source intact and
-authoritative, and reports exact cleanup or same-destination retry guidance. It
-never creates a second destination or retries automatically. Source deletion is
+authoritative, and reports exact cleanup or same-destination retry guidance. An
+explicitly reconfirmed retry is admitted through the otherwise blocked dual-store
+window only after the source revision and every existing destination marker,
+mapping, receipt, publication, and source digest prove that it is the same
+migration. Ordinary lifecycle discovery remains blocked. The operation never
+creates a second destination or retries automatically. Source deletion is
 refused on source drift, destination drift, incomplete proof, ownership drift,
 or ambiguous provider selection. There is no dual write, mirror, provider
 selection file, sidecar receipt, persistent lock, phase record, checkpoint, or

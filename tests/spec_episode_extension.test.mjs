@@ -11,6 +11,7 @@ import {
   allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
   restoreBlockedSpecEpisode, transitionSpecEpisodeToTaskOwnership,
   handoffTaskEpisode, resolveBlockedWorkflowAuthority, finalizeTaskEpisodeCleanup,
+  verifyActiveTaskEpisodeContinuity,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import { CliTaskEpisodeCleanupAdapter } from "../src/prime-agent-plugin/extension-support/task-episode-cleanup.ts";
@@ -2045,4 +2046,36 @@ test("Prime cleanup host uses supported kill and delete_saved_session daemon com
   ]);
   const failed = new PrimeSessionPublisher({ async request() { return { success: true, data: { ok: false, error: "refused" } }; }, close() {} });
   await assert.rejects(failed.deleteSaved("/tmp/episode.jsonl"), /refused/);
+});
+
+
+test("active task Episode continuity proves exact idle durable route and rejects missing or busy runtime", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-continuity-")));
+  const worktree = join(root, "episode"); mkdirSync(worktree);
+  const sessionFile = join(root, "episode.jsonl"); writeFileSync(sessionFile, "{}\n");
+  const record = parseEpisodeOwnership({
+    version: 2, status: "active", operationId: "operation-continuity", engine: "local",
+    ownerSessionId: "owner-continuity", taskId: "TASK-1", taskPath: "backlog/tasks/task-1.md",
+    baseRef: "a".repeat(40), createdAt: "2026-10-27T00:00:00.000Z", updatedAt: "2026-10-27T00:00:00.000Z",
+    worktree, branch: "episode/continuity", head: "b".repeat(40), episodeId: "episode-continuity",
+    episodeSessionFile: sessionFile, episodeActiveSessionId: "old-route",
+  });
+  const git = { worktrees: () => [{ path: worktree, branch: record.branch }] };
+  const filesystem = { exists: () => true, hasActiveLegacyPlanFiles: () => true, promoteBundle() {}, removeWorktree() {} };
+  const idleState = {
+    activeSessionId: "new-route", sessionId: record.episodeId, sessionFile,
+    isSessionActive: false, isStreaming: false, isCompacting: false, isBashRunning: false,
+    isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0,
+    sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null },
+  };
+  const summary = { sessionId: record.episodeId, sessionFile, cwd: worktree, activeSessionId: "new-route", isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 };
+  const publisher = { list: async () => [summary], getState: async () => idleState, close() {} };
+  try {
+    const proofs = await verifyActiveTaskEpisodeContinuity(root, [record], { git, filesystem, publisher });
+    assert.deepEqual(proofs, [{ ownerSessionId: record.ownerSessionId, expectedPreviousEpisodeActiveSessionId: "old-route", verifiedCurrentEpisodeActiveSessionId: "new-route" }]);
+    await assert.rejects(() => verifyActiveTaskEpisodeContinuity(root, [record], { git, filesystem, publisher: { ...publisher, list: async () => [] } }), /one durable Episode session/);
+    await assert.rejects(() => verifyActiveTaskEpisodeContinuity(root, [record], { git, filesystem, publisher: { ...publisher, list: async () => [{ ...summary, isSessionActive: true }] } }), /idle Episode summary/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -437,6 +437,11 @@ export interface ActiveTaskProviderOwnershipSwitchInput {
   targetProvider: "backlog" | "beads";
   switchedAt: string;
   destinations: Record<string, ActiveTaskProviderOwnershipDestination>;
+  expectedSourceRecords: Record<string, TaskEpisodeOwnershipRecord>;
+  runtimeProofs: Record<string, {
+    expectedPreviousEpisodeActiveSessionId: string;
+    verifiedCurrentEpisodeActiveSessionId: string;
+  }>;
 }
 
 export interface ActiveTaskProviderOwnershipSwitchResult {
@@ -478,6 +483,14 @@ export function switchActiveTaskProviderOwnership(
       if (actualProvider !== input.sourceProvider) {
         throw new Error(`active task Episode ${ownerSessionId} uses ${actualProvider}, not selected source ${input.sourceProvider}`);
       }
+      const expected = input.expectedSourceRecords[ownerSessionId];
+      if (!expected || JSON.stringify(record) !== JSON.stringify(expected)) {
+        throw new Error(`active task Episode ${ownerSessionId} changed after migration continuity proof`);
+      }
+      const runtimeProof = input.runtimeProofs[ownerSessionId];
+      if (!runtimeProof || record.episodeActiveSessionId !== runtimeProof.expectedPreviousEpisodeActiveSessionId) {
+        throw new Error(`active task Episode ${ownerSessionId} has no exact runtime continuity proof`);
+      }
       const destination = input.destinations[record.taskId];
       if (!destination) throw new Error(`provider migration has no verified destination mapping for active task ${record.taskId}`);
       if (input.targetProvider === "backlog" && (!destination.taskPath || !destination.taskPath.trim())) {
@@ -497,6 +510,7 @@ export function switchActiveTaskProviderOwnership(
       delete common.providerRevision;
       delete common.taskEvidence;
       delete common.updatedAt;
+      common.episodeActiveSessionId = runtimeProof.verifiedCurrentEpisodeActiveSessionId;
       const next: TaskEpisodeOwnershipRecord = input.targetProvider === "backlog"
         ? {
             ...common,
@@ -522,8 +536,28 @@ export function switchActiveTaskProviderOwnership(
       registry.owners[ownerSessionId] = next;
       transitions.push({ ownerSessionId, sourceTaskId: record.taskId, destinationTaskId: destination.taskId });
     }
+    const transitionedOwners = new Set(transitions.map((item) => item.ownerSessionId));
+    for (const ownerSessionId of [...Object.keys(input.expectedSourceRecords), ...Object.keys(input.runtimeProofs)]) {
+      if (!transitionedOwners.has(ownerSessionId)) throw new Error(`provider migration continuity proof references non-transitioned owner ${ownerSessionId}`);
+    }
     if (transitions.length > 0) persistOwnershipRegistry(projectRoot, registry);
     return { before, after: copiedRegistry(registry), transitions };
+  });
+}
+
+/** Run the destructive boundary only while the existing ownership lock proves
+ * the complete switched registry has not drifted. */
+export function withCurrentTaskProviderOwnershipSwitch<T>(
+  projectRoot: string,
+  switchResult: ActiveTaskProviderOwnershipSwitchResult,
+  operation: () => T,
+): T {
+  return withOwnershipLock(projectRoot, () => {
+    const current = copiedRegistry(readEpisodeOwnershipRegistry(projectRoot));
+    if (JSON.stringify(current) !== JSON.stringify(copiedRegistry(switchResult.after))) {
+      throw new Error("task-provider source deletion refused because ownership changed after the switch");
+    }
+    return operation();
   });
 }
 

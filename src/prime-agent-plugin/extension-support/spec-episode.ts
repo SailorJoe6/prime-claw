@@ -1028,6 +1028,80 @@ function assertIdleEpisodeState(state: EpisodeSessionState, identity: EpisodeOwn
     && Array.isArray(actions.followUps) && actions.followUps.length === 0 && actions.active == null;
   if (!idle) throw new Error("Owned Episode is not quiescent; handoff requires no active turn, tools, compaction, children, or queued actions");
 }
+export interface ActiveTaskEpisodeContinuityProof {
+  ownerSessionId: string;
+  expectedPreviousEpisodeActiveSessionId: string;
+  verifiedCurrentEpisodeActiveSessionId: string;
+}
+
+export interface ActiveTaskEpisodeContinuityDependencies {
+  git?: GitAdapter;
+  filesystem?: FilesystemAdapter;
+  publisher?: SessionPublisher;
+  orca?: OrcaAdapter;
+}
+
+/** Read-only proof that active task Episodes still have their exact durable,
+ * idle runtime and provider-independent resource identity. */
+export async function verifyActiveTaskEpisodeContinuity(
+  repo: string,
+  records: readonly TaskEpisodeOwnershipRecord[],
+  dependencies: ActiveTaskEpisodeContinuityDependencies = {},
+): Promise<ActiveTaskEpisodeContinuityProof[]> {
+  const git = dependencies.git ?? new CliGitAdapter();
+  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
+  const orca = dependencies.orca ?? new CliOrcaAdapter();
+  const publisher = dependencies.publisher ?? new PrimeSessionPublisher();
+  const closePublisher = dependencies.publisher === undefined;
+  try {
+    const sessions = await publisher.list();
+    const proofs: ActiveTaskEpisodeContinuityProof[] = [];
+    for (const record of records) {
+      if (record.version !== 2 || record.status !== "active") throw new Error("Provider migration continuity requires exact active version-2 ownership");
+      validateWorktreeRecord(record, git, filesystem, repo);
+      if (record.engine === "orca") {
+        const current = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
+        if (current.id !== record.worktreeId || current.identity !== record.worktreeIdentity
+          || !samePath(current.path, record.worktree!) || current.branch !== record.branch
+          || current.head !== record.head || current.projectSetupId !== record.projectSetupId) {
+          throw new Error(`Provider migration Orca worktree evidence no longer matches active owner ${record.ownerSessionId}`);
+        }
+        const expectedHandles = new Set(record.terminalHandles ?? [record.terminalHandle!]);
+        const currentHandles = new Set((await orca.listTerminals(record.worktreeId!, record.routingEnvironmentId))
+          .filter((terminal) => terminal.worktreeId === record.worktreeId && terminal.connected && terminal.writable && terminal.visible)
+          .map((terminal) => terminal.handle));
+        if (expectedHandles.size === 0 || currentHandles.size !== expectedHandles.size
+          || [...expectedHandles].some((handle) => !currentHandles.has(handle))) {
+          throw new Error(`Provider migration Orca terminal evidence no longer matches active owner ${record.ownerSessionId}`);
+        }
+      }
+      const durableMatches = sessions.filter((session) => session.sessionId === record.episodeId);
+      if (durableMatches.length !== 1) throw new Error(`Provider migration requires one durable Episode session for ${record.ownerSessionId}`);
+      const session = durableMatches[0];
+      if (!session.sessionFile || !samePath(session.sessionFile, record.episodeSessionFile!)
+        || !session.cwd || !samePath(session.cwd, record.worktree!)) {
+        throw new Error(`Provider migration durable session identity no longer matches active owner ${record.ownerSessionId}`);
+      }
+      const currentRoute = sessionRuntimeRoute(session);
+      if (!currentRoute) throw new Error(`Provider migration durable session has no current route for ${record.ownerSessionId}`);
+      if (currentRoute !== record.episodeActiveSessionId
+        && sessions.some((candidate) => sessionRuntimeRoute(candidate) === record.episodeActiveSessionId)) {
+        throw new Error(`Provider migration previous runtime route remains live for ${record.ownerSessionId}`);
+      }
+      if (sessionIsBusy(session)) throw new Error(`Provider migration requires idle Episode summary for ${record.ownerSessionId}`);
+      assertIdleEpisodeState(await publisher.getState(currentRoute), record, currentRoute);
+      proofs.push({
+        ownerSessionId: record.ownerSessionId,
+        expectedPreviousEpisodeActiveSessionId: record.episodeActiveSessionId!,
+        verifiedCurrentEpisodeActiveSessionId: currentRoute,
+      });
+    }
+    return proofs;
+  } finally {
+    if (closePublisher) publisher.close();
+  }
+}
+
 function exactOwnedRecord(
   record: EpisodeOwnershipRecord,
   location: string,

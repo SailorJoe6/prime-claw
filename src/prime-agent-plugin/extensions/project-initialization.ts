@@ -14,8 +14,10 @@ import {
   inspectTaskProviderMigration,
   migrateTaskProvider,
   type ProviderMigrationInspection,
+  type ProviderMigrationOptions,
   type ProviderMigrationResult,
 } from "../extension-support/task-provider-migration.ts";
+import { verifyActiveTaskEpisodeContinuity } from "../extension-support/spec-episode.ts";
 import {
   finishTemplateReview,
   recoverTemplateReview,
@@ -109,6 +111,7 @@ function toolResult(value: unknown, text?: string, isError = false) {
 type ProjectInitializationDependencies = Omit<ReconcileOptions, "cwd" | "registerOrca" | "requireOrcaRegistration"> & {
   migrationInspector?: typeof inspectTaskProviderMigration;
   migrationRunner?: typeof migrateTaskProvider;
+  migrationRuntimeVerifier?: ProviderMigrationOptions["verifyActiveRuntime"];
 };
 
 interface ActionArguments {
@@ -166,6 +169,10 @@ async function executeAction(action: Action, args: ActionArguments, ctx: Extensi
         actor: args.actor ?? "",
         semanticPlacement: args.semanticPlacement ?? "",
         runner: dependencies.runner,
+        verifyActiveRuntime: dependencies.migrationRuntimeVerifier ?? ((records) => {
+          const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", dependencies.runner);
+          return verifyActiveTaskEpisodeContinuity(project.root, records);
+        }),
       });
   }
 }

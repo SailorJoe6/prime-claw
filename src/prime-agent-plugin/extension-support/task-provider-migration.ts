@@ -41,6 +41,7 @@ import {
   CANONICAL_LIFECYCLE_STATUSES,
   checkBacklogCapabilities,
   checkBeadsCapabilities,
+  detectExplicitTaskProvider,
   detectTaskProvider,
   normalizedDoltGitRemote,
   prepareBeadsWorkspaceTransport,
@@ -56,8 +57,10 @@ import {
   restoreTaskProviderOwnershipSwitch,
   switchActiveTaskProviderOwnership,
   taskEpisodeProvider,
+  withCurrentTaskProviderOwnershipSwitch,
   type ActiveTaskProviderOwnershipDestination,
   type ActiveTaskProviderOwnershipSwitchResult,
+  type TaskEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 
 const RECEIPT_TITLE = "Prime Claw task-provider migration receipt";
@@ -129,6 +132,11 @@ export interface ProviderMigrationOptions {
   runner?: CommandRunner;
   now?: () => string;
   deleteSource?: (snapshot: SourceSnapshot, runner: CommandRunner) => void;
+  verifyActiveRuntime?: (records: readonly TaskEpisodeOwnershipRecord[]) => Promise<Array<{
+    ownerSessionId: string;
+    expectedPreviousEpisodeActiveSessionId: string;
+    verifiedCurrentEpisodeActiveSessionId: string;
+  }>>;
 }
 
 type NativeCommand = { stdout: string; stderr: string; status: number };
@@ -272,6 +280,23 @@ function directPublishedGitHead(runner: CommandRunner, repositoryRoot: string, r
   return { remote, ref };
 }
 
+function assertPublishedGitRef(
+  runner: CommandRunner,
+  repositoryRoot: string,
+  revision: string,
+  remoteName: string,
+  remoteUrl: string,
+  ref: string,
+  label: string,
+): void {
+  const urls = runRequired(runner, "git", ["-C", repositoryRoot, "remote", "get-url", "--all", remoteName], repositoryRoot, `${label} remote URL`)
+    .stdout.split(/\r?\n/).filter(Boolean);
+  if (urls.length !== 1 || urls[0] !== remoteUrl) throw new Error(`${label} remote authority changed`);
+  const direct = runRequired(runner, "git", ["-C", repositoryRoot, "ls-remote", "--exit-code", "--refs", remoteName, ref], repositoryRoot, label);
+  const rows = direct.stdout.trim().split(/\r?\n/).filter(Boolean);
+  if (rows.length !== 1 || rows[0] !== `${revision}\t${ref}`) throw new Error(`${label} does not equal exact revision ${revision}`);
+}
+
 function walkTaskFiles(storeDir: string): string[] {
   const files: string[] = [];
   const walk = (folder: string) => {
@@ -373,12 +398,15 @@ function captureBacklog(
     runner, repositoryRoot, projectRoot, revision,
     taskFiles.filter((item) => item.classification === "archived").map(({ taskId, path }) => ({ taskId, path })),
   );
-  const tasks = taskFiles.map(({ path, markdown, taskId, classification }): BacklogTaskPackage => {
-    const nativeView = classification === "archived" ? archivedViews.get(taskId)! : backlogTaskView(runner, projectRoot, taskId);
-    if (classification !== "archived") {
+  const tasks = taskFiles.map(({ path, markdown, taskId, classification: physicalClassification }): BacklogTaskPackage => {
+    const nativeView = physicalClassification === "archived" ? archivedViews.get(taskId)! : backlogTaskView(runner, projectRoot, taskId);
+    if (physicalClassification !== "archived") {
       const reported = resolve(projectRoot, nativeView.task.path);
       if (realpathSync(reported) !== realpathSync(path)) throw new Error(`Backlog task ${taskId} native path does not match its exact source file`);
     }
+    const classification = physicalClassification === "archived"
+      ? "archived" as const
+      : String(nativeView.task.status) === "Done" ? "closed" as const : "open" as const;
     const historyPath = relative(repositoryRoot, path).replace(/\\/g, "/");
     const history = runRequired(
       runner,
@@ -416,6 +444,39 @@ function jsonCommand(runner: CommandRunner, command: string, args: string[], cwd
   return parseJson(runRequired(runner, command, args, cwd, label).stdout, label);
 }
 
+function completeBeadsExport(runner: CommandRunner, projectRoot: string, label: string): Array<{ row: JsonObject; line: string }> {
+  const filter = asObject(
+    jsonCommand(runner, "bd", ["config", "get", "export.exclude_owners", "--json"], projectRoot, `${label} export filter`),
+    `${label} export filter`,
+  );
+  if (filter.schema_version !== 1 || filter.key !== "export.exclude_owners" || typeof filter.value !== "string") {
+    throw new Error(`${label} returned malformed export.exclude_owners evidence`);
+  }
+  if (filter.value.trim() !== "") {
+    throw new Error(`${label} cannot prove a complete inventory while export.exclude_owners is configured`);
+  }
+  const result = runRequired(runner, "bd", ["export", "--all"], projectRoot, `${label} complete export`);
+  const exported = result.stdout.split(/\r?\n/).filter((line) => line.trim() !== "").map((line) => ({
+    line,
+    row: asObject(parseJson(line, `${label} export row`), `${label} export row`),
+  }));
+  const inventory = jsonCommand(
+    runner,
+    "bd",
+    ["--readonly", "sql", "--json", "SELECT id FROM issues ORDER BY id"],
+    projectRoot,
+    `${label} independent issue inventory`,
+  );
+  if (!Array.isArray(inventory)) throw new Error(`${label} independent issue inventory is not an array`);
+  const inventoryIds = inventory.map((value) => exactTaskId(asObject(value, `${label} inventory row`).id, `${label} inventory row`)).sort();
+  const exportIds = exported.map(({ row }) => exactTaskId(row.id, `${label} export row`)).sort();
+  if (new Set(inventoryIds).size !== inventoryIds.length || new Set(exportIds).size !== exportIds.length
+      || canonical(inventoryIds) !== canonical(exportIds)) {
+    throw new Error(`${label} export does not exactly match the independent native issue inventory`);
+  }
+  return exported;
+}
+
 function captureBeads(
   projectRoot: string,
   evidence: BeadsProviderEvidence,
@@ -427,10 +488,8 @@ function captureBeads(
     ? prepareExplicitBeadsWorkspaceTransport(projectRoot, runner)
     : prepareBeadsWorkspaceTransport(projectRoot, runner);
   if (prepared.status !== "ready") throw new Error(`Beads publication proof failed (${prepared.code}): ${prepared.detail}; ${prepared.remediation}`);
-  const exportResult = runRequired(runner, "bd", ["export"], projectRoot, "bd export");
-  const lines = exportResult.stdout.split(/\r?\n/).filter((line) => line.trim() !== "");
-  const tasks = lines.map((line): BeadsTaskPackage => {
-    const exportRow = asObject(parseJson(line, "bd export row"), "bd export row");
+  const exported = completeBeadsExport(runner, projectRoot, "Beads source");
+  const tasks = exported.map(({ line, row: exportRow }): BeadsTaskPackage => {
     const taskId = exactTaskId(exportRow.id, "Beads export row");
     const rawView = jsonCommand(runner, "bd", ["show", taskId, "--json", "--long", "--include-comments"], projectRoot, `bd show ${taskId}`);
     const views = Array.isArray(rawView) ? rawView : [];
@@ -476,11 +535,21 @@ function selectedEvidence(projectRoot: string, runner: CommandRunner): { provide
   return { provider: detection.evidence.provider, evidence: detection.evidence };
 }
 
+function captureProviderEvidence(
+  projectRoot: string,
+  provider: TaskProviderId,
+  evidence: BacklogProviderEvidence | BeadsProviderEvidence,
+  runner: CommandRunner,
+  explicit = false,
+): SourceSnapshot {
+  return provider === "backlog"
+    ? captureBacklog(projectRoot, evidence as BacklogProviderEvidence, runner)
+    : captureBeads(projectRoot, evidence as BeadsProviderEvidence, runner, explicit);
+}
+
 function captureSelectedSource(projectRoot: string, runner: CommandRunner): SourceSnapshot {
   const selected = selectedEvidence(projectRoot, runner);
-  return selected.provider === "backlog"
-    ? captureBacklog(projectRoot, selected.evidence as BacklogProviderEvidence, runner)
-    : captureBeads(projectRoot, selected.evidence as BeadsProviderEvidence, runner, false);
+  return captureProviderEvidence(projectRoot, selected.provider, selected.evidence, runner);
 }
 
 function captureSameSource(snapshot: SourceSnapshot, runner: CommandRunner): SourceSnapshot {
@@ -502,6 +571,7 @@ interface ActiveMigrationOwnership {
   worktree: string;
   branch: string;
   head: string;
+  record: TaskEpisodeOwnershipRecord;
 }
 
 function verifyActiveCodeIdentity(projectRoot: string, row: ActiveMigrationOwnership, runner: CommandRunner): void {
@@ -526,10 +596,23 @@ function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, ru
   const rows: ActiveMigrationOwnership[] = [];
   for (const [ownerSessionId, record] of Object.entries(registry.owners)) {
     if (record.version === 1 || record.status === "inactive") continue;
+    if (record.status !== "active") throw new Error(`task Episode ${ownerSessionId} is ${record.status}; provider migration requires exact active idle ownership`);
     const provider = taskEpisodeProvider(record);
     if (provider !== sourceProvider) throw new Error(`active task Episode ${ownerSessionId} uses ${provider}, not selected source ${sourceProvider}`);
-    if (!record.worktree || !record.branch || !record.head) throw new Error(`active task Episode ${ownerSessionId} has no exact worktree/branch/head identity`);
-    const row = { ownerSessionId, taskId: record.taskId, worktree: record.worktree, branch: record.branch, head: record.head };
+    if (!record.worktree || !record.branch || !record.head || !record.episodeSessionFile) throw new Error(`active task Episode ${ownerSessionId} has no exact worktree/branch/head/session identity`);
+    if (!existsSync(record.episodeSessionFile)) throw new Error(`active task Episode ${ownerSessionId} durable session file is absent`);
+    const sessionEntry = lstatSync(record.episodeSessionFile);
+    if (!sessionEntry.isFile() || sessionEntry.isSymbolicLink() || realpathSync(record.episodeSessionFile) !== record.episodeSessionFile) {
+      throw new Error(`active task Episode ${ownerSessionId} durable session file identity is unsafe`);
+    }
+    const row = {
+      ownerSessionId,
+      taskId: record.taskId,
+      worktree: record.worktree,
+      branch: record.branch,
+      head: record.head,
+      record: JSON.parse(JSON.stringify(record)) as TaskEpisodeOwnershipRecord,
+    };
     verifyActiveCodeIdentity(projectRoot, row, runner);
     rows.push(row);
   }
@@ -538,7 +621,7 @@ function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, ru
 
 function verifyActiveSourceWorkspace(source: SourceSnapshot, row: ActiveMigrationOwnership, runner: CommandRunner): void {
   if (source.provider === "beads") {
-    const proof = prepareBeadsWorkspaceTransport(row.worktree, runner);
+    const proof = prepareExplicitBeadsWorkspaceTransport(row.worktree, runner);
     if (proof.status !== "ready") throw new Error(`active task Episode ${row.ownerSessionId} cannot prove its source Beads workspace: ${proof.detail}; ${proof.remediation}`);
     if (proof.evidence.publishedRevision !== source.revision) throw new Error(`active task Episode ${row.ownerSessionId} resolves Beads revision ${proof.evidence.publishedRevision} instead of source revision ${source.revision}`);
     return;
@@ -747,8 +830,7 @@ function writeJsonLines(path: string, rows: JsonObject[]): void {
 }
 
 function beadsExportRows(runner: CommandRunner, projectRoot: string): JsonObject[] {
-  const result = runRequired(runner, "bd", ["export"], projectRoot, "bd export destination");
-  return result.stdout.split(/\r?\n/).filter((line) => line.trim()).map((line) => asObject(parseJson(line, "bd export destination row"), "bd export destination row"));
+  return completeBeadsExport(runner, projectRoot, "Beads destination").map(({ row }) => row);
 }
 
 function beadsMigrationMetadata(row: JsonObject): JsonObject | null {
@@ -770,7 +852,10 @@ function ensureBeadsDestinationReusable(rows: JsonObject[], source: BacklogSnaps
       }
       continue;
     }
-    if (metadata.marker !== SOURCE_MARKER || metadata.sourceProvider !== "backlog") throw new Error(`Beads destination task ${String(row.id)} has unrelated migration metadata`);
+    if (metadata.marker !== SOURCE_MARKER || metadata.sourceProvider !== "backlog"
+        || metadata.sourceRevision !== source.revision || metadata.sourceDigest !== source.digest) {
+      throw new Error(`Beads destination task ${String(row.id)} has unrelated migration metadata`);
+    }
     const sourceTaskId = exactTaskId(metadata.sourceTaskId, "Beads destination migration metadata");
     if (!source.tasks.some((task) => task.sourceTaskId === sourceTaskId)) throw new Error(`Beads destination contains task from a different source snapshot: ${sourceTaskId}`);
     if (mapping[sourceTaskId]) throw new Error(`Beads destination repeats source task ${sourceTaskId}`);
@@ -1016,21 +1101,23 @@ function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: st
     const marker = comments.map((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "")).find((text: string) => text.startsWith(`${SOURCE_MARKER} mapping `));
     const receipt = comments.map((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "")).some((text: string) => text.includes(RECEIPT_MARKER));
     if (receipt) {
-      const notes = String(view.task.notes ?? "");
+      const notes = String(view.task.implementationNotes ?? "");
       const receiptJson = /^```json\n([\s\S]+)\n```$/.exec(notes)?.[1];
-      if (receiptJson) {
-        const exact = asObject(parseJson(receiptJson, `Backlog migration receipt ${id}`), `Backlog migration receipt ${id}`);
-        if (exact.sourceProvider !== "beads" || exact.targetProvider !== "backlog"
-            || exact.sourceRevision !== source.revision || exact.sourceDigest !== source.digest) {
-          throw new Error(`Backlog destination receipt ${id} belongs to a different source snapshot`);
-        }
+      if (!receiptJson) throw new Error(`Backlog destination receipt ${id} has no exact receipt payload`);
+      const exact = asObject(parseJson(receiptJson, `Backlog migration receipt ${id}`), `Backlog migration receipt ${id}`);
+      if (exact.sourceProvider !== "beads" || exact.targetProvider !== "backlog"
+          || exact.sourceRevision !== source.revision || exact.sourceDigest !== source.digest) {
+        throw new Error(`Backlog destination receipt ${id} belongs to a different source snapshot`);
       }
       continue;
     }
     if (!marker) throw new Error(`Backlog destination contains foreign task ${id}; use a clean destination or the exact same migration destination`);
     const parsed = asObject(parseJson(marker.slice(`${SOURCE_MARKER} mapping `.length), `Backlog migration marker ${id}`), `Backlog migration marker ${id}`);
-    if (parsed.sourceRevision !== source.revision || !source.tasks.some((task) => task.sourceTaskId === parsed.sourceTaskId)) throw new Error(`Backlog destination task ${id} belongs to a different source snapshot`);
-    mapping[String(parsed.sourceTaskId)] = id;
+    if (parsed.sourceRevision !== source.revision || parsed.sourceDigest !== source.digest
+        || !source.tasks.some((task) => task.sourceTaskId === parsed.sourceTaskId)) throw new Error(`Backlog destination task ${id} belongs to a different source snapshot`);
+    const sourceTaskId = String(parsed.sourceTaskId);
+    if (mapping[sourceTaskId]) throw new Error(`Backlog destination repeats source task ${sourceTaskId}`);
+    mapping[sourceTaskId] = id;
   }
   return mapping;
 }
@@ -1061,7 +1148,7 @@ function createBacklogTaskFromBeads(pkg: BeadsTaskPackage, source: BeadsSnapshot
   args.push("--plain");
   const created = runRequired(runner, "backlog", args, projectRoot, `create Backlog task for ${pkg.sourceTaskId}`);
   const id = backlogCreateId(created.stdout);
-  nativeBacklogComment(runner, projectRoot, id, `${SOURCE_MARKER} mapping ${JSON.stringify({ sourceTaskId: pkg.sourceTaskId, sourceRevision: source.revision })}`, "prime-claw-migration");
+  nativeBacklogComment(runner, projectRoot, id, `${SOURCE_MARKER} mapping ${JSON.stringify({ sourceTaskId: pkg.sourceTaskId, sourceRevision: source.revision, sourceDigest: source.digest })}`, "prime-claw-migration");
   for (const comment of chunkComment(backlogSourcePackage(pkg, source, semanticPlacement))) nativeBacklogComment(runner, projectRoot, id, comment, "prime-claw-migration");
   const nativeComments = Array.isArray(row.comments) ? row.comments : Array.isArray(pkg.exportRow.comments) ? pkg.exportRow.comments : [];
   for (const comment of nativeComments) {
@@ -1078,18 +1165,18 @@ function dependencyIds(pkg: BeadsTaskPackage): string[] {
   return dependencies.map((dep: any) => typeof dep === "string" ? dep : String(dep.depends_on_id ?? dep.id ?? dep.issue_id ?? "")).filter(Boolean);
 }
 
-function commitBacklogDestination(runner: CommandRunner, storeDir: string, message: string): string {
+function commitBacklogDestination(runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace, message: string): string {
+  const { storeDir, remoteName, remoteUrl } = prepared;
   runRequired(runner, "git", ["-C", storeDir, "add", "-A"], storeDir, "stage Backlog destination");
   const status = runRequired(runner, "git", ["-C", storeDir, "status", "--porcelain=v1"], storeDir, "Backlog destination status");
   if (status.stdout.trim()) runRequired(runner, "git", ["-C", storeDir, "-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-m", message], storeDir, "commit Backlog destination");
   const head = cleanGitRevision(runner, storeDir);
-  runRequired(runner, "git", ["-C", storeDir, "push", "origin", `HEAD:${TASK_HISTORY_REF}`], storeDir, "publish Backlog destination");
-  const direct = runRequired(runner, "git", ["-C", storeDir, "ls-remote", "--exit-code", "--refs", "origin", TASK_HISTORY_REF], storeDir, "prove Backlog destination publication");
-  if (!direct.stdout.startsWith(`${head}\t${TASK_HISTORY_REF}`)) throw new Error("Backlog destination direct publication does not equal its exact clean HEAD");
+  runRequired(runner, "git", ["-C", storeDir, "push", remoteName, `HEAD:${TASK_HISTORY_REF}`], storeDir, "publish Backlog destination");
+  assertPublishedGitRef(runner, storeDir, head, remoteName, remoteUrl, TASK_HISTORY_REF, "Backlog destination direct publication");
   return head;
 }
 
-function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: string, storeDir: string): string {
+function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: string, storeDir: string, source: BeadsSnapshot): string {
   const clean = runRequired(runner, "git", ["-C", storeDir, "status", "--porcelain=v1"], storeDir, "inspect Backlog receipt placeholder state").stdout === "";
   const views = clean
     ? backlogDestinationViews(runner, projectRoot, storeDir, "receipt-placeholder")
@@ -1101,9 +1188,10 @@ function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: str
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
     if (comments.some((comment: JsonObject) => String(comment.text ?? comment.body ?? comment.content ?? "").includes(RECEIPT_MARKER))) return id;
   }
-  const created = runRequired(runner, "backlog", ["task", "create", RECEIPT_TITLE, "--status", "In Progress", "--type", "task", "--notes", "Pending exact verified migration receipt", "--no-dod-defaults", "--plain"], projectRoot, "reserve Backlog migration receipt identity");
+  const pending = { marker: RECEIPT_MARKER, pending: true, sourceProvider: "beads", targetProvider: "backlog", sourceRevision: source.revision, sourceDigest: source.digest };
+  const created = runRequired(runner, "backlog", ["task", "create", RECEIPT_TITLE, "--status", "In Progress", "--type", "task", "--notes", `\`\`\`json\n${JSON.stringify(pending, null, 2)}\n\`\`\``, "--no-dod-defaults", "--plain"], projectRoot, "reserve Backlog migration receipt identity");
   const id = backlogCreateId(created.stdout);
-  nativeBacklogComment(runner, projectRoot, id, `${RECEIPT_MARKER}\nPending complete destination proof; this task becomes the sole final receipt.`, "prime-claw-migration");
+  nativeBacklogComment(runner, projectRoot, id, `${RECEIPT_MARKER}\nPending complete destination proof for ${source.revision}; this task becomes the sole final receipt.`, "prime-claw-migration");
   return id;
 }
 
@@ -1112,7 +1200,7 @@ function createOrUpdateBacklogReceipt(runner: CommandRunner, projectRoot: string
   for (const [id, view] of backlogDestinationViews(runner, projectRoot, storeDir, "receipt")) {
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
     if (comments.some((comment: JsonObject) => String(comment.text ?? comment.body ?? comment.content ?? "").includes(RECEIPT_MARKER))) {
-      runRequired(runner, "backlog", ["task", "edit", "--notes", `\`\`\`json\n${JSON.stringify(receipt, null, 2)}\n\`\`\``, "--plain", "--", id], projectRoot, "update Backlog migration receipt");
+      runRequired(runner, "backlog", ["task", "edit", "--notes", `\`\`\`json\n${JSON.stringify(receipt, null, 2)}\n\`\`\``, "--status", "Done", "--final-summary", "Verified selected-provider migration receipt", "--plain", "--", id], projectRoot, "update Backlog migration receipt");
       return id;
     }
   }
@@ -1181,6 +1269,7 @@ function prepareExplicitBacklogMigrationWorkspace(projectRoot: string, runner: C
   checkBacklogCapabilities(projectRoot, runner);
   const head = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "HEAD"], storeDir, "read Backlog destination revision").stdout.trim();
   if (!GIT_OID.test(head)) throw new Error("Backlog destination did not return an exact Git revision");
+  assertPublishedGitRef(runner, storeDir, head, "origin", remote.raw, TASK_HISTORY_REF, "Backlog destination initialization publication");
   return { storeDir, remoteName: "origin", remoteUrl: remote.raw, head };
 }
 
@@ -1210,12 +1299,14 @@ function migrateBeadsToBacklog(
   const prepared = prepareExplicitBacklogMigrationWorkspace(source.projectRoot, runner);
   const storeDir = prepared.storeDir;
   const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source);
+  const reusedDestinationIds = new Set(Object.values(mapping));
   for (const pkg of topologicalBeadsPackages(source.tasks)) {
     if (!mapping[pkg.sourceTaskId]) mapping[pkg.sourceTaskId] = createBacklogTaskFromBeads(pkg, source, source.projectRoot, runner, mapping, semanticPlacement);
   }
-  ensureBacklogReceiptPlaceholder(runner, source.projectRoot, storeDir);
+  ensureBacklogReceiptPlaceholder(runner, source.projectRoot, storeDir, source);
   for (const pkg of source.tasks) {
     const id = mapping[pkg.sourceTaskId];
+    if (reusedDestinationIds.has(id)) continue;
     const deps = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId);
     if (deps.length) runRequired(runner, "backlog", ["task", "edit", "--depends-on", deps.join(","), "--plain", "--", id], source.projectRoot, `migrate dependencies for ${pkg.sourceTaskId}`);
     if (pkg.classification === "archived") {
@@ -1226,7 +1317,7 @@ function migrateBeadsToBacklog(
       if (pkg.classification === "closed") runRequired(runner, "backlog", ["task", "complete", id], source.projectRoot, `complete migrated Backlog task ${id}`);
     }
   }
-  const dataRevision = commitBacklogDestination(runner, storeDir, "prime-claw: migrate Beads task history");
+  const dataRevision = commitBacklogDestination(runner, prepared, "prime-claw: migrate Beads task history");
   const dataViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "data");
   if (dataViews.size !== source.counts.total + 1) throw new Error(`Backlog destination count mismatch: expected ${source.counts.total} migrated tasks plus one receipt, found ${dataViews.size}`);
   const destinationTasks: DestinationTask[] = source.tasks.map((pkg) => {
@@ -1270,10 +1361,11 @@ function migrateBeadsToBacklog(
   const receiptBase = migrationReceiptBase(source, "backlog", dataRevision, destinationDataDigest,
     destinationTasks.map(({ sourceTaskId, destinationTaskId }) => ({ sourceTaskId, destinationTaskId })), transitions, actor, timestamp, semanticPlacement);
   const receiptTaskId = createOrUpdateBacklogReceipt(runner, source.projectRoot, storeDir, receiptBase);
-  const receiptRevision = commitBacklogDestination(runner, storeDir, "prime-claw: record task-provider migration receipt");
+  const receiptRevision = commitBacklogDestination(runner, prepared, "prime-claw: record task-provider migration receipt");
   const refresh = () => {
     const exact = cleanGitRevision(runner, storeDir);
     if (exact !== receiptRevision) throw new Error("Backlog destination revision changed after receipt publication");
+    assertPublishedGitRef(runner, storeDir, receiptRevision, prepared.remoteName, prepared.remoteUrl, TASK_HISTORY_REF, "Backlog destination receipt publication");
     const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "refresh");
     if (views.size !== source.counts.total + 1) throw new Error(`Backlog destination receipt count changed: expected ${source.counts.total + 1}, found ${views.size}`);
     const refreshed = destinationTasks.map((task) => {
@@ -1291,6 +1383,92 @@ function migrateBeadsToBacklog(
       prepareExplicitBacklogEpisodeWorkspace(worktree, runner, prepared.remoteUrl, receiptRevision);
     },
   };
+}
+
+function verifyExactRetryDestination(source: SourceSnapshot, target: TaskProviderId, runner: CommandRunner): void {
+  if (source.provider === "backlog" && target === "beads") {
+    const prepared = prepareExplicitBeadsWorkspaceTransport(source.projectRoot, runner);
+    if (prepared.status !== "ready") throw new Error(`existing Beads retry destination is not exactly reusable: ${prepared.detail}`);
+    const rows = beadsExportRows(runner, source.projectRoot);
+    const mapping = ensureBeadsDestinationReusable(rows, source);
+    const receipts = rows.filter((row) => beadsMigrationMetadata(row)?.marker === RECEIPT_MARKER);
+    if (receipts.length > 1 || rows.length !== Object.keys(mapping).length + receipts.length
+        || (Object.keys(mapping).length === 0 && receipts.length === 0)) {
+      throw new Error("existing Beads retry destination cannot be proven as the exact same destination for this source snapshot");
+    }
+    return;
+  }
+  if (source.provider === "beads" && target === "backlog") {
+    const storeDir = join(source.projectRoot, ".backlog");
+    if (!existsSync(storeDir) || !lstatSync(storeDir).isDirectory() || lstatSync(storeDir).isSymbolicLink()) {
+      throw new Error("existing Backlog retry destination is absent or unsafe");
+    }
+    const revision = cleanGitRevision(runner, storeDir);
+    const remote = gitRemoteForDolt(runner, source.projectRoot);
+    assertPublishedGitRef(runner, storeDir, revision, "origin", remote.raw, TASK_HISTORY_REF, "existing Backlog retry destination publication");
+    const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source);
+    const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "retry admission");
+    const receiptCount = [...views.values()].filter((view) => {
+      const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
+      return comments.some((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "").includes(RECEIPT_MARKER));
+    }).length;
+    if (receiptCount > 1 || views.size !== Object.keys(mapping).length + receiptCount
+        || (Object.keys(mapping).length === 0 && receiptCount === 0)) {
+      throw new Error("existing Backlog retry destination cannot be proven as the exact same destination for this source snapshot");
+    }
+    return;
+  }
+  throw new Error("same-destination retry requires different supported source and target providers");
+}
+
+function captureConfirmedSource(
+  projectRoot: string,
+  targetProvider: TaskProviderId,
+  expectedSourceRevision: string,
+  runner: CommandRunner,
+): SourceSnapshot {
+  const detection = detectTaskProvider(projectRoot, runner);
+  if (detection.kind === "selected") {
+    return captureProviderEvidence(projectRoot, detection.evidence.provider, detection.evidence, runner);
+  }
+  if (detection.kind !== "blocked" || detection.code !== "dual-providers") {
+    if (detection.kind === "blocked") throw new Error(`provider authority blocked (${detection.code}): ${detection.detail}; ${detection.remediation}`);
+    throw new Error("provider migration requires one selected live source provider");
+  }
+  const sourceProvider: TaskProviderId = targetProvider === "beads" ? "backlog" : "beads";
+  const explicit = detectExplicitTaskProvider(projectRoot, sourceProvider, runner);
+  if (explicit.kind !== "selected" || explicit.evidence.provider !== sourceProvider) {
+    throw new Error(`same-destination retry cannot prove the exact ${sourceProvider} source store`);
+  }
+  const source = captureProviderEvidence(projectRoot, sourceProvider, explicit.evidence, runner, true);
+  if (source.revision !== expectedSourceRevision) {
+    throw new Error(`same-destination retry source revision ${source.revision} does not equal confirmed ${expectedSourceRevision}`);
+  }
+  verifyExactRetryDestination(source, targetProvider, runner);
+  return source;
+}
+
+async function proveActiveRuntimeContinuity(
+  rows: readonly ActiveMigrationOwnership[],
+  verifier: ProviderMigrationOptions["verifyActiveRuntime"],
+): Promise<Record<string, { expectedPreviousEpisodeActiveSessionId: string; verifiedCurrentEpisodeActiveSessionId: string }>> {
+  if (rows.length === 0) return {};
+  if (!verifier) throw new Error("active task Episode runtime continuity verification is unavailable");
+  const proofs = await verifier(rows.map((row) => row.record));
+  const result: Record<string, { expectedPreviousEpisodeActiveSessionId: string; verifiedCurrentEpisodeActiveSessionId: string }> = {};
+  for (const proof of proofs) {
+    if (!rows.some((row) => row.ownerSessionId === proof.ownerSessionId) || result[proof.ownerSessionId]) {
+      throw new Error(`active runtime continuity returned unexpected or duplicate owner ${proof.ownerSessionId}`);
+    }
+    const row = rows.find((item) => item.ownerSessionId === proof.ownerSessionId)!;
+    if (!proof.expectedPreviousEpisodeActiveSessionId || !proof.verifiedCurrentEpisodeActiveSessionId
+        || proof.expectedPreviousEpisodeActiveSessionId !== row.record.episodeActiveSessionId) {
+      throw new Error(`active runtime continuity returned incomplete or mismatched evidence for ${proof.ownerSessionId}`);
+    }
+    result[proof.ownerSessionId] = proof;
+  }
+  if (Object.keys(result).length !== rows.length) throw new Error("active runtime continuity did not cover every active task Episode");
+  return result;
 }
 
 function ownershipDestinations(candidate: DestinationCandidate): Record<string, ActiveTaskProviderOwnershipDestination> {
@@ -1399,7 +1577,7 @@ function exactSelectedTarget(projectRoot: string, target: TaskProviderId, runner
   else checkBeadsCapabilities(projectRoot, runner);
 }
 
-export function migrateTaskProvider(options: ProviderMigrationOptions): ProviderMigrationResult {
+export async function migrateTaskProvider(options: ProviderMigrationOptions): Promise<ProviderMigrationResult> {
   const runner = options.runner ?? new ProcessCommandRunner();
   let source: SourceSnapshot | undefined;
   let ownershipSwitch: ActiveTaskProviderOwnershipSwitchResult | undefined;
@@ -1411,7 +1589,7 @@ export function migrateTaskProvider(options: ProviderMigrationOptions): Provider
     if (project.kind === "linked-worktree") return blocked("primary-required", "provider migration must run from the canonical primary checkout", "rerun from the canonical primary Conversation", { targetProvider: options.targetProvider });
     const codeHead = cleanGitRevision(runner, project.root);
     if (!directPublishedGitHead(runner, project.root, codeHead)) throw new Error("provider migration requires an exact directly published code head");
-    source = captureSelectedSource(project.root, runner);
+    source = captureConfirmedSource(project.root, options.targetProvider, options.expectedSourceRevision, runner);
     if (source.provider === options.targetProvider) return blocked("same-provider", `the selected provider is already ${source.provider}`, "choose the other supported provider", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     if (source.revision !== options.expectedSourceRevision) return blocked("source-revision-changed", `confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`, "quiesce mutations, request a fresh inspection, and confirm that exact revision", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     const ownershipRows = activeOwnership(project.root, source.provider, runner);
@@ -1419,11 +1597,13 @@ export function migrateTaskProvider(options: ProviderMigrationOptions): Provider
     const sourceIds = new Set(source.tasks.map((task) => task.sourceTaskId));
     const missing = ownershipRows.filter((row) => !sourceIds.has(row.taskId));
     if (missing.length) throw new Error(`active ownership references source tasks absent from the complete snapshot: ${missing.map((row) => row.taskId).join(", ")}`);
+    await proveActiveRuntimeContinuity(ownershipRows, options.verifyActiveRuntime);
     const timestamp = (options.now ?? (() => new Date().toISOString()))();
     if (Number.isNaN(Date.parse(timestamp))) throw new Error("migration timestamp is not RFC3339");
     const candidate = source.provider === "backlog"
       ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows)
       : migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows);
+    for (const owner of ownershipRows) candidate.prepareActiveWorktree(owner.worktree);
     const sourceAfterMigration = captureSameSource(source, runner);
     exactSnapshotUnchanged(source, sourceAfterMigration);
     const refreshed = candidate.refreshAfterReceipt();
@@ -1433,7 +1613,15 @@ export function migrateTaskProvider(options: ProviderMigrationOptions): Provider
     for (const owner of ownershipRows) {
       verifyActiveCodeIdentity(project.root, owner, runner);
       verifyActiveSourceWorkspace(source, owner, runner);
-      candidate.prepareActiveWorktree(owner.worktree);
+    }
+    const runtimeProofs = await proveActiveRuntimeContinuity(ownershipRows, options.verifyActiveRuntime);
+    const destinationAtSwitch = candidate.refreshAfterReceipt();
+    if (destinationAtSwitch.revision !== candidate.revision || destinationAtSwitch.digest !== candidate.digest) throw new Error("destination changed at ownership cutover");
+    const sourceAtSwitch = captureSameSource(source, runner);
+    exactSnapshotUnchanged(source, sourceAtSwitch);
+    for (const owner of ownershipRows) {
+      verifyActiveCodeIdentity(project.root, owner, runner);
+      verifyActiveSourceWorkspace(source, owner, runner);
     }
     const destinations = ownershipDestinations(candidate);
     ownershipSwitch = switchActiveTaskProviderOwnership(project.root, {
@@ -1441,16 +1629,37 @@ export function migrateTaskProvider(options: ProviderMigrationOptions): Provider
       targetProvider: candidate.provider,
       switchedAt: timestamp,
       destinations,
+      expectedSourceRecords: Object.fromEntries(ownershipRows.map((row) => [row.ownerSessionId, row.record])),
+      runtimeProofs,
     });
     const deleteSource = options.deleteSource ?? defaultDeleteSource;
     try {
-      const destinationBeforeDelete = candidate.refreshAfterReceipt();
-      if (destinationBeforeDelete.revision !== candidate.revision || destinationBeforeDelete.digest !== candidate.digest) throw new Error("destination changed before guarded source deletion");
-      const sourceBeforeDelete = captureSameSource(source, runner);
-      exactSnapshotUnchanged(source, sourceBeforeDelete);
-      const activeSourceStores = independentActiveBacklogStores(source, ownershipRows);
-      deleteSource(source, runner);
-      for (const storeDir of activeSourceStores) rmSync(storeDir, { recursive: true, force: false });
+      const switchedRows = ownershipRows.map((row) => {
+        const record = ownershipSwitch!.after.owners[row.ownerSessionId];
+        if (!record || record.version !== 2 || record.status !== "active") throw new Error(`switched ownership is absent for ${row.ownerSessionId}`);
+        return { ...row, taskId: record.taskId, record };
+      });
+      const postSwitchProofs = await proveActiveRuntimeContinuity(switchedRows, options.verifyActiveRuntime);
+      for (const row of switchedRows) {
+        const proof = postSwitchProofs[row.ownerSessionId];
+        if (proof.expectedPreviousEpisodeActiveSessionId !== row.record.episodeActiveSessionId
+            || proof.verifiedCurrentEpisodeActiveSessionId !== row.record.episodeActiveSessionId) {
+          throw new Error(`active runtime route changed after ownership switch for ${row.ownerSessionId}`);
+        }
+      }
+      withCurrentTaskProviderOwnershipSwitch(project.root, ownershipSwitch, () => {
+        const destinationBeforeDelete = candidate.refreshAfterReceipt();
+        if (destinationBeforeDelete.revision !== candidate.revision || destinationBeforeDelete.digest !== candidate.digest) throw new Error("destination changed before guarded source deletion");
+        const sourceBeforeDelete = captureSameSource(source!, runner);
+        exactSnapshotUnchanged(source!, sourceBeforeDelete);
+        for (const owner of ownershipRows) {
+          verifyActiveCodeIdentity(project.root, owner, runner);
+          verifyActiveSourceWorkspace(source!, owner, runner);
+        }
+        const activeSourceStores = independentActiveBacklogStores(source!, ownershipRows);
+        deleteSource(source!, runner);
+        for (const storeDir of activeSourceStores) rmSync(storeDir, { recursive: true, force: false });
+      });
     } catch (error) {
       if (!source.evidence.storeDir || existsSync(source.evidence.storeDir)) {
         restoreTaskProviderOwnershipSwitch(project.root, ownershipSwitch);
