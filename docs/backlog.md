@@ -952,8 +952,12 @@ confirmation text. It performs no destination initialization, receipt write,
 ownership update, or source mutation.
 
 Confirmation binds that exact revision, a named actor, non-empty managed
-semantic-placement prose, and literal operator approval. Backlog source capture
-retains each committed Markdown file, full Git history with actor/timestamp and
+semantic-placement prose, literal operator approval, and any exact provider-native
+values listed by inspection. For Backlog priority spellings without one native
+Beads equivalent, structured confirmation carries task-specific literal Beads
+priorities through `beadsPriorityPlacements`; prose remains audit evidence and is
+never parsed as a value. Backlog source capture retains each committed Markdown
+file, full Git history with complete commit-message bodies, actor/timestamp,
 binary changes, and the native structured view. Archived Markdown is moved only
 inside a disposable clone of the exact revision so the native Backlog reader can
 interpret it; live source bytes never move. Active and archived native drafts
@@ -965,10 +969,12 @@ Dolt revision, rejects effective export-owner filters, and requires a complete
 `--all` export to equal an independent read-only issue inventory before it
 retains long/comment views, native history, provenance, and relationship rows.
 Pair-specific native create
-paths project exact equivalent fields and use the supplied managed prose only
-for non-equivalent placement. Safe source IDs are reused; every generated ID is
-recorded by an immutable mapping. Deterministic re-reads prove every destination
-task, count, relationship, mapping, raw source package, and published revision.
+paths project exact equivalent fields, apply any explicitly selected literal
+provider-native value through supported native import/create inputs, and retain
+the supplied managed prose as audit evidence for non-equivalent placement. Safe
+source IDs are reused; every generated ID is recorded by an immutable mapping.
+Deterministic native re-reads prove every applied value, destination task, count,
+relationship, mapping, raw source package, and published revision before deletion.
 
 The final target-native decision/provenance record (Beads) or receipt task and
 history commit (Backlog) is the only durable migration artifact. It binds source
@@ -977,7 +983,11 @@ semantic-placement prose, and cutover timestamp. Only after destination proof
 does one atomic registry mutation remap active version-2 records. It preserves
 the exact owner, operation, code base/head, worktree, branch, Episode/session,
 runtime route, resource, and creation identity while replacing only
-provider-native task binding/evidence using the verified mapping. Exact idle
+provider-native task binding/evidence using the verified mapping. The preserved
+ownership `head` remains historical; migration separately captures the clean,
+directly published current Episode head, proves `baseRef → historical head →
+current head` ancestry and stability, and gives that current head to Orca
+continuity checks without rewriting ownership history. Exact idle
 durable-session/current-route proof and Orca worktree/terminal proof apply before
 and after that replacement. Missing mappings, foreign/provider drift,
 collisions, runtime loss, or concurrent registry changes refuse without a
@@ -987,7 +997,11 @@ proof fails.
 Repeated source revision/digest/count proof and fresh target publication proof
 precede deletion. Backlog destinations stay bound to the originally selected
 remote URL and task-history ref. The existing ownership lock encloses the final
-registry comparison, active-code proof, and destructive boundary.
+registry comparison, active-code proof, and destructive boundary. A failed
+source deletion rolls ownership back only after the complete exact source and all
+active source workspaces are re-read unchanged. Partial retirement keeps the
+verified destination binding and reports `cutover-incomplete`; directory
+existence alone never restores source authority.
 Backlog-to-Beads initializes an excluded `--stealth` store so Beads setup cannot
 advance the still-authoritative code-backed Backlog revision. Deletion uses
 provider-native stop/removal plus the provider's existing history publication

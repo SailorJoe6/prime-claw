@@ -86,10 +86,15 @@ active Episodes continue with the same identity.**
 revision, digest, open/closed/archived counts, active owner count, semantic
 placement prompt, and confirmation text. `switch-confirm` requires that exact
 revision plus an actor, managed semantic-placement prose, and literal operator
-confirmation. It creates the target only through supported native interfaces,
-preserves safe IDs or records immutable mappings, publishes and verifies every
-field, absence, relationship, comment, history, actor, timestamp, transition,
-and provenance record, and writes one final destination-native receipt.
+confirmation. When inspection finds a source value without one exact destination
+equivalent, structured confirmation also carries the managed role's exact
+provider-native literal; for ambiguous Backlog priority this is a task-specific
+Beads `0..4` value in `beadsPriorityPlacements`. Prose remains audit evidence and
+is never parsed into a value. The operation creates the target only through
+supported native interfaces, preserves safe IDs or records immutable mappings,
+publishes and verifies every field, absence, relationship, comment, complete Git
+commit-message body and history, actor, timestamp, transition, applied native
+value, and provenance record, and writes one final destination-native receipt.
 
 The source remains intact, clean, read-only, and authoritative through complete
 target proof. Beads export filters are rejected and a complete native export
@@ -97,15 +102,21 @@ must equal an independent issue inventory. Backlog active and archived drafts
 are included with exact Markdown, native view, Git history, original kind, and
 placement; completion counts use native status while archive placement retains
 abandonment meaning. Every active Episode
-must also be clean and directly published at its recorded code branch/head, with
-the same branch-local Backlog task bytes or exact shared provider revision, one
-idle durable runtime route, and matching Orca resources when applicable.
+must also be clean and directly published at its exact code branch. Its preserved
+ownership head remains historical while migration captures the actual current
+head, proves the base/historical/current ancestry chain, and keeps that head
+stable through native Git and Orca checks. The same branch-local Backlog task
+bytes or exact shared provider revision, one idle durable runtime route, and
+matching Orca resources are required when applicable.
 Active version-2 ownership changes atomically only after those proofs; Episode,
 session, worktree, branch, code/runtime, and resource identity remain unchanged.
 Repeated source, frozen-destination-remote, active-code/runtime, registry,
-sole-target, and source-absence proofs guard deletion. Any pre-cutover failure
-restores ownership, keeps source authority, and reports exact cleanup or an
-explicit same-destination retry that must re-prove all existing markers,
+sole-target, and source-absence proofs guard deletion. A failed deletion restores
+ownership only after a complete unchanged source proof. Partial retirement keeps
+the verified destination binding and reports `cutover-incomplete`; directory
+existence never establishes source authority. An intact pre-cutover failure keeps
+source authority and reports exact cleanup or an explicit same-destination retry
+that must re-prove all existing markers,
 mappings, receipt, digest, and publication. A previously created clean active-
 Episode Backlog clone may advance only by exact-remote fetch and fast-forward to
 the verified receipt; unsafe or divergent clones block. There is no automatic retry,

@@ -162,8 +162,12 @@ not create a destination, change ownership, or write a receipt.
 reported source revision, a non-empty actor, and the managed semantic-placement
 prose. The tool equivalent uses `action="switch-confirm"`, `targetProvider`,
 `expectedSourceRevision`, `actor`, `semanticPlacement`, and
-`confirmedSwitch=true`. The confirmed
-maintenance window is one linear operation:
+`confirmedSwitch=true`. When inspection lists a Backlog priority without one
+exact Beads equivalent, the structured tool also requires one exact
+`{sourceTaskId, priority}` entry in `beadsPriorityPlacements`; values are native
+Beads integers `0..4`. The slash form remains available when no structured native
+value is required. Managed prose is retained for audit and is never parsed into a
+provider value. The confirmed maintenance window is one linear operation:
 
 1. capture every source task plus its provider-native bytes or rows, all open,
    closed, and archived states, relationships, comments, native history,
@@ -171,9 +175,12 @@ maintenance window is one linear operation:
 2. create the target through its supported native initialization and create
    APIs, preserving source IDs when the target accepts them and otherwise
    recording an immutable source-to-destination mapping;
-3. let the managed model's supplied prose place only fields that have no exact
-   native equivalent, while deterministic code proves counts, projections,
-   relationships, histories, revisions, and mappings;
+3. let the managed model decide only fields that have no exact native equivalent,
+   pass any indispensable provider-native literal through the pair-specific
+   structured confirmation field, and prove the applied value by native readback;
+   prose remains audit evidence while deterministic code proves counts,
+   projections, relationships, complete commit messages/histories, revisions,
+   and mappings;
 4. publish and re-read the complete target, then write one final
    destination-native migration receipt containing the exact source and target
    revisions, digests, counts, mappings, actor, semantic-placement record, and
@@ -213,11 +220,14 @@ untracked (`--stealth`) target store so `bd init` cannot change the still-live
 Backlog code revision.
 
 Before destination creation, every active Episode is re-proved as the exact
-clean, directly published linked code worktree/branch/head in ownership. Its
-branch-local Backlog task bytes or shared provider revision must equal the
-captured source. The migration also reuses the ordinary Episode continuity
-checks: one exact idle durable session, current runtime route, and exact Orca
-worktree/terminal resources when applicable. Those code, source, registry, and
+clean, directly published linked code worktree and branch. The ownership head is
+preserved as historical identity; migration separately captures the actual
+current code head, proves `baseRef → historical head → current head` ancestry,
+keeps that current head stable, and uses it for the native Git and Orca
+continuity proofs. Its branch-local Backlog task bytes or shared provider revision
+must equal the captured source. The migration also reuses the ordinary Episode
+continuity checks: one exact idle durable session, current runtime route, and
+exact Orca worktree/terminal resources when applicable. Those code, source, registry, and
 runtime checks repeat beside the atomic ownership replacement and guarded
 source-deletion boundary. The existing ownership lock refuses deletion if the
 complete switched registry changes.
@@ -230,8 +240,13 @@ physical archive placement remains separate abandonment evidence. A Backlog
 destination is repeatedly proved against the originally selected remote URL and
 `refs/heads/prime-claw/tasks`, not a mutable local upstream alias.
 
-A pre-cutover failure restores any ownership change, leaves the source intact and
-authoritative, and reports exact cleanup or same-destination retry guidance. An
+A pre-cutover failure restores an ownership change only after a complete native
+re-read proves that the exact source and every active source workspace remain
+intact and unchanged. It then leaves the source authoritative and reports exact
+cleanup or same-destination retry guidance. If deletion partially retired the
+source, ownership stays on the verified destination and the result is truthfully
+`cutover-incomplete`; an existing directory alone is never treated as source
+authority. An
 explicitly reconfirmed retry is admitted through the otherwise blocked dual-store
 window only after the source revision and every existing destination marker,
 mapping, receipt, publication, and source digest prove that it is the same

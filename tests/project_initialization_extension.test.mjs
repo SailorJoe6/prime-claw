@@ -996,9 +996,12 @@ test("initialization UX separates read-only provider-switch inspection from exac
     confirmedSwitch: false, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
   }, undefined, undefined, ctx);
   assert.match(unconfirmed.content[0].text, /confirmation-required/);
+  const placements = [{ sourceTaskId: "TASK-1", priority: 1 }];
+  assert.equal(tool.parameters.properties.beadsPriorityPlacements.items.properties.priority.maximum, 4);
   const completed = await tool.execute("confirm", {
     action: "switch-confirm", targetProvider: "beads", expectedSourceRevision: "a".repeat(40),
     confirmedSwitch: true, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
+    beadsPriorityPlacements: placements,
   }, undefined, undefined, ctx);
   assert.equal(completed.isError, undefined);
   assert.match(completed.content[0].text, /source-absent=true/);
@@ -1006,6 +1009,7 @@ test("initialization UX separates read-only provider-switch inspection from exac
   assert.equal(calls[2].input.confirmedSwitch, true);
   assert.equal(calls[2].input.expectedSourceRevision, "a".repeat(40));
   assert.equal(calls[2].input.semanticPlacement, "keep unsupported fields in native metadata");
+  assert.deepEqual(calls[2].input.beadsPriorityPlacements, placements);
 });
 
 test("provider-switch slash confirmation requires exact revision actor and semantic placement", async () => {

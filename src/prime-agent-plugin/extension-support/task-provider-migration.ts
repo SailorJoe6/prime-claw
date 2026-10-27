@@ -110,6 +110,8 @@ export interface ProviderMigrationReceipt {
   actor: string;
   timestamp: string;
   semanticPlacement: string;
+  /** Exact operator-selected native Beads priorities for ambiguous Backlog values. */
+  beadsPriorityPlacements?: Array<{ sourceTaskId: string; priority: number }>;
 }
 
 export interface ProviderMigrationCompleted {
@@ -129,6 +131,8 @@ export interface ProviderMigrationOptions {
   confirmedSwitch: boolean;
   actor: string;
   semanticPlacement: string;
+  /** Pair-specific literal native values for Backlog priorities without one exact Beads equivalent. */
+  beadsPriorityPlacements?: Array<{ sourceTaskId: string; priority: number }>;
   runner?: CommandRunner;
   now?: () => string;
   deleteSource?: (snapshot: SourceSnapshot, runner: CommandRunner) => void;
@@ -449,7 +453,7 @@ function captureBacklog(
     const history = runRequired(
       runner,
       "git",
-      ["-C", repositoryRoot, "log", "--all", "--follow", "--format=commit %H%nAuthor: %an <%ae>%nAuthorDate: %aI%nCommitter: %cn <%ce>%nCommitDate: %cI%nSubject: %s", "--patch", "--binary", "--full-index", "--", historyPath],
+      ["-C", repositoryRoot, "log", "--all", "--follow", "--format=commit %H%nAuthor: %an <%ae>%nAuthorDate: %aI%nCommitter: %cn <%ce>%nCommitDate: %cI%nMessage:%n%B", "--patch", "--binary", "--full-index", "--", historyPath],
       repositoryRoot,
       `git history for ${taskId}`,
     ).stdout;
@@ -609,8 +613,12 @@ interface ActiveMigrationOwnership {
   taskId: string;
   worktree: string;
   branch: string;
-  head: string;
+  currentCodeHead: string;
   record: TaskEpisodeOwnershipRecord;
+}
+
+function gitAncestor(runner: CommandRunner, worktree: string, ancestor: string, descendant: string): boolean {
+  return runner.run("git", ["-C", worktree, "merge-base", "--is-ancestor", ancestor, descendant], { cwd: worktree, allowFailure: true }).status === 0;
 }
 
 function verifyActiveCodeIdentity(projectRoot: string, row: ActiveMigrationOwnership, runner: CommandRunner): void {
@@ -624,10 +632,17 @@ function verifyActiveCodeIdentity(projectRoot: string, row: ActiveMigrationOwner
   const head = runRequired(runner, "git", ["rev-parse", "HEAD"], row.worktree, `active Episode ${row.ownerSessionId} head`).stdout.trim();
   const status = runRequired(runner, "git", ["status", "--porcelain=v1"], row.worktree, `active Episode ${row.ownerSessionId} cleanliness`).stdout;
   if (realpathSync(top) !== row.worktree || dirname(realpathSync(common)) !== realpathSync(projectRoot)
-      || realpathSync(gitDir) === realpathSync(common) || branch !== row.branch || head !== row.head || status !== "") {
+      || realpathSync(gitDir) === realpathSync(common) || branch !== row.branch || head !== row.currentCodeHead || status !== "") {
     throw new Error(`active task Episode ${row.ownerSessionId} does not match its exact clean linked worktree/branch/head identity`);
   }
-  if (!directPublishedGitHead(runner, row.worktree, row.head)) throw new Error(`active task Episode ${row.ownerSessionId} code head is not directly published`);
+  const historicalHead = row.record.head;
+  const baseRef = row.record.baseRef;
+  if (!historicalHead || !baseRef
+      || !gitAncestor(runner, row.worktree, baseRef, historicalHead)
+      || !gitAncestor(runner, row.worktree, historicalHead, row.currentCodeHead)) {
+    throw new Error(`active task Episode ${row.ownerSessionId} current code head does not descend from its preserved historical ownership ancestry`);
+  }
+  if (!directPublishedGitHead(runner, row.worktree, row.currentCodeHead)) throw new Error(`active task Episode ${row.ownerSessionId} current code head is not directly published`);
 }
 
 function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, runner: CommandRunner): ActiveMigrationOwnership[] {
@@ -649,7 +664,7 @@ function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, ru
       taskId: record.taskId,
       worktree: record.worktree,
       branch: record.branch,
-      head: record.head,
+      currentCodeHead: runRequired(runner, "git", ["rev-parse", "HEAD"], record.worktree, `capture active Episode ${ownerSessionId} current code head`).stdout.trim(),
       record: JSON.parse(JSON.stringify(record)) as TaskEpisodeOwnershipRecord,
     };
     verifyActiveCodeIdentity(projectRoot, row, runner);
@@ -685,8 +700,18 @@ function verifyActiveSourceWorkspace(source: SourceSnapshot, row: ActiveMigratio
   }
 }
 
-function semanticPrompt(source: TaskProviderId, target: TaskProviderId): string {
-  return `Review exact ${source} source fields that have no native ${target} equivalent. Supply concise semantic-placement prose for the confirm call. The code preserves every raw value, absence, actor, timestamp, status transition, and history entry losslessly in destination-native metadata/provenance; your prose decides only the human-facing placement of non-equivalent content and must not authorize omission or normalization.`;
+function semanticPrompt(source: SourceSnapshot, target: TaskProviderId): string {
+  const priorityRequirements = source.provider === "backlog" && target === "beads"
+    ? source.tasks.flatMap((pkg) => {
+        const task = asObject(pkg.nativeView.task, `Backlog task ${pkg.sourceTaskId}`);
+        const raw = String(task.priority ?? "p2").trim();
+        return directBeadsPriority(raw) === undefined ? [`${pkg.sourceTaskId}=${raw}`] : [];
+      })
+    : [];
+  const nativeValues = priorityRequirements.length
+    ? ` These Backlog priorities have no single native Beads equivalent: ${priorityRequirements.join(", ")}. On switch-confirm, supply one exact literal Beads priority (0..4) for each through beadsPriorityPlacements; prose is never parsed as a value.`
+    : "";
+  return `Review exact ${source.provider} source fields that have no native ${target} equivalent. Supply concise semantic-placement prose for the confirm call.${nativeValues} The code preserves every raw value, absence, actor, timestamp, status transition, and history entry losslessly in destination-native metadata/provenance; your prose decides only the human-facing placement of non-equivalent content and must not authorize omission or normalization.`;
 }
 
 export function inspectTaskProviderMigration(options: {
@@ -716,7 +741,7 @@ export function inspectTaskProviderMigration(options: {
       sourceDigest: source.digest,
       taskCounts: source.counts,
       activeOwnership: ownership.map(({ ownerSessionId, taskId }) => ({ ownerSessionId, taskId })),
-      semanticPlacementPrompt: semanticPrompt(source.provider, options.targetProvider),
+      semanticPlacementPrompt: semanticPrompt(source, options.targetProvider),
       confirmation: `Confirm one-way ${source.provider}->${options.targetProvider} migration at exact source revision ${source.revision}; all task mutations must remain quiesced until the operation finishes.`,
     };
   } catch (error) {
@@ -743,6 +768,67 @@ function statusFromBeads(value: unknown): CanonicalLifecycleStatus {
 function backlogAcceptance(task: JsonObject): string {
   const rows = Array.isArray(task.acceptanceCriteria) ? task.acceptanceCriteria : [];
   return rows.map((row: JsonObject) => `- [${row.checked ? "x" : " "}] ${String(row.text ?? "")}`).join("\n");
+}
+
+function directBeadsPriority(backlogPriority: unknown): number | undefined {
+  const value = String(backlogPriority ?? "p2").trim().toLowerCase();
+  const exact = /^p([0-4])$/.exec(value);
+  if (exact) return Number(exact[1]);
+  if (value === "medium") return 2;
+  return undefined;
+}
+
+function validateBeadsPrioritySelection(
+  source: BacklogSnapshot,
+  input: Array<{ sourceTaskId: string; priority: number }> | undefined,
+): Record<string, number> {
+  if (input !== undefined && !Array.isArray(input)) {
+    throw new Error("beadsPriorityPlacements must be an array of exact source Backlog task IDs and native Beads priorities");
+  }
+  const supplied: Record<string, number> = {};
+  const sourceIds = new Set(source.tasks.map((pkg) => pkg.sourceTaskId));
+  for (const item of input ?? []) {
+    if (!item || typeof item !== "object" || typeof item.sourceTaskId !== "string") throw new Error("each managed Beads priority requires an exact sourceTaskId");
+    if (!sourceIds.has(item.sourceTaskId)) throw new Error(`managed Beads priority references unknown source Backlog task ${item.sourceTaskId}`);
+    if (Object.prototype.hasOwnProperty.call(supplied, item.sourceTaskId)) throw new Error(`managed Beads priority repeats source Backlog task ${item.sourceTaskId}`);
+    if (!Number.isInteger(item.priority) || item.priority < 0 || item.priority > 4) throw new Error(`managed Beads priority for ${item.sourceTaskId} must be an integer from 0 through 4`);
+    supplied[item.sourceTaskId] = item.priority;
+  }
+  const selected: Record<string, number> = {};
+  for (const pkg of source.tasks) {
+    const task = asObject(pkg.nativeView.task, `Backlog task ${pkg.sourceTaskId}`);
+    const raw = String(task.priority ?? "p2").trim();
+    const direct = directBeadsPriority(raw);
+    const hasManaged = Object.prototype.hasOwnProperty.call(supplied, pkg.sourceTaskId);
+    if (direct !== undefined) {
+      if (hasManaged) throw new Error(`Backlog task ${pkg.sourceTaskId} priority ${raw} already has exact native Beads priority ${direct}; omit the managed override`);
+      continue;
+    }
+    if (!hasManaged) {
+      throw new Error(`Backlog task ${pkg.sourceTaskId} priority ${raw} has no single native Beads equivalent; use the structured initialize_prime_claw switch-confirm and supply its explicit native value through beadsPriorityPlacements`);
+    }
+    const priority = supplied[pkg.sourceTaskId];
+    const normalized = raw.toLowerCase();
+    if (normalized === "high" && priority !== 0 && priority !== 1) {
+      throw new Error(`managed native Beads priority for Backlog High task ${pkg.sourceTaskId} must be 0 or 1`);
+    }
+    if (normalized === "low" && priority !== 3 && priority !== 4) {
+      throw new Error(`managed native Beads priority for Backlog Low task ${pkg.sourceTaskId} must be 3 or 4`);
+    }
+    selected[pkg.sourceTaskId] = priority;
+  }
+  return Object.fromEntries(Object.entries(selected).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function beadsPriorityForBacklog(pkg: BacklogTaskPackage, managed: Record<string, number>): number {
+  const task = asObject(pkg.nativeView.task, `Backlog task ${pkg.sourceTaskId}`);
+  const direct = directBeadsPriority(task.priority);
+  if (direct !== undefined) return direct;
+  const selected = managed[pkg.sourceTaskId];
+  if (!Number.isInteger(selected) || selected < 0 || selected > 4) {
+    throw new Error(`Backlog task ${pkg.sourceTaskId} has no verified native Beads priority selection`);
+  }
+  return selected;
 }
 
 function backlogSupplement(task: JsonObject, placement: string): string {
@@ -775,7 +861,12 @@ function assertSameIds(actual: string[], expected: string[], label: string): voi
   if (canonical(actual) !== canonical(expected)) throw new Error(`${label} mismatch: expected ${JSON.stringify(expected)}, observed ${JSON.stringify(actual)}`);
 }
 
-function backlogToBeadsRow(pkg: BacklogTaskPackage, placement: string, mapping: Record<string, string>): JsonObject {
+function backlogToBeadsRow(
+  pkg: BacklogTaskPackage,
+  placement: string,
+  mapping: Record<string, string>,
+  beadsPriorities: Record<string, number>,
+): JsonObject {
   const task = asObject(pkg.nativeView.task, `Backlog task ${pkg.sourceTaskId}`);
   const destinationId = mapping[pkg.sourceTaskId] ?? pkg.sourceTaskId;
   const parent = typeof task.parentTaskId === "string" && task.parentTaskId ? mapping[task.parentTaskId] ?? task.parentTaskId : undefined;
@@ -792,7 +883,6 @@ function backlogToBeadsRow(pkg: BacklogTaskPackage, placement: string, mapping: 
     created_at: comment.createdAt ?? comment.created_at ?? task.createdAt,
   })) : [];
   const type = ["bug", "feature", "task", "epic", "chore", "decision", "spike"].includes(String(task.type)) ? String(task.type) : "task";
-  const priorityMatch = /^p([0-4])$/i.exec(String(task.priority ?? "p2"));
   const sourcePackage = {
     marker: SOURCE_MARKER,
     sourceProvider: "backlog",
@@ -804,6 +894,9 @@ function backlogToBeadsRow(pkg: BacklogTaskPackage, placement: string, mapping: 
     markdownBase64: pkg.markdownBase64,
     gitHistoryBase64: pkg.gitHistoryBase64,
     semanticPlacement: placement,
+    ...(Object.prototype.hasOwnProperty.call(beadsPriorities, pkg.sourceTaskId)
+      ? { beadsPriorityPlacement: beadsPriorities[pkg.sourceTaskId] }
+      : {}),
   };
   const nativeDraftView = pkg.entityKind === "draft" && typeof task.nativePlainViewBase64 === "string"
     ? Buffer.from(task.nativePlainViewBase64, "base64").toString("utf8")
@@ -820,7 +913,7 @@ function backlogToBeadsRow(pkg: BacklogTaskPackage, placement: string, mapping: 
     notes,
     acceptance_criteria: backlogAcceptance(task),
     issue_type: type,
-    priority: priorityMatch ? Number(priorityMatch[1]) : 2,
+    priority: beadsPriorityForBacklog(pkg, beadsPriorities),
     status: pkg.classification === "archived" ? "closed" : pkg.entityKind === "draft" ? "in_design" : statusFromBacklog(task.status),
     ...(pkg.classification === "archived" ? { close_reason: `Migrated archived Backlog ${pkg.entityKind} ${pkg.sourceTaskId}; exact source lifecycle is retained in prime_claw_migration metadata` } : {}),
     ...(Array.isArray(task.assignees) && task.assignees.length ? { assignee: String(task.assignees[0]) } : {}),
@@ -928,7 +1021,7 @@ function idSafeForBeads(runner: CommandRunner, projectRoot: string, taskId: stri
 
 function migrationReceiptBase(source: SourceSnapshot, target: TaskProviderId, destinationRevision: string, destinationDigest: string,
   mappings: Array<{ sourceTaskId: string; destinationTaskId: string }>, ownership: Array<{ ownerSessionId: string; sourceTaskId: string; destinationTaskId: string }>,
-  actor: string, timestamp: string, semanticPlacement: string): Omit<ProviderMigrationReceipt, "destinationReceiptRevision"> {
+  actor: string, timestamp: string, semanticPlacement: string, beadsPriorities: Record<string, number> = {}): Omit<ProviderMigrationReceipt, "destinationReceiptRevision"> {
   return {
     schemaVersion: 1,
     marker: RECEIPT_MARKER,
@@ -944,6 +1037,9 @@ function migrationReceiptBase(source: SourceSnapshot, target: TaskProviderId, de
     actor,
     timestamp,
     semanticPlacement,
+    ...(Object.keys(beadsPriorities).length
+      ? { beadsPriorityPlacements: Object.entries(beadsPriorities).map(([sourceTaskId, priority]) => ({ sourceTaskId, priority })) }
+      : {}),
   };
 }
 
@@ -967,6 +1063,7 @@ function migrateBacklogToBeads(
   actor: string,
   timestamp: string,
   semanticPlacement: string,
+  beadsPriorities: Record<string, number>,
   ownershipRows: Array<{ ownerSessionId: string; taskId: string; worktree: string }>,
 ): DestinationCandidate {
   const prefix = source.tasks[0]?.sourceTaskId.split("-")[0] || basename(source.projectRoot).replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "TASK";
@@ -981,7 +1078,7 @@ function migrateBacklogToBeads(
   const temp = mkdtempSync(join(tmpdir(), "prime-claw-backlog-to-beads-"));
   try {
     const rows = source.tasks.map((pkg) => {
-      const row = backlogToBeadsRow(pkg, semanticPlacement, mapping);
+      const row = backlogToBeadsRow(pkg, semanticPlacement, mapping, beadsPriorities);
       (row.metadata.prime_claw_migration as JsonObject).sourceRevision = source.revision;
       (row.metadata.prime_claw_migration as JsonObject).sourceDigest = source.digest;
       return row;
@@ -1008,11 +1105,13 @@ function migrateBacklogToBeads(
     if (!row || !metadata || metadata.sourceTaskId !== pkg.sourceTaskId || metadata.sourceRevision !== source.revision
       || metadata.entityKind !== pkg.entityKind || metadata.classification !== pkg.classification
       || canonical(metadata.nativeView) !== canonical(pkg.nativeView)
-      || metadata.markdownBase64 !== pkg.markdownBase64 || metadata.gitHistoryBase64 !== pkg.gitHistoryBase64) {
+      || metadata.markdownBase64 !== pkg.markdownBase64 || metadata.gitHistoryBase64 !== pkg.gitHistoryBase64
+      || metadata.semanticPlacement !== semanticPlacement
+      || metadata.beadsPriorityPlacement !== beadsPriorities[pkg.sourceTaskId]) {
       throw new Error(`Beads destination did not preserve the exact source package for ${pkg.sourceTaskId}`);
     }
     const sourceTask = asObject(pkg.nativeView.task, `Backlog source task ${pkg.sourceTaskId}`);
-    const expectedRow = backlogToBeadsRow(pkg, semanticPlacement, mapping);
+    const expectedRow = backlogToBeadsRow(pkg, semanticPlacement, mapping, beadsPriorities);
     const projectionFields = ["title", "description", "design", "notes", "acceptance_criteria", "issue_type", "priority", "status", "assignee", "labels", "external_ref", "source_system", "close_reason"];
     for (const field of projectionFields) {
       const expected = expectedRow[field];
@@ -1038,7 +1137,7 @@ function migrateBacklogToBeads(
   const transitions = ownershipRows.map((row) => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));
   if (transitions.some((row) => !row.destinationTaskId)) throw new Error("active ownership has no Beads destination mapping");
   const receiptBase = migrationReceiptBase(source, "beads", dataTransport.evidence.publishedRevision, destinationDataDigest,
-    destinationTasks.map(({ sourceTaskId, destinationTaskId }) => ({ sourceTaskId, destinationTaskId })), transitions, actor, timestamp, semanticPlacement);
+    destinationTasks.map(({ sourceTaskId, destinationTaskId }) => ({ sourceTaskId, destinationTaskId })), transitions, actor, timestamp, semanticPlacement, beadsPriorities);
   const receiptTaskId = createOrUpdateBeadsReceipt(runner, source.projectRoot, receiptBase);
   runRequired(runner, "bd", ["dolt", "push", "--no-adopt"], source.projectRoot, "publish Beads migration receipt");
   const refresh = (): { revision: string; digest: string; tasks: DestinationTask[]; receiptTaskId: string } => {
@@ -1530,7 +1629,7 @@ async function proveActiveRuntimeContinuity(
 ): Promise<Record<string, { expectedPreviousEpisodeActiveSessionId: string; verifiedCurrentEpisodeActiveSessionId: string }>> {
   if (rows.length === 0) return {};
   if (!verifier) throw new Error("active task Episode runtime continuity verification is unavailable");
-  const proofs = await verifier(rows.map((row) => row.record));
+  const proofs = await verifier(rows.map((row) => ({ ...row.record, head: row.currentCodeHead }) as TaskEpisodeOwnershipRecord));
   const result: Record<string, { expectedPreviousEpisodeActiveSessionId: string; verifiedCurrentEpisodeActiveSessionId: string }> = {};
   for (const proof of proofs) {
     if (!rows.some((row) => row.ownerSessionId === proof.ownerSessionId) || result[proof.ownerSessionId]) {
@@ -1668,6 +1767,12 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     source = captureConfirmedSource(project.root, options.targetProvider, options.expectedSourceRevision, runner);
     if (source.provider === options.targetProvider) return blocked("same-provider", `the selected provider is already ${source.provider}`, "choose the other supported provider", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     if (source.revision !== options.expectedSourceRevision) return blocked("source-revision-changed", `confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`, "quiesce mutations, request a fresh inspection, and confirm that exact revision", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
+    const beadsPriorities = source.provider === "backlog" && options.targetProvider === "beads"
+      ? validateBeadsPrioritySelection(source, options.beadsPriorityPlacements)
+      : {};
+    if (source.provider !== "backlog" && (options.beadsPriorityPlacements?.length ?? 0) > 0) {
+      throw new Error("beadsPriorityPlacements applies only to Backlog-to-Beads migration");
+    }
     const ownershipRows = activeOwnership(project.root, source.provider, runner);
     for (const owner of ownershipRows) verifyActiveSourceWorkspace(source, owner, runner);
     const sourceIds = new Set(source.tasks.map((task) => task.sourceTaskId));
@@ -1677,7 +1782,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     const timestamp = (options.now ?? (() => new Date().toISOString()))();
     if (Number.isNaN(Date.parse(timestamp))) throw new Error("migration timestamp is not RFC3339");
     const candidate = source.provider === "backlog"
-      ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows)
+      ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), beadsPriorities, ownershipRows)
       : migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows);
     for (const owner of ownershipRows) candidate.prepareActiveWorktree(owner.worktree);
     const sourceAfterMigration = captureSameSource(source, runner);
@@ -1737,10 +1842,20 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
         for (const storeDir of activeSourceStores) rmSync(storeDir, { recursive: true, force: false });
       });
     } catch (error) {
-      if (!source.evidence.storeDir || existsSync(source.evidence.storeDir)) {
-        restoreTaskProviderOwnershipSwitch(project.root, ownershipSwitch);
-        ownershipSwitch = undefined;
+      try {
+        const sourceAfterFailedDeletion = captureSameSource(source, runner);
+        exactSnapshotUnchanged(source, sourceAfterFailedDeletion);
+        for (const owner of ownershipRows) {
+          verifyActiveCodeIdentity(project.root, owner, runner);
+          verifyActiveSourceWorkspace(source, owner, runner);
+        }
+      } catch (sourceProofError) {
+        const deletionMessage = error instanceof Error ? error.message : String(error);
+        const proofMessage = sourceProofError instanceof Error ? sourceProofError.message : String(sourceProofError);
+        throw new Error(`${deletionMessage}; ownership remains on the verified destination because the exact source is not intact after the failed deletion: ${proofMessage}`, { cause: error });
       }
+      restoreTaskProviderOwnershipSwitch(project.root, ownershipSwitch);
+      ownershipSwitch = undefined;
       throw error;
     }
     exactSelectedTarget(project.root, candidate.provider, runner);

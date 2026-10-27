@@ -200,23 +200,72 @@ test("read-only inspection captures complete Backlog open closed and archived na
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
 });
 
-test("confirmed migration preserves one active Episode identity and continues it on canonical-primary Beads", { timeout: 180_000 }, async (t) => {
+test("ambiguous Backlog priorities require exact task-specific native Beads values before any destination write", { timeout: 120_000 }, async (t) => {
+  const fixture = backlogSource(t, "backlog-native-priority-validation");
+  backlog(fixture.root, "task", "edit", fixture.ids.parent, "--priority", "High", "--plain");
+  git(fixture.root, "add", "backlog");
+  git(fixture.root, "commit", "-qm", "record ambiguous native priority");
+  git(fixture.root, "push", "-q");
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.match(inspection.semanticPlacementPrompt, new RegExp(`${fixture.ids.parent}=high`, "i"));
+  const base = {
+    cwd: fixture.root, targetProvider: "beads", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Choose an exact native Beads priority.",
+  };
+  const cases = [
+    { options: {}, detail: /no single native Beads equivalent/ },
+    { options: { beadsPriorityPlacements: [{ sourceTaskId: "UNKNOWN-1", priority: 1 }] }, detail: /unknown source Backlog task/ },
+    { options: { beadsPriorityPlacements: [{ sourceTaskId: fixture.ids.parent, priority: 5 }] }, detail: /integer from 0 through 4/ },
+    { options: { beadsPriorityPlacements: [{ sourceTaskId: fixture.ids.parent, priority: 1 }, { sourceTaskId: fixture.ids.parent, priority: 1 }] }, detail: /repeats source Backlog task/ },
+  ];
+  for (const item of cases) {
+    const result = await migrateTaskProvider({ ...base, ...item.options });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.code, "pre-cutover-failed");
+    assert.match(result.detail, item.detail);
+    assert.equal(existsSync(join(fixture.root, ".beads")), false);
+    assert.equal(existsSync(join(fixture.root, "backlog")), true);
+  }
+});
+
+test("confirmed migration preserves complete history, managed native placement, and a later active Episode head", { timeout: 240_000 }, async (t) => {
   const fixture = backlogSource(t, "backlog-active-owner");
+  backlog(fixture.root, "task", "edit", fixture.ids.parent, "--priority", "High", "--plain");
+  git(fixture.root, "add", "backlog");
+  git(fixture.root, "commit", "-qm", "record managed priority fixture", "-m", "BODY_ONLY_MIGRATION_ROLLBACK_EXPLANATION");
+  git(fixture.root, "push", "-q");
   const owner = addActiveBacklogOwner(fixture);
+  writeFileSync(join(owner.episode, "later-implementation.txt"), "ordinary Episode progress\n");
+  git(owner.episode, "add", "later-implementation.txt");
+  git(owner.episode, "commit", "-qm", "ordinary later Episode implementation");
+  git(owner.episode, "push", "-q");
+  const currentEpisodeHead = git(owner.episode, "rev-parse", "HEAD");
+  assert.notEqual(currentEpisodeHead, owner.record.head);
+  assert.ok(command(owner.episode, "git", ["merge-base", "--is-ancestor", owner.record.head, currentEpisodeHead], true) !== null);
+  let runtimeProofs = 0;
+  const verifyCurrentRuntime = async (records) => {
+    runtimeProofs += 1;
+    assert.ok(records.every((record) => record.head === currentEpisodeHead));
+    return proveFixtureRuntime(records);
+  };
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
   assert.equal(inspection.status, "ready", inspection.detail);
   assert.deepEqual(inspection.activeOwnership, [{ ownerSessionId: owner.ownerSessionId, taskId: fixture.ids.parent }]);
   const result = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "beads", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "migration-operator",
-    semanticPlacement: "Place the living plan in design and preserve all unsupported values in exact metadata.",
-    verifyActiveRuntime: proveFixtureRuntime,
+    semanticPlacement: "Place the living plan in design, apply native Beads priority 1, and preserve all unsupported values in exact metadata.",
+    beadsPriorityPlacements: [{ sourceTaskId: fixture.ids.parent, priority: 1 }],
+    verifyActiveRuntime: verifyCurrentRuntime,
   });
   assert.equal(result.status, "completed", result.detail);
   assert.equal(result.sourceAbsent, true);
   assert.equal(result.selectedProvider, "beads");
   assert.deepEqual(result.receipt.taskCounts, { open: 1, closed: 1, archived: 1, total: 3 });
   assert.equal(result.receipt.mappings.length, 3);
+  assert.deepEqual(result.receipt.beadsPriorityPlacements, [{ sourceTaskId: fixture.ids.parent, priority: 1 }]);
+  assert.ok(runtimeProofs >= 3);
   assert.equal(existsSync(join(fixture.root, "backlog")), false);
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
   assert.equal(git(fixture.root, "rev-parse", "HEAD"), git(fixture.root, "rev-parse", "origin/main"));
@@ -234,7 +283,13 @@ test("confirmed migration preserves one active Episode identity and continues it
     assert.equal(typeof task.metadata.prime_claw_migration.gitHistoryBase64, "string");
     const history = Buffer.from(task.metadata.prime_claw_migration.gitHistoryBase64, "base64").toString("utf8");
     assert.match(history, /diff --git/);
-    if (mapping.sourceTaskId === fixture.ids.parent) assert.match(history, /episode-only migration history/);
+    if (mapping.sourceTaskId === fixture.ids.parent) {
+      assert.match(history, /episode-only migration history/);
+      assert.match(history, /BODY_ONLY_MIGRATION_ROLLBACK_EXPLANATION/);
+      assert.equal(task.priority, 1);
+      assert.equal(task.metadata.prime_claw_migration.nativeView.task.priority.toLowerCase(), "high");
+      assert.equal(task.metadata.prime_claw_migration.beadsPriorityPlacement, 1);
+    }
   }
   const registry = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8"));
   const current = registry.owners[owner.ownerSessionId];
@@ -245,7 +300,8 @@ test("confirmed migration preserves one active Episode identity and continues it
     assert.deepEqual(current[field], owner.record[field], field);
   }
   assert.equal(git(owner.episode, "status", "--porcelain=v1"), "");
-  assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
+  assert.equal(git(owner.episode, "rev-parse", "HEAD"), currentEpisodeHead);
+  assert.equal(current.head, owner.record.head, "provider switch preserves the historical ownership head");
   const linkedDetection = detectTaskProvider(owner.episode, RUNNER);
   assert.equal(linkedDetection.kind, "selected");
   assert.equal(linkedDetection.evidence.provider, "beads");
@@ -313,6 +369,39 @@ test("pre-cutover deletion refusal preserves source and exact same-destination r
   assert.equal(retried.sourceAbsent, true);
   assert.deepEqual(retried.receipt.mappings.map((row) => row.destinationTaskId).concat(retried.receiptTaskId).sort(), destinationIds);
   assert.equal(existsSync(join(fixture.root, "backlog")), false);
+});
+
+test("partial source deletion preserves verified destination ownership and reports cutover incomplete", { timeout: 300_000 }, async (t) => {
+  const fixture = backlogSource(t, "backlog-partial-delete");
+  const owner = addActiveBacklogOwner(fixture);
+  const sourceTask = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", fixture.ids.parent)).task;
+  const sourceTaskPath = join(fixture.root, sourceTask.path);
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "beads", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "migration-operator",
+    semanticPlacement: "Preserve every non-equivalent field in exact destination-native metadata.",
+    verifyActiveRuntime: proveFixtureRuntime,
+    deleteSource() {
+      rmSync(sourceTaskPath);
+      throw new Error("injected filesystem deletion failure after one source task was removed");
+    },
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "cutover-incomplete");
+  assert.match(result.detail, /exact source is not intact/);
+  assert.match(result.remediation, /recover the exact source/);
+  assert.equal(existsSync(join(fixture.root, "backlog")), true);
+  assert.equal(existsSync(sourceTaskPath), false);
+  assert.equal(existsSync(join(fixture.root, ".beads")), true);
+  const registry = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8"));
+  const current = registry.owners[owner.ownerSessionId];
+  assert.equal(current.provider, "beads");
+  assert.notEqual(current.taskId, undefined);
+  assert.notDeepEqual(current, owner.record);
+  assert.equal(current.worktree, owner.record.worktree);
+  assert.equal(current.head, owner.record.head);
 });
 
 test("read-only inspection captures complete published Beads history and provenance", { timeout: 120_000 }, (t) => {
