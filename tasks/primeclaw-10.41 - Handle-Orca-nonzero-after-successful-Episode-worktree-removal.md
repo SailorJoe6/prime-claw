@@ -4,7 +4,7 @@ title: Handle Orca nonzero after successful Episode worktree removal
 status: In Progress
 assignee: []
 created_date: '2026-10-27 12:48'
-updated_date: '2026-10-27 16:48'
+updated_date: '2026-10-27 16:54'
 labels: []
 dependencies: []
 references:
@@ -103,10 +103,40 @@ Reran the same network-disabled Docker lifecycle command on integrated HEAD: 287
 Owner-authorized next execute integration (2026-10-27; accepted candidate remains 0c6073eba563e512559535126022e619547aa13e until refreshed):
 Integrate current canonical main `6719d19716f19dcc187c50572bea189fb7fd32b5` into this same accepted Episode. Preserve the existing narrow PRIMECLAW-10.41 Orca delete-then-nonzero fix and all current-main behavior, including commit `0174975` and the supported PRIMECLAW-10.39 reproduction comment on PRIMECLAW-10.41. Treat histories nested under an Episode artifact root as intentionally owned by that Episode; recursive deletion of that nested subtree is expected, not a defect. Do not add or revise cleanup behavior for that clarification. Resolve only in-scope integration conflicts in the overlapping task, cleanup adapter, focused tests, and cleanup document; do not broaden scope or add state/retries/frameworks. Re-run the focused Docker lifecycle tests, static policy tests, and Docker-only `scripts/test-tier1.sh --probe`, update task evidence through supported Backlog CLI without changing `In Progress`, push the refreshed candidate, and report the exact head. Do not merge, publish lifecycle status, run cleanup, or perform plugin/global actions.
 Handoff preparation records direction only; integration and validation are not yet performed. Preserve the existing task plan and prior evidence; refresh evidence/Final Summary after integration.
+
+Owner-authorized main integration complete (2026-10-27): integrated canonical main 6719d19716f19dcc187c50572bea189fb7fd32b5 into this same Episode branch, preserving accepted 0c6073eba563e512559535126022e619547aa13e and main 0174975. Source/tests auto-merged; the task and one oversight cleanup paragraph conflicted. Selected main's task baseline through Git and restored the Episode notes, checked criteria, modified files and summary only through supported Backlog CLI. Verified main's original PRIMECLAW-10.39 comment, including its author/time and non-identical initial-trigger caveat, remains exactly unchanged. Kept main's unowned saved-history behavior and original new regressions. No cleanup change was added for the clarification: histories nested under an Episode artifact root remain intentionally owned; recursive deletion of that subtree is expected.
+Integrated candidate validation:
+- Network-none Docker lifecycle suites (spec_episode_extension, episode_close_extension, task_episode_ownership_extension): 289 passed, 0 failed. Command: docker run --pull never --rm --network none -v "$PWD":/workspace:ro -w /workspace --entrypoint node sha256:030bbbca5f5e3e1ed9250037b4cdf9ac6aa08e57a7ebdb1fc202e4470304e6ed --experimental-strip-types --test tests/spec_episode_extension.test.mjs tests/episode_close_extension.test.mjs tests/task_episode_ownership_extension.test.mjs. Node v22.23.4. Historical image b08d8449361d was unavailable (attempt exit 125, no tests ran); used the present immutable tier1 image with --pull never instead. No source change for this environment repair.
+- Static policy: python3 -m pytest tests/test_reviewed_plan_extension.py -q -m "not container": 9 passed, 6 deselected.
+- Docker-only source-mode gate: TIER1_ENV_FILE=<external non-secret file selecting PRIME_AGENT_SOURCE=/absolute/path/to/verified/cwd-fix-v0.9.8-r1-source> scripts/test-tier1.sh --probe: exit 0, network absent, apply/check/offline probe passed, teardown clean. Reverified public fork URL, annotated tag object 8ca4d5c39b7c738f71b5c86422ea46394c3d0558, source commit a1faacd53ac4473a75de1d434afaf50945c2f647, tree 5301c70d9c9d74e474ccaf258fdd3c8de982c52f and lock SHA-256 3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74 against docs/prime-agent-installation.md.
+- New tier1 evidence: .test-results/20261027T165107Z-85174-1d14b037/tier1/manifest.json (run.status=passed, teardown.clean=true); setup.log includes plugin-applied/plugin-checked/probe-passed. These results supersede the pre-integration validation counts.
+The diff against requested main remains the same narrow five-file fix; no new state/retries/frameworks, finalizer/schema/order/gate/v1 changes or nested-history cleanup behavior. Prior accepted-candidate independent review remains prior evidence, not a new independent review of this integration. No host/manual live Orca cleanup UAT claimed. Task stays In Progress for owning Conversation review. No canonical-main merge, lifecycle publication, cleanup or plugin/global actions performed.
+
+Publication preparation: git pull --rebase fetched the existing Episode upstream but attempted to flatten the completed integration merge, stopping at the older main reproduction-comment commit. Aborted that rebase immediately; verified exact restored HEAD 6ae6dca94826b9cd3589a627f830393e00fc958a and unchanged complete validated tree. Preserving the integration merge topology and publishing by ordinary non-force push; no implementation repair or scope change.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Conversation PRIMECLAW-10.39
+created: 2026-10-27 14:37
+---
+Additional observed cleanup case: PRIMECLAW-10.39
+
+Terminal Episode head: b893faff3c701fcba401a89e7e98f6140c404e90. The exact candidate was merged, the bound task was Done on pushed canonical main, and the Episode was clean and pushed before cleanup. Exact owning Conversation: 01a13b1e-9ea9-72cb-9bcd-1c96de0da277; Episode: 01a1506c-11a5-759f-a056-a5621ba63325.
+
+1. finalize_task_episode(taskId=PRIMECLAW-10.39, episodeHead=b893faff3c701fcba401a89e7e98f6140c404e90, outcome=merged) removed the session/runtime, remote branch, Orca/Git worktree, and local branch, then reported: "Task Episode cleanup worktree is dirty or no longer exact".
+2. Fresh reads showed the saved Episode session and directory absent, no exact Git or Orca worktree, no local branch, and an empty live git ls-remote result for refs/heads/JLanders/prime-claw-primeclaw-10-39-episode-f1b99889 on origin. The original owner entry remained unchanged.
+3. A same-binding retry then reported: "Task Episode cleanup cannot prove the exact configured upstream identity; ownership retained". The deleted local branch's remote/merge configuration was absent. The adapter's resolvedUpstream cache is invocation-local, so the fresh call could not recover its prior proof. The stale origin remote-tracking ref was separately removed with an expected-head-guarded Git update-ref after live remote absence was verified.
+
+This is the same stranded-ownership failure pattern as this ticket, but an identical initial trigger is NOT proven: 10.39 surfaced the generic worktree-mismatch error, rather than the deleted-path Git error from the 10.40 reproduction. Please retain this distinction and use 10.39 as an additional regression case when assessing same-invocation post-state handling. No new persistent cleanup state or inferred upstream identity is requested.
+
+The operator has explicitly authorized a one-time manual close of only the unchanged 10.39 ownership entry after re-verifying complete resource absence. This recovery is not proposed as product behavior. No plugin code, task status, acceptance criteria, or implementation plan is changed by this report.
+---
+<!-- COMMENTS:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Implemented the narrow Orca delete-then-nonzero correction. Only the supported Orca removal call gains error reconciliation: one fresh same-adapter inspection accepts exact absence and lets the existing finalizer finish branch verification and exact owner deletion in the same invocation. Present, changed, foreign, partial or unreadable state fails closed. Added production-adapter/finalizer regressions and aligned both cleanup contracts. Docker lifecycle tests after integrating main: 287/287; static policy: 9/9; source-mode tier1 --probe passed; independent diff review found no material defects. Candidate prepared for owning Conversation review; no lifecycle transition or deployment performed.
+Refreshed the accepted narrow Orca delete-then-nonzero fix on canonical main 6719d19716f19dcc187c50572bea189fb7fd32b5. Preserved 0174975 saved-history behavior, the original native PRIMECLAW-10.39 reproduction comment, and Episode execution evidence. No behavior change for intentionally owned nested histories. The same five-file fix uses one same-adapter post-error inspection; exact absence lets existing finalization continue in the same invocation, otherwise it fails closed. Final integrated validation: 289/289 Docker lifecycle tests, 9/9 policy tests, Docker-only source-mode tier1 --probe passed with clean teardown. Candidate ready for owning Conversation review; task remains In Progress and no deployment, canonical merge, lifecycle publication or cleanup occurred.
 <!-- SECTION:FINAL_SUMMARY:END -->
