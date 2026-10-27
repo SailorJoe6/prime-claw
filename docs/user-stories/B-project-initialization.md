@@ -88,9 +88,12 @@ placement prompt, and confirmation text. `switch-confirm` requires that exact
 revision plus an actor, managed semantic-placement prose, and literal operator
 confirmation. When inspection finds a source value without one exact destination
 equivalent, structured confirmation also carries the managed role's exact
-provider-native literal; for ambiguous Backlog priority this is a task-specific
-Beads `0..4` value in `beadsPriorityPlacements`. Prose remains audit evidence and
-is never parsed into a value. The operation creates the target only through
+provider-native literal in one task-specific `beadsNativePlacements` entry. An
+ambiguous Backlog priority uses a Beads `0..4` value; a multi-assignee Backlog
+source uses one non-empty native Beads assignee, and one entry may carry both.
+Prose remains audit evidence and is never parsed into a value. The destination
+must read back every literal applied value before the source can be deleted. The
+operation creates the target only through
 supported native interfaces, preserves safe IDs or records immutable mappings,
 publishes and verifies every field, absence, relationship, comment, complete Git
 commit-message body and history, actor, timestamp, transition, applied native

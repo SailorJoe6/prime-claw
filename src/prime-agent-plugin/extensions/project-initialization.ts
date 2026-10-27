@@ -123,7 +123,7 @@ interface ActionArguments {
   confirmedSwitch: boolean;
   actor?: string;
   semanticPlacement?: string;
-  beadsPriorityPlacements?: Array<{ sourceTaskId: string; priority: number }>;
+  beadsNativePlacements?: ProviderMigrationOptions["beadsNativePlacements"];
 }
 
 function productionReconcileOptions(dependencies: ProjectInitializationDependencies) {
@@ -169,7 +169,7 @@ async function executeAction(action: Action, args: ActionArguments, ctx: Extensi
         confirmedSwitch: args.confirmedSwitch,
         actor: args.actor ?? "",
         semanticPlacement: args.semanticPlacement ?? "",
-        beadsPriorityPlacements: args.beadsPriorityPlacements,
+        beadsNativePlacements: args.beadsNativePlacements,
         runner: dependencies.runner,
         verifyActiveRuntime: dependencies.migrationRuntimeVerifier ?? ((records) => {
           const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", dependencies.runner);
@@ -247,7 +247,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
         "Use review-restore or review-keep only for an interrupted review after an explicit operator decision.",
         "Accepting an override or resetting an asset is an explicit content decision; never infer it from silence.",
         "For a provider switch, call switch-request first. Present the exact source provider/revision/counts, the bounded maintenance window, destructive source deletion, and the semantic-placement prompt. Do not call switch-confirm until the operator explicitly confirms that exact switch and all task mutation is quiesced.",
-        "switch-confirm must repeat the exact inspected source revision, target provider, truthful actor, and concise managed semantic-placement prose. When inspection lists ambiguous Backlog priorities, pass each exact operator-selected native Beads value through beadsPriorityPlacements; prose is audit evidence and is never parsed as a value. Use disposable fixtures for candidate validation; never migrate a live repository without separate explicit operator authority.",
+        "switch-confirm must repeat the exact inspected source revision, target provider, truthful actor, and concise managed semantic-placement prose. When inspection lists an ambiguous Backlog-to-Beads projection, pass the managed role's actual literal destination-native value through one task-specific beadsNativePlacements entry; prose is audit evidence and is never parsed as a value. Use disposable fixtures for candidate validation; never migrate a live repository without separate explicit operator authority.",
         "The switch is one linear native operation: source stays intact and authoritative through destination verification and receipt publication; existing active version-2 Episode identities are preserved; source deletion happens only after exact ownership cutover proof. Never retry transport automatically or create a second destination.",
       ],
       executionMode: "sequential",
@@ -263,16 +263,17 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
           confirmedSwitch: { type: "boolean", description: "True only after the operator explicitly confirmed this exact one-way switch and source deletion" },
           actor: { type: "string", description: "Operator-approved actor recorded in the destination-native receipt" },
           semanticPlacement: { type: "string", description: "Managed LLM decision for human-facing placement of non-equivalent native fields; it never authorizes omission" },
-          beadsPriorityPlacements: {
+          beadsNativePlacements: {
             type: "array",
-            description: "Exact task-specific native Beads priorities selected for ambiguous Backlog priority values; use only when switch-request lists them",
+            description: "Actual task-specific native Beads values selected for ambiguous Backlog projections; use only for fields listed by switch-request",
             items: {
               type: "object",
               properties: {
                 sourceTaskId: { type: "string" },
                 priority: { type: "integer", minimum: 0, maximum: 4 },
+                assignee: { type: "string", minLength: 1 },
               },
-              required: ["sourceTaskId", "priority"],
+              required: ["sourceTaskId"],
               additionalProperties: false,
             },
           },
@@ -291,7 +292,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
             confirmedSwitch: params.confirmedSwitch === true,
             actor: params.actor,
             semanticPlacement: params.semanticPlacement,
-            beadsPriorityPlacements: params.beadsPriorityPlacements,
+            beadsNativePlacements: params.beadsNativePlacements,
           }, ctx, dependencies);
           return toolResult(value, actionSummary(value));
         } catch (error) {

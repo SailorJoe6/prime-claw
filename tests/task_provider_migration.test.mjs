@@ -200,24 +200,27 @@ test("read-only inspection captures complete Backlog open closed and archived na
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
 });
 
-test("ambiguous Backlog priorities require exact task-specific native Beads values before any destination write", { timeout: 120_000 }, async (t) => {
-  const fixture = backlogSource(t, "backlog-native-priority-validation");
-  backlog(fixture.root, "task", "edit", fixture.ids.parent, "--priority", "High", "--plain");
+test("ambiguous Backlog assignees require and apply an actual native Beads value before source deletion", { timeout: 240_000 }, async (t) => {
+  const fixture = backlogSource(t, "backlog-native-assignee-validation");
+  backlog(fixture.root, "task", "edit", fixture.ids.parent, "--assignee", "alice,bob", "--plain");
   git(fixture.root, "add", "backlog");
-  git(fixture.root, "commit", "-qm", "record ambiguous native priority");
+  git(fixture.root, "commit", "-qm", "record ambiguous native assignees");
   git(fixture.root, "push", "-q");
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
   assert.equal(inspection.status, "ready", inspection.detail);
-  assert.match(inspection.semanticPlacementPrompt, new RegExp(`${fixture.ids.parent}=high`, "i"));
+  assert.equal(inspection.semanticPlacementPrompt.includes(`${fixture.ids.parent}.priority=`), false);
+  assert.ok(inspection.semanticPlacementPrompt.includes(`${fixture.ids.parent}.assignee=[\"alice\",\"bob\"]`));
   const base = {
     cwd: fixture.root, targetProvider: "beads", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
-    confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Choose an exact native Beads priority.",
+    confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Use bob as the single native Beads assignee and preserve both source values.",
   };
   const cases = [
-    { options: {}, detail: /no single native Beads equivalent/ },
-    { options: { beadsPriorityPlacements: [{ sourceTaskId: "UNKNOWN-1", priority: 1 }] }, detail: /unknown source Backlog task/ },
-    { options: { beadsPriorityPlacements: [{ sourceTaskId: fixture.ids.parent, priority: 5 }] }, detail: /integer from 0 through 4/ },
-    { options: { beadsPriorityPlacements: [{ sourceTaskId: fixture.ids.parent, priority: 1 }, { sourceTaskId: fixture.ids.parent, priority: 1 }] }, detail: /repeats source Backlog task/ },
+    { options: {}, detail: /cannot project to one native Beads assignee/ },
+    { options: { beadsNativePlacements: [{ sourceTaskId: "UNKNOWN-1", assignee: "bob" }] }, detail: /unknown source Backlog task/ },
+    { options: { beadsNativePlacements: [{ sourceTaskId: fixture.ids.parent, assignee: 7 }] }, detail: /non-empty native string/ },
+    { options: { beadsNativePlacements: [{ sourceTaskId: fixture.ids.parent, assignee: "bob" }, { sourceTaskId: fixture.ids.parent, assignee: "bob" }] }, detail: /repeats source Backlog task/ },
+    { options: { beadsNativePlacements: [{ sourceTaskId: fixture.ids.parent, priority: 5, assignee: "bob" }] }, detail: /integer from 0 through 4/ },
+    { options: { beadsNativePlacements: [{ sourceTaskId: fixture.ids.parent, priority: 1, assignee: "bob" }] }, detail: /already has exact native Beads priority 2/ },
   ];
   for (const item of cases) {
     const result = await migrateTaskProvider({ ...base, ...item.options });
@@ -227,13 +230,27 @@ test("ambiguous Backlog priorities require exact task-specific native Beads valu
     assert.equal(existsSync(join(fixture.root, ".beads")), false);
     assert.equal(existsSync(join(fixture.root, "backlog")), true);
   }
+  const result = await migrateTaskProvider({
+    ...base,
+    beadsNativePlacements: [{ sourceTaskId: fixture.ids.parent, assignee: "bob" }],
+  });
+  assert.equal(result.status, "completed", result.detail);
+  assert.equal(result.sourceAbsent, true);
+  assert.deepEqual(result.receipt.beadsNativePlacements, [{ sourceTaskId: fixture.ids.parent, assignee: "bob" }]);
+  const destinationId = result.receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId;
+  const destination = JSON.parse(bd(fixture.root, "show", destinationId, "--json", "--long", "--include-comments"))[0];
+  assert.equal(destination.priority, 2);
+  assert.equal(destination.assignee, "bob");
+  assert.deepEqual(destination.metadata.prime_claw_migration.nativeView.task.assignees, ["alice", "bob"]);
+  assert.deepEqual(destination.metadata.prime_claw_migration.beadsNativePlacement, { assignee: "bob" });
+  assert.equal(existsSync(join(fixture.root, "backlog")), false);
 });
 
 test("confirmed migration preserves complete history, managed native placement, and a later active Episode head", { timeout: 240_000 }, async (t) => {
   const fixture = backlogSource(t, "backlog-active-owner");
-  backlog(fixture.root, "task", "edit", fixture.ids.parent, "--priority", "High", "--plain");
+  backlog(fixture.root, "task", "edit", fixture.ids.parent, "--priority", "High", "--assignee", "alice,bob", "--plain");
   git(fixture.root, "add", "backlog");
-  git(fixture.root, "commit", "-qm", "record managed priority fixture", "-m", "BODY_ONLY_MIGRATION_ROLLBACK_EXPLANATION");
+  git(fixture.root, "commit", "-qm", "record managed native placement fixture", "-m", "BODY_ONLY_MIGRATION_ROLLBACK_EXPLANATION");
   git(fixture.root, "push", "-q");
   const owner = addActiveBacklogOwner(fixture);
   writeFileSync(join(owner.episode, "later-implementation.txt"), "ordinary Episode progress\n");
@@ -255,8 +272,8 @@ test("confirmed migration preserves complete history, managed native placement, 
   const result = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "beads", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "migration-operator",
-    semanticPlacement: "Place the living plan in design, apply native Beads priority 1, and preserve all unsupported values in exact metadata.",
-    beadsPriorityPlacements: [{ sourceTaskId: fixture.ids.parent, priority: 1 }],
+    semanticPlacement: "Place the living plan in design, apply native Beads priority 1 and single assignee bob, and preserve all unsupported values in exact metadata.",
+    beadsNativePlacements: [{ sourceTaskId: fixture.ids.parent, priority: 1, assignee: "bob" }],
     verifyActiveRuntime: verifyCurrentRuntime,
   });
   assert.equal(result.status, "completed", result.detail);
@@ -264,7 +281,7 @@ test("confirmed migration preserves complete history, managed native placement, 
   assert.equal(result.selectedProvider, "beads");
   assert.deepEqual(result.receipt.taskCounts, { open: 1, closed: 1, archived: 1, total: 3 });
   assert.equal(result.receipt.mappings.length, 3);
-  assert.deepEqual(result.receipt.beadsPriorityPlacements, [{ sourceTaskId: fixture.ids.parent, priority: 1 }]);
+  assert.deepEqual(result.receipt.beadsNativePlacements, [{ sourceTaskId: fixture.ids.parent, priority: 1, assignee: "bob" }]);
   assert.ok(runtimeProofs >= 3);
   assert.equal(existsSync(join(fixture.root, "backlog")), false);
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
@@ -272,6 +289,9 @@ test("confirmed migration preserves complete history, managed native placement, 
   assert.deepEqual(git(fixture.root, "ls-files", ".beads/.gitignore", ".beads/config.yaml", ".beads/metadata.json", ".beads/README.md").split("\n").sort(), [".beads/.gitignore", ".beads/README.md", ".beads/config.yaml", ".beads/metadata.json"].sort());
   const receipt = JSON.parse(bd(fixture.root, "show", result.receiptTaskId, "--json", "--long", "--include-comments"))[0];
   assert.equal(receipt.metadata.prime_claw_migration.marker, "prime-claw-task-provider-migration-receipt-v1");
+  assert.deepEqual(receipt.metadata.prime_claw_migration.beadsNativePlacements, [
+    { sourceTaskId: fixture.ids.parent, priority: 1, assignee: "bob" },
+  ]);
   for (const mapping of result.receipt.mappings) {
     const task = JSON.parse(bd(fixture.root, "show", mapping.destinationTaskId, "--json", "--long", "--include-comments"))[0];
     assert.equal(task.metadata.prime_claw_migration.sourceTaskId, mapping.sourceTaskId);
@@ -287,8 +307,10 @@ test("confirmed migration preserves complete history, managed native placement, 
       assert.match(history, /episode-only migration history/);
       assert.match(history, /BODY_ONLY_MIGRATION_ROLLBACK_EXPLANATION/);
       assert.equal(task.priority, 1);
+      assert.equal(task.assignee, "bob");
       assert.equal(task.metadata.prime_claw_migration.nativeView.task.priority.toLowerCase(), "high");
-      assert.equal(task.metadata.prime_claw_migration.beadsPriorityPlacement, 1);
+      assert.deepEqual(task.metadata.prime_claw_migration.nativeView.task.assignees, ["alice", "bob"]);
+      assert.deepEqual(task.metadata.prime_claw_migration.beadsNativePlacement, { priority: 1, assignee: "bob" });
     }
   }
   const registry = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8"));

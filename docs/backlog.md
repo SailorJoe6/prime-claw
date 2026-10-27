@@ -953,10 +953,14 @@ ownership update, or source mutation.
 
 Confirmation binds that exact revision, a named actor, non-empty managed
 semantic-placement prose, literal operator approval, and any exact provider-native
-values listed by inspection. For Backlog priority spellings without one native
-Beads equivalent, structured confirmation carries task-specific literal Beads
-priorities through `beadsPriorityPlacements`; prose remains audit evidence and is
-never parsed as a value. Backlog source capture retains each committed Markdown
+values listed by inspection. For any Backlog field that cannot project to one
+Beads-native value without a decision, structured confirmation carries the
+actual literal destination value in one task-specific `beadsNativePlacements`
+entry. This includes Beads priority integers `0..4` for ambiguous priority
+spellings and one native assignee string for a multi-assignee Backlog source.
+Prose remains audit evidence and is never parsed as a value; code applies and
+reads back the literal before source deletion. Backlog source capture retains
+each committed Markdown
 file, full Git history with complete commit-message bodies, actor/timestamp,
 binary changes, and the native structured view. Archived Markdown is moved only
 inside a disposable clone of the exact revision so the native Backlog reader can

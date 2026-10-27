@@ -162,12 +162,16 @@ not create a destination, change ownership, or write a receipt.
 reported source revision, a non-empty actor, and the managed semantic-placement
 prose. The tool equivalent uses `action="switch-confirm"`, `targetProvider`,
 `expectedSourceRevision`, `actor`, `semanticPlacement`, and
-`confirmedSwitch=true`. When inspection lists a Backlog priority without one
-exact Beads equivalent, the structured tool also requires one exact
-`{sourceTaskId, priority}` entry in `beadsPriorityPlacements`; values are native
-Beads integers `0..4`. The slash form remains available when no structured native
-value is required. Managed prose is retained for audit and is never parsed into a
-provider value. The confirmed maintenance window is one linear operation:
+`confirmedSwitch=true`. When inspection lists a Backlog field that cannot
+project to one Beads value without a decision, the structured tool also requires
+one task-specific `beadsNativePlacements` entry with the actual
+destination-native field. Priority
+is a Beads integer `0..4`; a multi-assignee Backlog source requires one non-empty
+native `assignee` string. One entry can carry both fields. The slash form remains
+available when no structured native value is required. Managed prose is retained
+for audit and is never parsed into a provider value. The literal value is applied
+and read back from the native destination before guarded source deletion. The
+confirmed maintenance window is one linear operation:
 
 1. capture every source task plus its provider-native bytes or rows, all open,
    closed, and archived states, relationships, comments, native history,
