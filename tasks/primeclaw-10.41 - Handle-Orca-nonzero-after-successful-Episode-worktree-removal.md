@@ -4,7 +4,7 @@ title: Handle Orca nonzero after successful Episode worktree removal
 status: In Progress
 assignee: []
 created_date: '2026-10-27 12:48'
-updated_date: '2026-10-27 14:27'
+updated_date: '2026-10-27 14:37'
 labels: []
 dependencies: []
 references:
@@ -70,3 +70,23 @@ This is a narrow correction to Orca post-removal result handling. Do not redesig
    - Update only the affected cleanup wording in `docs/user-stories/I-episode-finalization.md` and `docs/conversation-driven-episode-oversight.md`: a nonzero removal response is reconciled once against exact post-state, proven absence is success, and any present or ambiguous state remains a bounded failure with ownership retained.
    - Run the focused `tests/spec_episode_extension.test.mjs` suite, then the Docker-only plugin gate `scripts/test-tier1.sh --probe`. Record the resulting evidence in the task during implementation.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Conversation PRIMECLAW-10.39
+created: 2026-10-27 14:37
+---
+Additional observed cleanup case: PRIMECLAW-10.39
+
+Terminal Episode head: b893faff3c701fcba401a89e7e98f6140c404e90. The exact candidate was merged, the bound task was Done on pushed canonical main, and the Episode was clean and pushed before cleanup. Exact owning Conversation: 01a13b1e-9ea9-72cb-9bcd-1c96de0da277; Episode: 01a1506c-11a5-759f-a056-a5621ba63325.
+
+1. finalize_task_episode(taskId=PRIMECLAW-10.39, episodeHead=b893faff3c701fcba401a89e7e98f6140c404e90, outcome=merged) removed the session/runtime, remote branch, Orca/Git worktree, and local branch, then reported: "Task Episode cleanup worktree is dirty or no longer exact".
+2. Fresh reads showed the saved Episode session and directory absent, no exact Git or Orca worktree, no local branch, and an empty live git ls-remote result for refs/heads/JLanders/prime-claw-primeclaw-10-39-episode-f1b99889 on origin. The original owner entry remained unchanged.
+3. A same-binding retry then reported: "Task Episode cleanup cannot prove the exact configured upstream identity; ownership retained". The deleted local branch's remote/merge configuration was absent. The adapter's resolvedUpstream cache is invocation-local, so the fresh call could not recover its prior proof. The stale origin remote-tracking ref was separately removed with an expected-head-guarded Git update-ref after live remote absence was verified.
+
+This is the same stranded-ownership failure pattern as this ticket, but an identical initial trigger is NOT proven: 10.39 surfaced the generic worktree-mismatch error, rather than the deleted-path Git error from the 10.40 reproduction. Please retain this distinction and use 10.39 as an additional regression case when assessing same-invocation post-state handling. No new persistent cleanup state or inferred upstream identity is requested.
+
+The operator has explicitly authorized a one-time manual close of only the unchanged 10.39 ownership entry after re-verifying complete resource absence. This recovery is not proposed as product behavior. No plugin code, task status, acceptance criteria, or implementation plan is changed by this report.
+---
+<!-- COMMENTS:END -->
