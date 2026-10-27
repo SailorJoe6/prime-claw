@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-10.41
 title: Handle Orca nonzero after successful Episode worktree removal
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-10-27 12:48'
-updated_date: '2026-10-27 17:00'
+updated_date: '2026-10-27 18:40'
 labels: []
 dependencies: []
 references:
