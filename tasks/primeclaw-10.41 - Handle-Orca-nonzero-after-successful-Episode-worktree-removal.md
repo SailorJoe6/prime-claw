@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-10.41
 title: Handle Orca nonzero after successful Episode worktree removal
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-10-27 12:48'
+updated_date: '2026-10-27 13:23'
 labels: []
 dependencies: []
 references:
@@ -50,3 +51,22 @@ This is a narrow correction to Orca post-removal result handling. Do not redesig
 - [ ] #3 Existing idle-session, exact identity/head, cleanliness, remote-before-worktree, unrelated-owner preservation, and version-1 finalization behavior remain unchanged.
 - [ ] #4 A focused regression reproduces delete-then-nonzero Orca behavior and proves successful completion without persistent cleanup state or retry machinery; Docker-only plugin validation passes.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. **Reconcile only the Orca worktree-removal result at the existing adapter boundary.**
+   - In `src/prime-agent-plugin/extension-support/task-episode-cleanup.ts`, keep every current pre-removal identity, idle, head, cleanliness, terminal, and upstream-order check unchanged.
+   - Around only the existing `orca worktree rm --force` call in `CliTaskEpisodeCleanupAdapter.removeWorktree`, catch a removal error and run one fresh `inspect(record)` with the same adapter instance. Treat the step as successful only when that inspection proves the exact worktree absent; this preserves the invocation-local resolved upstream identity when Orca also removed the local branch and configuration.
+   - If the worktree remains present or the post-state is changed, foreign, partial, or ambiguous, fail closed with the bounded removal/observation error. Do not retry the command or add persisted cleanup state, metadata, stages, receipts, classifiers, or generalized reconciliation.
+   - Leave `finalizeTaskEpisodeCleanup`, its public tool schema, resource order, existing post-removal verification, remaining-branch removal, and owner compare-and-delete unchanged.
+
+2. **Cover the exact success-after-error and failure-preservation cases.**
+   - In `tests/spec_episode_extension.test.mjs`, extend the production Orca cleanup fixture through `finalizeTaskEpisodeCleanup` so `worktree rm` deletes the exact Git/Orca worktree and local branch/configuration, then returns nonzero. Prove that the same invocation completes, removes only the target owner, and preserves a foreign owner.
+   - Add the paired negative case where nonzero does not produce provable exact absence. Prove ownership remains and no unsafe branch or owner deletion follows.
+   - Keep the existing dirty-worktree, foreign-identity, upstream-order, absent-resource, ownership-integrity, and version-1 coverage passing.
+
+3. **Align the two cleanup contracts and validate through supported paths.**
+   - Update only the affected cleanup wording in `docs/user-stories/I-episode-finalization.md` and `docs/conversation-driven-episode-oversight.md`: a nonzero removal response is reconciled once against exact post-state, proven absence is success, and any present or ambiguous state remains a bounded failure with ownership retained.
+   - Run the focused `tests/spec_episode_extension.test.mjs` suite, then the Docker-only plugin gate `scripts/test-tier1.sh --probe`. Record the resulting evidence in the task during implementation.
+<!-- SECTION:PLAN:END -->
