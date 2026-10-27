@@ -9,6 +9,7 @@ import test from "node:test";
 import { inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
+import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 
 const BACKLOG_CANDIDATE = "deps/backlog/dist/backlog";
 const RUNTIME_BACKLOG = "/usr/local/bin/backlog";
@@ -495,6 +496,40 @@ test("confirmed Beads to Backlog migration preserves active Episode identity and
 });
 
 
+test("Beads to Backlog migration preserves the selected non-origin remote for ordinary preparation", { timeout: 240_000 }, async (t) => {
+  const fixture = beadsSource(t, "beads-upstream-remote");
+  git(fixture.root, "remote", "rename", "origin", "upstream");
+  bd(fixture.root, "dolt", "remote", "remove", "origin");
+  const remoteUrl = `git+${pathToFileURL(fixture.remote).href}`;
+  bd(fixture.root, "dolt", "remote", "add", "upstream", remoteUrl, "--allow-git-origin");
+  bd(fixture.root, "config", "set", "sync.remote", remoteUrl);
+  command(fixture.root, "bd", ["dolt", "commit", "-m", "select upstream remote"], true);
+  bd(fixture.root, "dolt", "push", "--remote", "upstream", "--no-adopt");
+  git(fixture.root, "add", "-A");
+  if (git(fixture.root, "status", "--porcelain=v1")) git(fixture.root, "commit", "-qm", "select upstream remote");
+  git(fixture.root, "push", "-q");
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const result = await migrateTaskProvider({
+    cwd: fixture.root,
+    targetProvider: "backlog",
+    runner: RUNNER,
+    expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true,
+    actor: "upstream-remote-operator",
+    semanticPlacement: "Preserve complete native fields in the selected independent Backlog store.",
+    verifyActiveRuntime: proveFixtureRuntime,
+  });
+  assert.equal(result.status, "completed", result.detail);
+  const storeDir = join(fixture.root, ".backlog");
+  assert.equal(git(storeDir, "remote"), "upstream");
+  assert.equal(git(storeDir, "remote", "get-url", "upstream"), fixture.remote);
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: fixture.root, runner: RUNNER });
+  assert.equal(prepared.status, "prepared", prepared.detail);
+  assert.equal(prepared.remote, "upstream");
+});
+
+
 test("independent Backlog source ref is retired so a later reverse provider switch is selectable", { timeout: 360_000 }, async (t) => {
   const fixture = beadsSource(t, "beads-backlog-beads-roundtrip");
   const operatorIgnore = "operator-cache/\n";
@@ -515,6 +550,10 @@ test("independent Backlog source ref is retired so a later reverse provider swit
     verifyActiveRuntime: proveFixtureRuntime,
   });
   assert.equal(backlogResult.status, "completed", backlogResult.detail);
+  const firstPreparation = prepareTaskHistoryWorkspace({ primaryRoot: fixture.root, runner: RUNNER });
+  assert.equal(firstPreparation.status, "prepared", firstPreparation.detail);
+  const firstPrimaryTaskRef = git(fixture.root, "rev-parse", TASK_HISTORY_REF);
+  assert.equal(firstPrimaryTaskRef, backlogResult.receipt.destinationReceiptRevision);
   assert.equal(existsSync(join(fixture.root, ".beads.gate.lock")), false, "retired Beads native gate lock must not survive cutover");
   assert.match(git(fixture.root, "ls-remote", "--heads", fixture.remote, "refs/heads/prime-claw/tasks"), /refs\/heads\/prime-claw\/tasks/);
   assert.equal(readFileSync(join(fixture.root, ".gitignore"), "utf8"), `\n${operatorIgnore}`, "cutover must retire only the exact Beads ignore block and preserve every operator byte");
@@ -536,7 +575,8 @@ test("independent Backlog source ref is retired so a later reverse provider swit
   });
   assert.equal(beadsResult.status, "completed", beadsResult.detail);
   assert.equal(beadsResult.selectedProvider, "beads");
-  assert.equal(git(fixture.root, "ls-remote", "--heads", fixture.remote, "refs/heads/prime-claw/tasks"), "");
+  assert.equal(git(fixture.root, "ls-remote", "--heads", fixture.remote, TASK_HISTORY_REF), "");
+  assert.equal(command(fixture.root, "git", ["rev-parse", "--verify", "--quiet", TASK_HISTORY_REF], true), null, "retired primary task ref must not survive cutover");
   assert.equal(existsSync(join(fixture.root, ".backlog")), false);
   assert.equal(detectTaskProvider(fixture.root, RUNNER).evidence.provider, "beads");
 
@@ -554,7 +594,10 @@ test("independent Backlog source ref is retired so a later reverse provider swit
   });
   assert.equal(secondBacklog.status, "completed", secondBacklog.detail);
   assert.equal(secondBacklog.selectedProvider, "backlog");
-  assert.match(git(fixture.root, "ls-remote", "--heads", fixture.remote, "refs/heads/prime-claw/tasks"), /refs\/heads\/prime-claw\/tasks/);
+  assert.match(git(fixture.root, "ls-remote", "--heads", fixture.remote, TASK_HISTORY_REF), /refs\/heads\/prime-claw\/tasks/);
+  const finalPreparation = prepareTaskHistoryWorkspace({ primaryRoot: fixture.root, runner: RUNNER });
+  assert.equal(finalPreparation.status, "prepared", finalPreparation.detail);
+  assert.equal(git(fixture.root, "rev-parse", TASK_HISTORY_REF), secondBacklog.receipt.destinationReceiptRevision);
 });
 
 test("Beads source inspection rejects configured owner filters before destination creation", { timeout: 120_000 }, (t) => {

@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-27 10:21'
+updated_date: '2026-10-27 11:40'
 labels: []
 dependencies: []
 references:
@@ -24,50 +24,108 @@ documentation:
   - docs/user-stories/traceability.md
 modified_files:
   - .agents/skills/blocked/SKILL.md
+  - .agents/skills/design-legacy/SKILL.md
+  - .agents/skills/design/SKILL.md
   - .agents/skills/execute/SKILL.md
+  - .agents/skills/spec-it-out-legacy/SKILL.md
+  - .agents/skills/spec-it-out/SKILL.md
   - .prime-claw/templates.json
   - .prime-claw/workflows/handoff.md
+  - .prime-claw/workflows/implement-prep.md
+  - .prime-claw/workflows/implement-spec.md
+  - .prime-claw/workflows/implement-task-prep.md
   - .prime-claw/workflows/implement-task.md
+  - .prime-claw/workflows/plan-prep.md
+  - .prime-claw/workflows/plan-spec.md
+  - .prime-claw/workflows/plan-task-prep.md
   - .prime-claw/workflows/plan-task.md
+  - LONG_RANGE_PLAN.md
+  - VISION.md
+  - >-
+    backlog/tasks/primeclaw-43 -
+    Support-selectable-task-providers-with-grandfathered-legacy-execution.md
   - bin/prime-claw
   - docker/runtime.Dockerfile
   - docker/test.Dockerfile
   - docs/backlog.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/future-specification-bundles.md
+  - docs/handoff-chain.md
+  - docs/information-architecture.md
+  - docs/prep-chain.md
   - docs/project-initialization.md
+  - docs/user-stories/B-project-initialization.md
+  - docs/user-stories/C-specification.md
+  - docs/user-stories/D-planning.md
+  - docs/user-stories/E-episode-promotion.md
+  - docs/user-stories/F-episode-execution.md
+  - docs/user-stories/G-oversight-and-review.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/I-episode-finalization.md
+  - docs/user-stories/README.md
   - docs/user-stories/traceability.md
   - scripts/build-backlog.sh
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/conversation-oversight.ts
+  - src/prime-agent-plugin/extension-support/episode-close.ts
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
   - src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts
+  - src/prime-agent-plugin/extension-support/legacy-workflow.ts
   - src/prime-agent-plugin/extension-support/prep-chain.ts
+  - src/prime-agent-plugin/extension-support/project-initialization.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - src/prime-agent-plugin/extension-support/task-provider-migration.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/extensions/project-initialization.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
   - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/design-legacy.md
+  - src/prime-agent-plugin/skills/project-templates/design.md
   - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out-legacy.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
   - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/workflows/implement-prep.md
+  - src/prime-agent-plugin/workflows/implement-spec.md
+  - src/prime-agent-plugin/workflows/implement-task-prep.md
   - src/prime-agent-plugin/workflows/implement-task.md
+  - src/prime-agent-plugin/workflows/plan-prep.md
+  - src/prime-agent-plugin/workflows/plan-spec.md
+  - src/prime-agent-plugin/workflows/plan-task-prep.md
   - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/beads_task_episode_admission_extension.test.mjs
+  - tests/episode_close_extension.test.mjs
+  - tests/project_conversation_extension.test.mjs
   - tests/project_initialization_extension.test.mjs
   - tests/reviewed_plan_extension.test.mjs
+  - tests/spec_episode_extension.test.mjs
   - tests/task_episode_admission_extension.test.mjs
+  - tests/task_episode_ownership_extension.test.mjs
   - tests/task_history_workspace.test.mjs
   - tests/task_provider_migration.test.mjs
   - tests/task_providers.test.mjs
+  - tests/template_review.test.mjs
   - tests/test_backlog_build.py
+  - tests/test_backlog_workflow.py
+  - tests/test_blocked_skill.py
   - tests/test_conversation_oversight_native.py
+  - tests/test_execute_skill.py
+  - tests/test_expert_review_skill.py
   - tests/test_future_plan_skills.py
+  - tests/test_handoff_chain_extension.py
+  - tests/test_managed_session_protocol.py
+  - tests/test_oversee_episode_skill.py
+  - tests/test_project_initialization.py
   - tests/test_runtime_connect.py
   - tests/test_task_history_workspace.py
   - tests/test_task_provider_migration.py
   - tests/test_task_providers.py
   - tests/test_tier1_image.py
-  - >-
-    backlog/tasks/primeclaw-43 -
-    Support-selectable-task-providers-with-grandfathered-legacy-execution.md
 priority: p1
 type: epic
 ordinal: 125000
@@ -1554,6 +1612,23 @@ Final validation evidence:
 - final scripts/test-all.sh run .test-results/20261027-030311-61040: Tier 0 PASS in 73s; Tier 1 had 69 passed, 1 skipped, and one failure. The sole failure is tests/test_source_builder_real_install.py::test_two_real_source_generations_install_changed_behavior_without_replay at the isolated prep-kernel compact-skill install. It reproduces on canonical main and was recorded before this candidate as an environmental baseline; all candidate-owned failures from the prior aggregate run were repaired and revalidated.
 
 No live PRIMECLAW-43.1 cutover, provider authority change, production registry/resource mutation, user-global plugin apply, merge, finalization, abandonment, or cleanup was performed. PRIMECLAW-43 remains In Progress for owner review.
+
+2026-10-27 independent exact-commit review of f1b79ef53b516418d4094a2cb4d1c587711d9acf requested revision for three reproduced in-scope gaps; all three were repaired without expanding the approved architecture.
+
+1. Beads-to-Backlog migration now preserves the selected code remote name as well as its URL through destination initialization, publication proof, exact retry admission, and active Episode clone/fetch/fast-forward. The new native regression renames both code and Dolt remotes to `upstream`, completes migration, and proves ordinary task-history preparation remains usable.
+2. Guarded Backlog retirement now examines both the independent source clone and canonical-primary repository. Before deleting remote authority it fetches the exact published source revision, requires every surviving local/task-tracking ref to equal or be an ancestor of that revision, blocks divergent or unpublished history, records the observed heads, then deletes only unchanged proven source refs after remote retirement. The three-leg native roundtrip now performs ordinary preparation between switches, proves the stale primary ref is retired, and proves final preparation binds the new history without divergence.
+3. Managed design, spec-it-out, and plan-task instructions now route every validated ignored independent Backlog clone through nested Git publication, whether built-in or retained custom layout. Code-root publication remains only for an actual branch-local store. Installed customized copies and canonical sources were reconciled with correct managed/customized template hashes.
+
+Repair validation:
+- focused selected-non-origin native migration: 1/1;
+- enhanced Beads->Backlog->Beads->Backlog native roundtrip with intermediate/final preparation: 1/1;
+- full native provider migration suite: 22/22;
+- managed-policy/template checks: 37/37, 1 skipped;
+- full non-container Python: 684 passed, 1 skipped, plus 75 subtests;
+- Linux-authoritative migration bridge: 1/1;
+- git diff --check: pass.
+
+The original reviewer independently passed provider/workspace/migration 162/162, lifecycle 208/208, legacy 101/101, and a disposable admission-to-cleanup probe, and reported no other material issue. No live provider cutover, global apply, merge, finalization, abandonment, or cleanup was performed. PRIMECLAW-43 remains In Progress pending exact revised-commit rereview and owner decision.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

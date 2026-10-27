@@ -1538,8 +1538,8 @@ function prepareExplicitBacklogMigrationWorkspace(projectRoot: string, runner: C
     if (!entry.isDirectory() || entry.isSymbolicLink() || !existsSync(join(storeDir, ".git"))) {
       throw new Error("existing .backlog destination is not the exact reusable independent Git store");
     }
-    const origin = runRequired(runner, "git", ["-C", storeDir, "remote", "get-url", "origin"], storeDir, "read Backlog destination remote").stdout.trim();
-    if (origin !== remote.raw) throw new Error("existing .backlog destination uses a different remote; clean it up or retry the exact same destination");
+    const destinationRemote = runRequired(runner, "git", ["-C", storeDir, "remote", "get-url", remote.name], storeDir, "read Backlog destination remote").stdout.trim();
+    if (destinationRemote !== remote.raw) throw new Error("existing .backlog destination uses a different remote; clean it up or retry the exact same destination");
   }
   ignoreMigrationBacklogStore(projectRoot, runner);
   if (!existsSync(storeDir)) {
@@ -1551,44 +1551,44 @@ function prepareExplicitBacklogMigrationWorkspace(projectRoot: string, runner: C
     mkdirSync(join(storeDir, "archive", "tasks"), { recursive: true });
     runRequired(runner, "git", ["-C", storeDir, "add", "TASKS.md", "config.yml"], storeDir, "stage Backlog destination initialization");
     runRequired(runner, "git", ["-C", storeDir, "-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-m", "prime-claw: initialize task history"], storeDir, "commit Backlog destination initialization");
-    runRequired(runner, "git", ["-C", storeDir, "remote", "add", "origin", remote.raw], storeDir, "configure Backlog destination remote");
-    runRequired(runner, "git", ["-C", storeDir, "push", "-u", "origin", `HEAD:${TASK_HISTORY_REF}`], storeDir, "publish Backlog destination initialization");
+    runRequired(runner, "git", ["-C", storeDir, "remote", "add", remote.name, remote.raw], storeDir, "configure Backlog destination remote");
+    runRequired(runner, "git", ["-C", storeDir, "push", "-u", remote.name, `HEAD:${TASK_HISTORY_REF}`], storeDir, "publish Backlog destination initialization");
   }
   checkBacklogCapabilities(projectRoot, runner);
   const head = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "HEAD"], storeDir, "read Backlog destination revision").stdout.trim();
   if (!GIT_OID.test(head)) throw new Error("Backlog destination did not return an exact Git revision");
-  assertPublishedGitRef(runner, storeDir, head, "origin", remote.raw, TASK_HISTORY_REF, "Backlog destination initialization publication");
-  return { storeDir, remoteName: "origin", remoteUrl: remote.raw, head };
+  assertPublishedGitRef(runner, storeDir, head, remote.name, remote.raw, TASK_HISTORY_REF, "Backlog destination initialization publication");
+  return { storeDir, remoteName: remote.name, remoteUrl: remote.raw, head };
 }
 
-function prepareExplicitBacklogEpisodeWorkspace(worktree: string, runner: CommandRunner, remoteUrl: string, expectedHead: string): void {
+function prepareExplicitBacklogEpisodeWorkspace(worktree: string, runner: CommandRunner, remoteName: string, remoteUrl: string, expectedHead: string): void {
   const storeDir = join(worktree, ".backlog");
   if (!existsSync(storeDir)) {
-    runRequired(runner, "git", ["clone", "-q", "--branch", "prime-claw/tasks", "--single-branch", remoteUrl, storeDir], worktree, "clone migrated Backlog history into active Episode");
+    runRequired(runner, "git", ["clone", "-q", "--origin", remoteName, "--branch", "prime-claw/tasks", "--single-branch", remoteUrl, storeDir], worktree, "clone migrated Backlog history into active Episode");
   } else {
     const entry = lstatSync(storeDir);
     if (!entry.isDirectory() || entry.isSymbolicLink() || !existsSync(join(storeDir, ".git"))) throw new Error(`active Episode ${worktree} has a foreign .backlog destination`);
-    const origin = runRequired(runner, "git", ["-C", storeDir, "remote", "get-url", "origin"], storeDir, "read active Episode Backlog remote").stdout.trim();
-    if (origin !== remoteUrl) throw new Error(`active Episode ${worktree} has a different Backlog destination remote`);
+    const destinationRemote = runRequired(runner, "git", ["-C", storeDir, "remote", "get-url", remoteName], storeDir, "read active Episode Backlog remote").stdout.trim();
+    if (destinationRemote !== remoteUrl) throw new Error(`active Episode ${worktree} has a different Backlog destination remote`);
   }
   const statusBefore = runRequired(runner, "git", ["-C", storeDir, "status", "--porcelain=v1"], storeDir, "active Episode Backlog cleanliness").stdout;
   const branch = runRequired(runner, "git", ["-C", storeDir, "symbolic-ref", "--short", "HEAD"], storeDir, "active Episode Backlog branch").stdout.trim();
   if (statusBefore !== "" || branch !== "prime-claw/tasks") throw new Error(`active Episode worktree ${worktree} has dirty or foreign Backlog destination state`);
-  assertPublishedGitRef(runner, storeDir, expectedHead, "origin", remoteUrl, TASK_HISTORY_REF, "active Episode Backlog destination publication");
+  assertPublishedGitRef(runner, storeDir, expectedHead, remoteName, remoteUrl, TASK_HISTORY_REF, "active Episode Backlog destination publication");
   runRequired(
     runner,
     "git",
-    ["-C", storeDir, "fetch", "--no-tags", "origin", `${TASK_HISTORY_REF}:refs/remotes/origin/prime-claw/tasks`],
+    ["-C", storeDir, "fetch", "--no-tags", remoteName, `${TASK_HISTORY_REF}:refs/remotes/${remoteName}/prime-claw/tasks`],
     storeDir,
     "refresh active Episode Backlog destination",
   );
-  const remoteHead = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "refs/remotes/origin/prime-claw/tasks"], storeDir, "active Episode Backlog remote revision").stdout.trim();
+  const remoteHead = runRequired(runner, "git", ["-C", storeDir, "rev-parse", `refs/remotes/${remoteName}/prime-claw/tasks`], storeDir, "active Episode Backlog remote revision").stdout.trim();
   const headBefore = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "HEAD"], storeDir, "active Episode Backlog revision").stdout.trim();
   if (remoteHead !== expectedHead) throw new Error(`active Episode worktree ${worktree} fetched a different Backlog destination revision`);
   if (headBefore !== expectedHead) {
     const ancestor = runner.run("git", ["-C", storeDir, "merge-base", "--is-ancestor", headBefore, expectedHead], { cwd: storeDir, allowFailure: true });
     if (ancestor.status !== 0) throw new Error(`active Episode worktree ${worktree} Backlog destination cannot fast-forward to the migrated revision`);
-    runRequired(runner, "git", ["-C", storeDir, "merge", "--ff-only", "refs/remotes/origin/prime-claw/tasks"], storeDir, "fast-forward active Episode Backlog destination");
+    runRequired(runner, "git", ["-C", storeDir, "merge", "--ff-only", `refs/remotes/${remoteName}/prime-claw/tasks`], storeDir, "fast-forward active Episode Backlog destination");
   }
   const statusAfter = runRequired(runner, "git", ["-C", storeDir, "status", "--porcelain=v1"], storeDir, "active Episode Backlog final cleanliness").stdout;
   const headAfter = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "HEAD"], storeDir, "active Episode Backlog final revision").stdout.trim();
@@ -1688,7 +1688,7 @@ function migrateBeadsToBacklog(
     provider: "backlog", revision: final.revision, digest: final.digest, receiptBase, receiptTaskId, tasks: final.tasks,
     refreshAfterReceipt: refresh,
     prepareActiveWorktree(worktree: string) {
-      prepareExplicitBacklogEpisodeWorkspace(worktree, runner, prepared.remoteUrl, receiptRevision);
+      prepareExplicitBacklogEpisodeWorkspace(worktree, runner, prepared.remoteName, prepared.remoteUrl, receiptRevision);
     },
   };
 }
@@ -1713,7 +1713,7 @@ function verifyExactRetryDestination(source: SourceSnapshot, target: TaskProvide
     }
     const revision = cleanGitRevision(runner, storeDir);
     const remote = gitRemoteForDolt(runner, source.projectRoot);
-    assertPublishedGitRef(runner, storeDir, revision, "origin", remote.raw, TASK_HISTORY_REF, "existing Backlog retry destination publication");
+    assertPublishedGitRef(runner, storeDir, revision, remote.name, remote.raw, TASK_HISTORY_REF, "existing Backlog retry destination publication");
     const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source);
     const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "retry admission");
     const receiptCount = [...views.values()].filter((view) => {
@@ -1799,40 +1799,83 @@ function verifyBacklogDeletionIdentity(snapshot: BacklogSnapshot): void {
   if ((!configEntry.isFile() && !configEntry.isSymbolicLink()) || !contained(snapshot.projectRoot, config)) throw new Error("Backlog source configuration identity changed before guarded deletion");
 }
 
+interface BacklogRefRetirement {
+  repositoryRoot: string;
+  ref: string;
+  expectedHead: string;
+}
+
+function safeBacklogRefRetirements(snapshot: BacklogSnapshot, runner: CommandRunner): BacklogRefRetirement[] {
+  if (!snapshot.publicationRemote || snapshot.publicationRef !== TASK_HISTORY_REF) {
+    throw new Error("independent Backlog source has no exact canonical task-history publication authority for guarded retirement");
+  }
+  const sourceRemoteUrl = runRequired(
+    runner, "git", ["-C", snapshot.repositoryRoot, "remote", "get-url", snapshot.publicationRemote],
+    snapshot.repositoryRoot, "read independent Backlog source remote",
+  ).stdout.trim();
+  const trackingRef = `refs/remotes/${snapshot.publicationRemote}/${TASK_HISTORY_REF.slice("refs/heads/".length)}`;
+  const retirements: BacklogRefRetirement[] = [];
+  for (const repositoryRoot of [...new Set([snapshot.repositoryRoot, snapshot.projectRoot])]) {
+    const remoteUrl = runRequired(
+      runner, "git", ["-C", repositoryRoot, "remote", "get-url", snapshot.publicationRemote],
+      repositoryRoot, "read Backlog retirement remote",
+    ).stdout.trim();
+    if (remoteUrl !== sourceRemoteUrl) {
+      throw new Error(`Backlog retirement repository ${repositoryRoot} maps ${snapshot.publicationRemote} to a different remote`);
+    }
+    const fetched = runRequired(
+      runner, "git", ["-C", repositoryRoot, "fetch", "--no-tags", snapshot.publicationRemote, snapshot.publicationRef],
+      repositoryRoot, "fetch exact Backlog source revision before guarded retirement",
+    );
+    const fetchedHead = runRequired(runner, "git", ["-C", repositoryRoot, "rev-parse", "FETCH_HEAD"], repositoryRoot, "read fetched Backlog source revision").stdout.trim();
+    if (fetched.status !== 0 || fetchedHead !== snapshot.revision) {
+      throw new Error(`Backlog retirement repository ${repositoryRoot} fetched ${fetchedHead || "no revision"}, not exact source ${snapshot.revision}`);
+    }
+    for (const ref of [snapshot.publicationRef, trackingRef]) {
+      const current = runner.run("git", ["-C", repositoryRoot, "rev-parse", "--verify", "--quiet", ref], { cwd: repositoryRoot, allowFailure: true });
+      if (current.status !== 0) continue;
+      const observed = current.stdout.trim();
+      if (observed !== snapshot.revision) {
+        const ancestor = runner.run("git", ["-C", repositoryRoot, "merge-base", "--is-ancestor", observed, snapshot.revision], { cwd: repositoryRoot, allowFailure: true });
+        if (ancestor.status !== 0) {
+          throw new Error(`independent Backlog source ${repositoryRoot}:${ref} contains unpublished or divergent history at ${observed}; refusing guarded retirement`);
+        }
+      }
+      retirements.push({ repositoryRoot, ref, expectedHead: observed });
+    }
+  }
+  return retirements;
+}
+
 function deleteBacklogSource(snapshot: BacklogSnapshot, runner: CommandRunner): void {
   verifyBacklogDeletionIdentity(snapshot);
   if (snapshot.repositoryRoot !== snapshot.projectRoot) {
-    if (!snapshot.publicationRemote || snapshot.publicationRef !== TASK_HISTORY_REF) {
-      throw new Error("independent Backlog source has no exact canonical task-history publication authority for guarded retirement");
-    }
-    const localTaskHead = runner.run("git", ["-C", snapshot.repositoryRoot, "rev-parse", "--verify", "--quiet", snapshot.publicationRef], { cwd: snapshot.repositoryRoot, allowFailure: true });
-    const trackingRef = `refs/remotes/${snapshot.publicationRemote}/${TASK_HISTORY_REF.slice("refs/heads/".length)}`;
-    const localTrackingHead = runner.run("git", ["-C", snapshot.repositoryRoot, "rev-parse", "--verify", "--quiet", trackingRef], { cwd: snapshot.repositoryRoot, allowFailure: true });
-    for (const [label, result] of [[snapshot.publicationRef, localTaskHead], [trackingRef, localTrackingHead]] as const) {
-      if (result.status === 0 && result.stdout.trim() !== snapshot.revision) {
-        throw new Error(`independent Backlog source ${label} advanced to ${result.stdout.trim()} before guarded retirement`);
-      }
-    }
+    const retirements = safeBacklogRefRetirements(snapshot, runner);
+    const publicationRef = snapshot.publicationRef!;
+    const publicationRemote = snapshot.publicationRemote!;
     runRequired(
       runner,
       "git",
-      ["-C", snapshot.repositoryRoot, "push", `--force-with-lease=${snapshot.publicationRef}:${snapshot.revision}`, snapshot.publicationRemote, `:${snapshot.publicationRef}`],
+      ["-C", snapshot.repositoryRoot, "push", `--force-with-lease=${publicationRef}:${snapshot.revision}`, publicationRemote, `:${publicationRef}`],
       snapshot.repositoryRoot,
       "retire exact Backlog source task-history publication",
     );
     const retained = runner.run(
       "git",
-      ["-C", snapshot.repositoryRoot, "ls-remote", "--exit-code", "--refs", snapshot.publicationRemote, snapshot.publicationRef],
+      ["-C", snapshot.repositoryRoot, "ls-remote", "--exit-code", "--refs", publicationRemote, publicationRef],
       { cwd: snapshot.repositoryRoot, allowFailure: true },
     );
     if (retained.status === 0 || retained.stdout.trim()) throw new Error("Backlog source task-history publication still exists after guarded retirement");
-    for (const ref of [snapshot.publicationRef, trackingRef]) {
-      const current = runner.run("git", ["-C", snapshot.repositoryRoot, "rev-parse", "--verify", "--quiet", ref], { cwd: snapshot.repositoryRoot, allowFailure: true });
+    for (const retirement of retirements) {
+      const current = runner.run("git", ["-C", retirement.repositoryRoot, "rev-parse", "--verify", "--quiet", retirement.ref], { cwd: retirement.repositoryRoot, allowFailure: true });
       if (current.status !== 0) continue;
-      if (current.stdout.trim() !== snapshot.revision) {
-        throw new Error(`independent Backlog source ${ref} changed to ${current.stdout.trim()} during guarded retirement`);
+      if (current.stdout.trim() !== retirement.expectedHead) {
+        throw new Error(`independent Backlog source ${retirement.repositoryRoot}:${retirement.ref} changed to ${current.stdout.trim()} during guarded retirement`);
       }
-      runRequired(runner, "git", ["-C", snapshot.repositoryRoot, "update-ref", "-d", ref, snapshot.revision], snapshot.repositoryRoot, `retire exact local Backlog source ref ${ref}`);
+      runRequired(
+        runner, "git", ["-C", retirement.repositoryRoot, "update-ref", "-d", retirement.ref, retirement.expectedHead],
+        retirement.repositoryRoot, `retire exact local Backlog source ref ${retirement.ref}`,
+      );
     }
   }
   const store = snapshot.evidence.storeDir!;
