@@ -940,3 +940,50 @@ may one guarded native transition publish `done` with a truthful final note
 naming the authorized tuple and code outcome. Failure preserves exact evidence;
 there is no retry, force, replay, custom publisher, receipt, snapshot, or new
 transaction. Beads abandonment and cleanup now use only existing native/Git boundaries. Successful merge stays custom native `done`. Explicit abandonment uses supported built-in `closed` plus an exact task/Episode-head `close_reason`, one non-force publication, and complete raw/history proof; `closed` is never mapped to canonical `Done`. Separately confirmed `finalize_task_episode` verifies the current published native outcome, code inclusion or exclusion, direct-remote heads, and ancestry before binding `cleanupHead`, removing only the idle Episode runtime/worktree/local branch, and marking ownership inactive last. The shared Beads store/server/history and unrelated owners survive. Migration/cutover and provider-independent task-history changes remain outside this slice.
+
+### Explicit selected-provider migration (AC18/19)
+
+The existing initialization/upgrade adapter now exposes a read-only
+`switch-request` and an explicit `switch-confirm`; migration is not a general
+tracker command. Inspection captures the selected Backlog or Beads source's
+exact native revision, canonical digest, complete open/closed/archived counts,
+active version-2 ownership count, semantic-placement prompt, and literal
+confirmation text. It performs no destination initialization, receipt write,
+ownership update, or source mutation.
+
+Confirmation binds that exact revision, a named actor, non-empty managed
+semantic-placement prose, and literal operator approval. Backlog source capture
+retains each committed Markdown file, full Git history with actor/timestamp and
+binary changes, and the native structured view. Archived Markdown is moved only
+inside a disposable clone of the exact revision so the native Backlog reader can
+interpret it; live source bytes never move. Beads source capture uses the clean,
+directly published Dolt revision and retains complete long/comment views,
+native history, provenance, and relationship rows. Pair-specific native create
+paths project exact equivalent fields and use the supplied managed prose only
+for non-equivalent placement. Safe source IDs are reused; every generated ID is
+recorded by an immutable mapping. Deterministic re-reads prove every destination
+task, count, relationship, mapping, raw source package, and published revision.
+
+The final target-native decision/provenance record (Beads) or receipt task and
+history commit (Backlog) is the only durable migration artifact. It binds source
+and target providers, revisions, digests, complete counts and mappings, actor,
+semantic-placement prose, and cutover timestamp. Only after destination proof
+does one atomic registry mutation remap active version-2 records. It preserves
+the exact owner, operation, code base/head, worktree, branch, Episode/session,
+runtime route, resource, and creation identity while replacing only
+provider-native task binding/evidence using the verified mapping. Missing
+mappings, foreign/provider drift, collisions, or concurrent registry changes
+refuse without a partial write; exact rollback is attempted before cutover if a
+later pre-cutover proof fails.
+
+A second source revision/digest/count proof and a fresh target publication proof
+precede deletion. Backlog-to-Beads initializes an excluded `--stealth` store so
+Beads setup cannot advance the still-authoritative code-backed Backlog revision.
+Deletion uses provider-native stop/removal plus the provider's existing history
+publication surface, then proves source absence and sole target selection. Any
+pre-cutover error keeps source authority and reports exact source-preserving
+cleanup or same-destination retry conditions. There is no duplicate target,
+automatic retry, dual write, mirror, universal task model, provider-selection
+file, sidecar receipt, persistent lock, coordinator, phase file, checkpoint, or
+resume state. The real `PRIMECLAW-43.1` repository migration remains separately
+operator-confirmed; this candidate and its tests use only disposable stores.

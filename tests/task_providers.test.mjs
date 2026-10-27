@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -566,6 +566,49 @@ test("registered linked worktree resolves the primary Beads authority and reads 
       assert.ok(call, `missing native linked-worktree call: bd ${args.join(" ")}`);
       assert.equal(call.cwd, fixture.linked);
     }
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("canonical-primary Beads cutover ignores only stale linked Backlog snapshot evidence", () => {
+  const fixture = linkedWorktreeFixture();
+  try {
+    writeBacklogFolderConfig(fixture.linked);
+    writeBacklogFolderConfig(fixture.primary);
+    const context = linkedBeadsContext(fixture.primary, fixture.linked);
+    const runner = linkedBeadsRunner({ stdout: JSON.stringify(context) + "\n", stderr: "", status: 0 });
+    const duringMaintenance = detectTaskProvider(fixture.linked, runner);
+    assert.equal(duringMaintenance.kind, "blocked");
+    assert.equal(duringMaintenance.code, "dual-providers");
+    rmSync(join(fixture.primary, "backlog"), { recursive: true, force: true });
+    const detection = detectTaskProvider(fixture.linked, runner);
+    assert.equal(detection.kind, "selected");
+    assert.equal(detection.evidence.provider, "beads");
+    assert.equal(detection.evidence.storeDir, join(fixture.primary, ".beads"));
+    assert.equal(existsSync(join(fixture.linked, "backlog", "config.yml")), true);
+    assert.equal(existsSync(join(fixture.primary, "backlog", "config.yml")), false);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("canonical-primary Backlog cutover ignores only stale linked Beads snapshot evidence", () => {
+  const fixture = linkedWorktreeFixture();
+  try {
+    writeBacklogFolderConfig(fixture.primary);
+    writeBacklogFolderConfig(fixture.linked);
+    const context = linkedBeadsContext(fixture.primary, fixture.linked);
+    const runner = linkedBeadsRunner({ stdout: JSON.stringify(context) + "\n", stderr: "", status: 0 });
+    const duringMaintenance = detectTaskProvider(fixture.linked, runner);
+    assert.equal(duringMaintenance.kind, "blocked");
+    assert.equal(duringMaintenance.code, "dual-providers");
+    rmSync(join(fixture.primary, ".beads"), { recursive: true, force: true });
+    const detection = detectTaskProvider(fixture.linked, runner);
+    assert.equal(detection.kind, "selected");
+    assert.equal(detection.evidence.provider, "backlog");
+    assert.equal(existsSync(join(fixture.linked, ".beads", "metadata.json")), true);
+    assert.equal(existsSync(join(fixture.primary, ".beads")), false);
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }

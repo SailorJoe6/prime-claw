@@ -194,6 +194,17 @@ Beads' raw living `design`, publishes native `In Planning`, proves the exact
 provider result, and stops for a separate operator review. Beads carries no task
 path or mirrored task model. Specification approval authorizes planning only.
 
+Provider choice is not permanent, but it changes only through a separate,
+explicit initialization/upgrade maintenance window. A read-only inspection
+binds the current source revision and complete open/closed/archived inventory.
+A confirmed Backlog↔Beads switch then uses native histories and creates, maps,
+publishes, and re-reads every task before one destination-native receipt remaps
+active version-2 ownership. The same Episode, session, worktree, branch, runtime,
+and resources continue. The source stays authoritative until a second exact
+proof, and is deleted only after destination activation; any pre-cutover
+failure preserves the source and never starts a duplicate, retry loop, mirror,
+or dual write.
+
 The primary implementation boundary is the active `/implement-task TASK-ID`
 path. It resolves one exact approved `In Planning` task, performs the final
 semantic readiness check, commits its transition to `In Progress`, reserves

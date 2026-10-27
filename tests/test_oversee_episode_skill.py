@@ -219,9 +219,9 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
 
     assert (
         "The Episode implements approved code, documentation, and tests in its isolated worktree "
-        "and exclusively owns bound task content in the selected branch-local or independent "
-        "nested store. The Conversation exclusively owns lifecycle status on canonical main or "
-        "its primary nested task store"
+        "and exclusively owns bound task content in the selected branch-local Backlog, independent "
+        "Backlog, or published Beads store. The Conversation exclusively owns lifecycle status and "
+        "review through canonical code plus the selected provider's primary native history"
     ) in future
     assert "The Episode edits only its bound task content" not in future
 
@@ -234,9 +234,9 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
     traceability = " ".join(TRACEABILITY.read_text().split())
     assert (
         "A task-native Episode implements approved code, documentation, and tests in its isolated "
-        "worktree, exclusively owns the bound task's content in the selected branch-local or "
-        "independent nested store, publishes independent task commits separately from code, and "
-        "leaves lifecycle status to the Conversation"
+        "worktree, exclusively owns the bound task's content in the selected branch-local Backlog, "
+        "independent Backlog, or published Beads store, publishes provider-native task history "
+        "separately from code, and leaves lifecycle status to the Conversation"
     ) in traceability
     assert "A task-bound Episode edits only its exact Backlog task content" not in traceability
     assert "retained version-1 compatibility folder Episodes keep their plan workflow" in traceability

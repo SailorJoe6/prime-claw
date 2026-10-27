@@ -11,13 +11,19 @@ import {
 } from "../extension-support/project-initialization.ts";
 import { prepareTaskHistoryWorkspace } from "../extension-support/task-history-workspace.ts";
 import {
+  inspectTaskProviderMigration,
+  migrateTaskProvider,
+  type ProviderMigrationInspection,
+  type ProviderMigrationResult,
+} from "../extension-support/task-provider-migration.ts";
+import {
   finishTemplateReview,
   recoverTemplateReview,
   requestTemplateReview,
   startTemplateReview,
 } from "../extension-support/template-review.ts";
 
-type Action = "reconcile" | "accept-override" | "reset" | "review-request" | "review-start" | "review-complete" | "review-cancel" | "review-restore" | "review-keep";
+type Action = "reconcile" | "accept-override" | "reset" | "review-request" | "review-start" | "review-complete" | "review-cancel" | "review-restore" | "review-keep" | "switch-request" | "switch-confirm";
 
 export function summarizeReconcile(result: ReconcileResult, detailed = false): string {
   if (result.skippedActiveEpisode) {
@@ -77,6 +83,18 @@ function actionSummary(value: unknown, detailed = true): string {
     return `Prime Claw review restored cleanly; ${(value as any).fallback} fallback:
 ${diff}`;
   }
+  if (value && typeof value === "object" && (value as any).status === "ready" && "sourceRevision" in (value as any)) {
+    const migration = value as ProviderMigrationInspection;
+    return `Prime Claw provider-switch inspection ready: ${migration.sourceProvider}->${migration.targetProvider} source=${migration.sourceRevision} digest=${migration.sourceDigest} tasks(open=${migration.taskCounts.open},closed=${migration.taskCounts.closed},archived=${migration.taskCounts.archived},total=${migration.taskCounts.total}) active-owners=${migration.activeOwnership.length}. Semantic placement: ${migration.semanticPlacementPrompt} Confirmation: ${migration.confirmation}`;
+  }
+  if (value && typeof value === "object" && (value as any).status === "completed" && "receipt" in (value as any)) {
+    const migration = value as Extract<ProviderMigrationResult, { status: "completed" }>;
+    return `Prime Claw provider switch completed: ${migration.receipt.sourceProvider}->${migration.receipt.targetProvider} source=${migration.receipt.sourceRevision} destination=${migration.receipt.destinationReceiptRevision} receipt=${migration.receiptTaskId} source-absent=true`;
+  }
+  if (value && typeof value === "object" && (value as any).status === "blocked" && "code" in (value as any) && "targetProvider" in (value as any)) {
+    const migration = value as Extract<ProviderMigrationResult, { status: "blocked" }>;
+    return `Prime Claw provider switch blocked (${migration.code}): ${migration.detail}; ${migration.remediation}`;
+  }
   return "Prime Claw initialization action completed";
 }
 
@@ -88,7 +106,21 @@ function toolResult(value: unknown, text?: string, isError = false) {
   };
 }
 
-type ProjectInitializationDependencies = Omit<ReconcileOptions, "cwd" | "registerOrca" | "requireOrcaRegistration">;
+type ProjectInitializationDependencies = Omit<ReconcileOptions, "cwd" | "registerOrca" | "requireOrcaRegistration"> & {
+  migrationInspector?: typeof inspectTaskProviderMigration;
+  migrationRunner?: typeof migrateTaskProvider;
+};
+
+interface ActionArguments {
+  assetId?: string;
+  ready: boolean;
+  visible: boolean;
+  targetProvider?: "backlog" | "beads";
+  expectedSourceRevision?: string;
+  confirmedSwitch: boolean;
+  actor?: string;
+  semanticPlacement?: string;
+}
 
 function productionReconcileOptions(dependencies: ProjectInitializationDependencies) {
   return {
@@ -97,33 +129,71 @@ function productionReconcileOptions(dependencies: ProjectInitializationDependenc
   };
 }
 
-async function executeAction(action: Action, assetId: string | undefined, ready: boolean, visible: boolean, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies) {
+async function executeAction(action: Action, args: ActionArguments, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies) {
   switch (action) {
     case "reconcile": return reconcilePrimeClawProject({
       ...productionReconcileOptions(dependencies), cwd: ctx.cwd, registerOrca: true, legacyInventoryMode: "initialize",
     });
     case "accept-override":
-      if (!assetId) throw new Error("accept-override requires assetId");
-      return { assetId, entry: acceptProjectOverride(ctx.cwd, assetId, dependencies) };
+      if (!args.assetId) throw new Error("accept-override requires assetId");
+      return { assetId: args.assetId, entry: acceptProjectOverride(ctx.cwd, args.assetId, dependencies) };
     case "reset":
-      if (!assetId) throw new Error("reset requires assetId");
-      return { assetId, entry: resetProjectAsset(ctx.cwd, assetId, dependencies) };
+      if (!args.assetId) throw new Error("reset requires assetId");
+      return { assetId: args.assetId, entry: resetProjectAsset(ctx.cwd, args.assetId, dependencies) };
     case "review-request":
-      if (!assetId) throw new Error("review-request requires assetId");
-      return requestTemplateReview(ctx.cwd, assetId, dependencies);
+      if (!args.assetId) throw new Error("review-request requires assetId");
+      return requestTemplateReview(ctx.cwd, args.assetId, dependencies);
     case "review-start":
-      if (!assetId) throw new Error("review-start requires assetId");
-      return startTemplateReview(ctx.cwd, assetId, ready, dependencies);
-    case "review-complete": return finishTemplateReview(ctx.cwd, "complete", visible, dependencies);
+      if (!args.assetId) throw new Error("review-start requires assetId");
+      return startTemplateReview(ctx.cwd, args.assetId, args.ready, dependencies);
+    case "review-complete": return finishTemplateReview(ctx.cwd, "complete", args.visible, dependencies);
     case "review-cancel": return finishTemplateReview(ctx.cwd, "cancel", false, dependencies);
     case "review-restore": return recoverTemplateReview(ctx.cwd, "restore", dependencies);
     case "review-keep": return recoverTemplateReview(ctx.cwd, "keep", dependencies);
+    case "switch-request":
+      if (!args.targetProvider) throw new Error("switch-request requires targetProvider");
+      return (dependencies.migrationInspector ?? inspectTaskProviderMigration)({
+        cwd: ctx.cwd, targetProvider: args.targetProvider, runner: dependencies.runner,
+      });
+    case "switch-confirm":
+      if (!args.targetProvider) throw new Error("switch-confirm requires targetProvider");
+      if (!args.expectedSourceRevision) throw new Error("switch-confirm requires expectedSourceRevision");
+      return (dependencies.migrationRunner ?? migrateTaskProvider)({
+        cwd: ctx.cwd,
+        targetProvider: args.targetProvider,
+        expectedSourceRevision: args.expectedSourceRevision,
+        confirmedSwitch: args.confirmedSwitch,
+        actor: args.actor ?? "",
+        semanticPlacement: args.semanticPlacement ?? "",
+        runner: dependencies.runner,
+      });
   }
 }
 
-function parseCommand(raw: string): { action: Action; assetId?: string; ready: boolean; visible: boolean } {
-  const args = raw.trim() ? raw.trim().split(/\s+/) : [];
-  if (!args.length) return { action: "reconcile", ready: false, visible: false };
+function parseCommand(raw: string): { action: Action; args: ActionArguments } {
+  const values = raw.trim() ? raw.trim().split(/\s+/) : [];
+  const defaults: ActionArguments = { ready: false, visible: false, confirmedSwitch: false };
+  if (!values.length) return { action: "reconcile", args: defaults };
+  if (values[0] === "--switch-request") {
+    if (values.length !== 2 || !["backlog", "beads"].includes(values[1])) throw new Error("usage: /initialize-prime-claw --switch-request <backlog|beads>");
+    return { action: "switch-request", args: { ...defaults, targetProvider: values[1] as "backlog" | "beads" } };
+  }
+  if (values[0] === "--switch-confirm") {
+    if (values.length < 5 || !["backlog", "beads"].includes(values[1])) {
+      throw new Error("usage: /initialize-prime-claw --switch-confirm <backlog|beads> <exact-source-revision> <actor> <semantic-placement-prose>");
+    }
+    return {
+      action: "switch-confirm",
+      args: {
+        ...defaults,
+        targetProvider: values[1] as "backlog" | "beads",
+        expectedSourceRevision: values[2],
+        actor: values[3],
+        semanticPlacement: values.slice(4).join(" "),
+        confirmedSwitch: true,
+      },
+    };
+  }
   const actions: Record<string, Action> = {
     "--accept-override": "accept-override",
     "--reset": "reset",
@@ -134,9 +204,9 @@ function parseCommand(raw: string): { action: Action; assetId?: string; ready: b
     "--review-restore": "review-restore",
     "--review-keep": "review-keep",
   };
-  const action = actions[args[0]];
-  if (!action || args.length > 2) throw new Error("usage: /initialize-prime-claw [--accept-override|--reset|--review|--review-ready <asset-id>|--review-complete|--review-cancel|--review-restore|--review-keep]");
-  return { action, assetId: args[1], ready: action === "review-start", visible: action === "review-complete" };
+  const action = actions[values[0]];
+  if (!action || values.length > 2) throw new Error("usage: /initialize-prime-claw [--accept-override|--reset|--review|--review-ready <asset-id>|--review-complete|--review-cancel|--review-restore|--review-keep|--switch-request <provider>|--switch-confirm <provider> <revision> <actor> <placement>]");
+  return { action, args: { ...defaults, assetId: values[1], ready: action === "review-start", visible: action === "review-complete" } };
 }
 
 export function createProjectInitializationExtension(dependencies: ProjectInitializationDependencies = {}) {
@@ -147,7 +217,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
       handler: async (args, ctx) => {
         try {
           const parsed = parseCommand(args);
-          const value = await executeAction(parsed.action, parsed.assetId, parsed.ready, parsed.visible, ctx, dependencies);
+          const value = await executeAction(parsed.action, parsed.args, ctx, dependencies);
           ctx.ui.notify(actionSummary(value), "info");
         } catch (error) {
           ctx.ui.notify(`Prime Claw initialization failed: ${error instanceof Error ? error.message : String(error)}`, "error");
@@ -158,7 +228,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
     pi.registerTool({
       name: "initialize_prime_claw",
       label: "Initialize Prime Claw project",
-      description: "Initialize or safely reconcile Prime Claw project templates, accept/reset an exact asset, or drive the explicitly confirmed template-review lifecycle.",
+      description: "Initialize or safely reconcile Prime Claw project templates, review an exact asset, or inspect and explicitly confirm one selected-provider migration.",
       promptSnippet: "Initialize or reconcile Prime Claw assets in the current Git project",
       promptGuidelines: [
         "Use initialize_prime_claw action=reconcile for explicit initialization or upgrade; it never commits. The first explicit run records the exact unfinished retained-legacy specification allowlist, and later runs never enroll or rebaseline legacy specifications.",
@@ -167,22 +237,39 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
         "Call review-complete only after visible confirmation and explicit completion; call review-cancel on cancellation. Never invoke Computer Use, Accessibility, or another GUI-control surface.",
         "Use review-restore or review-keep only for an interrupted review after an explicit operator decision.",
         "Accepting an override or resetting an asset is an explicit content decision; never infer it from silence.",
+        "For a provider switch, call switch-request first. Present the exact source provider/revision/counts, the bounded maintenance window, destructive source deletion, and the semantic-placement prompt. Do not call switch-confirm until the operator explicitly confirms that exact switch and all task mutation is quiesced.",
+        "switch-confirm must repeat the exact inspected source revision, target provider, truthful actor, and concise managed semantic-placement prose. Use disposable fixtures for candidate validation; never migrate a live repository without separate explicit operator authority.",
+        "The switch is one linear native operation: source stays intact and authoritative through destination verification and receipt publication; existing active version-2 Episode identities are preserved; source deletion happens only after exact ownership cutover proof. Never retry transport automatically or create a second destination.",
       ],
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
-          action: { type: "string", enum: ["reconcile", "accept-override", "reset", "review-request", "review-start", "review-complete", "review-cancel", "review-restore", "review-keep"] },
+          action: { type: "string", enum: ["reconcile", "accept-override", "reset", "review-request", "review-start", "review-complete", "review-cancel", "review-restore", "review-keep", "switch-request", "switch-confirm"] },
           assetId: { type: "string", description: "Exact stable asset ID for asset-specific actions" },
           confirmedReady: { type: "boolean", description: "True only after the operator explicitly said ready" },
           visibleConfirmed: { type: "boolean", description: "True only after the operator confirmed the focused comparison is visible" },
+          targetProvider: { type: "string", enum: ["backlog", "beads"], description: "Exact requested destination for a provider-switch inspection or confirmation" },
+          expectedSourceRevision: { type: "string", description: "Exact source revision returned by switch-request" },
+          confirmedSwitch: { type: "boolean", description: "True only after the operator explicitly confirmed this exact one-way switch and source deletion" },
+          actor: { type: "string", description: "Operator-approved actor recorded in the destination-native receipt" },
+          semanticPlacement: { type: "string", description: "Managed LLM decision for human-facing placement of non-equivalent native fields; it never authorizes omission" },
         },
         required: ["action"],
         additionalProperties: false,
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
-          const value = await executeAction(params.action as Action, params.assetId, params.confirmedReady === true, params.visibleConfirmed === true, ctx, dependencies);
+          const value = await executeAction(params.action as Action, {
+            assetId: params.assetId,
+            ready: params.confirmedReady === true,
+            visible: params.visibleConfirmed === true,
+            targetProvider: params.targetProvider,
+            expectedSourceRevision: params.expectedSourceRevision,
+            confirmedSwitch: params.confirmedSwitch === true,
+            actor: params.actor,
+            semanticPlacement: params.semanticPlacement,
+          }, ctx, dependencies);
           return toolResult(value, actionSummary(value));
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);

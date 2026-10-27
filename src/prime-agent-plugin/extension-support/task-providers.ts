@@ -397,7 +397,7 @@ function scanBeads(projectRoot: string, runner: CommandRunner): ScanResult {
     return null;
   }
   const unsafeAuthority = authorityIdentities.find((identity) =>
-    identity.entry.isSymbolicLink() || !identity.entry.isFile()
+    !identity.entry || identity.entry.isSymbolicLink() || !identity.entry.isFile()
       || identity.canonicalPath !== join(canonicalStore, identity.name)
       || !containedBy(canonicalStore, identity.canonicalPath)
       || !containedBy(canonicalProjectRoot, identity.canonicalPath));
@@ -563,28 +563,22 @@ function scanLinkedWorktreeBeads(projectRoot: string, runner: CommandRunner): Sc
   }
 
   let linkedDotGit: ReturnType<typeof lstatSync>;
-  let linkedBeadsDir: ReturnType<typeof lstatSync>;
-  let canonicalLinkedBeads: string;
   let commonEntry: ReturnType<typeof lstatSync>;
   let gitDirEntry: ReturnType<typeof lstatSync>;
   try {
     linkedDotGit = lstatSync(join(canonicalLinkedRoot, ".git"));
-    linkedBeadsDir = lstatSync(join(canonicalLinkedRoot, BEADS_DIR));
-    canonicalLinkedBeads = realpathSync(join(canonicalLinkedRoot, BEADS_DIR));
     commonEntry = lstatSync(canonicalCommonDir);
     gitDirEntry = lstatSync(canonicalGitDir);
   } catch {
     return blocked(
-      "Git linked-worktree or local Beads discovery metadata is missing or unreadable",
-      "Restore the registered linked worktree's real `.git` file, checked-out `.beads` metadata directory, and common-directory entries before retrying",
+      "Git linked-worktree discovery metadata is missing or unreadable",
+      "Restore the registered linked worktree's real `.git` file and common-directory entries before retrying",
     );
   }
   const primaryRoot = dirname(canonicalCommonDir);
   const expectedGitDirParent = join(canonicalCommonDir, "worktrees");
   if (canonicalTop !== canonicalLinkedRoot || canonicalGitDir === canonicalCommonDir
       || !linkedDotGit.isFile() || linkedDotGit.isSymbolicLink()
-      || !linkedBeadsDir.isDirectory() || linkedBeadsDir.isSymbolicLink()
-      || canonicalLinkedBeads !== join(canonicalLinkedRoot, BEADS_DIR)
       || !commonEntry.isDirectory() || commonEntry.isSymbolicLink()
       || !gitDirEntry.isDirectory() || gitDirEntry.isSymbolicLink()
       || basename(canonicalCommonDir) !== ".git"
@@ -702,6 +696,19 @@ function scanLinkedWorktreeBeads(projectRoot: string, runner: CommandRunner): Sc
   return primaryBeads;
 }
 
+function linkedPrimaryRoot(projectRoot: string, runner: CommandRunner): string | null {
+  const common = runner.run("git", ["rev-parse", "--git-common-dir"], { cwd: projectRoot, allowFailure: true });
+  if (common.status !== 0 || !common.stdout.trim()) return null;
+  try { return dirname(realpathSync(resolve(projectRoot, common.stdout.trim()))); }
+  catch { return null; }
+}
+
+function linkedPrimaryHasBeadsEvidence(projectRoot: string, runner: CommandRunner): boolean {
+  const primaryRoot = linkedPrimaryRoot(projectRoot, runner);
+  return primaryRoot !== null && (isFile(join(primaryRoot, BEADS_DIR, "metadata.json"))
+    || isFile(join(primaryRoot, BEADS_DIR, "config.yaml")));
+}
+
 /**
  * Detect the repository's sole live task provider from native store evidence.
  * Returns `none` when no valid evidence exists so initialization can default
@@ -714,18 +721,28 @@ export function detectTaskProvider(
 ): TaskProviderDetection {
   const project = resolveNearestProjectRoot(cwd, process.env.HOME ?? "", runner);
   const projectRoot = project.root;
-  const backlog = scanBacklog(projectRoot);
+  let backlog = scanBacklog(projectRoot);
   if (backlog && "blocked" in backlog) return { kind: "blocked", projectRoot, ...backlog.blocked };
 
-  // Preserve every existing Backlog and provider-absent linked-worktree path
-  // exactly. Checked-out Beads authority metadata selects the one new branch;
-  // native context remains the first authority read inside that branch.
-  const linkedBeadsCandidate = project.kind === "linked-worktree" && !backlog
+  // A linked Episode can retain code-tracked bytes for the old provider at its
+  // preserved historical head after an explicit cutover. Canonical primary's
+  // sole live provider is repository-global: ignore the stale linked Backlog
+  // snapshot only when primary has valid Beads and no Backlog, and ignore stale
+  // linked Beads metadata only when primary has valid Backlog and no Beads.
+  // During the dual-store maintenance window ordinary detection stays blocked.
+  const primaryRoot = project.kind === "linked-worktree" ? linkedPrimaryRoot(projectRoot, runner) : null;
+  const primaryBacklog = primaryRoot ? scanBacklog(primaryRoot) : null;
+  if (primaryBacklog && "blocked" in primaryBacklog) return { kind: "blocked", projectRoot, ...primaryBacklog.blocked };
+  const primaryHasBeads = project.kind === "linked-worktree" && linkedPrimaryHasBeadsEvidence(projectRoot, runner);
+  if (primaryHasBeads && !primaryBacklog) backlog = null;
+  const primaryHasSoleBacklog = project.kind === "linked-worktree" && !!primaryBacklog && !primaryHasBeads;
+  const linkedBeadsCandidate = project.kind === "linked-worktree" && !primaryHasSoleBacklog
     && (isFile(join(projectRoot, BEADS_DIR, "metadata.json"))
-      || isFile(join(projectRoot, BEADS_DIR, "config.yaml")));
+      || isFile(join(projectRoot, BEADS_DIR, "config.yaml"))
+      || primaryHasBeads);
   const beads = linkedBeadsCandidate
     ? scanLinkedWorktreeBeads(projectRoot, runner)
-    : scanBeads(projectRoot, runner);
+    : primaryHasSoleBacklog ? null : scanBeads(projectRoot, runner);
   if (beads && "blocked" in beads) return { kind: "blocked", projectRoot, ...beads.blocked };
   if (backlog && beads) {
     const backlogPath = (backlog.evidence as BacklogProviderEvidence).configPath;
@@ -931,7 +948,7 @@ function parseJSONRecordCommand(
   }
 }
 
-function normalizedDoltGitRemote(url: string): string | null {
+export function normalizedDoltGitRemote(url: string): string | null {
   if (!url || url.includes("\0") || /[\r\n]/.test(url)) return null;
   if (/^git\+(?:https?|ssh|file):\/\//.test(url)) return url;
   if (/^(?:https?|ssh|file):\/\//.test(url)) return `git+${url}`;
@@ -973,9 +990,56 @@ export function prepareBeadsWorkspaceTransport(
         : "Use the selected provider or complete an explicit provider migration before preparing Beads transport",
     };
   }
-  const projectRoot = detection.projectRoot;
-  const selected = detection.evidence;
+  return prepareSelectedBeadsWorkspaceTransport(detection.projectRoot, detection.evidence, runner);
+}
 
+/**
+ * Prove one exact canonical-primary Beads store from the primary checkout or
+ * one exact linked Episode while a separately verified Backlog store also
+ * exists during the bounded provider-switch window. This bypasses only
+ * dual-provider selection; it preserves every native authority,
+ * capability, server, revision, cleanliness, remote, and publication proof.
+ */
+export function prepareExplicitBeadsWorkspaceTransport(
+  cwd: string,
+  runner: CommandRunner = new ProcessCommandRunner(),
+): BeadsWorkspaceTransportPreparation {
+  const project = resolveNearestProjectRoot(cwd, process.env.HOME ?? "", runner);
+  const scanned = project.kind === "linked-worktree"
+    ? scanLinkedWorktreeBeads(project.root, runner)
+    : scanBeads(project.root, runner);
+  if (!scanned) {
+    return {
+      status: "blocked",
+      code: "provider-authority",
+      detail: "no explicit Beads store exists in the canonical primary checkout",
+      remediation: "initialize the one intended destination with supported `bd init --server`, or repair the exact source store before retrying",
+    };
+  }
+  if ("blocked" in scanned) {
+    return {
+      status: "blocked",
+      code: "provider-authority",
+      detail: `explicit Beads authority is blocked (${scanned.blocked.code}): ${scanned.blocked.detail}`,
+      remediation: scanned.blocked.remediation,
+    };
+  }
+  if (scanned.evidence.provider !== "beads") {
+    return {
+      status: "blocked",
+      code: "provider-authority",
+      detail: "explicit Beads proof resolved a different provider",
+      remediation: "repair the canonical .beads authority before retrying",
+    };
+  }
+  return prepareSelectedBeadsWorkspaceTransport(project.root, scanned.evidence, runner);
+}
+
+function prepareSelectedBeadsWorkspaceTransport(
+  projectRoot: string,
+  selected: BeadsProviderEvidence,
+  runner: CommandRunner,
+): BeadsWorkspaceTransportPreparation {
   let capabilities: ProviderCapabilities;
   try {
     capabilities = checkBeadsCapabilities(projectRoot, runner);
@@ -1005,7 +1069,7 @@ export function prepareBeadsWorkspaceTransport(
     && context.backend === "dolt"
     && context.bd_version === capabilities.version
     && context.database === selected.doltDatabase
-    && typeof context.repo_root === "string" && resolve(context.repo_root) === projectRoot
+    && typeof context.repo_root === "string" && resolve(context.repo_root) === dirname(selected.storeDir)
     && typeof context.cwd_repo_root === "string" && resolve(context.cwd_repo_root) === projectRoot
     && typeof context.beads_dir === "string" && resolve(context.beads_dir) === selected.storeDir;
   if (!contextMatches) {

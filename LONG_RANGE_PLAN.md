@@ -160,8 +160,8 @@ validated as an isolated candidate, and explicit apply/check tooling updates the
 one global lab copy only at an accepted deployment checkpoint. Neither the
 builder nor a managed project keeps a project-local copy while that global
 installation is active. The final sandbox uses the same
-environment-global placement inside its isolated home. In both stages the universal agent ensures every managed project has Backlog
-state, regular customizable skills under `.agents/skills/`, and lifecycle-only
+environment-global placement inside its isolated home. In both stages the universal agent ensures every managed project has one selected
+Backlog or Beads task provider, regular customizable skills under `.agents/skills/`, and lifecycle-only
 customizable workflows under `.prime-claw/workflows/`, reconciled without
 overwriting project changes. The generic plugin keeps existing `.ralph/plans/`
 trees available only to initialized projects still using the ordered version-1
@@ -182,8 +182,8 @@ builder repository removes its own tree at the final task-native cutover.
 - **4b — episode mechanics.** `/implement-task TASK-ID` now creates a
   worktree-rooted Episode from one meaningful provider-native plan and
   exact-task ownership. `handoff_task_episode` continues that exact durable
-  session. Conversation instructions use ordinary Git and Backlog for review
-  outcomes; cleanup-only `finalize_task_episode` handles separately authorized
+  session. Conversation instructions use ordinary Git and the selected provider's native
+  history for review outcomes; cleanup-only `finalize_task_episode` handles separately authorized
   exact resource removal. Generic
   `/implement-spec <future-folder>` mechanics remain active for retained bundles
   in initialized version-1 projects; they are not this builder
@@ -200,7 +200,10 @@ builder repository removes its own tree at the final task-native cutover.
   merge or abandonment decisions, and separately authorized cleanup.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
   codex/claude-skills project to prime-agent skills without manual copy-paste;
-  dogfood on the ralph repo.
+  dogfood on the ralph repo. The same initialization/upgrade UX inspects and,
+  only after exact operator confirmation, performs one verified Backlog↔Beads
+  task/history migration with active-Episode continuity and a sole
+  destination-native receipt.
 
 Done when: a project conversation has created or revised one provider-native
 `In Design` task through `/design` or `/spec-it-out`, received operator

@@ -413,6 +413,28 @@ Provider-absent/Backlog version-2 outcomes keep their existing ordinary Git and 
 
 Cleanup-only `finalize_task_episode(taskId, episodeHead, outcome, confirmed)` now supports both providers without changing its public signature. Backlog retains its exact pushed `Done` or archived-task proof. Beads pairs clean publication proof around the complete current raw task and accepts only custom `done` plus code in main for `merged`, or built-in `closed` plus the exact abandonment reason and code absent from main for `abandoned`. It also proves code/provider ancestry and direct-remote heads, binds `cleanupHead` plus current factual Beads revision/raw task/code head before removal, removes only the exact idle runtime, linked worktree, and local branch, and marks ownership inactive last. The shared Beads store/server/history and unrelated owners survive. Same-head partial cleanup and inactive replay remain idempotent; unbound missing resources and busy, dirty, foreign, unpublished, rewritten, or wrong-head state fail closed.
 
+## Active Episode continuity during a confirmed provider switch
+
+Provider migration is a separate initialization/upgrade maintenance action, not
+an oversight outcome. Its read-only inspection may report active version-2
+owners but changes nothing. After all destination tasks and their complete
+native histories are published and re-read, the confirmed operation atomically
+replaces only each active owner's provider-native task binding using the proved
+immutable mapping. Owner key, operation, code base/head, Episode/session,
+worktree/branch, runtime route, Orca resources, and timestamps of resource
+creation remain the same. Every active Episode receives the destination store at
+the same proved receipt revision before activation.
+
+Missing mappings, duplicate bindings, provider/task drift, foreign ownership,
+unsafe Episode worktrees, registry drift, or destination publication drift
+refuse before source deletion. If ownership was written and a later pre-cutover
+proof fails, exact compare-and-restore rollback is required; concurrent registry
+change makes that recovery a visible blocker rather than a guessed repair. The
+source stays authoritative until target proof, ownership continuation, a second
+source proof, and activation all succeed. Ordinary handoff, review, merge,
+abandonment, finalization, and cleanup keep their existing authority boundaries
+and continue against the newly selected provider only after cutover.
+
 ## Retained version-1 compatibility finalization
 
 After the operator's terminal decision has been carried out and verified,

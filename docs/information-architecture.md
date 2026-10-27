@@ -15,7 +15,7 @@ prime-claw juggles several genuinely different stores at once:
 - **tracked repository docs** holding shared project/tool knowledge
 - the **agent harness** (prime-agent's continual harness, via `refine`)
   holding agent behavior
-- **Backlog.md** holding issue/task state
+- the selected **task provider** (Backlog or Beads) holding issue/task state
 - **reports** holding synthesized outputs
 
 and could add more (Mnemosyne is a candidate — see below).
@@ -38,7 +38,7 @@ prevent.
 ### High-level: store selection (this repo)
 
 Chooses **between** stores: does this durable candidate belong in the brain,
-the tracked docs, the harness, Backlog.md, or a report? This table is
+the tracked docs, the harness, the selected task provider, or a report? This table is
 **generalizable** — it depends on the *shape* of the stores (a brain, a doc
 tree, an agent harness, an issue tracker, an output folder), not on the
 operator's domain. It is the architecture this repo encodes, and it is what
@@ -70,7 +70,7 @@ These hold for any claw, independent of domain or of which stores exist:
 2. **Stores are typed by the kind of truth they hold, and the types do not
    overlap.** Life/domain truth → brain. Shared project/tool truth → tracked
    docs. Agent behavior → harness. Ephemeral output → reports. Nothing fits →
-   Backlog.md, reluctantly. No durable value → *do nothing*.
+   the selected task provider, reluctantly. No durable value → *do nothing*.
 3. **Recall before write, always.** Search the canonical store; classify the
    candidate `new` / `known` / `stale` / `failed`; read the exact match before
    proposing an update. `known` → skip. `stale` → show the exact diff.
@@ -108,7 +108,7 @@ worked example, *not* prime-claw's binding contract.
 | Stable repository behavior or editing convention | the Prime-visible project instruction/skill location |
 | Evidence-backed runtime behavior, reusable procedure, recurring delegation role | Prime continual harness via `refine` |
 | Temporary session progress, blocker, coordination state | local continual harness via `refine` |
-| Transient operational insight with genuinely no better home | Backlog.md, as a last resort |
+| Transient operational insight with genuinely no better home | selected task provider, as a last resort |
 | No durable value | do nothing |
 
 Note what is *not* in this table: any brain entity type. The table routes
@@ -123,7 +123,7 @@ Any claw with memory needs a single candidate shape with a
 ```yaml
 candidate: <durable statement>
 type: fact | action | preference | artifact | policy | tool-lesson | procedure | delegation
-canonical_store: brain | inbox | sources | reports | repo | harness | backlog | none
+canonical_store: brain | inbox | sources | reports | repo | harness | task-provider | none
 recall_status: new | known | stale | failed
 harness_kind: memory | prompt | skill | subagent | null   # when store = harness
 harness_scope: local | global | null

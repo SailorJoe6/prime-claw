@@ -945,3 +945,83 @@ test("reconcile does not touch the provider seam for an active Episode worktree"
   assert.deepEqual(result.taskProvider,{status:"not-run",reason:"episode-activity"});
   assert.equal(runner.providerInits??0,0);
 });
+
+
+test("initialization UX separates read-only provider-switch inspection from exact explicit confirmation", async () => {
+  const commands = new Map(), tools = new Map(), events = new Map();
+  const calls = [];
+  const pi = {
+    registerCommand(name, value) { commands.set(name, value); },
+    registerTool(tool) { tools.set(tool.name, tool); },
+    on(name, handler) { events.set(name, handler); },
+  };
+  createProjectInitializationExtension({
+    migrationInspector(input) {
+      calls.push({ kind: "inspect", input });
+      return {
+        status: "ready", projectRoot: "/fixture", sourceProvider: "backlog", targetProvider: input.targetProvider,
+        sourceRevision: "a".repeat(40), sourceDigest: "b".repeat(64),
+        taskCounts: { open: 2, closed: 1, archived: 1, total: 4 }, activeOwnership: [],
+        semanticPlacementPrompt: "decide native placement", confirmation: "confirm exact destructive switch",
+      };
+    },
+    migrationRunner(input) {
+      calls.push({ kind: "run", input });
+      if (!input.confirmedSwitch) return { status: "blocked", code: "confirmation-required", detail: "not confirmed", remediation: "confirm", targetProvider: input.targetProvider };
+      return {
+        status: "completed", receiptTaskId: "RECEIPT-1", sourceAbsent: true, selectedProvider: input.targetProvider,
+        receipt: {
+          schemaVersion: 1, marker: "prime-claw-task-provider-migration-receipt-v1",
+          sourceProvider: "backlog", targetProvider: input.targetProvider, sourceRevision: input.expectedSourceRevision,
+          sourceDigest: "b".repeat(64), destinationDataRevision: "c".repeat(32), destinationDataDigest: "d".repeat(64),
+          destinationReceiptRevision: "e".repeat(32), taskCounts: { open: 2, closed: 1, archived: 1, total: 4 },
+          mappings: [], ownershipTransitions: [], actor: input.actor, timestamp: "2026-10-27T12:00:00.000Z",
+          semanticPlacement: input.semanticPlacement,
+        },
+      };
+    },
+  })(pi);
+  const notices = [];
+  const ctx = { cwd: "/fixture", ui: { notify(message, level) { notices.push({ message, level }); } } };
+  const tool = tools.get("initialize_prime_claw");
+  const inspected = await tool.execute("inspect", { action: "switch-request", targetProvider: "beads" }, undefined, undefined, ctx);
+  assert.equal(inspected.isError, undefined);
+  assert.match(inspected.content[0].text, /backlog->beads/);
+  assert.match(inspected.content[0].text, /tasks\(open=2,closed=1,archived=1,total=4\)/);
+  assert.match(inspected.content[0].text, /digest=b{64}/);
+  assert.match(inspected.content[0].text, /Semantic placement: decide native placement/);
+  assert.equal(calls.length, 1);
+  const unconfirmed = await tool.execute("blocked", {
+    action: "switch-confirm", targetProvider: "beads", expectedSourceRevision: "a".repeat(40),
+    confirmedSwitch: false, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
+  }, undefined, undefined, ctx);
+  assert.match(unconfirmed.content[0].text, /confirmation-required/);
+  const completed = await tool.execute("confirm", {
+    action: "switch-confirm", targetProvider: "beads", expectedSourceRevision: "a".repeat(40),
+    confirmedSwitch: true, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
+  }, undefined, undefined, ctx);
+  assert.equal(completed.isError, undefined);
+  assert.match(completed.content[0].text, /source-absent=true/);
+  assert.deepEqual(calls.map((call) => call.kind), ["inspect", "run", "run"]);
+  assert.equal(calls[2].input.confirmedSwitch, true);
+  assert.equal(calls[2].input.expectedSourceRevision, "a".repeat(40));
+  assert.equal(calls[2].input.semanticPlacement, "keep unsupported fields in native metadata");
+});
+
+test("provider-switch slash confirmation requires exact revision actor and semantic placement", async () => {
+  const commands = new Map(), tools = new Map(), notices = [], calls = [];
+  createProjectInitializationExtension({
+    migrationInspector(input) { calls.push({ kind: "inspect", input }); return { status: "blocked", code: "fixture", detail: "fixture", remediation: "fixture" }; },
+    migrationRunner(input) { calls.push({ kind: "run", input }); return { status: "blocked", code: "fixture", detail: "fixture", remediation: "fixture" }; },
+  })({ registerCommand(name, value) { commands.set(name, value); }, registerTool(name) { tools.set(name.name, name); }, on() {} });
+  const ctx = { cwd: "/fixture", ui: { notify(message, level) { notices.push({ message, level }); } } };
+  await commands.get("initialize-prime-claw").handler("--switch-request beads", ctx);
+  assert.equal(calls[0].kind, "inspect");
+  await commands.get("initialize-prime-claw").handler(`--switch-confirm beads ${"a".repeat(40)} operator preserve exact unsupported fields in destination metadata`, ctx);
+  assert.equal(calls[1].kind, "run");
+  assert.equal(calls[1].input.confirmedSwitch, true);
+  assert.equal(calls[1].input.actor, "operator");
+  assert.equal(calls[1].input.semanticPlacement, "preserve exact unsupported fields in destination metadata");
+  await commands.get("initialize-prime-claw").handler("--switch-confirm beads", ctx);
+  assert.match(notices.at(-1).message, /usage:/);
+});

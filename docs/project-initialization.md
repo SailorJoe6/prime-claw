@@ -2,8 +2,10 @@
 
 Prime Claw installs one global plugin generation and keeps project policy as
 regular, tracked, customizable files. `/initialize-prime-claw` and the
-model-callable `initialize_prime_claw` tool call the same deterministic
-reconciler. They never stage or commit files.
+model-callable `initialize_prime_claw` tool expose the same initialization and
+upgrade UX. Template reconciliation never stages or commits files. An explicit,
+confirmed task-provider switch is a separate maintenance operation described
+below and uses each provider's native publication history.
 
 ## Asset inventory
 
@@ -145,6 +147,83 @@ A terminal tracked-file `git diff -- <path>` result is the fallback
 when Orca cannot open the comparison. The restored comparison is returned directly
 in both slash-command and model-callable tool output. Prime Claw does not invoke Orca Computer Use, macOS Accessibility,
 an OS permission prompt, or another GUI-control API for this workflow.
+
+## Confirmed task-provider switch
+
+An initialized project can inspect and then explicitly confirm a one-time switch
+between Backlog and Beads without a second tracker command or durable migration
+coordinator. `/initialize-prime-claw --switch-request <backlog|beads>` is
+read-only. It reports the selected source provider, exact source revision and
+digest, complete open/closed/archived counts, active version-2 ownership count,
+the semantic-placement prompt, and the exact confirmation requirement. It does
+not create a destination, change ownership, or write a receipt.
+
+`/initialize-prime-claw --switch-confirm <provider> <revision> <actor> <semantic-placement-prose>` is itself the explicit confirmation and requires the
+reported source revision, a non-empty actor, and the managed semantic-placement
+prose. The tool equivalent uses `action="switch-confirm"`, `targetProvider`,
+`expectedSourceRevision`, `actor`, `semanticPlacement`, and
+`confirmedSwitch=true`. The confirmed
+maintenance window is one linear operation:
+
+1. capture every source task plus its provider-native bytes or rows, all open,
+   closed, and archived states, relationships, comments, native history,
+   provenance, actor, timestamp, and transition evidence;
+2. create the target through its supported native initialization and create
+   APIs, preserving source IDs when the target accepts them and otherwise
+   recording an immutable source-to-destination mapping;
+3. let the managed model's supplied prose place only fields that have no exact
+   native equivalent, while deterministic code proves counts, projections,
+   relationships, histories, revisions, and mappings;
+4. publish and re-read the complete target, then write one final
+   destination-native migration receipt containing the exact source and target
+   revisions, digests, counts, mappings, actor, semantic-placement record, and
+   cutover time;
+5. atomically remap only active version-2 task bindings in
+   `.prime-claw/ownership.json`, preserving every Episode, session, worktree,
+   branch, operation, runtime route, resource, and provider-native task view;
+6. re-prove the source is unchanged, activate and re-prove the sole target, and
+   remove the source only after every check succeeds. Backlog-to-Beads cutover
+   then publishes Beads' native `.gitignore`, `config.yaml`, `metadata.json`,
+   and `README.md` so the provider choice survives a fresh code checkout; the
+   live Dolt database and runtime files remain provider-managed and ignored.
+
+A preserved active Episode can still have code-tracked bytes for the old
+provider at its historical head after either cutover direction. Those bytes
+remain part of the unchanged code snapshot, not a live provider store.
+Linked-worktree detection ignores stale code-tracked Backlog bytes only after
+canonical primary proves sole Beads authority, and ignores stale code-tracked
+Beads metadata only after canonical primary proves sole Backlog authority.
+Independent nested Backlog source clones are live replicas rather than code
+snapshots, so guarded cutover removes the exact clean source clone from every
+active Episode as well as canonical primary. While canonical primary still
+contains both stores, ordinary task lifecycle mutation remains blocked as an
+incomplete migration.
+
+Backlog archived records are interpreted only in a disposable exact-revision
+clone: their unchanged Markdown is temporarily placed in that clone's active
+corpus so the repository-built Backlog native reader supplies the structured
+view. The live source store remains untouched and authoritative. Beads reads use
+published clean Dolt revision proof, `bd show --long --include-comments`, native
+history, provenance, and relationship queries. Backlog-to-Beads uses an
+untracked (`--stealth`) target store so `bd init` cannot change the still-live
+Backlog code revision.
+
+Before destination creation, every active Episode is re-proved as the exact
+clean, directly published linked code worktree/branch/head in ownership. Its
+branch-local Backlog task bytes or shared provider revision must equal the
+captured source; the check repeats before ownership replacement and at final
+proof.
+
+A pre-cutover failure restores any ownership change, leaves the source intact and
+authoritative, and reports exact cleanup or same-destination retry guidance. It
+never creates a second destination or retries automatically. Source deletion is
+refused on source drift, destination drift, incomplete proof, ownership drift,
+or ambiguous provider selection. There is no dual write, mirror, provider
+selection file, sidecar receipt, persistent lock, phase record, checkpoint, or
+resume state. The final destination-native receipt is the only durable
+migration artifact. Actual migration of a production repository remains an
+operator-authorized upgrade action; initialization and ordinary startup never
+perform it automatically.
 
 ## Global drift
 

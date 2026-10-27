@@ -76,11 +76,42 @@ this repository's applicable policy, overview, development guidance,
 documentation map, and native work commands without flooding context or
 requiring conventional files and tools that the project does not use.**
 
+## US-28 — Switch the selected task provider without losing authority
+
+**As a project operator, I want an explicit, verified task-provider switch in
+the existing upgrade UX, so that every task and its native history survives and
+active Episodes continue with the same identity.**
+
+`switch-request` performs a read-only inventory and returns the exact source
+revision, digest, open/closed/archived counts, active owner count, semantic
+placement prompt, and confirmation text. `switch-confirm` requires that exact
+revision plus an actor, managed semantic-placement prose, and literal operator
+confirmation. It creates the target only through supported native interfaces,
+preserves safe IDs or records immutable mappings, publishes and verifies every
+field, absence, relationship, comment, history, actor, timestamp, transition,
+and provenance record, and writes one final destination-native receipt.
+
+The source remains intact, clean, read-only, and authoritative through complete
+target proof. Every active Episode must also be clean and directly published at
+its recorded code branch/head, with the same branch-local Backlog task bytes or
+the exact shared provider revision; drift blocks before destination creation.
+Active version-2 ownership changes atomically and only after that
+proof; Episode, session, worktree, branch, code/runtime, and resource identity
+remain unchanged. A second source proof, sole-target activation proof, and
+source-absence proof guard deletion. Any pre-cutover failure restores ownership,
+keeps source authority, and reports exact cleanup or same-destination retry
+conditions. There is no automatic retry, duplicate destination, dual write,
+mirror, provider-selection file, sidecar receipt, persistent coordinator, phase,
+checkpoint, or resume state. Production cutover remains a separately confirmed
+operator action and never occurs during startup reconciliation.
+
 ## Primary implementation surfaces
 
 - `extensions/project-initialization.ts`
 - `extension-support/project-initialization.ts`
 - `extension-support/template-review.ts`
+- `extension-support/task-provider-migration.ts`
+- `extension-support/episode-ownership.ts`
 - `skills/project-templates/prepare.md`
 - `asset-inventory.json`
 

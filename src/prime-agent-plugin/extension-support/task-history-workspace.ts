@@ -56,7 +56,7 @@ const CANONICAL_STATUSES = ["In Design", "In Planning", "In Progress", "Blocked"
  * is therefore lifecycle-ready from the first published commit and never
  * returned as an untracked/unpublished local config write.
  */
-function initialTaskStoreConfig(projectName: string): string {
+export function initialTaskStoreConfig(projectName: string): string {
   const statuses = CANONICAL_STATUSES.map((status) => `"${status}"`).join(", ");
   // The full canonical default configuration (the same keys upstream's
   // `backlog init` writes) with the exact ordered lifecycle and

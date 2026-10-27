@@ -25,7 +25,7 @@ outside the current plugin.
 | Group | Lifecycle area | Stories |
 |---|---|---:|
 | [A](A-installation.md) | Install and maintain the plugin | US-01–US-02 |
-| [B](B-project-initialization.md) | Initialize and maintain a project | US-03–US-07 |
+| [B](B-project-initialization.md) | Initialize and maintain a project | US-03–US-07, US-28 |
 | [C](C-specification.md) | Develop a specification | US-08–US-10 |
 | [D](D-planning.md) | Produce and review an implementation plan | US-11–US-12 |
 | [E](E-episode-promotion.md) | Admit an approved task or retained version-1 bundle into an Episode | US-13–US-16 |
@@ -74,7 +74,7 @@ These mechanisms support the stories but are not user outcomes by themselves:
 Likewise, command and tool variants are usually two interfaces to one story.
 The primary task-native lifecycle uses `/plan` with `plan_task`,
 `/implement-task` with `create_task_episode`, and `handoff_task_episode`.
-Conversation review and outcomes use ordinary Git plus the supported Backlog CLI;
+Conversation review and outcomes use ordinary Git plus the selected provider's supported native CLI;
 the cleanup-only `finalize_task_episode` remains the narrow resource boundary. Retained version-1 compatibility
 keeps `/plan-spec` with `plan_spec`, `/implement-spec` with
 `create_spec_episode`, exact blocked recovery with

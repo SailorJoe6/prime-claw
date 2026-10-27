@@ -425,6 +425,125 @@ export function mutateEpisodeOwnership(
   });
 }
 
+export interface ActiveTaskProviderOwnershipDestination {
+  taskId: string;
+  providerRevision: string;
+  taskEvidence: Record<string, unknown>;
+  taskPath?: string;
+}
+
+export interface ActiveTaskProviderOwnershipSwitchInput {
+  sourceProvider: "backlog" | "beads";
+  targetProvider: "backlog" | "beads";
+  switchedAt: string;
+  destinations: Record<string, ActiveTaskProviderOwnershipDestination>;
+}
+
+export interface ActiveTaskProviderOwnershipSwitchResult {
+  before: EpisodeOwnershipRegistry;
+  after: EpisodeOwnershipRegistry;
+  transitions: Array<{
+    ownerSessionId: string;
+    sourceTaskId: string;
+    destinationTaskId: string;
+  }>;
+}
+
+function copiedRegistry(registry: EpisodeOwnershipRegistry): EpisodeOwnershipRegistry {
+  return JSON.parse(JSON.stringify(orderedRegistry(registry))) as EpisodeOwnershipRegistry;
+}
+
+/**
+ * Atomically move every active version-2 binding from one selected provider to
+ * the already-verified destination. Version-1 and inactive historical records
+ * remain byte-for-byte equivalent. The task mapping and complete native target
+ * evidence are supplied by the migration verifier; this function creates no
+ * provider data and changes no Episode resource identity.
+ */
+export function switchActiveTaskProviderOwnership(
+  projectRoot: string,
+  input: ActiveTaskProviderOwnershipSwitchInput,
+): ActiveTaskProviderOwnershipSwitchResult {
+  if (input.sourceProvider === input.targetProvider) throw new Error("task-provider ownership switch requires different providers");
+  if (!input.switchedAt || Number.isNaN(Date.parse(input.switchedAt))) throw new Error("task-provider ownership switch requires an RFC3339 timestamp");
+  return withOwnershipLock(projectRoot, () => {
+    const registry = readEpisodeOwnershipRegistry(projectRoot);
+    const before = copiedRegistry(registry);
+    const transitions: ActiveTaskProviderOwnershipSwitchResult["transitions"] = [];
+    const destinationTaskIds = new Set<string>();
+    const destinationTaskPaths = new Set<string>();
+    for (const [ownerSessionId, record] of Object.entries(registry.owners)) {
+      if (record.status === "inactive" || record.version === 1) continue;
+      const actualProvider = taskEpisodeProvider(record);
+      if (actualProvider !== input.sourceProvider) {
+        throw new Error(`active task Episode ${ownerSessionId} uses ${actualProvider}, not selected source ${input.sourceProvider}`);
+      }
+      const destination = input.destinations[record.taskId];
+      if (!destination) throw new Error(`provider migration has no verified destination mapping for active task ${record.taskId}`);
+      if (input.targetProvider === "backlog" && (!destination.taskPath || !destination.taskPath.trim())) {
+        throw new Error(`provider migration has no verified Backlog task path for active task ${record.taskId}`);
+      }
+      if (destinationTaskIds.has(destination.taskId)) throw new Error(`provider migration destination task ${destination.taskId} is mapped more than once`);
+      destinationTaskIds.add(destination.taskId);
+      if (input.targetProvider === "backlog") {
+        const taskPath = destination.taskPath!.trim();
+        if (destinationTaskPaths.has(taskPath)) throw new Error(`provider migration destination path ${taskPath} is mapped more than once`);
+        destinationTaskPaths.add(taskPath);
+      }
+      const common = { ...record } as Record<string, unknown>;
+      delete common.provider;
+      delete common.taskId;
+      delete common.taskPath;
+      delete common.providerRevision;
+      delete common.taskEvidence;
+      delete common.updatedAt;
+      const next: TaskEpisodeOwnershipRecord = input.targetProvider === "backlog"
+        ? {
+            ...common,
+            version: 2,
+            provider: "backlog",
+            taskId: destination.taskId,
+            taskPath: destination.taskPath ?? "",
+            providerRevision: destination.providerRevision,
+            taskEvidence: destination.taskEvidence,
+            updatedAt: input.switchedAt,
+          } as PublishedBacklogTaskEpisodeOwnershipRecord
+        : {
+            ...common,
+            version: 2,
+            provider: "beads",
+            taskId: destination.taskId,
+            providerRevision: destination.providerRevision,
+            taskEvidence: destination.taskEvidence,
+            updatedAt: input.switchedAt,
+          } as BeadsTaskEpisodeOwnershipRecord;
+      parseEpisodeOwnership(next, `provider migration owner ${ownerSessionId}`);
+      if (next.ownerSessionId !== ownerSessionId) throw new Error("provider migration cannot change the owning Conversation");
+      registry.owners[ownerSessionId] = next;
+      transitions.push({ ownerSessionId, sourceTaskId: record.taskId, destinationTaskId: destination.taskId });
+    }
+    if (transitions.length > 0) persistOwnershipRegistry(projectRoot, registry);
+    return { before, after: copiedRegistry(registry), transitions };
+  });
+}
+
+/** Exact rollback for a failed pre-deletion cutover. No concurrent registry
+ * change is overwritten; a mismatch blocks and leaves current ownership intact. */
+export function restoreTaskProviderOwnershipSwitch(
+  projectRoot: string,
+  switchResult: ActiveTaskProviderOwnershipSwitchResult,
+): EpisodeOwnershipRegistry {
+  return withOwnershipLock(projectRoot, () => {
+    const current = copiedRegistry(readEpisodeOwnershipRegistry(projectRoot));
+    if (JSON.stringify(current) !== JSON.stringify(copiedRegistry(switchResult.after))) {
+      throw new Error("task-provider ownership rollback refused because the registry changed after the switch");
+    }
+    const restored = copiedRegistry(switchResult.before);
+    if (JSON.stringify(restored) !== JSON.stringify(current)) persistOwnershipRegistry(projectRoot, restored);
+    return restored;
+  });
+}
+
 export function writeEpisodeOwnership(projectRoot: string, record: EpisodeOwnershipRecord): void {
   parseEpisodeOwnership(record);
   mutateEpisodeOwnership(projectRoot, record.ownerSessionId, () => record);

@@ -19,23 +19,24 @@ or Episode admission.
 3. Run `/implement-task TASK-ID`. The compact-first readiness chain binds the
    exact task and placement, then calls `create_task_episode` once.
 4. Trusted admission publishes the exact task as `In Progress` in its selected
-   Backlog topology, persists version-2 ownership, and creates one isolated
+   provider-native topology, persists version-2 ownership, and creates one isolated
    Episode from the exact clean code base. Independent task history binds its
    separate published revision/native view. It copies no bundle and creates no
    `.ralph/plans` promotion commit.
 5. The Episode implements approved code, documentation, and tests in its
    isolated worktree and exclusively owns bound task content in the selected
-   branch-local or independent nested store. The Conversation exclusively owns
-   lifecycle status on canonical main or its primary nested task store and review.
-   It uses `handoff_task_episode` for continuation, ordinary Git and Backlog
-   for terminal outcomes, and cleanup-only `finalize_task_episode` for exact
+   branch-local Backlog, independent Backlog, or published Beads store. The
+   Conversation exclusively owns lifecycle status and review through canonical
+   code plus the selected provider's primary native history. It uses
+   `handoff_task_episode` for continuation, ordinary Git plus the selected
+   provider's native CLI for terminal outcomes, and cleanup-only `finalize_task_episode` for exact
    resource removal.
 6. Merge or abandonment requires an explicit operator decision. Destructive
    cleanup requires a separate explicit decision and closes ownership only
    after the exact resources are absent.
 
-The task's supported Backlog fields are the sole durable authority throughout
-this path. Task-native code never falls back to a folder specification.
+The task's complete supported provider-native fields are the sole durable
+authority throughout this path. Task-native code never falls back to a folder specification.
 
 ## Retained version-1 compatibility
 
