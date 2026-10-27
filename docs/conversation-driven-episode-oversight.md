@@ -9,8 +9,10 @@ do not grant product authority.
 ## Authority boundary
 
 The operator alone decides product direction, scope changes, merge,
-abandonment, destructive cleanup, and any future remote transport. The
-Conversation may review evidence, accept an in-scope candidate, record a bounded
+abandonment, and any future remote transport. For task-native ownership, an
+already authorized terminal outcome includes automatic prompt-led exact cleanup
+after commit and push, without separate cleanup confirmation. Retained version-1
+destructive cleanup still requires separate operator authority. The Conversation may review evidence, accept an in-scope candidate, record a bounded
 revision, pause, or consult the operator. It does not implement Episode work.
 A retained version-1 Episode implements only its promoted frozen specification
 and living execution plan. The active specification must match its exact
@@ -124,17 +126,20 @@ concurrent reservation cannot overwrite another Conversation's entry.
 
 Each strict entry persists lifecycle state plus durable owner, authority,
 placement, and resource bindings. The registry is not an event journal and
-stores no review, progress, merge, or abandonment receipts. Version 2 adds only
-an optional `cleanupHead`, bound immediately before separately authorized
-resource deletion so same-head cleanup can resume safely.
+stores no review, progress, merge, or abandonment receipts. Version 2 stores no
+`cleanupHead` or cleanup-progress stage. The parser accepts and discards the old
+optional head marker without migrating or rewriting foreign owners.
 
 An entry is written before its external mutation and updated at genuine external
-boundaries. Active and inactive entries retain exact bindings needed for restart
-recovery and idempotent final bookkeeping. The former per-slug identity
+boundaries. Active entries retain exact bindings needed for restart recovery.
+Version-2 cleanup removes only the unchanged owner entry after all exact resources
+are absent; it leaves no inactive record. Version-1 final bookkeeping retains
+its inactive record and idempotent replay behavior. The former per-slug identity
 directory and transcript oversight markers are retired.
 
-For primary version-2 ownership, a short inter-process admission lock serializes
-only the exact Backlog status edit, task-only commit, and durable reservation.
+For grandfathered branch-local Backlog version-2 ownership, a short inter-process
+admission lock serializes only the exact Backlog status edit, task-only commit,
+and durable reservation.
 The reservation seam re-resolves the exact task, verifies the caller-supplied
 admission commit and a clean task, then writes `provisioning` before releasing
 the lock or starting push, branch, worktree, session, or assignment work. Its
@@ -142,9 +147,11 @@ allocator consumes only that reservation, creates the selected local or Orca
 worktree from `baseRef`, skips bundle promotion, binds one durable exact-CWD
 session, and sends one execute assignment carrying both the task ID and exact
 owning Conversation registry key. The active execute policy treats that task as the sole durable
-authority, permits only Episode-owned content edits through Backlog in the
-Episode worktree, verifies status remains `In Progress`, and reserves every
-lifecycle transition on main for the Conversation.
+authority. The selected provider determines the native content/publication
+contract: branch-local Backlog uses the code branch, independent Backlog uses
+its nested task clone, and Beads uses raw native fields and Dolt publication.
+The Episode preserves native `In Progress`; lifecycle transitions remain
+Conversation-owned through the selected primary native history.
 
 Retained version-1 compatibility ownership keeps its existing folder plan
 workflow. Owned-resource recovery validates exact active resources before
@@ -155,13 +162,15 @@ lifecycle surfaces. Partial provisioning or allocation failure becomes
 `uncertain` and cannot replay fresh. The trusted task-admission
 transaction first proves it is at the repository root of the primary Git
 worktree on `main`; linked worktrees and other branches fail before any task,
-Git, ownership, or allocator mutation. It then commits the exact clean `In
-Planning` task as `In Progress`, reserves from that exact SHA while holding the
-short admission lock, releases the lock before best-effort push and allocation,
-and verifies durable active identity. Proven-clean pre-ownership
-failure commits the task back to `In Planning`; any recorded or uncertain
-mutation commits `Blocked` with its exact recovery condition while retaining
-evidence. Folder admission and close operations explicitly reject version 2;
+Git, ownership, or allocator mutation. Grandfathered Backlog commits the exact clean `In Planning` task as `In Progress`
+and reserves from that exact SHA under the short lock. Independent Backlog
+publishes that status on its disconnected task branch, binding its revision
+and native view separately from the clean code base. Beads publishes one
+guarded native `in_progress` transition and binds its published raw task and
+revision. Allocation follows reservation and verifies durable active identity.
+Proven-clean pre-ownership failure restores native `In Planning`; durable or
+uncertain mutation publishes native `Blocked` with its exact recovery condition
+while retaining evidence. No path retries admission. Folder admission and close operations explicitly reject version 2;
 task-native creation, handoff, lifecycle, and cleanup use their separate public
 surfaces.
 
@@ -331,7 +340,7 @@ through. The tool admits ordinary canonical handoff and queues canonical
 execute as its sole follow-up. Admission is not completion and uncertain
 transport is never retried blindly.
 
-Blocker publication and resume are prompt-led Conversation work. For provider-absent/Backlog version 2, accepting an exact pushed blocker report still runs supported `backlog task edit` on canonical main, verifies the bound ID/path and a one-path diff, commits only that task as `Blocked`, and pushes. After the operator accepts the unblock condition, the same exact-task operation restores `In Progress`, then uses `handoff_task_episode`. The dual-mode blocked skill selects durable ownership before prompt text; active version-2 ownership forces its persisted provider/task mode and never falls back to `.ralph/plans`.
+Blocker publication and resume are prompt-led Conversation work. For grandfathered branch-local Backlog version 2, accepting an exact pushed blocker report still runs supported `backlog task edit` on canonical main, verifies the bound ID/path and a one-path diff, commits only that task as `Blocked`, and pushes. After the operator accepts the unblock condition, the same exact-task operation restores `In Progress`, then uses `handoff_task_episode`. The dual-mode blocked skill selects durable ownership before prompt text; active version-2 ownership forces its persisted provider/task mode and never falls back to `.ralph/plans`.
 
 A Beads report or EXPERT conclusion is evidence, not approval. Current
 synchronized native status, not the older ownership observation, governs. The
@@ -359,11 +368,13 @@ meaningful design. Raw inequality is not an approval boundary: the LLM handles
 compatible changes and escalates genuine semantic, authority, or scope conflicts.
 Guidance never supplies native authority, and no code keeps an artificial
 `in_progress` snapshot. Beads readiness, Request Changes, and `Done` use the same
-guarded native publication proof described below; abandonment, finalization,
-and cleanup remain unavailable. The Conversation never routes through
+guarded native publication proof described below. Abandonment and cleanup use
+the separate native terminal evidence described below, never handoff. The Conversation never routes through
 Backlog-only commands for Beads or writes the ownership registry directly.
 
 Persisted active version-1 ownership keeps its frozen-specification/living-plan pair active while blocked and throughout candidate review or revision. An older blocked snapshot with no active pair is not live: only after an explicit operator unblock decision may the blocked skill call `restore_blocked_spec_episode` for the exact owned future-folder identity. The tool requires the blocked specification to match the accepted inventory digest before either file moves, works without the original future source or a task provider, restores the exact readable pair without clobber or mode fallback, and revalidates the same active identity. No-ownership old in-place blocking remains separate.
+
+Candidate review is evidence-led. Before merge readiness, the Conversation verifies provider-reported idle completion of the exact Episode and explicitly proven descendants using current supported Prime Agent list/state responses. Only explicit recursive parent session ID or canonical parent session-file edges prove descendants; both must agree when present. Shared worktree or RLM metadata proves no ownership. Active or unprovably idle work refuses readiness.
 
 Backlog version-2 ownership has two compatible topologies. Provider-absent or
 explicit Backlog without revision/evidence remains branch-local. Explicit
@@ -383,15 +394,17 @@ Existing ordinary/root/custom Backlog stores never migrate through these paths.
 
 For grandfathered provider-absent/Backlog ownership, `handoff_task_episode` proves canonical primary-main caller context, exact owner/task/path in main and the Episode worktree, committed `In Progress` status, meaningful plans, clean owned worktree, exact Git/Orca and durable-session CWD identity, and quiescence. The Beads branch proves canonical-primary Conversation context, exact active provider/task/operation/base/resource identity, any truthful prior raw lifecycle observation with a meaningful design, an exact current `in_progress` raw design, an idle/quiescent Episode, clean synchronized publication, and a clean pushed current code head; then it records factual current observations and transports exact previous/current native context without a semantic equality gate. Both branches bind both prompts to the exact task and reuse the same resources. Handoff itself performs no status, review, or terminal work.
 
-Candidate review is evidence-led and branches only after exact owner/provider selection. For provider-absent/Backlog, an accepted complete pushed candidate keeps the existing task-only path: supported CLI `Ready for Merge`, exact ID/path/parent/status and one-path proof, commit/push as `mainHead`, then ordinary integration of that main head into the idle Episode while preserving Episode task content plus only the authorized status. The refreshed clean branch is pushed as `candidateHead`. For Beads, no task-file or status commit exists: `mainHead` is the current clean pushed canonical code HEAD. The Conversation ordinarily integrates that head into the clean idle Episode when needed, pushes, and proves exact branch/local/upstream/direct-remote `candidateHead` plus `mainHead` ancestry before lifecycle mutation. It then freshly proves the exact active owner/provider/task, current native `in_progress`, meaningful raw design, clean revision and stable publication ref; performs one guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`; pushes once without force; and proves exact local and isolated-remote raw content, revision, ref, note, preserved unrelated fields, and cleanliness. Both branches show the operator `(taskId, mainHead, candidateHead)`; Beads also shows factual native evidence. Neither a provider revision nor raw task equality becomes merge authority, and there is no custom Ready publisher, receipt, snapshot, digest, or replay protocol.
+Candidate review is evidence-led and branches only after exact owner/provider selection. For grandfathered branch-local Backlog, an accepted complete pushed candidate keeps the existing task-only path: supported CLI `Ready for Merge`, exact ID/path/parent/status and one-path proof, commit/push as `mainHead`, then ordinary integration of that main head into the idle Episode while preserving Episode task content plus only the authorized status. The refreshed clean branch is pushed as `candidateHead`. For Beads, no task-file or status commit exists: `mainHead` is the current clean pushed canonical code HEAD. The Conversation ordinarily integrates that head into the clean idle Episode when needed, pushes, and proves exact branch/local/upstream/direct-remote `candidateHead` plus `mainHead` ancestry before lifecycle mutation. It then freshly proves the exact active owner/provider/task, current native `in_progress`, meaningful raw design, clean revision and stable publication ref; performs one guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`; pushes once without force; and proves exact local and isolated-remote raw content, revision, ref, note, preserved unrelated fields, and cleanliness. Both branches show the operator `(taskId, mainHead, candidateHead)`; Beads also shows factual native evidence. Neither a provider revision nor raw task equality becomes merge authority, and there is no custom Ready publisher, receipt, snapshot, digest, or replay protocol.
 
-Delay changes nothing. Request Changes requires an explicit operator decision and a concrete accepted in-scope finding. Backlog returns only the bound main task to `In Progress`, verifies and commits only that path, pushes, and ordinarily merges current main into the same Episode when needed. It restores the pre-merge Episode task content, applies only the authorized `In Progress` status, lets Git block every other conflict, pushes the refreshed candidate, and then resumes through `handoff_task_episode`. Beads freshly proves current `ready_for_merge`, performs one guarded `--if-status ready_for_merge` update to `in_progress` with a truthful finding note, pushes once without force, proves exact raw/revision/ref/content state, and then hands off the same Episode. Uncertain transport is preserved evidence; it never authorizes retry, force, replay, or replacement resources.
+Delay changes nothing. Request Changes requires an explicit operator decision and a concrete accepted in-scope finding. Grandfathered Backlog returns only the bound main task to `In Progress`, verifies and commits only that path, pushes, and ordinarily merges current main into the same Episode when needed. It restores the pre-merge Episode task content, applies only the authorized `In Progress` status, lets Git block every other conflict, pushes the refreshed candidate, and then resumes through `handoff_task_episode`. Beads freshly proves current `ready_for_merge`, performs one guarded `--if-status ready_for_merge` update to `in_progress` with a truthful finding note, pushes once without force, proves exact raw/revision/ref/content state, and then hands off the same Episode. Uncertain transport is preserved evidence; it never authorizes retry, force, replay, or replacement resources.
 
-Immediately before Merge, the Conversation re-reads ownership and freshly preflights the exact `(taskId, mainHead, candidateHead)` shown to the operator. Canonical main is clean and operation-free, equals upstream/direct remote and `mainHead`; the exact idle Episode is clean, and branch/local/upstream/direct-remote heads all equal `candidateHead`; and `git merge-base --is-ancestor mainHead candidateHead` succeeds. Backlog must still hold the exact bound task at `Ready for Merge` in both checkouts. Beads must freshly prove exact current native `ready_for_merge`, meaningful raw design, clean published revision/ref, and unchanged owner/resources; compatible native advances remain LLM evidence rather than an equality gate. Only explicit operator authority for that exact tuple permits ordinary `git merge --ff-only candidateHead`. The Conversation pushes canonical main normally and proves main/upstream/direct remote equal `candidateHead` before any terminal mutation. Backlog then sets only the exact task to `Done`, verifies/commits/pushes one task path, and rechecks identity/status. Beads instead performs one guarded `--if-status ready_for_merge` update to `done` with a truthful final-outcome note naming the exact tuple and proven code publication, one non-force push, and exact local/remote raw status, note, revision, ref, content, and clean proof. If native `Done` fails after code publication, report the exact state and do not replay the merge or lifecycle mutation. Ownership and resources remain active.
+Immediately before Merge, the Conversation rechecks provider-reported idle completion of the exact Episode and explicitly proven descendants, re-reads ownership, and freshly preflights the exact `(taskId, mainHead, candidateHead)` shown to the operator. Canonical main is clean and operation-free, equals upstream/direct remote and `mainHead`; the exact idle Episode is clean, and branch/local/upstream/direct-remote heads all equal `candidateHead`; and `git merge-base --is-ancestor mainHead candidateHead` succeeds. Backlog must still hold the exact bound task at `Ready for Merge` in both checkouts. Beads must freshly prove exact current native `ready_for_merge`, meaningful raw design, clean published revision/ref, and unchanged owner/resources; compatible native advances remain LLM evidence rather than an equality gate. Only explicit operator authority for that exact tuple permits ordinary `git merge --ff-only candidateHead`. The Conversation pushes canonical main normally and proves main/upstream/direct remote equal `candidateHead` before any terminal mutation. Grandfathered Backlog then sets only the exact task to `Done`, verifies/commits/pushes one task path, and rechecks identity/status. Beads instead performs one guarded `--if-status ready_for_merge` update to `done` with a truthful final-outcome note naming the exact tuple and proven code publication, one non-force push, and exact local/remote raw status, note, revision, ref, content, and clean proof. If native `Done` fails after code publication, report the exact state and do not replay the merge or lifecycle mutation. Ownership and resources remain active until immediate cleanup verifies removal.
 
-Confirmed abandonment is also prompt-led. From clean pushed canonical main, after explicit operator confirmation, the Conversation selects only the bound task file from the exact pushed Episode head, reapplies the non-`Done` status and truthful Final Summary with Backlog, archives the task, verifies only the exact active/archive move and no Episode code, commits, and pushes. Git and Backlog report unsafe intermediate state directly. Ownership and resources remain active.
+Grandfathered Backlog abandonment is also prompt-led. From clean pushed canonical main, after explicit operator confirmation, the Conversation selects only the bound task file from the exact pushed Episode head, reapplies the non-`Done` status and truthful Final Summary with Backlog, archives the task, verifies only the exact active/archive move and no Episode code, commits, and pushes. Git and Backlog report unsafe intermediate state directly. After the pushed terminal result is verified, the Conversation continues immediately to cleanup without a second confirmation.
 
-Cleanup alone remains a native destructive resource boundary. After the terminal main state is pushed and the operator separately authorizes Cleanup, `finalize_task_episode` receives the exact task, terminal Episode head, truthful merged/abandoned outcome, and confirmation. It durably records `cleanupHead`, verifies terminal main plus exact idle clean resources, removes runtime, worktree, and branch, verifies absence, and marks ownership inactive last. Same-head partial retry is idempotent. A different head, unpushed main, changed task/archive state, busy or foreign runtime, dirty or changed worktree, unsafe resource gap, provisioning, or uncertain ownership fails closed. The tool performs no review, task status edit, merge, abandonment, archive, or push.
+Independent Backlog readiness, Request Changes, Done, and archive publish only on the disconnected task branch through the primary nested clone; code `mainHead` remains the clean pushed code HEAD. Both nested clones fast-forward to the exact published native revision without mixing task bytes into the code DAG. Ordinary code integration still uses Git when needed. Before terminal cleanup, the Episode nested clone must be clean at that terminal task revision.
+
+Cleanup alone remains a native destructive resource boundary. Immediately after the already operator-authorized terminal main state is committed, pushed, and verified, the Conversation automatically calls `finalize_task_episode` without separate cleanup confirmation. It supplies only exact `taskId`, terminal `episodeHead`, and truthful merged/abandoned `outcome`. It verifies pushed terminal code and selected-provider task evidence plus exact idle clean resources. Independent Backlog first proves and removes only the exact clean fully published Episode nested task clone; Beads preserves the shared store/server/history. It removes the runtime, then the upstream remote ref, then the worktree and any remaining local ref. The remote must be absent before Orca worktree removal because Orca may itself delete the local branch and its ordinary configuration. Orca uses supported `worktree rm --force` only after fresh exact clean Git/provider/terminal checks. Branch cleanup resolves the configured upstream remote/full ref from current Git configuration, requires one unambiguous fetch/push destination, and checks the actual remote head. It deletes the remote ref with an exact expected-head lease and verifies absence before compare-and-deleting the local ref. Both refs must be absent before ownership removal. Any exact resource already absent is complete; any present resource must match. Missing upstream identity (including a pre-existing absent local branch whose configuration was erased) blocks rather than inferring a remote. Existing ordinary Git configuration is not new cleanup state; no remote identity is persisted by the tool. After verifying all resources absent, it atomically removes only the unchanged owner entry. No cleanup head, stage, inactive record, or replay result is stored. A provider failure returns its bounded error and retains ordinary ownership. The Conversation interprets errors and re-reads current ownership, provider, Git, and selected-provider evidence, including supported Prime Agent list/state responses, before any safe re-invocation with the same exact task, terminal head, and truthful outcome. It does not blindly replay failures or infer success from an absent response. It asks the operator for help only when safe autonomous progress is no longer possible, with the exact blocker and needed action. The tool never retries internally. An unpushed main, changed task/archive state, busy or foreign runtime, dirty or changed resource, provisioning, uncertain, or inactive ownership fails closed. The tool performs no review, task status edit, merge, abandonment, archive, or push.
 
 Later routing refreshes `activeSessionId` from the durable Episode session
 ID/file. Orca terminal handles are also refreshable. Durable session and
@@ -411,7 +424,7 @@ remain available; none becomes workspace scheduling or product authority.
 
 Provider-absent/Backlog version-2 outcomes keep their existing ordinary Git and the supported Backlog CLI flow. Beads keeps guarded native Blocked/Resume, readiness, Request Changes, and post-code-publication custom `done`. Explicit abandonment uses the different built-in native `closed` status plus its first-class `close_reason`: after exact task and pushed-Episode-head authority, the Conversation proves current owner/resources, clean code heads and ancestry, and stable published raw task state; runs one `bd close` with the exact task/head/no-merge reason; makes one non-force provider push; and proves `closed`, `closed_at`, reason, preserved task/comments/history, revision, and publication ref. Prime Claw never maps `closed` to canonical `Done` and never merges abandoned code.
 
-Cleanup-only `finalize_task_episode(taskId, episodeHead, outcome, confirmed)` now supports both providers without changing its public signature. Backlog retains its exact pushed `Done` or archived-task proof. Beads pairs clean publication proof around the complete current raw task and accepts only custom `done` plus code in main for `merged`, or built-in `closed` plus the exact abandonment reason and code absent from main for `abandoned`. It also proves code/provider ancestry and direct-remote heads, binds `cleanupHead` plus current factual Beads revision/raw task/code head before removal, removes only the exact idle runtime, linked worktree, and local branch, and marks ownership inactive last. The shared Beads store/server/history and unrelated owners survive. Same-head partial cleanup and inactive replay remain idempotent; unbound missing resources and busy, dirty, foreign, unpublished, rewritten, or wrong-head state fail closed.
+Version-2 outcomes use ordinary Git and the selected provider's supported native CLI. The only native terminal tool is cleanup-only `finalize_task_episode`, with exact `taskId`, `episodeHead`, and `outcome`. It accepts no separate confirmation field. Backlog retains exact published `Done` or archived-task proof; independent Backlog also proves both nested task clones and the terminal direct remote revision before removing only the exact clean published Episode clone. Beads pairs clean publication proof around the complete current raw task and accepts only custom `done` plus code in main for `merged`, or built-in `closed` plus the exact abandonment reason and code absent from main for `abandoned`. Both providers retain code/provider ancestry and direct-remote proof. The Conversation automatically continues to cleanup after the already operator-authorized terminal outcome is committed and pushed, without separate cleanup confirmation. Cleanup removes only exact idle Episode resources and the unchanged owner entry after verified absence. Shared provider state and unrelated owners survive. It persists no cleanup head, progress stage, inactive version-2 record, or successful-close replay result. Semantic judgment, error interpretation, and safe re-invocation from current evidence remain Conversation responsibilities; no hook, watcher, background worker, retry loop, classifier, coordinator, or receipt is added.
 
 ## Active Episode continuity during a confirmed provider switch
 

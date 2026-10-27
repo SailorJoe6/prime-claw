@@ -312,7 +312,7 @@ test("routine verification never enrolls or rebaselines legacy specifications", 
 });
 
 test("inventory exposes sixteen manifest-authoritative project assets including retained compatibility",()=>{
-  const inv=loadAssetInventory(PLUGIN); assert.equal(inv.schemaVersion,2); assert.equal(inv.assets.length,16); assert.equal(new Set(inv.assets.map(x=>x.id)).size,16);
+  const inv=loadAssetInventory(PLUGIN); assert.equal(inv.schemaVersion,2); assert.equal(inv.assets.length,17); assert.equal(new Set(inv.assets.map(x=>x.id)).size,17);
   assert.deepEqual(inv.assets.filter(x=>x.exposure==="discoverable").map(x=>x.id).sort(),[
     "project-skill-blocked","project-skill-design","project-skill-design-legacy","project-skill-execute","project-skill-prepare","project-skill-spec-it-out","project-skill-spec-it-out-legacy",
   ]);
@@ -381,7 +381,7 @@ test("retained legacy workflow assets initialize and reconcile without replacing
   }
 
   const fresh=repo(t), freshResult=reconcilePrimeClawProject({cwd:fresh,pluginRoot:plugin,home:dirname(fresh),runner:new Runner()});
-  assert.equal(freshResult.items.filter(item=>item.action==="created").length,16);
+  assert.equal(freshResult.items.filter(item=>item.action==="created").length,17);
   for (const [id,source,destination] of compatibility) {
     assert.deepEqual(readFileSync(join(fresh,destination)),readFileSync(join(plugin,source)),id);
     assert.equal(JSON.parse(readFileSync(join(fresh,".prime-claw/templates.json"),"utf8")).assets[id].state,"managed");
@@ -394,7 +394,7 @@ test("tracker and archive layout do not retire either workflow family or invent 
     if (layout==="beads-only") { mkdirSync(join(root,".beads"),{recursive:true});writeFileSync(join(root,".beads/issues.jsonl"),"{}\n"); }
     else { const archive=join(root,".ralph/plans/archive/old");mkdirSync(archive,{recursive:true});writeFileSync(join(archive,"SPECIFICATION.md"),"historical\n");writeFileSync(join(archive,"EXECUTION_PLAN.md"),"historical plan\n"); }
     const result=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});
-    assert.equal(result.items.filter(item=>item.action==="created").length,16);
+    assert.equal(result.items.filter(item=>item.action==="created").length,17);
     for (const name of ["plan-task.md","implement-task.md","plan-spec.md","implement-spec.md"]) assert.equal(existsSync(join(root,".prime-claw/workflows",name)),true);
     assert.equal(existsSync(join(root,".prime-claw/ownership.json")),false);
     assert.equal(hasActiveLegacyPlanFiles(root),false);
@@ -414,7 +414,7 @@ test("root discovery handles nested cwd, nested repo, linked worktree, submodule
 
 test("fresh reconcile is convergent, registers once, preserves customization, and tracks later upstream",t=>{
   const root=repo(t); const runner=new Runner();
-  const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); assert.equal(first.items.filter(x=>x.action==="created").length,16); assert.equal(first.registration.status,"added"); assert.equal(runner.adds,1); assert.equal(existsSync(join(root,".ralph","plans")),false);
+  const first=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); assert.equal(first.items.filter(x=>x.action==="created").length,17); assert.equal(first.registration.status,"added"); assert.equal(runner.adds,1); assert.equal(existsSync(join(root,".ralph","plans")),false);
   for (const name of ["plan-task-prep.md","plan-task.md","implement-task-prep.md","implement-task.md"]) assert.equal(readFileSync(join(root,".prime-claw/workflows",name),"utf8"),readFileSync(join(PLUGIN,"workflows",name),"utf8"));
   const manifestPath=join(root,".prime-claw/templates.json"), beforeManifest=statSync(manifestPath,{bigint:true});
   const second=reconcilePrimeClawProject({cwd:join(root,".agents"),pluginRoot:PLUGIN,home:dirname(root),runner,registerOrca:true}); const afterManifest=statSync(manifestPath,{bigint:true}); assert.equal(second.changed,false); assert.equal(second.manifestWritten,false); assert.equal(afterManifest.ino,beforeManifest.ino); assert.equal(afterManifest.mtimeNs,beforeManifest.mtimeNs); assert.equal(second.registration.status,"reused"); assert.equal(runner.adds,1);

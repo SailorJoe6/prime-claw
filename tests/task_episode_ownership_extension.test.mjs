@@ -20,6 +20,7 @@ import {
   restoreTaskProviderOwnershipSwitch,
   switchActiveTaskProviderOwnership,
   withCurrentTaskProviderOwnershipSwitch,
+  removeTaskEpisodeOwnership,
   writeEpisodeOwnership,
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import {
@@ -824,6 +825,136 @@ test("legacy direct ownership is migration input and the next write preserves it
   assert.throws(() => readEpisodeOwnership(root), /exact ownerSessionId is required/);
 });
 
+test("task ownership parser discards only the legacy cleanup marker without changing version-1 parsing", () => {
+  const task = taskOwnership("task-owner", "PRIMECLAW-43");
+  const raw = { ...task, cleanupHead: "c".repeat(40) };
+  assert.deepEqual(parseEpisodeOwnership(raw), task);
+  assert.equal(raw.cleanupHead, "c".repeat(40), "parsing must not mutate the input");
+  assert.deepEqual(parseEpisodeOwnership({ ...task, cleanupHead: "d".repeat(64) }), task);
+  assert.throws(() => parseEpisodeOwnership({ ...task, cleanupHead: "not-a-head" }), /unsupported shape/);
+  assert.throws(() => parseEpisodeOwnership({ ...task, cleanupStage: 1 }), /unsupported shape/);
+  const legacy = legacyOwnership("legacy-owner", ".ralph/plans/future/legacy-source");
+  assert.strictEqual(parseEpisodeOwnership(legacy), legacy);
+  assert.throws(() => parseEpisodeOwnership({ ...legacy, cleanupHead: "c".repeat(40) }), /unsupported shape/);
+});
+
+test("owner writes discard their own old marker and preserve foreign raw entries", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-foreign-marker-"));
+  const path = join(root, ".prime-claw", "ownership.json");
+  mkdirSync(join(root, ".prime-claw"), { recursive: true });
+  const owned = taskOwnership("owner", "PRIMECLAW-43");
+  const foreign = { ...taskOwnership("foreign", "PRIMECLAW-44"), cleanupHead: "d".repeat(40) };
+  const legacy = legacyOwnership("legacy", ".ralph/plans/future/foreign-legacy");
+  writeFileSync(path, JSON.stringify({ schemaVersion: 1, owners: { owner: { ...owned, cleanupHead: "c".repeat(40) }, foreign, legacy } }));
+  const normalized = readEpisodeOwnershipRegistry(root);
+  assert.equal(normalized.owners.owner.cleanupHead, undefined);
+  assert.equal(normalized.owners.foreign.cleanupHead, undefined);
+
+  writeEpisodeOwnership(root, { ...owned, updatedAt: "changed", cleanupHead: "c".repeat(40) });
+  const raw = JSON.parse(readFileSync(path, "utf8"));
+  assert.equal(raw.owners.owner.cleanupHead, undefined);
+  assert.equal(raw.owners.owner.updatedAt, "changed");
+  assert.deepEqual(raw.owners.foreign, foreign);
+  assert.deepEqual(raw.owners.legacy, legacy);
+});
+
+test("writing another owner preserves a direct task record's legacy marker", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-direct-marker-"));
+  const path = join(root, ".prime-claw", "ownership.json");
+  mkdirSync(join(root, ".prime-claw"), { recursive: true });
+  const foreign = { ...taskOwnership("foreign", "PRIMECLAW-44"), cleanupHead: "d".repeat(40) };
+  writeFileSync(path, JSON.stringify(foreign));
+  const owned = taskOwnership("owner", "PRIMECLAW-43");
+  writeEpisodeOwnership(root, owned);
+  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")).owners, { foreign, owner: owned });
+});
+
+function activeTaskOwnership(owner = "owner", taskId = "PRIMECLAW-43") {
+  return parseEpisodeOwnership({
+    ...taskOwnership(owner, taskId), status: "active", worktree: `/tmp/${owner}-worktree`,
+    branch: `${owner}-episode`, head: "b".repeat(40), episodeId: `${owner}-episode-id`,
+    episodeSessionFile: `/tmp/${owner}-episode.jsonl`, episodeActiveSessionId: `${owner}-route`,
+    terminalHandles: ["terminal-one", "terminal-two"],
+  });
+}
+
+test("atomic task removal deletes only the unchanged owner and rejects a second removal", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-remove-"));
+  const path = join(root, ".prime-claw", "ownership.json");
+  const owned = activeTaskOwnership();
+  writeEpisodeOwnership(root, owned);
+  const foreign = { ...activeTaskOwnership("foreign", "PRIMECLAW-44"), cleanupHead: "c".repeat(40) };
+  const legacy = legacyOwnership("legacy", ".ralph/plans/future/foreign-legacy");
+  const raw = JSON.parse(readFileSync(path, "utf8"));
+  raw.owners.foreign = foreign;
+  raw.owners.legacy = legacy;
+  raw.owners.owner.cleanupHead = "d".repeat(40);
+  writeFileSync(path, JSON.stringify(raw));
+
+  // Key order is not ownership drift. The old marker is discarded by the read boundary.
+  const expected = Object.fromEntries(Object.entries(readEpisodeOwnership(root, "owner")).reverse());
+  removeTaskEpisodeOwnership(root, expected);
+  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")).owners, { foreign, legacy });
+  const after = readFileSync(path, "utf8");
+  assert.throws(() => removeTaskEpisodeOwnership(root, expected), /changed or is missing/);
+  assert.equal(readFileSync(path, "utf8"), after);
+});
+
+test("removing a sole direct task entry leaves no inactive record or tombstone", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-remove-direct-"));
+  const path = join(root, ".prime-claw", "ownership.json");
+  mkdirSync(join(root, ".prime-claw"), { recursive: true });
+  const owned = activeTaskOwnership();
+  writeFileSync(path, JSON.stringify({ ...owned, cleanupHead: "c".repeat(40) }));
+  removeTaskEpisodeOwnership(root, readEpisodeOwnership(root, owned.ownerSessionId));
+  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), { schemaVersion: 1, owners: {} });
+  assert.equal(readEpisodeOwnership(root), null);
+});
+
+test("atomic task removal fails without rewriting on missing records, status, version, or binding drift", () => {
+  const expected = activeTaskOwnership();
+  const changes = [
+    { operationId: "changed-operation" }, { updatedAt: "changed-time" },
+    { taskId: "PRIMECLAW-99" }, { taskPath: "backlog/tasks/changed.md" },
+    { branch: "changed-branch" }, { head: "c".repeat(40) }, { baseRef: "d".repeat(40) },
+    { episodeActiveSessionId: "changed-route" }, { worktree: "/tmp/changed-worktree" },
+    { terminalHandles: ["terminal-two", "terminal-one"] },
+    ...["inactive", "provisioning", "uncertain"].map((status) => ({ status })),
+  ];
+  const candidates = changes.map((change) => ({ ...expected, ...change }));
+  candidates.push(legacyOwnership("owner", ".ralph/plans/future/legacy-source"));
+  candidates.push(taskOwnership("foreign", "PRIMECLAW-44"));
+  for (const current of candidates) {
+    const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-remove-drift-"));
+    writeEpisodeOwnership(root, current);
+    const path = join(root, ".prime-claw", "ownership.json");
+    const before = readFileSync(path, "utf8");
+    assert.throws(() => removeTaskEpisodeOwnership(root, expected), /changed or is missing/);
+    assert.equal(readFileSync(path, "utf8"), before);
+  }
+  const emptyRoot = mkdtempSync(join(tmpdir(), "prime-claw-ownership-remove-missing-"));
+  assert.throws(() => removeTaskEpisodeOwnership(emptyRoot, expected), /changed or is missing/);
+  assert.equal(readEpisodeOwnership(emptyRoot), null);
+  for (const invalid of [
+    { ...expected, status: "inactive" },
+    taskOwnership("owner", "PRIMECLAW-43"),
+    legacyOwnership("owner", ".ralph/plans/future/legacy-source"),
+  ]) assert.throws(() => removeTaskEpisodeOwnership(emptyRoot, invalid), /exact active version-2/);
+});
+
+test("atomic removal validates foreign entries before any registry change", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-remove-invalid-foreign-"));
+  const owned = activeTaskOwnership();
+  writeEpisodeOwnership(root, owned);
+  const path = join(root, ".prime-claw", "ownership.json");
+  const raw = JSON.parse(readFileSync(path, "utf8"));
+  raw.owners.foreign = { ...taskOwnership("foreign", "PRIMECLAW-44"), shadowAuthority: true };
+  writeFileSync(path, JSON.stringify(raw));
+  const before = readFileSync(path, "utf8");
+  assert.throws(() => removeTaskEpisodeOwnership(root, owned), /unsupported shape/);
+  assert.equal(readFileSync(path, "utf8"), before);
+});
+
 test("one Conversation cannot replace a different active Episode", () => {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-owner-cardinality-"));
   const first = taskOwnership("same-owner", "PRIMECLAW-43");
@@ -1539,4 +1670,42 @@ test("destructive provider boundary refuses registry drift under the existing ow
   writeEpisodeOwnership(root, parseEpisodeOwnership({ ...readEpisodeOwnership(root, original.ownerSessionId), updatedAt: "2026-10-27T12:00:01.000Z" }));
   assert.throws(() => withCurrentTaskProviderOwnershipSwitch(root, switched, () => { operations += 1; }), /ownership changed after the switch/);
   assert.equal(operations, 1);
+});
+
+
+test("provider switch preserves raw inactive cleanup compatibility fields and exact rollback", () => {
+  const { root } = fixture();
+  const original = activeTaskOwnership("switch-owner", "PRIMECLAW-SWITCH");
+  const inactive = { ...activeTaskOwnership("historical-owner", "PRIMECLAW-OLD"), status: "inactive", cleanupHead: "d".repeat(40) };
+  writeEpisodeOwnership(root, original);
+  const path = join(root, ".prime-claw", "ownership.json");
+  const raw = JSON.parse(readFileSync(path, "utf8"));
+  raw.owners[original.ownerSessionId].cleanupHead = "e".repeat(40);
+  raw.owners[inactive.ownerSessionId] = inactive;
+  writeFileSync(path, JSON.stringify(raw));
+  const switched = switchActiveTaskProviderOwnership(root, {
+    sourceProvider: "backlog", targetProvider: "beads", switchedAt: "2026-10-27T12:00:00.000Z",
+    ...switchContinuity(original),
+    destinations: { [original.taskId]: { taskId: "BEAD-SWITCH", providerRevision: "f".repeat(32), taskEvidence: { id: "BEAD-SWITCH", title: "Migrated", status: "in_progress" } } },
+  });
+  const after = JSON.parse(readFileSync(path, "utf8"));
+  assert.deepEqual(after.owners[inactive.ownerSessionId], inactive);
+  assert.equal(after.owners[original.ownerSessionId].cleanupHead, undefined);
+  let guarded = false;
+  withCurrentTaskProviderOwnershipSwitch(root, switched, () => { guarded = true; });
+  assert.equal(guarded, true);
+  restoreTaskProviderOwnershipSwitch(root, switched);
+  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), raw);
+});
+
+test("atomic task removal handles provider-native Beads evidence without a Backlog task path", () => {
+  const { root } = fixture();
+  const { taskPath: _taskPath, ...resourceBinding } = activeTaskOwnership();
+  const record = parseEpisodeOwnership({ ...resourceBinding, ...beadsOwnership("owner", "BEAD-CLEANUP"), status: "active" });
+  writeEpisodeOwnership(root, record);
+  const expected = readEpisodeOwnership(root, "owner");
+  assert.equal(expected.provider, "beads");
+  assert.equal(expected.taskPath, undefined);
+  removeTaskEpisodeOwnership(root, expected);
+  assert.equal(readEpisodeOwnership(root, "owner"), null);
 });

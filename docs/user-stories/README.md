@@ -50,8 +50,11 @@ The plugin separates responsibilities:
 - **Conversation** supervises an owned Episode.
 - **Episode** implements approved scope.
 - **Expert** provides independent read-only review.
-- **Operator** retains product, scope, merge, abandonment, destructive cleanup,
-  placement, and other one-way decisions.
+- **Operator** retains product, scope, merge, abandonment, placement, and other
+  one-way decisions. For task-native Episodes, an already authorized committed
+  and pushed terminal outcome includes automatic prompt-led exact cleanup
+  without separate cleanup confirmation. Retained version-1 destructive cleanup
+  still requires separate operator authority.
 
 No role borrows another role's authority. See
 [`ROLE_KERNEL.md`](../../src/prime-agent-plugin/ROLE_KERNEL.md) and
@@ -75,7 +78,7 @@ Likewise, command and tool variants are usually two interfaces to one story.
 The primary task-native lifecycle uses `/plan` with `plan_task`,
 `/implement-task` with `create_task_episode`, and `handoff_task_episode`.
 Conversation review and outcomes use ordinary Git plus the selected provider's supported native CLI;
-the cleanup-only `finalize_task_episode` remains the narrow resource boundary. Retained version-1 compatibility
+the Conversation automatically invokes cleanup-only `finalize_task_episode` after an authorized terminal outcome is committed and pushed, without separate cleanup confirmation. It remains the narrow resource boundary; error interpretation and safe re-invocation from current evidence remain prompt-led. Retained version-1 compatibility
 keeps `/plan-spec` with `plan_spec`, `/implement-spec` with
 `create_spec_episode`, exact blocked recovery with
 `restore_blocked_spec_episode`, `handoff_spec_episode`, and

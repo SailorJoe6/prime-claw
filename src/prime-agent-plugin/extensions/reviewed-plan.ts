@@ -1,3 +1,7 @@
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import yaml from "../extension-support/vendor/yaml/yaml.cjs";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -340,6 +344,157 @@ function registerPrepChainCommand(
   return handler;
 }
 
+const CONVERSATION_AFTER_HANDOFF_NAME = "conversation-after-handoff";
+const CONVERSATION_AFTER_HANDOFF_DEFAULT_THRESHOLD = 0.6;
+const CONVERSATION_AFTER_HANDOFF_MIN_THRESHOLD = 0.1;
+
+export type ConversationAfterHandoffResult =
+  | { outcome: "prompt-delivered"; threshold: number; usagePercent: number }
+  | { outcome: "skipped"; reason: string; error?: boolean };
+
+export type ConversationAfterHandoffHook = (
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+) => Promise<ConversationAfterHandoffResult>;
+
+function boundedCompactionReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.length > 200 ? `${message.slice(0, 197)}...` : message;
+}
+
+/**
+ * Normalize one configured threshold_percent value to the internal 0-1 scale.
+ * Bare numbers in [0, 1] are ratios; bare numbers above 1 are percentages; a
+ * percent suffix always means a percentage. Zero disables the feature;
+ * anything else must normalize to [0.1, 1] inclusive.
+ */
+export function normalizeConversationCompactionThreshold(
+  raw: unknown,
+): { ok: true; value: number } | { ok: false; error: string } {
+  if (typeof raw !== "number" && typeof raw !== "string") {
+    return { ok: false, error: "threshold_percent must be a numeric scalar" };
+  }
+  const text = (typeof raw === "number" ? String(raw) : raw).trim();
+  if (!text) return { ok: false, error: "threshold_percent is empty" };
+  const percentSuffixed = text.endsWith("%");
+  const numericText = (percentSuffixed ? text.slice(0, -1) : text).trim();
+  if (!numericText) return { ok: false, error: "threshold_percent has no numeric value" };
+  const value = Number(numericText);
+  if (!Number.isFinite(value)) {
+    return { ok: false, error: `threshold_percent is not a finite number: ${JSON.stringify(text)}` };
+  }
+  if (value < 0) return { ok: false, error: "threshold_percent must not be negative" };
+  const normalized = percentSuffixed ? value / 100 : value <= 1 ? value : value / 100;
+  if (normalized === 0) return { ok: true, value: 0 };
+  if (normalized < CONVERSATION_AFTER_HANDOFF_MIN_THRESHOLD || normalized > 1) {
+    return { ok: false, error: `threshold_percent ${JSON.stringify(text)} normalizes outside the 10-100% range` };
+  }
+  return { ok: true, value: normalized };
+}
+
+/**
+ * Best-effort Conversation compaction trigger after one successful canonical
+ * Episode handoff dispatch. Reads the project-local managed workflow once for
+ * both policy and prompt, validates its threshold_percent setting, compares
+ * current context utilization strictly above the threshold, and steers the
+ * workflow prompt. Every failure or skip is a bounded result, never a throw:
+ * a compaction-side problem must not reverse or repeat the admitted handoff.
+ */
+export async function maybeDeliverConversationAfterHandoff(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+): Promise<ConversationAfterHandoffResult> {
+  const workflowPath = join(ctx.cwd, ".prime-claw", "workflows", `${CONVERSATION_AFTER_HANDOFF_NAME}.md`);
+  let content: string;
+  try {
+    if (!existsSync(workflowPath) || !statSync(workflowPath).isFile()) {
+      return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow is not installed at .prime-claw/workflows/${CONVERSATION_AFTER_HANDOFF_NAME}.md`, error: true };
+    }
+    content = readFileSync(workflowPath, "utf8");
+  } catch (error) {
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow is unreadable: ${boundedCompactionReason(error)}`, error: true };
+  }
+  const normalizedContent = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (normalizedContent.startsWith("---") && normalizedContent.indexOf("\n---", 3) === -1) {
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow has an unterminated frontmatter header`, error: true };
+  }
+  let frontmatter: Record<string, unknown>;
+  try {
+    // Keep the supported parser's YAML defaults, but do not load the runtime
+    // coding-agent barrel through source-mode jiti. The exact local dependency
+    // ships with the plugin; only framing and threshold normalization live here.
+    const endIndex = normalizedContent.indexOf("\n---", 3);
+    const header = normalizedContent.startsWith("---") ? normalizedContent.slice(4, endIndex) : "";
+    const parsed = header ? yaml.parse(header) ?? {} : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is not a mapping`, error: true };
+    }
+    frontmatter = parsed;
+  } catch (error) {
+    return { outcome: "skipped", reason: `${CONVERSATION_AFTER_HANDOFF_NAME} workflow frontmatter is invalid: ${boundedCompactionReason(error)}`, error: true };
+  }
+  let threshold = CONVERSATION_AFTER_HANDOFF_DEFAULT_THRESHOLD;
+  if ("threshold_percent" in frontmatter) {
+    const configured = normalizeConversationCompactionThreshold(frontmatter.threshold_percent);
+    if (!configured.ok) return { outcome: "skipped", reason: configured.error, error: true };
+    threshold = configured.value;
+  }
+  if (threshold === 0) {
+    return { outcome: "skipped", reason: "Conversation after-handoff compaction is disabled (threshold_percent: 0)" };
+  }
+  const usage = ctx.getContextUsage();
+  const percent = usage?.percent;
+  if (typeof percent !== "number" || !Number.isFinite(percent)) {
+    return { outcome: "skipped", reason: "Conversation context utilization is unknown" };
+  }
+  if (!(percent / 100 > threshold)) {
+    return { outcome: "skipped", reason: `Conversation context utilization ${percent}% is at or below the ${threshold * 100}% threshold` };
+  }
+  const prompt = `<skill name="${CONVERSATION_AFTER_HANDOFF_NAME}" location="${workflowPath}">
+References are relative to ${dirname(workflowPath)}.
+
+${content}
+</skill>`;
+  try {
+    await pi.sendUserMessage(prompt, { deliverAs: "steer" });
+  } catch (error) {
+    return { outcome: "skipped", reason: `Conversation compaction prompt delivery failed: ${boundedCompactionReason(error)}`, error: true };
+  }
+  return { outcome: "prompt-delivered", threshold, usagePercent: percent };
+}
+
+async function runConversationAfterHandoff(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  dependencies: ReviewedPlanDependencies | undefined,
+): Promise<ConversationAfterHandoffResult> {
+  const hook = dependencies?.conversationAfterHandoff ?? maybeDeliverConversationAfterHandoff;
+  try {
+    return await hook(pi, ctx);
+  } catch (error) {
+    return { outcome: "skipped", reason: `Conversation compaction check failed: ${boundedCompactionReason(error)}`, error: true };
+  }
+}
+
+const CONVERSATION_COMPACTION_WARNING_LIMIT = 320;
+
+/**
+ * Bounded model-visible warning appended to an otherwise successful handoff
+ * receipt when the after-handoff compaction attempt was skipped for an
+ * error-class reason (invalid configuration, missing or unreadable workflow,
+ * delivery failure, hook throw). Ordinary skips (disabled, at or below the
+ * threshold, unknown utilization) stay silent in content and remain recorded
+ * in details. The warning never changes the receipt: no isError, no retry,
+ * and the admitted handoff is unaffected.
+ */
+function conversationCompactionWarning(result: ConversationAfterHandoffResult): string {
+  if (result.outcome !== "skipped" || !result.error) return "";
+  const warning = ` Warning: Conversation after-handoff compaction was skipped: ${result.reason}`;
+  return warning.length > CONVERSATION_COMPACTION_WARNING_LIMIT
+    ? `${warning.slice(0, CONVERSATION_COMPACTION_WARNING_LIMIT - 3)}...`
+    : warning;
+}
+
 type TaskEpisodePublicActions = {
   create: typeof createTaskEpisode;
   handoff: typeof handoffTaskEpisode;
@@ -366,13 +521,13 @@ type ReviewedPlanDependencies = EpisodeDependencies & EpisodeOwnershipTransition
   taskCleanupBeadsTransport?: TaskEpisodeCleanupDependencies["beadsTransport"];
   taskCleanupBeadsTaskReader?: TaskEpisodeCleanupDependencies["beadsTaskReader"];
   taskCleanupBeadsRevisionIsAncestor?: TaskEpisodeCleanupDependencies["beadsRevisionIsAncestor"];
+  conversationAfterHandoff?: ConversationAfterHandoffHook;
 };
 
 type TaskEpisodeCleanupParams = {
   taskId: string;
   episodeHead: string;
   outcome: TaskEpisodeCleanupOutcome;
-  confirmed: boolean;
 };
 
 function requireLiveImplementationTask(selection: ProviderTaskResolution): void {
@@ -412,7 +567,6 @@ async function runTaskEpisodeCleanup(
   if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) {
     throw new Error("Task Episode cleanup requires one exact provider-native task ID");
   }
-  if (!params.confirmed) throw new Error("Task Episode cleanup requires separate explicit operator confirmation");
   const cleanupGit = dependencies.taskCleanupGit ?? new CliTaskEpisodeCleanupGit();
   const projectRoot = cleanupGit.repositoryRoot(ctx.cwd);
   const ownedCleanup = dependencies.taskCleanup
@@ -835,12 +989,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       name: "finalize_task_episode",
       label: "Clean up task Episode resources",
       description: "After an operator-authorized merge or abandonment is committed and pushed, remove the exact idle Episode resources and close ownership.",
-      promptSnippet: "Clean up the exact terminal task Episode after separate operator authority",
+      promptSnippet: "Clean up the exact task Episode after its authorized pushed terminal outcome",
       promptGuidelines: [
         "Use finalize_task_episode only for one exact task-native Episode owned by this Conversation. Never use it for retained folder ownership.",
         "Perform review, request changes, merge, abandonment, and provider-native terminal publication through the Conversation instructions, ordinary Git, and the selected provider's supported CLI before cleanup.",
-        "Call this tool only after separate explicit operator cleanup authority, with the exact pushed Episode head and truthful terminal outcome. Backlog requires its pushed Done/archive terminal evidence; Beads requires current clean published native done completion or closed plus the exact abandonment reason.",
-        "Cleanup removes only the bound idle runtime, worktree, and branch, then closes ownership. It performs no merge, abandonment, task edit, archive, provider push, shared-store removal, or server shutdown.",
+        "Call this tool immediately after the already operator-authorized terminal outcome is committed, pushed, and verified, with the exact pushed Episode head and truthful outcome. No second cleanup confirmation is needed. Backlog requires its pushed Done/archive terminal evidence; Beads requires current clean published native done completion or closed plus the exact abandonment reason.",
+        "Cleanup removes only the bound idle runtime and explicit descendants, exact upstream branch, provider worktree, and remaining local branch, then deletes the exact owner entry. It performs no merge, abandonment, task edit, archive, provider push, shared-store removal, or server shutdown.",
+        "On error, interpret the provider evidence and re-read current ownership, Prime Agent, provider, and Git state. Re-invoke only when current evidence proves safe progress; ask the operator only when safe progress is impossible.",
       ],
       executionMode: "sequential",
       parameters: {
@@ -849,9 +1004,8 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           taskId: { type: "string", description: "Exact canonical provider-native task ID owned by this Conversation" },
           episodeHead: { type: "string", description: "Exact pushed Episode head that was merged or abandoned" },
           outcome: { type: "string", enum: ["merged", "abandoned"], description: "Terminal outcome already committed and pushed on canonical main" },
-          confirmed: { type: "boolean", description: "True only after separate explicit operator authority for destructive cleanup" },
         },
-        required: ["taskId", "episodeHead", "outcome", "confirmed"],
+        required: ["taskId", "episodeHead", "outcome"],
         additionalProperties: false,
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -894,9 +1048,10 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
           const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
+          const conversationCompaction = await runConversationAfterHandoff(pi, ctx, dependencies);
           return {
-            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.` }],
-            details: result,
+            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.${conversationCompactionWarning(conversationCompaction)}` }],
+            details: { ...result, conversationCompaction },
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -978,12 +1133,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             ctx,
             dependencies,
           );
+          const conversationCompaction = await runConversationAfterHandoff(pi, ctx, dependencies);
           return {
             content: [{
               type: "text",
-              text: `Episode handoff admitted for ${result.sourceLocation}: canonical handoff was admitted as an ordinary prompt and canonical execute was queued as the sole follow-up. Admission may be immediate or queued; inspect the episode Status/Evidence output before claiming either workflow completed.`,
+              text: `Episode handoff admitted for ${result.sourceLocation}: canonical handoff was admitted as an ordinary prompt and canonical execute was queued as the sole follow-up. Admission may be immediate or queued; inspect the episode Status/Evidence output before claiming either workflow completed.${conversationCompactionWarning(conversationCompaction)}`,
             }],
-            details: result,
+            details: { ...result, conversationCompaction },
           };
         } catch (error) {
           return {

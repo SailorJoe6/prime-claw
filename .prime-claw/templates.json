@@ -240,6 +240,21 @@
         "customization": "project-customizable",
         "lifecycleTrigger": "implement-task"
       }
+    },
+    "project-workflow-conversation-after-handoff": {
+      "source": "workflows/conversation-after-handoff.md",
+      "destination": ".prime-claw/workflows/conversation-after-handoff.md",
+      "baselineSha256": "8209305f6b6abcb084deb0a192428e8241aa71ae4e7587c81d7b3bcb65b22317",
+      "installedSha256": "8209305f6b6abcb084deb0a192428e8241aa71ae4e7587c81d7b3bcb65b22317",
+      "acceptedOverrideSha256": null,
+      "availableUpstreamSha256": "8209305f6b6abcb084deb0a192428e8241aa71ae4e7587c81d7b3bcb65b22317",
+      "state": "managed",
+      "provenance": {
+        "scope": "project",
+        "exposure": "internal",
+        "customization": "project-customizable",
+        "lifecycleTrigger": "conversation-after-handoff"
+      }
     }
   }
 }

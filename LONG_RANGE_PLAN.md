@@ -182,9 +182,14 @@ builder repository removes its own tree at the final task-native cutover.
 - **4b — episode mechanics.** `/implement-task TASK-ID` now creates a
   worktree-rooted Episode from one meaningful provider-native plan and
   exact-task ownership. `handoff_task_episode` continues that exact durable
-  session. Conversation instructions use ordinary Git and the selected provider's native
-  history for review outcomes; cleanup-only `finalize_task_episode` handles separately authorized
-  exact resource removal. Generic
+  session. Conversation instructions use ordinary Git and the selected provider's native history for review
+  outcomes. After an operator-authorized terminal outcome is committed and
+  pushed, the Conversation automatically calls cleanup-only
+  `finalize_task_episode` for exact resource removal without separate cleanup
+  confirmation. Before merge readiness it verifies provider-reported idle
+  completion of the exact Episode and explicitly proven descendants, refusing
+  active or unprovably idle work. Error interpretation and safe re-invocation
+  from current ownership, provider, Git, and selected-provider evidence remain prompt-led. Generic
   `/implement-spec <future-folder>` mechanics remain active for retained bundles
   in initialized version-1 projects; they are not this builder
   repository's workflow authority.
@@ -197,7 +202,8 @@ builder repository removes its own tree at the final task-native cutover.
   generic compatibility route for already-created future bundles in projects
   that retain them. Manual proof must show that one task and owner identity survive
   execute/handoff iterations, useful EXPERT reviews, candidate revision,
-  merge or abandonment decisions, and separately authorized cleanup.
+  operator-authorized merge or abandonment decisions, and automatic prompt-led
+  cleanup after the terminal outcome is committed and pushed.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
   codex/claude-skills project to prime-agent skills without manual copy-paste;
   dogfood on the ralph repo. The same initialization/upgrade UX inspects and,

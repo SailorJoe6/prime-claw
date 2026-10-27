@@ -27,6 +27,7 @@ import {
   isTaskEpisodeOwnership,
   parseEpisodeOwnership,
   readEpisodeOwnership,
+  removeTaskEpisodeOwnership,
   withEpisodeAdmissionLock,
   writeEpisodeOwnership,
   type BacklogTaskEpisodeOwnershipRecord,
@@ -90,12 +91,9 @@ import {
 } from "./task-episode-ownership.ts";
 
 /**
- * Default task resolver for the Episode lifecycle paths in this module:
- * provider-aware resolution narrowed to the existing Backlog selection
- * contract these paths still require. A Beads store resolves the task with
- * no Markdown path, so the file-bound admission/cleanup choreography here
- * rejects it explicitly until its own provider slice lands; task resolution
- * and status mutation themselves already run through the selected provider.
+ * Provider-aware resolution narrowed to the file-bound Backlog branches in
+ * this module. Beads lifecycle branches read native task evidence directly;
+ * a Markdown task path is never treated as universal provider identity.
  */
 function defaultEpisodeTaskResolver(runner: CommandRunner) {
   return (cwd: string, exactTaskId: string): BacklogTaskSelection | null =>
@@ -146,14 +144,19 @@ export type TaskEpisodeResult = TaskEpisodeOwnershipRecord & { reused: boolean }
 
 export interface SessionSummary {
   activeSessionId?: string; id?: string; sessionId?: string; sessionFile?: string;
-  sessionName?: string; cwd?: string; isSessionActive?: boolean; isStreaming?: boolean;
-  isCompacting?: boolean; queuedCount?: number;
-}
-export interface EpisodeSessionState extends SessionSummary {
+  sessionName?: string; cwd?: string; lifecycle?: "draft" | "live" | "archived";
+  activity?: "working" | "idle"; runtimeKind?: "top-level" | "subagent"; rlmDepth?: number;
+  isSessionActive?: boolean; isStreaming?: boolean; isCompacting?: boolean;
   isBashRunning?: boolean; isRunningTools?: boolean; hasRunningRlmChildren?: boolean;
-  unfinishedActionCount?: number;
+  hasActiveHeartbeat?: boolean; hasRegisteredHeartbeat?: boolean; hasRegisteredCronJob?: boolean;
+  attachedClients?: number; directAttachedClients?: number; unfinishedActionCount?: number;
+  queuedCount?: number;
   sessionActions?: { queuedCount?: number; steering?: unknown[]; followUps?: unknown[]; active?: unknown };
+  parentActiveSessionId?: string; parentSessionId?: string; parentSessionPath?: string;
+  rlmChildId?: string; workerState?: "starting" | "ready" | "recovering" | "stopping" | "failed";
+  statusLabel?: "queued" | "recovering" | "failed";
 }
+export interface EpisodeSessionState extends SessionSummary {}
 export interface EpisodeHandoffResult {
   admitted: true; sourceLocation: string; episodeId: string; episodeActiveSessionId: string;
   handoffDelivery: "prompt"; executeDelivery: "followUp";
@@ -309,8 +312,7 @@ export interface TaskEpisodeCleanupGit {
   branch(repo: string): string;
   head(repo: string): string;
   upstreamHead(repo: string): string;
-  branchUpstreamHead(repo: string, branch: string): string;
-  /** Required only for provider-native Beads cleanup before exact resources disappear. */
+  /** Required for provider-native Beads canonical-main publication proof. */
   directRemoteHead?(repo: string, branch: string): string;
   assertCleanWorktree(repo: string): void;
   isAncestor(repo: string, ancestor: string, descendant: string): boolean;
@@ -322,15 +324,19 @@ export type TaskEpisodeCleanupSnapshot = {
   runtime?: { cwd: string; idle: boolean };
   worktree?: { path: string; branch: string; head: string; clean: boolean };
   branch?: { name: string; head: string };
+  upstream?: { remote: string; ref: string; head: string };
 };
 export interface TaskEpisodeCleanupAdapter {
   inspect(record: TaskEpisodeOwnershipRecord): Promise<TaskEpisodeCleanupSnapshot>;
   removeRuntime(record: TaskEpisodeOwnershipRecord): Promise<void>;
+  removeUpstream(record: TaskEpisodeOwnershipRecord): Promise<void>;
   removeWorktree(record: TaskEpisodeOwnershipRecord): Promise<void>;
   removeBranch(record: TaskEpisodeOwnershipRecord): Promise<void>;
 }
 export interface TaskEpisodeCleanupDependencies {
-  ownership?: EpisodeOwnershipStore;
+  ownership?: Pick<EpisodeOwnershipStore, "read"> & {
+    removeTask(projectRoot: string, expected: TaskEpisodeOwnershipRecord): void;
+  };
   cleanupGit?: TaskEpisodeCleanupGit;
   cleanup: TaskEpisodeCleanupAdapter;
   taskRunner?: CommandRunner;
@@ -341,7 +347,6 @@ export interface TaskEpisodeCleanupDependencies {
   inspectTaskHistory?: typeof inspectEpisodeTaskHistoryStore;
   inspectPublishedTaskHistory?: typeof inspectPublishedPrimaryTaskHistory;
   cleanupTaskHistory?: typeof cleanupEpisodeTaskHistoryStore;
-  now?: () => string;
 }
 export type TaskEpisodeCleanupResult = {
   verified: true;
@@ -349,8 +354,7 @@ export type TaskEpisodeCleanupResult = {
   taskId: string;
   episodeHead: string;
   resourcesRemoved: true;
-  ownershipStatus: "inactive";
-  reused: boolean;
+  ownershipRemoved: true;
 };
 
 function runGitRaw(cwd: string, args: string[]): string {
@@ -419,9 +423,6 @@ export class CliTaskEpisodeCleanupGit implements TaskEpisodeCleanupGit {
   branch(repo: string): string { return runGit(repo, ["symbolic-ref", "--short", "HEAD"]); }
   head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
   upstreamHead(repo: string): string { return runGit(repo, ["rev-parse", "@{upstream}"]); }
-  branchUpstreamHead(repo: string, branch: string): string {
-    return runGit(repo, ["rev-parse", `${branch}@{upstream}`]);
-  }
   directRemoteHead(repo: string, branch: string): string {
     return exactDirectRemoteBranchHead(repo, branch, "Task Episode cleanup");
   }
@@ -2413,13 +2414,16 @@ function expectedArchivedTaskPath(taskPath: string): string {
   return join(dirname(activeDirectory), "archive", "tasks", basename(taskPath));
 }
 
-function taskCleanupStage(
+function verifyTaskCleanupResources(
   snapshot: TaskEpisodeCleanupSnapshot,
   record: TaskEpisodeOwnershipRecord,
   episodeHead: string,
-): number {
-  if (snapshot.runtime && (!samePath(snapshot.runtime.cwd, record.worktree!) || !snapshot.runtime.idle)) {
-    throw new Error("Task Episode cleanup runtime is busy or no longer exact");
+): void {
+  if (snapshot.runtime && !samePath(snapshot.runtime.cwd, record.worktree!)) {
+    throw new Error("Task Episode cleanup runtime is no longer exact");
+  }
+  if (snapshot.runtime && !snapshot.runtime.idle) {
+    throw new Error("The Episode has not completed its work: cleanup requires the exact idle runtime and descendants");
   }
   if (snapshot.worktree && (!samePath(snapshot.worktree.path, record.worktree!)
     || snapshot.worktree.branch !== record.branch
@@ -2430,12 +2434,9 @@ function taskCleanupStage(
   if (snapshot.branch && (snapshot.branch.name !== record.branch || snapshot.branch.head !== episodeHead)) {
     throw new Error("Task Episode cleanup branch is no longer exact");
   }
-  const present = [Boolean(snapshot.runtime), Boolean(snapshot.worktree), Boolean(snapshot.branch)];
-  if (present.every(Boolean)) return 0;
-  if (!present[0] && present[1] && present[2]) return 1;
-  if (!present[0] && !present[1] && present[2]) return 2;
-  if (present.every((value) => !value)) return 3;
-  throw new Error("Task Episode cleanup resources are missing in an unsafe order");
+  if (snapshot.upstream && snapshot.upstream.head !== episodeHead) {
+    throw new Error("Task Episode cleanup upstream branch is no longer exact");
+  }
 }
 
 function beadsAbandonmentReason(taskId: string, episodeHead: string): string {
@@ -2663,7 +2664,7 @@ export async function finalizeTaskEpisodeCleanup(
     throw new Error("Task Episode cleanup is available only to the persisted top-level owning Conversation");
   }
   const git = dependencies.cleanupGit ?? new CliTaskEpisodeCleanupGit();
-  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const store = dependencies.ownership ?? { read: readEpisodeOwnership, removeTask: removeTaskEpisodeOwnership };
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
   const resolveTask = dependencies.taskResolver
     ?? defaultEpisodeTaskResolver(runner);
@@ -2671,70 +2672,39 @@ export async function finalizeTaskEpisodeCleanup(
   if (!samePath(projectRoot, ctx.cwd) || git.branch(projectRoot) !== "main") {
     throw new Error("Task Episode cleanup must run from the canonical primary main checkout");
   }
-  let record = store.read(projectRoot, ctx.sessionManager.getSessionId());
+  const record = store.read(projectRoot, ctx.sessionManager.getSessionId());
   if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
   exactOwnedTaskCleanupRecord(record, taskId, ctx.sessionManager.getSessionId());
-  if (record.status !== "active" && record.status !== "inactive") {
+  if (record.status !== "active") {
     throw new Error(`Task Episode cleanup cannot finalize ${record.status} ownership`);
   }
-  if (record.cleanupHead && record.cleanupHead !== episodeHead) {
-    throw new Error("Task Episode cleanup head differs from the durable cleanup binding");
+  const inspect = async (): Promise<TaskEpisodeCleanupSnapshot> => {
+    const snapshot = await dependencies.cleanup.inspect(record);
+    verifyTaskCleanupResources(snapshot, record, episodeHead);
+    return snapshot;
+  };
+  let snapshot = await inspect();
+  if (!git.isAncestor(projectRoot, record.baseRef, episodeHead)) {
+    throw new Error("Task Episode cleanup head is not descended from the owned Episode base");
   }
-  let snapshot = await dependencies.cleanup.inspect(record);
-  let stage = taskCleanupStage(snapshot, record, episodeHead);
-  if (isBeadsTaskEpisodeOwnership(record) && stage !== 0 && !record.cleanupHead) {
-    throw new Error("Task Episode cleanup found Beads resources already missing without the durable cleanup head");
-  }
-  if (stage !== 3) {
-    if (!git.isAncestor(projectRoot, record.baseRef, episodeHead)) {
-      throw new Error("Task Episode cleanup head is not descended from the owned Episode base");
-    }
-    if (isBeadsTaskEpisodeOwnership(record)
-        && (!record.head
-          || !git.isAncestor(projectRoot, record.baseRef, record.head)
-          || !git.isAncestor(projectRoot, record.head, episodeHead))) {
-      throw new Error("Task Episode cleanup found unsafe Beads base/recorded/terminal code ancestry");
-    }
-    if (git.branchUpstreamHead(projectRoot, record.branch!) !== episodeHead) {
-      throw new Error("Task Episode cleanup requires the exact Episode head to be pushed");
-    }
-    if (isBeadsTaskEpisodeOwnership(record)
-        && (!git.directRemoteHead || git.directRemoteHead(projectRoot, record.branch!) !== episodeHead)) {
-      throw new Error("Task Episode cleanup requires the exact direct-remote Beads Episode head");
-    }
+  if (isBeadsTaskEpisodeOwnership(record)
+      && (!record.head
+        || !git.isAncestor(projectRoot, record.baseRef, record.head)
+        || !git.isAncestor(projectRoot, record.head, episodeHead))) {
+    throw new Error("Task Episode cleanup found unsafe Beads base/recorded/terminal code ancestry");
   }
   git.assertCleanWorktree(projectRoot);
   const providerTerminal = verifyTaskEpisodeTerminalState(
     projectRoot, record, episodeHead, outcome, git, resolveTask, runner, dependencies,
   );
-  if (!record.cleanupHead) {
-    const updatedAt = dependencies.now?.() ?? new Date().toISOString();
-    const bound: TaskEpisodeOwnershipRecord = providerTerminal
-      ? parseEpisodeOwnership({
-          ...record,
-          providerRevision: providerTerminal.providerRevision,
-          taskEvidence: providerTerminal.taskEvidence,
-          ...(isBeadsTaskEpisodeOwnership(record) ? { head: episodeHead } : {}),
-          cleanupHead: episodeHead,
-          updatedAt,
-        }) as TaskEpisodeOwnershipRecord
-      : { ...record, cleanupHead: episodeHead, updatedAt };
-    store.write(projectRoot, bound);
-    const verifiedBinding = store.read(projectRoot, ctx.sessionManager.getSessionId());
-    if (!verifiedBinding || !isTaskEpisodeOwnership(verifiedBinding)
-      || JSON.stringify(verifiedBinding) !== JSON.stringify(bound)) {
-      throw new Error("Task Episode cleanup could not persist the exact cleanup head");
-    }
-    record = bound;
-  }
 
-  if (record.status === "inactive") {
-    if (stage !== 3) throw new Error("Inactive task Episode ownership still has retained resources");
-    return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipStatus: "inactive", reused: true };
-  }
-
-  if (isPublishedBacklogTaskEpisodeOwnership(record) && (stage === 0 || stage === 1)) {
-    const historyInput = { primaryRoot: projectRoot, targetWorktree: record.worktree!, expectedRevision: record.providerRevision, runner };
+  // Independent task history must be clean and published before removing any
+  // parent resource. Its terminal revision is evidence, not a cleanup marker.
+  if (isPublishedBacklogTaskEpisodeOwnership(record) && snapshot.worktree) {
+    const historyInput = {
+      primaryRoot: projectRoot, targetWorktree: record.worktree!,
+      expectedRevision: providerTerminal!.providerRevision, runner,
+    };
     const inspected = (dependencies.inspectTaskHistory ?? inspectEpisodeTaskHistoryStore)(historyInput);
     if (inspected.status === "refused") {
       throw new Error(`Task Episode cleanup refuses nested task history before parent-resource removal: ${inspected.code}: ${inspected.detail}`);
@@ -2745,32 +2715,36 @@ export async function finalizeTaskEpisodeCleanup(
     }
   }
 
-  const advance = async (remove: () => Promise<void>, expectedStages: number[]): Promise<void> => {
-    await remove();
-    snapshot = await dependencies.cleanup.inspect(record);
-    stage = taskCleanupStage(snapshot, record, episodeHead);
-    if (!expectedStages.includes(stage)) throw new Error("Task Episode cleanup removal was not verified exactly");
-  };
-  if (stage === 0) await advance(() => dependencies.cleanup.removeRuntime(record), [1]);
-  if (stage === 1) await advance(() => dependencies.cleanup.removeWorktree(record), [2, 3]);
-  if (stage === 2) await advance(() => dependencies.cleanup.removeBranch(record), [3]);
-  if (stage !== 3) throw new Error("Task Episode cleanup did not remove every exact resource");
-
-  const retained = store.read(projectRoot, ctx.sessionManager.getSessionId());
-  if (!retained || JSON.stringify(retained) !== JSON.stringify(record)) {
-    throw new Error("Task Episode ownership changed during authorized cleanup");
+  if (snapshot.runtime) {
+    await dependencies.cleanup.removeRuntime(record);
+    snapshot = await inspect();
+    if (snapshot.runtime) throw new Error("Task Episode cleanup runtime removal was not verified exactly");
   }
-  const closed: TaskEpisodeOwnershipRecord = {
-    ...record,
-    status: "inactive",
-    updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-  };
-  store.write(projectRoot, closed);
-  const verified = store.read(projectRoot, ctx.sessionManager.getSessionId());
-  if (!verified || !isTaskEpisodeOwnership(verified) || JSON.stringify(verified) !== JSON.stringify(closed)) {
-    throw new Error("Task Episode cleanup could not verify inactive ownership bookkeeping");
+  // Orca may delete the local branch during worktree removal, so the upstream
+  // must be absent before invoking that provider operation.
+  if (snapshot.upstream) {
+    await dependencies.cleanup.removeUpstream(record);
+    snapshot = await inspect();
+    if (snapshot.runtime || snapshot.upstream) {
+      throw new Error("Task Episode cleanup upstream removal was not verified exactly");
+    }
   }
-  return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipStatus: "inactive", reused: false };
+  if (snapshot.worktree) {
+    await dependencies.cleanup.removeWorktree(record);
+    snapshot = await inspect();
+    if (snapshot.runtime || snapshot.worktree) {
+      throw new Error("Task Episode cleanup worktree removal was not verified exactly");
+    }
+  }
+  if (snapshot.branch) {
+    await dependencies.cleanup.removeBranch(record);
+    snapshot = await inspect();
+  }
+  if (snapshot.runtime || snapshot.worktree || snapshot.branch || snapshot.upstream) {
+    throw new Error("Task Episode cleanup did not remove every exact resource");
+  }
+  store.removeTask(projectRoot, record);
+  return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipRemoved: true };
 }
 
 type BeadsProviderTaskResolution = Extract<ProviderTaskResolution, { provider: "beads" }>;

@@ -47,6 +47,8 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Independent Backlog publishes the exact Ready status on the disconnected task branch",
         "preserving its task content plus authorized status",
         "Git blocks every other code conflict",
+        "remaining lifecycle and cleanup flow applies only to version 2 task-native ownership",
+        "Do not create lifecycle receipts or replay protocols",
         "git merge --no-edit currentMainHead",
         "restore its pre-merge Episode task content, apply only the authorized status, let Git block every other conflict, and push the refreshed candidate",
         "leaves both code heads unchanged",
@@ -76,11 +78,8 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "selects only the bound task file from that Episode head",
         "reapplies its non-`Done` status and truthful Final Summary through the supported CLI",
         "verifies only the active/archive task move and no Episode code, commits, and pushes",
-        "Keep resources pending cleanup authority",
-        "Cleanup** calls `finalize_task_episode`",
-        "binds `cleanupHead` plus facts",
-        "removes idle runtime/worktree/local branch",
-        "Replay is idempotent",
+        "cleanup-only `finalize_task_episode`",
+        "atomically removes only the unchanged owner entry",
         "Review conclusions are evidence",
         "material contract defect",
         "Speculative hardening",
@@ -226,9 +225,9 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
     assert "The Episode edits only its bound task content" not in future
 
     assert "stores no review, progress, merge, or abandonment receipts" in current
-    assert "optional `cleanupHead`" in current
-    assert "Cleanup-only `finalize_task_episode(taskId, episodeHead, outcome, confirmed)`" in current
-    assert "ordinary Git and the supported Backlog CLI" in current
+    assert "Version 2 stores no `cleanupHead` or cleanup-progress stage" in current
+    assert "cleanup-only `finalize_task_episode`" in current
+    assert "ordinary Git and the selected provider's supported native CLI" in current
     assert "placement, and task-native lifecycle receipts" not in current
 
     traceability = " ".join(TRACEABILITY.read_text().split())
@@ -241,3 +240,41 @@ def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
     assert "A task-bound Episode edits only its exact Backlog task content" not in traceability
     assert "retained version-1 compatibility folder Episodes keep their plan workflow" in traceability
     assert "`PRIMECLAW-10.15`, `PRIMECLAW-10.24`, and `PRIMECLAW-10.26`" in traceability
+
+
+def test_task_native_cleanup_is_prompt_led_without_second_confirmation():
+    text = " ".join(GUIDE.read_text().split())
+    task_policy = text.split("The remaining lifecycle and cleanup flow applies only to version 2", 1)[1]
+    lower = task_policy.lower()
+    assert "before merge readiness" in lower
+    assert "provider-reported idle completion" in lower
+    assert "explicitly proven descendant" in lower
+    assert "prime agent list/state responses" in lower
+    assert "active or unprovable-idle sessions block readiness and merge" in lower
+    assert "cleanup independently rechecks before mutation" in lower
+    assert "automatically" in lower and "immediately" in lower
+    assert "second cleanup confirmation" in lower
+    for identifier in ("taskId", "episodeHead", "outcome"):
+        assert identifier in task_policy
+    error_policy = lower.split("on error/interruption", 1)[1]
+    assert "conversation interprets provider evidence" in error_policy
+    assert "re-read current ownership, prime agent, provider, and git state" in error_policy
+    assert "re-invoke only when current evidence proves safe progress" in error_policy
+    assert "consult the operator only when safe progress is impossible" in error_policy
+    for obsolete in (
+        "confirmed: true", "cleanup needs separate authority",
+        "Cleanup** is separately explicit", "Same-head retry is idempotent",
+        "durably binds that head",
+    ):
+        assert obsolete not in task_policy
+
+
+def test_current_task_cleanup_docs_remove_second_confirmation_but_keep_evidence():
+    for path in (DOC, HANDOFF_DOC, REPO / "docs/user-stories/I-episode-finalization.md"):
+        text = " ".join(path.read_text().split())
+        assert "without separate cleanup confirmation" in text, path
+        assert "provider-reported idle completion" in text, path
+        assert "explicitly proven descendants" in text, path
+        assert "current ownership, provider, Git, and selected-provider evidence" in text, path
+        assert "durable cleanup head" not in text, path
+        assert "Same-head retry is idempotent" not in text, path

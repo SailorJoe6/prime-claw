@@ -28,6 +28,11 @@ def test_spec_episode_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_task_episode_ownership_node_suite(tier1_container) -> None:
+    result = tier1_container.run("node", "--experimental-strip-types", "--test", "/workspace/tests/task_episode_ownership_extension.test.mjs", timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_episode_close_node_suite(tier1_container) -> None:
     result = tier1_container.run("node", "--experimental-strip-types", "--test", WS_EPISODE_CLOSE_NODE_SUITE, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -123,8 +128,14 @@ def test_task_finalization_surface_is_cleanup_only() -> None:
         assert removed not in support
     assert 'name: "finalize_task_episode"' in extension
     assert 'enum: ["merged", "abandoned"]' in extension
-    assert 'required: ["taskId", "episodeHead", "outcome", "confirmed"]' in extension
-    assert "cleanupHead" in support
+    start = extension.index('name: "finalize_task_episode"')
+    cleanup_surface = extension[start:extension.index("async execute", start)]
+    assert 'required: ["taskId", "episodeHead", "outcome"]' in cleanup_surface
+    assert "confirmed" not in cleanup_surface
+    assert "cleanupHead" not in support
+    assert "taskCleanupStage" not in support
+    assert "ownershipRemoved: true" in support
+    assert "store.removeTask(projectRoot, record)" in support
     assert 'runGit(repo, ["merge", "--ff-only"' not in support
 
 
@@ -240,6 +251,8 @@ def test_traceability_covers_both_episode_schemas_at_creation_recovery_and_finis
     assert "public admission replay fails closed" in rows["US-16"]
 
     assert "finalize_task_episode" in rows["US-24"]
-    assert "separately confirmed" in rows["US-24"]
+    assert "without separate cleanup confirmation" in rows["US-24"]
+    assert "provider-reported idle completion" in rows["US-24"]
+    assert "explicitly proven descendants" in rows["US-24"]
     assert "exact idle resources" in rows["US-24"]
     assert "finalize_spec_episode" in rows["US-24"]

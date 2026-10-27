@@ -1,0 +1,9 @@
+{
+  "name": "prime-claw-plugin-yaml-vendor",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "yaml": "2.9.0"
+  }
+}

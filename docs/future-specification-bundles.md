@@ -31,9 +31,17 @@ or Episode admission.
    `handoff_task_episode` for continuation, ordinary Git plus the selected
    provider's native CLI for terminal outcomes, and cleanup-only `finalize_task_episode` for exact
    resource removal.
-6. Merge or abandonment requires an explicit operator decision. Destructive
-   cleanup requires a separate explicit decision and closes ownership only
-   after the exact resources are absent.
+6. Before merge readiness, the Conversation verifies provider-reported idle
+   completion of the exact Episode and explicitly proven descendants; active or
+   unprovably idle work refuses readiness. Merge or abandonment requires an
+   explicit operator decision. After that authorized terminal outcome is
+   committed and pushed, the Conversation automatically invokes cleanup with
+   exact `taskId`, terminal `episodeHead`, and truthful `outcome`, without
+   separate cleanup confirmation. It interprets errors and re-reads current
+   ownership, provider, Git, and selected-provider evidence before any safe re-invocation.
+   Cleanup closes ownership only after the exact resources are absent. No
+   coordinator, background worker, retry loop, receipt, or progress state is
+   introduced.
 
 The task's complete supported provider-native fields are the sole durable
 authority throughout this path. Task-native code never falls back to a folder specification.

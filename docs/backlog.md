@@ -128,9 +128,16 @@ evidence. Neither path retries fresh admission.
 The resulting Episode uses the exact task as its sole durable authority, skips
 bundle copy and promotion, and leaves every later lifecycle status transition
 to the owning Conversation. Continuation uses `handoff_task_episode`. Review,
-status changes, merge, and abandonment remain provider-native prompt-guided
-operations. Cleanup alone uses `finalize_task_episode` as the separately
-confirmed exact-resource boundary.
+status changes, merge, and abandonment use prompt instructions, ordinary Git,
+and the selected provider's supported native CLI. Before merge readiness the Conversation verifies
+provider-reported idle completion of the exact Episode and explicitly proven
+descendants; active or unprovably idle work refuses readiness. After the
+operator-authorized terminal outcome is committed and pushed, the Conversation
+automatically calls cleanup-only `finalize_task_episode` without separate
+cleanup confirmation, retaining exact `taskId`, terminal `episodeHead`, and
+truthful `outcome`. It interprets errors and re-reads current ownership,
+provider, Git, and selected-provider evidence before any safe re-invocation. The tool
+remains the exact-resource boundary, not a coordinator or retry loop.
 
 ## Retained version-1 compatibility
 
@@ -551,7 +558,8 @@ raw task-file write is added.
 Cleanup-only finalization preserves terminal Done/archive and code ancestry
 checks. Independent Backlog first proves the clean primary nested clone equals
 one stable direct remote head, reads the terminal task from that exact revision
-(the committed archive file for abandonment), and binds that revision/evidence.
+(the committed archive file for abandonment), and checks that revision/evidence
+without persisting cleanup progress.
 Native abandonment prepares the built-in `archive/tasks/` directory before the
 archive command. The terminal workflow fast-forwards the Episode nested clone
 to the published Done/archive revision before cleanup. Cleanup then runs a
@@ -692,8 +700,10 @@ Every newly written record names `provider`. Both provider branches retain the
 canonical `taskId`, the existing exact Episode Git `baseRef`, and the existing
 resource/lifecycle bindings:
 
-- `provider: "backlog"` carries the exact repository-relative `taskPath` and no
-  Beads revision or task evidence.
+- `provider: "backlog"` carries the exact repository-relative `taskPath`.
+  Grandfathered branch-local ownership has no revision/evidence; independent
+  Backlog binds the 40-hex task-history `providerRevision` and complete native
+  `taskEvidence` separately from code.
 - `provider: "beads"` carries no Backlog path. It requires the exact published
   32-character Dolt `providerRevision` and `taskEvidence`: the raw native task
   object whose exact `id` matches `taskId` and whose native title and status
@@ -930,7 +940,7 @@ parallel workflow is introduced.
 
 ### Beads merge readiness and merge status
 
-Accepted complete pushed Beads candidates now use the same native status helper
+Before merge readiness, the Conversation verifies provider-reported idle completion of the exact Episode and explicitly proven descendants; active or unprovably idle work refuses readiness. Accepted complete pushed Beads candidates use the same native status helper
 and ordinary Git surfaces without a public status tool or task-file mirror. The
 Conversation treats `mainHead` as the current clean pushed canonical code head,
 ordinarily integrates it into the idle Episode when needed, pushes and proves an
@@ -950,7 +960,7 @@ native `ready_for_merge` preflight. Canonical main uses ordinary
 may one guarded native transition publish `done` with a truthful final note
 naming the authorized tuple and code outcome. Failure preserves exact evidence;
 there is no retry, force, replay, custom publisher, receipt, snapshot, or new
-transaction. Beads abandonment and cleanup now use only existing native/Git boundaries. Successful merge stays custom native `done`. Explicit abandonment uses supported built-in `closed` plus an exact task/Episode-head `close_reason`, one non-force publication, and complete raw/history proof; `closed` is never mapped to canonical `Done`. Separately confirmed `finalize_task_episode` verifies the current published native outcome, code inclusion or exclusion, direct-remote heads, and ancestry before binding `cleanupHead`, removing only the idle Episode runtime/worktree/local branch, and marking ownership inactive last. The shared Beads store/server/history and unrelated owners survive. Migration/cutover and provider-independent task-history changes remain outside this slice.
+transaction. Beads abandonment and cleanup now use only existing native/Git boundaries. Successful merge stays custom native `done`. Explicit abandonment uses supported built-in `closed` plus an exact task/Episode-head `close_reason`, one non-force publication, and complete raw/history proof; `closed` is never mapped to canonical `Done`. After the operator-authorized terminal outcome is committed, pushed, and verified, the Conversation automatically invokes cleanup-only `finalize_task_episode` without separate cleanup confirmation, passing exact `taskId`, terminal `episodeHead`, and truthful `outcome`. It verifies current published native outcome, code inclusion or exclusion, direct-remote heads, ancestry, and exact idle resources; removes only the bound runtime, upstream ref, worktree, and any remaining local branch; and removes only the unchanged owner entry after verified absence. It stores no cleanup head, progress state, inactive record, or successful-close replay result. The Conversation interprets errors and re-reads current ownership, provider, Git, and selected-provider evidence before any safe re-invocation; no retry loop drives cleanup. The shared Beads store/server/history and unrelated owners survive. Migration/cutover and provider-independent task-history changes remain outside this slice.
 
 ### Explicit selected-provider migration (AC18/19)
 
