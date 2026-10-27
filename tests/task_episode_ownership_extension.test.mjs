@@ -360,6 +360,12 @@ function transitionFixture() {
   return { root, relative, episodeRoot: realpathSync(episodeRoot), baseRef, legacyHead, episodeHead, mainHead, transcript, legacy, selection };
 }
 
+function makeBeadsTransitionContinuable(f) {
+  f.legacy = { ...f.legacy, head: f.baseRef };
+  writeEpisodeOwnership(f.root, f.legacy);
+  return f;
+}
+
 function transition(f, overrides = {}, dependencies = {}) {
   return transitionLegacyEpisodeOwnershipToTask({
     projectRoot: f.root,
@@ -373,7 +379,7 @@ function transition(f, overrides = {}, dependencies = {}) {
     confirmedReady: true,
     ...overrides,
   }, {
-    taskResolver: () => f.selection,
+    transitionTargetResolver: () => ({ provider: "backlog", history: "branch-local", task: f.selection }),
     now: () => "2026-10-14T09:00:00.000Z",
     ...dependencies,
   });
@@ -408,6 +414,202 @@ test("guarded transition replaces only the exact owner's legacy authority and pr
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.record, result.record);
   assert.throws(() => transition(f, { sourceLocation: ".ralph/plans/future/different" }), /superseded legacy source binding/);
+});
+
+test("guarded transition records published independent Backlog authority without manufacturing task evidence on the code DAG", () => {
+  const f = transitionFixture();
+  const providerRevision = "7".repeat(40);
+  const taskEvidence = {
+    schemaVersion: 1,
+    kind: "task-view",
+    task: {
+      id: f.selection.taskId,
+      path: f.relative,
+      status: "In Progress",
+      implementationPlan: f.selection.implementationPlan,
+      references: f.selection.references,
+    },
+  };
+  const providerTarget = {
+    provider: "backlog",
+    history: "independent",
+    task: f.selection,
+    providerRevision,
+    taskEvidence,
+  };
+  const result = transition(f, {}, { transitionTargetResolver: () => providerTarget });
+  assert.equal(result.record.provider, "backlog");
+  assert.equal(result.record.taskPath, f.relative);
+  assert.equal(result.record.providerRevision, providerRevision);
+  assert.deepEqual(result.record.taskEvidence, taskEvidence);
+  assert.equal(result.record.baseRef, f.legacy.baseRef);
+  assert.equal(result.record.operationId, f.legacy.operationId);
+  assert.equal(result.record.episodeId, f.legacy.episodeId);
+  assert.equal(result.record.worktree, f.legacy.worktree);
+  assert.equal(result.record.branch, f.legacy.branch);
+
+  const replay = transition(f, {}, { transitionTargetResolver: () => providerTarget });
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.record, result.record);
+});
+
+test("guarded transition records published Beads authority and its first normal handoff remains usable", () => {
+  const f = makeBeadsTransitionContinuable(transitionFixture());
+  const sourceReference = `legacy-episode-source=${f.legacy.sourceLocation}; superseded-by=${f.selection.taskId}`;
+  const taskEvidence = {
+    id: f.selection.taskId,
+    title: "Native retained migration",
+    status: "in_progress",
+    description: "Reviewed retained specification content",
+    design: "Complete bridge candidate plan",
+    notes: `Migration provenance\n${sourceReference}`,
+    comments: [{ body: "reviewed before authority switch" }],
+  };
+  const providerTarget = {
+    provider: "beads",
+    task: {
+      provider: "beads",
+      taskId: f.selection.taskId,
+      title: taskEvidence.title,
+      nativeStatus: taskEvidence.status,
+      status: "In Progress",
+      projectRoot: f.root,
+      nativeView: taskEvidence,
+    },
+    providerRevision: "m".repeat(32),
+    taskEvidence,
+  };
+  const result = transition(f, {}, { transitionTargetResolver: () => providerTarget });
+  assert.equal(result.record.provider, "beads");
+  assert.equal(result.record.taskId, f.selection.taskId);
+  assert.equal(result.record.providerRevision, "m".repeat(32));
+  assert.deepEqual(result.record.taskEvidence, taskEvidence);
+  assert.equal(result.record.taskPath, undefined);
+  assert.equal(result.record.baseRef, f.legacy.baseRef);
+  assert.equal(result.record.head, f.legacy.head);
+
+  const replay = transition(f, {}, { transitionTargetResolver: () => providerTarget });
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.record, result.record);
+
+  const advancedEvidence = { ...taskEvidence, notes: `${taskEvidence.notes}\noutside advance` };
+  const advanced = {
+    ...providerTarget,
+    providerRevision: "n".repeat(32),
+    task: { ...providerTarget.task, nativeView: advancedEvidence },
+    taskEvidence: advancedEvidence,
+  };
+  assert.throws(() => transition(f, {}, { transitionTargetResolver: () => advanced }), /does not match the completed transition binding/);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), result.record);
+
+  const firstHandoff = {
+    root: f.root, episodeRoot: f.episodeRoot, taskId: f.selection.taskId,
+    owner: result.record, reviewedHead: f.episodeHead,
+    publishedProviderRevision: providerTarget.providerRevision,
+    currentTaskEvidence: taskEvidence,
+  };
+  const preparedHandoff = prepareEvidence(firstHandoff);
+  assert.equal(preparedHandoff.commit().head, f.episodeHead);
+});
+
+test("guarded Beads transition rejects a historical head that its first handoff and cleanup cannot continue", () => {
+  const f = transitionFixture();
+  const sourceReference = `legacy-episode-source=${f.legacy.sourceLocation}; superseded-by=${f.selection.taskId}`;
+  const taskEvidence = {
+    id: f.selection.taskId, title: "Native retained migration", status: "in_progress",
+    design: "Complete bridge candidate plan", notes: sourceReference,
+  };
+  const providerTarget = {
+    provider: "beads",
+    task: {
+      provider: "beads", taskId: f.selection.taskId, title: taskEvidence.title,
+      nativeStatus: taskEvidence.status, status: "In Progress", projectRoot: f.root, nativeView: taskEvidence,
+    },
+    providerRevision: "m".repeat(32),
+    taskEvidence,
+  };
+  assert.throws(() => transition(f, {}, { transitionTargetResolver: () => providerTarget }), /historical Episode head cannot continue/);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), f.legacy);
+
+  const backlogResult = transition(f);
+  assert.equal(backlogResult.record.provider, "backlog");
+  assert.equal(backlogResult.record.head, f.legacyHead);
+});
+
+test("guarded Beads transition rejects a published design that differs from the retained living plan", () => {
+  const f = makeBeadsTransitionContinuable(transitionFixture());
+  const sourceReference = `legacy-episode-source=${f.legacy.sourceLocation}; superseded-by=${f.selection.taskId}`;
+  const taskEvidence = {
+    id: f.selection.taskId,
+    title: "Native retained migration",
+    status: "in_progress",
+    design: "Stale or partial provider-native plan",
+    notes: sourceReference,
+  };
+  const providerTarget = {
+    provider: "beads",
+    task: {
+      provider: "beads", taskId: f.selection.taskId, title: taskEvidence.title,
+      nativeStatus: taskEvidence.status, status: "In Progress", projectRoot: f.root, nativeView: taskEvidence,
+    },
+    providerRevision: "m".repeat(32),
+    taskEvidence,
+  };
+  assert.throws(() => transition(f, {}, { transitionTargetResolver: () => providerTarget }), /Beads task plan does not exactly match/);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), f.legacy);
+});
+
+test("guarded provider publication failure and paired evidence drift preserve exact version-1 recovery", () => {
+  const failed = transitionFixture();
+  assert.throws(() => transition(failed, {}, {
+    transitionTargetResolver: () => { throw new Error("published provider task is unavailable"); },
+  }), /published provider task is unavailable/);
+  assert.deepEqual(readEpisodeOwnership(failed.root, failed.legacy.ownerSessionId), failed.legacy);
+
+  const raced = transitionFixture();
+  let calls = 0;
+  const first = {
+    provider: "backlog",
+    history: "independent",
+    task: raced.selection,
+    providerRevision: "7".repeat(40),
+    taskEvidence: { task: {
+      id: raced.selection.taskId, path: raced.relative, status: "In Progress",
+      implementationPlan: raced.selection.implementationPlan, references: raced.selection.references,
+    } },
+  };
+  assert.throws(() => transition(raced, {}, {
+    transitionTargetResolver: () => (++calls === 1 ? first : { ...first, providerRevision: "8".repeat(40) }),
+  }), /publication changed during ownership transition validation/);
+  assert.equal(calls, 2);
+  assert.deepEqual(readEpisodeOwnership(raced.root, raced.legacy.ownerSessionId), raced.legacy);
+});
+
+test("guarded transition re-proves exact code state after final provider reads and before replay returns", () => {
+  const f = transitionFixture();
+  let calls = 0;
+  assert.throws(() => transition(f, {}, {
+    transitionTargetResolver: () => {
+      calls += 1;
+      if (calls === 2) writeFileSync(join(f.episodeRoot, f.relative), "status: In Progress\nplan: concurrent tracked drift\n");
+      return { provider: "backlog", history: "branch-local", task: f.selection };
+    },
+  }), /Git state changed during ownership transition validation/);
+  assert.equal(calls, 2);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), f.legacy);
+
+  git(f.episodeRoot, "checkout", "--", f.relative);
+  const completed = transition(f);
+  let replayCalls = 0;
+  assert.throws(() => transition(f, {}, {
+    transitionTargetResolver: () => {
+      replayCalls += 1;
+      writeFileSync(join(f.episodeRoot, f.relative), "status: In Progress\nplan: concurrent replay drift\n");
+      return { provider: "backlog", history: "branch-local", task: f.selection };
+    },
+  }), /Git state changed during ownership transition validation/);
+  assert.equal(replayCalls, 1);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), completed.record);
 });
 
 test("guarded transition atomically replaces an obsolete runtime route with the verified current route", () => {
@@ -521,7 +723,9 @@ test("guarded transition rejects merge, rebase, cherry-pick, and revert state", 
 
 test("guarded transition requires the complete task plan to equal the active execution plan", () => {
   const f = transitionFixture();
-  assert.throws(() => transition(f, {}, { taskResolver: () => ({ ...f.selection, implementationPlan: "stale partial plan" }) }), /does not exactly match/);
+  assert.throws(() => transition(f, {}, { transitionTargetResolver: () => ({
+    provider: "backlog", history: "branch-local", task: { ...f.selection, implementationPlan: "stale partial plan" },
+  }) }), /does not exactly match/);
   assert.deepEqual(readEpisodeOwnership(f.root), f.legacy);
 });
 

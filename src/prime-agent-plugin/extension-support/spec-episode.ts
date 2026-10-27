@@ -82,6 +82,7 @@ import {
   reservePublishedBeadsTaskEpisodeOwnership,
   reservePublishedBacklogTaskEpisodeOwnership,
   reserveTaskEpisodeOwnership,
+  resolveLegacyTaskOwnershipTransitionTarget,
   transitionLegacyEpisodeOwnershipToTask,
   type LegacyTaskOwnershipTransitionGit,
   type LegacyTaskOwnershipTransitionResult,
@@ -253,6 +254,7 @@ export interface EpisodeOwnershipTransitionDependencies extends EpisodeDependenc
   transitionGit?: LegacyTaskOwnershipTransitionGit;
   taskRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  transitionTargetResolver?: typeof resolveLegacyTaskOwnershipTransitionTarget;
   transitionNow?: () => string;
   transitionOwnership?: typeof transitionLegacyEpisodeOwnershipToTask;
 }
@@ -1474,8 +1476,8 @@ export async function transitionSpecEpisodeToTaskOwnership(
   const store = dependencies.ownership ?? defaultOwnershipStore;
   const orca = dependencies.orca ?? new CliOrcaAdapter();
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? defaultEpisodeTaskResolver(runner);
+  const resolveTransitionTarget = dependencies.transitionTargetResolver
+    ?? resolveLegacyTaskOwnershipTransitionTarget;
   let publisher = dependencies.publisher;
   try {
     const repo = git.repositoryRoot(ctx.cwd);
@@ -1550,7 +1552,8 @@ export async function transitionSpecEpisodeToTaskOwnership(
     }, {
       ...(dependencies.transitionGit ? { git: dependencies.transitionGit } : {}),
       ownership: store,
-      taskResolver: resolveTask,
+      runner,
+      transitionTargetResolver: resolveTransitionTarget,
       ...(dependencies.transitionNow ? { now: dependencies.transitionNow } : {}),
     });
   } finally { try { publisher?.close(); } catch { /* do not mask transition result */ } }

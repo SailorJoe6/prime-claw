@@ -36,7 +36,11 @@ import {
   type BeadsWorkspaceTransportPreparation,
   type ProviderTaskResolution,
 } from "./task-providers.ts";
-import type { EpisodeTaskHistoryMutation } from "./task-history-workspace.ts";
+import {
+  inspectEpisodeTaskHistoryStore,
+  inspectPublishedPrimaryTaskHistory,
+  type EpisodeTaskHistoryMutation,
+} from "./task-history-workspace.ts";
 
 /**
  * Default resolver: provider-aware task resolution narrowed to the existing
@@ -198,19 +202,45 @@ export interface LegacyTaskOwnershipTransitionGit {
   operationInProgress(repo: string): boolean;
   worktrees(repo: string): Array<{ path: string; branch: string; head: string }>;
   isAncestor(repo: string, ancestor: string, descendant: string): boolean;
-  commitPaths(repo: string, ref: string): string[];
   blobOid(repo: string, ref: string, path: string): string;
 }
+
+export type LegacyTaskOwnershipTransitionTarget =
+  | {
+      provider: "backlog";
+      history: "branch-local";
+      task: BacklogTaskSelection;
+    }
+  | {
+      provider: "backlog";
+      history: "independent";
+      task: BacklogTaskSelection;
+      providerRevision: string;
+      taskEvidence: Record<string, unknown>;
+    }
+  | {
+      provider: "beads";
+      task: Extract<ProviderTaskResolution, { provider: "beads" }>;
+      providerRevision: string;
+      taskEvidence: Record<string, unknown>;
+    };
 
 export interface LegacyTaskOwnershipTransitionDependencies {
   git?: LegacyTaskOwnershipTransitionGit;
   ownership?: TaskEpisodeReservationStore;
-  taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  runner?: CommandRunner;
+  transitionTargetResolver?: (
+    projectRoot: string,
+    episodeRoot: string,
+    taskId: string,
+    runner: CommandRunner,
+  ) => LegacyTaskOwnershipTransitionTarget;
   now?: () => string;
 }
 
 export interface LegacyTaskOwnershipTransitionResult {
-  record: LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord;
+  record: LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord
+    | PublishedBacklogTaskEpisodeOwnershipRecord | BeadsTaskEpisodeOwnershipRecord;
   reused: boolean;
   mainHead: string;
   episodeHead: string;
@@ -324,10 +354,6 @@ export class CliLegacyTaskOwnershipTransitionGit implements LegacyTaskOwnershipT
       throw error;
     }
   }
-  commitPaths(repo: string, ref: string): string[] {
-    const output = runGit(repo, ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", ref, "--"]);
-    return output ? output.split(/\r?\n/).filter(Boolean) : [];
-  }
   blobOid(repo: string, ref: string, path: string): string {
     return runGit(repo, ["rev-parse", "--verify", `${ref}:${path}`]);
   }
@@ -389,25 +415,164 @@ function assertRegularNonemptyFile(path: string, label: string): void {
   }
 }
 
-function exactTransitionTask(
+function exactTransitionBacklogTask(
   root: string,
-  input: LegacyTaskOwnershipTransitionInput,
-  resolver: (cwd: string, taskId: string) => BacklogTaskSelection | null,
+  taskId: string,
+  selection: BacklogTaskSelection,
+  history: "branch-local" | "independent",
 ): { selection: BacklogTaskSelection; taskPath: string } {
-  const selection = resolver(root, input.taskId);
-  if (!selection) throw new Error(`Backlog task ${input.taskId} is unavailable for ownership transition`);
-  if (selection.taskId !== input.taskId) throw new Error("Ownership transition requires the exact canonical Backlog task ID");
+  if (selection.taskId !== taskId) throw new Error("Ownership transition requires the exact canonical Backlog task ID");
   if (realpathSync(selection.projectRoot) !== root) throw new Error("Ownership transition task resolved in a different project");
-  if (selection.status !== "In Progress") throw new Error("Ownership transition requires the committed main task to remain In Progress");
+  if (selection.status !== "In Progress") throw new Error("Ownership transition requires the selected Backlog task to remain In Progress");
   if (!meaningfulTaskImplementationPlan(selection.implementationPlan)) {
-    throw new Error("Ownership transition requires a meaningful committed-main Implementation Plan");
+    throw new Error("Ownership transition requires a meaningful selected-provider Implementation Plan");
   }
   assertRegularNonemptyFile(selection.taskPath, "Ownership transition task");
-  const taskPath = realpathSync(selection.taskPath);
-  if (!containedBy(root, taskPath)) throw new Error("Ownership transition task escaped the project root");
-  const relativePath = portableRelativePath(root, taskPath);
-  if (relativePath !== selection.taskPathRelative) throw new Error("Ownership transition task path changed after Backlog resolution");
-  return { selection, taskPath: relativePath };
+  const realTaskPath = realpathSync(selection.taskPath);
+  if (!containedBy(root, realTaskPath)) throw new Error("Ownership transition task escaped the project root");
+  if (history === "branch-local") {
+    const relativePath = portableRelativePath(root, realTaskPath);
+    if (relativePath !== selection.taskPathRelative) throw new Error("Ownership transition task path changed after Backlog resolution");
+  } else if (!selection.taskPathRelative || isAbsolute(selection.taskPathRelative)
+      || win32.isAbsolute(selection.taskPathRelative) || selection.taskPathRelative.includes("\\")
+      || selection.taskPathRelative.split("/").some((part) => !part || part === "." || part === "..")) {
+    throw new Error("Ownership transition received an unsafe provider-native Backlog task path");
+  }
+  return { selection, taskPath: selection.taskPathRelative };
+}
+
+function parseNativeTaskView(result: { stdout: string; stderr: string; status: number }, label: string): Record<string, unknown> {
+  if (result.status !== 0) {
+    throw new Error(`${label} failed: ${result.stderr.trim() || result.stdout.trim() || `exit ${result.status}`}`);
+  }
+  try {
+    const parsed = JSON.parse(result.stdout) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(`${label} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Read-only provider-native proof for the task that will supersede retained
+ * authority. Explicit authoring and publication happen before this boundary;
+ * this resolver never creates a task, task-history workspace, or resource.
+ */
+export function resolveLegacyTaskOwnershipTransitionTarget(
+  projectRoot: string,
+  episodeRoot: string,
+  taskId: string,
+  runner: CommandRunner = new ProcessCommandRunner(),
+): LegacyTaskOwnershipTransitionTarget {
+  const detection = detectTaskProvider(projectRoot, runner);
+  if (detection.kind !== "selected") {
+    const detail = detection.kind === "blocked" ? `${detection.code}: ${detection.detail}` : "no live provider is selected";
+    throw new Error(`Ownership transition cannot prove selected provider authority: ${detail}`);
+  }
+  const mainTask = resolveProviderTask(projectRoot, taskId, runner);
+  if (!mainTask || mainTask.taskId !== taskId || mainTask.status !== "In Progress") {
+    throw new Error("Ownership transition requires the exact selected-provider task to remain In Progress");
+  }
+  if (mainTask.provider !== detection.evidence.provider) {
+    throw new Error("Ownership transition provider resolution differs from selected provider authority");
+  }
+
+  if (mainTask.provider === "backlog") {
+    const storeDir = detection.evidence.storeDir;
+    if (!storeDir) throw new Error("Ownership transition selected Backlog store has not materialized");
+    const storeRootResult = runner.run("git", ["rev-parse", "--show-toplevel"], { cwd: storeDir, allowFailure: true });
+    if (storeRootResult.status !== 0) {
+      throw new Error(`Ownership transition cannot prove Backlog history topology: ${storeRootResult.stderr.trim() || `exit ${storeRootResult.status}`}`);
+    }
+    const storeRoot = realpathSync(storeRootResult.stdout.trim());
+    if (storeRoot === projectRoot) {
+      exactTransitionBacklogTask(projectRoot, taskId, mainTask, "branch-local");
+      return { provider: "backlog", history: "branch-local", task: mainTask };
+    }
+    if (storeRoot !== realpathSync(storeDir)) {
+      throw new Error("Ownership transition Backlog store is neither branch-local nor an independent native history clone");
+    }
+
+    const primary = inspectPublishedPrimaryTaskHistory({ primaryRoot: projectRoot, taskId, runner });
+    if (primary.status !== "ready") {
+      throw new Error(`Ownership transition cannot prove published independent Backlog history: ${primary.code}: ${primary.detail}`);
+    }
+    const episode = inspectEpisodeTaskHistoryStore({
+      primaryRoot: projectRoot, targetWorktree: episodeRoot, expectedRevision: primary.head, runner,
+    });
+    if (episode.status !== "ready" || !episode.present) {
+      const detail = episode.status === "refused" ? `${episode.code}: ${episode.detail}` : "the Episode task-history clone is absent";
+      throw new Error(`Ownership transition cannot prove the pre-existing Episode Backlog workspace: ${detail}`);
+    }
+    const episodeTask = resolveProviderTask(episodeRoot, taskId, runner);
+    if (!episodeTask || episodeTask.provider !== "backlog" || episodeTask.taskId !== taskId
+        || episodeTask.status !== "In Progress" || episodeTask.taskPathRelative !== mainTask.taskPathRelative
+        || !meaningfulTaskImplementationPlan(episodeTask.implementationPlan)) {
+      throw new Error("Ownership transition primary and Episode Backlog task identities differ");
+    }
+    exactTransitionBacklogTask(projectRoot, taskId, mainTask, "independent");
+    exactTransitionBacklogTask(episodeRoot, taskId, episodeTask, "independent");
+    const mainEvidence = parseNativeTaskView(
+      runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd: projectRoot, allowFailure: true }),
+      "Ownership transition primary Backlog task read",
+    );
+    const episodeEvidence = parseNativeTaskView(
+      runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd: episodeRoot, allowFailure: true }),
+      "Ownership transition Episode Backlog task read",
+    );
+    if (JSON.stringify(mainEvidence) !== JSON.stringify(episodeEvidence)) {
+      throw new Error("Ownership transition primary and Episode Backlog native task evidence differ");
+    }
+    const pairedPrimary = inspectPublishedPrimaryTaskHistory({ primaryRoot: projectRoot, taskId, expectedRevision: primary.head, runner });
+    const pairedEpisode = inspectEpisodeTaskHistoryStore({
+      primaryRoot: projectRoot, targetWorktree: episodeRoot, expectedRevision: primary.head, runner,
+    });
+    if (pairedPrimary.status !== "ready" || pairedPrimary.head !== primary.head
+        || pairedEpisode.status !== "ready" || !pairedEpisode.present) {
+      throw new Error("Ownership transition independent Backlog publication changed during paired proof");
+    }
+    return {
+      provider: "backlog", history: "independent", task: mainTask,
+      providerRevision: primary.head, taskEvidence: mainEvidence,
+    };
+  }
+
+  const prepare = (): BeadsWorkspaceTransportPreparation => prepareBeadsWorkspaceTransport(projectRoot, runner);
+  const primary = prepare();
+  if (primary.status !== "ready") {
+    throw new Error(`Ownership transition cannot prove published Beads history: ${primary.code}: ${primary.detail}`);
+  }
+  if (primary.evidence.revision !== primary.evidence.publishedRevision) {
+    throw new Error("Ownership transition Beads working revision is not the exact published provider revision");
+  }
+  const episodeDetection = detectTaskProvider(episodeRoot, runner);
+  if (episodeDetection.kind !== "selected" || episodeDetection.evidence.provider !== "beads"
+      || episodeDetection.evidence.storeDir !== detection.evidence.storeDir
+      || episodeDetection.evidence.metadataPath !== detection.evidence.metadataPath
+      || episodeDetection.evidence.configPath !== detection.evidence.configPath
+      || episodeDetection.evidence.doltDatabase !== detection.evidence.doltDatabase) {
+    throw new Error("Ownership transition Episode Beads authority differs from the selected primary provider");
+  }
+  const episodeTask = resolveProviderTask(episodeRoot, taskId, runner);
+  if (!episodeTask || episodeTask.provider !== "beads" || episodeTask.taskId !== taskId
+      || episodeTask.status !== "In Progress" || JSON.stringify(episodeTask.nativeView) !== JSON.stringify(mainTask.nativeView)) {
+    throw new Error("Ownership transition primary and Episode Beads task evidence differ");
+  }
+  if (typeof mainTask.nativeView.design !== "string" || !meaningfulTaskImplementationPlan(mainTask.nativeView.design)) {
+    throw new Error("Ownership transition requires a meaningful selected-provider Beads design");
+  }
+  const pairedPrimary = prepare();
+  if (pairedPrimary.status !== "ready"
+      || pairedPrimary.evidence.publishedRevision !== primary.evidence.publishedRevision
+      || pairedPrimary.evidence.publicationHead !== primary.evidence.publicationHead) {
+    throw new Error("Ownership transition Beads publication changed during paired proof");
+  }
+  return {
+    provider: "beads", task: mainTask,
+    providerRevision: primary.evidence.publishedRevision,
+    taskEvidence: mainTask.nativeView,
+  };
 }
 
 function activePlanEvidence(
@@ -451,6 +616,24 @@ function canonicalMainStatusIsSafe(status: string): boolean {
   return status.split(/\r?\n/).filter(Boolean).every((line) => line.startsWith("?? "));
 }
 
+function assertLegacyTransitionGitState(
+  root: string,
+  episodeRoot: string,
+  initial: EpisodeOwnershipRecord,
+  input: LegacyTaskOwnershipTransitionInput,
+  git: LegacyTaskOwnershipTransitionGit,
+): void {
+  const worktree = git.worktrees(root).find((entry) => entry.path === episodeRoot);
+  if (git.operationInProgress(root) || !git.isPrimaryWorktree(root) || git.branch(root) !== "main"
+      || git.head(root) !== input.expectedMainHead || git.upstreamHead(root) !== input.expectedMainHead
+      || !canonicalMainStatusIsSafe(git.status(root)) || git.operationInProgress(episodeRoot)
+      || !worktree || worktree.branch !== initial.branch || worktree.head !== input.expectedEpisodeHead
+      || git.branch(episodeRoot) !== initial.branch || git.head(episodeRoot) !== input.expectedEpisodeHead
+      || git.upstreamHead(episodeRoot) !== input.expectedEpisodeHead || git.status(episodeRoot) !== "") {
+    throw new Error("Git state changed during ownership transition validation");
+  }
+}
+
 /**
  * Replace one exact live version-1 authority binding with a task-native binding.
  * This is deliberately a post-review, post-merge, post-activation transition:
@@ -467,7 +650,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
     throw new Error("Ownership transition requires one exact retained future-plan source location");
   }
   if (!input.taskId || /\s/.test(input.taskId) || input.taskId.startsWith("-")) {
-    throw new Error("Ownership transition requires one exact canonical Backlog task ID");
+    throw new Error("Ownership transition requires one exact canonical task ID");
   }
   if (!input.ownerSessionId) throw new Error("Ownership transition requires the exact owner Conversation session");
   if (!input.expectedPreviousEpisodeActiveSessionId || !input.verifiedCurrentEpisodeActiveSessionId) {
@@ -479,7 +662,8 @@ export function transitionLegacyEpisodeOwnershipToTask(
 
   const git = dependencies.git ?? new CliLegacyTaskOwnershipTransitionGit();
   const ownership = dependencies.ownership ?? defaultOwnership;
-  const resolver = dependencies.taskResolver ?? defaultOwnershipTaskResolver;
+  const runner = dependencies.runner ?? new ProcessCommandRunner();
+  const targetResolver = dependencies.transitionTargetResolver ?? resolveLegacyTaskOwnershipTransitionTarget;
   const requestedRoot = realpathSync(input.projectRoot);
   const root = git.repositoryRoot(requestedRoot);
   if (root !== requestedRoot) throw new Error("Ownership transition must run from the repository root");
@@ -497,30 +681,18 @@ export function transitionLegacyEpisodeOwnershipToTask(
   }
   if (!canonicalMainStatusIsSafe(git.status(root))) throw new Error("Canonical main has staged or tracked working-tree changes; ownership transition made no change");
 
-  const { selection, taskPath } = exactTransitionTask(root, input, resolver);
   const initial = ownership.read(root, input.ownerSessionId);
   if (!initial) throw new Error("Exact Episode ownership is missing before ownership transition");
   if (initial.status !== "active") throw new Error(`Ownership transition requires active ownership; found ${initial.status}`);
   if (initial.ownerSessionId !== input.ownerSessionId) throw new Error("Ownership transition requires the exact owner Conversation");
-
   if (isLegacyEpisodeOwnership(initial)) {
     if (initial.sourceLocation !== input.sourceLocation) throw new Error("Ownership transition source location does not match active ownership");
     if (initial.episodeActiveSessionId !== input.expectedPreviousEpisodeActiveSessionId) {
       throw new Error("Ownership transition previous runtime route drifted before atomic replacement");
     }
-  } else {
-    if (!isBacklogTaskEpisodeOwnership(initial)) {
-      throw new Error("Legacy ownership transition replay does not yet support Beads ownership");
-    }
-    if (initial.taskId !== input.taskId || initial.taskPath !== taskPath
+  } else if (initial.taskId !== input.taskId
       || initial.episodeActiveSessionId !== input.verifiedCurrentEpisodeActiveSessionId) {
-      throw new Error("Existing task-native ownership does not match the completed transition binding");
-    }
-  }
-
-  const sourceReference = `legacy-episode-source=${input.sourceLocation}; superseded-by=${input.taskId}`;
-  if (!selection.references?.includes(sourceReference)) {
-    throw new Error("Ownership transition task does not preserve the exact superseded legacy source binding");
+    throw new Error("Existing task-native ownership does not match the completed transition binding");
   }
 
   const requiredIdentity = [
@@ -541,7 +713,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
   }
   if (git.status(episodeRoot) !== "") throw new Error("Owned Episode worktree is dirty; ownership transition made no change");
   if (!TRANSITION_GIT_OID.test(initial.baseRef) || !TRANSITION_GIT_OID.test(initial.head!)) {
-    throw new Error("Ownership transition lacks exact admission or resource-head evidence");
+    throw new Error("Ownership transition lacks exact original legacy admission or resource-head evidence");
   }
   if (!git.isAncestor(root, initial.baseRef, initial.head!)
     || !git.isAncestor(root, initial.baseRef, input.expectedEpisodeHead)
@@ -549,48 +721,118 @@ export function transitionLegacyEpisodeOwnershipToTask(
     || !git.isAncestor(root, input.expectedEpisodeHead, input.expectedMainHead)) {
     throw new Error("Ownership transition branch or HEAD ancestry is unsafe");
   }
-  const admissionPaths = git.commitPaths(root, initial.baseRef);
-  if (admissionPaths.length !== 1 || admissionPaths[0] !== taskPath) {
-    throw new Error("Ownership transition admission evidence is not the exact task-only status commit");
+
+  const providerTarget = targetResolver(root, episodeRoot, input.taskId, runner);
+  const sourceReference = `legacy-episode-source=${input.sourceLocation}; superseded-by=${input.taskId}`;
+  let taskPath: string | undefined;
+  if (providerTarget.provider === "backlog") {
+    const exact = exactTransitionBacklogTask(root, input.taskId, providerTarget.task, providerTarget.history);
+    taskPath = exact.taskPath;
+    if (!providerTarget.task.references?.includes(sourceReference)) {
+      throw new Error("Ownership transition Backlog task does not preserve the exact superseded legacy source binding");
+    }
+    if (providerTarget.history === "independent") {
+      const rawTask = providerTarget.taskEvidence.task;
+      if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
+          || (rawTask as Record<string, unknown>).id !== input.taskId
+          || (rawTask as Record<string, unknown>).path !== taskPath
+          || (rawTask as Record<string, unknown>).status !== "In Progress"
+          || (rawTask as Record<string, unknown>).implementationPlan !== providerTarget.task.implementationPlan
+          || !Array.isArray((rawTask as Record<string, unknown>).references)
+          || !((rawTask as Record<string, unknown>).references as unknown[]).includes(sourceReference)) {
+        throw new Error("Ownership transition independent Backlog evidence does not match the exact native task binding");
+      }
+    }
+  } else {
+    if (JSON.stringify(providerTarget.taskEvidence) !== JSON.stringify(providerTarget.task.nativeView)) {
+      throw new Error("Ownership transition Beads evidence does not match the exact raw native task");
+    }
+    const notes = providerTarget.taskEvidence.notes;
+    if (typeof notes !== "string" || !notes.split(/\r?\n/).includes(sourceReference)) {
+      throw new Error("Ownership transition Beads task notes do not preserve the exact superseded legacy source binding");
+    }
+    if (!git.isAncestor(episodeRoot, initial.head!, input.expectedEpisodeHead)) {
+      throw new Error("Ownership transition cannot switch to Beads because the preserved historical Episode head cannot continue through Beads handoff or cleanup");
+    }
   }
-  let mainTaskBlob: string;
-  let episodeTaskBlob: string;
-  try {
-    mainTaskBlob = git.blobOid(root, input.expectedMainHead, taskPath);
-    episodeTaskBlob = git.blobOid(episodeRoot, input.expectedEpisodeHead, taskPath);
-  } catch {
-    throw new Error("Ownership transition cannot prove the exact committed task on main and the Episode branch");
+
+  if (isTaskEpisodeOwnership(initial)) {
+    const sameTarget = providerTarget.provider === "beads"
+      ? isBeadsTaskEpisodeOwnership(initial)
+        && initial.providerRevision === providerTarget.providerRevision
+        && JSON.stringify(initial.taskEvidence) === JSON.stringify(providerTarget.taskEvidence)
+      : isBacklogTaskEpisodeOwnership(initial) && initial.taskPath === taskPath
+        && (providerTarget.history === "branch-local"
+          ? initial.providerRevision === undefined && initial.taskEvidence === undefined
+          : initial.provider === "backlog" && initial.providerRevision === providerTarget.providerRevision
+            && JSON.stringify(initial.taskEvidence) === JSON.stringify(providerTarget.taskEvidence));
+    if (!sameTarget) throw new Error("Existing task-native ownership does not match the completed transition binding");
   }
-  if (mainTaskBlob !== episodeTaskBlob || !TRANSITION_GIT_OID.test(mainTaskBlob)) {
-    throw new Error("Committed main task evidence differs from the reviewed Episode task");
+
+  if (providerTarget.provider === "backlog" && providerTarget.history === "branch-local") {
+    let mainTaskBlob: string;
+    let episodeTaskBlob: string;
+    try {
+      mainTaskBlob = git.blobOid(root, input.expectedMainHead, taskPath!);
+      episodeTaskBlob = git.blobOid(episodeRoot, input.expectedEpisodeHead, taskPath!);
+    } catch {
+      throw new Error("Ownership transition cannot prove the exact committed task on main and the Episode branch");
+    }
+    if (mainTaskBlob !== episodeTaskBlob || !TRANSITION_GIT_OID.test(mainTaskBlob)) {
+      throw new Error("Committed main task evidence differs from the reviewed Episode task");
+    }
   }
+
   const plans = activePlanEvidence(initial, git, input.expectedEpisodeHead);
   const normalizePlan = (value: string) => value.replace(/\r\n/g, "\n").replace(/\n+$/, "");
   const activePlan = readFileSync(join(episodeRoot, plans.activeImplementationPlan.path), "utf8");
-  if (!selection.implementationPlan || normalizePlan(selection.implementationPlan) !== normalizePlan(activePlan)) {
-    throw new Error("Committed task Implementation Plan does not exactly match the active Episode execution plan");
+  const providerPlan = providerTarget.provider === "backlog"
+    ? providerTarget.task.implementationPlan
+    : providerTarget.task.nativeView.design;
+  if (typeof providerPlan !== "string" || normalizePlan(providerPlan) !== normalizePlan(activePlan)) {
+    throw new Error(`Selected ${providerTarget.provider === "backlog" ? "Backlog" : "Beads"} task plan does not exactly match the active Episode execution plan`);
   }
 
+  // A provider read may be slow or synchronize native state. Pair every replay
+  // return with a fresh code-state proof rather than trusting the pre-read view.
+  assertLegacyTransitionGitState(root, episodeRoot, initial, input, git);
   if (isTaskEpisodeOwnership(initial)) {
     return { record: initial, reused: true, mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
   }
 
   const { version: _version, sourceLocation: _sourceLocation, slug: _slug, bundleDigest: _bundleDigest, ...preserved } = initial;
-  const target = parseEpisodeOwnership({
+  const commonTarget = {
     ...preserved,
-    version: 2,
-    provider: "backlog",
+    version: 2 as const,
     taskId: input.taskId,
-    taskPath,
     episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-  }) as BacklogTaskEpisodeOwnershipRecord;
+  };
+  const target = parseEpisodeOwnership(providerTarget.provider === "beads" ? {
+    ...commonTarget,
+    provider: "beads",
+    providerRevision: providerTarget.providerRevision,
+    taskEvidence: providerTarget.taskEvidence,
+  } : providerTarget.history === "independent" ? {
+    ...commonTarget,
+    provider: "backlog",
+    taskPath,
+    providerRevision: providerTarget.providerRevision,
+    taskEvidence: providerTarget.taskEvidence,
+  } : {
+    ...commonTarget,
+    provider: "backlog",
+    taskPath,
+  });
 
-  if (git.operationInProgress(root) || git.head(root) !== input.expectedMainHead || git.upstreamHead(root) !== input.expectedMainHead
-    || !canonicalMainStatusIsSafe(git.status(root)) || git.head(episodeRoot) !== input.expectedEpisodeHead
-    || git.upstreamHead(episodeRoot) !== input.expectedEpisodeHead || git.status(episodeRoot) !== "") {
-    throw new Error("Git state changed during ownership transition validation");
+  const pairedProviderTarget = targetResolver(root, episodeRoot, input.taskId, runner);
+  if (JSON.stringify(pairedProviderTarget) !== JSON.stringify(providerTarget)) {
+    throw new Error("Selected provider task or publication changed during ownership transition validation");
   }
+  // The final provider proof is allowed to perform native synchronization, so
+  // the exact reviewed code state must be re-proven after it and directly
+  // before the sole ownership replacement.
+  assertLegacyTransitionGitState(root, episodeRoot, initial, input, git);
   const beforeWrite = ownership.read(root, input.ownerSessionId);
   if (!sameOwnership(beforeWrite, initial)) throw new Error("Episode ownership changed during transition validation");
 
@@ -604,7 +846,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
   }
   const stored = ownership.read(root, input.ownerSessionId);
   if (!sameOwnership(stored, target)) throw new Error("Ownership transition could not verify the exact completed binding");
-  return { record: target, reused: false, mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
+  return { record: target as LegacyTaskOwnershipTransitionResult["record"], reused: false, mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
 }
 
 /**

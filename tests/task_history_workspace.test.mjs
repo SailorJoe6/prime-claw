@@ -26,6 +26,9 @@ import {
   publishTaskHistoryMutation,
   publishEpisodeTaskHistoryMutation,
 } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
+import {
+  resolveLegacyTaskOwnershipTransitionTarget,
+} from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
 
 const FULL_CANONICAL_CONFIG = [
   'project_name: "x"',
@@ -995,6 +998,62 @@ function taskMarkdown(id, title, notes = "initial") {
     "",
   ].join("\n");
 }
+
+test("legacy transition target proves real independent Backlog publication in both existing native clones", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const taskId = "TASK-BRIDGE";
+  const sourceReference = `legacy-episode-source=.ralph/plans/future/bridge; superseded-by=${taskId}`;
+  const taskPath = "tasks/task-bridge - Bridge.md";
+  const markdown = [
+    "---",
+    `id: ${taskId}`,
+    "title: Bridge retained authority",
+    "status: In Progress",
+    "assignee: []",
+    "created_date: '2026-10-27 00:00'",
+    "updated_date: '2026-10-27 00:00'",
+    "labels: []",
+    "dependencies: []",
+    "references:",
+    `  - '${sourceReference}'`,
+    "priority: p2",
+    "type: task",
+    "---",
+    "",
+    "## Description",
+    "",
+    "Preserve the reviewed retained specification.",
+    "",
+    "## Implementation Plan",
+    "",
+    "Complete bridge candidate plan",
+    "",
+  ].join("\n");
+  const f = episodeFixture({ taskFiles: { [taskPath]: markdown } });
+  assert.equal(existsSync(f.storeDir), false);
+  assert.throws(
+    () => resolveLegacyTaskOwnershipTransitionTarget(f.root, f.target, taskId),
+    /pre-existing Episode Backlog workspace.*absent/,
+  );
+  assert.equal(existsSync(f.storeDir), false, "transition proof never creates the Episode task clone");
+  const prepared = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: f.root, targetWorktree: f.target });
+  assert.equal(prepared.status, "prepared");
+
+  const target = resolveLegacyTaskOwnershipTransitionTarget(f.root, f.target, taskId);
+  assert.equal(target.provider, "backlog");
+  assert.equal(target.history, "independent");
+  assert.equal(target.providerRevision, f.primaryHead);
+  assert.equal(target.task.taskId, taskId);
+  assert.equal(target.task.taskPathRelative, `.backlog/${taskPath}`);
+  assert.equal(target.task.status, "In Progress");
+  assert.equal(target.task.implementationPlan, "Complete bridge candidate plan");
+  assert.deepEqual(target.task.references, [sourceReference]);
+  assert.equal(target.taskEvidence.task.id, taskId);
+  assert.equal(target.taskEvidence.task.path, `.backlog/${taskPath}`);
+  assert.equal(target.taskEvidence.task.status, "In Progress");
+  assert.equal(git(f.primaryStoreDir, "status", "--porcelain"), "");
+  assert.equal(git(f.storeDir, "status", "--porcelain"), "");
+});
 
 function mutationFixture() {
   const fixture = episodeFixture({ taskFiles: {

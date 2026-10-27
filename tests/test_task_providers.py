@@ -103,7 +103,11 @@ def test_version_two_ownership_keeps_one_discriminated_provider_native_shape() -
         'exactBeadsTaskEvidence(item.taskEvidence, item.taskId)',
     ):
         assert sentinel in ownership
-    assert writer.count('provider: "backlog"') == 3
+    assert writer.count('provider: "backlog"') >= 3
+    assert "resolveLegacyTaskOwnershipTransitionTarget" in writer
+    assert 'history: "independent"' in writer
+    assert "providerRevision: primary.head" in writer
+    assert "taskEvidence: mainTask.nativeView" in writer
     assert "reservePublishedBacklogTaskEpisodeOwnership" in writer
     assert "reservePublishedBacklogTaskEpisodeOwnership" in episode
     assert writer.count("reservePublishedBeadsTaskEpisodeOwnership") == 1
@@ -111,7 +115,8 @@ def test_version_two_ownership_keeps_one_discriminated_provider_native_shape() -
     assert 'provider: "beads"' in writer
     assert "reservePublishedBeadsTaskEpisodeOwnership" in episode
     assert "reserveBeadsTaskOwnership ?? reservePublishedBeadsTaskEpisodeOwnership" in episode
-    assert "Legacy ownership transition replay does not yet support Beads ownership" in writer
+    assert "Legacy ownership transition replay does not yet support Beads ownership" not in writer
+    assert "Selected provider task or publication changed during ownership transition validation" in writer
     assert "isBacklogTaskEpisodeOwnership(record)" in episode
     assert "does not yet admit Beads ownership" in episode
     for forbidden in (

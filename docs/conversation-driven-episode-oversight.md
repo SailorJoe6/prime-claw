@@ -176,39 +176,58 @@ restart, and proven by UAT. The exact owner supplies the retained source,
 canonical task ID, reviewed pushed Episode head, activated pushed main head, and
 explicit readiness confirmation.
 
+Before review and cutover, the owner explicitly authors the selected
+provider-native task with its native CLI, preserves the retained specification
+and living plan in provider fields, records the exact superseded-source marker
+in Backlog references or a Beads notes line, publishes it, and prepares the
+same provider workspace in the retained Episode. The tool never creates that
+task or workspace.
+
 Before the one atomic ownership write, the host proves:
 
 - the caller is the top-level owner Conversation in pushed primary `main`, where
-  `HEAD` equals both upstream and reviewed evidence, no merge, rebase, cherry-pick,
-  or revert is in progress, and no staged or tracked changes exist; unrelated
-  untracked paths are allowed;
+  `HEAD` equals both upstream and reviewed evidence, no merge, rebase,
+  cherry-pick, or revert is in progress, and no staged or tracked changes exist;
+  unrelated untracked paths are allowed;
 - active version-1 ownership matches the exact source, operation, Episode,
   worktree identity/path, branch, and optional Orca resources; the recorded
   runtime route must either remain exact or be absent while one sole idle
   durable session exposes a verified current replacement route;
-- the exact `In Progress` task path and meaningful native plan are committed on
-  main and byte-identical on the reviewed Episode head, and an exact task
-  reference retains the superseded legacy source binding for replay proof;
-- the task plan exactly equals the active execution plan, while the readable
-  active specification and plan remain tracked at that head;
-- the original task-only admission `baseRef`, historical recorded head,
-  reviewed Episode head, and activated main head have safe ancestry; and
+- the exact selected-provider task remains `In Progress`, its Backlog
+  Implementation Plan or Beads design exactly retains the living execution
+  plan, and it retains the exact superseded-source marker;
+- branch-local Backlog keeps the existing committed main/Episode blob and exact
+  plan checks; independent Backlog instead proves one clean stable direct
+  `refs/heads/prime-claw/tasks` revision and equal complete native task views in
+  both existing nested clones; Beads proves one clean stable published Dolt
+  revision/ref and equal complete raw task views in both workspaces;
+- the readable active specification and plan remain tracked at the reviewed
+  Episode head; the original legacy `baseRef`, historical recorded head,
+  reviewed Episode head, and activated main head have safe code ancestry,
+  without pretending provider history belongs to the code DAG or requiring a
+  pure legacy admission to be a Backlog task-only commit; when Beads is selected,
+  the preserved historical head must also be an ancestor of the reviewed
+  Episode head so its first handoff and cleanup remain usable; and
 - the durable Episode session is unique, exact-CWD, and fully idle, with exact
   connected writable visible Orca terminal inventory when applicable.
 
 The atomic replacement removes only `version`, `sourceLocation`, `slug`, and
-`bundleDigest`; adds version 2 plus the canonical `taskId` and `taskPath`;
-updates bookkeeping time; and preserves every common owner, operation,
-`baseRef`, Episode, durable session ID/file, worktree, branch, recorded-head,
-and Orca field. When a full restart replaced only the ephemeral runtime route,
-the same atomic write binds that sole verified current route; it refuses the
-refresh if the recorded route is still live, another durable match exists, or
-any owner, CWD, branch, worktree, session-file, or resource evidence differs.
-The tool creates no resource, assignment, task/status commit, merge, handoff,
-finalization, deletion, or cleanup. Only an exact same-binding replay is
-idempotent. Dirty, partial, foreign, divergent, unpushed, busy, missing, or
-unverifiable state fails closed. The active pair remains until the later,
-separately reviewed repository-local deletion.
+`bundleDigest`; adds version 2 plus the provider-native task binding and, for
+independent Backlog or Beads, its current published revision and complete task
+evidence; updates bookkeeping time; and preserves every common owner,
+operation, original `baseRef`, Episode, durable session ID/file, worktree,
+branch, recorded-head, and Orca field. When a full restart replaced only the
+ephemeral runtime route, the same atomic write binds that sole verified current
+route; it refuses the refresh if the recorded route is still live, another
+durable match exists, or any owner, CWD, branch, worktree, session-file, or
+resource evidence differs. The tool creates no resource, assignment, task,
+workspace, provider commit, code commit, merge, handoff, finalization, deletion,
+or cleanup. The host pairs the final provider proof, then immediately re-proves
+the exact code heads and clean worktrees before either the sole write or a replay
+return. Only an exact same-binding replay is idempotent. Dirty, partial,
+foreign, divergent, unpublished, busy, missing, or unverifiable state fails
+closed with version-1 authority and blocked recovery unchanged. The active pair
+remains until the later, separately reviewed repository-local deletion.
 
 ## Retained version-1 compatibility Orca creation
 

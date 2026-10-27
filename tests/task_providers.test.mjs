@@ -7,6 +7,7 @@ import test from "node:test";
 
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { commitConversationTaskStatus } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
+import { resolveLegacyTaskOwnershipTransitionTarget } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import {
   BEADS_DOLT_DATA_REF,
@@ -274,6 +275,59 @@ function recordedDetectionRunner(extra = {}, options = {}) {
     },
   };
 }
+
+test("legacy transition target proves paired published Beads revision and complete raw native evidence", () => {
+  const { primary, linked } = linkedWorktreeFixture();
+  mkdirSync(join(primary, ".beads", "dolt"), { recursive: true });
+  mkdirSync(join(linked, ".beads", "dolt"), { recursive: true });
+  const taskId = "TST-BRIDGE";
+  const sourceReference = `legacy-episode-source=.ralph/plans/future/bridge; superseded-by=${taskId}`;
+  const nativeView = {
+    id: taskId,
+    title: "Bridge retained authority",
+    status: "in_progress",
+    description: "Reviewed retained specification content",
+    design: "Reviewed provider-native living plan",
+    notes: `Reviewed provenance\n${sourceReference}`,
+    comments: [{ id: "comment-1", body: "reviewed before cutover" }],
+    provider_native_tail: { opaque: [1, { two: 2 }] },
+  };
+  const real = new ProcessCommandRunner();
+  const calls = [];
+  const runner = {
+    run(command, args, options = {}) {
+      calls.push({ command, args: [...args], cwd: options.cwd });
+      const cwd = options.cwd === linked ? linked : primary;
+      if (command === "bd" && args[0] === "context" && options.cwd === linked) {
+        return {
+          stdout: `${JSON.stringify(linkedBeadsContext(primary, linked, { bd_version: "1.1.2" }))}\n`,
+          stderr: "", status: 0,
+        };
+      }
+      if (command === "bd" && args[0] === "show") {
+        return { stdout: `${JSON.stringify([nativeView])}\n`, stderr: "", status: 0 };
+      }
+      if (command === "dolt" && args[0] === "clone") return { stdout: "cloned\n", stderr: "", status: 0 };
+      if (command === "dolt" && args[0] === "sql" && args.at(-1) === DOLT_REMOTE_IDENTITY_QUERY) {
+        return { stdout: `${JSON.stringify({ rows: [{ database_name: "fixture_db", branch: "main", revision: DOLT_REVISION }] })}\n`, stderr: "", status: 0 };
+      }
+      const responses = beadsWorkspaceResponses(cwd);
+      const key = [command, ...args].join("\0");
+      if (key in responses) return responses[key];
+      return real.run(command, args, options);
+    },
+  };
+
+  const target = resolveLegacyTaskOwnershipTransitionTarget(primary, linked, taskId, runner);
+  assert.equal(target.provider, "beads");
+  assert.equal(target.providerRevision, DOLT_REVISION);
+  assert.deepEqual(target.taskEvidence, nativeView);
+  assert.deepEqual(target.task.nativeView, nativeView);
+  assert.equal(target.task.status, "In Progress");
+  assert.equal(target.task.projectRoot, primary);
+  assert.equal(calls.filter((call) => call.command === "bd" && call.args[0] === "show").length, 2);
+  assert.equal(calls.filter((call) => call.command === "git" && call.args[0] === "ls-remote").length, 4);
+});
 
 function beadsMutationRunner(root, scenario = {}) {
   const delegate = beadsTransportRunner(beadsWorkspaceResponses(root));

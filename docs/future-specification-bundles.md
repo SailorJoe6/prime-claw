@@ -84,23 +84,50 @@ bridge candidate, merge it to canonical primary `main`, apply that accepted
 plugin generation user-globally, complete a coordinated Prime Agent restart,
 and prove the loaded generation by UAT.
 
+Before cutover, the owning Conversation explicitly creates the selected
+provider-native task with its native CLI. The reviewed authoring step preserves
+the retained specification and living plan in native fields, records
+`legacy-episode-source=<location>; superseded-by=<task-id>` in Backlog
+references or as an exact Beads notes line, publishes the task, and prepares the
+same provider workspace in the retained Episode. The transition tool never
+creates a task, task-history clone, Beads store, or Episode resource.
+
 The owning top-level Conversation passes the exact retained source, canonical
 `In Progress` task ID, reviewed pushed Episode head, activated pushed main head,
-and readiness confirmation. The host then proves canonical `HEAD` equals both its upstream and the reviewed main head, no merge, rebase, cherry-pick, or revert is in progress, no staged or tracked canonical-main changes exist (unrelated untracked paths are allowed), exact ancestry, a wholly clean Episode,
-complete task/active-plan equality, live owner and resource
-identity, and an idle exact-CWD durable session. For Orca it also proves the
-same setup, worktree identity, path, branch, head, and connected writable
-visible terminal handles. If a restart replaced the recorded ephemeral route,
-the host requires exactly one idle durable session with the same ID, file, CWD,
-owner, worktree, branch, and resources, requires the old route to be absent,
-and binds the verified current route in the same atomic write. The replacement
-preserves the existing Episode, durable session, worktree, branch, admission
-`baseRef`, historical recorded head, and optional Orca resources. It creates or
-deletes nothing and performs
-no status change, assignment, handoff, merge, finalization, or cleanup.
+and readiness confirmation. The host proves canonical `HEAD` equals both its
+upstream and the reviewed main head, no merge, rebase, cherry-pick, or revert is
+in progress, no staged or tracked canonical-main changes exist (unrelated
+untracked paths are allowed), genuine code ancestry, a wholly clean Episode,
+live owner and resource identity, and an idle exact-CWD durable session.
+Separately, it proves the selected provider in both primary and Episode
+workspaces. Branch-local Backlog retains its committed task/blob and exact-plan
+checks. Independent Backlog binds the clean stable direct
+`refs/heads/prime-claw/tasks` revision and complete native task view without
+putting that task commit on the code DAG. Beads binds the clean stable published
+Dolt revision/ref and complete raw task view without a Backlog path. The native
+Backlog Implementation Plan or Beads design must exactly retain the living
+execution plan. Provider publication is paired again immediately before the sole ownership
+write, then the host re-proves the exact reviewed code heads and clean worktrees
+so a slow native read cannot hide concurrent code drift. Before a Beads switch,
+the preserved historical Episode head must also be an ancestor of the reviewed
+Episode head because the first normal handoff and terminal cleanup require that
+continuable code chain.
+
+For Orca the host also proves the same setup, worktree identity, path, branch,
+head, and connected writable visible terminal handles. If a restart replaced
+the recorded ephemeral route, the host requires exactly one idle durable
+session with the same ID, file, CWD, owner, worktree, branch, and resources,
+requires the old route to be absent, and binds the verified current route in the
+same atomic write. The replacement preserves the operation, existing Episode,
+durable session, worktree, branch, original legacy admission `baseRef`,
+historical recorded head, and optional Orca resources. A pure legacy
+`baseRef` is not required to be a Backlog task-only commit. The write creates or
+deletes nothing and performs no status change, assignment, handoff, merge,
+finalization, or cleanup.
 
 An exact same-binding replay is a no-op. Every different, partial, dirty,
-unpushed, busy, foreign, or unverifiable state fails closed. The active plan
+unpublished, busy, foreign, or unverifiable state fails closed before the
+switch, leaving version-1 authority and blocked recovery intact. The active plan
 pair remains present after transition. Removing this repository's pair is a
 later separately reviewed data-cutover step, not part of the bridge.
 

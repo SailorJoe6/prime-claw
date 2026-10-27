@@ -64,20 +64,34 @@ Conversation transcript or receives an initial handoff.
 
 A separately reviewed migration may move that same live retained Episode to
 version-2 authority through `transition_spec_episode_to_task`. This is not a
-second admission: after the bridge is merged, globally activated, restarted,
-and UAT-proven, the exact owner supplies reviewed pushed main/Episode heads and
-explicit confirmation. The host proves exact reviewed main/upstream identity,
-no staged or tracked canonical-main changes, no in-progress merge/rebase/cherry-pick/revert,
-exact ancestry, complete committed task and active-plan identity, an idle exact
-durable session, and unchanged
-worktree/branch/Orca resources. When restart changed only the ephemeral route,
-the host additionally requires one sole matching idle durable session and an
-absent old route, then binds the verified current route in the same atomic
-ownership replacement. That write removes only the legacy authority fields,
-adds the exact task binding, preserves every durable resource, keeps the active
-pair, and creates no assignment, commit, status
-change, handoff, finalization, deletion, or cleanup. Only exact replay is
-idempotent; drift or missing evidence fails closed.
+second admission. Before cutover, the owner explicitly authors and publishes
+the selected provider-native `In Progress` task, preserves the retained content
+and source marker in native fields, and prepares its existing workspace in the
+retained Episode. After the bridge and exact native task are reviewed, the code
+is merged, globally activated, restarted, and UAT-proven; the exact owner then
+supplies reviewed pushed main/Episode heads and explicit confirmation.
+
+The host proves exact reviewed main/upstream identity, no staged or tracked
+canonical-main changes, no in-progress merge/rebase/cherry-pick/revert, genuine
+code ancestry, the current published provider revision and complete native task
+evidence, an idle exact durable session, and unchanged
+worktree/branch/Orca resources. Branch-local Backlog retains its committed task
+checks. Independent Backlog uses its disconnected published task-history
+revision, and Beads uses its published Dolt revision; neither is manufactured
+on the code DAG. The original legacy `baseRef` remains code/admission evidence
+and need not be a Backlog task-only commit. A Beads target additionally requires
+the preserved historical head to be an ancestor of the reviewed Episode head,
+so its first normal handoff and cleanup remain usable. After the final provider
+proof, the host re-proves exact clean code state immediately before replacement
+or replay return. When restart changed only the
+ephemeral route, the host additionally requires one sole matching idle durable
+session and an absent old route, then binds the verified current route in the
+same atomic ownership replacement. That write removes only legacy authority
+fields, adds the selected provider's exact task binding and evidence, preserves
+the operation and every durable resource, keeps the active pair, and creates no
+task, workspace, assignment, provider/code commit, status change, handoff,
+finalization, deletion, or cleanup. Only exact replay is idempotent; every
+pre-switch failure leaves version-1 authority and recovery unchanged.
 
 ## US-15 — Select Episode placement explicitly
 

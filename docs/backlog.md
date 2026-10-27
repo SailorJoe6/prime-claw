@@ -693,17 +693,22 @@ Provider-absent version-2 records remain a read-only compatibility shape for
 already-written Backlog ownership. They parse as Backlog only when their
 existing canonical task ID and safe exact task path remain valid. Reads do not
 rewrite those records, including unrelated owners in the Conversation-keyed
-registry. New Backlog reservation and retained-ownership transition writes
-include `provider: "backlog"` while preserving all existing fields.
+registry. New Backlog reservations include `provider: "backlog"`. The reviewed
+retained-ownership transition writes the selected provider plus its native path
+or published revision/evidence while preserving every existing resource and
+legacy code-identity field.
 
 The parser rejects unknown providers, provider/path/revision mixtures, missing
 or mismatched native task evidence, and malformed Dolt revisions. Active
 binding uniqueness preserves canonical task-ID uniqueness across providers and
 exact Backlog path uniqueness; advancing a Beads revision does not change the owned
 Episode identity. Backlog path-bound lifecycle entry points explicitly keep requiring a Backlog
-ownership branch. The public creation, handoff, and bounded blocker/resume
-boundaries below are the Beads exceptions; finalization, cleanup, migration, and
-legacy transition still reject Beads ownership and never rewrite another owner.
+ownership branch. Public creation, handoff, bounded blocker/resume, and the exceptional reviewed
+retained-ownership transition are the Beads paths. That transition requires its
+preserved historical code head to remain continuable by later handoff/cleanup
+and re-proves clean reviewed code after the final provider read. Finalization,
+cleanup, and provider-switch migration remain separate guarded slices and never
+rewrite another owner.
 
 ### Direct Beads task Episode admission
 

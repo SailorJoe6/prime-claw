@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-27 00:11'
+updated_date: '2026-10-27 01:23'
 labels: []
 dependencies: []
 references:
@@ -23,6 +23,9 @@ documentation:
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/traceability.md
 modified_files:
+  - >-
+    "backlog/tasks/primeclaw-43 -
+    Support-selectable-task-providers-with-grandfathered-legacy-execution.md"
   - .agents/skills/blocked/SKILL.md
   - .agents/skills/design-legacy/SKILL.md
   - .agents/skills/design/SKILL.md
@@ -1407,6 +1410,30 @@ Implement only AC17’s remaining plan-step-5 slice: generalize the existing exp
 Preserve real prerequisites without performing them here: separate review, merge of reviewed code to canonical main, user-global activation, coordinated full restart, successful UAT, exact reviewed heads, and explicit `confirmedReady`. Generalize only the current Backlog-file/code-DAG/task-only-admission assumptions that do not apply to independent Backlog task history or Beads native history. Preserve original v1 `baseRef`, resource identity, genuine reviewed code ancestry/cleanliness, and provider-native identity/current published revision/task evidence separately. Do not treat a Backlog path as universal identity, manufacture a task commit in the code DAG, or require a pure legacy admission to be a Backlog task-only commit. Retain branch-local Backlog compatibility and all accepted AC16 behavior.
 
 Use native task creation, reads, and history for explicit reviewed authoring/migration; managed LLM instructions place content. Code checks identity, publication, integrity, and provenance, not semantic equivalence through a universal converter. Add representative real independent-Backlog and Beads transition evidence, exact-same-identity replay, and pre-switch failure/version-1 recovery tests without Cartesian expansion. No new command/tool/approval protocol, schema, phase machine, sidecar, public parameters, coordinator state, semantic classifier, or raw-task/living-plan approval lock. AC18–AC19 and provider-switch migration remain later slices. Do not mutate this live already-v2 Episode, live stores, ownership, or legacy plans; do not globally apply, cut over, merge, abandon, finalize, or clean up.
+
+### 2026-10-27 — AC17 selected-provider transition implementation
+
+Generalized the existing `transition_spec_episode_to_task` path without changing its public parameters. The guarded transition now resolves the selected provider before the sole ownership write. Branch-local Backlog keeps its existing committed task/blob and exact plan checks. Independent Backlog requires pre-existing clean primary and Episode nested clones at one stable directly published `refs/heads/prime-claw/tasks` revision, complete equal native task views, and provider revision/evidence in the version-2 record. Beads proves the primary clean published Dolt revision/ref, exact linked Episode provider identity and raw task view, exact living-plan/design equality, and stores the complete native evidence without a Backlog path.
+
+The bridge preserves the original version-1 `baseRef`, historical head, operation, Episode/session/session file/worktree/branch/Orca fields, and active plan pair. It no longer treats provider history as code ancestry or requires pure legacy admission to be a Backlog task-only commit. It creates no task, provider workspace, resource, assignment, or code/provider commit. Publication is paired again before the atomic write, exact same-binding replay is the only replay, and provider failure or drift leaves version-1 authority and recovery unchanged.
+
+Managed instructions now require an explicit native authoring/publication/review step that carries the retained specification, living plan, and exact source marker. Representative low-level transition tests, a real disposable independent-Backlog history test, and a linked-worktree Beads native-evidence test pass. An independent architecture pass found and prompted two in-scope repairs: use primary-only Beads publication proof plus linked provider identity/read, and require Beads design to equal the retained living plan. Related full validation is running. AC17 remains unchecked pending complete validation, independent exact-commit review, and owner acceptance.
+
+### 2026-10-27 — AC17 candidate validation complete
+
+The selected-provider transition candidate is complete. The existing public tool and confirmation protocol are unchanged. Production transition resolution now proves one of three exact targets: branch-local Backlog with committed main/Episode task identity; independent Backlog with pre-existing clean primary/Episode clones at one stable directly published task-history revision and complete equal native views; or Beads with one clean stable primary published Dolt revision/ref plus exact linked Episode provider identity and equal complete raw task views. Backlog Implementation Plan or Beads design must exactly retain the active living plan. Provider revision/evidence is persisted only for independent Backlog or Beads. Original legacy `baseRef`, historical head, operation, Episode/session/session file/worktree/branch/Orca resources, and active plan files are preserved.
+
+The transition never creates the native task, provider workspace, Episode resource, assignment, or code/provider commit. It no longer requires a pure legacy admission to be a Backlog task-only commit and never projects independent provider history onto the code DAG. Exact source provenance is required in Backlog references or an exact Beads notes line. Provider publication is paired immediately before the sole ownership write. Same-binding replay is idempotent; any provider, code, ownership, runtime, or resource failure before that write leaves version-1 authority and recovery intact.
+
+Evidence: representative low-level independent-Backlog/Beads transition, replay, publication-race, plan-mismatch, and recovery tests pass; real disposable independent Backlog target proof validates both existing native clones and proves the transition creates no clone; linked-worktree Beads target proof validates the published revision and complete raw evidence. Latest related Node passes 331/331 and related Python passes 50 with 10 skipped. Full Node passes 471/471. Full Python reports 678 passed and 69 skipped with only the same three established unrelated baseline failures. Docker tier 1 passes. Import smoke and diff checks pass. AC17 remains unchecked pending independent exact-commit review and owner acceptance. AC18–AC19, live transition, provider migration, global apply, merge, finalization, and cleanup remain out of scope.
+
+### 2026-10-27 — AC17 exact-review repairs validated
+
+Independent review of candidate `aca70d2f0507eb04c1b1a0974f601d33b84fc2ba` found two material transition defects. First, the final provider proof ran after the last code-state proof, so a concurrent tracked Episode edit could be hidden during the slow native read and version-2 ownership could still be written. Second, Beads conversion accepted a preserved historical Episode head that was not an ancestor of the reviewed Episode head, even though the first normal Beads evidence handoff and terminal cleanup require that continuable ancestry; conversion could therefore strand ownership after version-1 authority was removed.
+
+The repair now pairs every replay return with a fresh exact Git proof after its provider read and, for a new transition, performs the final provider proof before re-proving canonical-main and Episode primary/worktree/branch/head/upstream/operation/cleanliness state directly beside the sole ownership replacement. A Beads target now preflights the preserved historical-head ancestry required by its downstream handoff and cleanup before any authority switch. Branch-local Backlog retains the supported reviewed/rebased legacy-head behavior. New regressions cover final-read tracked drift, replay drift, incompatible Beads ancestry with exact version-1 preservation, continued branch-local success, and successful transition through the first normal Beads evidence handoff.
+
+Evidence on the repaired tree: the reviewer’s real independent-Backlog late-drift reproduction now fails closed at the post-provider Git proof; its Beads-only stranded-head reproduction now fails before conversion at the new ancestry guard. Focused guarded-transition tests pass 14/14, explicit Beads historical-head/design tests pass 2/2, related Node passes 333/333, and related static Python passes 10 with 2 skipped. Full Node passes 473/473. Full Python reports 678 passed and 69 skipped with only the same three established unrelated baseline failures. Docker tier 1 passes. Import smoke and diff checks pass. AC17 remains unchecked pending independent exact-commit rereview and owner acceptance.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1523,4 +1550,8 @@ Owner review did not accept `a66a295e71fa829d4645d94a5197b66b53e96ad9`. AC16 is 
 The owner-requested AC16 two-defect revision is implemented and fully validated: owned reads now reject a symlinked worktree `.ralph` ancestor, and safely proven completed/archive history is excluded before residual future specification bytes are required. Both exact reproductions pass; full Node is 465/465, Python is 678 passed and 69 skipped with only the same three unrelated baselines, and Docker tier 1 passes. The prior three expert repairs and provider-independent retained-v1 behavior remain intact. AC16 is pending independent review and owner acceptance.
 
 AC16 is owner-accepted at `eb37f92bd3757d99191ad60078a5e5ea0509417f`. The next bounded slice is AC17 only: generalize the existing reviewed one-way retained-v1-to-task transition for the selected provider while preserving exact Episode identity, original legacy/code provenance, provider-native publication evidence, real activation/UAT prerequisites, same-binding replay, and version-1 recovery on every pre-switch failure. Whole feature remains In Progress and not Ready for Merge.
+
+AC16 is owner-accepted. The bounded AC17 candidate generalizes the existing reviewed one-way retained-v1 transition to branch-local Backlog, independent published Backlog history, and published Beads history while preserving exact legacy code provenance, operation and Episode resources, the active plan pair, provider-native revision/evidence, same-binding replay, and version-1 recovery on every pre-switch failure. Full Node is 471/471, full Python is 678 passed and 69 skipped with only the same three unrelated baselines, and Docker tier 1 passes. AC17 awaits independent review and owner acceptance; PRIMECLAW-43 remains In Progress and not Ready for Merge.
+
+The AC17 candidate now also closes the two material independent-review gaps: exact code state is re-proven after the final provider read and before replacement or replay return, and Beads conversion rejects a preserved historical head that downstream handoff/cleanup cannot continue. Reviewer reproductions fail closed, full Node passes 473/473, full Python retains only the three established unrelated baselines, and Docker tier 1 passes. AC17 remains pending exact-commit rereview and owner acceptance; PRIMECLAW-43 stays In Progress and not Ready for Merge.
 <!-- SECTION:FINAL_SUMMARY:END -->
