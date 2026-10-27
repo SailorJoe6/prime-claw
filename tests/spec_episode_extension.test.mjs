@@ -2210,6 +2210,39 @@ test("fresh cleanup adapters resolve changed branch remote and merge config with
   assert.equal(f.localPresent(), false);
 });
 
+test("cleanup ignores unrelated saved CWD histories after the owned root is absent", async (t) => {
+  const f = cleanupTransportFixture(t);
+  const path = join(f.root, "unrelated-saved.jsonl");
+  writeFileSync(path, "preserve saved history\n");
+  const saved = { sessionId: "unrelated", sessionFile: path, cwd: f.record.worktree, isSessionActive: false };
+  const sessions = { async list() { return [{ ...saved }]; } };
+  const adapter = new CliTaskEpisodeCleanupAdapter(f.root, f.head, { sessions });
+  assert.equal((await adapter.inspect(f.record)).runtime, undefined);
+  await adapter.removeUpstream(f.record);
+  await adapter.removeBranch(f.record);
+  assert.deepEqual(await adapter.inspect(f.record), {});
+  assert.equal(readFileSync(path, "utf8"), "preserve saved history\n");
+});
+
+test("cleanup without its root still rejects live CWD and exact saved-identity collisions", async (t) => {
+  const f = cleanupTransportFixture(t);
+  const path = join(f.root, "foreign-saved.jsonl"); writeFileSync(path, "preserve\n");
+  const unrelated = { sessionId: "unrelated", sessionFile: path, cwd: f.record.worktree, isSessionActive: false };
+  for (const collision of [
+    { ...unrelated, activeSessionId: "foreign-route" },
+    { ...unrelated, activeSessionId: f.record.episodeActiveSessionId, cwd: f.root },
+    { ...unrelated, sessionId: f.record.episodeId, cwd: f.root },
+    { ...unrelated, sessionFile: f.record.episodeSessionFile, cwd: f.root },
+  ]) {
+    const sessions = { async list() { return [structuredClone(collision)]; } };
+    const adapter = new CliTaskEpisodeCleanupAdapter(f.root, f.head, { sessions });
+    await assert.rejects(adapter.inspect(f.record), /foreign or duplicate Prime Agent session identity/);
+    assert.equal(readFileSync(path, "utf8"), "preserve\n");
+    assert.equal(f.localPresent(), true);
+    assert.equal(f.remoteHead(), f.head);
+  }
+});
+
 test("production local cleanup adapter proves exact idle runtime, worktree, and unmerged branch removal", async () => {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-cleanup-host-"));
   execFileSync("git", ["init", "-q", "-b", "main", root]);
@@ -2394,6 +2427,15 @@ test("production cleanup adapter removes ID-only and path-only descendants witho
     async kill(activeSessionId) { calls.push(["kill", activeSessionId]); rows = rows.map((row) => row.activeSessionId === activeSessionId ? Object.fromEntries(Object.entries(row).filter(([key]) => key !== "activeSessionId")) : row); },
     async deleteSaved(path) { calls.push(["delete", path]); if (existsSync(path)) unlinkSync(path); rows = rows.filter((row) => row.sessionFile !== path); },
   };
+  // Saved histories can retain this CWD after their runtimes and parents are gone.
+  // They are not owned descendants and must survive cleanup outside the worktree.
+  const savedFiles = [join(root, "unrelated-saved.jsonl"), join(root, "orphan-saved.jsonl")];
+  for (const path of savedFiles) writeFileSync(path, "saved history\n");
+  rows.push(
+    { sessionId: "unrelated-saved", sessionFile: savedFiles[0], cwd: worktree, isSessionActive: false },
+    { sessionId: "orphan-saved", sessionFile: savedFiles[1], cwd: worktree, isSessionActive: false,
+      parentSessionPath: join(root, "already-removed-parent.jsonl") },
+  );
   const record = parseEpisodeOwnership({ version: 2, status: "active", operationId: "op", engine: "local", ownerSessionId: "owner", taskId: "PRIMECLAW-1", taskPath: "backlog/tasks/task.md", baseRef: base, createdAt: "x", updatedAt: "x", worktree, branch: "episode-descendants", head: base, episodeId: "episode", episodeSessionFile: sessionFile, episodeActiveSessionId: "route" });
   const adapter = new CliTaskEpisodeCleanupAdapter(root, base, { sessions });
   assert.equal((await adapter.inspect(record)).runtime.idle, true);
@@ -2404,7 +2446,12 @@ test("production cleanup adapter removes ID-only and path-only descendants witho
   assert.equal(deleted.at(-1), sessionFile);
   assert.deepEqual(new Set(deleted.slice(0, -1)), new Set(childFiles));
   assert.equal(existsSync(siblingFile), true);
-  assert.deepEqual(rows.map((row) => row.sessionId), ["possible-sibling"]);
+  assert.deepEqual(rows.map((row) => row.sessionId), ["possible-sibling", "unrelated-saved", "orphan-saved"]);
+  await adapter.removeUpstream(record);
+  await adapter.removeWorktree(record);
+  await adapter.removeBranch(record);
+  assert.deepEqual(await adapter.inspect(record), {});
+  for (const path of savedFiles) assert.equal(readFileSync(path, "utf8"), "saved history\n");
 });
 
 test("production cleanup adapter removes nested descendants deepest-first and resumes exact partial deletion", async () => {
@@ -2489,8 +2536,8 @@ test("production cleanup adapter blocks busy, foreign, and ambiguous descendants
       await assert.rejects(adapter.removeRuntime(record), /exact idle runtime/);
     });
   }
-  await t.test("foreign same-worktree session", async () => {
-    rows = [rootRow, { ...idle, sessionId: "foreign", sessionFile: foreignFile, cwd: worktree, runtimeKind: "top-level" }];
+  await t.test("foreign same-worktree live runtime", async () => {
+    rows = [rootRow, { ...idle, activeSessionId: "foreign-route", sessionId: "foreign", sessionFile: foreignFile, cwd: worktree, runtimeKind: "top-level" }];
     await assert.rejects(adapter.inspect(record), /foreign or duplicate Prime Agent session identity/);
   });
   await t.test("partial parent identity", async () => {
