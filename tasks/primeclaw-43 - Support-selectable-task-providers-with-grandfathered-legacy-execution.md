@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-27 05:00'
+updated_date: '2026-10-27 05:32'
 labels: []
 dependencies: []
 references:
@@ -1453,6 +1453,22 @@ Validation on the final repair tree:
 - Changed-module imports and `git diff --check`: passed. Targeted TypeScript checking reported no diagnostics in `task-provider-migration.ts`; only established unrelated project diagnostics remain.
 
 No live migration, ownership transition, global activation, merge, abandonment, finalization, or cleanup was performed. AC18/19 remain unchecked pending fresh exact-commit independent review and owner acceptance.
+
+2026-10-27 — owner-requested AC18/19 four-defect revision after `acbc10bb42df977def960699597a1c3de4b1ed06`:
+
+The owning Conversation did not accept `acbc10bb42df977def960699597a1c3de4b1ed06`. The latest accepted implementation base remains `22e953def7ae71c5ceb790a5b94e1d4b48ec8a88` (AC17). Parent review reports eight Node and eleven Python checks passed, the exact task/owner and idle clean pushed Episode were verified, and canonical main was fresh at `aa68ffb`. Parent native probes plus a distinct GPT-6 Astra/max lossless review found four concrete material AC18/19 defects. Repair exactly these four while preserving all prior nine review closures and accepted AC16/17, provider, version-1, and customization behavior:
+
+1. **Current Episode code head versus historical ownership head.** `activeOwnership` / `verifyActiveCodeIdentity` and Orca continuity wrongly freeze `record.head` as the current checkout HEAD. `/tmp/primeclaw43-migration-historical-head.mjs` makes a normal later implementation commit in the same Episode, clean and directly pushed, with historical `record.head` still a true ancestor and identical task/resources; `switch-request` wrongly blocks. Capture and prove the actual current native Git/Orca code head through maintenance separately from the preserved historical `record.head` / `baseRef`. Preserve real code/resource identity, current-head stability, historical ancestry, and downstream lifecycle compatibility. Do not require manual registry refresh, extra approval, or public head parameters.
+
+2. **Partial source deletion must never be reported as intact rollback.** `/tmp/primeclaw43-migration-partial-delete.mjs` completes real Backlog→Beads verification, removes one exact source task, then simulates a filesystem deletion error while the source directory still exists. Current catch logic restores old Backlog ownership, returns `pre-cutover-failed`, and claims source authority although the task is gone. Roll back only after proving the whole exact source remains intact and unchanged. Once partial retirement occurred, preserve the verified destination binding and truthfully report `cutover-incomplete` recovery. Reuse the existing source proof/error boundary; do not add a checkpoint, resume state, quarantine authority, or recovery engine. An intact deletion refusal must still roll back and allow the exact same-destination retry.
+
+3. **Complete Git commit messages.** Backlog history capture records `%s` but drops commit-message bodies. The native reproduction puts the only rollback explanation in the body; native `git log %B` contains it, but migrated `gitHistoryBase64` and destination rows do not before source deletion. Include the complete native commit message while retaining actor, timestamps, patch, binary, and full-index history. Add a body-only sentinel regression. Do not add a history engine or store.
+
+4. **Apply managed semantic placement as actual native values.** The current prose is audit-only and inert. The native reproduction reads Backlog priority `High`, explicitly selects native Beads priority `1`, but migration writes `2` while the receipt records unapplied prose. Approved plan step 6 requires the managed decision's actual provider-native values to be applied and read back before deletion. Preserve supported native equivalent spellings and transport/apply literal provider-native values for genuinely non-equivalent managed decisions through supported native authoring/import/edit inputs. A minimal indispensable transport of actual provider-native values is allowed. Do not invent a provider-neutral override schema/DSL, prose parser, semantic converter, phase machine, or another approval protocol. Human prose remains audit evidence, not a substitute for applying its native decision. Add a real positive `High`→Beads priority `1` regression and preserve raw unsupported values, provenance, identity, and lifecycle integrity. No programmatic inference or judgment of prose semantics is required.
+
+Exact expert evidence is in `/var/folders/4_/twy0wz3s1mq650wnqzn1b8rr0000gq/T/primeclaw43-contract-review-hol_cor6/review-probe.mjs` and `review-probe.log`; the scripts self-clean and import the current candidate. The expert found no blocker merely from two native package types or the same pending-to-final receipt identity; `bd history` defaults to all records and provenance log has no limit. Do not add scope for those non-findings.
+
+Use only disposable native fixtures. Do not mutate the live repository/provider stores, registry, ownership/resources, legacy plans, inventory, or global plugin; do not perform `PRIMECLAW-43.1`, merge, abandonment, finalization, or cleanup. Add focused regressions and representative closure checks, run relevant host/full suites and Docker tier-1, preserve the earlier draft/export/remote/deletion-boundary/discovery/retry/runtime/count repairs, push one clean repaired candidate, report exact evidence, and stop for owner review. There is no automatic retry, new destination copy, dual write, or persistent migration state. Owner continuation remains automatic until a real blocker or the whole feature is Ready for Merge; whole-feature criteria/docs/UAT/source-pin and baseline audit still follow.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
