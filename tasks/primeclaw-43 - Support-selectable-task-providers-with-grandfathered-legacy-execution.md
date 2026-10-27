@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-27 13:15'
+updated_date: '2026-10-27 13:16'
 labels: []
 dependencies: []
 references:
@@ -1654,6 +1654,8 @@ Validation:
 - Tier2 scripts/test-integration.sh: PASS; manifest .test-results/20261027T131208Z-24699-73945843/integration/manifest.json.
 
 Bun absence remains limited to the slim Tier1 final image; actual sandbox runtime retains Bun. Whole-feature audit and prior no-material-findings review remain evidence, not approval. This integrated candidate requires a new independent exact-commit review before owner decision. No merge into canonical main, status Ready/Done publication, global apply, live PRIMECLAW-43.1 migration, abandonment, ownership mutation or Episode resource cleanup occurred.
+
+Final pre-publication fetch found canonical main advanced to 06e30d182e78ac58f0e58de9ca292e5b239ce71f. The sole change after aa68ffb is the unrelated PRIMECLAW-10.41 design task; it changes no plugin, runtime, docs, or tests. Preserved the validated aa68ffb merge as 0713e51 and ordinarily merged 06e30d1 with no conflicts or history rewrite. Final integrated candidate therefore includes both exact main commits; validation remains applicable to identical code/docs/test bytes. PRIMECLAW-10.41 is inherited main task data, not implementation scope or authority for this Episode.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1788,4 +1790,6 @@ The bounded residual original-F4 revision now carries actual ambiguous Backlog-t
 Owner accepted exact implementation `510b7c845800ea00bdf4edbdfe0c36697579508d`; AC18/19 are now complete. PRIMECLAW-43 remains In Progress and not Ready for Merge. The only next pass is implementation-plan step 7 / AC20: audit every AC1–AC20 promise against actual native behavior, lifecycle routing, managed guidance, documentation, runtime artifact delivery, representative UAT, source pins, baseline failures, and final project validation including `scripts/test-all.sh`; fix only concrete in-scope gaps, publish one independently reviewed clean candidate, and stop for the owner’s final decision. No live PRIMECLAW-43.1 cutover or terminal lifecycle action is authorized.
 
 Authorized current-main integration: ordinary main→Episode merge includes aa68ffb428492dc5803b5f0202e2aa02bd982ee5 while preserving the published 3df6b80 candidate and task checkpoint 8280fdc. All 19 conflicts resolved semantically with main cleanup/lineage/compaction/source-loader repairs plus selectable-provider behavior intact. Host 687 passed plus 75 subtests (only the main-reproduced duplicate-ID test deselected); Docker 71 passed, known synthetic fixture mismatch retained and new native fixture repaired with 2/2 proof; Tier2 passed. See Implementation Notes for exact artifacts and baseline attribution. Task remains In Progress. Exact integrated-commit independent review and owner decision remain; no main merge, live cutover, global activation, lifecycle finalization, or resource cleanup.
+
+Final main ancestry refreshed to 06e30d182e78ac58f0e58de9ca292e5b239ce71f through an ordinary no-conflict merge of its unrelated design-task-only advance. Validated implementation bytes are unchanged.
 <!-- SECTION:FINAL_SUMMARY:END -->
