@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-27 01:45'
+updated_date: '2026-10-27 03:29'
 labels: []
 dependencies: []
 references:
@@ -23,81 +23,29 @@ documentation:
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/traceability.md
 modified_files:
-  - >-
-    "backlog/tasks/primeclaw-43 -
-    Support-selectable-task-providers-with-grandfathered-legacy-execution.md"
-  - .agents/skills/blocked/SKILL.md
-  - .agents/skills/design-legacy/SKILL.md
-  - .agents/skills/design/SKILL.md
-  - .agents/skills/execute/SKILL.md
-  - .agents/skills/spec-it-out-legacy/SKILL.md
-  - .agents/skills/spec-it-out/SKILL.md
-  - .prime-claw/templates.json
-  - .prime-claw/workflows/handoff.md
-  - .prime-claw/workflows/implement-prep.md
-  - .prime-claw/workflows/implement-spec.md
-  - .prime-claw/workflows/plan-prep.md
-  - .prime-claw/workflows/plan-spec.md
-  - .prime-claw/workflows/plan-task.md
-  - >-
-    backlog/tasks/primeclaw-43 -
-    Support-selectable-task-providers-with-grandfathered-legacy-execution.md
+  - LONG_RANGE_PLAN.md
+  - VISION.md
   - docs/backlog.md
   - docs/conversation-driven-episode-oversight.md
   - docs/future-specification-bundles.md
-  - docs/handoff-chain.md
-  - docs/prep-chain.md
+  - docs/information-architecture.md
+  - docs/project-initialization.md
   - docs/user-stories/B-project-initialization.md
-  - docs/user-stories/E-episode-promotion.md
-  - docs/user-stories/F-episode-execution.md
-  - docs/user-stories/G-oversight-and-review.md
-  - docs/user-stories/H-handoff-and-continuation.md
-  - docs/user-stories/I-episode-finalization.md
+  - docs/user-stories/README.md
   - docs/user-stories/traceability.md
   - src/prime-agent-plugin/asset-inventory.json
-  - src/prime-agent-plugin/extension-support/conversation-oversight.ts
-  - src/prime-agent-plugin/extension-support/episode-close.ts
   - src/prime-agent-plugin/extension-support/episode-ownership.ts
-  - src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts
-  - src/prime-agent-plugin/extension-support/legacy-workflow.ts
-  - src/prime-agent-plugin/extension-support/prep-chain.ts
-  - src/prime-agent-plugin/extension-support/project-initialization.ts
-  - src/prime-agent-plugin/extension-support/spec-episode.ts
-  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/extensions/project-initialization.ts
-  - src/prime-agent-plugin/extensions/reviewed-plan.ts
-  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
-  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
-  - src/prime-agent-plugin/skills/project-templates/blocked.md
-  - src/prime-agent-plugin/skills/project-templates/design-legacy.md
-  - src/prime-agent-plugin/skills/project-templates/design.md
-  - src/prime-agent-plugin/skills/project-templates/execute.md
-  - src/prime-agent-plugin/skills/project-templates/spec-it-out-legacy.md
-  - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
-  - src/prime-agent-plugin/workflows/handoff.md
-  - src/prime-agent-plugin/workflows/implement-prep.md
-  - src/prime-agent-plugin/workflows/implement-spec.md
-  - src/prime-agent-plugin/workflows/plan-prep.md
-  - src/prime-agent-plugin/workflows/plan-spec.md
-  - src/prime-agent-plugin/workflows/plan-task.md
-  - tests/episode_close_extension.test.mjs
-  - tests/project_conversation_extension.test.mjs
   - tests/project_initialization_extension.test.mjs
-  - tests/reviewed_plan_extension.test.mjs
-  - tests/spec_episode_extension.test.mjs
-  - tests/task_episode_admission_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
-  - tests/task_history_workspace.test.mjs
+  - tests/task_provider_migration.test.mjs
   - tests/task_providers.test.mjs
-  - tests/test_backlog_workflow.py
-  - tests/test_blocked_skill.py
-  - tests/test_execute_skill.py
-  - tests/test_future_plan_skills.py
   - tests/test_managed_session_protocol.py
   - tests/test_oversee_episode_skill.py
-  - tests/test_task_providers.py
+  - tests/test_task_provider_migration.py
 priority: p1
 type: epic
 ordinal: 125000
@@ -1444,6 +1392,18 @@ The next single bounded operation is plan step 6, AC18–AC19: provider-switch m
 Do not introduce a universal task model or migration schema, semantic converter/classifier/diff engine, dynamic framework, tracker replacement, mirror, provider-selection file, dual-write, persistent lock/coordinator/phase/checkpoint/resume engine, or retry loop. The only new durable artifact allowed is the final receipt in destination-native history/provenance; if the provider cannot hold it exactly, stop for plan review rather than create a sidecar. The receipt and final proof bind source/destination revisions, complete counts/digests, mappings, ownership transitions, actor, and timestamp. Only after complete verification may the implementation update required existing version-2 provider ownership while preserving exact active Episode/session/worktree/branch/code/runtime/resource identity, activate the destination, and immediately delete source initialization/store through narrow native guards with absence proof.
 
 Every pre-cutover failure keeps the source intact and authoritative, reports exact native cleanup or same-destination retry conditions, never creates another destination copy, auto-retries transport, or dual-writes. Preserve provider-independent version-1 work and all accepted discovery/config/custom-layout/status/history/revision/ordinary-task/AC16/AC17 behavior; do not turn task or living-plan observations into approval locks. Implementation and destructive/native UAT use disposable fixtures only. Do not migrate this live repository, provider stores, registry, ownership, legacy inventory/plans, resources, or global plugin. The real `PRIMECLAW-43.1` cutover, global activation/restart, real authority transition, merge, abandonment, finalization, and cleanup require separate operator authority. Finish with representative native directions, complete data/history/provenance/relationship and immutable-mapping coverage, active-owner continuation, verified source deletion, pre-cutover source preservation, deletion refusal on drift/incomplete proof, managed/custom asset reconciliation, relevant host/full suites, and Docker tier 1. Stop at one pushed reviewable candidate for owner review.
+
+### 2026-10-27 — AC18/19 implementation candidate
+
+Implemented the one-shot selected-provider migration in the existing initialization/upgrade UX. `switch-request` is read-only and reports the exact source provider/revision/digest, complete open/closed/archived counts, active-owner count, semantic-placement prompt, and literal confirmation. `switch-confirm` binds that revision, actor, managed placement prose, and explicit approval before any migration mutation.
+
+The implementation has two native, pair-specific paths rather than a universal task model. Backlog capture retains exact Markdown bytes, native structured views, and complete `git log --all --follow --patch --binary --full-index` history. Archived tasks are interpreted only in an exact-revision disposable clone. Beads capture retains `bd export`, long/comment views, native history/events/provenance, relationships, and the exact clean published Dolt revision. Equivalent fields are projected natively and deterministically re-read; every unsupported value and absence is retained in destination-native metadata or provenance. Safe IDs are preserved where Beads accepts them, and all other IDs receive immutable source-to-destination mappings. Archived Backlog and Beads `closed` remain abandonment, distinct from completed Beads `done`.
+
+One destination-native receipt binds source and destination revisions/digests, counts, mappings, ownership transitions, actor, timestamp, and semantic-placement record. The confirmed flow repeatedly proves source and destination stability, validates every active Episode's exact clean/directly-published code identity and source-provider workspace, atomically replaces only version-2 provider-native task bindings, preserves Episode/session/worktree/branch/code/runtime/resource identity, deletes the exact source stores only after verified activation, publishes Beads native discovery metadata when Beads becomes selected, and proves sole-provider selection. Historical old-provider bytes at preserved code heads remain non-authoritative; independent active Backlog source clones are removed. Every pre-cutover failure restores ownership when the source remains present, preserves source authority, and reports exact same-destination cleanup/retry conditions without automatic retry, duplicate destination, mirror, dual write, sidecar, lock, coordinator, checkpoint, or resume state.
+
+Disposable real-native fixtures cover read-only inspection, Backlog→Beads and Beads→Backlog with complete open/completed/abandoned data, raw history/provenance, relationships, exact projections, immutable mappings, receipt/count proof, active-owner continuation in both directions, historical linked-worktree provider selection, successful source deletion, active identity drift, and deletion refusal with source/ownership preservation. No live repository, provider store, ownership registry, Episode resource, or global plugin was migrated or activated. AC18 and AC19 remain unchecked pending independent exact-commit review and owning Conversation acceptance.
+
+Validation on the final tree: focused disposable migration suite 7/7; full Node 488/488; related static Python 11 passed with 7 skipped; full Python 680 passed and 70 skipped with only the same three established unrelated baseline failures (host-safe marker, missing task-episode-admission bridge, and Backlog source-pin mismatch); Docker tier 1 probe passed with teardown and manifest publication verified. Module import smoke and `git diff --check` pass. Targeted TypeScript compilation reports no diagnostics in the migration/provider/ownership/initialization changes; the only compiler diagnostic is the established unrelated legacy-specification-inventory inference error.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -1566,4 +1526,6 @@ AC16 is owner-accepted. The bounded AC17 candidate generalizes the existing revi
 The AC17 candidate now also closes the two material independent-review gaps: exact code state is re-proven after the final provider read and before replacement or replay return, and Beads conversion rejects a preserved historical head that downstream handoff/cleanup cannot continue. Reviewer reproductions fail closed, full Node passes 473/473, full Python retains only the three established unrelated baselines, and Docker tier 1 passes. AC17 remains pending exact-commit rereview and owner acceptance; PRIMECLAW-43 stays In Progress and not Ready for Merge.
 
 AC17 is owner-accepted at `22e953def7ae71c5ceb790a5b94e1d4b48ec8a88`. PRIMECLAW-43 remains In Progress and not Ready for Merge. The next bounded implementation pass is the existing plan-step-6 AC18/19 provider-switch capability: one explicit initialization/upgrade maintenance operation, complete lossless native migration and verification, destination-native receipt, exact active ownership preservation, and guarded source deletion only after cutover proof. All implementation/UAT must use disposable fixtures; the live repository and real PRIMECLAW-43.1 cutover remain untouched pending separate authority.
+
+Implemented the AC18/19 selected-provider migration candidate through the existing initialization/upgrade UX. The candidate performs read-only exact inspection followed only by explicit confirmation; uses native pair-specific Backlog↔Beads capture/create/history paths; preserves complete raw data, lifecycle/abandonment semantics, relationships, history, provenance, safe IDs or immutable mappings; writes one destination-native receipt; atomically preserves active Episode identity; repeatedly guards source/destination drift; activates one provider; and deletes the source with bounded same-destination recovery. Validation uses disposable repositories only. The live PRIMECLAW-43.1 cutover and global activation remain separately unauthorized. AC18/19 await independent review and owner acceptance. Final validation: focused migration 7/7, full Node 488/488, static Python 11 passed/7 skipped, full Python 680 passed/70 skipped with three established unrelated baseline failures, and Docker tier 1 passed.
 <!-- SECTION:FINAL_SUMMARY:END -->
