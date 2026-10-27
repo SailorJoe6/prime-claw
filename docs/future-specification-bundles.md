@@ -51,8 +51,12 @@ At the first explicit initialization or upgrade boundary, Prime Claw writes one
 `.prime-claw/legacy-specifications.json` allowlist. It contains only exact
 unfinished `.ralph/plans/future/<slug>` locations and SHA-256 digests of their
 accepted `SPECIFICATION.md` bytes. Archive-only history and inactive version-1
-ownership are excluded. Later startup and reconciliation verify this inventory;
-they never add a location or replace an accepted digest.
+ownership are excluded after candidate directories pass the same safe-directory
+checks, but before residual future specification bytes are required. Reading an
+owned active or blocked specification requires the recorded worktree, its
+`.ralph` directory, and its plan root to be real non-symlink directories. Later
+startup and reconciliation verify this inventory; they never add a location or
+replace an accepted digest.
 
 A retained bundle contains `SPECIFICATION.md` and `EXECUTION_PLAN.md`, plus any
 supporting artifacts needed to make the work self-contained. The accepted

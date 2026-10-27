@@ -157,6 +157,71 @@ test("explicit inventory captures source-absent active and blocked version-one o
   ));
 });
 
+test("explicit inventory rejects a symlinked owned .ralph ancestor before enrollment", (t) => {
+  const root = repo(t), location = ".ralph/plans/future/alpha";
+  const worktree = join(dirname(root), "alpha-owned-symlink");
+  const outsideRalph = join(dirname(root), "external-alpha-ralph");
+  mkdirSync(worktree, { recursive: true });
+  mkdirSync(join(outsideRalph, "plans"), { recursive: true });
+  writeFileSync(join(outsideRalph, "plans", "SPECIFICATION.md"), "external accepted bytes\n");
+  writeFileSync(join(outsideRalph, "plans", "EXECUTION_PLAN.md"), "external plan\n");
+  symlinkSync(outsideRalph, join(worktree, ".ralph"));
+  writeEpisodeOwnership(root, {
+    version: 1, status: "active", operationId: "alpha-operation", engine: "local", ownerSessionId: "alpha-owner",
+    sourceLocation: location, slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64),
+    createdAt: "2026-10-26T00:00:00.000Z", updatedAt: "2026-10-26T00:00:00.000Z",
+    worktree, branch: "episode/alpha", head: "head", episodeId: "alpha-episode",
+    episodeSessionFile: join(worktree, "episode.jsonl"), episodeActiveSessionId: "alpha-route",
+  });
+
+  const result = reconcileLegacySpecificationInventory(root, "initialize");
+  assert.equal(result.status, "blocked");
+  assert.match(result.detail, /legacy ownership \.ralph root must be a real directory/);
+  assert.equal(existsSync(join(root, LEGACY_SPECIFICATION_INVENTORY)), false);
+});
+
+test("completed history is excluded before residual future specification bytes are required", (t) => {
+  const root = repo(t), location = ".ralph/plans/future/alpha";
+  mkdirSync(join(root, location), { recursive: true });
+  const archive = join(root, ".ralph", "plans", "archive", "alpha");
+  mkdirSync(archive, { recursive: true });
+  writeFileSync(join(archive, "SPECIFICATION.md"), "completed specification\n");
+  writeFileSync(join(archive, "EXECUTION_PLAN.md"), "completed plan\n");
+  writeEpisodeOwnership(root, {
+    version: 1, status: "inactive", operationId: "inactive-operation", engine: "local", ownerSessionId: "inactive-owner",
+    sourceLocation: location, slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64),
+    createdAt: "2026-10-26T00:00:00.000Z", updatedAt: "2026-10-26T00:00:00.000Z",
+    worktree: root, branch: "episode/inactive-alpha", head: "head", episodeId: "inactive-alpha-episode",
+    episodeSessionFile: join(root, "inactive.jsonl"), episodeActiveSessionId: "inactive-route",
+  });
+
+  const created = reconcileLegacySpecificationInventory(root, "initialize");
+  assert.deepEqual(created, {
+    status: "created", path: LEGACY_SPECIFICATION_INVENTORY, accepted: 0, violations: [],
+  });
+  const inventory = JSON.parse(readFileSync(join(root, LEGACY_SPECIFICATION_INVENTORY), "utf8"));
+  assert.deepEqual(inventory.specifications, []);
+  const verified = reconcileLegacySpecificationInventory(root, "verify");
+  assert.equal(verified.status, "verified");
+  assert.deepEqual(verified.violations, []);
+  assert.throws(() => assertGrandfatheredLegacySpecification(root, location), /completed legacy history/);
+
+  const activeWorktree = join(dirname(root), "active-alpha-worktree");
+  mkdirSync(join(activeWorktree, ".ralph", "plans"), { recursive: true });
+  writeFileSync(join(activeWorktree, ".ralph", "plans", "SPECIFICATION.md"), "active specification\n");
+  writeFileSync(join(activeWorktree, ".ralph", "plans", "EXECUTION_PLAN.md"), "active plan\n");
+  writeEpisodeOwnership(root, {
+    version: 1, status: "active", operationId: "active-operation", engine: "local", ownerSessionId: "active-owner",
+    sourceLocation: location, slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64),
+    createdAt: "2026-10-26T00:00:00.000Z", updatedAt: "2026-10-26T00:00:00.000Z",
+    worktree: activeWorktree, branch: "episode/active-alpha", head: "head", episodeId: "active-alpha-episode",
+    episodeSessionFile: join(activeWorktree, "active.jsonl"), episodeActiveSessionId: "active-route",
+  });
+  const conflict = reconcileLegacySpecificationInventory(root, "verify");
+  assert.equal(conflict.status, "blocked");
+  assert.match(conflict.detail, /both completed and non-terminal legacy ownership/);
+});
+
 test("explicit inventory blocks disagreement between future and owned specification", (t) => {
   const root = repo(t), location = ".ralph/plans/future/alpha";
   const future = join(root, location); mkdirSync(future, { recursive: true });

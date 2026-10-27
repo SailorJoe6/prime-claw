@@ -78,7 +78,9 @@ function requireRealDirectory(path: string, label: string): void {
 
 function ownedSpecificationBytes(worktree: string): { active: Buffer | null; blocked: Buffer | null } {
   requireRealDirectory(worktree, "legacy ownership worktree");
-  const plans = join(worktree, ".ralph", "plans");
+  const ralph = join(worktree, ".ralph");
+  requireRealDirectory(ralph, "legacy ownership .ralph root");
+  const plans = join(ralph, "plans");
   requireRealDirectory(plans, "legacy ownership plan root");
   const active = regularReadableBytes(join(plans, "SPECIFICATION.md"));
   const blockedRoot = join(plans, "blocked");
@@ -138,6 +140,7 @@ export function discoverGrandfatherableLegacySpecifications(
   ownershipRecords: EpisodeOwnershipRecord[] = readAllEpisodeOwnership(projectRoot),
 ): GrandfatheredLegacySpecification[] {
   const futureRoot = join(projectRoot, ".ralph", "plans", "future");
+  const futureFolders = new Map<string, string>();
   const byLocation = new Map<string, string>();
   let rootStat;
   try { rootStat = lstatSync(futureRoot); }
@@ -159,9 +162,7 @@ export function discoverGrandfatherableLegacySpecifications(
       if (!containedBy(futureRoot, folder) || !containedBy(projectRoot, folder)) {
         throw new Error(`${location} escapes the legacy future-plan root`);
       }
-      const bytes = regularReadableBytes(join(folder, "SPECIFICATION.md"));
-      if (!bytes) throw new Error(`${location}/SPECIFICATION.md must be a readable non-empty regular file`);
-      byLocation.set(location, digest(bytes));
+      futureFolders.set(location, folder);
     }
   }
 
@@ -189,8 +190,22 @@ export function discoverGrandfatherableLegacySpecifications(
 
   for (const record of ownershipRecords) {
     if (record.version !== 1) continue;
-    if (record.status === "inactive") { retired.add(record.sourceLocation); continue; }
-    nonInactive.add(record.sourceLocation);
+    if (record.status === "inactive") retired.add(record.sourceLocation);
+    else nonInactive.add(record.sourceLocation);
+  }
+  for (const location of retired) {
+    if (nonInactive.has(location)) throw new Error(`${location} has both completed and non-terminal legacy ownership`);
+  }
+
+  for (const [location, folder] of futureFolders) {
+    if (retired.has(location)) continue;
+    const bytes = regularReadableBytes(join(folder, "SPECIFICATION.md"));
+    if (!bytes) throw new Error(`${location}/SPECIFICATION.md must be a readable non-empty regular file`);
+    byLocation.set(location, digest(bytes));
+  }
+
+  for (const record of ownershipRecords) {
+    if (record.version !== 1 || record.status === "inactive") continue;
     if (!record.worktree) throw new Error(`non-inactive legacy ownership for ${record.sourceLocation} has no worktree`);
     const { active, blocked } = ownedSpecificationBytes(record.worktree);
     if (active && blocked) throw new Error(`legacy ownership for ${record.sourceLocation} has both active and blocked specifications`);
@@ -210,10 +225,6 @@ export function discoverGrandfatherableLegacySpecifications(
     }
   }
 
-  for (const location of retired) {
-    if (nonInactive.has(location)) throw new Error(`${location} has both completed and non-terminal legacy ownership`);
-    byLocation.delete(location);
-  }
   return [...byLocation.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([location, specificationSha256]) => ({ location, specificationSha256 }));
