@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-27 03:29'
+updated_date: '2026-10-27 04:27'
 labels: []
 dependencies: []
 references:
@@ -35,11 +35,13 @@ modified_files:
   - docs/user-stories/traceability.md
   - src/prime-agent-plugin/asset-inventory.json
   - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - src/prime-agent-plugin/extension-support/task-provider-migration.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/extensions/project-initialization.ts
   - tests/project_initialization_extension.test.mjs
+  - tests/spec_episode_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
   - tests/task_provider_migration.test.mjs
   - tests/task_providers.test.mjs
@@ -1404,6 +1406,30 @@ One destination-native receipt binds source and destination revisions/digests, c
 Disposable real-native fixtures cover read-only inspection, Backlog→Beads and Beads→Backlog with complete open/completed/abandoned data, raw history/provenance, relationships, exact projections, immutable mappings, receipt/count proof, active-owner continuation in both directions, historical linked-worktree provider selection, successful source deletion, active identity drift, and deletion refusal with source/ownership preservation. No live repository, provider store, ownership registry, Episode resource, or global plugin was migrated or activated. AC18 and AC19 remain unchecked pending independent exact-commit review and owning Conversation acceptance.
 
 Validation on the final tree: focused disposable migration suite 7/7; full Node 488/488; related static Python 11 passed with 7 skipped; full Python 680 passed and 70 skipped with only the same three established unrelated baseline failures (host-safe marker, missing task-episode-admission bridge, and Backlog source-pin mismatch); Docker tier 1 probe passed with teardown and manifest publication verified. Module import smoke and `git diff --check` pass. Targeted TypeScript compilation reports no diagnostics in the migration/provider/ownership/initialization changes; the only compiler diagnostic is the established unrelated legacy-specification-inventory inference error.
+
+2026-10-27 — AC18/19 independent-review repairs (owner acceptance still pending):
+
+The exact candidate `4d624486d4e4dbad10878a7b6a348bbef1bcf944` was rejected after independent review reproduced seven AC18/19 gaps. This bounded repair pass addresses all seven without performing the live `PRIMECLAW-43.1` cutover:
+
+1. Beads inventory now uses `bd export --all`, rejects effective `export.exclude_owners`, rejects duplicate IDs, and requires exact equality with an independent read-only native issue inventory.
+2. Backlog destination proof stays bound to the originally selected remote name, URL, task-history ref, and exact revision on every refresh.
+3. The final ownership-locked destructive boundary repeats destination, source, active code, active source workspace, and complete switched-registry proof immediately before source deletion.
+4. Ordinary linked-worktree lifecycle discovery now propagates canonical-primary malformed or dual-provider evidence and remains blocked throughout an incomplete migration.
+5. Only an explicitly reconfirmed migration retry may inspect both exact stores independently; it reuses one provably matching destination and refuses foreign, duplicate, stale, filtered, or uncertain evidence.
+6. Active Episodes now require exact clean published code, a safe durable session file, one current idle runtime route, and exact Orca resource continuity before and after ownership replacement; a lost route rolls ownership back before deletion.
+7. Backlog counts now classify non-archived tasks by exact native `Done` lifecycle status while retaining archive placement as separate abandonment evidence.
+
+The retry path also binds every destination marker and pending/final receipt to the exact source revision and digest, makes the Backlog receipt terminal, and reuses existing destination IDs without rewriting tasks. Disposable native regressions cover both migration directions, both deletion-refusal retries, filtered or incomplete Beads export, native Done counts, frozen Backlog remote advancement, late active-code drift, missing durable session evidence, post-switch runtime loss, linked canonical dual evidence, and ownership drift. AC18/19 remain unchecked until this replacement candidate passes full validation and a fresh exact-commit independent review.
+
+Validation for this repair candidate:
+
+- `node --test tests/*.test.mjs`: 500 passed, 0 failed, including all 15 disposable native migration regressions.
+- `python3 -m pytest tests/test_task_provider_migration.py tests/test_managed_session_protocol.py tests/test_oversee_episode_skill.py -q`: 11 passed, 2 skipped.
+- `python3 -m pytest tests/ -q`: 680 passed, 70 skipped, 75 subtests passed; only the three established unrelated host-baseline failures remain (`test_mocked_runtime_tests_are_host_safe_tier0`, `test_every_node_suite_has_a_pytest_bridge`, and `test_backlog_source_identity_matches_pin`).
+- `scripts/test-tier1.sh --probe`: passed immutable-image, network-isolation, offline RPC probe, teardown, and manifest checks.
+- Changed-module import smoke passed. Targeted TypeScript checking reported no diagnostics in the new migration/provider/ownership/runtime-continuity additions; it retains only established unrelated project diagnostics. `git diff --check` passed before task evidence publication.
+
+No live provider migration, ownership transition, global activation, merge, abandonment, finalization, or cleanup was performed. AC18/19 remain unchecked pending fresh exact-commit independent review and owner acceptance.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
