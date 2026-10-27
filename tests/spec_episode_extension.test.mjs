@@ -2557,7 +2557,7 @@ test("production cleanup adapter fails closed when a saved-session file is missi
 });
 
 
-test("production Orca cleanup adapter force-removes only an exact verified-clean terminal-bearing worktree", async (t) => {
+function productionOrcaCleanupFixture(t, removal = "success", removeLocalBranch = true) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-cleanup-orca-"));
   execFileSync("git", ["init", "-q", "-b", "main", root]);
   execFileSync("git", ["-C", root, "config", "user.name", "Fixture"]); execFileSync("git", ["-C", root, "config", "user.email", "fixture@example.test"]);
@@ -2573,7 +2573,12 @@ test("production Orca cleanup adapter force-removes only an exact verified-clean
   execFileSync("git", ["-C", worktree, "-c", "protocol.file.allow=always", "submodule", "add", "-q", submodule, "fixture-module"]);
   execFileSync("git", ["-C", worktree, "commit", "-qm", "initialized submodule"]);
   const head = execFileSync("git", ["-C", worktree, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-  configureCleanupUpstream(root, "episode-orca");
+  const upstream = configureCleanupUpstream(root, "episode-orca");
+  t.after(() => {
+    rmSync(worktree, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+    rmSync(upstream.remotePath, { recursive: true, force: true });
+  });
   const sessionFile = join(root, "orca.jsonl"); writeFileSync(sessionFile, "{}\n");
   let sessionRows = [{ activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } }];
   let terminalPresent = true, worktreePresent = true; const calls = [];
@@ -2589,10 +2594,15 @@ test("production Orca cleanup adapter force-removes only an exact verified-clean
       catch (error) { return { stdout: String(error.stdout ?? ""), stderr: String(error.stderr ?? error), status: Number.isInteger(error.status) ? error.status : 1 }; }
     }
     assert.equal(command, "orca"); calls.push(args);
+    const failed = () => ({ stdout: JSON.stringify({ ok: false, error: { message: "post-removal inspection failed" } }), stderr: "", status: 1 });
+    const removalAttempted = calls.some((call) => call[0] === "worktree" && call[1] === "rm");
     const ok = (result) => ({ stdout: JSON.stringify({ ok: true, result }), stderr: "", status: 0 });
     if (args[0] === "worktree" && args[1] === "show") {
+      if (removalAttempted && removal === "observation-error") return failed();
       if (!worktreePresent) return { stdout: JSON.stringify({ ok: false, error: { code: "selector_not_found", message: "missing" } }), stderr: "", status: 1 };
-      return ok({ worktree: { id: "wt", identity: { key: "identity" }, path: worktree, branch: "refs/heads/episode-orca", head, projectHostSetupId: "setup" } });
+      const identity = removalAttempted && removal === "foreign" ? "foreign" : "identity";
+      const observedHead = removalAttempted && removal === "changed" ? base : head;
+      return ok({ worktree: { id: "wt", identity: { key: identity }, path: worktree, branch: "refs/heads/episode-orca", head: observedHead, projectHostSetupId: "setup" } });
     }
     if (args[0] === "terminal" && args[1] === "list") return ok({ terminals: terminalPresent ? [
       { handle: "fallback", worktreeId: "wt", worktreePath: worktree, agentIdentity: "shell" },
@@ -2602,14 +2612,22 @@ test("production Orca cleanup adapter force-removes only an exact verified-clean
     if (args[0] === "worktree" && args[1] === "rm") {
       assert.ok(args.includes("--force")); assert.equal(args.includes("TRUE"), false);
       assert.equal(execFileSync("git", ["-C", root, "ls-remote", "--refs", "--", "delivery", "refs/heads/episode-orca"], { encoding: "utf8" }).trim(), "", "remote must be absent before Orca can also delete the branch");
+      if (["present", "foreign", "changed", "observation-error"].includes(removal)) return failed();
       execFileSync("git", ["-C", root, "worktree", "remove", "--force", "--", worktree]);
-      execFileSync("git", ["-C", root, "branch", "-D", "episode-orca"]);
-      terminalPresent = false; worktreePresent = false; return ok({ removed: true });
+      if (removeLocalBranch) execFileSync("git", ["-C", root, "branch", "-D", "episode-orca"]);
+      terminalPresent = false;
+      worktreePresent = removal === "partial";
+      return removal === "success" ? ok({ removed: true }) : failed();
     }
     throw new Error(`unexpected Orca command ${args.join(" ")}`);
   } };
   const record = parseEpisodeOwnership({ version: 2, status: "active", operationId: "op", engine: "orca", ownerSessionId: "owner", taskId: "PRIMECLAW-1", taskPath: "backlog/tasks/task.md", baseRef: base, createdAt: "x", updatedAt: "x", projectSetupId: "setup", worktreeId: "wt", worktreeIdentity: "identity", worktree, branch: "episode-orca", head: base, episodeId: "episode", episodeSessionFile: sessionFile, episodeActiveSessionId: "route", terminalHandle: "term", terminalHandles: ["fallback", "term"] });
   const adapter = new CliTaskEpisodeCleanupAdapter(root, head, { sessions, runner });
+  return { root, worktree, head, record, adapter, calls, runner, sessions };
+}
+
+test("production Orca cleanup adapter force-removes only an exact verified-clean terminal-bearing worktree", async (t) => {
+  const { root, worktree, head, record, adapter, calls } = productionOrcaCleanupFixture(t);
   assert.ok((await adapter.inspect(record)).runtime);
   await adapter.removeRuntime(record);
   await adapter.removeUpstream(record);
@@ -2640,6 +2658,63 @@ test("production Orca cleanup adapter force-removes only an exact verified-clean
   assert.ok(remove.includes("--force")); assert.equal(remove.includes("TRUE"), false);
 });
 
+
+
+function orcaCleanupFinalization(f) {
+  const { root, record, adapter, head } = f;
+  const foreign = { ...record, ownerSessionId: "foreign-owner", taskId: "PRIMECLAW-2", taskPath: "backlog/tasks/foreign.md",
+    operationId: "foreign-op", worktree: join(root, "foreign"), branch: "foreign", worktreeId: "foreign-wt",
+    worktreeIdentity: "foreign-identity", episodeId: "foreign-episode", episodeSessionFile: join(root, "foreign.jsonl"),
+    episodeActiveSessionId: "foreign-route", terminalHandle: "foreign-terminal", terminalHandles: ["foreign-terminal"] };
+  writeEpisodeOwnership(root, record);
+  writeEpisodeOwnership(root, foreign);
+  const owners = () => JSON.parse(readFileSync(join(root, ".prime-claw", "ownership.json"), "utf8")).owners;
+  const ctx = { cwd: root, sessionManager: {
+    getSessionId: () => record.ownerSessionId, getSessionFile: () => join(root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
+  } };
+  const deps = {
+    cleanup: adapter,
+    cleanupGit: {
+      repositoryRoot: () => root, branch: () => "main", head: () => head, upstreamHead: () => head,
+      assertCleanWorktree() {},
+      isAncestor(_root, ancestor, descendant) { return [record.baseRef, head].includes(ancestor) && descendant === head; },
+    },
+    taskResolver: () => taskSelection({ root }, { taskId: record.taskId, status: "Done",
+      taskPathRelative: record.taskPath, taskPath: join(root, record.taskPath) }),
+  };
+  return { owners, foreign, finalize: () => finalizeTaskEpisodeCleanup(record.taskId, head, "merged", ctx, deps) };
+}
+
+test("production Orca cleanup finishes the same invocation after delete-then-nonzero", async (t) => {
+  for (const removeLocalBranch of [true, false]) await t.test(`Orca also removes branch/config: ${removeLocalBranch}`, async (t) => {
+    const f = productionOrcaCleanupFixture(t, "removed-error", removeLocalBranch);
+    const h = orcaCleanupFinalization(f);
+    const result = await h.finalize();
+    assert.equal(result.resourcesRemoved, true);
+    assert.equal(result.ownershipRemoved, true);
+    assert.deepEqual(h.owners(), { "foreign-owner": h.foreign });
+    assert.equal(existsSync(f.worktree), false);
+    assert.deepEqual(await f.adapter.inspect(f.record), {});
+    assert.equal(f.calls.filter((args) => args[0] === "worktree" && args[1] === "rm").length, 1, "no removal retry");
+    if (removeLocalBranch) await assert.rejects(
+      new CliTaskEpisodeCleanupAdapter(f.root, f.head, { sessions: f.sessions, runner: f.runner }).inspect(f.record),
+      /cannot prove the exact configured upstream identity/, "no persisted upstream recovery metadata",
+    );
+  });
+});
+
+test("production Orca cleanup retains ownership when nonzero removal does not prove exact absence", async (t) => {
+  for (const removal of ["present", "changed", "foreign", "partial", "observation-error"]) await t.test(removal, async (t) => {
+    const f = productionOrcaCleanupFixture(t, removal, false);
+    const h = orcaCleanupFinalization(f);
+    const before = h.owners();
+    await assert.rejects(h.finalize(), /Orca worktree removal failed|changed Orca worktree head|foreign Orca worktree|partially removed worktree|Orca worktree lookup failed/);
+    assert.deepEqual(h.owners(), before);
+    assert.equal(execFileSync("git", ["-C", f.root, "rev-parse", "refs/heads/episode-orca"], { encoding: "utf8" }).trim(), f.head, "no follow-on branch deletion");
+    assert.equal(existsSync(f.worktree), removal !== "partial");
+    assert.equal(f.calls.filter((args) => args[0] === "worktree" && args[1] === "rm").length, 1, "no removal retry");
+  });
+});
 
 test("Prime cleanup host uses supported kill and delete_saved_session daemon commands", async () => {
   const commands = [];

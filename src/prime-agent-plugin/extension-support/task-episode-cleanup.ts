@@ -377,10 +377,16 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
         if (this.status(record.worktree!) !== "") {
           throw new Error("Task Episode cleanup refuses to force-remove a dirty Orca worktree");
         }
-        this.orcaMutation(
-          ["worktree", "rm", "--worktree", `id:${record.worktreeId}`, "--force"],
-          "Orca worktree removal",
-        );
+        try {
+          this.orcaMutation(
+            ["worktree", "rm", "--worktree", `id:${record.worktreeId}`, "--force"],
+            "Orca worktree removal",
+          );
+        } catch (error) {
+          // Orca can fail its post-removal inspection after deleting the worktree
+          // and branch config. Reuse this invocation's resolved upstream identity.
+          if ((await this.inspect(record)).worktree) throw error;
+        }
       }
       return;
     }
