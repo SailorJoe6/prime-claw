@@ -31,7 +31,6 @@ import {
   detectTaskProvider,
   prepareBeadsWorkspaceTransport,
   requireBacklogTaskSelection,
-  resolveProviderTask,
   type BeadsTaskMutationPublication,
   type BeadsWorkspaceTransportPreparation,
   type ProviderTaskResolution,
@@ -39,6 +38,7 @@ import {
 import {
   inspectEpisodeTaskHistoryStore,
   inspectPublishedPrimaryTaskHistory,
+  resolveSynchronizedProviderTask,
   type EpisodeTaskHistoryMutation,
 } from "./task-history-workspace.ts";
 
@@ -50,7 +50,7 @@ import {
  */
 function defaultOwnershipTaskResolver(cwd: string, rawTaskId: string): BacklogTaskSelection | null {
   return requireBacklogTaskSelection(
-    resolveProviderTask(cwd, rawTaskId),
+    resolveSynchronizedProviderTask(cwd, rawTaskId),
     "this Episode ownership path",
   );
 }
@@ -470,7 +470,7 @@ export function resolveLegacyTaskOwnershipTransitionTarget(
     const detail = detection.kind === "blocked" ? `${detection.code}: ${detection.detail}` : "no live provider is selected";
     throw new Error(`Ownership transition cannot prove selected provider authority: ${detail}`);
   }
-  const mainTask = resolveProviderTask(projectRoot, taskId, runner);
+  const mainTask = resolveSynchronizedProviderTask(projectRoot, taskId, runner);
   if (!mainTask || mainTask.taskId !== taskId || mainTask.status !== "In Progress") {
     throw new Error("Ownership transition requires the exact selected-provider task to remain In Progress");
   }
@@ -505,7 +505,7 @@ export function resolveLegacyTaskOwnershipTransitionTarget(
       const detail = episode.status === "refused" ? `${episode.code}: ${episode.detail}` : "the Episode task-history clone is absent";
       throw new Error(`Ownership transition cannot prove the pre-existing Episode Backlog workspace: ${detail}`);
     }
-    const episodeTask = resolveProviderTask(episodeRoot, taskId, runner);
+    const episodeTask = resolveSynchronizedProviderTask(episodeRoot, taskId, runner);
     if (!episodeTask || episodeTask.provider !== "backlog" || episodeTask.taskId !== taskId
         || episodeTask.status !== "In Progress" || episodeTask.taskPathRelative !== mainTask.taskPathRelative
         || !meaningfulTaskImplementationPlan(episodeTask.implementationPlan)) {
@@ -554,7 +554,7 @@ export function resolveLegacyTaskOwnershipTransitionTarget(
       || episodeDetection.evidence.doltDatabase !== detection.evidence.doltDatabase) {
     throw new Error("Ownership transition Episode Beads authority differs from the selected primary provider");
   }
-  const episodeTask = resolveProviderTask(episodeRoot, taskId, runner);
+  const episodeTask = resolveSynchronizedProviderTask(episodeRoot, taskId, runner);
   if (!episodeTask || episodeTask.provider !== "beads" || episodeTask.taskId !== taskId
       || episodeTask.status !== "In Progress" || JSON.stringify(episodeTask.nativeView) !== JSON.stringify(mainTask.nativeView)) {
     throw new Error("Ownership transition primary and Episode Beads task evidence differ");
@@ -1303,7 +1303,7 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
       || !BEADS_RESERVATION_REVISION.test(prepared.publishedRevision)) {
     throw new Error("Beads evidence advancement publication proof does not match the exact recorded Episode project");
   }
-  const currentTask = (dependencies.resolveTask ?? resolveProviderTask)(episodeRoot, input.taskId, runner);
+  const currentTask = (dependencies.resolveTask ?? resolveSynchronizedProviderTask)(episodeRoot, input.taskId, runner);
   if (!currentTask || currentTask.provider !== "beads" || currentTask.taskId !== input.taskId
       || realpathSync(currentTask.projectRoot) !== episodeRoot) {
     throw new Error("Beads evidence advancement could not prove the exact native task identity and project");

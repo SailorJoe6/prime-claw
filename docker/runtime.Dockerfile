@@ -70,9 +70,33 @@ RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" \
     && ln -sf /usr/local/bun/bin/bunx /usr/local/bin/bunx \
     && test "$(bun --version)" = "$BUN_VERSION"
 
+# --- Beads + Dolt: exact provider-native binaries for selectable task stores ---
+ARG BEADS_VERSION=1.3.1
+ARG DOLT_VERSION=2.5.0
+LABEL org.prime-claw.beads-version="${BEADS_VERSION}" \
+      org.prime-claw.dolt-version="${DOLT_VERSION}"
+RUN set -eux; \
+    ARCH=$(case "$(uname -m)" in x86_64|amd64) echo amd64 ;; aarch64|arm64) echo arm64 ;; *) exit 1 ;; esac); \
+    case "$ARCH" in \
+      amd64) BEADS_SHA=3219443a9734b89b93fb16ee8d65844759fa1b3cd3cf139c606b7353cfb0715c; DOLT_SHA=639b8042d1ea46ebf6b645a002fc787134dbe1dc02888cc51a51d1d3eb557c93 ;; \
+      arm64) BEADS_SHA=c3b32c71a6c0cd6358a12c28272b17e6818db991da192f87df52339c222e423a; DOLT_SHA=ede33a0ea8fea7c6bd72246f68bf2df7d1334806c802d52b7822f912e3ca0fcf ;; \
+      *) echo "unsupported provider-tool architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/gastownhall/beads/releases/download/v${BEADS_VERSION}/beads_${BEADS_VERSION}_linux_${ARCH}.tar.gz" -o /tmp/beads.tar.gz; \
+    echo "$BEADS_SHA  /tmp/beads.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/beads.tar.gz -C /tmp bd; \
+    install -m 0755 /tmp/bd /usr/local/bin/bd; \
+    curl -fsSL "https://github.com/dolthub/dolt/releases/download/v${DOLT_VERSION}/dolt-linux-${ARCH}.tar.gz" -o /tmp/dolt.tar.gz; \
+    echo "$DOLT_SHA  /tmp/dolt.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/dolt.tar.gz -C /tmp "dolt-linux-${ARCH}/bin/dolt"; \
+    install -m 0755 "/tmp/dolt-linux-${ARCH}/bin/dolt" /usr/local/bin/dolt; \
+    bd --version | grep -F "bd version ${BEADS_VERSION}"; \
+    dolt version | grep -F "dolt version ${DOLT_VERSION}"; \
+    rm -rf /tmp/beads.tar.gz /tmp/dolt.tar.gz /tmp/bd "/tmp/dolt-linux-${ARCH}"
+
 # --- Backlog.md: compile the exact vendored fork revision for this image ---
 ARG BACKLOG_VERSION=1.53.0
-ARG BACKLOG_COMMIT=fd20f71493fb4eda44b021aa89f257956f17fb71
+ARG BACKLOG_COMMIT=5d556c1954f7724abd180f6211cf528e9253ad4c
 LABEL org.prime-claw.backlog-version="${BACKLOG_VERSION}" \
       org.prime-claw.backlog-commit="${BACKLOG_COMMIT}"
 COPY --from=backlog_source . /opt/backlog

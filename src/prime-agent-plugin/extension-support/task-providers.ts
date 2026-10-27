@@ -224,13 +224,19 @@ function scanBacklog(projectRoot: string): ScanResult {
           },
         };
       }
+      const normalizedStore = relative(projectRoot, storePath).split(sep).join("/");
+      const configuredLayout = normalizedStore === ".backlog"
+        ? ".backlog"
+        : normalizedStore === "backlog"
+          ? "backlog"
+          : "custom";
       return {
         evidence: {
           provider: "backlog",
           configPath: rootConfigPath,
           configSource: "root",
           storeDir: storePath,
-          layout: "custom",
+          layout: configuredLayout,
         },
       };
     }
@@ -284,6 +290,27 @@ function scanBacklog(projectRoot: string): ScanResult {
     if (!isDirectory(storePath)) continue;
     const configPath = folderConfigPath(storePath);
     if (configPath) {
+      let metadata: BacklogConfigMetadata;
+      try {
+        metadata = parseBacklogConfigMetadata(readFileSync(configPath, "utf8"));
+      } catch (error) {
+        return {
+          blocked: {
+            code: "malformed-evidence",
+            detail: `${dirName} folder configuration is unreadable: ${error instanceof Error ? error.message : String(error)}`,
+            remediation: `Repair or remove ${relative(projectRoot, configPath)} so live provider evidence is unambiguous`,
+          },
+        };
+      }
+      if (!metadata.projectName || metadata.backlogDirectoryInvalid) {
+        return {
+          blocked: {
+            code: "malformed-evidence",
+            detail: `${relative(projectRoot, configPath)} is not valid initialized Backlog configuration${!metadata.projectName ? " (project_name is missing)" : " (backlog_directory is invalid)"}`,
+            remediation: `Repair the folder configuration with the pinned backlog CLI or remove it; Prime Claw never selects malformed provider evidence`,
+          },
+        };
+      }
       return {
         evidence: {
           provider: "backlog",
@@ -1426,7 +1453,7 @@ function prepareSelectedBeadsWorkspaceTransport(
       "--ref", BEADS_DOLT_DATA_REF,
       configuredRemote,
       proofDatabase,
-    ], { allowFailure: true });
+    ], { cwd: proofRoot, allowFailure: true });
     if (cloned.status !== 0) {
       return {
         status: "blocked",
@@ -1794,7 +1821,7 @@ function readIsolatedBeadsRemoteTask(
       "clone", "--branch", prepared.branch, "--single-branch", "--ref", BEADS_DOLT_DATA_REF,
       prepared.remoteUrl, proofDatabase,
     ];
-    const cloneResult = runner.run("dolt", cloneArgs, { allowFailure: true });
+    const cloneResult = runner.run("dolt", cloneArgs, { cwd: proofRoot, allowFailure: true });
     evidence.clone = rawCommand("dolt", cloneArgs, cloneResult);
     if (cloneResult.status !== 0) return { ...evidence, error: commandFailure("dolt clone", cloneResult) };
 

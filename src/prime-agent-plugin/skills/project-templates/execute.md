@@ -122,6 +122,19 @@ mark the task `Done`, publish `Blocked` or `Ready for Merge`, or write task
 content in another checkout. Ordinary execution performs no cross-checkout
 copy, mirroring, or dual write.
 
+For independent Backlog, the host first fetches the exact task ref and
+fast-forwards only clean primary/Episode nested clones. Compare the persisted
+complete native `taskEvidence` with the freshly synchronized `backlog task view`
+field for field. A descendant caused only by unrelated tasks is compatible. For
+an outside change to this same task, use bounded semantic judgment: incorporate
+a compatible in-scope clarification or living-plan update as the current basis,
+and stop without mutation for a genuine semantic conflict, authority change,
+scope expansion, or product decision. Raw inequality is evidence, not an
+approval gate. Never add an equality gate or deterministic semantic classifier.
+Immediately before an owner-authorized task-content write, synchronize and
+reread once more; after it, prove the exact intended fields, preserved unrelated
+fields, clean clone, non-force publication, and exact native reread.
+
 If blocked after a bounded attempt, append the exact blocker, attempted actions,
 evidence, and unblock condition to this task's Implementation Notes on the
 Episode task authority. Verify the task identity and unchanged status. In

@@ -296,7 +296,7 @@ function violations(
   current: GrandfatheredLegacySpecification[],
 ): LegacySpecificationViolation[] {
   const byLocation = new Map(accepted.specifications.map((item) => [item.location, item.specificationSha256]));
-  return current.flatMap((item) => {
+  return current.flatMap<LegacySpecificationViolation>((item) => {
     const expected = byLocation.get(item.location);
     if (!expected) return [{ location: item.location, reason: "not-grandfathered" as const }];
     if (expected !== item.specificationSha256) return [{ location: item.location, reason: "specification-changed" as const }];

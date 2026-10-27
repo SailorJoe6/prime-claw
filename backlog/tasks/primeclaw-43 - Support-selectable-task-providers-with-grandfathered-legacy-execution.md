@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-27 07:24'
+updated_date: '2026-10-27 10:21'
 labels: []
 dependencies: []
 references:
@@ -23,31 +23,51 @@ documentation:
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/traceability.md
 modified_files:
-  - LONG_RANGE_PLAN.md
-  - VISION.md
+  - .agents/skills/blocked/SKILL.md
+  - .agents/skills/execute/SKILL.md
+  - .prime-claw/templates.json
+  - .prime-claw/workflows/handoff.md
+  - .prime-claw/workflows/implement-task.md
+  - .prime-claw/workflows/plan-task.md
+  - bin/prime-claw
+  - docker/runtime.Dockerfile
+  - docker/test.Dockerfile
   - docs/backlog.md
-  - docs/conversation-driven-episode-oversight.md
-  - docs/future-specification-bundles.md
-  - docs/information-architecture.md
   - docs/project-initialization.md
-  - docs/user-stories/B-project-initialization.md
-  - docs/user-stories/README.md
   - docs/user-stories/traceability.md
-  - src/prime-agent-plugin/asset-inventory.json
-  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - scripts/build-backlog.sh
+  - src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts
+  - src/prime-agent-plugin/extension-support/prep-chain.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - src/prime-agent-plugin/extension-support/task-provider-migration.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/extensions/project-initialization.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/workflows/implement-task.md
+  - src/prime-agent-plugin/workflows/plan-task.md
   - tests/project_initialization_extension.test.mjs
-  - tests/spec_episode_extension.test.mjs
-  - tests/task_episode_ownership_extension.test.mjs
+  - tests/reviewed_plan_extension.test.mjs
+  - tests/task_episode_admission_extension.test.mjs
+  - tests/task_history_workspace.test.mjs
   - tests/task_provider_migration.test.mjs
   - tests/task_providers.test.mjs
-  - tests/test_managed_session_protocol.py
-  - tests/test_oversee_episode_skill.py
+  - tests/test_backlog_build.py
+  - tests/test_conversation_oversight_native.py
+  - tests/test_future_plan_skills.py
+  - tests/test_runtime_connect.py
+  - tests/test_task_history_workspace.py
   - tests/test_task_provider_migration.py
+  - tests/test_task_providers.py
+  - tests/test_tier1_image.py
+  - >-
+    backlog/tasks/primeclaw-43 -
+    Support-selectable-task-providers-with-grandfathered-legacy-execution.md
 priority: p1
 type: epic
 ordinal: 125000
@@ -170,26 +190,26 @@ Managed Markdown instructions receive content review, reconciliation checks, and
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The implementation plan maps every acceptance criterion to the least-technology mechanism in this order: provider-native behavior, managed LLM instruction, then narrow deterministic adapter code; it justifies any new persistent state or state machine, and review rejects semantic workflow machinery that a prompt can perform.
-- [ ] #2 Sequencing gates prove the admitted PRIMECLAW-10.38 Episode may finish under existing authority while implementation of PRIMECLAW-43 and PRIMECLAW-43.1 remains blocked until PRIMECLAW-10.38 reaches a terminal decision.
-- [ ] #3 Provider discovery recognizes only valid live initialization evidence, selects the sole Backlog or Beads store, defaults new Prime Claw initialization to `.backlog/` unless supported Beads is explicitly selected, blocks malformed or dual live evidence, and creates no provider-selection file or shadow authority.
-- [ ] #4 Prime Claw supplies and capability-checks one pinned managed Backlog executable while preserving upstream direct-init `backlog/` behavior; Prime Claw initialization recommends `.backlog/`, and valid retained `backlog/` or custom layouts remain supported by explicit operator choice.
-- [ ] #5 Backlog configuration and migration acceptance preserves native root and folder discovery, moves configuration with the nested task checkout, offers custom-layout normalization, and uses only a validated relative root symlink when an operator retains a custom directory.
-- [ ] #6 Provider fixtures prove Backlog statuses and Beads custom plus built-in statuses map exactly to In Design, In Planning, In Progress, Blocked, Ready for Merge, and Done, including category-aware readiness capability checks before mutation.
-- [ ] #7 Existing skills and canonical tools remain the UX over a narrow provider adapter for identity, native reads and writes, workspace preparation, synchronization, publication, revisions, and exact change presentation; native `backlog` and `bd` interfaces remain underneath, with no general replacement tracker CLI.
-- [ ] #8 Managed `/design` and `/spec-it-out` content, reconciliation, and UAT target only exact selected-provider In Design tasks and never create or revise `.ralph/plans`; `/plan` and `/implement-task` deterministically accept only one exact provider task ID or grandfathered path without search or substitution.
-- [ ] #9 Generalized version-2 ownership and all task-native lifecycle receipts bind provider, canonical task ID, exact Episode code HEAD, published store revision, and task-scoped evidence without treating a Backlog path as universal identity.
-- [ ] #10 Backlog acceptance proves task history uses disconnected ordinary orphan branch `refs/heads/prime-claw/tasks` in the selected existing remote and an ignored independent nested clone per code worktree, never a submodule, linked worktree, alternate index, same-root custom work tree, or separate hosted repository.
-- [ ] #11 Backlog remote selection uses the primary code branch upstream, otherwise the sole remote; no remote permits explicit local-only unpublished history, while ambiguous remotes block. Workspace setup creates, validates, or repairs each nested checkout and cleanup refuses dirty or unpublished state.
-- [ ] #12 Backlog synchronization disables tracker auto-commit, commits supported native mutations in the nested clone, refreshes before reads and writes, rejects stale pushes and force overwrite, and reconciles unrelated-task changes through ordinary Git behavior without persistent locks.
-- [ ] #13 Beads acceptance uses one repository-associated Dolt store in native per-project server mode, validates supported `bd` auto-start/lifecycle or an operator-managed external server, rejects unsupported concurrency, uses supported Dolt transport including `refs/dolt/data` when configured, and never treats `.beads/issues.jsonl` as authority.
-- [ ] #14 Revision acceptance proves unrelated-task advances and owner-authored iterative task or living-plan updates do not block; receipts advance after publication, and outside same-task changes are synchronized and delivered as exact evidence to the responsible LLM rather than decided by a deterministic semantic merge state machine.
-- [ ] #15 Managed Episode and Conversation instructions require LLM reasoning to incorporate compatible in-scope task changes, keep the task and plan current, and escalate only genuine semantic conflicts, authority changes, or product/scope decisions; representative UAT covers this behavior while automated tests cover only deterministic transport and integrity.
+- [x] #1 The implementation plan maps every acceptance criterion to the least-technology mechanism in this order: provider-native behavior, managed LLM instruction, then narrow deterministic adapter code; it justifies any new persistent state or state machine, and review rejects semantic workflow machinery that a prompt can perform.
+- [x] #2 Sequencing gates prove the admitted PRIMECLAW-10.38 Episode may finish under existing authority while implementation of PRIMECLAW-43 and PRIMECLAW-43.1 remains blocked until PRIMECLAW-10.38 reaches a terminal decision.
+- [x] #3 Provider discovery recognizes only valid live initialization evidence, selects the sole Backlog or Beads store, defaults new Prime Claw initialization to `.backlog/` unless supported Beads is explicitly selected, blocks malformed or dual live evidence, and creates no provider-selection file or shadow authority.
+- [x] #4 Prime Claw supplies and capability-checks one pinned managed Backlog executable while preserving upstream direct-init `backlog/` behavior; Prime Claw initialization recommends `.backlog/`, and valid retained `backlog/` or custom layouts remain supported by explicit operator choice.
+- [x] #5 Backlog configuration and migration acceptance preserves native root and folder discovery, moves configuration with the nested task checkout, offers custom-layout normalization, and uses only a validated relative root symlink when an operator retains a custom directory.
+- [x] #6 Provider fixtures prove Backlog statuses and Beads custom plus built-in statuses map exactly to In Design, In Planning, In Progress, Blocked, Ready for Merge, and Done, including category-aware readiness capability checks before mutation.
+- [x] #7 Existing skills and canonical tools remain the UX over a narrow provider adapter for identity, native reads and writes, workspace preparation, synchronization, publication, revisions, and exact change presentation; native `backlog` and `bd` interfaces remain underneath, with no general replacement tracker CLI.
+- [x] #8 Managed `/design` and `/spec-it-out` content, reconciliation, and UAT target only exact selected-provider In Design tasks and never create or revise `.ralph/plans`; `/plan` and `/implement-task` deterministically accept only one exact provider task ID or grandfathered path without search or substitution.
+- [x] #9 Generalized version-2 ownership and all task-native lifecycle receipts bind provider, canonical task ID, exact Episode code HEAD, published store revision, and task-scoped evidence without treating a Backlog path as universal identity.
+- [x] #10 Backlog acceptance proves task history uses disconnected ordinary orphan branch `refs/heads/prime-claw/tasks` in the selected existing remote and an ignored independent nested clone per code worktree, never a submodule, linked worktree, alternate index, same-root custom work tree, or separate hosted repository.
+- [x] #11 Backlog remote selection uses the primary code branch upstream, otherwise the sole remote; no remote permits explicit local-only unpublished history, while ambiguous remotes block. Workspace setup creates, validates, or repairs each nested checkout and cleanup refuses dirty or unpublished state.
+- [x] #12 Backlog synchronization disables tracker auto-commit, commits supported native mutations in the nested clone, refreshes before reads and writes, rejects stale pushes and force overwrite, and reconciles unrelated-task changes through ordinary Git behavior without persistent locks.
+- [x] #13 Beads acceptance uses one repository-associated Dolt store in native per-project server mode, validates supported `bd` auto-start/lifecycle or an operator-managed external server, rejects unsupported concurrency, uses supported Dolt transport including `refs/dolt/data` when configured, and never treats `.beads/issues.jsonl` as authority.
+- [x] #14 Revision acceptance proves unrelated-task advances and owner-authored iterative task or living-plan updates do not block; receipts advance after publication, and outside same-task changes are synchronized and delivered as exact evidence to the responsible LLM rather than decided by a deterministic semantic merge state machine.
+- [x] #15 Managed Episode and Conversation instructions require LLM reasoning to incorporate compatible in-scope task changes, keep the task and plan current, and escalate only genuine semantic conflicts, authority changes, or product/scope decisions; representative UAT covers this behavior while automated tests cover only deterministic transport and integrity.
 - [x] #16 Upgrade records the exact unfinished grandfathered set and accepted specification digests, rejects new or materially revised legacy specifications, excludes archive-only history from reminders, and preserves provider-independent version-1 planning, execution, review, recovery, and finalization with frozen specifications and living plans.
 - [x] #17 Legacy-to-task migration is explicit, reviewed, one-way, and lossless; it targets the selected provider, preserves provenance and exact active Episode identity, establishes one task authority before retiring legacy authority, and leaves version-1 recovery intact on failure.
 - [x] #18 Provider-switch acceptance uses a bounded mutation-free maintenance window and migrates every open and closed task with all fields, relationships, comments, lifecycle state, history, and provenance, preserving any non-native value losslessly in destination-supported metadata or provenance; IDs are preserved when safely supported and otherwise receive immutable source-to-destination mappings.
 - [x] #19 Cutover verification binds exact source and destination revisions, complete counts and digests, ID mappings, ownership transitions, actor, and timestamp. Any pre-cutover failure keeps the source intact and authoritative; only complete verification and ownership transition activate the destination and immediately delete the source store.
-- [ ] #20 Automated tests cover deterministic discovery, capability gates, workspaces, synchronization, optimistic concurrency, revision and diff transport, ownership, transitions, complete migration, recovery, and destructive cutover guards. Managed prose receives content review, reconciliation checks, and representative UAT instead of artificial behavioral unit tests.
+- [x] #20 Automated tests cover deterministic discovery, capability gates, workspaces, synchronization, optimistic concurrency, revision and diff transport, ownership, transitions, complete migration, recovery, and destructive cutover guards. Managed prose receives content review, reconciliation checks, and representative UAT instead of artificial behavioral unit tests.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -1511,6 +1531,29 @@ Verify AC2's admitted PRIMECLAW-10.38 terminal sequencing from real historical e
 Preserve every accepted repair, customization guarantee, and exact active version-2 Episode identity. Prefer existing native behavior, concise managed reasoning, and narrow integrity checks; add no semantic classifier, approval machinery, task/plan snapshot locks, universal model/converter, framework, or checkpoint state. Run the required final validation, including `scripts/test-all.sh`, relevant native Node/Python coverage, and Docker tier-1; rerun only evidence invalidated by a direct in-scope repair. Plugin and Prime Agent probes remain Docker-only or use the isolated wrapper. Do not run host/user-global apply/check/probes, another host Prime Agent instance, unguarded settings mutations, GUI control, or credential-store access. Missing credentials remain manual operator conditions. Disposable Docker/UAT is sufficient pre-merge; post-merge global activation, full restart, and real cutover remain separately unauthorized.
 
 Do not mutate the real PRIMECLAW-43.1 data/provider store, live inventory, canonical registry/ownership/resources, legacy plans, or global plugin. Do not merge, abandon, finalize, clean up, or self-publish Ready for Merge. One clean final whole-feature candidate must be pushed with focused evidence, full validation, and independent exact review, then stop for the owner’s final decision; otherwise record one actual blocker and precise manual unblock condition.
+
+2026-10-27 plan step 7 / AC20 whole-feature audit completed against actual code, managed instructions, native fixtures, runtime delivery, reconciliation, documentation, and representative UAT.
+
+Acceptance audit:
+- AC1-2: the accepted plan maps native provider behavior before managed semantic judgment and narrow deterministic integrity code; no provider framework/state machine was introduced. PRIMECLAW-10.38 reached Done at 73bdbba5c3e6ebc16a95484a07491b9ee6d5e165 before PRIMECLAW-43 admission 8c9a2edc0fe07401e9d05071583860d34359791b and first implementation 6c9878a2f975dee733748a131db20c11a7f49068; PRIMECLAW-43.1 remains unchanged and gated.
+- AC3-6: native evidence selects one valid Backlog or Beads store, malformed/dual/uncertain evidence blocks, Prime Claw defaults initialization to .backlog/, retained root/folder/custom layouts and validated compatibility symlinks work, the managed Backlog build is pinned to exact commit 5d556c1954f7724abd180f6211cf528e9253ad4c with v1.53.0 ancestor fd20f71493fb4eda44b021aa89f257956f17fb71, and all six Backlog/Beads lifecycle mappings plus category-aware readiness are natively proven before mutation.
+- AC7-9: existing skills/tools remain the only UX over direct native backlog/bd operations; exact task IDs and grandfathered paths route without search/substitution; synchronized reads precede admission; version-2 ownership and receipts bind provider, canonical ID, published revision, exact code HEAD, and task-scoped evidence without treating paths as universal identity.
+- AC10-12: Backlog history uses independent ordinary-Git clones on disconnected refs/heads/prime-claw/tasks, selected existing remote transport, explicit unpublished local-only mode only when requested, safe preparation/repair/cleanup, native auto-commit disabled, synchronized native mutation plus ordinary commit/push, stale-push and unsafe-clone refusal, and ordinary different-task reconciliation without locks or force.
+- AC13: disposable Beads 1.3.1 / Dolt 2.5.0 native proofs cover per-project server behavior, supported refs/dolt/data transport, independent remote proof, and JSONL non-authority; runtime and Tier-1 images deliver exact Backlog 1.53.0, Beads 1.3.1, and Dolt 2.5.0 while Bun remains absent from the final runtime image.
+- AC14-15: unrelated advances and owner iteration proceed; synchronized outside same-task evidence is delivered without a deterministic semantic classifier. Representative semantic UAT accepted a compatible stale-clone regression clarification and escalated a provider-neutral Jira/Linear/coordinator expansion without mutation.
+- AC16-17: exact grandfathered inventory/digests, frozen legacy specifications with living plans, provider-independent version-1 recovery, and reviewed one-way lossless legacy-to-selected-provider transition preserve exact active Episode identity.
+- AC18-19: native pair-specific migration covers every open/closed/archived task, supported fields/history/provenance, exact IDs/mappings, source and destination revisions/digests/counts, active ownership/runtime continuity, guarded cutover, immediate exact source retirement, rollback/refusal paths, exact receipt drift, and repeated Backlog->Beads->Backlog round trips without mirrors, checkpoints, or dual writes.
+- AC20: deterministic discovery, capability, workspace, synchronization, concurrency, revision/diff, ownership, transition, migration, recovery, and destructive guards have automated coverage; managed prose passed content/reconciliation checks and representative UAT rather than artificial semantic unit tests.
+
+Final validation evidence:
+- task-history workspace Node suite: 63/63; provider migration Node suite: 21/21; task Episode admission Node suite: 20/20; provider suite: 78/78; combined provider/lifecycle suites: 378/378.
+- full non-container Python: 684 passed, 1 skipped, plus 75 subtests.
+- managed-policy subset: 88/88; git diff --check passed.
+- current-source Docker Tier-1 probe passed with immutable image, absent network, manifest publication, and verified teardown; canonical bin/prime-claw build passed with runtime Backlog 1.53.0, Beads 1.3.1, and Dolt 2.5.0.
+- repaired Linux gate passed native post-compaction guide reinjection, task-history workspace, provider migration, provider coverage, and the final task-admission retry (1/1); host task admission passed 20/20.
+- final scripts/test-all.sh run .test-results/20261027-030311-61040: Tier 0 PASS in 73s; Tier 1 had 69 passed, 1 skipped, and one failure. The sole failure is tests/test_source_builder_real_install.py::test_two_real_source_generations_install_changed_behavior_without_replay at the isolated prep-kernel compact-skill install. It reproduces on canonical main and was recorded before this candidate as an environmental baseline; all candidate-owned failures from the prior aggregate run were repaired and revalidated.
+
+No live PRIMECLAW-43.1 cutover, provider authority change, production registry/resource mutation, user-global plugin apply, merge, finalization, abandonment, or cleanup was performed. PRIMECLAW-43 remains In Progress for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

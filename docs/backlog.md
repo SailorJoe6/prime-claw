@@ -6,16 +6,20 @@ Prime Claw vendors its long-lived Backlog.md fork as the Git submodule at
 
 ## Current bounded release
 
-The migration snapshot resolved the latest stable upstream release as:
+The managed fork remains based on the latest stable upstream release selected
+for the migration, with one exact post-release compatibility commit:
 
-- release: `v1.53.0`
-- commit: `fd20f71493fb4eda44b021aa89f257956f17fb71`
+- base release: `v1.53.0`
+- base commit: `fd20f71493fb4eda44b021aa89f257956f17fb71`
+- managed source commit: `5d556c1954f7724abd180f6211cf528e9253ad4c`
 - fork: `https://github.com/SailorJoe6/Backlog.md`
 - upstream: `https://github.com/MrLesk/Backlog.md`
 
-The release and commit stay fixed through migration review and cutover. A later
-stable release is adopted only through a separate fork sync and validated
-submodule-pin update. Prereleases and branch heads are not dependency targets.
+The managed source commit adds the accepted exact completed-task restore needed
+by the task-native lifecycle. Builds require the submodule HEAD to equal that
+commit and require `v1.53.0` to be its Git ancestor; they do not accept an
+arbitrary branch head. A later stable release or another fork change is adopted
+only through a separate validated source-pin update.
 
 Clone this repository with `git clone --recurse-submodules`, or initialize an
 existing checkout with `git submodule update --init --recursive`.
@@ -28,7 +32,7 @@ Build and run upstream's compiled-binary smoke path:
 scripts/build-backlog.sh
 ```
 
-The script verifies the submodule tag and commit, runs
+The script verifies the exact managed commit and its stable-release ancestry, runs
 `bun install --frozen-lockfile`, compiles the version-stamped standalone binary,
 and runs `scripts/smoke-compiled-build.ts`. The resulting candidate is
 `deps/backlog/dist/backlog`. Bun is required to build and smoke-test it, but the
@@ -49,7 +53,9 @@ The sandbox build pins Bun `1.3.11`, matching the accepted build toolchain, so a
 floating installer release cannot silently reuse or replace the compiled
 artifact. The build uses the vendored source. It does not install an npm
 package, download an upstream prebuilt binary, or require Bun to execute
-`backlog`.
+`backlog`. The Tier-1 image performs the same exact source/ancestry/smoke proof
+in an isolated build stage and copies only the standalone binary into its slim
+runtime stage; Bun is not retained in that image.
 
 ## Plugin task-resolution seam
 
@@ -250,8 +256,11 @@ checkout is never switched, staged, or written:
 
 - **Remote selection** (`selectTaskHistoryRemote`): the canonical primary code
   branch's upstream wins; otherwise the sole repository remote. The selection
-  carries the remote's transport URL. No remote or ambiguous remotes block with
-  exact remediation; the seam never guesses.
+  carries the remote's transport URL. Ambiguous remotes block. With no remote,
+  ordinary preparation blocks unless the operator explicitly selects
+  `unpublishedLocalOnly`; that bounded route creates one clean independent
+  nested repository with no remotes, labels it unpublished, and never treats it
+  as admission, terminal-publication, or cleanup proof.
 - **Direct remote evidence is authoritative** (`ensureTaskHistoryBranch`): the
   exact task ref is read with `git ls-remote --heads <transport>
   refs/heads/prime-claw/tasks` and parsed as either absent or one well-formed
@@ -277,9 +286,10 @@ checkout is never switched, staged, or written:
 - **Nested clone from the remote URL** (`prepareTaskHistoryWorkspace`): the
   primary checkout's ignored, independent nested Backlog clone is cloned from
   the selected remote's transport URL — never the primary filesystem path —
-  onto the published task branch, at the validated built-in task-store
-  location. The default with no live provider evidence is `.backlog/` (never
-  `backlog/`); an explicitly selected existing `backlog/` store is preserved.
+  onto the published task branch, at the validated selected in-repository
+  task-store location. The default with no live provider evidence is `.backlog/`
+  (never `backlog/`); selected `backlog/`, `.backlog/`, and safe relative custom
+  stores are preserved.
   An existing nested clone is verified exactly — remote name AND canonical URL,
   branch, and head — never recreated. An existing non-empty store without
   `.git` blocks before mutation (adopting it is the deferred migration/cutover
@@ -289,8 +299,8 @@ checkout is never switched, staged, or written:
   unpublished config. No submodules, linked nested worktrees, alternate
   indexes, same-root custom Git work trees, separate hosted repo, or
   coordinator.
-- **Containment before mutation**: the store target is proven directly inside
-  the canonical primary root and no path component (target or ancestor) may be
+- **Containment before mutation**: the store target is proven at a safe relative
+  path inside the canonical primary root and no path component (target or ancestor) may be
   a symlink; a symlinked store or escape blocks before any branch or store
   mutation.
 - **Ignore proven with native Git**: the store is ignored by appending a final
@@ -298,15 +308,18 @@ checkout is never switched, staged, or written:
   ineffective result blocks with exact remediation. `git check-ignore` must
   succeed so an ordinary `git add .` can never stage the nested repository as a
   forbidden gitlink.
-- **Root-config layouts block before any native config write**: when discovery
-  selects a root `backlog.config.yml`, preparation blocks
-  (`config-not-preserved`) before any ignore/branch/clone/config mutation.
-  Backlog's native config discovery walks UP from the nested store and resolves
-  the root config, so any `backlog config` write from the nested clone would
-  rewrite the PRIMARY root configuration while the published folder config
-  stays unchanged; mere folder-config existence is not preservation. Relocating
-  that authority is the deferred cutover (PRIMECLAW-43.1). A published folder
-  config is used as-is and never modified or shadowed.
+- **Root configuration is relocated without task-data cutover**: the exact root
+  configuration is first validated natively in a disposable fixture so its
+  source bytes cannot be normalized. A proven-empty native directory skeleton
+  may then be replaced by the independent clone. Built-in layouts publish the
+  equivalent folder `config.yml` without the root-only `backlog_directory` key
+  and remove the old root file. An explicitly retained custom layout publishes
+  the exact config in the selected custom store and replaces
+  `backlog.config.yml` with one exact relative symlink into that clone. The
+  result is reread natively, kept clean, and returned with a brittleness warning.
+  Any live task content, conflicting published config, absolute/alternate
+  symlink, escape, or semantic drift blocks; task-data adoption remains a
+  separate reviewed migration.
 - **Effective native configuration proven on every path**: after the nested
   store is materialized or verified, its effective Backlog configuration is
   validated from the canonical primary root on every path — regardless of the
@@ -389,10 +402,9 @@ fields, no lifecycle wiring, no per-task mutation loop.
   `common-repo-mismatch`). No ownership fields or lifecycle wiring.
 - **Derived from the prepared primary:** the selected remote name, exact
   transport URL, published `refs/heads/prime-claw/tasks` authority, and exact
-  one-segment built-in store location come from
-  `prepareTaskHistoryWorkspace(primaryRoot)`. A prepared `backlog/` primary
-  therefore maps only to target `backlog/`; `.backlog` is never hardcoded.
-  Root/custom-layout blocks from accepted slice 2A are preserved.
+  exact safe relative store location come from
+  `prepareTaskHistoryWorkspace(primaryRoot)`. A prepared `backlog/`, `.backlog/`,
+  or retained custom primary maps only to the same relative target path.
 - **Pre-existing effective ignore required:** the store path must be directly
   contained and non-symlinked, and native `git check-ignore` must prove it is
   already ignored BEFORE anything is created. The target code worktree is
@@ -401,12 +413,11 @@ fields, no lifecycle wiring, no per-task mutation loop.
   `.gitignore` (a worktree-creation/operator responsibility, not this seam's).
 - **Exact target-native authority:** before the clone write, target provider
   discovery may be absent or may select only the exact derived Backlog store;
-  another provider or store blocks. Any target root configuration blocks even
-  when it selects that same derived store: root-authority relocation remains
-  deferred to PRIMECLAW-43.1, and no native reads may normalize the tracked
-  code-worktree file. After creation or reuse, discovery must select the exact
-  folder-configured store before native lifecycle/default/autoCommit reads are
-  trusted.
+  another provider or store blocks. A target root configuration is accepted
+  only when it is the exact reviewed relative symlink into the derived custom
+  nested clone; regular, absolute, dangling, and alternate targets block.
+  After creation or reuse, discovery must select that exact store before native
+  lifecycle/default/autoCommit reads are trusted.
 - **Independent nested clone:** an ordinary-Git clone uses both the selected
   remote name (`--origin <selected>`) and exact URL on `prime-claw/tasks` at
   the exact remote head — never a nested linked worktree, submodule,

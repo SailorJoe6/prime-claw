@@ -66,8 +66,14 @@ Backlog store. The task is the sole lifecycle authority in this branch.
 Grandfathered Backlog reads canonical main. Independent Backlog first
 fast-forwards the clean primary nested clone to the directly published
 `refs/heads/prime-claw/tasks`; dirty, local-ahead, divergent, unavailable, or
-foreign history blocks without migration or force. Work with the user to satisfy the
-recorded unblock condition. After the user or accepted
+foreign history blocks without migration or force. Compare the persisted complete
+native `taskEvidence` with the freshly synchronized exact task view. An
+unrelated-task descendant alone is compatible. For an outside same-task change,
+use bounded semantic judgment: preserve a compatible in-scope clarification or
+living-plan update, and stop without mutation for a genuine semantic conflict,
+authority change, scope expansion, or product decision. Raw inequality is not
+an approval gate; never add an equality gate or deterministic classifier. Work
+with the user to satisfy the recorded unblock condition. After the user or accepted
 evidence clears it, only that exact owning Conversation may publish the same
 task as `In Progress`. Grandfathered Backlog preserves the existing one exact-
 task-only main commit: unrelated main dirt is allowed, the task path must match

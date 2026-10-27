@@ -124,19 +124,20 @@ interface ActionArguments {
   actor?: string;
   semanticPlacement?: string;
   beadsNativePlacements?: ProviderMigrationOptions["beadsNativePlacements"];
+  unpublishedLocalOnly: boolean;
 }
 
-function productionReconcileOptions(dependencies: ProjectInitializationDependencies) {
+function productionReconcileOptions(dependencies: ProjectInitializationDependencies, unpublishedLocalOnly = false) {
   return {
     ...dependencies,
-    taskHistoryPreparer: dependencies.taskHistoryPreparer ?? prepareTaskHistoryWorkspace,
+    taskHistoryPreparer: (input) => (dependencies.taskHistoryPreparer ?? prepareTaskHistoryWorkspace)({ ...input, unpublishedLocalOnly }),
   };
 }
 
 async function executeAction(action: Action, args: ActionArguments, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies) {
   switch (action) {
     case "reconcile": return reconcilePrimeClawProject({
-      ...productionReconcileOptions(dependencies), cwd: ctx.cwd, registerOrca: true, legacyInventoryMode: "initialize",
+      ...productionReconcileOptions(dependencies, args.unpublishedLocalOnly), cwd: ctx.cwd, registerOrca: true, legacyInventoryMode: "initialize",
     });
     case "accept-override":
       if (!args.assetId) throw new Error("accept-override requires assetId");
@@ -181,8 +182,12 @@ async function executeAction(action: Action, args: ActionArguments, ctx: Extensi
 
 function parseCommand(raw: string): { action: Action; args: ActionArguments } {
   const values = raw.trim() ? raw.trim().split(/\s+/) : [];
-  const defaults: ActionArguments = { ready: false, visible: false, confirmedSwitch: false };
+  const defaults: ActionArguments = { ready: false, visible: false, confirmedSwitch: false, unpublishedLocalOnly: false };
   if (!values.length) return { action: "reconcile", args: defaults };
+  if (values[0] === "--unpublished-local-only") {
+    if (values.length !== 1) throw new Error("usage: /initialize-prime-claw --unpublished-local-only");
+    return { action: "reconcile", args: { ...defaults, unpublishedLocalOnly: true } };
+  }
   if (values[0] === "--switch-request") {
     if (values.length !== 2 || !["backlog", "beads"].includes(values[1])) throw new Error("usage: /initialize-prime-claw --switch-request <backlog|beads>");
     return { action: "switch-request", args: { ...defaults, targetProvider: values[1] as "backlog" | "beads" } };
@@ -240,7 +245,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
       description: "Initialize or safely reconcile Prime Claw project templates, review an exact asset, or inspect and explicitly confirm one selected-provider migration.",
       promptSnippet: "Initialize or reconcile Prime Claw assets in the current Git project",
       promptGuidelines: [
-        "Use initialize_prime_claw action=reconcile for explicit initialization or upgrade; it never commits. The first explicit run records the exact unfinished retained-legacy specification allowlist, and later runs never enroll or rebaseline legacy specifications.",
+        "Use initialize_prime_claw action=reconcile for explicit initialization or upgrade; it never commits. Set unpublishedLocalOnly true only when the operator explicitly selects unpublished local-only task history for a repository with no remote. The first explicit run records the exact unfinished retained-legacy specification allowlist, and later runs never enroll or rebaseline legacy specifications.",
         "For review, call review-request first, explain the temporary overwrite and foreground switch exactly, and wait for the operator to say ready or cancel.",
         "Call review-start only after literal operator readiness. After it opens the focused Orca diff, ask whether the comparison is visible and keep the overwrite held.",
         "Call review-complete only after visible confirmation and explicit completion; call review-cancel on cancellation. Never invoke Computer Use, Accessibility, or another GUI-control surface.",
@@ -258,6 +263,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
           assetId: { type: "string", description: "Exact stable asset ID for asset-specific actions" },
           confirmedReady: { type: "boolean", description: "True only after the operator explicitly said ready" },
           visibleConfirmed: { type: "boolean", description: "True only after the operator confirmed the focused comparison is visible" },
+          unpublishedLocalOnly: { type: "boolean", description: "True only after the operator explicitly chooses unpublished local-only task history because this repository has no remote" },
           targetProvider: { type: "string", enum: ["backlog", "beads"], description: "Exact requested destination for a provider-switch inspection or confirmation" },
           expectedSourceRevision: { type: "string", description: "Exact source revision returned by switch-request" },
           confirmedSwitch: { type: "boolean", description: "True only after the operator explicitly confirmed this exact one-way switch and source deletion" },
@@ -293,6 +299,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
             actor: params.actor,
             semanticPlacement: params.semanticPlacement,
             beadsNativePlacements: params.beadsNativePlacements,
+            unpublishedLocalOnly: params.unpublishedLocalOnly === true,
           }, ctx, dependencies);
           return toolResult(value, actionSummary(value));
         } catch (error) {

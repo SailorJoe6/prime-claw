@@ -10,7 +10,11 @@ import { inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 
-const BACKLOG = realpathSync("deps/backlog/dist/backlog");
+const BACKLOG_CANDIDATE = "deps/backlog/dist/backlog";
+const RUNTIME_BACKLOG = "/usr/local/bin/backlog";
+const BACKLOG = process.platform === "linux" && existsSync(RUNTIME_BACKLOG)
+  ? RUNTIME_BACKLOG
+  : existsSync(BACKLOG_CANDIDATE) ? realpathSync(BACKLOG_CANDIDATE) : "backlog";
 const CUSTOM = "in_design:active,in_planning:active,ready_for_merge:wip,done:done";
 
 class CandidateRunner extends ProcessCommandRunner {
@@ -491,6 +495,68 @@ test("confirmed Beads to Backlog migration preserves active Episode identity and
 });
 
 
+test("independent Backlog source ref is retired so a later reverse provider switch is selectable", { timeout: 360_000 }, async (t) => {
+  const fixture = beadsSource(t, "beads-backlog-beads-roundtrip");
+  const operatorIgnore = "operator-cache/\n";
+  writeFileSync(join(fixture.root, ".gitignore"), `${readFileSync(join(fixture.root, ".gitignore"), "utf8")}${operatorIgnore}`);
+  git(fixture.root, "add", ".gitignore");
+  git(fixture.root, "commit", "-qm", "preserve operator ignore rule");
+  git(fixture.root, "push", "-q");
+  const toBacklog = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  assert.equal(toBacklog.status, "ready", toBacklog.detail);
+  const backlogResult = await migrateTaskProvider({
+    cwd: fixture.root,
+    targetProvider: "backlog",
+    runner: RUNNER,
+    expectedSourceRevision: toBacklog.sourceRevision,
+    confirmedSwitch: true,
+    actor: "roundtrip-operator",
+    semanticPlacement: "Preserve complete native fields and place Beads design in the Backlog living plan.",
+    verifyActiveRuntime: proveFixtureRuntime,
+  });
+  assert.equal(backlogResult.status, "completed", backlogResult.detail);
+  assert.equal(existsSync(join(fixture.root, ".beads.gate.lock")), false, "retired Beads native gate lock must not survive cutover");
+  assert.match(git(fixture.root, "ls-remote", "--heads", fixture.remote, "refs/heads/prime-claw/tasks"), /refs\/heads\/prime-claw\/tasks/);
+  assert.equal(readFileSync(join(fixture.root, ".gitignore"), "utf8"), `\n${operatorIgnore}`, "cutover must retire only the exact Beads ignore block and preserve every operator byte");
+
+  const toBeads = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
+  assert.equal(toBeads.status, "ready", toBeads.detail);
+  const backlogStore = join(fixture.root, ".backlog");
+  const backlogStatusAfterInspection = git(backlogStore, "status", "--porcelain=v1");
+  assert.equal(backlogStatusAfterInspection, "", "read-only inspection must leave independent Backlog history clean");
+  const beadsResult = await migrateTaskProvider({
+    cwd: fixture.root,
+    targetProvider: "beads",
+    runner: RUNNER,
+    expectedSourceRevision: toBeads.sourceRevision,
+    confirmedSwitch: true,
+    actor: "roundtrip-operator",
+    semanticPlacement: "Restore provider-native Beads fields and preserve exact Backlog provenance in native metadata.",
+    verifyActiveRuntime: proveFixtureRuntime,
+  });
+  assert.equal(beadsResult.status, "completed", beadsResult.detail);
+  assert.equal(beadsResult.selectedProvider, "beads");
+  assert.equal(git(fixture.root, "ls-remote", "--heads", fixture.remote, "refs/heads/prime-claw/tasks"), "");
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+  assert.equal(detectTaskProvider(fixture.root, RUNNER).evidence.provider, "beads");
+
+  const toBacklogAgain = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  assert.equal(toBacklogAgain.status, "ready", toBacklogAgain.detail);
+  const secondBacklog = await migrateTaskProvider({
+    cwd: fixture.root,
+    targetProvider: "backlog",
+    runner: RUNNER,
+    expectedSourceRevision: toBacklogAgain.sourceRevision,
+    confirmedSwitch: true,
+    actor: "roundtrip-operator",
+    semanticPlacement: "Restore Backlog native task history after exact retirement of the prior independent source ref.",
+    verifyActiveRuntime: proveFixtureRuntime,
+  });
+  assert.equal(secondBacklog.status, "completed", secondBacklog.detail);
+  assert.equal(secondBacklog.selectedProvider, "backlog");
+  assert.match(git(fixture.root, "ls-remote", "--heads", fixture.remote, "refs/heads/prime-claw/tasks"), /refs\/heads\/prime-claw\/tasks/);
+});
+
 test("Beads source inspection rejects configured owner filters before destination creation", { timeout: 120_000 }, (t) => {
   const fixture = beadsSource(t, "beads-filtered-source");
   bd(fixture.root, "create", "Filtered ordinary task", "--status", "in_progress", "--actor", "excluded-reviewer", "--json");
@@ -555,6 +621,70 @@ test("missing active Episode durable session blocks inspection before destinatio
   assert.match(inspection.detail, /durable session file is absent/);
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
   assert.equal(existsSync(join(fixture.root, "backlog")), true);
+});
+
+class BeadsReceiptDriftRunner extends CandidateRunner {
+  constructor() { super(); this.drifted = false; }
+  run(commandName, args, options = {}) {
+    const result = super.run(commandName, args, options);
+    if (!this.drifted && commandName === "bd" && args[0] === "create"
+        && args[1] === "Prime Claw task-provider migration receipt" && result.status === 0) {
+      const created = JSON.parse(result.stdout);
+      const row = Array.isArray(created) ? created[0] : created;
+      this.drifted = true;
+      super.run("bd", ["update", row.id, "--notes", "corrupted receipt", "--metadata", JSON.stringify({ prime_claw_migration: {
+        marker: "prime-claw-task-provider-migration-receipt-v1", sourceProvider: "backlog", targetProvider: "beads",
+        sourceRevision: "0".repeat(40), sourceDigest: "0".repeat(64),
+      } }), "--json"], options);
+    }
+    return result;
+  }
+}
+
+class BacklogReceiptDriftRunner extends CandidateRunner {
+  constructor() { super(); this.drifted = false; }
+  run(commandName, args, options = {}) {
+    const result = super.run(commandName, args, options);
+    if (!this.drifted && commandName === "backlog" && args[0] === "task" && args[1] === "edit"
+        && args.includes("Verified selected-provider migration receipt") && result.status === 0) {
+      const id = args.at(-1);
+      this.drifted = true;
+      super.run("backlog", ["task", "edit", "--notes", "corrupted receipt", "--plain", "--", id], options);
+    }
+    return result;
+  }
+}
+
+test("exact Beads receipt drift blocks before Backlog source deletion", { timeout: 180_000 }, async (t) => {
+  const fixture = backlogSource(t, "beads-receipt-drift");
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const runner = new BeadsReceiptDriftRunner();
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "beads", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve unsupported values in native metadata.",
+  });
+  assert.equal(runner.drifted, true);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "pre-cutover-failed");
+  assert.match(result.detail, /receipt.*does not exactly match/i);
+  assert.equal(existsSync(join(fixture.root, "backlog")), true);
+});
+
+test("exact Backlog receipt drift blocks before Beads source deletion", { timeout: 240_000 }, async (t) => {
+  const fixture = beadsSource(t, "backlog-receipt-drift");
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const runner = new BacklogReceiptDriftRunner();
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve unsupported values in native provenance.",
+  });
+  assert.equal(runner.drifted, true);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "pre-cutover-failed");
+  assert.match(result.detail, /receipt.*does not exactly match/i);
+  assert.equal(existsSync(join(fixture.root, ".beads")), true);
 });
 
 class BacklogRemoteRaceRunner extends CandidateRunner {

@@ -613,13 +613,15 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "call `create_task_episode` exactly once",
         "exact canonical task ID as its sole `taskId` argument",
         "from `In Planning` to `In Progress` through Backlog",
-        "commit and verify that exact task path",
+        "Grandfathered branch-local mode commits and verifies that exact task path",
+        "publishes the exact task-path-only status commit on `refs/heads/prime-claw/tasks` without force",
+        "leaves the code HEAD unchanged",
         "persist one `provisioning` ownership record",
-        "bound to the canonical task and status-commit SHA",
-        "before creating any branch, worktree, or session",
-        "creates the Episode branch and worktree from that recorded SHA",
-        "transport failure alone does not block local Episode creation",
-        "returns the exact main task to `In Planning`",
+        "Before any branch, worktree, or session",
+        "independent mode also binds its published provider revision and complete task evidence",
+        "created from the recorded code base",
+        "Grandfathered prompt push is best-effort",
+        "returns the exact task to `In Planning`",
         "partial, or uncertain mutation publishes `Blocked`",
         "must never be retried as a new Episode",
         "one fixed execute assignment",
@@ -646,9 +648,10 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "must never retry, force, adopt, reset, use raw Dolt writes",
     ):
         assert fragment in implement
-    assert implement.index("verified status commit") < implement.index("persist one `provisioning` ownership record")
-    assert implement.index("persist one `provisioning` ownership record") < implement.index("before creating any branch, worktree, or session")
-    assert implement.index("before creating any branch, worktree, or session") < implement.index("creates the Episode branch and worktree from that recorded SHA")
+    assert implement.index("publishes the exact task-path-only status commit") < implement.index("persist one `provisioning` ownership record")
+    assert implement.index("publishes the exact task-path-only status commit") < implement.index("Before any branch, worktree, or session")
+    assert implement.index("Before any branch, worktree, or session") < implement.index("persist one `provisioning` ownership record")
+    assert implement.index("persist one `provisioning` ownership record") < implement.index("created from the recorded code base")
 
     # Installed prep policy may differ until deliberate candidate activation.
     for name in ("implement-task-prep", "implement-task"):

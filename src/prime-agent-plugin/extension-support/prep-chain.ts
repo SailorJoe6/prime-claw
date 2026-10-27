@@ -7,9 +7,9 @@ import {
 import { assertGrandfatheredLegacySpecification } from "./legacy-specification-inventory.ts";
 import {
   requireBacklogTaskSelection,
-  resolveProviderTask,
   type ProviderTaskResolution,
 } from "./task-providers.ts";
+import { resolveSynchronizedProviderTask } from "./task-history-workspace.ts";
 import {
   admitWorkflowChain,
   canonicalWorkflowPrompt,
@@ -69,7 +69,7 @@ ${selection.taskPathRelative}
  */
 const defaultTaskResolver: BacklogTaskResolver = (cwd, rawTaskId) =>
   requireBacklogTaskSelection(
-    resolveProviderTask(cwd, rawTaskId),
+    resolveSynchronizedProviderTask(cwd, rawTaskId),
     "task-native planning chain admission",
   );
 type TaskPrepChainPreflight = (
@@ -261,7 +261,7 @@ export async function admitProviderTaskPrepChain(
   rawTaskId: string,
   workflow: TaskPrepChainWorkflow,
   source: "native" | "tool",
-  taskResolver: ProviderTaskResolver = resolveProviderTask,
+  taskResolver: ProviderTaskResolver = resolveSynchronizedProviderTask,
   preflight?: (
     ctx: ExtensionContext,
     selection: ProviderTaskResolution,

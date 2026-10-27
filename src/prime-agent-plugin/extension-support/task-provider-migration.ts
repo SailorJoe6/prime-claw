@@ -1110,18 +1110,46 @@ function migrationReceiptBase(source: SourceSnapshot, target: TaskProviderId, de
   };
 }
 
+function beadsReceiptNotes(receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">): string {
+  return `Destination-native Prime Claw migration receipt. The containing Dolt revision is the receipt revision.
+
+\`\`\`json
+${JSON.stringify(receipt, null, 2)}
+\`\`\``;
+}
+
 function createOrUpdateBeadsReceipt(runner: CommandRunner, projectRoot: string, receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">): string {
   const existing = beadsExportRows(runner, projectRoot).find((row) => beadsMigrationMetadata(row)?.marker === RECEIPT_MARKER);
   const metadata = JSON.stringify({ prime_claw_migration: receipt });
-  const notes = `Destination-native Prime Claw migration receipt. The containing Dolt revision is the receipt revision.\n\n\`\`\`json\n${JSON.stringify(receipt, null, 2)}\n\`\`\``;
+  const notes = beadsReceiptNotes(receipt);
   if (existing) {
     const id = exactTaskId(existing.id, "existing Beads migration receipt");
-    runRequired(runner, "bd", ["update", id, "--title", RECEIPT_TITLE, "--notes", notes, "--metadata", metadata, "--json"], projectRoot, "update Beads migration receipt");
+    runRequired(runner, "bd", ["update", id, "--title", RECEIPT_TITLE, "--status", "done", "--notes", notes, "--metadata", metadata, "--json"], projectRoot, "update Beads migration receipt");
     return id;
   }
   const created = jsonCommand(runner, "bd", ["create", RECEIPT_TITLE, "--type", "decision", "--status", "done", "--notes", notes, "--metadata", metadata, "--json"], projectRoot, "create Beads migration receipt");
   const row = Array.isArray(created) ? created[0] : created;
   return exactTaskId(asObject(row, "create Beads migration receipt").id, "create Beads migration receipt");
+}
+
+function assertExactBeadsReceipt(
+  runner: CommandRunner,
+  projectRoot: string,
+  allRows: JsonObject[],
+  receiptTaskId: string,
+  receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">,
+): void {
+  const row = allRows.find((item) => String(item.id) === receiptTaskId);
+  if (!row) throw new Error(`Beads destination receipt ${receiptTaskId} is not present in the complete export`);
+  if (canonical(beadsMigrationMetadata(row)) !== canonical(receipt)) throw new Error(`Beads destination receipt ${receiptTaskId} metadata does not exactly match the verified migration receipt`);
+  const shown = jsonCommand(runner, "bd", ["show", receiptTaskId, "--json", "--long", "--include-comments"], projectRoot, `verify Beads migration receipt ${receiptTaskId}`);
+  if (!Array.isArray(shown) || shown.length !== 1 || shown[0].id !== receiptTaskId) throw new Error(`Beads destination receipt ${receiptTaskId} is not exactly readable`);
+  const view = asObject(shown[0], `Beads migration receipt ${receiptTaskId}`);
+  if (view.title !== RECEIPT_TITLE || view.status !== "done" || view.issue_type !== "decision"
+      || view.notes !== beadsReceiptNotes(receipt)
+      || canonical(beadsMigrationMetadata(view)) !== canonical(receipt)) {
+    throw new Error(`Beads destination receipt ${receiptTaskId} native payload does not exactly match the verified migration receipt`);
+  }
 }
 
 function migrateBacklogToBeads(
@@ -1220,6 +1248,7 @@ function migrateBacklogToBeads(
     const allRows = beadsExportRows(runner, source.projectRoot);
     const receiptCount = allRows.filter((row) => beadsMigrationMetadata(row)?.marker === RECEIPT_MARKER).length;
     if (allRows.length !== source.counts.total + 1 || receiptCount !== 1) throw new Error(`Beads destination receipt count mismatch: expected ${source.counts.total + 1} total rows with one receipt, found ${allRows.length} rows and ${receiptCount} receipts`);
+    assertExactBeadsReceipt(runner, source.projectRoot, allRows, receiptTaskId, receiptBase);
     const refreshedTasks = destinationTasks.map((task) => {
       const view = jsonCommand(runner, "bd", ["show", task.destinationTaskId, "--json", "--long", "--include-comments"], source.projectRoot, `refresh Beads task ${task.destinationTaskId}`);
       if (!Array.isArray(view) || view.length !== 1) throw new Error(`Beads task ${task.destinationTaskId} is not exactly readable after receipt`);
@@ -1329,7 +1358,7 @@ function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: st
   for (const [id, view] of backlogDestinationViews(runner, projectRoot, storeDir, "reuse")) {
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
     const marker = comments.map((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "")).find((text: string) => text.startsWith(`${SOURCE_MARKER} mapping `));
-    const receipt = comments.map((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "")).some((text: string) => text.includes(RECEIPT_MARKER));
+    const receipt = comments.some(isBacklogReceiptComment);
     if (receipt) {
       const notes = String(view.task.implementationNotes ?? "");
       const receiptJson = /^```json\n([\s\S]+)\n```$/.exec(notes)?.[1];
@@ -1350,6 +1379,11 @@ function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: st
     mapping[sourceTaskId] = id;
   }
   return mapping;
+}
+
+function isBacklogReceiptComment(comment: JsonObject): boolean {
+  const text = String(comment.text ?? comment.content ?? comment.body ?? "");
+  return text === RECEIPT_MARKER || text.startsWith(`${RECEIPT_MARKER}\n`);
 }
 
 function nativeBacklogComment(runner: CommandRunner, projectRoot: string, taskId: string, text: string, author: string): void {
@@ -1416,7 +1450,7 @@ function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: str
       }));
   for (const [id, view] of views) {
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
-    if (comments.some((comment: JsonObject) => String(comment.text ?? comment.body ?? comment.content ?? "").includes(RECEIPT_MARKER))) return id;
+    if (comments.some(isBacklogReceiptComment)) return id;
   }
   const pending = { marker: RECEIPT_MARKER, pending: true, sourceProvider: "beads", targetProvider: "backlog", sourceRevision: source.revision, sourceDigest: source.digest };
   const created = runRequired(runner, "backlog", ["task", "create", RECEIPT_TITLE, "--status", "In Progress", "--type", "task", "--notes", `\`\`\`json\n${JSON.stringify(pending, null, 2)}\n\`\`\``, "--no-dod-defaults", "--plain"], projectRoot, "reserve Backlog migration receipt identity");
@@ -1429,8 +1463,8 @@ function createOrUpdateBacklogReceipt(runner: CommandRunner, projectRoot: string
   receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">): string {
   for (const [id, view] of backlogDestinationViews(runner, projectRoot, storeDir, "receipt")) {
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
-    if (comments.some((comment: JsonObject) => String(comment.text ?? comment.body ?? comment.content ?? "").includes(RECEIPT_MARKER))) {
-      runRequired(runner, "backlog", ["task", "edit", "--notes", `\`\`\`json\n${JSON.stringify(receipt, null, 2)}\n\`\`\``, "--status", "Done", "--final-summary", "Verified selected-provider migration receipt", "--plain", "--", id], projectRoot, "update Backlog migration receipt");
+    if (comments.some(isBacklogReceiptComment)) {
+      runRequired(runner, "backlog", ["task", "edit", "--notes", backlogReceiptNotes(receipt), "--status", "Done", "--final-summary", "Verified selected-provider migration receipt", "--plain", "--", id], projectRoot, "update Backlog migration receipt");
       return id;
     }
   }
@@ -1439,6 +1473,30 @@ function createOrUpdateBacklogReceipt(runner: CommandRunner, projectRoot: string
   nativeBacklogComment(runner, projectRoot, id, `${RECEIPT_MARKER}\nThe containing task-history Git commit is the destination receipt revision.`, "prime-claw-migration");
   runRequired(runner, "backlog", ["task", "edit", "--status", "Done", "--final-summary", "Verified selected-provider migration receipt", "--plain", "--", id], projectRoot, "complete Backlog migration receipt content");
   return id;
+}
+
+function backlogReceiptNotes(receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">): string {
+  return `\`\`\`json
+${JSON.stringify(receipt, null, 2)}
+\`\`\``;
+}
+
+function assertExactBacklogReceipt(
+  views: Map<string, JsonObject>,
+  receiptTaskId: string,
+  receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">,
+): void {
+  const view = views.get(receiptTaskId);
+  if (!view) throw new Error(`Backlog destination receipt ${receiptTaskId} is not exactly readable`);
+  const task = asObject(view.task, `Backlog migration receipt ${receiptTaskId}`);
+  const comments = Array.isArray(task.comments) ? task.comments : [];
+  const hasMarker = comments.some(isBacklogReceiptComment);
+  if (task.id !== receiptTaskId || task.title !== RECEIPT_TITLE || task.status !== "Done"
+      || task.implementationNotes !== backlogReceiptNotes(receipt)
+      || task.finalSummary !== "Verified selected-provider migration receipt"
+      || !hasMarker) {
+    throw new Error(`Backlog destination receipt ${receiptTaskId} native payload does not exactly match the verified migration receipt`);
+  }
 }
 
 function migratedBacklogPackage(view: JsonObject): string {
@@ -1617,6 +1675,7 @@ function migrateBeadsToBacklog(
     assertPublishedGitRef(runner, storeDir, receiptRevision, prepared.remoteName, prepared.remoteUrl, TASK_HISTORY_REF, "Backlog destination receipt publication");
     const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "refresh");
     if (views.size !== source.counts.total + 1) throw new Error(`Backlog destination receipt count changed: expected ${source.counts.total + 1}, found ${views.size}`);
+    assertExactBacklogReceipt(views, receiptTaskId, receiptBase);
     const refreshed = destinationTasks.map((task) => {
       const taskEvidence = views.get(task.destinationTaskId);
       if (!taskEvidence) throw new Error(`Backlog destination task ${task.destinationTaskId} is not exactly readable after receipt`);
@@ -1740,8 +1799,42 @@ function verifyBacklogDeletionIdentity(snapshot: BacklogSnapshot): void {
   if ((!configEntry.isFile() && !configEntry.isSymbolicLink()) || !contained(snapshot.projectRoot, config)) throw new Error("Backlog source configuration identity changed before guarded deletion");
 }
 
-function deleteBacklogSource(snapshot: BacklogSnapshot): void {
+function deleteBacklogSource(snapshot: BacklogSnapshot, runner: CommandRunner): void {
   verifyBacklogDeletionIdentity(snapshot);
+  if (snapshot.repositoryRoot !== snapshot.projectRoot) {
+    if (!snapshot.publicationRemote || snapshot.publicationRef !== TASK_HISTORY_REF) {
+      throw new Error("independent Backlog source has no exact canonical task-history publication authority for guarded retirement");
+    }
+    const localTaskHead = runner.run("git", ["-C", snapshot.repositoryRoot, "rev-parse", "--verify", "--quiet", snapshot.publicationRef], { cwd: snapshot.repositoryRoot, allowFailure: true });
+    const trackingRef = `refs/remotes/${snapshot.publicationRemote}/${TASK_HISTORY_REF.slice("refs/heads/".length)}`;
+    const localTrackingHead = runner.run("git", ["-C", snapshot.repositoryRoot, "rev-parse", "--verify", "--quiet", trackingRef], { cwd: snapshot.repositoryRoot, allowFailure: true });
+    for (const [label, result] of [[snapshot.publicationRef, localTaskHead], [trackingRef, localTrackingHead]] as const) {
+      if (result.status === 0 && result.stdout.trim() !== snapshot.revision) {
+        throw new Error(`independent Backlog source ${label} advanced to ${result.stdout.trim()} before guarded retirement`);
+      }
+    }
+    runRequired(
+      runner,
+      "git",
+      ["-C", snapshot.repositoryRoot, "push", `--force-with-lease=${snapshot.publicationRef}:${snapshot.revision}`, snapshot.publicationRemote, `:${snapshot.publicationRef}`],
+      snapshot.repositoryRoot,
+      "retire exact Backlog source task-history publication",
+    );
+    const retained = runner.run(
+      "git",
+      ["-C", snapshot.repositoryRoot, "ls-remote", "--exit-code", "--refs", snapshot.publicationRemote, snapshot.publicationRef],
+      { cwd: snapshot.repositoryRoot, allowFailure: true },
+    );
+    if (retained.status === 0 || retained.stdout.trim()) throw new Error("Backlog source task-history publication still exists after guarded retirement");
+    for (const ref of [snapshot.publicationRef, trackingRef]) {
+      const current = runner.run("git", ["-C", snapshot.repositoryRoot, "rev-parse", "--verify", "--quiet", ref], { cwd: snapshot.repositoryRoot, allowFailure: true });
+      if (current.status !== 0) continue;
+      if (current.stdout.trim() !== snapshot.revision) {
+        throw new Error(`independent Backlog source ${ref} changed to ${current.stdout.trim()} during guarded retirement`);
+      }
+      runRequired(runner, "git", ["-C", snapshot.repositoryRoot, "update-ref", "-d", ref, snapshot.revision], snapshot.repositoryRoot, `retire exact local Backlog source ref ${ref}`);
+    }
+  }
   const store = snapshot.evidence.storeDir!;
   const config = snapshot.evidence.configPath;
   const configInsideStore = contained(store, config);
@@ -1754,7 +1847,27 @@ function deleteBeadsSource(snapshot: BeadsSnapshot, runner: CommandRunner): void
   if (!existsSync(store)) throw new Error("Beads source store disappeared before guarded deletion");
   const entry = lstatSync(store);
   if (!entry.isDirectory() || entry.isSymbolicLink() || realpathSync(store) !== store || !contained(snapshot.projectRoot, store)) throw new Error("Beads source store identity changed before guarded deletion");
+  const remoteUrl = snapshot.transport.remoteUrl.replace(/^git\+/, "");
+  runRequired(
+    runner,
+    "git",
+    ["push", `--force-with-lease=${snapshot.transport.publicationRef}:${snapshot.transport.publicationHead}`, remoteUrl, `:${snapshot.transport.publicationRef}`],
+    snapshot.projectRoot,
+    "retire exact Beads source publication",
+  );
+  const retained = runner.run("git", ["ls-remote", "--exit-code", "--refs", remoteUrl, snapshot.transport.publicationRef], { cwd: snapshot.projectRoot, allowFailure: true });
+  if (retained.status === 0 || retained.stdout.trim()) throw new Error("Beads source publication still exists after guarded retirement");
   runRequired(runner, "bd", ["dolt", "stop"], snapshot.projectRoot, "stop Beads source server before deletion");
+  const gateLock = join(snapshot.projectRoot, ".beads.gate.lock");
+  if (existsSync(gateLock)) {
+    const tracked = runner.run("git", ["-C", snapshot.projectRoot, "ls-files", "--error-unmatch", "--", ".beads.gate.lock"], { cwd: snapshot.projectRoot, allowFailure: true });
+    if (tracked.status === 0) throw new Error("Beads source gate lock is unexpectedly tracked by the code repository");
+    const gateEntry = lstatSync(gateLock);
+    if (!gateEntry.isFile() || gateEntry.isSymbolicLink() || realpathSync(gateLock) !== gateLock || !contained(snapshot.projectRoot, gateLock)) {
+      throw new Error("Beads source gate lock is not one safe native transient file");
+    }
+    unlinkSync(gateLock);
+  }
   rmSync(store, { recursive: true, force: false });
 }
 
@@ -1765,8 +1878,40 @@ function independentActiveBacklogStores(source: SourceSnapshot, owners: ActiveMi
 }
 
 function defaultDeleteSource(snapshot: SourceSnapshot, runner: CommandRunner): void {
-  if (snapshot.provider === "backlog") deleteBacklogSource(snapshot);
+  if (snapshot.provider === "backlog") deleteBacklogSource(snapshot, runner);
   else deleteBeadsSource(snapshot, runner);
+}
+
+const BEADS_ROOT_GITIGNORE_BLOCK = [
+  "# Beads / Dolt files (added by bd init)",
+  ".dolt/",
+  "*.db",
+  ".beads-credential-key",
+  ".beads/proxieddb/",
+  "*.gate.lock*",
+  "",
+].join("\n");
+
+/**
+ * `bd init --server` commits one exact root ignore block. It is provider
+ * initialization metadata, but the surrounding file may contain operator
+ * rules. Retire only the pinned native block and preserve every other byte.
+ */
+function retireBeadsRootGitignoreBlock(projectRoot: string): boolean {
+  const path = join(projectRoot, ".gitignore");
+  if (!existsSync(path)) return false;
+  const entry = lstatSync(path);
+  if (!entry.isFile() || entry.isSymbolicLink() || realpathSync(path) !== path) {
+    throw new Error("Beads root .gitignore metadata is not one safe regular file");
+  }
+  const before = readFileSync(path, "utf8");
+  const occurrences = before.split(BEADS_ROOT_GITIGNORE_BLOCK).length - 1;
+  if (occurrences === 0) return false;
+  if (occurrences !== 1) throw new Error("Beads root .gitignore metadata block is ambiguous");
+  const after = before.replace(BEADS_ROOT_GITIGNORE_BLOCK, "");
+  if (after === "") unlinkSync(path);
+  else writeFileSync(path, after);
+  return true;
 }
 
 function activateBeadsCodeMetadata(projectRoot: string, runner: CommandRunner): string[] {
@@ -1793,6 +1938,8 @@ function publishProviderCutoverCodeState(snapshot: SourceSnapshot, runner: Comma
   const allowed = new Set<string>([".prime-claw/ownership.json"]);
   if (snapshot.provider === "backlog") {
     for (const path of activateBeadsCodeMetadata(projectRoot, runner)) allowed.add(path);
+  } else if (retireBeadsRootGitignoreBlock(projectRoot)) {
+    allowed.add(".gitignore");
   }
   if (snapshot.evidence.storeDir && contained(projectRoot, snapshot.evidence.storeDir)) {
     allowed.add(relative(projectRoot, snapshot.evidence.storeDir).replace(/\\/g, "/"));

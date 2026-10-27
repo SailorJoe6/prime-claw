@@ -42,13 +42,13 @@ import {
   type BacklogTaskSelection,
 } from "../extension-support/reviewed-plan-support.ts";
 import { isLegacyEpisodeOwnership, readEpisodeOwnership, type LegacyEpisodeOwnershipRecord } from "../extension-support/episode-ownership.ts";
+import { resolveSynchronizedProviderTask } from "../extension-support/task-history-workspace.ts";
 import {
   assertGrandfatheredLegacySpecificationFile,
   assertSafeLegacyFutureLocation,
 } from "../extension-support/legacy-specification-inventory.ts";
 import { assertLiveLegacyEpisodeFiles } from "../extension-support/legacy-workflow.ts";
 import {
-  resolveProviderTask,
   type ProviderTaskResolution,
 } from "../extension-support/task-providers.ts";
 
@@ -66,7 +66,7 @@ function taskProviderResolver(
 ): ProviderTaskResolver {
   if (dependencies.providerTaskResolver) return dependencies.providerTaskResolver;
   if (dependencies.taskResolver) return asBacklogProviderResolver(dependencies.taskResolver);
-  return resolveProviderTask;
+  return resolveSynchronizedProviderTask;
 }
 
 /**
@@ -296,47 +296,48 @@ export async function admitTaskImplementationPrepChain(
   return result;
 }
 
+type PrepChainCommandOptions = {
+  command: string;
+  description: string;
+  workflow: PrepChainWorkflow;
+  onValidated?: (ctx: ExtensionContext, location: string, selection: CommandSelection, preflightValue?: string) => void;
+  preflight?: (ctx: ExtensionContext, location: string) => string | undefined;
+  phasePreamble?: () => string;
+  parseArgs?: (args: string) => CommandSelection | null;
+  sourceAbsentReplay?: (ctx: ExtensionContext, rawLocation: string) => { projectRoot: string; location: string } | null;
+};
+
 function registerPrepChainCommand(
   pi: ExtensionAPI,
-  options: {
-    command: string;
-    description: string;
-    workflow: PrepChainWorkflow;
-    onValidated?: (ctx: ExtensionContext, location: string, selection: CommandSelection, preflightValue?: string) => void;
-    preflight?: (ctx: ExtensionContext, location: string) => string | undefined;
-    phasePreamble?: () => string;
-    parseArgs?: (args: string) => CommandSelection | null;
-    sourceAbsentReplay?: (ctx: ExtensionContext, rawLocation: string) => { projectRoot: string; location: string } | null;
-  },
-): void {
-  pi.registerCommand(options.command, {
-    description: options.description,
-    handler: async (args, ctx) => {
-      const selection = options.parseArgs?.(args) ?? { location: args.trim() };
-      if (!selection) {
-        ctx.ui.notify(options.workflow.usage, "warning");
-        return;
-      }
-      let preflightValue: string | undefined;
-      const result = await admitPrepChain(
-        pi,
-        ctx,
-        selection.location,
-        options.workflow,
-        "native",
-        options.preflight ? (callCtx, location) => {
-          preflightValue = options.preflight!(callCtx, location);
-        } : undefined,
-        options.phasePreamble?.(),
-        options.sourceAbsentReplay,
-      );
-      if (!result.ok) {
-        ctx.ui.notify(result.message, result.level);
-        return;
-      }
-      options.onValidated?.(ctx, result.location, selection, preflightValue);
-    },
-  });
+  options: PrepChainCommandOptions,
+): (args: string, ctx: ExtensionContext) => Promise<void> {
+  const handler = async (args: string, ctx: ExtensionContext): Promise<void> => {
+    const selection = options.parseArgs?.(args) ?? { location: args.trim() };
+    if (!selection) {
+      ctx.ui.notify(options.workflow.usage, "warning");
+      return;
+    }
+    let preflightValue: string | undefined;
+    const result = await admitPrepChain(
+      pi,
+      ctx,
+      selection.location,
+      options.workflow,
+      "native",
+      options.preflight ? (callCtx, location) => {
+        preflightValue = options.preflight!(callCtx, location);
+      } : undefined,
+      options.phasePreamble?.(),
+      options.sourceAbsentReplay,
+    );
+    if (!result.ok) {
+      ctx.ui.notify(result.message, result.level);
+      return;
+    }
+    options.onValidated?.(ctx, result.location, selection, preflightValue);
+  };
+  pi.registerCommand(options.command, { description: options.description, handler });
+  return handler;
 }
 
 type TaskEpisodePublicActions = {
@@ -451,19 +452,23 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       ?? new TaskImplementationApprovalStore();
     const oversightOptions = { guideRoot: dependencies?.guideRoot };
     registerConversationOversight(pi, oversightOptions);
-    registerPrepChainCommand(pi, {
+    const planSpecHandler = registerPrepChainCommand(pi, {
       command: "plan-spec",
       description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",
       workflow: PLAN_PREP_WORKFLOW,
     });
     pi.registerCommand("plan", {
-      description: "Plan one exact reviewed provider-native task in In Design or In Planning",
+      description: "Plan one exact reviewed provider-native task or grandfathered future specification",
       handler: async (args, ctx) => {
+        if (resolveFutureLocationSyntax(ctx.cwd, args.trim())) {
+          await planSpecHandler(args, ctx);
+          return;
+        }
         const result = await admitTaskPlanningPrepChain(pi, ctx, args, "native", dependencies);
         if (!result.ok) ctx.ui.notify(result.message, result.level);
       },
     });
-    registerPrepChainCommand(pi, {
+    const implementSpecHandler = registerPrepChainCommand(pi, {
       command: "implement-spec",
       description: "Review and promote an approved future bundle into an isolated implementation episode",
       workflow: IMPLEMENT_PREP_WORKFLOW,
@@ -492,8 +497,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       },
     });
     pi.registerCommand("implement-task", {
-      description: "Review and admit one exact planned provider-native task into an isolated implementation Episode",
+      description: "Review and admit one exact planned provider-native task or grandfathered future specification",
       handler: async (args, ctx) => {
+        const legacySelection = parseImplementationArgs(args);
+        if (legacySelection && resolveFutureLocationSyntax(ctx.cwd, legacySelection.location)) {
+          await implementSpecHandler(args, ctx);
+          return;
+        }
         const result = await admitTaskImplementationPrepChain(
           pi,
           ctx,

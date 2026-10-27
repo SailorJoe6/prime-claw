@@ -73,7 +73,14 @@ the task on the Episode code branch. Independent mode commits only the task path
 in the ignored nested clone, pushes `HEAD:refs/heads/prime-claw/tasks` without
 force, proves direct publication and unchanged code HEAD, and leaves ownership
 revision/evidence advancement to `handoff_task_episode` after message admission.
-A dirty, unpublished, divergent, or foreign nested clone blocks.
+A dirty, unpublished, divergent, or foreign nested clone blocks. The host
+supplies the persisted and freshly synchronized complete native task views and
+revisions as factual context. An unrelated-task descendant alone is compatible.
+For an outside same-task change, use bounded semantic judgment: incorporate a
+compatible in-scope clarification or living-plan update, and stop for a genuine
+semantic conflict, authority change, scope expansion, or product decision. Raw
+inequality is not an approval gate; never add an equality gate or deterministic
+classifier.
 
 For Beads task-native handoff, use only the exact active owner's persisted
 `providerRevision` and complete raw `taskEvidence`. Before delivery, the public

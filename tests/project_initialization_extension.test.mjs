@@ -424,6 +424,20 @@ test("fresh reconcile is convergent, registers once, preserves customization, an
   const fourth=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner}); assert.equal(fourth.items.find(x=>x.assetId==="project-skill-prepare").reason,"accepted override");
 });
 
+test("initialization tool forwards only an explicit unpublished local-only choice", async (t) => {
+  const root=repo(t); const runner=new Runner([{id:"local",path:root,displayName:"local"}]); const tools=new Map(); let received=null;
+  createProjectInitializationExtension({
+    pluginRoot:PLUGIN,home:dirname(root),runner,
+    taskHistoryPreparer:(input)=>{received=input; return {status:"prepared",storeDir:join(root,".backlog"),head:"a".repeat(40)};},
+  })({registerCommand(){},registerTool(tool){tools.set(tool.name,tool)},on(){}});
+  const tool=tools.get("initialize_prime_claw");
+  assert.equal(tool.parameters.properties.unpublishedLocalOnly.type,"boolean");
+  const ctx={cwd:root,ui:{notify(){}}};
+  const result=await tool.execute("local",{action:"reconcile",unpublishedLocalOnly:true},null,null,ctx);
+  assert.equal(result.isError,undefined);
+  assert.equal(received.unpublishedLocalOnly,true);
+});
+
 test("legacy customized skill and known symlink migrate while unsafe collision blocks only its asset",t=>{
   const root=repo(t); const runner=new Runner([{id:"r",path:null}]); runner.registrations[0].path=root;
   mkdirSync(join(root,".ralph/skills/prepare"),{recursive:true}); writeFileSync(join(root,".ralph/skills/prepare/SKILL.md"),"custom legacy\n"); mkdirSync(join(root,".agents/skills"),{recursive:true}); symlinkSync("../../.ralph/skills/prepare",join(root,".agents/skills/prepare"));

@@ -810,6 +810,17 @@ test("root config without a materialized store directory is valid evidence with 
   assert.equal(detection.evidence.layout, null);
 });
 
+test("malformed folder configuration blocks before native provider reads", () => {
+  const root = fixtureRoot();
+  mkdirSync(join(root, "backlog"), { recursive: true });
+  writeFileSync(join(root, "backlog", "config.yml"), "garbage: [\n");
+  const detection = detectTaskProvider(root);
+  assert.equal(detection.kind, "blocked");
+  assert.equal(detection.code, "malformed-evidence");
+  assert.match(detection.detail, /project_name is missing/);
+  assert.match(detection.remediation, /pinned backlog CLI/);
+});
+
 test("root config may select an existing custom directory", () => {
   const root = fixtureRoot();
   mkdirSync(join(root, "planning", "tasks"), { recursive: true });

@@ -19,7 +19,10 @@ unrelated queue is not Beads planning authority and must not mix providers.
 
 Use only the selected provider:
 
-- **Backlog:** run `backlog task view --json -- TASK-ID` from the exact root.
+- **Backlog:** when the selected store is an independent nested clone, first fetch
+the exact task ref and fast-forward only a clean clone to the stable direct
+published head; dirty, local-ahead, divergent, unavailable, or foreign history
+blocks. Then run `backlog task view --json -- TASK-ID` from the exact root.
   Require the canonical ID and returned project-relative task path to equal the
   admitted binding and status exactly `In Design` or `In Planning`. Read the
   Description, Acceptance Criteria, constraints, references, documentation,

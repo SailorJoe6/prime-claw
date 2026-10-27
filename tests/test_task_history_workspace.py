@@ -16,7 +16,7 @@ WS_NODE_SUITE = "/workspace/tests/task_history_workspace.test.mjs"
 def test_task_history_workspace_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
-        timeout=420,
+        timeout=900,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

@@ -29,14 +29,19 @@
  * and task-data migration remain later slices.
  */
 
-import { appendFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   type CommandRunner,
   ProcessCommandRunner,
 } from "./project-initialization.ts";
-import { checkBacklogCapabilities, detectTaskProvider } from "./task-providers.ts";
+import {
+  checkBacklogCapabilities,
+  detectTaskProvider,
+  resolveProviderTask,
+  type ProviderTaskResolution,
+} from "./task-providers.ts";
 
 /** The disconnected task-history branch Prime Claw manages. */
 export const TASK_HISTORY_REF = "refs/heads/prime-claw/tasks";
@@ -86,6 +91,8 @@ export interface TaskHistoryWorkspaceInput {
   /** Absolute path of the canonical primary checkout (never an Episode worktree). */
   primaryRoot: string;
   runner?: CommandRunner;
+  /** Explicit operator choice to retain unpublished local-only history when no remote exists. */
+  unpublishedLocalOnly?: boolean;
 }
 
 export type TaskHistoryRemoteSelection =
@@ -114,6 +121,21 @@ export type TaskHistoryWorkspace =
       storeDir: string;
       configSource: "root" | "folder" | "none";
       autoCommit: false;
+      layoutWarning?: string;
+    }
+  | {
+      status: "prepared";
+      remote: null;
+      remoteUrl: null;
+      remoteVia: "local-only";
+      branch: typeof TASK_HISTORY_BRANCH;
+      branchState: "local-only";
+      head: string;
+      storeDir: string;
+      configSource: "root" | "folder" | "none";
+      autoCommit: false;
+      unpublished: true;
+      layoutWarning?: string;
     }
   | {
       status: "blocked";
@@ -234,6 +256,7 @@ export function ensureTaskHistoryBranch(
   remote: string,
   remoteUrl: string,
   runner: CommandRunner = new ProcessCommandRunner(),
+  initialConfig: string = initialTaskStoreConfig(basename(primaryRoot)),
 ): TaskHistoryBranchState {
   const current = gitOk(runner, primaryRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read the current branch");
   if (current === TASK_HISTORY_BRANCH) {
@@ -382,7 +405,7 @@ export function ensureTaskHistoryBranch(
     gitOk(runner, temp, ["init", "-q", "-b", TASK_HISTORY_BRANCH], "initialize the disposable bootstrap repository");
     gitOk(runner, temp, ["remote", "add", "origin", remoteUrl], "point the bootstrap repository at the selected remote");
     writeFileSync(join(temp, INITIAL_FILE), INITIAL_FILE_CONTENT);
-    writeFileSync(join(temp, "config.yml"), initialTaskStoreConfig(basename(primaryRoot)));
+    writeFileSync(join(temp, "config.yml"), initialConfig);
     gitOk(runner, temp, ["add", INITIAL_FILE, "config.yml"], "stage the task-history marker and lifecycle-ready config");
     gitOk(runner, temp, ["-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-q", "-m", INITIAL_COMMIT_MESSAGE], "create the initial task-history commit");
     const push = runGit(runner, temp, ["push", "origin", `${TASK_HISTORY_REF}:${TASK_HISTORY_REF}`]);
@@ -445,17 +468,18 @@ function selectStoreLocation(
     const storeDir = detection.evidence.storeDir;
     if (storeDir) {
       const rel = relative(primaryRoot, storeDir);
-      const parts = rel.split(sep);
-      if (isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`) || parts.length !== 1 || !(BUILT_IN_TASK_STORE_DIRS as readonly string[]).includes(parts[0])) {
+      const parts = rel.split(sep).filter(Boolean);
+      if (isAbsolute(rel) || rel === "" || rel === ".." || rel.startsWith(`..${sep}`)
+          || parts.some((part) => part === "." || part === "..") || parts[0] === ".git") {
         return {
           blocked: {
             status: "blocked", code: "unsafe-store-location",
-            detail: `the live Backlog store directory ${storeDir} is not a built-in task-store location (.backlog/ or backlog/) directly under the primary checkout`,
-            remediation: "normalize the Backlog store to the built-in .backlog/ or backlog/ location (root configuration may still select it) before preparing the workspace",
+            detail: `the live Backlog store directory ${storeDir} is not a safe relative task-store location inside the primary checkout`,
+            remediation: "set backlog_directory to a real relative directory inside the repository (never .git, an absolute path, or an escape) and retry",
           },
         };
       }
-      dir = parts[0];
+      dir = rel;
     }
   }
   return { storeDir: join(primaryRoot, dir) };
@@ -472,11 +496,11 @@ function validateContainment(
   storeDir: string,
 ): TaskHistoryWorkspace & { status: "blocked" } | null {
   const rel = relative(primaryRoot, storeDir);
-  if (isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`) || rel === "" || rel.includes(sep)) {
+  if (isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`) || rel === "") {
     return {
       status: "blocked", code: "unsafe-store-location",
-      detail: `the task-store target ${storeDir} is not directly inside the primary root ${primaryRoot}`,
-      remediation: "the store location is resolved by the provider seam; report this layout and repair the repository configuration",
+      detail: `the task-store target ${storeDir} is not inside the primary root ${primaryRoot}`,
+      remediation: "the store location must be a safe relative path inside the repository; repair backlog_directory and retry",
     };
   }
   let cursor = storeDir;
@@ -492,6 +516,47 @@ function validateContainment(
     cursor = resolve(cursor, "..");
   }
   return null;
+}
+
+function directoryTreeHasMaterialContent(root: string): boolean {
+  if (!existsSync(root)) return false;
+  const entry = lstatSync(root);
+  if (!entry.isDirectory() || entry.isSymbolicLink()) return true;
+  for (const name of readdirSync(root)) {
+    const child = join(root, name);
+    const stat = lstatSync(child);
+    if (!stat.isDirectory() || stat.isSymbolicLink() || directoryTreeHasMaterialContent(child)) return true;
+  }
+  return false;
+}
+
+function validateRootConfigCandidate(
+  primaryRoot: string,
+  content: string,
+  storeDir: string,
+  runner: CommandRunner,
+): void {
+  const temp = mkdtempSync(join(tmpdir(), "prime-claw-backlog-config-check-"));
+  try {
+    const rel = relative(primaryRoot, storeDir);
+    mkdirSync(join(temp, rel), { recursive: true });
+    writeFileSync(join(temp, "backlog.config.yml"), content);
+    checkBacklogCapabilities(temp, runner);
+    const defaultStatus = runner.run("backlog", ["config", "get", "defaultStatus"], { cwd: temp, allowFailure: true });
+    const autoCommit = runner.run("backlog", ["config", "get", "autoCommit"], { cwd: temp, allowFailure: true });
+    if (defaultStatus.status !== 0 || defaultStatus.stdout.trim() !== "In Design"
+        || autoCommit.status !== 0 || autoCommit.stdout.trim() !== "false") {
+      throw new Error(`effective defaultStatus/autoCommit must be exactly In Design/false (got ${JSON.stringify(defaultStatus.stdout.trim())}/${JSON.stringify(autoCommit.stdout.trim())})`);
+    }
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+}
+
+function folderConfigFromRootConfig(content: string, preserveDirectory: boolean): string {
+  if (preserveDirectory) return content;
+  const normalized = content.replace(/^backlog_directory\s*:\s*.*(?:\r?\n|$)/m, "");
+  return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
 function hasTrackedTaskContent(runner: CommandRunner, primaryRoot: string, storeDir: string): boolean {
@@ -548,6 +613,40 @@ function ensureIgnored(
 }
 
 /**
+ * Refresh or repair the selected independent Backlog read workspace before an
+ * admission/status read. Branch-local Backlog and Beads remain provider-native
+ * and unchanged; only an already-selected independent Backlog topology uses
+ * the existing primary/Episode preparation seams.
+ */
+export function resolveSynchronizedProviderTask(
+  cwd: string,
+  rawTaskId: string,
+  runner: CommandRunner = new ProcessCommandRunner(),
+): ProviderTaskResolution | null {
+  const topRaw = gitOk(runner, cwd, ["rev-parse", "--show-toplevel"], "resolve task-read worktree");
+  const gitDirRaw = gitOk(runner, cwd, ["rev-parse", "--git-dir"], "resolve task-read git directory");
+  const commonRaw = gitOk(runner, cwd, ["rev-parse", "--git-common-dir"], "resolve task-read common directory");
+  const top = realpathSync(resolve(cwd, topRaw));
+  const gitDir = realpathSync(resolve(cwd, gitDirRaw));
+  const commonDir = realpathSync(resolve(cwd, commonRaw));
+  const primaryRoot = gitDir === commonDir ? top : realpathSync(dirname(commonDir));
+  const primaryDetection = detectTaskProvider(primaryRoot, runner);
+  if (primaryDetection.kind === "blocked") {
+    throw new Error(`task provider discovery blocked (${primaryDetection.code}): ${primaryDetection.detail}; ${primaryDetection.remediation}`);
+  }
+  if (primaryDetection.kind === "selected" && primaryDetection.evidence.provider === "backlog"
+      && primaryDetection.evidence.storeDir && existsSync(join(primaryDetection.evidence.storeDir, ".git"))) {
+    const prepared = gitDir === commonDir
+      ? prepareTaskHistoryWorkspace({ primaryRoot, runner })
+      : prepareEpisodeTaskHistoryWorkspace({ primaryRoot, targetWorktree: top, runner });
+    if (prepared.status === "blocked") {
+      throw new Error(`Backlog task-read workspace is blocked (${prepared.code}): ${prepared.detail}; ${prepared.remediation}`);
+    }
+  }
+  return resolveProviderTask(top, rawTaskId, runner);
+}
+
+/**
  * Prepare the primary checkout's ignored independent nested Backlog clone at
  * the validated built-in task-store location, checked out on the published
  * disconnected task-history branch, with Backlog code-repository auto-commit
@@ -574,10 +673,13 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   }
 
   const remoteSelection = selectTaskHistoryRemote(primaryRoot, runner);
-  if (remoteSelection.status === "blocked") {
+  const localOnly = remoteSelection.status === "blocked" && remoteSelection.code === "no-remote"
+    && input.unpublishedLocalOnly === true;
+  if (remoteSelection.status === "blocked" && !localOnly) {
     return { status: "blocked", code: remoteSelection.code, detail: remoteSelection.detail, remediation: remoteSelection.remediation };
   }
-  const { name: remote, url: remoteUrl } = remoteSelection;
+  const remote = remoteSelection.status === "selected" ? remoteSelection.name : null;
+  const remoteUrl = remoteSelection.status === "selected" ? remoteSelection.url : null;
 
   const { detection, blocked: detectionBlocked } = providerEvidence(primaryRoot);
   if (detectionBlocked) return detectionBlocked;
@@ -588,23 +690,45 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     return {
       status: "blocked", code: "provider-not-backlog",
       detail: "the selected provider is Beads; the Backlog workspace seam does not prepare a task store for it",
-      remediation: "the Beads workspace transport is a later slice; no Backlog clone is prepared",
+      remediation: "use the provider-native Beads transport; no Backlog clone is prepared",
     };
   }
 
-  // Root-config layouts block BEFORE any ignore/branch/clone/config mutation.
-  // Backlog's native config discovery walks UP from the nested store directory
-  // and resolves the primary's root backlog.config.yml; any native
-  // `backlog config` write from the nested clone would rewrite the PRIMARY
-  // root configuration while the published folder config stays unchanged —
-  // and mere folder-config existence is not preservation. Moving that
-  // authority is the deferred cutover (PRIMECLAW-43.1).
-  if (detection!.kind === "selected" && detection!.evidence.provider === "backlog" && detection!.evidence.configSource === "root") {
-    return {
-      status: "blocked", code: "config-not-preserved",
-      detail: `the repository's Backlog authority is the root configuration ${detection!.evidence.configPath}; native config resolution from the nested store would rewrite that root config, so preparation refuses to proceed`,
-      remediation: "root-config authority relocation is part of the deferred cutover (PRIMECLAW-43.1); re-run preparation after it lands",
-    };
+  const rootLayout = detection!.kind === "selected" && detection!.evidence.provider === "backlog"
+    && detection!.evidence.configSource === "root" ? detection!.evidence : null;
+  let rootConfigContent: string | null = null;
+  let relocatedConfigContent: string | null = null;
+  let customLayout = false;
+  if (rootLayout) {
+    if (!rootLayout.storeDir) {
+      return {
+        status: "blocked", code: "config-not-preserved",
+        detail: "root configuration backlog.config.yml does not select a task store",
+        remediation: "set backlog_directory to backlog, .backlog, or another safe relative directory before preparing independent task history",
+      };
+    }
+    try {
+      rootConfigContent = readFileSync(rootLayout.configPath, "utf8");
+    } catch (error) {
+      return {
+        status: "blocked", code: "config-not-preserved",
+        detail: `the selected root Backlog configuration cannot be read for relocation: ${error instanceof Error ? error.message : String(error)}`,
+        remediation: "repair backlog.config.yml and retry; configuration relocation never guesses or rewrites unreadable bytes",
+      };
+    }
+    customLayout = rootLayout.layout === "custom";
+    relocatedConfigContent = folderConfigFromRootConfig(rootConfigContent, customLayout);
+    // Validate the exact native configuration before any filesystem or Git
+    // mutation. Relocation changes only discovery placement.
+    try {
+      validateRootConfigCandidate(primaryRoot, rootConfigContent, rootLayout.storeDir!, runner);
+    } catch (error) {
+      return {
+        status: "blocked", code: "backlog-cli",
+        detail: `the root Backlog configuration is not lifecycle-ready: ${error instanceof Error ? error.message : String(error)}`,
+        remediation: "repair the native Backlog lifecycle configuration before relocating it into task history",
+      };
+    }
   }
 
   const location = selectStoreLocation(primaryRoot, detection!);
@@ -624,12 +748,18 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       remediation: `remove the tracked files from the code branch (\`git -C ${primaryRoot} rm -r --cached ${relative(primaryRoot, storeDir)}\` and commit) so the store is ignored before preparation`,
     };
   }
-  if (!existsSync(nestedGit) && storeExists && statSync(storeDir).isDirectory() && readdirSync(storeDir).length > 0) {
-    return {
-      status: "blocked", code: "uncommitted-task-content",
-      detail: `${storeDir} has live Backlog content and no .git; adopting it onto the published task-history branch is the deferred task-data migration slice`,
-      remediation: "this repo's cutover (adopting the existing store onto the published task-history branch) is PRIMECLAW-43.1; run it before preparing the workspace here",
-    };
+  if (!existsSync(nestedGit) && storeExists) {
+    if (!statSync(storeDir).isDirectory() || directoryTreeHasMaterialContent(storeDir)) {
+      return {
+        status: "blocked", code: "uncommitted-task-content",
+        detail: `${storeDir} has live Backlog content and no .git; adopting task data onto the published task-history branch remains a separate migration`,
+        remediation: "migrate the existing task data through the reviewed provider migration path before preparing this independent workspace",
+      };
+    }
+    // Native root-config initialization creates an empty directory skeleton.
+    // Removing only that proven-empty tree lets the ordinary clone materialize
+    // at the same selected location without moving any task data.
+    rmSync(storeDir, { recursive: true, force: true });
   }
 
   // Prove the ignore rule before creating the nested repository, so an
@@ -637,110 +767,169 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   const ignoreBlock = ensureIgnored(runner, primaryRoot, storeDir);
   if (ignoreBlock) return ignoreBlock;
 
-  const branchState = ensureTaskHistoryBranch(primaryRoot, remote, remoteUrl, runner);
-  if (branchState.status === "blocked") {
-    return { status: "blocked", code: branchState.code, detail: branchState.detail, remediation: branchState.remediation };
-  }
-
-  if (existsSync(nestedGit)) {
-    // Existing nested clone: verify it exactly — remote name AND canonical
-    // transport URL — never recreate.
-    if (!statSync(nestedGit).isDirectory()) {
-      return {
-        status: "blocked", code: "unsafe-store-location",
-        detail: `${nestedGit} exists but is not a directory (a gitfile would make this a linked worktree, which this seam never creates)`,
-        remediation: `remove ${nestedGit} and re-run preparation so an independent nested clone can be created`,
-      };
-    }
-    const innerRemotes = gitOk(runner, storeDir, ["remote"], "read the nested clone remotes").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    if (innerRemotes.length !== 1 || innerRemotes[0] !== remote) {
-      return {
-        status: "blocked", code: "unreadable",
-        detail: `the nested clone remotes are ${innerRemotes.join(", ") || "none"}; expected exactly ${remote}`,
-        remediation: `remove ${storeDir} and re-run preparation, or repair its remote to exactly ${remote}`,
-      };
-    }
-    const innerUrl = gitOk(runner, storeDir, ["remote", "get-url", remote], "read the nested clone remote URL");
-    if (innerUrl !== remoteUrl) {
-      return {
-        status: "blocked", code: "unreadable",
-        detail: `the nested clone remote ${remote} points at ${innerUrl}, not the selected remote's canonical URL ${remoteUrl}`,
-        remediation: `remove ${storeDir} and re-run preparation, or repair its remote URL to ${remoteUrl}`,
-      };
-    }
-    const innerBranch = gitOk(runner, storeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read the nested clone branch");
-    if (innerBranch !== TASK_HISTORY_BRANCH) {
-      return {
-        status: "blocked", code: "unreadable",
-        detail: `the nested clone is on branch ${innerBranch}; expected ${TASK_HISTORY_BRANCH}`,
-        remediation: `switch the nested clone to ${TASK_HISTORY_BRANCH} (\`git -C ${storeDir} switch ${TASK_HISTORY_BRANCH}\`) or remove ${storeDir} and re-run preparation`,
-      };
-    }
-    // Refresh from the selected remote (result-checked) into the tracking
-    // namespace; a divergence blocks rather than being overwritten.
-    gitOk(runner, storeDir, ["fetch", "-q", remote, `${TASK_HISTORY_REF}:refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`], "refresh the nested clone task branch");
-    const innerRemoteHead = refHead(runner, storeDir, `refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`);
-    const innerHead = refHead(runner, storeDir, "HEAD");
-    if (!innerHead || !innerRemoteHead) {
-      return {
-        status: "blocked", code: "unreadable",
-        detail: `the nested clone head (${innerHead ?? "unreadable"}) or remote ref (${innerRemoteHead ?? "unreadable"}) could not be read`,
-        remediation: "inspect the nested clone refs and re-run preparation",
-      };
-    }
-    // ensureTaskHistoryBranch already blocked a remote ahead of the primary's
-    // local task branch, and a local-ahead branch blocks too; the nested clone
-    // tracks the primary's branch, so innerHead === innerRemoteHead here. A
-    // mismatch means divergence this foundation never reconciles.
-    if (innerHead !== innerRemoteHead) {
-      const nestedClean = runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain", "--untracked-files=all"]);
-      if (nestedClean.status !== 0 || nestedClean.stdout.trim() !== ""
-          || !isAncestor(runner, storeDir, innerHead, innerRemoteHead)) {
+  let branchState: { status: "verified" | "published" | "local-only"; head: string };
+  if (localOnly) {
+    if (existsSync(nestedGit)) {
+      const identity = verifyIndependentTaskClone(storeDir, runner);
+      if (identity.status === "blocked") {
+        return { status: "blocked", code: identity.code === "unreadable" ? "unreadable" : "unsafe-store-location", detail: identity.detail, remediation: identity.remediation };
+      }
+      const remotes = gitOk(runner, storeDir, ["remote"], "read local-only task-store remotes");
+      const branch = gitOk(runner, storeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read local-only task-store branch");
+      const dirty = gitOk(runner, storeDir, ["status", "--porcelain", "--untracked-files=all"], "verify local-only task store is clean");
+      const head = refHead(runner, storeDir, "HEAD");
+      if (remotes !== "" || branch !== TASK_HISTORY_BRANCH || dirty !== "" || !head) {
         return {
-          status: "blocked", code: nestedClean.status === 0 && nestedClean.stdout.trim() !== "" ? "uncommitted-task-content" : "remote-advanced",
-          detail: `the nested clone (${innerHead.slice(0, 12)}) is not a clean fast-forward ancestor of the remote task branch (${innerRemoteHead.slice(0, 12)})`,
-          remediation: "inspect and reconcile the nested clone with the remote task branch through ordinary Git; never force",
+          status: "blocked", code: dirty ? "uncommitted-task-content" : "unreadable",
+          detail: `the explicit local-only task store is not one clean unpublished ${TASK_HISTORY_BRANCH} repository with no remotes`,
+          remediation: "repair the local-only nested repository without publishing or forcing it, then retry",
         };
       }
-      const fastForward = runGit(runner, storeDir, ["merge", "--ff-only", `refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`]);
-      if (fastForward.status !== 0 || refHead(runner, storeDir, "HEAD") !== innerRemoteHead) {
-        return {
-          status: "blocked", code: "remote-advanced",
-          detail: `the clean nested clone could not fast-forward to ${innerRemoteHead}: ${fastForward.stderr.trim() || `exit ${fastForward.status}`}`,
-          remediation: "retry after concurrent publishers quiesce; never force",
-        };
-      }
-    }
-    const finalHead = refHead(runner, storeDir, "HEAD");
-    if (finalHead !== branchState.head) {
-      return {
-        status: "blocked", code: "unreadable",
-        detail: `the nested clone head ${finalHead ?? "unreadable"} does not match the task-history head ${branchState.head}`,
-        remediation: "inspect the nested clone refs and re-run preparation",
-      };
+      branchState = { status: "local-only", head };
+    } else {
+      mkdirSync(storeDir, { recursive: true });
+      gitOk(runner, storeDir, ["init", "-q", "-b", TASK_HISTORY_BRANCH], "initialize explicit local-only task history");
+      writeFileSync(join(storeDir, INITIAL_FILE), INITIAL_FILE_CONTENT);
+      writeFileSync(join(storeDir, "config.yml"), relocatedConfigContent ?? initialTaskStoreConfig(basename(primaryRoot)));
+      gitOk(runner, storeDir, ["add", INITIAL_FILE, "config.yml"], "stage local-only task history");
+      gitOk(runner, storeDir, ["-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-q", "-m", INITIAL_COMMIT_MESSAGE], "commit local-only task history");
+      const head = refHead(runner, storeDir, "HEAD");
+      if (!head) throw new Error("the explicit local-only task-history head could not be read");
+      branchState = { status: "local-only", head };
     }
   } else {
-    // Fresh nested clone FROM THE SELECTED REMOTE'S TRANSPORT URL — never
-    // from the primary checkout's filesystem path — onto the published task
-    // branch, with tracking configured by the clone itself.
-    gitOk(runner, primaryRoot, ["clone", "-q", "--origin", remote, "--branch", TASK_HISTORY_BRANCH, remoteUrl, storeDir], "clone the nested task store from the selected remote");
-    // Prove the published content is tracked, not staged for deletion: the
-    // clone's cached diff against the published head must be empty.
-    const innerHead = refHead(runner, storeDir, "HEAD");
-    if (!innerHead || innerHead !== branchState.head) {
-      return {
-        status: "blocked", code: "unreadable",
-        detail: `the nested clone head ${innerHead ?? "unreadable"} does not match the published task-history head ${branchState.head}`,
-        remediation: "inspect the nested clone refs and re-run preparation",
-      };
+    const publishedState = ensureTaskHistoryBranch(
+      primaryRoot,
+      remote!,
+      remoteUrl!,
+      runner,
+      relocatedConfigContent ?? initialTaskStoreConfig(basename(primaryRoot)),
+    );
+    if (publishedState.status === "blocked") {
+      return { status: "blocked", code: publishedState.code, detail: publishedState.detail, remediation: publishedState.remediation };
     }
-    const cachedDiff = gitOk(runner, storeDir, ["diff", "--cached", "--name-only"], "verify the nested clone index matches the published task branch");
-    if (cachedDiff.length > 0) {
-      return {
-        status: "blocked", code: "unreadable",
-        detail: `the nested clone index does not match the published task branch (staged: ${cachedDiff.split(/\r?\n/).slice(0, 5).join(", ")})`,
-        remediation: `remove ${storeDir} and re-run preparation`,
-      };
+    branchState = publishedState;
+  if (existsSync(nestedGit)) {
+      // Existing nested clone: prove independent ordinary-Git identity before
+      // any fetch, refresh, or native read. A symlinked/shared .git directory
+      // must never be accepted as a second independent workspace.
+      const identity = verifyIndependentTaskClone(storeDir, runner);
+      if (identity.status === "blocked") {
+        return {
+          status: "blocked",
+          code: identity.code === "unreadable" ? "unreadable" : "unsafe-store-location",
+          detail: identity.detail,
+          remediation: identity.remediation,
+        };
+      }
+      // Existing nested clone: verify it exactly — remote name AND canonical
+      // transport URL — never recreate.
+      if (!statSync(nestedGit).isDirectory()) {
+        return {
+          status: "blocked", code: "unsafe-store-location",
+          detail: `${nestedGit} exists but is not a directory (a gitfile would make this a linked worktree, which this seam never creates)`,
+          remediation: `remove ${nestedGit} and re-run preparation so an independent nested clone can be created`,
+        };
+      }
+      const innerRemotes = gitOk(runner, storeDir, ["remote"], "read the nested clone remotes").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      if (innerRemotes.length !== 1 || innerRemotes[0] !== remote) {
+        return {
+          status: "blocked", code: "unreadable",
+          detail: `the nested clone remotes are ${innerRemotes.join(", ") || "none"}; expected exactly ${remote}`,
+          remediation: `remove ${storeDir} and re-run preparation, or repair its remote to exactly ${remote}`,
+        };
+      }
+      const innerUrl = gitOk(runner, storeDir, ["remote", "get-url", remote], "read the nested clone remote URL");
+      if (innerUrl !== remoteUrl) {
+        return {
+          status: "blocked", code: "unreadable",
+          detail: `the nested clone remote ${remote} points at ${innerUrl}, not the selected remote's canonical URL ${remoteUrl}`,
+          remediation: `remove ${storeDir} and re-run preparation, or repair its remote URL to ${remoteUrl}`,
+        };
+      }
+      const innerBranch = gitOk(runner, storeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read the nested clone branch");
+      if (innerBranch !== TASK_HISTORY_BRANCH) {
+        return {
+          status: "blocked", code: "unreadable",
+          detail: `the nested clone is on branch ${innerBranch}; expected ${TASK_HISTORY_BRANCH}`,
+          remediation: `switch the nested clone to ${TASK_HISTORY_BRANCH} (\`git -C ${storeDir} switch ${TASK_HISTORY_BRANCH}\`) or remove ${storeDir} and re-run preparation`,
+        };
+      }
+      // Refresh from the selected remote (result-checked) into the tracking
+      // namespace; a divergence blocks rather than being overwritten.
+      gitOk(runner, storeDir, ["fetch", "-q", remote, `${TASK_HISTORY_REF}:refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`], "refresh the nested clone task branch");
+      const innerRemoteHead = refHead(runner, storeDir, `refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`);
+      const innerHead = refHead(runner, storeDir, "HEAD");
+      if (!innerHead || !innerRemoteHead) {
+        return {
+          status: "blocked", code: "unreadable",
+          detail: `the nested clone head (${innerHead ?? "unreadable"}) or remote ref (${innerRemoteHead ?? "unreadable"}) could not be read`,
+          remediation: "inspect the nested clone refs and re-run preparation",
+        };
+      }
+      // ensureTaskHistoryBranch already blocked a remote ahead of the primary's
+      // local task branch, and a local-ahead branch blocks too; the nested clone
+      // tracks the primary's branch, so innerHead === innerRemoteHead here. A
+      // mismatch means divergence this foundation never reconciles.
+      if (innerHead !== innerRemoteHead) {
+        const nestedClean = runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain", "--untracked-files=all"]);
+        if (nestedClean.status !== 0 || nestedClean.stdout.trim() !== ""
+            || !isAncestor(runner, storeDir, innerHead, innerRemoteHead)) {
+          return {
+            status: "blocked", code: nestedClean.status === 0 && nestedClean.stdout.trim() !== "" ? "uncommitted-task-content" : "remote-advanced",
+            detail: `the nested clone (${innerHead.slice(0, 12)}) is not a clean fast-forward ancestor of the remote task branch (${innerRemoteHead.slice(0, 12)})`,
+            remediation: "inspect and reconcile the nested clone with the remote task branch through ordinary Git; never force",
+          };
+        }
+        const fastForward = runGit(runner, storeDir, ["merge", "--ff-only", `refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`]);
+        if (fastForward.status !== 0 || refHead(runner, storeDir, "HEAD") !== innerRemoteHead) {
+          return {
+            status: "blocked", code: "remote-advanced",
+            detail: `the clean nested clone could not fast-forward to ${innerRemoteHead}: ${fastForward.stderr.trim() || `exit ${fastForward.status}`}`,
+            remediation: "retry after concurrent publishers quiesce; never force",
+          };
+        }
+      }
+      const finalHead = refHead(runner, storeDir, "HEAD");
+      if (finalHead !== branchState.head) {
+        return {
+          status: "blocked", code: "unreadable",
+          detail: `the nested clone head ${finalHead ?? "unreadable"} does not match the task-history head ${branchState.head}`,
+          remediation: "inspect the nested clone refs and re-run preparation",
+        };
+      }
+    } else {
+      // Fresh nested clone FROM THE SELECTED REMOTE'S TRANSPORT URL — never
+      // from the primary checkout's filesystem path — onto the published task
+      // branch, with tracking configured by the clone itself.
+      gitOk(runner, primaryRoot, ["clone", "-q", "--origin", remote, "--branch", TASK_HISTORY_BRANCH, remoteUrl, storeDir], "clone the nested task store from the selected remote");
+      const identity = verifyIndependentTaskClone(storeDir, runner);
+      if (identity.status === "blocked") {
+        return {
+          status: "blocked",
+          code: identity.code === "unreadable" ? "unreadable" : "unsafe-store-location",
+          detail: identity.detail,
+          remediation: identity.remediation,
+        };
+      }
+      // Prove the published content is tracked, not staged for deletion: the
+      // clone's cached diff against the published head must be empty.
+      const innerHead = refHead(runner, storeDir, "HEAD");
+      if (!innerHead || innerHead !== branchState.head) {
+        return {
+          status: "blocked", code: "unreadable",
+          detail: `the nested clone head ${innerHead ?? "unreadable"} does not match the published task-history head ${branchState.head}`,
+          remediation: "inspect the nested clone refs and re-run preparation",
+        };
+      }
+      const cachedDiff = gitOk(runner, storeDir, ["diff", "--cached", "--name-only"], "verify the nested clone index matches the published task branch");
+      if (cachedDiff.length > 0) {
+        return {
+          status: "blocked", code: "unreadable",
+          detail: `the nested clone index does not match the published task branch (staged: ${cachedDiff.split(/\r?\n/).slice(0, 5).join(", ")})`,
+          remediation: `remove ${storeDir} and re-run preparation`,
+        };
+      }
     }
   }
 
@@ -753,7 +942,15 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     return {
       status: "blocked", code: "config-not-preserved",
       detail: `the published task-history branch carries no folder configuration in ${storeDir}; establishing one locally would be an untracked, unpublished, non-lifecycle-ready config, which this seam never returns as prepared`,
-      remediation: "publish the lifecycle-ready task store config (the deferred cutover PRIMECLAW-43.1 owns existing stores), then re-run preparation",
+      remediation: "publish the lifecycle-ready task store config through a separately reviewed existing-store adoption, then re-run preparation",
+    };
+  }
+  const nestedConfigPath = nestedConfigCandidates.find((path) => existsSync(path))!;
+  if (relocatedConfigContent !== null && readFileSync(nestedConfigPath, "utf8") !== relocatedConfigContent) {
+    return {
+      status: "blocked", code: "config-not-preserved",
+      detail: `the published task-history configuration at ${nestedConfigPath} does not exactly preserve the selected root configuration semantics`,
+      remediation: "publish the reviewed relocated configuration on the task-history branch or retire the conflicting branch; never overwrite it implicitly",
     };
   }
   const configSource: "root" | "folder" | "none" =
@@ -817,17 +1014,106 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       remediation: "publish the nested clone's commits (the deferred mutation loop) or re-run preparation",
     };
   }
+  let layoutWarning: string | undefined;
+  if (rootLayout && rootConfigContent !== null) {
+    const rootEntry = lstatIfPresent(rootLayout.configPath);
+    if (!rootEntry) {
+      return {
+        status: "blocked", code: "config-not-preserved",
+        detail: `the selected root configuration ${rootLayout.configPath} disappeared before relocation`,
+        remediation: "restore the exact selected configuration and retry",
+      };
+    }
+    let changedRoot = false;
+    if (customLayout) {
+      const expectedLink = relative(dirname(rootLayout.configPath), nestedConfigPath).split(sep).join("/");
+      if (rootEntry.isSymbolicLink()) {
+        const actualLink = readlinkSync(rootLayout.configPath);
+        if (isAbsolute(actualLink) || actualLink !== expectedLink) {
+          return {
+            status: "blocked", code: "config-not-preserved",
+            detail: `custom-layout root configuration symlink is ${JSON.stringify(actualLink)}, not the exact relative target ${JSON.stringify(expectedLink)}`,
+            remediation: `replace it with the relative symlink ${rootLayout.configPath} -> ${expectedLink}; absolute or alternate targets are refused`,
+          };
+        }
+      } else if (rootEntry.isFile()) {
+        unlinkSync(rootLayout.configPath);
+        symlinkSync(expectedLink, rootLayout.configPath);
+        changedRoot = true;
+      } else {
+        return {
+          status: "blocked", code: "config-not-preserved",
+          detail: `${rootLayout.configPath} is neither a regular configuration file nor the required relative symlink`,
+          remediation: "restore a regular root configuration so Prime Claw can relocate it safely",
+        };
+      }
+      layoutWarning = `custom Backlog layout retained through relative symlink ${relative(primaryRoot, rootLayout.configPath)} -> ${expectedLink}; this compatibility layout is more brittle than .backlog/ or backlog/`;
+    } else if (rootEntry.isFile()) {
+      unlinkSync(rootLayout.configPath);
+      changedRoot = true;
+    } else {
+      return {
+        status: "blocked", code: "config-not-preserved",
+        detail: `${rootLayout.configPath} must be a regular file before built-in root configuration can move into ${nestedConfigPath}`,
+        remediation: "restore the root configuration as a regular file and retry",
+      };
+    }
+
+    try {
+      checkBacklogCapabilities(primaryRoot, runner);
+      const relocatedDetection = detectTaskProvider(primaryRoot, runner);
+      if (relocatedDetection.kind !== "selected" || relocatedDetection.evidence.provider !== "backlog"
+          || !relocatedDetection.evidence.storeDir
+          || realpathSync(relocatedDetection.evidence.storeDir) !== realpathSync(storeDir)) {
+        throw new Error("native provider discovery no longer selects the exact relocated task store");
+      }
+      if (gitOk(runner, storeDir, ["status", "--porcelain"], "verify relocated task configuration is clean") !== ""
+          || refHead(runner, storeDir, "HEAD") !== branchState.head) {
+        throw new Error("relocation changed or advanced the published task-history clone");
+      }
+    } catch (error) {
+      if (changedRoot) {
+        const current = lstatIfPresent(rootLayout.configPath);
+        if (current) unlinkSync(rootLayout.configPath);
+        writeFileSync(rootLayout.configPath, rootConfigContent);
+      }
+      return {
+        status: "blocked", code: "config-not-preserved",
+        detail: `root configuration relocation did not preserve native authority: ${error instanceof Error ? error.message : String(error)}`,
+        remediation: "inspect the unchanged published task config and retry after repairing native discovery; the original root config was restored",
+      };
+    }
+  }
+
+  const finalConfigSource = rootLayout ? (customLayout ? "root" : "folder") : configSource;
+  if (localOnly) {
+    return {
+      status: "prepared",
+      remote: null,
+      remoteUrl: null,
+      remoteVia: "local-only",
+      branch: TASK_HISTORY_BRANCH,
+      branchState: "local-only",
+      head: branchState.head,
+      storeDir,
+      configSource: finalConfigSource,
+      autoCommit: false,
+      unpublished: true,
+      ...(layoutWarning ? { layoutWarning } : {}),
+    };
+  }
   return {
     status: "prepared",
-    remote,
-    remoteUrl,
-    remoteVia: remoteSelection.via,
+    remote: remote!,
+    remoteUrl: remoteUrl!,
+    remoteVia: remoteSelection.status === "selected" ? remoteSelection.via : "sole-remote",
     branch: TASK_HISTORY_BRANCH,
-    branchState: branchState.status,
+    branchState: branchState.status as "verified" | "published",
     head: branchState.head,
     storeDir,
-    configSource,
+    configSource: finalConfigSource,
     autoCommit: false,
+    ...(layoutWarning ? { layoutWarning } : {}),
   };
 }
 
@@ -1036,7 +1322,7 @@ type NonMutatingPrimaryTaskAuthority =
       status: "ready";
       primaryRoot: string;
       storeDir: string;
-      storeName: (typeof BUILT_IN_TASK_STORE_DIRS)[number];
+      storeName: string;
       remote: string;
       remoteUrl: string;
       head: string;
@@ -1048,20 +1334,21 @@ function deriveTargetStore(
   primaryRoot: string,
   targetWorktree: string,
   primaryStoreDir: string,
-): { storeDir: string; storeName: (typeof BUILT_IN_TASK_STORE_DIRS)[number] } | { blocked: EpisodeAuthorityBlocked } {
+): { storeDir: string; storeName: string } | { blocked: EpisodeAuthorityBlocked } {
   const primaryReal = realpathSync(primaryRoot);
   const rel = relative(primaryReal, resolve(primaryStoreDir));
-  if (isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`) || rel.includes(sep)
-      || !(BUILT_IN_TASK_STORE_DIRS as readonly string[]).includes(rel)) {
+  const parts = rel.split(sep).filter(Boolean);
+  if (isAbsolute(rel) || rel === "" || rel === ".." || rel.startsWith(`..${sep}`)
+      || parts.some((part) => part === "." || part === "..") || parts[0] === ".git") {
     return {
       blocked: {
         status: "blocked", code: "unsafe-store-location",
-        detail: `the prepared primary store ${primaryStoreDir} is not one exact built-in store directly under ${primaryReal}`,
-        remediation: "repair the primary Backlog store so it resolves to exactly .backlog/ or backlog/ before preparing an Episode workspace",
+        detail: `the prepared primary store ${primaryStoreDir} is not one safe relative store inside ${primaryReal}`,
+        remediation: "repair backlog_directory so the store is a relative in-repository path before preparing an Episode workspace",
       },
     };
   }
-  const storeName = rel as (typeof BUILT_IN_TASK_STORE_DIRS)[number];
+  const storeName = rel;
   return { storeName, storeDir: join(targetWorktree, storeName) };
 }
 
@@ -1138,11 +1425,25 @@ function verifyTargetBacklogAuthority(
     };
   }
   if (detection.evidence.configSource === "root") {
-    return {
-      status: "blocked", code: "unsafe-store-location",
-      detail: `the target Backlog authority is root configuration ${detection.evidence.configPath}; native reads could normalize tracked code-worktree configuration even when it selects the derived nested store`,
-      remediation: "root-config authority relocation remains deferred to PRIMECLAW-43.1",
-    };
+    const rootEntry = lstatIfPresent(detection.evidence.configPath);
+    const expectedConfig = join(storeDir, "config.yml");
+    let exactRelativeLink = false;
+    if (rootEntry?.isSymbolicLink()) {
+      const target = readlinkSync(detection.evidence.configPath);
+      try {
+        exactRelativeLink = !isAbsolute(target)
+          && realpathSync(resolve(dirname(detection.evidence.configPath), target)) === realpathSync(expectedConfig);
+      } catch {
+        exactRelativeLink = false;
+      }
+    }
+    if (!exactRelativeLink) {
+      return {
+        status: "blocked", code: "unsafe-store-location",
+        detail: `the target root configuration is not the exact relative Backlog compatibility symlink into ${expectedConfig}`,
+        remediation: "retain custom layout only through the reviewed relative backlog.config.yml -> <store>/config.yml symlink; regular, absolute, dangling, or alternate targets are refused",
+      };
+    }
   }
   const selectedStore = detection.evidence.storeDir;
   let exactStore = false;
@@ -1315,11 +1616,25 @@ function inspectPrimaryTaskAuthority(
     };
   }
   if (detection.kind === "selected" && detection.evidence.provider === "backlog" && detection.evidence.configSource === "root") {
-    return {
-      status: "blocked", code: "config-not-preserved",
-      detail: `the primary Backlog authority is root configuration ${detection.evidence.configPath}; slice-2A blocks this unpreserved layout`,
-      remediation: "root-config authority relocation remains deferred to PRIMECLAW-43.1",
-    };
+    const configEntry = lstatIfPresent(detection.evidence.configPath);
+    const expectedConfig = detection.evidence.storeDir ? join(detection.evidence.storeDir, "config.yml") : "";
+    let exactRelativeLink = false;
+    if (configEntry?.isSymbolicLink() && expectedConfig) {
+      const target = readlinkSync(detection.evidence.configPath);
+      try {
+        exactRelativeLink = !isAbsolute(target)
+          && realpathSync(resolve(dirname(detection.evidence.configPath), target)) === realpathSync(expectedConfig);
+      } catch {
+        exactRelativeLink = false;
+      }
+    }
+    if (!exactRelativeLink) {
+      return {
+        status: "blocked", code: "config-not-preserved",
+        detail: `the primary custom-layout root configuration is not the exact relative symlink into its published nested store`,
+        remediation: "re-run explicit initialization to relocate root configuration, or repair the reviewed relative symlink without changing task data",
+      };
+    }
   }
   const location = selectStoreLocation(primaryRoot, detection);
   if ("blocked" in location) return location.blocked;
@@ -1603,7 +1918,7 @@ type MutationClone = {
   primaryRoot: string;
   targetWorktree: string;
   storeDir: string;
-  storeName: (typeof BUILT_IN_TASK_STORE_DIRS)[number];
+  storeName: string;
   remote: string;
   remoteUrl: string;
 };

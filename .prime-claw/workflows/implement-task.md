@@ -20,7 +20,10 @@ Resolve the live provider directly from its native project evidence. Do not use
 a provider-selection file, infer the provider from the task ID, or mix provider
 commands or evidence. Reload the exact task through that provider:
 
-- **Backlog:** run `backlog task view --json -- TASK-ID`. Require the returned
+- **Backlog:** when the selected store is an independent nested clone, first
+  fetch the exact task ref and fast-forward only a clean clone to the stable
+direct published head; dirty, local-ahead, divergent, unavailable, or foreign
+history blocks. Then run `backlog task view --json -- TASK-ID`. Require the returned
   canonical ID to match the admitted identity, status exactly `In Planning`,
   and the exact returned task path. Require the native Implementation Plan to
   be meaningful and not blank or an obvious placeholder. Treat Description,
@@ -82,20 +85,26 @@ consumed once and can never authorize a second create dispatch.
 
 ### Backlog admission transaction
 
-For Backlog, the trusted capability changes only that main task from
-`In Planning` to `In Progress` through Backlog. It must commit and verify that
-exact task path. After that verified status commit, it must first persist one
-`provisioning` ownership record under this Conversation's exact registry key,
-bound to the canonical task and status-commit SHA, before creating any branch,
-worktree, or session. It then creates the Episode branch and worktree from that
-recorded SHA. A prompt push is attempted when a remote exists, but transport
-failure alone does not block local Episode creation.
+For Backlog, the trusted capability changes only the exact task from `In
+Planning` to `In Progress` through Backlog. Grandfathered branch-local mode
+commits and verifies that exact task path on canonical main and creates the
+Episode from that recorded status-commit SHA. Independent mode first proves the
+clean pushed canonical code `baseRef`, publishes the exact task-path-only status
+commit on `refs/heads/prime-claw/tasks` without force, proves the direct task
+head and complete native reread, and leaves the code HEAD unchanged. Before any
+branch, worktree, or session, both modes persist one `provisioning` ownership
+record under this Conversation's exact registry key; independent mode also binds
+its published provider revision and complete task evidence. The Episode branch
+and worktree are then created from the recorded code base. Grandfathered prompt
+push is best-effort when a remote exists; independent task publication must be
+proved before resource creation.
 
 A creation failure proven to have produced no Episode resource or ownership
-mutation returns the exact main task to `In Planning` in a verified task-only
-commit. Any recorded, partial, or uncertain mutation publishes `Blocked` with
-the exact recovery condition, preserves evidence and resources, and must never
-be retried as a new Episode.
+mutation returns the exact task to `In Planning` through the same selected
+Backlog authority and verifies its task-only publication. Any recorded, partial,
+or uncertain mutation publishes `Blocked` through that same authority with the
+exact recovery condition, preserves evidence and resources, and must never be
+retried as a new Episode.
 
 ### Beads admission transaction
 

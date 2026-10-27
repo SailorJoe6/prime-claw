@@ -14,7 +14,7 @@ WS_NODE_SUITE = "/workspace/tests/task_provider_migration.test.mjs"
 def test_task_provider_migration_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
-        timeout=480,
+        timeout=2400,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

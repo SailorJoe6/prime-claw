@@ -99,6 +99,20 @@ legacy regular-file bytes move to the new regular destination and remain marked
 customized. Unknown legacy entries remain in place and are reported; there is no
 recursive delete.
 
+## Task-history publication choice
+
+Normal initialization selects the primary code branch upstream, or the sole
+repository remote, as the Backlog task-history publication authority. Ambiguous
+remotes block. A repository with no remote also blocks by default. If the
+operator explicitly accepts unpublished local-only history, use
+`/initialize-prime-claw --unpublished-local-only` or tool
+`action="reconcile", unpublishedLocalOnly=true`. That route creates or reuses
+one clean independent nested Backlog repository on `prime-claw/tasks` with no
+remote, labels the result unpublished, and never treats it as admission,
+terminal-publication, or cleanup proof. Startup reconciliation never selects
+this route implicitly. Adding and selecting a remote later remains a separate
+operator action.
+
 ## Startup ordering and Episode snapshots
 
 The plugin's awaited `session_start` handler first verifies that the Git project

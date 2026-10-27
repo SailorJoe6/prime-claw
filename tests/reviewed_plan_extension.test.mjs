@@ -69,6 +69,13 @@ test("native plan-spec preserves prep then sole phase follow-up", async () => {
   assert.match(f.sent[1].message, /PLAN-SPEC POLICY/); assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
 });
 
+test("common plan command dispatches one exact grandfathered path to the guarded legacy route", async () => {
+  const f = fixture(); await f.commands.get("plan").handler(".ralph/plans/future/alpha", f.ctx);
+  assert.deepEqual(f.resolved, []);
+  assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /PLAN-PREP POLICY/);
+  assert.match(f.sent[1].message, /PLAN-SPEC POLICY/); assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
+});
+
 test("plan_spec tool steers prep and queues sole plan-spec follow-up", async () => {
   const f = fixture(); const result = await f.tools.get("plan_spec").execute("tool", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
   assert.equal(result.details.admitted, true); assert.deepEqual(f.sent[0].options, { deliverAs: "steer" }); assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
@@ -200,6 +207,18 @@ test("implement-spec queues full ordinary guide in post-prep phase before semant
   assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
   assert.ok(f.sent[1].message.indexOf("FULL OVERSIGHT GUIDE") < f.sent[1].message.indexOf("IMPLEMENT-SPEC POLICY"));
   assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
+});
+
+test("common implement-task command dispatches one exact grandfathered path and host to the guarded legacy route", async () => {
+  const f = fixture();
+  await f.commands.get("implement-task").handler(".ralph/plans/future/alpha --host id:123e4567-e89b-12d3-a456-426614174000", f.ctx);
+  assert.deepEqual(f.resolved, []);
+  assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
+  assert.match(f.sent[1].message, /IMPLEMENT-SPEC POLICY/);
+  await f.events.get("agent_end")({}, f.ctx);
+  const result = await f.tools.get("create_spec_episode").execute("common", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined, JSON.stringify(result));
+  assert.equal(f.created[0].options.host, "id:123e4567-e89b-12d3-a456-426614174000");
 });
 
 

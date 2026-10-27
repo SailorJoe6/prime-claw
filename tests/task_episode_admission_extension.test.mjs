@@ -33,7 +33,10 @@ import {
 import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
 const ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), ".."));
-const BACKLOG = join(ROOT, "deps", "backlog", "dist", "backlog");
+const RUNTIME_BACKLOG = "/usr/local/bin/backlog";
+const BACKLOG = process.platform === "linux" && existsSync(RUNTIME_BACKLOG)
+  ? RUNTIME_BACKLOG
+  : join(ROOT, "deps", "backlog", "dist", "backlog");
 
 function git(root, ...args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -244,6 +247,8 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   assert.equal(git(join(result.worktree, ".backlog"), "rev-parse", "HEAD"), publishedTaskHead);
   assert.notEqual(realpathSync(join(root, ".backlog", ".git")), realpathSync(join(result.worktree, ".backlog", ".git")));
 
+  git(join(result.worktree, ".backlog"), "config", "user.name", "Prime Claw Test");
+  git(join(result.worktree, ".backlog"), "config", "user.email", "prime-claw@example.invalid");
   const changedTask = publishTaskHistoryMutation({
     primaryRoot: root,
     targetWorktree: result.worktree,

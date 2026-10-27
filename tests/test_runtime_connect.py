@@ -1,4 +1,4 @@
-"""Offline tests for the explicit, read-only prime-claw connect path."""
+"""Offline: host-safe tests for the explicit, read-only prime-claw connect path."""
 import json
 import os
 import subprocess

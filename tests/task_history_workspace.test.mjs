@@ -11,7 +11,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync, readdirSync, realpathSync, renameSync, lstatSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync, readdirSync, realpathSync, readlinkSync, renameSync, lstatSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -20,6 +20,7 @@ import {
   ensureTaskHistoryBranch,
   prepareTaskHistoryWorkspace,
   prepareEpisodeTaskHistoryWorkspace,
+  resolveSynchronizedProviderTask,
   cleanupEpisodeTaskHistoryStore,
   inspectEpisodeTaskHistoryStore,
   inspectPublishedPrimaryTaskHistory,
@@ -151,6 +152,30 @@ test("remote selection blocks with no remote", () => {
   assert.equal(sel.status, "blocked");
   assert.equal(sel.code, "no-remote");
   assert.match(sel.remediation, /remote add|set-upstream-to/);
+});
+
+test("explicit no-remote preparation creates stable unpublished local-only task history", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root } = fixtureRepo();
+  git(root, "remote", "remove", "origin");
+  const ordinary = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(ordinary.status, "blocked");
+  assert.equal(ordinary.code, "no-remote");
+
+  const local = prepareTaskHistoryWorkspace({ primaryRoot: root, unpublishedLocalOnly: true });
+  assert.equal(local.status, "prepared");
+  assert.equal(local.remoteVia, "local-only");
+  assert.equal(local.remote, null);
+  assert.equal(local.unpublished, true);
+  assert.equal(git(local.storeDir, "remote"), "");
+  assert.equal(git(local.storeDir, "status", "--porcelain", "--untracked-files=all"), "");
+  assert.equal(git(local.storeDir, "rev-parse", "--abbrev-ref", "HEAD"), "prime-claw/tasks");
+  const again = prepareTaskHistoryWorkspace({ primaryRoot: root, unpublishedLocalOnly: true });
+  assert.equal(again.status, "prepared");
+  assert.equal(again.head, local.head);
+  const stillExplicit = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(stillExplicit.status, "blocked");
+  assert.equal(stillExplicit.code, "no-remote");
 });
 
 test("remote selection blocks ambiguous remotes with no upstream", () => {
@@ -324,6 +349,22 @@ test("a symlinked store target blocks before any write", () => {
   assert.deepEqual(primarySnapshot(root), before);
 });
 
+test("primary nested clone reuse refuses a symlinked shared Git directory", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root } = fixtureRepo();
+  const first = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(first.status, "prepared");
+  const dotGit = join(first.storeDir, ".git");
+  const shared = join(first.storeDir, ".git-shared");
+  renameSync(dotGit, shared);
+  symlinkSync(".git-shared", dotGit, "dir");
+  const reused = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(reused.status, "blocked");
+  assert.equal(reused.code, "unsafe-store-location");
+  assert.match(reused.detail, /independent ordinary-Git clone|symlink/);
+  assert.ok(lstatSync(dotGit).isSymbolicLink());
+});
+
 test("a negated ignore rule blocks instead of returning prepared", () => {
   const { root } = fixtureRepo();
   writeFileSync(join(root, ".gitignore"), "/.backlog/\n!/.backlog/\n");
@@ -474,13 +515,70 @@ test("root config with a published folder config blocks before any native config
   writeFileSync(join(root, "backlog.config.yml"), rootCfg);
   const ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
   assert.equal(ws.status, "blocked");
-  assert.equal(ws.code, "config-not-preserved");
-  assert.match(ws.detail, /root/);
+  assert.equal(ws.code, "uncommitted-task-content");
+  assert.match(ws.detail, /live Backlog content/);
   // Root config bytes unchanged; no native write to it; no prepared result.
   assert.equal(readFileSync(join(root, "backlog.config.yml"), "utf8"), rootCfg);
   // No nested store was created (blocked before clone/config mutation).
   assert.ok(!existsSync(join(root, ".backlog", ".git")));
   assert.ok(!existsSync(join(root, "backlog", ".git")));
+});
+
+test("valid built-in root layout moves equivalent config into the published store", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root } = fixtureRepo();
+  const store = join(root, "backlog");
+  mkdirSync(join(store, "tasks"), { recursive: true });
+  const rootConfig = join(root, "backlog.config.yml");
+  const rootBytes = `${FULL_CANONICAL_CONFIG.trimEnd()}
+backlog_directory: "backlog"
+`;
+  writeFileSync(rootConfig, rootBytes);
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(prepared.status, "prepared");
+  assert.equal(prepared.storeDir, store);
+  assert.equal(prepared.configSource, "folder");
+  assert.equal(existsSync(rootConfig), false);
+  const folderBytes = readFileSync(join(store, "config.yml"), "utf8");
+  assert.doesNotMatch(folderBytes, /^backlog_directory\s*:/m);
+  assert.match(folderBytes, /^project_name: "x"$/m);
+  assert.equal(git(store, "status", "--porcelain"), "");
+  assert.equal(prepareTaskHistoryWorkspace({ primaryRoot: root }).status, "prepared");
+});
+
+test("valid custom root layout relocates config into task history and carries through Episode cleanup", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { dir, root } = fixtureRepo();
+  const customStore = join(root, "planning", "task-store");
+  mkdirSync(join(customStore, "tasks"), { recursive: true });
+  const rootConfig = join(root, "backlog.config.yml");
+  const rootBytes = `${FULL_CANONICAL_CONFIG.trimEnd()}
+backlog_directory: "planning/task-store"
+`;
+  writeFileSync(rootConfig, rootBytes);
+
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(prepared.status, "prepared");
+  assert.equal(prepared.storeDir, customStore);
+  assert.match(prepared.layoutWarning, /more brittle/);
+  assert.ok(lstatSync(rootConfig).isSymbolicLink());
+  assert.equal(readlinkSync(rootConfig), "planning/task-store/config.yml");
+  assert.equal(readFileSync(join(customStore, "config.yml"), "utf8"), rootBytes);
+  assert.equal(git(customStore, "status", "--porcelain"), "");
+  assert.equal(prepareTaskHistoryWorkspace({ primaryRoot: root }).status, "prepared");
+
+  git(root, "add", ".gitignore", "backlog.config.yml");
+  git(root, "commit", "-qm", "retain reviewed custom task layout");
+  const target = join(dir, "custom-episode");
+  git(root, "branch", "custom-episode", "main");
+  git(root, "worktree", "add", "-q", target, "custom-episode");
+  const episode = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(episode.status, "prepared");
+  assert.equal(episode.storeDir, join(target, "planning", "task-store"));
+  assert.equal(readlinkSync(join(target, "backlog.config.yml")), "planning/task-store/config.yml");
+  const cleaned = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+  assert.equal(cleaned.status, "cleaned");
+  assert.equal(existsSync(episode.storeDir), false);
 });
 
 // Residual 2: the bootstrap publishes a lifecycle-ready config; the store is clean and stable.
@@ -603,6 +701,8 @@ function episodeFixture({ ignoreTarget = true, publishConfig = true, storeName =
     ws = prepareTaskHistoryWorkspace({ primaryRoot: root });
     if (ws.status !== "prepared") throw new Error(`fixture backlog/ primary not prepared: ${ws.detail}`);
   }
+  git(ws.storeDir, "config", "user.name", "Prime Claw Test");
+  git(ws.storeDir, "config", "user.email", "prime-claw@example.invalid");
   const target = join(dir, "episode");
   git(root, "branch", "episode", "main");
   git(root, "worktree", "add", "-q", target, "episode");
@@ -640,6 +740,8 @@ test("a clean stale Episode task clone fast-forwards only to a stable published 
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, target, storeDir } = episodeFixture();
   assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+  git(storeDir, "config", "user.name", "Prime Claw Test");
+  git(storeDir, "config", "user.email", "prime-claw@example.invalid");
   const before = git(storeDir, "rev-parse", "HEAD");
   writeFileSync(join(root, ".backlog", "TASKS.md"), "# Tasks\n\npublished descendant\n");
   git(join(root, ".backlog"), "add", "TASKS.md");
@@ -652,6 +754,41 @@ test("a clean stale Episode task clone fast-forwards only to a stable published 
   assert.equal(reused.head, published);
   assert.equal(git(storeDir, "rev-parse", "HEAD"), published);
   assert.equal(git(storeDir, "status", "--porcelain"), "");
+});
+
+test("first provider task read safely prepares a missing Episode Backlog clone", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const fixture = episodeFixture({ taskFiles: {
+    [OWNER_TASK_PATH]: taskMarkdown("TASK-1", "Owner"),
+  } });
+  assert.equal(existsSync(fixture.storeDir), false);
+  const resolved = resolveSynchronizedProviderTask(fixture.target, "TASK-1");
+  assert.equal(resolved.provider, "backlog");
+  assert.equal(resolved.status, "In Progress");
+  assert.ok(existsSync(join(fixture.storeDir, ".git")));
+  assert.equal(git(fixture.storeDir, "rev-parse", "HEAD"), fixture.primaryHead);
+});
+
+test("provider task read refreshes a stale clean Episode clone before status admission", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const fixture = episodeFixture({ taskFiles: {
+    [OWNER_TASK_PATH]: taskMarkdown("TASK-1", "Owner"),
+  } });
+  assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: fixture.root, targetWorktree: fixture.target }).status, "prepared");
+  const staleHead = git(fixture.storeDir, "rev-parse", "HEAD");
+  const publication = publishTaskHistoryMutation({
+    primaryRoot: fixture.root,
+    targetWorktree: fixture.root,
+    taskId: "TASK-1",
+    expectedTaskStatus: "In Progress",
+    edits: [{ option: "--status", value: "Done" }],
+  });
+  assert.equal(publication.status, "published");
+  assert.equal(git(fixture.storeDir, "rev-parse", "HEAD"), staleHead);
+  const resolved = resolveSynchronizedProviderTask(fixture.target, "TASK-1");
+  assert.equal(resolved.provider, "backlog");
+  assert.equal(resolved.status, "Done");
+  assert.equal(git(fixture.storeDir, "rev-parse", "HEAD"), publication.publishedHead);
 });
 
 test("a foreign (unregistered) target directory blocks before any write", (t) => {
@@ -803,13 +940,13 @@ test("same-store target root Backlog config refuses reuse and cleanup without to
   const reuse = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
   assert.equal(reuse.status, "blocked");
   assert.equal(reuse.code, "unsafe-store-location");
-  assert.match(reuse.remediation, /deferred.*PRIMECLAW-43\.1/i);
+  assert.match(reuse.remediation, /relative.*symlink/i);
   assert.equal(readFileSync(rootConfig, "utf8"), rootBytes);
   assert.equal(git(target, "status", "--porcelain", "--untracked-files=all"), statusBefore);
 
   const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
   assert.equal(cleanup.status, "refused");
-  assert.match(cleanup.remediation, /deferred.*PRIMECLAW-43\.1/i);
+  assert.match(cleanup.remediation, /relative.*symlink/i);
   assert.equal(readFileSync(rootConfig, "utf8"), rootBytes);
   assert.equal(git(target, "status", "--porcelain", "--untracked-files=all"), statusBefore);
   assert.ok(existsSync(storeDir), "root-config refusal retains the exact nested store");

@@ -14,12 +14,30 @@ OWNERSHIP_MODULE = REPO / "src" / "prime-agent-plugin" / "extension-support" / "
 OWNERSHIP_WRITER = REPO / "src" / "prime-agent-plugin" / "extension-support" / "task-episode-ownership.ts"
 EPISODE_MODULE = REPO / "src" / "prime-agent-plugin" / "extension-support" / "spec-episode.ts"
 WS_NODE_SUITE = "/workspace/tests/task_providers.test.mjs"
+WS_BACKLOG_ADMISSION_SUITE = "/workspace/tests/task_episode_admission_extension.test.mjs"
+WS_OWNERSHIP_SUITE = "/workspace/tests/task_episode_ownership_extension.test.mjs"
 WS_BEADS_ADMISSION_SUITE = "/workspace/tests/beads_task_episode_admission_extension.test.mjs"
 
 
 def test_task_providers_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
+        timeout=180,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_backlog_task_episode_admission_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", WS_BACKLOG_ADMISSION_SUITE,
+        timeout=180,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_task_episode_ownership_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", WS_OWNERSHIP_SUITE,
         timeout=180,
     )
     assert result.returncode == 0, result.stdout + result.stderr

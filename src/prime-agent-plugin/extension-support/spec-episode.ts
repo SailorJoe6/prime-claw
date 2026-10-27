@@ -49,7 +49,6 @@ import {
   prepareBeadsWorkspaceTransport,
   readBeadsNativeTask,
   requireBacklogTaskSelection,
-  resolveProviderTask,
   type BeadsNativeTaskResolution,
   type BeadsTaskMutationPublication,
   type ProviderTaskResolution,
@@ -71,6 +70,7 @@ import {
   prepareEpisodeTaskHistoryWorkspace,
   prepareTaskHistoryWorkspace,
   publishTaskHistoryMutation,
+  resolveSynchronizedProviderTask,
   type EpisodeTaskHistoryMutation,
 } from "./task-history-workspace.ts";
 
@@ -100,7 +100,7 @@ import {
 function defaultEpisodeTaskResolver(runner: CommandRunner) {
   return (cwd: string, exactTaskId: string): BacklogTaskSelection | null =>
     requireBacklogTaskSelection(
-      resolveProviderTask(cwd, exactTaskId, runner),
+      resolveSynchronizedProviderTask(cwd, exactTaskId, runner),
       "this Episode lifecycle path",
     );
 }
@@ -294,7 +294,7 @@ export interface TaskEpisodeAllocationDependencies extends EpisodeDependencies {
 export interface TaskEpisodeCreationDependencies extends TaskEpisodeAllocationDependencies {
   admissionGit?: TaskEpisodeAdmissionGit;
   providerDetector?: typeof detectTaskProvider;
-  providerTaskResolver?: typeof resolveProviderTask;
+  providerTaskResolver?: typeof resolveSynchronizedProviderTask;
   commitTaskStatus?: typeof commitConversationTaskStatus;
   reserveTaskOwnership?: typeof reserveTaskEpisodeOwnership;
   reservePublishedBacklogTaskOwnership?: typeof reservePublishedBacklogTaskEpisodeOwnership;
@@ -2920,7 +2920,7 @@ async function createBeadsTaskEpisode(
 ): Promise<TaskEpisodeCreationResult> {
   const git = dependencies.admissionGit ?? new CliTaskEpisodeAdmissionGit();
   const store = dependencies.ownership ?? defaultOwnershipStore;
-  const resolveProvider = dependencies.providerTaskResolver ?? resolveProviderTask;
+  const resolveProvider = dependencies.providerTaskResolver ?? resolveSynchronizedProviderTask;
   const commitStatus = dependencies.commitTaskStatus ?? commitConversationTaskStatus;
   const reserve = dependencies.reserveBeadsTaskOwnership ?? reservePublishedBeadsTaskEpisodeOwnership;
   const allocate = dependencies.allocateTaskEpisode ?? allocateReservedTaskEpisode;

@@ -419,10 +419,11 @@ def _backlog_source_identity() -> tuple[bool, str]:
     code, commit = run(["git", "-C", source, "rev-parse", "HEAD"])
     if code != 0 or commit.strip() != BACKLOG_COMMIT:
         return False, f"expected {BACKLOG_COMMIT}, found {commit.strip() or 'unavailable'}"
-    code, tag = run(["git", "-C", source, "describe", "--tags", "--exact-match"])
-    if code != 0 or tag.strip() != "v" + BACKLOG_VERSION:
-        return False, f"expected tag v{BACKLOG_VERSION}, found {tag.strip() or 'unavailable'}"
-    return True, f"v{BACKLOG_VERSION} at {BACKLOG_COMMIT}"
+    release_ref = "refs/tags/v" + BACKLOG_VERSION
+    code, _ = run(["git", "-C", source, "merge-base", "--is-ancestor", release_ref, BACKLOG_COMMIT])
+    if code != 0:
+        return False, f"expected {release_ref} to be an ancestor of managed commit {BACKLOG_COMMIT}"
+    return True, f"v{BACKLOG_VERSION} base at managed commit {BACKLOG_COMMIT}"
 
 
 def cmd_build(cfg, args) -> int:
@@ -518,7 +519,7 @@ PRIME_AGENT_SOURCE_COMMIT = "a1faacd53ac4473a75de1d434afaf50945c2f647"
 PRIME_AGENT_SOURCE_TREE = "5301c70d9c9d74e474ccaf258fdd3c8de982c52f"
 PRIME_AGENT_SOURCE_LOCK_SHA256 = "3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74"
 BACKLOG_VERSION = "1.53.0"
-BACKLOG_COMMIT = "fd20f71493fb4eda44b021aa89f257956f17fb71"
+BACKLOG_COMMIT = "5d556c1954f7724abd180f6211cf528e9253ad4c"
 
 
 def _prime_agent_source_gate_script() -> str:
