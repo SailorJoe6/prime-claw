@@ -4,7 +4,7 @@ title: Handle Orca nonzero after successful Episode worktree removal
 status: In Progress
 assignee: []
 created_date: '2026-10-27 12:48'
-updated_date: '2026-10-27 14:35'
+updated_date: '2026-10-27 16:48'
 labels: []
 dependencies: []
 references:
@@ -99,6 +99,10 @@ No host/global plugin application, upstream source edits, public schema changes,
 
 Final integration validation: required git pull --rebase origin main integrated newly landed PRIMECLAW-43 at ddcbf9c. Only the two documentation paragraphs conflicted; resolution preserved all selected-provider/independent-history wording and inserted only this approved Orca reconciliation text. Code/tests merged automatically; diff remains the same five-file single-purpose slice. No scope expansion.
 Reran the same network-disabled Docker lifecycle command on integrated HEAD: 287 passed, 0 failed (expanded current suites). Reran static policy: 9 passed, 6 deselected. Reran source-mode scripts/test-tier1.sh --probe: exit 0, offline apply/check/probe passed, network absent, teardown clean. Final gate evidence: .test-results/20261027T143357Z-44293-2d276d1c/tier1/manifest.json (run.status=passed, teardown.clean=true), setup.log phases plugin-applied/plugin-checked/probe-passed. This integrated validation supersedes the pre-rebase counts above. Task remains In Progress; no merge, deployment or lifecycle mutation.
+
+Owner-authorized next execute integration (2026-10-27; accepted candidate remains 0c6073eba563e512559535126022e619547aa13e until refreshed):
+Integrate current canonical main `6719d19716f19dcc187c50572bea189fb7fd32b5` into this same accepted Episode. Preserve the existing narrow PRIMECLAW-10.41 Orca delete-then-nonzero fix and all current-main behavior, including commit `0174975` and the supported PRIMECLAW-10.39 reproduction comment on PRIMECLAW-10.41. Treat histories nested under an Episode artifact root as intentionally owned by that Episode; recursive deletion of that nested subtree is expected, not a defect. Do not add or revise cleanup behavior for that clarification. Resolve only in-scope integration conflicts in the overlapping task, cleanup adapter, focused tests, and cleanup document; do not broaden scope or add state/retries/frameworks. Re-run the focused Docker lifecycle tests, static policy tests, and Docker-only `scripts/test-tier1.sh --probe`, update task evidence through supported Backlog CLI without changing `In Progress`, push the refreshed candidate, and report the exact head. Do not merge, publish lifecycle status, run cleanup, or perform plugin/global actions.
+Handoff preparation records direction only; integration and validation are not yet performed. Preserve the existing task plan and prior evidence; refresh evidence/Final Summary after integration.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
