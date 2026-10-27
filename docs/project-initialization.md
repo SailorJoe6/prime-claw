@@ -202,7 +202,11 @@ incomplete migration.
 Backlog archived records are interpreted only in a disposable exact-revision
 clone: their unchanged Markdown is temporarily placed in that clone's active
 corpus so the repository-built Backlog native reader supplies the structured
-view. The live source store remains untouched and authoritative. Beads reads use
+view. Native active and archived drafts are part of the same complete inventory.
+Their exact Markdown, Git history, native draft view, original kind, and
+active-or-archived placement are preserved in Beads-native metadata and notes;
+drafts count as open work while archived drafts retain abandonment placement.
+The live source store remains untouched and authoritative. Beads reads use
 published clean Dolt revision proof, `bd show --long --include-comments`, native
 history, provenance, and relationship queries. Backlog-to-Beads uses an
 untracked (`--stealth`) target store so `bd init` cannot change the still-live
@@ -231,7 +235,11 @@ authoritative, and reports exact cleanup or same-destination retry guidance. An
 explicitly reconfirmed retry is admitted through the otherwise blocked dual-store
 window only after the source revision and every existing destination marker,
 mapping, receipt, publication, and source digest prove that it is the same
-migration. Ordinary lifecycle discovery remains blocked. The operation never
+migration. When an active Episode already has the clean exact Backlog destination
+clone from the failed attempt, ordinary exact-remote fetch and fast-forward-only
+reconciliation advances that same clone to the newly verified receipt revision;
+dirty, foreign, ahead, or divergent clones remain blocked. Ordinary lifecycle
+discovery remains blocked. The operation never
 creates a second destination or retries automatically. Source deletion is
 refused on source drift, destination drift, incomplete proof, ownership drift,
 or ambiguous provider selection. There is no dual write, mirror, provider

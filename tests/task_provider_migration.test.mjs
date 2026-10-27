@@ -512,30 +512,83 @@ test("post-switch runtime continuity loss rolls ownership back before source del
 });
 
 
-test("Beads deletion refusal preserves source and exact Backlog destination retry completes", { timeout: 300_000 }, async (t) => {
+test("active Beads Episode deletion refusal preserves source and exact Backlog destination retry completes", { timeout: 360_000 }, async (t) => {
   const fixture = beadsSource(t, "beads-delete-refusal-retry");
+  const owner = addActiveBeadsOwner(fixture);
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
   assert.equal(inspection.status, "ready", inspection.detail);
   const first = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve exact unsupported values in native provenance.",
+    verifyActiveRuntime: proveFixtureRuntime,
     deleteSource() { throw new Error("fixture refuses Beads deletion after destination proof"); },
   });
   assert.equal(first.status, "blocked");
   assert.equal(first.code, "pre-cutover-failed");
   assert.equal(existsSync(join(fixture.root, ".beads")), true);
   assert.equal(detectTaskProvider(fixture.root, RUNNER).code, "dual-providers");
+  const firstEpisodeDestinationHead = git(join(owner.episode, ".backlog"), "rev-parse", "HEAD");
   const destinationIds = git(join(fixture.root, ".backlog"), "ls-files").split(/\r?\n/).filter((path) => path.endsWith(".md") && path !== "TASKS.md")
     .map((path) => /^id:\s*([A-Z][A-Z0-9_-]*-\d+(?:\.\d+)*)/m.exec(readFileSync(join(fixture.root, ".backlog", path), "utf8"))?.[1]).filter(Boolean).sort();
   const retried = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve exact unsupported values in native provenance.",
+    verifyActiveRuntime: proveFixtureRuntime,
   });
   assert.equal(retried.status, "completed", retried.detail);
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
   assert.deepEqual(retried.receipt.mappings.map((row) => row.destinationTaskId).concat(retried.receiptTaskId).sort(), destinationIds);
+  const finalDestinationHead = git(join(fixture.root, ".backlog"), "rev-parse", "HEAD");
+  assert.notEqual(finalDestinationHead, firstEpisodeDestinationHead);
+  assert.equal(git(join(owner.episode, ".backlog"), "rev-parse", "HEAD"), finalDestinationHead);
+  const retained = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8").toString()).owners[owner.ownerSessionId];
+  assert.equal(retained.provider, "backlog");
+  assert.equal(retained.worktree, owner.episode);
+  assert.equal(retained.head, owner.episodeHead);
 });
 
+
+
+test("Backlog native drafts are counted and preserved exactly before source deletion", { timeout: 300_000 }, async (t) => {
+  const fixture = backlogSource(t, "backlog-draft-inventory");
+  const output = backlog(fixture.root, "task", "create", "Draft with pending product notes", "--draft", "--description", "Unique draft source bytes 20261027", "--no-dod-defaults", "--plain");
+  const draftId = output.match(/\bDRAFT-\d+(?:\.\d+)*\b/)[0];
+  const archivedOutput = backlog(fixture.root, "task", "create", "Archived draft source", "--draft", "--description", "Unique archived draft bytes 20261027", "--no-dod-defaults", "--plain");
+  const archivedDraftId = archivedOutput.match(/\bDRAFT-\d+(?:\.\d+)*\b/)[0];
+  backlog(fixture.root, "draft", "archive", archivedDraftId);
+  assert.match(backlog(fixture.root, "draft", "list", "--plain"), new RegExp(draftId));
+  assert.doesNotMatch(backlog(fixture.root, "draft", "list", "--plain"), new RegExp(archivedDraftId));
+  git(fixture.root, "add", "backlog");
+  git(fixture.root, "commit", "-qm", "commit native draft source");
+  git(fixture.root, "push", "-q");
+
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.deepEqual(inspection.taskCounts, { open: 2, closed: 1, archived: 2, total: 5 });
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "beads", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve exact draft content and unsupported values in native metadata.",
+  });
+  assert.equal(result.status, "completed", result.detail);
+  assert.equal(existsSync(join(fixture.root, "backlog")), false);
+  const rows = bd(fixture.root, "export", "--all").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+  const destinationId = result.receipt.mappings.find((row) => row.sourceTaskId === draftId)?.destinationTaskId;
+  const draft = rows.find((row) => row.id === destinationId);
+  const preserved = draft?.metadata?.prime_claw_migration;
+  assert.equal(preserved?.sourceTaskId, draftId);
+  assert.equal(preserved?.entityKind, "draft");
+  assert.equal(preserved?.classification, "open");
+  assert.match(Buffer.from(preserved.markdownBase64, "base64").toString("utf8"), /Unique draft source bytes 20261027/);
+  assert.match(Buffer.from(preserved.nativeView.task.nativePlainViewBase64, "base64").toString("utf8"), /Unique draft source bytes 20261027/);
+  assert.match(draft.notes, /Unique draft source bytes 20261027/);
+  const archivedDestinationId = result.receipt.mappings.find((row) => row.sourceTaskId === archivedDraftId)?.destinationTaskId;
+  const archivedDraft = rows.find((row) => row.id === archivedDestinationId);
+  const archivedPreserved = archivedDraft?.metadata?.prime_claw_migration;
+  assert.equal(archivedPreserved?.entityKind, "draft");
+  assert.equal(archivedPreserved?.classification, "archived");
+  assert.match(Buffer.from(archivedPreserved.markdownBase64, "base64").toString("utf8"), /Unique archived draft bytes 20261027/);
+  assert.equal(archivedDraft.status, "closed");
+});
 
 class DroppedBeadsExportRunner extends CandidateRunner {
   constructor() { super(); this.dropped = false; this.sawInventory = false; }

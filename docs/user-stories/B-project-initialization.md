@@ -93,8 +93,10 @@ and provenance record, and writes one final destination-native receipt.
 
 The source remains intact, clean, read-only, and authoritative through complete
 target proof. Beads export filters are rejected and a complete native export
-must equal an independent issue inventory; Backlog completion counts use native
-status while archive placement retains abandonment meaning. Every active Episode
+must equal an independent issue inventory. Backlog active and archived drafts
+are included with exact Markdown, native view, Git history, original kind, and
+placement; completion counts use native status while archive placement retains
+abandonment meaning. Every active Episode
 must also be clean and directly published at its recorded code branch/head, with
 the same branch-local Backlog task bytes or exact shared provider revision, one
 idle durable runtime route, and matching Orca resources when applicable.
@@ -104,7 +106,9 @@ Repeated source, frozen-destination-remote, active-code/runtime, registry,
 sole-target, and source-absence proofs guard deletion. Any pre-cutover failure
 restores ownership, keeps source authority, and reports exact cleanup or an
 explicit same-destination retry that must re-prove all existing markers,
-mappings, receipt, digest, and publication. There is no automatic retry,
+mappings, receipt, digest, and publication. A previously created clean active-
+Episode Backlog clone may advance only by exact-remote fetch and fast-forward to
+the verified receipt; unsafe or divergent clones block. There is no automatic retry,
 duplicate destination, dual write,
 mirror, provider-selection file, sidecar receipt, persistent coordinator, phase,
 checkpoint, or resume state. Production cutover remains a separately confirmed

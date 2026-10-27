@@ -956,9 +956,11 @@ semantic-placement prose, and literal operator approval. Backlog source capture
 retains each committed Markdown file, full Git history with actor/timestamp and
 binary changes, and the native structured view. Archived Markdown is moved only
 inside a disposable clone of the exact revision so the native Backlog reader can
-interpret it; live source bytes never move. Native status, rather than physical
-folder alone, classifies Backlog completion while archive placement remains
-abandonment evidence. Beads source capture uses the clean, directly published
+interpret it; live source bytes never move. Active and archived native drafts
+are also inventoried. Their exact Markdown, Git history, native draft view,
+original kind, and placement are retained in Beads-native metadata and notes.
+Native status, rather than physical folder alone, classifies Backlog completion
+while archive placement remains abandonment evidence. Beads source capture uses the clean, directly published
 Dolt revision, rejects effective export-owner filters, and requires a complete
 `--all` export to equal an independent read-only issue inventory before it
 retains long/comment views, native history, provenance, and relationship rows.
@@ -993,8 +995,10 @@ surface, then proves source absence and sole target selection. Any pre-cutover
 error keeps source authority and reports exact source-preserving cleanup or
 same-destination retry conditions. A reconfirmed retry can cross the otherwise
 blocked dual-store window only after exact source and existing target markers,
-mappings, receipt, digest, and publication prove the same destination; ordinary
-lifecycle mutation remains blocked. There is no duplicate target,
+mappings, receipt, digest, and publication prove the same destination. A clean
+active-Episode Backlog destination clone is reconciled only by exact-remote
+fetch and fast-forward to that verified receipt revision; foreign, dirty, ahead,
+or divergent clones block. Ordinary lifecycle mutation remains blocked. There is no duplicate target,
 automatic retry, dual write, mirror, universal task model, provider-selection
 file, sidecar receipt, persistent lock, coordinator, phase file, checkpoint, or
 resume state. The real `PRIMECLAW-43.1` repository migration remains separately

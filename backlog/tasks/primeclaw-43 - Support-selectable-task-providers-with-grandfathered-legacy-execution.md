@@ -4,7 +4,7 @@ title: Support selectable task providers with grandfathered legacy execution
 status: In Progress
 assignee: []
 created_date: '2026-10-15 21:20'
-updated_date: '2026-10-27 04:27'
+updated_date: '2026-10-27 05:00'
 labels: []
 dependencies: []
 references:
@@ -1430,6 +1430,29 @@ Validation for this repair candidate:
 - Changed-module import smoke passed. Targeted TypeScript checking reported no diagnostics in the new migration/provider/ownership/runtime-continuity additions; it retains only established unrelated project diagnostics. `git diff --check` passed before task evidence publication.
 
 No live provider migration, ownership transition, global activation, merge, abandonment, finalization, or cleanup was performed. AC18/19 remain unchecked pending fresh exact-commit independent review and owner acceptance.
+
+2026-10-27 — AC18/19 second exact-review repairs:
+
+Fresh independent review rejected exact candidate `c05dffac5f63c2879530c7a8a5749650032ac9bf` with two additional concrete AC18/19 defects, both reproduced only in disposable native repositories:
+
+1. Committed Backlog drafts were outside the task inventory, so a successful Backlog→Beads switch could delete their only copy while the receipt claimed completeness.
+2. A Beads→Backlog same-destination retry with an active Episode advanced the destination receipt but left the Episode's existing clean destination clone at the prior commit, causing the retry to fail itself.
+
+The bounded repair now inventories active and archived native drafts alongside tasks. It invokes the native draft view for each entry, normalizes only the disposable absolute file-path line, and preserves exact Markdown, full Git history, native view, original `draft` kind, active-or-archived placement, and semantic placement in Beads-native metadata/notes. Active drafts count as open work; archived drafts retain closed abandonment placement. Exact package verification now binds kind and classification before deletion.
+
+For active-Episode Beads→Backlog recovery, an existing exact clean destination clone is re-proved against the frozen remote URL and task-history ref, fetched without tags or force, required to be an ancestor of the new receipt revision, and advanced only by `git merge --ff-only`. Dirty, foreign-branch, wrong-remote, ahead, divergent, or mismatched-ref clones still block. No new checkpoint, retry state, or recovery interface was introduced.
+
+Validation on the final repair tree:
+
+- Real native draft regression, including active and archived drafts: passed.
+- Real native active-Episode deletion-refusal/same-destination retry regression: passed and proved the same Episode clone fast-forwarded to the final destination revision while preserving Episode code identity.
+- `node --test tests/*.test.mjs`: 501 passed, 0 failed.
+- Focused related Python: 11 passed, 2 skipped.
+- Full Python: 680 passed, 70 skipped, 75 subtests passed, with only the same three established unrelated host-baseline failures.
+- Docker tier-1 offline probe: passed with teardown and manifest verification.
+- Changed-module imports and `git diff --check`: passed. Targeted TypeScript checking reported no diagnostics in `task-provider-migration.ts`; only established unrelated project diagnostics remain.
+
+No live migration, ownership transition, global activation, merge, abandonment, finalization, or cleanup was performed. AC18/19 remain unchecked pending fresh exact-commit independent review and owner acceptance.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
