@@ -127,7 +127,7 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       const collision = sessions.find((entry) => entry.activeSessionId === record.episodeActiveSessionId
         || entry.sessionId === record.episodeId
         || samePath(entry.sessionFile, record.episodeSessionFile!)
-        || samePath(entry.cwd, record.worktree!));
+        || (Boolean(entry.activeSessionId) && samePath(entry.cwd, record.worktree!)));
       if (collision) throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
       if (sessions.some((entry) => entry.parentSessionId === record.episodeId
         || samePath(entry.parentSessionPath, record.episodeSessionFile!))) {
@@ -174,8 +174,9 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
         throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
       }
     }
+    // Saved histories do not use the worktree and are not owned by sharing its CWD.
     const foreign = sessions.find((candidate) => !owned.has(candidate) && (
-      samePath(candidate.cwd, record.worktree!)
+      (Boolean(candidate.activeSessionId) && samePath(candidate.cwd, record.worktree!))
       || identities.some((summary) => candidate.parentSessionId === summary.sessionId
         || samePath(candidate.parentSessionPath, summary.sessionFile!))
     ));
