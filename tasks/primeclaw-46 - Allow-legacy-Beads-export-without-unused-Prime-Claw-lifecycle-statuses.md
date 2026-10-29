@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-46
 title: Allow legacy Beads export without unused Prime Claw lifecycle statuses
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-10-28 22:04'
-updated_date: '2026-10-28 22:10'
+updated_date: '2026-10-29 15:26'
 labels: []
 dependencies: []
 references:
@@ -50,6 +50,18 @@ No custom Beads source statuses configured; no switch-confirm issued. This issue
 - [ ] #4 Inspect every status actually present, including deferred/pinned/hooked or custom statuses; deferred-to-drafts stays an explicit unresolved design question until decided, with no silent omission or guessed mapping.
 - [ ] #5 Disposable regression fixtures cover built-in-only source inspection, completed closed issues, full mixed-status inventory, and retained safety failures; no live migration is needed for candidate validation.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. In `task-providers.ts`, separate native Beads executable/version/status-catalog readability from strict lifecycle-write readiness. Add only a narrowly scoped migration-source transport purpose, strict by default. Use it for every outgoing-source capture, confirmation/recheck, and active-Episode workspace proof in `task-provider-migration.ts`. Keep ordinary Beads operations, Beads destinations, and post-cutover destination recovery strict; retain all existing publication, inventory, identity, quiescence, ownership, receipt, rollback, and deletion proofs. Never configure the outgoing source or add a general validation bypass.
+
+2. Retain the full native status catalog/category context and source version in the existing snapshot, drift checks, and verified provenance. Before any destination writes, validate the complete inventory against migration-local projections: open/in_design → In Design; in_planning → In Planning; in_progress → In Progress; blocked → Blocked; ready_for_merge → Ready for Merge; done and ordinary closed → Done/completed. Use the same projections for counts, native writes, and status plus physical-placement verification. Archive only with exact existing prior-archive/Prime Claw abandonment evidence; preserve raw close_reason/history. Report exact task IDs and statuses for deferred/pinned/hooked, unknown semantics, or genuinely ambiguous archive evidence, and stop before destination creation. Deferred-to-drafts remains undecided; do not implement that mapping or guess from status categories or reason keywords.
+
+3. Extend `tests/task_provider_migration.test.mjs` and `tests/task_providers.test.mjs` using disposable native fixtures. Cover built-in-only and partial-custom sources without source mutation, complete mixed-status preflight refusal, completed closed versus positively evidenced archive/abandonment, exact catalog/history preservation, active-source and repeated source proofs, and confirmed end-to-end migration. Retain existing safety/refusal coverage and strict write/destination capability rejection. Correct the fixture assumption that every closed issue is archived.
+
+4. Run the focused provider/migration regressions and mandatory Docker tier 1 (`scripts/test-tier1.sh --probe`); no host plugin probes. Update only relevant migration guidance in `docs/project-initialization.md` / `docs/backlog.md` and the task with results. Keep this a local source-read/projection repair: no generic mapping framework, deterministic reconciliation/semantic-decision engine, new persistent workflow state, existing-destination work, global activation, or live migration. Commit and push the candidate through the separately admitted implementation Episode; merge remains a separate operator decision.
+<!-- SECTION:PLAN:END -->
 
 ## Comments
 
