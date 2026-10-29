@@ -4,7 +4,7 @@ title: Allow legacy Beads export without unused Prime Claw lifecycle statuses
 status: In Planning
 assignee: []
 created_date: '2026-10-28 22:04'
-updated_date: '2026-10-29 15:26'
+updated_date: '2026-10-29 22:22'
 labels: []
 dependencies: []
 references:
@@ -117,5 +117,19 @@ The temporary Node probe reused only the repository helper from `tests/task_prov
 Existing coverage gap: `beadsSource()` always configures every custom status (`tests/task_provider_migration.test.mjs:123–145`, especially `126`), models completion using custom done (`134`), and uses closed only for an explicitly abandoned fixture (`136`). Inspection/confirmation tests therefore encode one archive count and skip ordinary native task checks for it (`434–479`). They cannot catch an unmodified legacy source or ordinary closed completion. Update those assumptions, not just the source gate.
 
 **Next boundary:** review the recommendation and unresolved mappings, then use the normal task planning/implementation lifecycle. No live retry, migration, global activation, or deployment is authorized by this investigation.
+---
+
+author: Prime-Claw Expert
+created: 2026-10-29 22:22
+---
+## Superseded by PRIMECLAW-44 — do not implement this plan independently
+
+Joe approved consolidating this overlapping bug into PRIMECLAW-44 on 2026-10-29. PRIMECLAW-44 is the implementation scope; this task retains the investigation/reproduction evidence published in 5d520d3. Its separate Implementation Plan from b19932f is superseded, not implementation authority.
+
+The findings and regression requirements have been added to PRIMECLAW-44: nested source-read gates through capture/transport/active-source workspace/rechecks; raw status-catalog/version/reason/history preservation and stable capture; ordinary closed -> Done/completed versus positively evidenced archive/abandonment; exact-ID preflight refusal for unsupported actual statuses; and disposable built-in/partial-custom, completion/archive, drift, continuity, and end-to-end coverage. The active PRIMECLAW-44 planning Conversation is being notified so these additions are incorporated without overwriting concurrent work.
+
+Where the old recommendation/plan requires outgoing Beads server mode, a remote, or source publication, PRIMECLAW-44's newer specification takes precedence: read the retiring source as-is, including embedded/local-only stores, without engine/configuration changes or source publication. Require correct identity, complete stable capture/history, quiescence, ownership continuity, destination verification/publication, and safe cutover before retirement. Ordinary active Beads execution/write safety remains unchanged. No new status mapping (including deferred-to-drafts), generic reconciliation framework, or independent PRIMECLAW-46 Episode is authorized.
+
+This is scope consolidation, not a completed fix. No implementation, task completion/archive, merge, global activation, or live migration is performed here.
 ---
 <!-- COMMENTS:END -->
