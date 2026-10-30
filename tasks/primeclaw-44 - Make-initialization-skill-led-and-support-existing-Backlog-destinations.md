@@ -4,7 +4,7 @@ title: Make initialization skill-led and support existing Backlog destinations
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:55'
-updated_date: '2026-10-30 20:42'
+updated_date: '2026-10-30 20:44'
 labels: []
 dependencies: []
 references:
@@ -446,6 +446,8 @@ Minimal correction only in the2fixture setups: assert actual rule and ignored pa
 2026-10-30 — Integrated acceptance evidence complete. Corrected fixture-only run20261030T203710Z-85706-fc27ee87:7passed6deselected204.61s; both full former failing suites now pass, including all17text cases and all20admission cases with original exact byte/index/inode/mtime/manifest/HEAD/patch/recovery/concurrency/captured-base/two-owner assertions. Additional initializer eight47creation-only cases/default/warnings/no-repair/no-retry, native skill discovery, ownership and native tool loading pass. Read-only child47preservation review found no issue in the source merge or two fixture-only diffs. Review is internal evidence, not independent Conversation acceptance.
 Three new integrated Docker runs audited: full20261030T201314Z-27898-e4a60d0c46pass2fail; boundary20261030T201408Z-30047-6e75b6af2pass; repairedfocused20261030T203710Z-85706-fc27ee877pass. All17/15/14declared artifact hashes verified, offline execution, runtime+builder clean absent teardown and unchanged native source checkout inventories. Final frozen plugin/test hashes and exact dirty-status four-path set prove production source unchanged after the full run. Full48was NOT rerun or relabeled green; retained failed output explains exact errors and minimal documented fixture correction. Static24pass4.97s. Source-generation/manifest hashes/commands/limits are in docs/evidence/primeclaw44-integration-20261030.md.
 Ready only for clean same-branch publication and separate owner/independent review. Native fork431/pins/gitlink/frozen-lock/stable tags and old full-native red2901/8skip/9fail/1error limits remain untouched/unwaived. No accepted main47/task47/guard/ownership edits, main merge, lifecycle/global/live operation or Episode cleanup.
+
+2026-10-30 — Git publication recovery, no source/test change. Final evidence/fixture checkpoint b543032ab4aa6db3806438a5d1fc234cae2bfdb2 was committed clean. Ordinary git pull --rebase attempted replay of already-merged main history and conflicted on historical852267f task44 content. No rebase continue/skip or push was attempted. git rebase --abort succeeded and restored exactb543032, clean state and exact verified native task. Direct remote Episode remainedcf1372a7413baa93a3a72145ce299a78a310320f; its tracking ref agreed. Explicit git pull --ff-only origin JLanders/prime-claw-primeclaw-44-episode-7beff785 then succeeded Already up to date, leaving candidate HEAD unchanged. Preserve the deliberate main merge/ancestry; publish normal fast-forward, never force or replay obsolete task content. Attempt/abort/ref evidence retained at/tmp/primeclaw44-main-integration-git-publication.log. No ownership/main/source/test/lifecycle change or additional runtime proof needed for this Git-only recovery.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
