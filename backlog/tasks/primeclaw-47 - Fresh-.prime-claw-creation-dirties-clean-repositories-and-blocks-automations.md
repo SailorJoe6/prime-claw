@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-47
 title: Fresh .prime-claw creation dirties clean repositories and blocks automations
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: '2026-10-30 15:52'
-updated_date: '2026-10-30 17:20'
+updated_date: '2026-10-30 17:28'
 labels: []
 dependencies: []
 references:
