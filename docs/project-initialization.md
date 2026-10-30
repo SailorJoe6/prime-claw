@@ -322,6 +322,12 @@ and plugin delivery state retain their distinct ownership records.
 
 ## Validation and migration boundary
 
+[The PRIMECLAW-44 embedded-source proof](evidence/beads-embedded-source-capture-20261030.md)
+records a disposable native read path without custom statuses, a Beads remote,
+or server mode. It is evidence for the planned retiring-source repair, not a
+claim that the current migration supports that source or that destination
+publication and source retirement have been proven.
+
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,
 `registerTool`, and awaited `session_start`). Prime Claw remains pinned to v0.9.8
