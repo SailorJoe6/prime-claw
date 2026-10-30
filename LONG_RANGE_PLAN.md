@@ -207,7 +207,7 @@ builder repository removes its own tree at the final task-native cutover.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
   codex/claude-skills project to prime-agent skills without manual copy-paste;
   dogfood on the ralph repo. The same initialization/upgrade UX inspects and,
-  only after exact operator confirmation, performs one verified Backlog↔Beads
+  only after exact operator confirmation, performs one verified one-way Beads→Backlog
   task/history migration with active-Episode continuity and a sole
   destination-native receipt.
 

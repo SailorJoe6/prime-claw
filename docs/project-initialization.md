@@ -1,11 +1,16 @@
 # Prime Claw project initialization and template reconciliation
 
 Prime Claw installs one global plugin generation and keeps project policy as
-regular, tracked, customizable files. `/initialize-prime-claw` and the
-model-callable `initialize_prime_claw` tool expose the same initialization and
-upgrade UX. Template reconciliation never stages or commits files. An explicit,
-confirmed task-provider switch is a separate maintenance operation described
-below and uses each provider's native publication history.
+regular, tracked, customizable files. The globally discoverable
+`initialize-prime-claw` Markdown skill guides setup, upgrades, text comparisons,
+and one-way migration through the model-callable `initialize_prime_claw` tool.
+There is no custom initializer command/action syntax for the operator to learn.
+Template reconciliation never stages or commits template assets. Explicit setup
+may preserve an existing store in an independent task-history DAG, commit and
+publish that history, and stage only original task-path deletions in the code
+index. It leaves code branch HEAD unchanged; root-link and ignore bookkeeping
+remain explicit code changes. An explicitly confirmed task-provider switch is a
+separate maintenance operation described below and uses native publication history.
 
 ## Asset inventory
 
@@ -15,7 +20,7 @@ target classes distinguish exact plugin files, drift-managed global files, the
 user-level goals skill, the selected-context role block, and customizable
 project files.
 
-Global discoverable skills are `goals-and-heartbeats`,
+Global discoverable skills include `initialize-prime-claw`, `goals-and-heartbeats`,
 `prime-claw-expert-review`, and `prime-claw-oversee-episode`. `ROLE_KERNEL.md`
 and the goal-continuation fragment are global internal assets. Project skill
 sources remain under `src/prime-agent-plugin/skills/project-templates/` but use
@@ -125,8 +130,7 @@ recursive delete.
 Normal initialization selects the primary code branch upstream, or the sole
 repository remote, as the Backlog task-history publication authority. Ambiguous
 remotes block. A repository with no remote also blocks by default. If the
-operator explicitly accepts unpublished local-only history, use
-`/initialize-prime-claw --unpublished-local-only` or tool
+operator explicitly accepts unpublished local-only history, the agent uses tool
 `action="reconcile", unpublishedLocalOnly=true`. That route creates or reuses
 one clean independent nested Backlog repository on `prime-claw/tasks` with no
 remote, labels the result unpublished, and never treats it as admission,
@@ -156,38 +160,33 @@ pair. An older blocked-only pair is uncertain until the exact
 operator-authorized restore revalidates that same recorded worktree; the
 reconciler never restores it or selects another mode. Linked-worktree
 enumeration or identity uncertainty fails closed and reports a degraded skip.
-Reset, override acceptance, and review-start mutations use the same protection.
+Reset and override-acceptance mutations use the same protection. Text comparison
+is read-only; interrupted legacy-review recovery is a separate explicit decision.
 
-## Customized-template review
+## Customized-template comparison and explicit decisions
 
-Reconciliation reports customization but never starts a visual review. Review is
-a separate explicit lifecycle driven through `initialize_prime_claw` actions:
+The initialization skill requests an ordinary Git patch as text through
+`initialize_prime_claw(action="review-request", assetId="...")`. The comparison
+uses disposable inputs containing the actual current asset and upstream bytes.
+It never overwrites, stages, restores, or foregrounds the real asset and leaves
+its Git index unchanged, including clean, dirty, and staged assets. No special
+viewer, Orca focus, ready/visibility confirmation, or new held-review state is
+needed. A patch is information, not acceptance.
 
-1. `review-request` explains that review will temporarily overwrite the tracked
-   file and foreground its Orca worktree. It asks the operator for **ready** or
-   **cancel**. Cancellation before readiness changes nothing.
-2. `review-start` is legal only after explicit readiness. It requires a clean,
-   tracked regular file, records recovery state, writes the upstream bytes, and
-   runs `orca file diff <path> --worktree path:<exact-root> --focus --json`.
-3. The overwrite remains held after the open command. `opened: true` is not
-   visibility proof. The operator confirms that the comparison is visible and
-   then explicitly completes or cancels.
-4. Completion, cancellation, and open errors restore with
-   `git restore --worktree -- <path>` and verify both index and worktree clean.
-5. If held bytes change, cleanup is uncertain, or the process that owned a held
-   comparison exits, current bytes remain preserved until explicit `review-restore`
-   or `review-keep`. A still-live held-review owner must complete or cancel normally.
-
-A terminal tracked-file `git diff -- <path>` result is the fallback
-when Orca cannot open the comparison. The restored comparison is returned directly
-in both slash-command and model-callable tool output. Prime Claw does not invoke Orca Computer Use, macOS Accessibility,
-an OS permission prompt, or another GUI-control API for this workflow.
+After reading it, the operator may explicitly accept the current customization
+(`accept-override`) or reset that exact asset (`reset`). Neither decision is
+inferred from silence or from requesting the patch. Existing legacy interrupted
+review state is not discarded: reconciliation and destructive content decisions
+remain protected until the operator explicitly chooses `review-restore` or
+`review-keep` for that recorded comparison. This recovery path preserves its
+existing evidence; new comparisons never create overwrite recovery state.
 
 ## Confirmed task-provider switch
 
 The public migration entry points support **Beads to Backlog only**. Reverse
 requests refuse before project lookup or native commands. The existing
-`/initialize-prime-claw --switch-request backlog` interface is read-only. It
+`initialize_prime_claw(action="switch-request", targetProvider="backlog")`
+interface is read-only. It
 reports exact Beads identity/capture revision and digest, complete
 open/closed/archived counts, active version-2 ownership count, the
 semantic-placement prompt and explicit confirmation requirement. Inspection does
@@ -196,17 +195,25 @@ not create a destination, change ownership or write a receipt.
 Explicit inspection can read Beads alongside a valid default, hidden or
 root-config-selected custom Backlog destination. Ordinary discovery still blocks
 dual providers, and active Beads lifecycle readiness remains strict. This
-inspection permission does **not** yet implement populated destination imports:
-confirmation retains its exact same-destination retry/publication/preparation
-and import guards. Existing records/config/history must be preserved; a refusal
-is not permission to replace or recreate the destination. The bounded evidence
-and unfinished work are linked below.
+explicit migration preserves existing selected task records, configuration,
+history, and independent clone identity. It is not permission to replace or
+recreate the destination or to reset configuration. Only default `backlog/` is
+normalized to `.backlog/` plus the standard native root configuration symlink in
+both explicit initialization/install and migration. Hidden and custom selected
+stores stay in place; code-tracked history and original IDs remain preserved.
+There is no separate preservation-approval gate. The root link retains the whole
+native root configuration. If that authority differs from an inactive folder
+`config.yml`, preserve both files: the selected store carries the authoritative
+`backlog.config.yml`, and the code-root link names that exact safe relative
+file. Identical existing root/folder configurations may retain the standard
+`config.yml` or `config.yaml` target. Native readback must preserve effective
+settings and the configured custom location; no defaults or pointer overlay
+replace either configuration.
 
-`/initialize-prime-claw --switch-confirm backlog <revision> <actor> <semantic-placement-prose>`
-requires the inspected exact source revision, a non-empty actor and managed
-semantic-placement prose. The tool equivalent uses `action="switch-confirm"`,
-`targetProvider="backlog"`, `expectedSourceRevision`, `actor`,
-`semanticPlacement` and `confirmedSwitch=true`. Viewing inspection output never
+The agent calls `action="switch-confirm"`, `targetProvider="backlog"`,
+`expectedSourceRevision`, `actor`, `semanticPlacement`, and `confirmedSwitch=true`
+only after explicit operator confirmation of the exact inspected source and the
+quiesced maintenance window. Viewing inspection output never
 confirms a switch. The existing native Beads package importer keeps every raw
 value/history; managed prose may choose human-facing placement but never permit
 omission. The confirmed maintenance window is one linear operation:
@@ -214,15 +221,14 @@ omission. The confirmed maintenance window is one linear operation:
 1. capture every source task plus its provider-native bytes or rows, all open,
    closed, and archived states, relationships, comments, native history,
    provenance, actor, timestamp, and transition evidence;
-2. create the target through its supported native initialization and create
-   APIs, preserving source IDs when the target accepts them and otherwise
-   recording an immutable source-to-destination mapping;
-3. let the managed model decide only fields that have no exact native equivalent,
-   pass any indispensable provider-native literal through the pair-specific
-   structured confirmation field, and prove the applied value by native readback;
-   prose remains audit evidence while deterministic code proves counts,
-   projections, relationships, complete commit messages/histories, revisions,
-   and mappings;
+2. preserve existing Backlog IDs, content, history and configuration, and reuse
+   the existing Beads importer with native Backlog create operations and the
+   exact returned source-to-destination ID mapping;
+3. retain the existing field/status/history/relationship projections and record
+   managed semantic-placement prose for non-equivalent fields without omitting
+   raw values. There is no reverse-migration structured confirmation field or
+   new mapping policy. Native readback proves counts, projections, relationships,
+   complete histories, revisions and mappings;
 4. publish and re-read the complete target, then write one final
    destination-native migration receipt containing the exact source and target
    revisions, digests, counts, mappings, actor, semantic-placement record, and
@@ -235,7 +241,7 @@ omission. The confirmed maintenance window is one linear operation:
    history is retained; source publication is not a retirement prerequisite.
 
 A preserved active Episode can still have code-tracked bytes for the old
-provider at its historical head after either cutover direction. Those bytes
+provider at its historical head after cutover. Those bytes
 remain part of the unchanged code snapshot, not a live provider store.
 Linked-worktree detection ignores stale code-tracked Backlog bytes only after
 canonical primary proves sole Beads authority, and ignores stale code-tracked
@@ -246,18 +252,23 @@ active Episode as well as canonical primary. While canonical primary still
 contains both stores, ordinary task lifecycle mutation remains blocked as an
 incomplete migration.
 
-Backlog archived records are interpreted only in a disposable exact-revision
-clone: their unchanged Markdown is temporarily placed in that clone's active
-corpus so the repository-built Backlog native reader supplies the structured
-view. Native active and archived drafts are part of the same complete inventory.
-Their exact Markdown, Git history, native draft view, original kind, and
-active-or-archived placement are preserved in Beads-native metadata and notes;
-drafts count as open work while archived drafts retain abandonment placement.
-The live source store remains untouched and authoritative. Beads reads use
-published clean Dolt revision proof, `bd show --long --include-comments`, native
-history, provenance, and relationship queries. Backlog-to-Beads uses an
-untracked (`--stealth`) target store so `bd init` cannot change the still-live
-Backlog code revision.
+Existing Backlog physical records are preserved individually, including archives
+that share an ID with a live task or another historical record. Archived native
+views are read only in disposable exact-revision clones; the real records never
+move merely to inspect them. Preservation checks cover authored native fields,
+exact files/configuration, Git history and clone identity. Corpus-derived native
+readiness, graphs and subtasks may change as imports add records; authored
+content must not. Destination counts include preserved baseline records plus
+all imports and the single receipt.
+
+Archived means deleted/history. Only actual `tasks/` and `completed/` records
+are eligible dependency targets. A reused live ID is not ambiguous because an
+archive retains it; archive-only targets refuse as missing/deleted. Genuine
+live/completed ambiguity, unknown/self references and direct/transitive cycles
+still refuse. Archive enumeration/history and native ID allocation/reuse do not
+change. A real source relationship to a deleted task is reported with exact IDs
+before mutation, never omitted or automatically repaired. No allocation flag,
+reservation, prefix change, archive renumber, or new importer mapping is used.
 
 Before destination creation, every active Episode is re-proved as the exact
 clean, directly published linked code worktree and branch. The ownership head is
@@ -308,8 +319,7 @@ After destination publication and ownership/runtime/source rechecks, retirement
 removes the exact local `.beads` store. Embedded mode makes no server-stop call;
 a server-mode source must identify a non-shared server before the native stop.
 Any outgoing remote history is retained untouched; it is not local live provider
-authority. Broader PRIMECLAW-44 status preflight/classification and existing
-destination/layout/skill work remain unfinished. Backlog completion counts come
+authority. Backlog completion counts come
 from exact native lifecycle status;
 physical archive placement remains separate abandonment evidence. A Backlog
 destination is repeatedly proved against the originally selected remote URL and
@@ -392,13 +402,13 @@ retains its existing exact-retry/destination guards; populated imports and layou
 normalization remain unfinished, not bypassed by inspection permission.
 
 [The populated hidden-store attempt](evidence/populated-hidden-backlog-import-20261030.md)
-records a native allocation blocker, not a production increment. Native Backlog
-can allocate an ID already held by an original archived record and then refuse
-its ambiguous dependency. No supported reservation/explicit-ID option was found;
-existing IDs/configuration were not changed to work around it. The unvalidated
-production attempt was rolled back; the same destination guards remain. Any
-resolution needs a supported native capability or an explicit product decision,
-not a silent allocation-policy change or permission to recreate the destination.
+retains the failed historical runs and rolled-back patch. Joe explicitly resolved
+the old blocker: archive/live same-ID dependency ambiguity was incorrect native
+eligibility semantics, not an allocator defect or permission to alter IDs. The
+managed Backlog correction uses tasks/completed-only dependency targets while
+preserving archive history and ordinary allocation. Historical passing tests
+prove their old bounded behavior only; current complete-candidate validation
+must explicitly prove the superseding semantics and remaining requirements.
 
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,

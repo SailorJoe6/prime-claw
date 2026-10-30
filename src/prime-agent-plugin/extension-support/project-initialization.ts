@@ -27,6 +27,7 @@ import {
 } from "./legacy-specification-inventory.ts";
 import { readAllEpisodeOwnership } from "./episode-ownership.ts";
 import { CANONICAL_LIFECYCLE_STATUSES, checkBacklogCapabilities, detectTaskProvider } from "./task-providers.ts";
+import { prepareExistingBacklogTaskHistoryWorkspace } from "./task-history-workspace.ts";
 
 export const TEMPLATE_MANIFEST = ".prime-claw/templates.json";
 export const TEMPLATE_REVIEW_STATE = ".prime-claw/template-review.json";
@@ -108,7 +109,7 @@ export interface ReconcileOptions {
   requireOrcaRegistration?: boolean;
   isActiveEpisode?: (projectRoot: string) => boolean;
   legacyInventoryMode?: "initialize" | "verify";
-  taskHistoryPreparer?: (input: { primaryRoot: string; runner: CommandRunner }) =>
+  taskHistoryPreparer?: (input: { primaryRoot: string; runner: CommandRunner; normalizeExisting?: true }) =>
     | { status: "prepared"; storeDir: string; head: string }
     | { status: "blocked"; code: string; detail: string; remediation: string };
 }
@@ -643,7 +644,11 @@ function ensureProjectTaskProvider(
   projectRoot: string,
   runner: CommandRunner,
   taskHistoryPreparer?: ReconcileOptions["taskHistoryPreparer"],
+  normalizeExisting = false,
 ): TaskProviderSetup {
+  // Explicit install/upgrade only. Startup reconciliation and ordinary reads
+  // keep the strict non-adopting preparer and never move a live task store.
+  if (normalizeExisting && !taskHistoryPreparer) taskHistoryPreparer = (input) => prepareExistingBacklogTaskHistoryWorkspace(input);
   let detection;
   try {
     detection = detectTaskProvider(projectRoot, runner);
@@ -656,7 +661,7 @@ function ensureProjectTaskProvider(
     }
     const prepareSelectedBacklog = (): TaskProviderSetup => {
       try {
-        const prepared = taskHistoryPreparer({ primaryRoot: projectRoot, runner });
+        const prepared = taskHistoryPreparer({ primaryRoot: projectRoot, runner, ...(normalizeExisting ? { normalizeExisting: true as const } : {}) });
         return prepared.status === "prepared"
           ? { status: "selected", provider: "backlog", taskHistoryHead: prepared.head }
           : { status: "blocked", code: "task-history", detail: `${prepared.code}: ${prepared.detail}`, remediation: prepared.remediation };
@@ -672,9 +677,9 @@ function ensureProjectTaskProvider(
     const nestedGit = join(detection.evidence.storeDir, ".git");
     const entry = lstatIfPresent(nestedGit);
     if (!entry) {
-      // Existing ordinary/custom Backlog authority is grandfathered and never
-      // adopted or normalized during routine initialization.
-      return { status: "selected", provider: "backlog" };
+      // Routine startup leaves existing ordinary authority alone. An explicit
+      // installation uses the history-preserving preparation seam above.
+      return normalizeExisting ? prepareSelectedBacklog() : { status: "selected", provider: "backlog" };
     }
     if (!entry.isDirectory() || entry.isSymbolicLink()) {
       return {
@@ -688,7 +693,7 @@ function ensureProjectTaskProvider(
   if (detection.kind === "blocked") return { status: "blocked", code: detection.code, detail: detection.detail, remediation: detection.remediation };
   if (taskHistoryPreparer) {
     try {
-      const prepared = taskHistoryPreparer({ primaryRoot: projectRoot, runner });
+      const prepared = taskHistoryPreparer({ primaryRoot: projectRoot, runner, ...(normalizeExisting ? { normalizeExisting: true as const } : {}) });
       return prepared.status === "prepared"
         ? { status: "initialized", provider: "backlog", storeDir: prepared.storeDir, taskHistoryHead: prepared.head }
         : { status: "blocked", code: "task-history", detail: `${prepared.code}: ${prepared.detail}`, remediation: prepared.remediation };
@@ -924,7 +929,7 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
       project.root,
       options.legacyInventoryMode ?? "verify",
     );
-    const taskProvider = ensureProjectTaskProvider(project.root, runner, options.taskHistoryPreparer);
+    const taskProvider = ensureProjectTaskProvider(project.root, runner, options.taskHistoryPreparer, options.legacyInventoryMode === "initialize");
     // Provider and frozen-legacy failures count in the existing conflict
     // decision so explicit initialization and startup verification surface
     // exact remediation without silently enrolling or rebaselining anything.
@@ -955,7 +960,7 @@ export function acceptProjectOverride(cwd: string, assetId: string, options: Omi
   const release = acquireProjectMutationLock(project.root);
   try {
     if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
-    if (lstatIfPresent(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("template review requires completion or recovery before accepting an override");
+    if (lstatIfPresent(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("legacy interrupted template review requires explicit keep or restore recovery before accepting an override");
     const destination = join(project.root, asset.destination);
     assertSafePathAncestors(project.root, destination);
     const stat = lstatSync(destination);
@@ -980,7 +985,7 @@ export function resetProjectAsset(cwd: string, assetId: string, options: Omit<Re
   const release = acquireProjectMutationLock(project.root);
   try {
     if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
-    if (lstatIfPresent(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("template review requires completion or recovery before resetting an asset");
+    if (lstatIfPresent(join(project.root, TEMPLATE_REVIEW_STATE))) throw new Error("legacy interrupted template review requires explicit keep or restore recovery before resetting an asset");
     const sourceBytes = readFileSync(join(pluginRoot, asset.source));
     const upstream = digest(sourceBytes);
     const destination = join(project.root, asset.destination);

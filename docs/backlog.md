@@ -7,18 +7,28 @@ Prime Claw vendors its long-lived Backlog.md fork as the Git submodule at
 ## Current bounded release
 
 The managed fork remains based on the latest stable upstream release selected
-for the migration, with one exact post-release compatibility commit:
+for the migration, with the exact reviewed managed source pin below:
 
 - base release: `v1.53.0`
 - base commit: `fd20f71493fb4eda44b021aa89f257956f17fb71`
-- managed source commit: `5d556c1954f7724abd180f6211cf528e9253ad4c`
+- managed source commit: `431e95612d6167e418c507ec206d95df43c38c54`
 - fork: `https://github.com/SailorJoe6/Backlog.md`
 - upstream: `https://github.com/MrLesk/Backlog.md`
 
-The managed source commit adds the accepted exact completed-task restore needed
-by the task-native lifecycle. Builds require the submodule HEAD to equal that
-commit and require `v1.53.0` to be its Git ancestor; they do not accept an
-arbitrary branch head. A later stable release or another fork change is adopted
+The managed source retains the accepted exact completed-task restore from
+`5d556c1954f7724abd180f6211cf528e9253ad4c` and adds PRIMECLAW-44's narrowly
+reviewed dependency eligibility correction. Only actual `tasks/` and `completed/`
+records are dependency targets, consistently in validation, cycle/defect checks,
+and reporting (including interactive draft details). Drafts and archives remain
+display/history records, not targets or fallback. Archive/live same-ID reuse is
+valid; archive-only targets refuse. Native allocation and archive bytes/history
+are unchanged. Builds require the submodule HEAD to equal this exact commit and
+require `v1.53.0` to be its Git ancestor; they do not accept an arbitrary branch
+head. The reviewed source is published on the managed fork's
+`fix/primeclaw-44-dependency-eligibility` branch. Native test results and retained
+full-suite failures are recorded in
+[`primeclaw44-integration-20261030.md`](evidence/primeclaw44-integration-20261030.md);
+this is not a full-suite-green or complete-builder acceptance claim. A later stable release or another fork change is adopted
 only through a separate validated source-pin update.
 
 Clone this repository with `git clone --recurse-submodules`, or initialize an
@@ -247,11 +257,15 @@ exact ordered canonical lifecycle (`statuses:` + `default_status:`) in the
 native folder configuration — upstream hardcodes generic statuses and
 `backlog config set` exposes no `statuses` key, so the supported native
 configuration-file update is the only non-interactive surface — and proves the
-store lifecycle-ready through the existing capability gate. A second reconcile
-is a no-op. Existing Backlog or Beads evidence is preserved untouched; dual,
-malformed, or uncertain evidence blocks with exact remediation; and a blocked
-or failed provider setup counts as a reconcile conflict and surfaces its exact
-detail/remediation in command, tool, and startup summaries without failing
+store lifecycle-ready through the existing capability gate. Explicit
+reconciliation preserves existing Backlog tasks/configuration/history and can
+normalize a default dedicated `backlog/` to `.backlog/`; native-selected custom
+stores stay in place. Existing Beads is not reconfigured or migrated by setup.
+Startup and ordinary preparation remain non-adopting. Dual, malformed, or
+uncertain evidence blocks with exact remediation; only a separately confirmed
+one-way migration may treat Beads/Backlog coexistence as source/destination.
+A blocked or failed provider setup counts as a reconcile conflict and surfaces
+its exact detail/remediation in tool and startup summaries without failing
 asset reconciliation.
 
 ### Task-history workspace foundation (slice 2A)
@@ -298,9 +312,10 @@ checkout is never switched, staged, or written:
   (never `backlog/`); selected `backlog/`, `.backlog/`, and safe relative custom
   stores are preserved.
   An existing nested clone is verified exactly — remote name AND canonical URL,
-  branch, and head — never recreated. An existing non-empty store without
-  `.git` blocks before mutation (adopting it is the deferred migration/cutover
-  slice), leaving content untouched. The clone's cached diff against the
+  branch, and head — never recreated. In this ordinary non-adopting preparer,
+  an existing non-empty store without `.git` blocks before mutation and leaves
+  content untouched. Explicit preserving initialization now handles adoption;
+  it is not deferred and is not triggered by ordinary preparation. The clone's cached diff against the
   published head is empty and its `git status` is clean — the published tree is
   materialized and tracked, never staged for deletion, with no uncommitted or
   unpublished config. No submodules, linked nested worktrees, alternate
@@ -324,9 +339,10 @@ checkout is never switched, staged, or written:
   the exact config in the selected custom store and replaces
   `backlog.config.yml` with one exact relative symlink into that clone. The
   result is reread natively, kept clean, and returned with a brittleness warning.
-  Any live task content, conflicting published config, absolute/alternate
-  symlink, escape, or semantic drift blocks; task-data adoption remains a
-  separate reviewed migration.
+  In this ordinary preparer, live task content, conflicting published config,
+  absolute/alternate symlinks, escapes or semantic drift block. Explicit
+  initialization uses the separate existing-store preservation path described
+  below; it does not require an extra preservation approval.
 - **Effective native configuration proven on every path**: after the nested
   store is materialized or verified, its effective Backlog configuration is
   validated from the canonical primary root on every path — regardless of the
@@ -515,12 +531,18 @@ recoverable local work in the nested clone and never calls it published.
 
 ## Independent Backlog production lifecycle connection
 
-Production initialization now supplies `prepareTaskHistoryWorkspace`. When no
-provider exists it creates the new published independent store; when Backlog
-already selects a valid nested ordinary-Git clone it verifies and cleanly
-fast-forwards it. Existing populated non-Git, root-config, custom, or ordinary
-branch-local Backlog layouts remain grandfathered. They are never adopted,
-moved, normalized, or deleted by routine preparation.
+Explicit production initialization supplies
+`prepareExistingBacklogTaskHistoryWorkspace`. It preserves existing native
+Backlog data and full configuration while establishing independent task history.
+Only a default dedicated `backlog/` relocates to `.backlog/`; an existing hidden
+store or native-selected custom store stays in place. It may commit/publish
+the task-history DAG and stage exact original task-path deletions in the code
+index, but does not commit the code branch or template assets. An explicitly
+chosen unpublished local-only history is allowed only when there is no remote.
+Startup and ordinary preparation still use non-adopting
+`prepareTaskHistoryWorkspace`: they verify an existing independent clone or
+create a new one when appropriate, and never silently adopt/move populated
+branch-local layouts. Grandfathered task ownership is not automatically replaced.
 
 Task admission selects the topology with Git evidence. A task path already
 tracked by the code repository keeps the existing one-path code commit flow. An
@@ -963,6 +985,16 @@ there is no retry, force, replay, custom publisher, receipt, snapshot, or new
 transaction. Beads abandonment and cleanup now use only existing native/Git boundaries. Successful merge stays custom native `done`. Explicit abandonment uses supported built-in `closed` plus an exact task/Episode-head `close_reason`, one non-force publication, and complete raw/history proof; `closed` is never mapped to canonical `Done`. After the operator-authorized terminal outcome is committed, pushed, and verified, the Conversation automatically invokes cleanup-only `finalize_task_episode` without separate cleanup confirmation, passing exact `taskId`, terminal `episodeHead`, and truthful `outcome`. It verifies current published native outcome, code inclusion or exclusion, direct-remote heads, ancestry, and exact idle resources; removes only the bound runtime, upstream ref, worktree, and any remaining local branch; and removes only the unchanged owner entry after verified absence. It stores no cleanup head, progress state, inactive record, or successful-close replay result. The Conversation interprets errors and re-reads current ownership, provider, Git, and selected-provider evidence before any safe re-invocation; no retry loop drives cleanup. The shared Beads store/server/history and unrelated owners survive. Migration/cutover and provider-independent task-history changes remain outside this slice.
 
 ### Explicit selected-provider migration (AC18/19)
+
+> **Historical and superseded; not current operating instructions.** The text
+> below records the earlier bidirectional design, including its retired reverse
+> fields and outgoing-source publication/filter requirements. Current migration
+> is **Beads to Backlog only**. It preserves existing destinations and reads the
+> retiring Beads source as-is, including embedded/local-only data without a Dolt
+> remote, source publication or engine conversion. Use the
+> [current confirmed-switch guidance](project-initialization.md#confirmed-task-provider-switch)
+> and the `initialize-prime-claw` skill. Active Beads execution safety elsewhere
+> in this document is unchanged.
 
 The existing initialization/upgrade adapter now exposes a read-only
 `switch-request` and an explicit `switch-confirm`; migration is not a general

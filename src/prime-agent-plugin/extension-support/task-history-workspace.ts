@@ -29,7 +29,7 @@
  * and task-data migration remain later slices.
  */
 
-import { appendFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
@@ -39,6 +39,7 @@ import {
 import {
   checkBacklogCapabilities,
   detectTaskProvider,
+  detectExplicitTaskProvider,
   resolveProviderTask,
   type ProviderTaskResolution,
 } from "./task-providers.ts";
@@ -93,6 +94,8 @@ export interface TaskHistoryWorkspaceInput {
   runner?: CommandRunner;
   /** Explicit operator choice to retain unpublished local-only history when no remote exists. */
   unpublishedLocalOnly?: boolean;
+  /** Only the explicitly confirmed Beads-to-Backlog operation may inspect coexisting Backlog. */
+  explicitMigration?: boolean;
 }
 
 export type TaskHistoryRemoteSelection =
@@ -437,9 +440,9 @@ export function ensureTaskHistoryBranch(
 }
 
 /** The provider evidence that selects (or blocks) the built-in store location. */
-function providerEvidence(primaryRoot: string) {
+function providerEvidence(primaryRoot: string, runner: CommandRunner, explicitMigration = false) {
   try {
-    return { detection: detectTaskProvider(primaryRoot), blocked: undefined };
+    return { detection: explicitMigration ? detectExplicitTaskProvider(primaryRoot, "backlog", runner) : detectTaskProvider(primaryRoot, runner), blocked: undefined };
   } catch (error) {
     return {
       detection: undefined,
@@ -518,7 +521,44 @@ function validateContainment(
   return null;
 }
 
-function taskStoreConfigPath(storeDir: string): string {
+/** The existing explicit unpublished-local-only clone proof, shared by
+ * ordinary preparation and whole-root configuration preservation. */
+function verifyLocalOnlyTaskClone(
+  storeDir: string,
+  runner: CommandRunner,
+): { status: "verified"; head: string } | Extract<TaskHistoryWorkspace, { status: "blocked" }> {
+  const identity = verifyIndependentTaskClone(storeDir, runner);
+  if (identity.status === "blocked") {
+    return { status: "blocked", code: identity.code === "unreadable" ? "unreadable" : "unsafe-store-location", detail: identity.detail, remediation: identity.remediation };
+  }
+  const remotes = gitOk(runner, storeDir, ["remote"], "read local-only task-store remotes");
+  const branch = gitOk(runner, storeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read local-only task-store branch");
+  const dirty = gitOk(runner, storeDir, ["status", "--porcelain", "--untracked-files=all"], "verify local-only task store is clean");
+  const head = refHead(runner, storeDir, "HEAD");
+  if (remotes !== "" || branch !== TASK_HISTORY_BRANCH || dirty !== "" || !head) {
+    return {
+      status: "blocked", code: dirty ? "uncommitted-task-content" : "unreadable",
+      detail: `the explicit local-only task store is not one clean unpublished ${TASK_HISTORY_BRANCH} repository with no remotes`,
+      remediation: "repair the local-only nested repository without publishing or forcing it, then retry",
+    };
+  }
+  return { status: "verified", head };
+}
+
+function taskStoreConfigPath(storeDir: string, nativeRootConfigPath?: string): string {
+  const nativeRoot = join(storeDir, "backlog.config.yml");
+  const nativeEntry = lstatIfPresent(nativeRoot);
+  const rootEntry = nativeRootConfigPath ? lstatIfPresent(nativeRootConfigPath) : null;
+  // The extra native filename is not a new selection policy. It is selected
+  // only by proven whole-file root authority, never by its presence alone.
+  if (nativeRootConfigPath && nativeEntry?.isFile() && !nativeEntry.isSymbolicLink() && rootEntry) {
+    if (rootEntry.isSymbolicLink()) {
+      const expected = relative(dirname(nativeRootConfigPath), nativeRoot).split(sep).join("/");
+      if (readlinkSync(nativeRootConfigPath) === expected) return nativeRoot;
+    } else if (rootEntry.isFile() && readFileSync(nativeRootConfigPath).compare(readFileSync(nativeRoot)) === 0) {
+      return nativeRoot;
+    }
+  }
   return ["config.yml", "config.yaml"].map((name) => join(storeDir, name))
     .find((path) => existsSync(path)) ?? join(storeDir, "config.yml");
 }
@@ -690,7 +730,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       remediation: "restore the exact published primary task-store clone before preparation; do not replace the retained root configuration",
     };
   }
-  const { detection, blocked: detectionBlocked } = providerEvidence(primaryRoot);
+  const { detection, blocked: detectionBlocked } = providerEvidence(primaryRoot, runner, input.explicitMigration);
   if (detectionBlocked) return detectionBlocked;
   if (detection!.kind === "blocked") {
     return { status: "blocked", code: "provider-not-backlog", detail: detection!.detail, remediation: detection!.remediation };
@@ -755,7 +795,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   // Native root configuration is whole-file authority; an alternate link must
   // not publish its target bytes before being refused.
   if (rootLayout && lstatIfPresent(rootLayout.configPath)?.isSymbolicLink()) {
-    const expectedLink = relative(dirname(rootLayout.configPath), taskStoreConfigPath(storeDir)).split(sep).join("/");
+    const expectedLink = relative(dirname(rootLayout.configPath), taskStoreConfigPath(storeDir, rootLayout.configPath)).split(sep).join("/");
     const actualLink = readlinkSync(rootLayout.configPath);
     if (isAbsolute(actualLink) || actualLink !== expectedLink) {
       return {
@@ -796,22 +836,9 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   let branchState: { status: "verified" | "published" | "local-only"; head: string };
   if (localOnly) {
     if (existsSync(nestedGit)) {
-      const identity = verifyIndependentTaskClone(storeDir, runner);
-      if (identity.status === "blocked") {
-        return { status: "blocked", code: identity.code === "unreadable" ? "unreadable" : "unsafe-store-location", detail: identity.detail, remediation: identity.remediation };
-      }
-      const remotes = gitOk(runner, storeDir, ["remote"], "read local-only task-store remotes");
-      const branch = gitOk(runner, storeDir, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read local-only task-store branch");
-      const dirty = gitOk(runner, storeDir, ["status", "--porcelain", "--untracked-files=all"], "verify local-only task store is clean");
-      const head = refHead(runner, storeDir, "HEAD");
-      if (remotes !== "" || branch !== TASK_HISTORY_BRANCH || dirty !== "" || !head) {
-        return {
-          status: "blocked", code: dirty ? "uncommitted-task-content" : "unreadable",
-          detail: `the explicit local-only task store is not one clean unpublished ${TASK_HISTORY_BRANCH} repository with no remotes`,
-          remediation: "repair the local-only nested repository without publishing or forcing it, then retry",
-        };
-      }
-      branchState = { status: "local-only", head };
+      const local = verifyLocalOnlyTaskClone(storeDir, runner);
+      if (local.status === "blocked") return local;
+      branchState = { status: "local-only", head: local.head };
     } else {
       mkdirSync(storeDir, { recursive: true });
       gitOk(runner, storeDir, ["init", "-q", "-b", TASK_HISTORY_BRANCH], "initialize explicit local-only task history");
@@ -963,7 +990,12 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   // bootstrap publishes the exact lifecycle-ready config). The nested clone
   // checks it out tracked; this seam NEVER writes an untracked, unpublished,
   // or non-lifecycle-ready local config.
-  const nestedConfigPath = taskStoreConfigPath(storeDir);
+  const nestedConfigPath = taskStoreConfigPath(storeDir, join(primaryRoot, "backlog.config.yml"));
+  if (lstatIfPresent(nestedConfigPath)?.isSymbolicLink()) return {
+    status: "blocked", code: "config-not-preserved",
+    detail: "the selected published native task configuration cannot itself be a symlink",
+    remediation: "restore the exact published regular native configuration file inside the selected store",
+  };
   if (!existsSync(nestedConfigPath)) {
     return {
       status: "blocked", code: "config-not-preserved",
@@ -1077,7 +1109,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
 
     try {
       checkBacklogCapabilities(primaryRoot, runner);
-      const relocatedDetection = detectTaskProvider(primaryRoot, runner);
+      const relocatedDetection = input.explicitMigration ? detectExplicitTaskProvider(primaryRoot, "backlog", runner) : detectTaskProvider(primaryRoot, runner);
       if (relocatedDetection.kind !== "selected" || relocatedDetection.evidence.provider !== "backlog"
           || !relocatedDetection.evidence.storeDir
           || realpathSync(relocatedDetection.evidence.storeDir) !== realpathSync(storeDir)) {
@@ -1133,6 +1165,396 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   };
 }
 
+
+
+/**
+ * Explicit installation / confirmed migration preparation. Ordinary task reads
+ * deliberately keep using prepareTaskHistoryWorkspace: they never relocate or
+ * adopt an existing store. All code-tree effects are returned as exact paths;
+ * the caller owns their ordinary code commit/publication. Code HEAD never moves.
+ *
+ * A code-tracked store is split with native `git subtree split`, retaining every
+ * task revision in the disconnected task DAG while the original commits remain
+ * reachable, unchanged, from the code branch. Materialization initializes Git
+ * in the SAME directory and reads only the index; no task bytes are checked out,
+ * deleted, reconstructed, renumbered, or overwritten.
+ */
+export function prepareExistingBacklogTaskHistoryWorkspace(
+  input: TaskHistoryWorkspaceInput,
+): TaskHistoryWorkspace & { codePaths?: string[] } {
+  const runner = input.runner ?? new ProcessCommandRunner();
+  const root = realpathSync(resolve(input.primaryRoot));
+  const paths = new Set<string>();
+  const refuse = (code: Extract<TaskHistoryWorkspace, { status: "blocked" }>["code"], detail: string): TaskHistoryWorkspace => ({
+    status: "blocked", code, detail,
+    remediation: "repair the exact reported native configuration, Git identity, or unpublished changes without replacing the existing task store, then retry explicit preparation",
+  });
+  try {
+    const gitDir = realpathSync(resolve(root, gitOk(runner, root, ["rev-parse", "--git-dir"], "read primary git directory")));
+    const commonDir = realpathSync(resolve(root, gitOk(runner, root, ["rev-parse", "--git-common-dir"], "read primary common directory")));
+    if (gitDir !== commonDir) return refuse("not-primary-checkout", "existing-store preparation requires the canonical primary checkout");
+    const beforeHead = gitOk(runner, root, ["rev-parse", "HEAD"], "read code head before task-store preparation");
+    const observed = input.explicitMigration ? detectExplicitTaskProvider(root, "backlog", runner) : detectTaskProvider(root, runner);
+    if (observed.kind === "blocked") return refuse("provider-not-backlog", observed.detail);
+    if (observed.kind === "selected" && observed.evidence.provider !== "backlog") return refuse("provider-not-backlog", "selected provider is not Backlog");
+    if (observed.kind === "none" || !observed.evidence.storeDir) {
+      const fresh = prepareTaskHistoryWorkspace(input);
+      if (fresh.status === "blocked") return fresh;
+      const rootConfig = join(root, "backlog.config.yml");
+      if (!lstatIfPresent(rootConfig)) {
+        symlinkSync(relative(root, taskStoreConfigPath(fresh.storeDir, rootConfig)).split(sep).join("/"), rootConfig);
+        paths.add("backlog.config.yml");
+      }
+      paths.add(".gitignore");
+      paths.add("backlog.config.yml");
+      return { ...fresh, codePaths: [...paths] };
+    }
+    const evidence = observed.evidence;
+    const original = evidence.storeDir!;
+    const safety = validateContainment(root, original);
+    if (safety) return safety;
+    const originalRel = relative(root, original).split(sep).join("/");
+    const targetRel = originalRel === "backlog" ? ".backlog" : originalRel;
+    const target = join(root, targetRel);
+    if (target !== original && lstatIfPresent(target)) return refuse("unsafe-store-location", `cannot relocate ${originalRel}: ${targetRel} already exists`);
+    const rootConfig = join(root, "backlog.config.yml");
+    const oldFolderConfig = taskStoreConfigPath(original, rootConfig);
+    if (lstatIfPresent(oldFolderConfig)?.isSymbolicLink()) return refuse("config-not-preserved", "the selected store configuration must be a real contained native file, not a second symlink");
+    const config = readFileSync(evidence.configPath, "utf8");
+    const distinctRootConfig = evidence.configSource === "root" && existsSync(oldFolderConfig) && readFileSync(oldFolderConfig, "utf8") !== config;
+    // Native root authority can legitimately differ from an inactive folder
+    // config. Keep that folder file untouched; retain the full selected root
+    // config under its native root filename within the same published store.
+    if (distinctRootConfig && existsSync(join(original, "backlog.config.yml"))) return refuse("config-not-preserved", "selected root and existing in-store native root configuration disagree");
+    validateRootConfigCandidate(root, config, original, runner);
+    const rootEntry = lstatIfPresent(rootConfig);
+    if (rootEntry?.isSymbolicLink()) {
+      const expected = relative(root, taskStoreConfigPath(original, rootConfig)).split(sep).join("/");
+      if (readlinkSync(rootConfig) !== expected) return refuse("config-not-preserved", `root configuration is not the exact relative link ${expected}`);
+    }
+    const tracked = gitOk(runner, root, ["ls-files", "-z", "--", originalRel], "read original code-tracked task paths").split("\0").filter(Boolean);
+    const nestedGit = join(original, ".git");
+    const gitEntry = lstatIfPresent(nestedGit);
+    if (gitEntry && (!gitEntry.isDirectory() || gitEntry.isSymbolicLink())) return refuse("unsafe-store-location", "existing task .git must be a real independent directory");
+    // In-place hidden/custom adoption leaves only the original task entries'
+    // staged deletions pending in the code index. This exact projection is
+    // not an uncommitted edit to the now-independent task authority. Require
+    // its proven native root link, zero remaining code-tracked task entries,
+    // no worktree-vs-index edits, and no staged additions/modifications. The
+    // strict clone/config/remote/publication proof below still applies.
+    const detachedProjection = Boolean(gitEntry && rootEntry?.isSymbolicLink() && tracked.length === 0
+      && gitOk(runner, root, ["diff", "--name-only", "--", originalRel], "verify detached store has no code worktree edits") === ""
+      && gitOk(runner, root, ["diff", "--cached", "--diff-filter=ACMRTUXB", "--name-only", "HEAD", "--", originalRel], "verify pending store projection contains deletions only") === "");
+    const scoped = [originalRel, ...(rootEntry?.isSymbolicLink() ? [] : ["backlog.config.yml"])];
+    if (!detachedProjection && gitOk(runner, root, ["diff", "HEAD", "--name-only", "--", ...scoped], "verify existing tracked task/config bytes") !== "") {
+      return refuse("uncommitted-task-content", "existing code-tracked task/config changes must be committed before preserving their native history");
+    }
+    if (lstatIfPresent(evidence.configPath)?.isSymbolicLink() && evidence.configSource !== "root") return refuse("config-not-preserved", "folder configuration cannot be a symlink");
+    const independent = gitEntry !== null;
+    let splitHead: string | null = null;
+    const remote = selectTaskHistoryRemote(root, runner);
+    const localOnly = remote.status === "blocked" && remote.code === "no-remote" && input.unpublishedLocalOnly === true;
+    if (remote.status === "blocked" && !localOnly) return refuse(remote.code, remote.detail);
+    if (independent) {
+      // This proves clean independent identity, exact publication/remote/config
+      // and all existing ancestry protections BEFORE the directory is moved.
+      if (!distinctRootConfig) {
+        const prior = prepareTaskHistoryWorkspace(input);
+        if (prior.status === "blocked") return prior;
+      } else if (localOnly) {
+        const local = verifyLocalOnlyTaskClone(original, runner);
+        if (local.status === "blocked") return local;
+      } else {
+        const identity = verifyIndependentTaskClone(original, runner);
+        if (identity.status === "blocked") return refuse("unsafe-store-location", identity.detail);
+        if (remote.status !== "selected") return refuse("no-remote", "preserving distinct native root/folder configuration requires the existing task clone publication authority");
+        const published = ensureTaskHistoryBranch(root, remote.name, remote.url, runner);
+        if (published.status === "blocked") return published;
+        if (gitOk(runner, original, ["remote"], "read original independent remotes") !== remote.name
+            || gitOk(runner, original, ["remote", "get-url", remote.name], "read original independent transport") !== remote.url
+            || gitOk(runner, original, ["symbolic-ref", "--short", "HEAD"], "read original independent branch") !== TASK_HISTORY_BRANCH
+            || gitOk(runner, original, ["status", "--porcelain", "--untracked-files=all"], "verify original independent cleanliness") !== "") return refuse("uncommitted-task-content", "existing independent clone has dirty or foreign publication identity");
+        gitOk(runner, original, ["fetch", "-q", remote.name, `${TASK_HISTORY_REF}:refs/remotes/${remote.name}/${TASK_HISTORY_BRANCH}`], "refresh original independent publication");
+        const fetched = refHead(runner, original, `refs/remotes/${remote.name}/${TASK_HISTORY_BRANCH}`);
+        const head = refHead(runner, original, "HEAD");
+        if (!head || fetched !== published.head || !isAncestor(runner, original, head, fetched)) return refuse("remote-advanced", "original independent store is not a clean fast-forward ancestor of the exact published task history");
+        gitOk(runner, original, ["merge", "--ff-only", fetched], "retain original independent history before native root placement");
+      }
+    } else {
+      if (remote.status === "selected") {
+        const probe = runGit(runner, root, ["ls-remote", "--heads", remote.url, TASK_HISTORY_REF]);
+        if (probe.status !== 0) return refuse("remote-unavailable", "cannot inspect existing destination task publication");
+        if (probe.stdout.trim() !== "" || refHead(runner, root, TASK_HISTORY_REF)) {
+          return refuse("remote-advanced", "ordinary store and an existing task-history branch are distinct authorities; refusing to overwrite either history");
+        }
+      }
+      if (tracked.length) {
+        // Native Git preserves task changes across the complete current code
+        // ancestry, including merged branch history, without rewriting code.
+        splitHead = gitOk(runner, root, ["subtree", "split", `--prefix=${originalRel}`, "HEAD"], "split the original native Git task history");
+        if (!/^[0-9a-f]{40}$/.test(splitHead) || sharesCodeAncestry(runner, root, splitHead)) {
+          return refuse("shared-ancestry", "native task subtree split did not produce disconnected task history");
+        }
+      }
+      // Prove ignore intent before creating Git or touching the code index.
+      // check-ignore --no-index is required while original paths are tracked.
+      const ignoreText = existsSync(join(root, ".gitignore")) ? readFileSync(join(root, ".gitignore"), "utf8") : "";
+      if (ignoreText.split(/\r?\n/).some(line => [ `!/${targetRel}/`, `!${targetRel}/`, `!/${targetRel}`, `!${targetRel}` ].includes(line.trim()))) {
+        return refuse("not-ignored", `explicit negation prevents safely ignoring ${targetRel}`);
+      }
+      const ignoredOriginal = gitOk(runner, root, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", originalRel], "read existing ignored task attachments")
+        .split("\0").filter(Boolean).filter(path => {
+          // Git permits -z only with --stdin, which CommandRunner deliberately
+          // does not expose. A single native verbose result keeps filenames
+          // C-quoted (tabs/newlines cannot masquerade as field separators).
+          const verbose = gitOk(runner, root, ["check-ignore", "-v", "--", path], "read the native attachment ignore rule");
+          const matched = verbose.match(/^.*?:[0-9]+:([\s\S]*)\t[^\n]*$/);
+          if (!matched) throw new Error(`cannot read the native ignore rule for existing attachment ${JSON.stringify(path)}`);
+          // A wrapper ignore protects the dedicated store from code staging;
+          // it is not an instruction to leave all native tasks unpublished.
+          return ![`/${originalRel}/`, `${originalRel}/`, `/${originalRel}`, originalRel].includes(matched[1]);
+        }).map(path => path.slice(originalRel.length + 1));
+      gitOk(runner, original, ["init", "-q", "-b", TASK_HISTORY_BRANCH], "materialize existing task history in place");
+      if (ignoredOriginal.length) {
+        // Keep pre-existing ignored bytes local/ignored. Adoption must not
+        // publish an attachment solely because the Git boundary moved.
+        const patterns = ignoredOriginal.map(path => "/" + path.replace(/[\\*?\[\]#!]/g, "\\$&"));
+        appendFileSync(join(original, ".git", "info", "exclude"), "\n" + patterns.join("\n") + "\n");
+      }
+      if (splitHead) {
+        gitOk(runner, original, ["fetch", "-q", root, splitHead], "materialize original task history objects");
+        gitOk(runner, original, ["update-ref", TASK_HISTORY_REF, splitHead], "retain the split task ancestry");
+        gitOk(runner, original, ["read-tree", splitHead], "materialize original task index without changing task bytes");
+      }
+      if (remote.status === "selected") gitOk(runner, original, ["remote", "add", remote.name, remote.url], "retain selected publication transport");
+      if (tracked.length) {
+        gitOk(runner, root, ["rm", "-r", "--cached", "--", originalRel], "remove only task paths from code index after preserving their history");
+        tracked.forEach(path => paths.add(path));
+      }
+    }
+    if (target !== original) renameSync(original, target);
+    const folderConfig = join(target, distinctRootConfig ? "backlog.config.yml" : basename(oldFolderConfig));
+    // Root configuration is the full native authority, not a pointer overlay.
+    // Only a default relocation changes its directory selection. Custom stores
+    // keep every configuration byte, including supported key spellings.
+    let finalConfig = config;
+    if (target !== original) {
+      const key = /^(backlog_directory|backlogDirectory):.*$/m;
+      finalConfig = key.test(config)
+        ? config.replace(key, (_line, spelling) => `${spelling}: ".backlog"`)
+        : config + (config.endsWith("\n") ? "" : "\n") + 'backlog_directory: ".backlog"\n';
+    }
+    if (!existsSync(folderConfig) || readFileSync(folderConfig, "utf8") !== finalConfig) writeFileSync(folderConfig, finalConfig);
+    // Commit only the configuration of an existing independent clone. For an
+    // ordinary store all current native content (including attachments) is the
+    // preserved initial materialization atop its original split history.
+    if (independent) gitOk(runner, target, ["add", "--", relative(target, folderConfig)], "stage exact relocated native config");
+    else gitOk(runner, target, ["add", "-A", "--", "."], "preserve all existing native task content");
+    if (gitOk(runner, target, ["diff", "--cached", "--name-only"], "read task preparation changes") !== "") {
+      gitOk(runner, target, ["-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-q", "-m", "prime-claw: preserve existing Backlog history and layout"], "commit preserved task materialization");
+    }
+    if (rootEntry) unlinkSync(rootConfig);
+    symlinkSync(relative(root, folderConfig).split(sep).join("/"), rootConfig);
+    paths.add("backlog.config.yml");
+    const ignored = ensureIgnored(runner, root, target);
+    if (ignored) return ignored;
+    paths.add(".gitignore");
+    if (remote.status === "selected") {
+      gitOk(runner, target, ["push", "-u", remote.name, `HEAD:${TASK_HISTORY_REF}`], "publish preserved task history without force");
+      // Update the unused primary ref through a checked native fetch, never
+      // force it or make a code branch share the task DAG.
+      gitOk(runner, root, ["fetch", "-q", remote.name, `${TASK_HISTORY_REF}:${TASK_HISTORY_REF}`], "retain published preserved task history");
+    }
+    if (gitOk(runner, root, ["rev-parse", "HEAD"], "verify unchanged code head") !== beforeHead) throw new Error("code head changed during existing task preparation");
+    const after = prepareTaskHistoryWorkspace(input);
+    return after.status === "prepared" ? { ...after, codePaths: [...paths] } : after;
+  } catch (error) {
+    return refuse("unreadable", `existing Backlog preservation failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+
+
+export interface ExistingBacklogFile {
+  path: string;
+  bytesBase64: string;
+  mode: number;
+}
+
+/** Materialize the already-verified destination into one exact active Episode.
+ * HEAD, branch, code ancestry, and every code index entry stay unchanged. Only
+ * the known old/new task paths and native root-link worktree projection change.
+ * The migration caller freezes this exact factual projection for later proofs.
+ */
+export function prepareExistingBacklogEpisodeProjection(input: {
+  primaryRoot: string;
+  targetWorktree: string;
+  runner?: CommandRunner;
+  expectedRevision: string;
+  remoteName: string;
+  remoteUrl: string;
+  originalStoreRelative: string;
+  originalFiles: ExistingBacklogFile[];
+  originalRootConfig: { bytesBase64: string; linkTarget?: string; mode: number } | null;
+  /** Internal caller proof of one exact receipt/source-bound pending layout;
+   * never a public dirty-worktree flag or authority to waive Git identity. */
+  verifyInitialCodeProjection?: () => void;
+}): { status: "prepared"; storeDir: string; head: string; codePaths: string[] }
+  | Extract<TaskHistoryWorkspace, { status: "blocked" }> {
+  const runner = input.runner ?? new ProcessCommandRunner();
+  const worktree = realpathSync(input.targetWorktree);
+  const identity = verifyLinkedWorktree(input.primaryRoot, worktree, runner);
+  if (identity) return { ...identity, code: identity.code === "not-primary-checkout" ? identity.code : "unsafe-store-location" };
+  const fail = (detail: string): Extract<TaskHistoryWorkspace, { status: "blocked" }> => ({
+    status: "blocked", code: "uncommitted-task-content", detail,
+    remediation: "preserve the exact Episode task/configuration evidence and resolve the reported divergence through ordinary native Git before retrying; never overwrite it",
+  });
+  const sourceRel = input.originalStoreRelative;
+  const targetRel = sourceRel === "backlog" ? ".backlog" : sourceRel;
+  const original = join(worktree, sourceRel), target = join(worktree, targetRel);
+  const rootConfig = join(worktree, "backlog.config.yml");
+  let temp: string | undefined;
+  try {
+    const safety = validateContainment(worktree, original) ?? validateContainment(worktree, target);
+    if (safety) return safety;
+    if (original !== target && lstatIfPresent(target)) return fail(`Episode target ${targetRel} already exists alongside ${sourceRel}`);
+    const beforeHead = gitOk(runner, worktree, ["rev-parse", "HEAD"], "read unchanged Episode code head");
+    const beforeIndex = gitOk(runner, worktree, ["ls-files", "--stage", "-z"], "read unchanged Episode code index");
+    // A clean older Episode is a historical code snapshot, not a second
+    // current task authority. Native Git proves any differing projected file
+    // existed at this exact path in canonical code ancestry before replacing
+    // its worktree view with the published canonical task workspace.
+    const historicalCanonicalFile = (path: string): boolean => {
+      if (runGit(runner, worktree, ["ls-files", "--error-unmatch", "--", path]).status !== 0) return false;
+      const blob = gitOk(runner, worktree, ["hash-object", "--", path], "read historical Episode file object");
+      const revisions = gitOk(runner, input.primaryRoot, ["log", "--format=%H", "HEAD", "--", path], "read original canonical code file history").split(/\r?\n/).filter(Boolean);
+      const mode = (lstatSync(join(worktree, path)).mode & 0o111) ? "100755" : "100644";
+      return revisions.some(revision => {
+        const found = runGit(runner, input.primaryRoot, ["ls-tree", revision, "--", path]);
+        return found.status === 0 && found.stdout.startsWith(`${mode} blob ${blob}\t`);
+      });
+    };
+    const originalTrackedPaths = gitOk(runner, worktree, ["ls-files", "-z", "--", sourceRel], "read exact original Episode tracked task paths").split("\0").filter(Boolean);
+    const initialStatus = gitOk(runner, worktree, ["status", "--porcelain", "--untracked-files=all"], "verify Episode code cleanliness before projection");
+    if (initialStatus !== "" && !input.verifyInitialCodeProjection) {
+      return fail("Episode code must be clean before its exact task-layout projection");
+    }
+    // Only the migration caller can supply this internal native receipt/source
+    // proof. Run it even when status is empty, so drift from its frozen initial
+    // projection is rejected before any clone, fast-forward, or file write.
+    input.verifyInitialCodeProjection?.();
+    if (runGit(runner, worktree, ["check-ignore", "--no-index", "-q", "--", `${targetRel}/x`]).status !== 0) return fail(`Episode target ${targetRel} is not ignored`);
+    const oldRoot = lstatIfPresent(rootConfig);
+    if (oldRoot) {
+      const exactRoot = input.originalRootConfig
+        && oldRoot.isSymbolicLink() === (input.originalRootConfig.linkTarget !== undefined)
+        && (oldRoot.isSymbolicLink() ? readlinkSync(rootConfig) === input.originalRootConfig.linkTarget
+          : readFileSync(rootConfig).toString("base64") === input.originalRootConfig.bytesBase64);
+      if (!exactRoot && (oldRoot.isSymbolicLink() || !historicalCanonicalFile("backlog.config.yml"))) {
+        return fail("Episode root Backlog configuration is neither the preserved selected config nor a proven historical canonical code snapshot");
+      }
+    }
+    const baseline = new Map(input.originalFiles.map(file => [file.path, file]));
+    const actual: ExistingBacklogFile[] = [];
+    const readFiles = (directory: string, prefix = ""): void => {
+      if (!existsSync(directory)) return;
+      for (const name of readdirSync(directory)) {
+        if (!prefix && name === ".git") continue;
+        const path = join(directory, name), rel = prefix ? `${prefix}/${name}` : name;
+        const entry = lstatSync(path);
+        if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile())) throw new Error(`unsupported Episode task entry ${rel}`);
+        if (entry.isDirectory()) readFiles(path, rel);
+        else actual.push({ path: rel, bytesBase64: readFileSync(path).toString("base64"), mode: entry.mode });
+      }
+    };
+    const gitEntry = lstatIfPresent(join(original, ".git"));
+    if (gitEntry) {
+      const checked = verifyIndependentTaskClone(original, runner);
+      if (checked.status === "blocked") return fail(checked.detail);
+      if (gitOk(runner, original, ["remote", "get-url", input.remoteName], "read Episode task publication transport") !== input.remoteUrl
+          || gitOk(runner, original, ["symbolic-ref", "--short", "HEAD"], "read Episode task branch") !== TASK_HISTORY_BRANCH
+          || gitOk(runner, original, ["status", "--porcelain", "--untracked-files=all"], "verify Episode task cleanliness") !== "") {
+        return fail("Episode task clone has dirty or foreign publication identity");
+      }
+      gitOk(runner, original, ["fetch", "-q", input.remoteName, `${TASK_HISTORY_REF}:refs/remotes/${input.remoteName}/${TASK_HISTORY_BRANCH}`], "fetch verified Episode task destination");
+      const fetched = refHead(runner, original, `refs/remotes/${input.remoteName}/${TASK_HISTORY_BRANCH}`);
+      const head = refHead(runner, original, "HEAD");
+      if (!head || fetched !== input.expectedRevision || !isAncestor(runner, original, head, fetched)) return fail("Episode task clone is not a fast-forward ancestor of the exact published destination");
+      gitOk(runner, original, ["merge", "--ff-only", fetched], "fast-forward the original Episode clone without replacement");
+      if (original !== target) renameSync(original, target);
+    } else {
+      readFiles(original);
+      const historical = new Set<string>();
+      for (const file of actual) {
+        const expected = baseline.get(file.path);
+        if (!expected || expected.bytesBase64 !== file.bytesBase64 || (expected.mode & 0o111) !== (file.mode & 0o111)) {
+          if (!historicalCanonicalFile(`${sourceRel}/${file.path}`)) return fail(`Episode task file ${file.path} has authored bytes absent from preserved canonical task/code history`);
+          historical.add(file.path);
+        }
+      }
+      // Clone only to disposable inputs. Validate the exact published result
+      // before touching any Episode task/configuration bytes.
+      temp = mkdtempSync(join(tmpdir(), "prime-claw-episode-backlog-"));
+      gitOk(runner, worktree, ["clone", "-q", "--origin", input.remoteName, "--branch", TASK_HISTORY_BRANCH, "--single-branch", input.remoteUrl, temp], "read the published Episode destination");
+      if (refHead(runner, temp, "HEAD") !== input.expectedRevision) return fail("published Episode destination advanced during materialization");
+      const destinationPaths = gitOk(runner, temp, ["ls-files", "-z"], "read published Episode destination files").split("\0").filter(Boolean);
+      const retainedIgnored: string[] = [];
+      const historicalRemoved: string[] = [];
+      for (const file of actual) {
+        const incoming = join(temp, file.path);
+        if (!existsSync(incoming)) {
+          if (historical.has(file.path)) { historicalRemoved.push(file.path); continue; }
+          if (runGit(runner, worktree, ["check-ignore", "--no-index", "-q", "--", `${sourceRel}/${file.path}`]).status === 0) {
+            retainedIgnored.push(file.path);
+            continue; // same baseline bytes stay local and ignored, never published implicitly
+          }
+          return fail(`published task destination does not preserve Episode file ${file.path}`);
+        }
+        if (!lstatSync(incoming).isFile()) return fail(`published task destination does not preserve Episode file ${file.path}`);
+        if (readFileSync(incoming).toString("base64") !== file.bytesBase64 && !historical.has(file.path) && !["config.yml", "config.yaml", "backlog.config.yml"].includes(file.path)) {
+          return fail(`published task destination changed existing Episode record ${file.path}`);
+        }
+      }
+      if (existsSync(original) && original !== target) renameSync(original, target);
+      mkdirSync(target, { recursive: true });
+      gitOk(runner, target, ["init", "-q", "-b", TASK_HISTORY_BRANCH], "materialize task Git in the existing Episode directory");
+      if (retainedIgnored.length) appendFileSync(join(target, ".git", "info", "exclude"), "\n" + retainedIgnored.map(path => "/" + path.replace(/[\\*?\[\]#!]/g, "\\$&")).join("\n") + "\n");
+      gitOk(runner, target, ["remote", "add", input.remoteName, input.remoteUrl], "retain Episode task publication transport");
+      gitOk(runner, target, ["fetch", "-q", input.remoteName, `${TASK_HISTORY_REF}:refs/remotes/${input.remoteName}/${TASK_HISTORY_BRANCH}`], "materialize published Episode task objects");
+      gitOk(runner, target, ["update-ref", TASK_HISTORY_REF, input.expectedRevision], "retain exact Episode task revision");
+      gitOk(runner, target, ["read-tree", input.expectedRevision], "materialize only the independent task index");
+      for (const path of historicalRemoved) unlinkSync(join(target, path));
+      for (const path of destinationPaths) {
+        const incoming = join(temp, path), out = join(target, path);
+        if (!lstatSync(incoming).isFile() || lstatSync(incoming).isSymbolicLink()) throw new Error(`unsupported destination task entry ${path}`);
+        mkdirSync(dirname(out), { recursive: true });
+        if (!existsSync(out) || readFileSync(out).compare(readFileSync(incoming)) !== 0) copyFileSync(incoming, out);
+        chmodSync(out, lstatSync(incoming).mode & 0o777);
+      }
+    }
+    const publishedRootLink = join(input.primaryRoot, "backlog.config.yml");
+    if (!lstatIfPresent(publishedRootLink)?.isSymbolicLink()) return fail("primary destination has no exact native root configuration link");
+    const link = readlinkSync(publishedRootLink);
+    if (isAbsolute(link) || resolve(input.primaryRoot, link) !== taskStoreConfigPath(join(input.primaryRoot, targetRel), publishedRootLink)) return fail("primary destination root link does not select its exact published native configuration");
+    if (oldRoot) unlinkSync(rootConfig);
+    symlinkSync(link, rootConfig);
+    checkBacklogCapabilities(worktree, runner);
+    const selected = detectExplicitTaskProvider(worktree, "backlog", runner);
+    if (selected.kind !== "selected" || selected.evidence.storeDir !== target) return fail("Episode native discovery does not select the projected exact task store");
+    if (refHead(runner, target, "HEAD") !== input.expectedRevision || gitOk(runner, target, ["status", "--porcelain", "--untracked-files=all"], "verify materialized Episode task store") !== "") return fail("Episode task materialization is not clean at the exact published revision");
+    if (gitOk(runner, worktree, ["rev-parse", "HEAD"], "verify preserved Episode code head") !== beforeHead
+        || gitOk(runner, worktree, ["ls-files", "--stage", "-z"], "verify preserved Episode code index") !== beforeIndex) throw new Error("Episode code HEAD or index changed during task projection");
+    const codePaths = gitOk(runner, worktree, ["diff", "--name-only", "-z", "HEAD"], "read exact Episode task projection").split("\0").filter(Boolean);
+    const permitted = (path: string) => path === "backlog.config.yml" || path === sourceRel || path.startsWith(`${sourceRel}/`) || path === targetRel || path.startsWith(`${targetRel}/`);
+    if (codePaths.some(path => !permitted(path))) throw new Error("Episode projection changed an unrelated code path");
+    if (!codePaths.includes("backlog.config.yml")) codePaths.push("backlog.config.yml");
+    return { status: "prepared", storeDir: target, head: input.expectedRevision, codePaths: [...new Set([...codePaths, ...originalTrackedPaths])] };
+  } catch (error) {
+    return fail(`Episode Backlog projection failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    if (temp) rmSync(temp, { recursive: true, force: true });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Slice 2B: Episode-worktree preparation + guarded nested-store cleanup
@@ -1393,7 +1815,7 @@ function verifyTargetBacklogAuthority(
   let expectedDanglingRoot = false;
   if (lstatIfPresent(rootConfigPath)?.isSymbolicLink() && !existsSync(rootConfigPath)) {
     const link = readlinkSync(rootConfigPath);
-    const expectedLinks = ["config.yml", "config.yaml"].map((name) =>
+    const expectedLinks = ["backlog.config.yml", "config.yml", "config.yaml"].map((name) =>
       relative(targetWorktree, join(storeDir, name)).split(sep).join("/"));
     expectedDanglingRoot = allowNone && expectedLinks.includes(link);
     if (!expectedDanglingRoot) {
@@ -1460,7 +1882,13 @@ function verifyTargetBacklogAuthority(
   if (expectedDanglingRoot) return null;
   if (detection.evidence.configSource === "root") {
     const rootEntry = lstatIfPresent(detection.evidence.configPath);
-    const expectedConfig = taskStoreConfigPath(storeDir);
+    const expectedConfig = taskStoreConfigPath(storeDir, rootConfigPath);
+    const nativeConfigEntry = lstatIfPresent(expectedConfig);
+    if (nativeConfigEntry && (!nativeConfigEntry.isFile() || nativeConfigEntry.isSymbolicLink())) return {
+      status: "blocked", code: "config-not-preserved",
+      detail: "the exact native task configuration must be a real regular file inside the selected store",
+      remediation: "restore the exact published native configuration file; never follow a second configuration symlink",
+    };
     let exactRelativeLink = false;
     if (rootEntry?.isSymbolicLink()) {
       const target = readlinkSync(detection.evidence.configPath);
@@ -1651,7 +2079,7 @@ function inspectPrimaryTaskAuthority(
   }
   if (detection.kind === "selected" && detection.evidence.provider === "backlog" && detection.evidence.configSource === "root") {
     const configEntry = lstatIfPresent(detection.evidence.configPath);
-    const expectedConfig = detection.evidence.storeDir ? taskStoreConfigPath(detection.evidence.storeDir) : "";
+    const expectedConfig = detection.evidence.storeDir ? taskStoreConfigPath(detection.evidence.storeDir, detection.evidence.configPath) : "";
     let exactRelativeLink = false;
     if (configEntry?.isSymbolicLink() && expectedConfig) {
       const target = readlinkSync(detection.evidence.configPath);

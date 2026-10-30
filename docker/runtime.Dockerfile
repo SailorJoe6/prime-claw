@@ -96,7 +96,7 @@ RUN set -eux; \
 
 # --- Backlog.md: compile the exact vendored fork revision for this image ---
 ARG BACKLOG_VERSION=1.53.0
-ARG BACKLOG_COMMIT=5d556c1954f7724abd180f6211cf528e9253ad4c
+ARG BACKLOG_COMMIT=431e95612d6167e418c507ec206d95df43c38c54
 LABEL org.prime-claw.backlog-version="${BACKLOG_VERSION}" \
       org.prime-claw.backlog-commit="${BACKLOG_COMMIT}"
 COPY --from=backlog_source . /opt/backlog

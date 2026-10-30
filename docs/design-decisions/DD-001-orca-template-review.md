@@ -1,4 +1,28 @@
-# DD-001 — Preserve side-by-side template comparison as the primary UX
+# DD-001 — Template comparison: current text-patch decision and retained history
+
+- **Current status:** the overwrite/viewer decision below is superseded by PRIMECLAW-44.
+- **Stories:** [US-04–US-05](../user-stories/B-project-initialization.md)
+
+## Current decision — PRIMECLAW-44
+
+The operator reads an ordinary Git patch as text. Compare current project asset
+bytes with upstream template bytes using disposable inputs. Comparison never
+replaces, stages, restores, or foregrounds the actual asset. Clean, dirty, and
+staged files keep their exact worktree bytes and Git index. No Orca viewer,
+readiness/visibility protocol, or new held-review state is required. Produce
+standard patch text rather than launching a configured external viewer.
+
+Viewing the patch does not accept an override or reset an asset. Those remain
+separate explicit content decisions. Existing interrupted legacy overwrite
+records and backup evidence remain protected until an explicit restore/keep
+choice; the new comparison must not silently discard or reinterpret them.
+
+The historical probes below still document the former Orca constraint. They do
+not impose an overwrite, GUI, fallback ordering, or diff-viewer requirement on
+the current implementation. PRIMECLAW-44's native task is the current approved
+contract; candidate test results are recorded with that task.
+
+## Historical decision and evidence — superseded, not current policy
 
 - **Status:** accepted; clarified by operator on 2026-10-11
 - **Stories:** [US-04–US-05](../user-stories/B-project-initialization.md)

@@ -3,7 +3,7 @@
 
 def test_backlog_destination_layout_node_suite(tier1_container) -> None:
     result = tier1_container.run(
-        "node", "--test", "/workspace/tests/backlog_destination_layout.test.mjs",
+        "node", "--experimental-strip-types", "--test", "/workspace/tests/backlog_destination_layout.test.mjs",
         timeout=600,
     )
     # Keep successful native assertions/version/layout diagnostics beside the receipt.

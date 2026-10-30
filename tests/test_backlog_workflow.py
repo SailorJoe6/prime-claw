@@ -260,19 +260,26 @@ def test_repository_status_migration_receipt_and_live_data_are_consistent() -> N
     assert receipt["afterMigrationBeforeConfigRemoval"]["identityOrParentDriftCount"] == 0
 
     records = {}
+    physical_records = []
     for directory in (ROOT / "backlog/tasks", ROOT / "backlog/completed", ROOT / "backlog/archive"):
         if not directory.exists():
             continue
         for path in directory.rglob("*.md"):
             record = _task_frontmatter(path)
             if record and record.get("id"):
-                assert record["id"] not in records
-                records[record["id"]] = record
+                physical_records.append(record)
+                # Archives are deleted/history, not live identities or a fallback.
+                # Native allocation may reuse their IDs; keep every physical record.
+                if directory.name != "archive":
+                    assert record["id"] not in records
+                    records[record["id"]] = record
     assert records
     assert all(record.get("status") != "To Do" for record in records.values())
     for row in receipt["migrations"] + receipt["preserved"]:
-        assert row["id"] in records
-        assert records[row["id"]].get("parent_task_id") == row["parentTaskId"]
+        # This historical receipt survives later archive/deletion and ID reuse.
+        assert any(record["id"] == row["id"]
+                   and record.get("parent_task_id") == row["parentTaskId"]
+                   for record in physical_records)
 
 
 def test_prompt_led_merge_uses_ff_only_then_exact_backlog_done_commit(tmp_path: Path) -> None:

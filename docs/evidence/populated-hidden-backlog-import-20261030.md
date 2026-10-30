@@ -1,5 +1,21 @@
 # Populated hidden Backlog import — native blocker, Slice 1h
 
+> **Superseded interpretation — operator decision, 2026-10-30.** Joe resolved
+> the blocker below: archived records are deleted/history, never dependency
+> targets or fallback. Eligible targets are actual `tasks/` or `completed/`
+> records only. A reused live ID is valid despite a historical same-ID archive.
+> Archive-only targets refuse as missing/deleted; genuine live ambiguity, self
+> references and cycles still refuse. Native allocation and archived bytes, IDs,
+> paths, configuration and history remain unchanged. The narrow managed Backlog
+> eligibility correction and reviewed builder pin are authorized in PRIMECLAW-44;
+> no allocator flag, reservation, renumber, config/prefix workaround, dependency
+> dropping, or importer redesign is authorized. The task's latest living plan
+> and notes carry the complete superseding direction to finish the remaining
+> approved specification. The failed runs, old-policy passing regression, and
+> rolled-back historical patch below are retained unchanged as historical
+> evidence, not a current blocker, successful populated migration, or ready code.
+
+
 ## Outcome: blocked, not a production increment
 
 A bounded attempt to import into an already-published independent populated

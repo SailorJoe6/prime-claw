@@ -3,7 +3,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "1.53.0"
-COMMIT = "5d556c1954f7724abd180f6211cf528e9253ad4c"
+COMMIT = "431e95612d6167e418c507ec206d95df43c38c54"
 BUN_VERSION = "1.3.11"
 BEADS_VERSION = "1.3.1"
 DOLT_VERSION = "2.5.0"
@@ -53,6 +53,8 @@ def test_runtime_and_tier1_images_deliver_pinned_provider_native_tools():
         assert "sha256sum -c -" in dockerfile
     tier1 = (ROOT / "docker/test.Dockerfile").read_text()
     assert "https://github.com/SailorJoe6/Backlog.md.git" in tier1
+    # The exact reviewed pin is three commits above v1.53.0; retain that path.
+    assert 'fetch -q --depth 4 origin "$BACKLOG_COMMIT"' in tier1
     assert 'git -C /tmp/backlog merge-base --is-ancestor "refs/tags/v${BACKLOG_VERSION}" "$BACKLOG_COMMIT"' in tier1
     assert "BACKLOG_BUILD_OUTFILE=/out/backlog bun run build" in tier1
     assert 'bun scripts/smoke-compiled-build.ts /out/backlog "$BACKLOG_VERSION"' in tier1

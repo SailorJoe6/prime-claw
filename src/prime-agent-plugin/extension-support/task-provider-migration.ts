@@ -17,6 +17,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   renameSync,
   readdirSync,
   realpathSync,
@@ -33,7 +34,8 @@ import {
   resolveNearestProjectRoot,
 } from "./project-initialization.ts";
 import {
-  initialTaskStoreConfig,
+  prepareExistingBacklogTaskHistoryWorkspace,
+  prepareExistingBacklogEpisodeProjection,
   TASK_HISTORY_REF,
 } from "./task-history-workspace.ts";
 import {
@@ -216,6 +218,10 @@ interface DestinationCandidate {
   tasks: DestinationTask[];
   refreshAfterReceipt: () => { revision: string; digest: string; tasks: DestinationTask[]; receiptTaskId: string };
   prepareActiveWorktree: (worktree: string) => void;
+  codePaths?: string[];
+  verifyCodeProjection?: () => void;
+  activeCodeProjections?: Map<string, () => void>;
+  publishActiveCodeLayout?: (worktree: string) => string;
 }
 
 function blocked(
@@ -379,25 +385,38 @@ function archivedBacklogViews(
   if (!archived.length) return views;
   const temp = mkdtempSync(join(tmpdir(), "prime-claw-archived-backlog-read-"));
   const nestedStore = repositoryRoot !== projectRoot;
-  const clone = join(temp, nestedStore ? ".backlog" : "source");
+  const storeRelative = nestedStore ? relative(projectRoot, repositoryRoot) : "";
+  const clone = join(temp, nestedStore ? storeRelative : "source");
   try {
+    mkdirSync(dirname(clone), { recursive: true });
     runRequired(runner, "git", ["clone", "-q", "--no-hardlinks", repositoryRoot, clone], temp, "clone exact Backlog source for archived native reads");
     runRequired(runner, "git", ["-C", clone, "checkout", "-q", "--detach", revision], clone, "checkout exact Backlog source revision");
     const nativeRoot = nestedStore ? temp : clone;
+    if (nestedStore && existsSync(join(projectRoot, "backlog.config.yml"))) {
+      writeFileSync(join(nativeRoot, "backlog.config.yml"), readFileSync(join(projectRoot, "backlog.config.yml")));
+    }
+    // Read one original archived record at a time. Historical IDs may repeat
+    // both eligible live IDs and other archived IDs; none is a replacement.
+    const disposableStores = new Set(archived.map((item) => nestedStore ? clone
+      : join(clone, relative(projectRoot, dirname(dirname(dirname(item.path)))))));
+    for (const store of disposableStores) for (const path of walkTaskFiles(store)) {
+      if (!relative(store, path).replace(/\\/g, "/").startsWith("archive/")) unlinkSync(path);
+    }
     for (const item of archived) {
-      const archivedRelative = relative(repositoryRoot, item.path);
-      const disposableSource = join(clone, archivedRelative);
-      const storeRelative = nestedStore
-        ? ".backlog"
-        : relative(projectRoot, dirname(dirname(dirname(item.path))));
-      const disposableFolder = resolve(nativeRoot, storeRelative, item.entityKind === "draft" ? "drafts" : "tasks");
+      const disposableSource = join(clone, relative(repositoryRoot, item.path));
+      const originalStore = dirname(dirname(dirname(item.path)));
+      const disposableStore = nestedStore ? clone : join(clone, relative(projectRoot, originalStore));
+      const disposableFolder = join(disposableStore, item.entityKind === "draft" ? "drafts" : "tasks");
       if (!contained(clone, disposableFolder)) throw new Error(`archived Backlog ${item.entityKind} ${item.taskId} has unsafe disposable placement`);
       mkdirSync(disposableFolder, { recursive: true });
-      renameSync(disposableSource, join(disposableFolder, basename(item.path)));
+      const target = join(disposableFolder, `${item.taskId.toLowerCase()} - migration-archive-read.md`);
+      renameSync(disposableSource, target);
       const view = item.entityKind === "draft"
         ? backlogDraftView(runner, nativeRoot, item.taskId, relative(projectRoot, item.path).replace(/\\/g, "/"))
         : backlogTaskView(runner, nativeRoot, item.taskId);
-      views.set(item.taskId, view);
+      view.task.path = relative(projectRoot, item.path).replace(/\\/g, "/");
+      views.set(item.path, view);
+      renameSync(target, disposableSource);
     }
     return views;
   } finally {
@@ -445,7 +464,7 @@ function captureBacklog(
   const tasks = taskFiles.map(({ path, markdown, taskId, entityKind, classification: physicalClassification }): BacklogTaskPackage => {
     const relativePath = relative(projectRoot, path).replace(/\\/g, "/");
     const nativeView = physicalClassification === "archived"
-      ? archivedViews.get(taskId)!
+      ? archivedViews.get(path)!
       : entityKind === "draft"
         ? backlogDraftView(runner, projectRoot, taskId, relativePath)
         : backlogTaskView(runner, projectRoot, taskId);
@@ -585,6 +604,7 @@ function captureBeads(
   // Inspect the complete used inventory before any destination preparation. Every
   // recapture uses this same preflight; unused catalog entries remain raw context.
   validateBeadsTaskLifecycles(tasks);
+  validateBeadsRelationshipTargets(tasks);
   const counts = {
     open: tasks.filter((task) => task.classification === "open").length,
     closed: tasks.filter((task) => task.classification === "closed").length,
@@ -597,6 +617,37 @@ function captureBeads(
     sourceVersion, statusCatalog,
     revision: `capture-sha256:${digest}`, digest, tasks, counts,
   };
+}
+
+/** Validate the actual target corpus, never archived/deleted history. */
+function validateBeadsRelationshipTargets(tasks: BeadsTaskPackage[]): void {
+  const byId = new Map(tasks.map((task) => [task.sourceTaskId, task]));
+  const eligible = new Set(tasks.filter((task) => task.classification !== "archived").map((task) => task.sourceTaskId));
+  const problems: string[] = [];
+  for (const pkg of tasks) {
+    const parent = typeof pkg.nativeView.parent === "string" ? pkg.nativeView.parent : pkg.exportRow.parent;
+    const targets = [...dependencyIds(pkg).map((id) => ({ id, kind: "dependency" })),
+      ...(typeof parent === "string" && parent ? [{ id: parent, kind: "parent" }] : [])];
+    for (const { id, kind } of targets) {
+      if (id === pkg.sourceTaskId) problems.push(`${pkg.sourceTaskId} ${kind} ${id}: self target`);
+      else if (!eligible.has(id)) {
+        const target = byId.get(id);
+        problems.push(`${pkg.sourceTaskId} ${kind} ${id}: ${target ? `deleted/archive-only target (status=${JSON.stringify(target.nativeView.status ?? target.exportRow.status)}, classification=${target.classification})` : "missing from complete source inventory"}`);
+      }
+    }
+  }
+  const visiting = new Set<string>(), visited = new Set<string>();
+  const visit = (id: string, chain: string[]) => {
+    if (visiting.has(id)) { problems.push(`dependency cycle: ${[...chain, id].join(" -> ")}`); return; }
+    if (visited.has(id) || !eligible.has(id)) return;
+    visiting.add(id);
+    for (const target of dependencyIds(byId.get(id)!)) visit(target, [...chain, id]);
+    visiting.delete(id); visited.add(id);
+  };
+  for (const id of eligible) visit(id, []);
+  // Existing parent sorter supplies the exact source hierarchy cycle diagnostic.
+  topologicalBeadsPackages(tasks);
+  if (problems.length) throw new Error(`Beads source relationship preflight failed: ${problems.join("; ")}`);
 }
 
 function selectedEvidence(projectRoot: string, runner: CommandRunner): { provider: TaskProviderId; evidence: BacklogProviderEvidence | BeadsProviderEvidence } {
@@ -652,6 +703,7 @@ interface ActiveMigrationOwnership {
   worktree: string;
   branch: string;
   currentCodeHead: string;
+  verifyCodeProjection?: () => void;
   record: TaskEpisodeOwnershipRecord;
 }
 
@@ -669,8 +721,9 @@ function verifyActiveCodeIdentity(projectRoot: string, row: ActiveMigrationOwner
   const branch = runRequired(runner, "git", ["branch", "--show-current"], row.worktree, `active Episode ${row.ownerSessionId} branch`).stdout.trim();
   const head = runRequired(runner, "git", ["rev-parse", "HEAD"], row.worktree, `active Episode ${row.ownerSessionId} head`).stdout.trim();
   const status = runRequired(runner, "git", ["status", "--porcelain=v1"], row.worktree, `active Episode ${row.ownerSessionId} cleanliness`).stdout;
+  row.verifyCodeProjection?.();
   if (realpathSync(top) !== row.worktree || dirname(realpathSync(common)) !== realpathSync(projectRoot)
-      || realpathSync(gitDir) === realpathSync(common) || branch !== row.branch || head !== row.currentCodeHead || status !== "") {
+      || realpathSync(gitDir) === realpathSync(common) || branch !== row.branch || head !== row.currentCodeHead || (status !== "" && !row.verifyCodeProjection)) {
     throw new Error(`active task Episode ${row.ownerSessionId} does not match its exact clean linked worktree/branch/head identity`);
   }
   const historicalHead = row.record.head;
@@ -683,7 +736,7 @@ function verifyActiveCodeIdentity(projectRoot: string, row: ActiveMigrationOwner
   if (!directPublishedGitHead(runner, row.worktree, row.currentCodeHead)) throw new Error(`active task Episode ${row.ownerSessionId} current code head is not directly published`);
 }
 
-function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, runner: CommandRunner): ActiveMigrationOwnership[] {
+function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, runner: CommandRunner, replayProjection?: (worktree: string) => () => void): ActiveMigrationOwnership[] {
   const registry = readEpisodeOwnershipRegistry(projectRoot);
   const rows: ActiveMigrationOwnership[] = [];
   for (const [ownerSessionId, record] of Object.entries(registry.owners)) {
@@ -697,7 +750,7 @@ function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, ru
     if (!sessionEntry.isFile() || sessionEntry.isSymbolicLink() || realpathSync(record.episodeSessionFile) !== record.episodeSessionFile) {
       throw new Error(`active task Episode ${ownerSessionId} durable session file identity is unsafe`);
     }
-    const row = {
+    const row: ActiveMigrationOwnership = {
       ownerSessionId,
       taskId: record.taskId,
       worktree: record.worktree,
@@ -705,6 +758,8 @@ function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, ru
       currentCodeHead: runRequired(runner, "git", ["rev-parse", "HEAD"], record.worktree, `capture active Episode ${ownerSessionId} current code head`).stdout.trim(),
       record: JSON.parse(JSON.stringify(record)) as TaskEpisodeOwnershipRecord,
     };
+    const pending = runRequired(runner, "git", ["-C", row.worktree, "status", "--porcelain=v1"], row.worktree, "inspect active Episode pending replay layout").stdout;
+    if (pending && replayProjection) row.verifyCodeProjection = replayProjection(row.worktree);
     verifyActiveCodeIdentity(projectRoot, row, runner);
     rows.push(row);
   }
@@ -764,7 +819,7 @@ export function inspectTaskProviderMigration(options: {
   try {
     if (options.targetProvider !== "backlog") return blocked("unsupported-direction", "provider migration supports only Beads-to-Backlog", "request an explicit Beads-to-Backlog inspection; reverse migration is not supported", { targetProvider: options.targetProvider });
     const project = resolveNearestProjectRoot(options.cwd, process.env.HOME ?? "", runner);
-    if (project.kind === "linked-worktree") return blocked("primary-required", "provider migration must run from the canonical primary checkout", "rerun /initialize-prime-claw from the canonical primary Conversation", { targetProvider: options.targetProvider });
+    if (project.kind === "linked-worktree") return blocked("primary-required", "provider migration must run from the canonical primary checkout", "run the initialize-prime-claw skill from the canonical primary Conversation", { targetProvider: options.targetProvider });
     const codeHead = cleanGitRevision(runner, project.root);
     if (!directPublishedGitHead(runner, project.root, codeHead)) throw new Error("provider migration inspection requires an exact directly published code head");
     const source = captureSelectedSource(project.root, runner);
@@ -1419,15 +1474,20 @@ function backlogDestinationViews(runner: CommandRunner, projectRoot: string, sto
       classification: backlogClassification(storeDir, path),
     };
   });
+  // Before ordinary/code-tracked adoption the selected store is a directory
+  // inside the code repository, not an independent clone. Bind disposable
+  // archive reads to the actual native Git root in either supported layout.
+  const repositoryRoot = realpathSync(runRequired(runner, "git", ["-C", storeDir, "rev-parse", "--show-toplevel"], storeDir, `Backlog destination ${phase} Git identity`).stdout.trim());
+  if (repositoryRoot !== realpathSync(storeDir) && repositoryRoot !== realpathSync(projectRoot)) throw new Error(`Backlog destination ${phase} has a foreign Git root ${repositoryRoot}`);
   const archived = archivedBacklogViews(
-    runner, storeDir, projectRoot, revision,
+    runner, repositoryRoot, projectRoot, revision,
     files.filter((item) => item.classification === "archived").map(({ taskId, path, entityKind }) => ({ taskId, path, entityKind })),
   );
   try {
     return new Map(files.map((item) => [
-      item.taskId,
+      relative(storeDir, item.path).replace(/\\/g, "/"),
       item.classification === "archived"
-        ? archived.get(item.taskId)!
+        ? archived.get(item.path)!
         : item.entityKind === "draft"
           ? backlogDraftView(runner, projectRoot, item.taskId, relative(projectRoot, item.path).replace(/\\/g, "/"))
           : backlogTaskView(runner, projectRoot, item.taskId),
@@ -1435,6 +1495,26 @@ function backlogDestinationViews(runner: CommandRunner, projectRoot: string, sto
   } catch (error) {
     throw new Error(`Backlog destination ${phase} read failed (store=${existsSync(storeDir)}, config=${existsSync(join(storeDir, "config.yml"))}): ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+function backlogDestinationViewById(views: Map<string, JsonObject>, id: string, sourceTaskId?: string): JsonObject | undefined {
+  const matches = [...views.values()].filter((view) => view.task.id === id &&
+    (Array.isArray(view.task.comments) ? view.task.comments : []).some((comment: JsonObject) => {
+      if (!sourceTaskId) return isBacklogReceiptComment(comment);
+      const text = String(comment.text ?? comment.content ?? comment.body ?? "");
+      if (!text.startsWith(`${SOURCE_MARKER} mapping `)) return false;
+      const marker = asObject(parseJson(text.slice(`${SOURCE_MARKER} mapping `.length), `Backlog migration marker ${id}`), `Backlog migration marker ${id}`);
+      return marker.sourceTaskId === sourceTaskId;
+    }));
+  if (matches.length > 1) throw new Error(`Backlog migration identity ${id} repeats exact migration provenance`);
+  return matches[0];
+}
+
+function backlogReceiptId(views: Map<string, JsonObject>): string | undefined {
+  const receipts = [...views.values()].filter((view) =>
+    (Array.isArray(view.task.comments) ? view.task.comments : []).some(isBacklogReceiptComment));
+  if (receipts.length > 1) throw new Error("Backlog destination contains more than one migration receipt");
+  return receipts[0]?.task.id;
 }
 
 function backlogPhysicalTaskPaths(storeDir: string): Map<string, string[]> {
@@ -1451,7 +1531,7 @@ function assertBacklogLifecyclePlacement(
 ): string {
   const expectedStatus = pkg.classification === "archived" ? "In Progress" : statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
   if (view.task.status !== expectedStatus) throw new Error(`Backlog destination status projection mismatch for ${pkg.sourceTaskId}`);
-  const matches = paths.get(id) ?? [];
+  const matches = (paths.get(id) ?? []).filter((path) => String(view.task.path).replace(/\\/g, "/").endsWith(relative(storeDir, path).replace(/\\/g, "/")));
   const folder = pkg.classification === "archived" ? "archive/tasks/" : pkg.classification === "closed" ? "completed/" : "tasks/";
   if (matches.length !== 1 || !relative(storeDir, matches[0]).replace(/\\/g, "/").startsWith(folder)) {
     throw new Error(`Backlog destination physical placement mismatch for ${pkg.sourceTaskId}: expected one ${folder} record for ${id}`);
@@ -1461,9 +1541,12 @@ function assertBacklogLifecyclePlacement(
   return matches[0];
 }
 
-function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: string, storeDir: string, source: BeadsSnapshot): Record<string, string> {
+function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: string, storeDir: string, source: BeadsSnapshot,
+  views = backlogDestinationViews(runner, projectRoot, storeDir, "reuse")): Record<string, string> {
   const mapping: Record<string, string> = {};
-  for (const [id, view] of backlogDestinationViews(runner, projectRoot, storeDir, "reuse")) {
+  backlogReceiptId(views);
+  for (const view of views.values()) {
+    const id = view.task.id;
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
     const marker = comments.map((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "")).find((text: string) => text.startsWith(`${SOURCE_MARKER} mapping `));
     const receipt = comments.some(isBacklogReceiptComment);
@@ -1478,7 +1561,7 @@ function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: st
       }
       continue;
     }
-    if (!marker) throw new Error(`Backlog destination contains foreign task ${id}; use a clean destination or the exact same migration destination`);
+    if (!marker) continue; // Unrelated original records are preserved, never remapped.
     const parsed = asObject(parseJson(marker.slice(`${SOURCE_MARKER} mapping `.length), `Backlog migration marker ${id}`), `Backlog migration marker ${id}`);
     if (parsed.sourceRevision !== source.revision || parsed.sourceDigest !== source.digest
         || !source.tasks.some((task) => task.sourceTaskId === parsed.sourceTaskId)) throw new Error(`Backlog destination task ${id} belongs to a different source snapshot`);
@@ -1548,18 +1631,8 @@ function commitBacklogDestination(runner: CommandRunner, prepared: ExplicitBackl
   return head;
 }
 
-function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: string, storeDir: string, source: BeadsSnapshot): string {
-  const clean = runRequired(runner, "git", ["-C", storeDir, "status", "--porcelain=v1"], storeDir, "inspect Backlog receipt placeholder state").stdout === "";
-  const views = clean
-    ? backlogDestinationViews(runner, projectRoot, storeDir, "receipt-placeholder")
-    : new Map(walkTaskFiles(storeDir).map((path) => {
-        const id = backlogTaskId(readFileSync(path, "utf8"), path);
-        return [id, backlogTaskView(runner, projectRoot, id)] as const;
-      }));
-  for (const [id, view] of views) {
-    const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
-    if (comments.some(isBacklogReceiptComment)) return id;
-  }
+function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: string, source: BeadsSnapshot, receiptTaskId?: string): string {
+  if (receiptTaskId) return receiptTaskId;
   const pending = { marker: RECEIPT_MARKER, pending: true, sourceProvider: "beads", targetProvider: "backlog", sourceRevision: source.revision, sourceDigest: source.digest };
   const created = runRequired(runner, "backlog", ["task", "create", RECEIPT_TITLE, "--status", "In Progress", "--type", "task", "--notes", `\`\`\`json\n${JSON.stringify(pending, null, 2)}\n\`\`\``, "--no-dod-defaults", "--plain"], projectRoot, "reserve Backlog migration receipt identity");
   const id = backlogCreateId(created.stdout);
@@ -1567,20 +1640,10 @@ function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: str
   return id;
 }
 
-function createOrUpdateBacklogReceipt(runner: CommandRunner, projectRoot: string, storeDir: string,
-  receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">): string {
-  for (const [id, view] of backlogDestinationViews(runner, projectRoot, storeDir, "receipt")) {
-    const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
-    if (comments.some(isBacklogReceiptComment)) {
-      runRequired(runner, "backlog", ["task", "edit", "--notes", backlogReceiptNotes(receipt), "--status", "Done", "--final-summary", "Verified selected-provider migration receipt", "--plain", "--", id], projectRoot, "update Backlog migration receipt");
-      return id;
-    }
-  }
-  const created = runRequired(runner, "backlog", ["task", "create", RECEIPT_TITLE, "--status", "In Progress", "--type", "task", "--notes", `\`\`\`json\n${JSON.stringify(receipt, null, 2)}\n\`\`\``, "--no-dod-defaults", "--plain"], projectRoot, "create Backlog migration receipt");
-  const id = backlogCreateId(created.stdout);
-  nativeBacklogComment(runner, projectRoot, id, `${RECEIPT_MARKER}\nThe containing task-history Git commit is the destination receipt revision.`, "prime-claw-migration");
-  runRequired(runner, "backlog", ["task", "edit", "--status", "Done", "--final-summary", "Verified selected-provider migration receipt", "--plain", "--", id], projectRoot, "complete Backlog migration receipt content");
-  return id;
+function createOrUpdateBacklogReceipt(runner: CommandRunner, projectRoot: string,
+  receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">, receiptTaskId: string): string {
+  runRequired(runner, "backlog", ["task", "edit", "--notes", backlogReceiptNotes(receipt), "--status", "Done", "--final-summary", "Verified selected-provider migration receipt", "--plain", "--", receiptTaskId], projectRoot, "update Backlog migration receipt");
+  return receiptTaskId;
 }
 
 function backlogReceiptNotes(receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">): string {
@@ -1594,7 +1657,7 @@ function assertExactBacklogReceipt(
   receiptTaskId: string,
   receipt: Omit<ProviderMigrationReceipt, "destinationReceiptRevision">,
 ): void {
-  const view = views.get(receiptTaskId);
+  const view = backlogDestinationViewById(views, receiptTaskId);
   if (!view) throw new Error(`Backlog destination receipt ${receiptTaskId} is not exactly readable`);
   const task = asObject(view.task, `Backlog migration receipt ${receiptTaskId}`);
   const comments = Array.isArray(task.comments) ? task.comments : [];
@@ -1622,85 +1685,243 @@ function migratedBacklogPackage(view: JsonObject): string {
 }
 
 interface ExplicitBacklogMigrationWorkspace {
+  codePaths: string[];
   storeDir: string;
   remoteName: string;
   remoteUrl: string;
   head: string;
 }
 
-function ignoreMigrationBacklogStore(projectRoot: string, runner: CommandRunner): void {
+function ignoreMigrationBacklogStore(projectRoot: string, runner: CommandRunner, storeRelative = ".backlog"): void {
   const raw = runRequired(runner, "git", ["-C", projectRoot, "rev-parse", "--path-format=absolute", "--git-path", "info/exclude"], projectRoot, "resolve Git private exclude").stdout.trim();
   const exclude = isAbsolute(raw) ? raw : resolve(projectRoot, raw);
-  const line = "/.backlog/";
+  const line = `/${storeRelative}/`;
   const existing = existsSync(exclude) ? readFileSync(exclude, "utf8") : "";
   if (!existing.split(/\r?\n/).includes(line)) appendFileSync(exclude, `${existing && !existing.endsWith("\n") ? "\n" : ""}${line}\n`);
-  const ignored = runRequired(runner, "git", ["-C", projectRoot, "check-ignore", "-q", ".backlog/probe"], projectRoot, "prove private Backlog destination ignore");
+  const ignored = runRequired(runner, "git", ["-C", projectRoot, "check-ignore", "-q", `${storeRelative}/probe`], projectRoot, "prove private Backlog destination ignore");
   if (ignored.status !== 0) throw new Error("Backlog destination is not privately ignored by the code repository");
 }
 
 function prepareExplicitBacklogMigrationWorkspace(projectRoot: string, runner: CommandRunner): ExplicitBacklogMigrationWorkspace {
-  const remote = gitRemoteForDolt(runner, projectRoot);
-  const storeDir = join(projectRoot, ".backlog");
-  if (existsSync(storeDir)) {
-    const entry = lstatSync(storeDir);
-    if (!entry.isDirectory() || entry.isSymbolicLink() || !existsSync(join(storeDir, ".git"))) {
-      throw new Error("existing .backlog destination is not the exact reusable independent Git store");
-    }
-    const destinationRemote = runRequired(runner, "git", ["-C", storeDir, "remote", "get-url", remote.name], storeDir, "read Backlog destination remote").stdout.trim();
-    if (destinationRemote !== remote.raw) throw new Error("existing .backlog destination uses a different remote; clean it up or retry the exact same destination");
-  }
-  ignoreMigrationBacklogStore(projectRoot, runner);
-  if (!existsSync(storeDir)) {
-    runRequired(runner, "git", ["init", "-q", "--initial-branch", "prime-claw/tasks", storeDir], projectRoot, "initialize independent Backlog destination");
-    writeFileSync(join(storeDir, "TASKS.md"), "# Prime Claw task history\n\nThis disconnected branch carries the provider-native Backlog task store.\n");
-    writeFileSync(join(storeDir, "config.yml"), initialTaskStoreConfig(basename(projectRoot)));
-    mkdirSync(join(storeDir, "tasks"), { recursive: true });
-    mkdirSync(join(storeDir, "completed"), { recursive: true });
-    mkdirSync(join(storeDir, "archive", "tasks"), { recursive: true });
-    runRequired(runner, "git", ["-C", storeDir, "add", "TASKS.md", "config.yml"], storeDir, "stage Backlog destination initialization");
-    runRequired(runner, "git", ["-C", storeDir, "-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-m", "prime-claw: initialize task history"], storeDir, "commit Backlog destination initialization");
-    runRequired(runner, "git", ["-C", storeDir, "remote", "add", remote.name, remote.raw], storeDir, "configure Backlog destination remote");
-    runRequired(runner, "git", ["-C", storeDir, "push", "-u", remote.name, `HEAD:${TASK_HISTORY_REF}`], storeDir, "publish Backlog destination initialization");
+  const prepared = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: projectRoot, runner, explicitMigration: true });
+  if (prepared.status !== "prepared" || !prepared.remote || !prepared.remoteUrl) {
+    throw new Error(`Backlog destination preparation failed: ${prepared.status === "blocked" ? `${prepared.detail}; ${prepared.remediation}` : "destination publication remote is required"}`);
   }
   checkBacklogCapabilities(projectRoot, runner);
-  const head = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "HEAD"], storeDir, "read Backlog destination revision").stdout.trim();
-  if (!GIT_OID.test(head)) throw new Error("Backlog destination did not return an exact Git revision");
-  assertPublishedGitRef(runner, storeDir, head, remote.name, remote.raw, TASK_HISTORY_REF, "Backlog destination initialization publication");
-  return { storeDir, remoteName: remote.name, remoteUrl: remote.raw, head };
+  // Git does not materialize empty native directories. Native task complete
+  // moves into completed/ and requires it to exist; retain the original
+  // migration preparation's directory setup for fresh/cloned destinations.
+  for (const folder of ["tasks", "completed", "archive/tasks"]) mkdirSync(join(prepared.storeDir, folder), { recursive: true });
+  ignoreMigrationBacklogStore(projectRoot, runner, relative(projectRoot, prepared.storeDir).replace(/\\/g, "/"));
+  assertPublishedGitRef(runner, prepared.storeDir, prepared.head, prepared.remote, prepared.remoteUrl, TASK_HISTORY_REF, "Backlog destination preparation publication");
+  return { storeDir: prepared.storeDir, remoteName: prepared.remote, remoteUrl: prepared.remoteUrl, head: prepared.head, codePaths: prepared.codePaths ?? [] };
 }
 
-function prepareExplicitBacklogEpisodeWorkspace(worktree: string, runner: CommandRunner, remoteName: string, remoteUrl: string, expectedHead: string): void {
-  const storeDir = join(worktree, ".backlog");
-  if (!existsSync(storeDir)) {
-    runRequired(runner, "git", ["clone", "-q", "--origin", remoteName, "--branch", "prime-claw/tasks", "--single-branch", remoteUrl, storeDir], worktree, "clone migrated Backlog history into active Episode");
-  } else {
-    const entry = lstatSync(storeDir);
-    if (!entry.isDirectory() || entry.isSymbolicLink() || !existsSync(join(storeDir, ".git"))) throw new Error(`active Episode ${worktree} has a foreign .backlog destination`);
-    const destinationRemote = runRequired(runner, "git", ["-C", storeDir, "remote", "get-url", remoteName], storeDir, "read active Episode Backlog remote").stdout.trim();
-    if (destinationRemote !== remoteUrl) throw new Error(`active Episode ${worktree} has a different Backlog destination remote`);
+// Native Backlog derives these four fields from the whole visible corpus.
+// New imports may resolve old references without changing authored records.
+function preservedBacklogNativeView(view: JsonObject): JsonObject {
+  const { dependencyGraph, readiness, isReady, subtasks, ...authored } = view.task;
+  return { ...view, task: authored };
+}
+
+interface BacklogDestinationBaseline {
+  head: string;
+  cloneIdentity: string;
+  records: Map<string, JsonObject>;
+  files: Map<string, { bytes: string; history: string; repository: string; relativePath: string }>;
+}
+
+function backlogFileBytes(path: string): string {
+  const entry = lstatSync(path);
+  return `${entry.mode}:` + (entry.isSymbolicLink()
+    ? `link:${readlinkSync(path)}:${readFileSync(path).toString("base64")}`
+    : readFileSync(path).toString("base64"));
+}
+
+function backlogCloneIdentity(storeDir: string): string {
+  return [storeDir, join(storeDir, ".git")].map((path) => {
+    const entry = lstatSync(path);
+    return `${realpathSync(path)}:${entry.dev}:${entry.ino}`;
+  }).join("\n");
+}
+
+function backlogFileHistory(runner: CommandRunner, repository: string, relativePath: string): string {
+  return runRequired(runner, "git", ["-C", repository, "log", "--all", "--follow", "--format=%H", "--", relativePath], repository, `Backlog baseline history ${relativePath}`).stdout;
+}
+
+function captureBacklogDestinationBaseline(
+  projectRoot: string, prepared: ExplicitBacklogMigrationWorkspace, runner: CommandRunner, views: Map<string, JsonObject>,
+): BacklogDestinationBaseline {
+  const records = new Map([...views].filter(([, view]) => {
+    const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
+    return !comments.some((comment: JsonObject) => isBacklogReceiptComment(comment)
+      || String(comment.text ?? comment.content ?? comment.body ?? "").startsWith(`${SOURCE_MARKER} mapping `));
+  }).map(([path, view]) => [path, preservedBacklogNativeView(view)]));
+  const migrationPaths = new Set([...views.keys()].filter((path) => !records.has(path)));
+  const tracked = runRequired(runner, "git", ["-C", prepared.storeDir, "ls-files", "-z"], prepared.storeDir, "Backlog baseline files").stdout.split("\0").filter(Boolean);
+  const paths = new Set(tracked.filter((path) => !migrationPaths.has(path)).map((path) => join(prepared.storeDir, path)));
+  const captureFiles = (folder: string) => {
+    for (const entry of readdirSync(folder, { withFileTypes: true })) {
+      if (entry.name === ".git") continue;
+      const path = join(folder, entry.name);
+      if (entry.isDirectory()) captureFiles(path);
+      else if (!migrationPaths.has(relative(prepared.storeDir, path).replace(/\\/g, "/"))) paths.add(path);
+    }
+  };
+  captureFiles(prepared.storeDir);
+  for (const path of records.keys()) paths.add(join(prepared.storeDir, path));
+  for (const path of [join(projectRoot, "backlog.config.yml"), join(prepared.storeDir, "config.yml"), join(prepared.storeDir, "config.yaml"), join(prepared.storeDir, ".git", "config")]) {
+    if (existsSync(path)) paths.add(path);
   }
-  const statusBefore = runRequired(runner, "git", ["-C", storeDir, "status", "--porcelain=v1"], storeDir, "active Episode Backlog cleanliness").stdout;
-  const branch = runRequired(runner, "git", ["-C", storeDir, "symbolic-ref", "--short", "HEAD"], storeDir, "active Episode Backlog branch").stdout.trim();
-  if (statusBefore !== "" || branch !== "prime-claw/tasks") throw new Error(`active Episode worktree ${worktree} has dirty or foreign Backlog destination state`);
-  assertPublishedGitRef(runner, storeDir, expectedHead, remoteName, remoteUrl, TASK_HISTORY_REF, "active Episode Backlog destination publication");
-  runRequired(
-    runner,
-    "git",
-    ["-C", storeDir, "fetch", "--no-tags", remoteName, `${TASK_HISTORY_REF}:refs/remotes/${remoteName}/prime-claw/tasks`],
-    storeDir,
-    "refresh active Episode Backlog destination",
-  );
-  const remoteHead = runRequired(runner, "git", ["-C", storeDir, "rev-parse", `refs/remotes/${remoteName}/prime-claw/tasks`], storeDir, "active Episode Backlog remote revision").stdout.trim();
-  const headBefore = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "HEAD"], storeDir, "active Episode Backlog revision").stdout.trim();
-  if (remoteHead !== expectedHead) throw new Error(`active Episode worktree ${worktree} fetched a different Backlog destination revision`);
-  if (headBefore !== expectedHead) {
-    const ancestor = runner.run("git", ["-C", storeDir, "merge-base", "--is-ancestor", headBefore, expectedHead], { cwd: storeDir, allowFailure: true });
-    if (ancestor.status !== 0) throw new Error(`active Episode worktree ${worktree} Backlog destination cannot fast-forward to the migrated revision`);
-    runRequired(runner, "git", ["-C", storeDir, "merge", "--ff-only", `refs/remotes/${remoteName}/prime-claw/tasks`], storeDir, "fast-forward active Episode Backlog destination");
+  const files = new Map<string, { bytes: string; history: string; repository: string; relativePath: string }>();
+  for (const path of paths) {
+    const repository = contained(prepared.storeDir, path) ? prepared.storeDir : projectRoot;
+    const relativePath = relative(repository, path).replace(/\\/g, "/");
+    const history = backlogFileHistory(runner, repository, relativePath);
+    if (records.has(relative(prepared.storeDir, path).replace(/\\/g, "/")) && !history.trim()) {
+      throw new Error(`Backlog baseline record ${relativePath} has no published native file history`);
+    }
+    files.set(path, { bytes: backlogFileBytes(path), history, repository, relativePath });
   }
-  const statusAfter = runRequired(runner, "git", ["-C", storeDir, "status", "--porcelain=v1"], storeDir, "active Episode Backlog final cleanliness").stdout;
-  const headAfter = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "HEAD"], storeDir, "active Episode Backlog final revision").stdout.trim();
-  if (statusAfter !== "" || headAfter !== expectedHead) throw new Error(`active Episode worktree ${worktree} cannot bind the migrated Backlog revision`);
+  return { head: prepared.head, cloneIdentity: backlogCloneIdentity(prepared.storeDir), records, files };
+}
+
+function assertPreservedBacklogBaseline(
+  baseline: BacklogDestinationBaseline, storeDir: string, runner: CommandRunner, views?: Map<string, JsonObject>,
+): void {
+  if (backlogCloneIdentity(storeDir) !== baseline.cloneIdentity) throw new Error("Backlog destination original clone identity changed");
+  runRequired(runner, "git", ["-C", storeDir, "merge-base", "--is-ancestor", baseline.head, "HEAD"], storeDir, "Backlog baseline ancestry");
+  for (const [path, original] of baseline.files) {
+    if (!existsSync(path) || backlogFileBytes(path) !== original.bytes
+        || backlogFileHistory(runner, original.repository, original.relativePath) !== original.history) {
+      throw new Error(`Backlog destination changed original baseline file/history ${original.relativePath}`);
+    }
+  }
+  if (views) for (const [path, original] of baseline.records) {
+    const current = views.get(path);
+    if (!current || canonical(preservedBacklogNativeView(current)) !== canonical(original)) throw new Error(`Backlog destination changed original native record ${path}`);
+  }
+}
+
+function originalBacklogLayout(projectRoot: string, runner: CommandRunner) {
+  const selected = detectExplicitTaskProvider(projectRoot, "backlog", runner);
+  if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || !selected.evidence.storeDir) return null;
+  const store = selected.evidence.storeDir;
+  const originalFiles: Array<{ path: string; bytesBase64: string; mode: number }> = [];
+  const walk = (folder: string) => {
+    for (const entry of readdirSync(folder, { withFileTypes: true })) {
+      if (entry.name === ".git") continue;
+      const path = join(folder, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else originalFiles.push({ path: relative(store, path).replace(/\\/g, "/"), bytesBase64: readFileSync(path).toString("base64"), mode: lstatSync(path).mode });
+    }
+  };
+  walk(store);
+  const config = join(projectRoot, "backlog.config.yml");
+  const originalRootConfig = existsSync(config) ? {
+    bytesBase64: readFileSync(config).toString("base64"), mode: lstatSync(config).mode,
+    ...(lstatSync(config).isSymbolicLink() ? { linkTarget: readlinkSync(config) } : {}),
+  } : null;
+  return { originalStoreRelative: relative(projectRoot, store).replace(/\\/g, "/"), originalFiles, originalRootConfig };
+}
+
+/** Read-only proof for the observed fresh-store, explicit same-migration replay. */
+function freshBacklogMigrationReplay(
+  source: BeadsSnapshot, runner: CommandRunner,
+): (worktree: string) => () => void {
+  const storeDir = join(source.projectRoot, ".backlog");
+  const selected = detectExplicitTaskProvider(source.projectRoot, "backlog", runner);
+  if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || selected.evidence.storeDir !== storeDir
+      || !existsSync(join(storeDir, ".git")) || !lstatSync(join(storeDir, ".git")).isDirectory()) {
+    throw new Error("same-migration layout replay requires the exact existing independent hidden destination");
+  }
+  const head = cleanGitRevision(runner, storeDir);
+  const remote = gitRemoteForDolt(runner, source.projectRoot);
+  const actualRemote = runRequired(runner, "git", ["-C", storeDir, "remote", "get-url", remote.name], storeDir, "read replay destination transport").stdout.trim();
+  const top = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "--show-toplevel"], storeDir, "read replay destination Git identity").stdout.trim();
+  const branch = runRequired(runner, "git", ["-C", storeDir, "symbolic-ref", "--short", "HEAD"], storeDir, "read replay destination branch").stdout.trim();
+  if (actualRemote !== remote.raw || realpathSync(top) !== realpathSync(storeDir) || branch !== "prime-claw/tasks") throw new Error("same-migration destination clone identity changed");
+  assertPublishedGitRef(runner, storeDir, head, remote.name, remote.raw, TASK_HISTORY_REF, "same-migration replay destination publication");
+  const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "same-migration replay");
+  const receiptId = backlogReceiptId(views);
+  const receiptView = receiptId ? backlogDestinationViewById(views, receiptId) : undefined;
+  const payload = receiptView && /^```json\n([\s\S]+)\n```$/.exec(String(receiptView.task.implementationNotes ?? ""))?.[1];
+  if (!receiptId || !payload) throw new Error("same-migration layout replay requires a complete destination-native receipt");
+  const receipt = asObject(parseJson(payload, "same-migration replay receipt"), "same-migration replay receipt") as Omit<ProviderMigrationReceipt, "destinationReceiptRevision">;
+  if (receipt.schemaVersion !== 1 || receipt.marker !== RECEIPT_MARKER || receipt.sourceProvider !== "beads" || receipt.targetProvider !== "backlog"
+      || receipt.sourceRevision !== source.revision || receipt.sourceDigest !== source.digest || canonical(receipt.taskCounts) !== canonical(source.counts)
+      || !GIT_OID.test(receipt.destinationDataRevision) || typeof receipt.semanticPlacement !== "string") {
+    throw new Error("same-migration layout replay receipt does not bind the complete exact source capture");
+  }
+  assertExactBacklogReceipt(views, receiptId, receipt);
+  const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source, views);
+  const expectedMappings = source.tasks.map((pkg) => ({ sourceTaskId: pkg.sourceTaskId, destinationTaskId: mapping[pkg.sourceTaskId] }));
+  if (views.size !== source.counts.total + 1 || Object.keys(mapping).length !== source.counts.total
+      || canonical(receipt.mappings) !== canonical(expectedMappings)) throw new Error("fresh same-migration replay inventory/mappings do not match the verified receipt");
+  const paths = backlogPhysicalTaskPaths(storeDir);
+  const tasks = source.tasks.map((pkg) => {
+    const id = mapping[pkg.sourceTaskId];
+    const view = backlogDestinationViewById(views, id, pkg.sourceTaskId);
+    if (!view || canonical(parseJson(migratedBacklogPackage(view), `replay source package ${id}`))
+        !== canonical(parseJson(backlogSourcePackage(pkg, source, receipt.semanticPlacement), `complete source package ${pkg.sourceTaskId}`))) {
+      throw new Error(`same-migration replay does not preserve the exact native source package ${pkg.sourceTaskId}`);
+    }
+    assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
+    return view;
+  });
+  if (sha256(canonical({ preserved: [], imported: tasks })) !== receipt.destinationDataDigest) throw new Error("same-migration replay native destination digest differs from its complete receipt");
+  runRequired(runner, "git", ["-C", storeDir, "merge-base", "--is-ancestor", receipt.destinationDataRevision, head], storeDir, "verify replay receipt data ancestry");
+  const receiptPath = relative(storeDir, resolve(source.projectRoot, String(receiptView!.task.path))).replace(/\\/g, "/");
+  const laterFiles = runRequired(runner, "git", ["-C", storeDir, "diff", "--name-only", "-z", receipt.destinationDataRevision, head], storeDir, "verify replay receipt-only native changes").stdout.split("\0").filter(Boolean);
+  if (laterFiles.some((path) => path !== receiptPath)) throw new Error("same-migration replay destination files changed outside the verified receipt");
+  const rootConfig = join(source.projectRoot, "backlog.config.yml");
+  if (!lstatSync(rootConfig).isSymbolicLink()) throw new Error("same-migration replay requires the exact native root configuration link");
+  const link = readlinkSync(rootConfig);
+  if (isAbsolute(link) || !contained(storeDir, resolve(source.projectRoot, link)) || realpathSync(rootConfig) !== realpathSync(selected.evidence.configPath)) {
+    throw new Error("same-migration replay root configuration does not select its exact published store");
+  }
+  const configRelative = relative(storeDir, resolve(source.projectRoot, link)).replace(/\\/g, "/");
+  const publishedConfig = runRequired(runner, "git", ["-C", storeDir, "show", `${head}:${configRelative}`], storeDir, "read exact published replay native configuration").stdout;
+  if (publishedConfig !== readFileSync(rootConfig, "utf8")) throw new Error("same-migration replay native configuration differs from the published clone");
+  return (worktree: string) => {
+    const codeHead = runRequired(runner, "git", ["-C", worktree, "rev-parse", "HEAD"], worktree, "read exact replay code HEAD").stdout.trim();
+    if (!GIT_OID.test(codeHead)) throw new Error("same-migration replay has no exact code HEAD");
+    const previousRoot = runner.run("git", ["-C", worktree, "cat-file", "-e", `${codeHead}:backlog.config.yml`], { cwd: worktree, allowFailure: true });
+    if (previousRoot.status === 0) throw new Error("fresh same-migration replay root configuration was not absent at code HEAD");
+    const indexChanged = runRequired(runner, "git", ["-C", worktree, "diff", "--cached", "--name-only", "-z", codeHead], worktree, "verify unchanged replay code index").stdout;
+    if (indexChanged) throw new Error("fresh same-migration replay code index differs from HEAD");
+    const changed = runRequired(runner, "git", ["-C", worktree, "diff", "--name-only", "-z", codeHead], worktree, "inspect replay code changes").stdout.split("\0").filter(Boolean);
+    const untracked = runRequired(runner, "git", ["-C", worktree, "ls-files", "--others", "--exclude-standard", "-z"], worktree, "inspect replay untracked paths").stdout.split("\0").filter(Boolean);
+    if ([...changed, ...untracked].some((path) => path !== ".gitignore" && path !== "backlog.config.yml")) throw new Error("fresh same-migration replay contains unrelated code changes");
+    const previousIgnore = runner.run("git", ["-C", worktree, "show", `${codeHead}:.gitignore`], { cwd: worktree, allowFailure: true });
+    const originalIgnore = previousIgnore.status === 0 ? previousIgnore.stdout : "";
+    const ignorePath = join(worktree, ".gitignore");
+    if (existsSync(ignorePath) && !lstatSync(ignorePath).isFile()) throw new Error("replay .gitignore is not the original regular native metadata file");
+    const currentIgnore = existsSync(ignorePath) ? readFileSync(ignorePath, "utf8") : "";
+    const appendedIgnore = originalIgnore + (originalIgnore && !originalIgnore.endsWith("\n") ? "\n" : "") + "/.backlog/\n";
+    if (currentIgnore !== originalIgnore && currentIgnore !== appendedIgnore) throw new Error("fresh same-migration replay .gitignore contains unauthorized metadata changes");
+    const projectedRoot = join(worktree, "backlog.config.yml");
+    if (!existsSync(projectedRoot) || !lstatSync(projectedRoot).isSymbolicLink() || readlinkSync(projectedRoot) !== link
+        || readFileSync(projectedRoot).compare(readFileSync(rootConfig)) !== 0) throw new Error("fresh same-migration replay root link differs from the verified published native configuration");
+    const projection = migrationCodeProjection(worktree, runner, [".gitignore", "backlog.config.yml"]);
+    return () => {
+      if (runRequired(runner, "git", ["-C", worktree, "rev-parse", "HEAD"], worktree, "recheck replay code HEAD").stdout.trim() !== codeHead
+          || migrationCodeProjection(worktree, runner, [".gitignore", "backlog.config.yml"]) !== projection) throw new Error("fresh same-migration replay layout projection changed");
+    };
+  };
+}
+
+function migrationCodeProjection(projectRoot: string, runner: CommandRunner, allowed: string[]): string {
+  const changed = runRequired(runner, "git", ["-C", projectRoot, "diff", "--name-only", "-z", "HEAD"], projectRoot, "inspect migration layout changes").stdout.split("\0").filter(Boolean);
+  const untracked = runRequired(runner, "git", ["-C", projectRoot, "ls-files", "--others", "--exclude-standard", "-z"], projectRoot, "inspect migration layout untracked paths").stdout.split("\0").filter(Boolean);
+  const layoutPath = (path: string) => allowed.some((base) => path === base || path.startsWith(`${base}/`));
+  // Ownership is separately guarded by exact original records and the native
+  // switch lock. It is not part of the authorized layout projection.
+  const foreign = [...changed, ...untracked].filter((path) => !layoutPath(path) && path !== ".prime-claw/ownership.json");
+  if (foreign.length) throw new Error(`migration layout encountered unrelated code changes: ${foreign.join(", ")}`);
+  const diff = allowed.length ? runRequired(runner, "git", ["-C", projectRoot, "diff", "--binary", "HEAD", "--", ...allowed], projectRoot, "capture migration layout diff").stdout : "";
+  const index = runRequired(runner, "git", ["-C", projectRoot, "ls-files", "--stage", "-z"], projectRoot, "capture migration layout index").stdout;
+  return sha256(canonical({ diff, index, files: untracked.filter(layoutPath).map((path) => [path, backlogFileBytes(join(projectRoot, path))]) }));
 }
 
 function migrateBeadsToBacklog(
@@ -1709,16 +1930,26 @@ function migrateBeadsToBacklog(
   actor: string,
   timestamp: string,
   semanticPlacement: string,
-  ownershipRows: Array<{ ownerSessionId: string; taskId: string; worktree: string }>,
+  ownershipRows: Array<{ ownerSessionId: string; taskId: string; worktree: string; verifyCodeProjection?: () => void }>,
 ): DestinationCandidate {
+  const originalLayout = originalBacklogLayout(source.projectRoot, runner);
+  const activeCodeProjections = new Map<string, () => void>();
+  const activeLayoutPublishers = new Map<string, () => string>();
   const prepared = prepareExplicitBacklogMigrationWorkspace(source.projectRoot, runner);
   const storeDir = prepared.storeDir;
-  const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source);
+  const codeProjection = migrationCodeProjection(source.projectRoot, runner, prepared.codePaths);
+  const verifyCodeProjection = () => {
+    if (migrationCodeProjection(source.projectRoot, runner, prepared.codePaths) !== codeProjection) throw new Error("code layout projection changed during provider migration");
+  };
+  const originalViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "pre-import baseline");
+  const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source, originalViews);
+  const baseline = captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, originalViews);
+  const expectedCount = baseline.records.size + source.counts.total + 1;
   const reusedDestinationIds = new Set(Object.values(mapping));
   for (const pkg of topologicalBeadsPackages(source.tasks)) {
     if (!mapping[pkg.sourceTaskId]) mapping[pkg.sourceTaskId] = createBacklogTaskFromBeads(pkg, source, source.projectRoot, runner, mapping, semanticPlacement);
   }
-  ensureBacklogReceiptPlaceholder(runner, source.projectRoot, storeDir, source);
+  const reservedReceiptId = ensureBacklogReceiptPlaceholder(runner, source.projectRoot, source, backlogReceiptId(originalViews));
   for (const pkg of source.tasks) {
     const id = mapping[pkg.sourceTaskId];
     if (reusedDestinationIds.has(id)) continue;
@@ -1732,16 +1963,19 @@ function migrateBeadsToBacklog(
     } else {
       const status = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
       runRequired(runner, "backlog", ["task", "edit", "--status", status, "--plain", "--", id], source.projectRoot, `migrate status for ${pkg.sourceTaskId}`);
-      if (pkg.classification === "closed") runRequired(runner, "backlog", ["task", "complete", id], source.projectRoot, `complete migrated Backlog task ${id}`);
+      if (pkg.classification === "closed") runRequired(runner, "backlog", ["task", "complete", id], source.projectRoot,
+        `complete migrated Backlog task ${id} (source=${pkg.sourceTaskId}, store=${storeDir}, completedDir=${existsSync(join(storeDir, "completed"))})`);
     }
   }
+  assertPreservedBacklogBaseline(baseline, storeDir, runner);
   const dataRevision = commitBacklogDestination(runner, prepared, "prime-claw: migrate Beads task history");
   const dataViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "data");
   const dataPaths = backlogPhysicalTaskPaths(storeDir);
-  if (dataViews.size !== source.counts.total + 1) throw new Error(`Backlog destination count mismatch: expected ${source.counts.total} migrated tasks plus one receipt, found ${dataViews.size}`);
+  if (dataViews.size !== expectedCount) throw new Error(`Backlog destination count mismatch: expected ${baseline.records.size} preserved records + ${source.counts.total} imports + one receipt, found ${dataViews.size}`);
+  assertPreservedBacklogBaseline(baseline, storeDir, runner, dataViews);
   const destinationTasks: DestinationTask[] = source.tasks.map((pkg) => {
     const id = mapping[pkg.sourceTaskId];
-    const view = dataViews.get(id);
+    const view = backlogDestinationViewById(dataViews, id, pkg.sourceTaskId);
     if (!view) throw new Error(`Backlog destination task ${id} is not exactly readable`);
     const packageText = migratedBacklogPackage(view);
     if (canonical(parseJson(packageText, `Backlog migration package ${id}`)) !== canonical(parseJson(backlogSourcePackage(pkg, source, semanticPlacement), `source migration package ${pkg.sourceTaskId}`))) {
@@ -1771,36 +2005,82 @@ function migrateBeadsToBacklog(
     assertSameIds(relationshipIds(view.task.dependencies, id), expectedDependencies, `Backlog destination dependencies for ${pkg.sourceTaskId}`);
     return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath, taskEvidence: view };
   });
-  const destinationDataDigest = sha256(canonical(destinationTasks.map((task) => task.taskEvidence)));
+  const destinationDigest = (tasks: DestinationTask[]) => sha256(canonical({ preserved: [...baseline.records], imported: tasks.map((task) => task.taskEvidence) }));
+  const destinationDataDigest = destinationDigest(destinationTasks);
   const transitions = ownershipRows.map((row) => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));
   if (transitions.some((row) => !row.destinationTaskId)) throw new Error("active ownership has no Backlog destination mapping");
   const receiptBase = migrationReceiptBase(source, "backlog", dataRevision, destinationDataDigest,
     destinationTasks.map(({ sourceTaskId, destinationTaskId }) => ({ sourceTaskId, destinationTaskId })), transitions, actor, timestamp, semanticPlacement);
-  const receiptTaskId = createOrUpdateBacklogReceipt(runner, source.projectRoot, storeDir, receiptBase);
+  const receiptTaskId = createOrUpdateBacklogReceipt(runner, source.projectRoot, receiptBase, reservedReceiptId);
+  assertPreservedBacklogBaseline(baseline, storeDir, runner);
   const receiptRevision = commitBacklogDestination(runner, prepared, "prime-claw: record task-provider migration receipt");
   const refresh = () => {
     const exact = cleanGitRevision(runner, storeDir);
     if (exact !== receiptRevision) throw new Error("Backlog destination revision changed after receipt publication");
     assertPublishedGitRef(runner, storeDir, receiptRevision, prepared.remoteName, prepared.remoteUrl, TASK_HISTORY_REF, "Backlog destination receipt publication");
     const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "refresh");
-    if (views.size !== source.counts.total + 1) throw new Error(`Backlog destination receipt count changed: expected ${source.counts.total + 1}, found ${views.size}`);
+    if (views.size !== expectedCount) throw new Error(`Backlog destination receipt count changed: expected ${expectedCount} preserved/import/receipt records, found ${views.size}`);
+    assertPreservedBacklogBaseline(baseline, storeDir, runner, views);
     assertExactBacklogReceipt(views, receiptTaskId, receiptBase);
     const paths = backlogPhysicalTaskPaths(storeDir);
     const sourceById = new Map(source.tasks.map((pkg) => [pkg.sourceTaskId, pkg]));
     const refreshed = destinationTasks.map((task) => {
-      const taskEvidence = views.get(task.destinationTaskId);
+      const taskEvidence = backlogDestinationViewById(views, task.destinationTaskId, task.sourceTaskId);
       if (!taskEvidence) throw new Error(`Backlog destination task ${task.destinationTaskId} is not exactly readable after receipt`);
       assertBacklogLifecyclePlacement(sourceById.get(task.sourceTaskId)!, task.destinationTaskId, taskEvidence, storeDir, paths);
       return { ...task, taskEvidence };
     });
-    return { revision: exact, digest: sha256(canonical(refreshed.map((task) => task.taskEvidence))), tasks: refreshed, receiptTaskId };
+    return { revision: exact, digest: destinationDigest(refreshed), tasks: refreshed, receiptTaskId };
   };
   const final = refresh();
   return {
     provider: "backlog", revision: final.revision, digest: final.digest, receiptBase, receiptTaskId, tasks: final.tasks,
+    codePaths: prepared.codePaths, verifyCodeProjection, activeCodeProjections,
+    publishActiveCodeLayout(worktree: string) {
+      const publish = activeLayoutPublishers.get(worktree);
+      if (!publish) throw new Error(`active Episode ${worktree} has no exact reviewed layout projection`);
+      return publish();
+    },
     refreshAfterReceipt: refresh,
     prepareActiveWorktree(worktree: string) {
-      prepareExplicitBacklogEpisodeWorkspace(worktree, runner, prepared.remoteName, prepared.remoteUrl, receiptRevision);
+      const indexBefore = runRequired(runner, "git", ["-C", worktree, "ls-files", "--stage", "-z"], worktree, "capture active Episode original code index").stdout;
+      const originalRelative = originalLayout?.originalStoreRelative ?? relative(source.projectRoot, prepared.storeDir).replace(/\\/g, "/");
+      const targetRelative = relative(source.projectRoot, prepared.storeDir).replace(/\\/g, "/");
+      const detachPaths = runRequired(runner, "git", ["-C", worktree, "ls-files", "-z", "--", originalRelative], worktree, "capture active Episode original tracked task paths").stdout.split("\0").filter(Boolean);
+      const headBefore = runRequired(runner, "git", ["-C", worktree, "rev-parse", "HEAD"], worktree, "capture active Episode original code HEAD").stdout;
+      const attached = prepareExistingBacklogEpisodeProjection({ primaryRoot: source.projectRoot, targetWorktree: worktree,
+        runner, expectedRevision: receiptRevision, remoteName: prepared.remoteName, remoteUrl: prepared.remoteUrl,
+        originalStoreRelative: originalLayout?.originalStoreRelative ?? relative(source.projectRoot, prepared.storeDir).replace(/\\/g, "/"), originalFiles: originalLayout?.originalFiles ?? [],
+        originalRootConfig: originalLayout?.originalRootConfig ?? null,
+        verifyInitialCodeProjection: ownershipRows.find((row) => row.worktree === worktree)?.verifyCodeProjection });
+      if (attached.status !== "prepared") throw new Error(`active Episode Backlog attachment failed: ${attached.detail}`);
+      if (runRequired(runner, "git", ["-C", worktree, "ls-files", "--stage", "-z"], worktree, "verify active Episode original code index").stdout !== indexBefore
+          || runRequired(runner, "git", ["-C", worktree, "rev-parse", "HEAD"], worktree, "verify active Episode original code HEAD").stdout !== headBefore) {
+        throw new Error(`active Episode ${worktree} original code HEAD/index changed during layout projection`);
+      }
+      const projection = migrationCodeProjection(worktree, runner, attached.codePaths ?? []);
+      activeCodeProjections.set(worktree, () => {
+        if (migrationCodeProjection(worktree, runner, attached.codePaths ?? []) !== projection) throw new Error(`active Episode ${worktree} layout projection changed`);
+      });
+      activeLayoutPublishers.set(worktree, () => {
+        activeCodeProjections.get(worktree)!();
+        if (runRequired(runner, "git", ["-C", worktree, "rev-parse", "HEAD"], worktree, "verify active Episode pre-publication head").stdout !== headBefore) throw new Error(`active Episode ${worktree} code head changed before layout publication`);
+        if (detachPaths.length) runRequired(runner, "git", ["-C", worktree, "rm", "--cached", "--", ...detachPaths], worktree, "detach only exact preserved Episode task paths from code index");
+        const metadata = attached.codePaths.filter((path) => path !== originalRelative && !path.startsWith(`${originalRelative}/`) && path !== targetRelative && !path.startsWith(`${targetRelative}/`));
+        if (metadata.length) runRequired(runner, "git", ["-C", worktree, "add", "-A", "--", ...metadata], worktree, "stage exact Episode layout metadata");
+        const staged = runRequired(runner, "git", ["-C", worktree, "diff", "--cached", "--name-only", "-z"], worktree, "verify exact Episode layout publication paths").stdout.split("\0").filter(Boolean);
+        const exactPaths = new Set([...detachPaths, ...metadata]);
+        if (staged.some((path) => !exactPaths.has(path))) throw new Error(`active Episode ${worktree} layout publication includes unrelated staged paths`);
+        const gitlinks = runRequired(runner, "git", ["-C", worktree, "ls-files", "--stage"], worktree, "verify Episode layout contains no task gitlink").stdout.split("\n").filter((line) => line.startsWith("160000 ") && (line.endsWith(`\t${originalRelative}`) || line.endsWith(`\t${targetRelative}`)));
+        if (gitlinks.length) throw new Error(`active Episode ${worktree} layout publication would retain a task gitlink`);
+        if (staged.length) {
+          runRequired(runner, "git", ["-C", worktree, "-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-m", "prime-claw: activate migrated Backlog Episode layout"], worktree, "commit exact Episode layout bookkeeping");
+          runRequired(runner, "git", ["-C", worktree, "push"], worktree, "publish exact Episode layout bookkeeping");
+        }
+        const head = cleanGitRevision(runner, worktree);
+        if (!gitAncestor(runner, worktree, headBefore.trim(), head) || !directPublishedGitHead(runner, worktree, head)) throw new Error(`active Episode ${worktree} layout is not a clean directly published code descendant`);
+        return head;
+      });
     },
   };
 }
@@ -1819,25 +2099,13 @@ function verifyExactRetryDestination(source: SourceSnapshot, target: TaskProvide
     return;
   }
   if (source.provider === "beads" && target === "backlog") {
-    const storeDir = join(source.projectRoot, ".backlog");
-    if (!existsSync(storeDir) || !lstatSync(storeDir).isDirectory() || lstatSync(storeDir).isSymbolicLink()) {
-      throw new Error("existing Backlog retry destination is absent or unsafe");
-    }
-    const revision = cleanGitRevision(runner, storeDir);
-    const remote = gitRemoteForDolt(runner, source.projectRoot);
-    assertPublishedGitRef(runner, storeDir, revision, remote.name, remote.raw, TASK_HISTORY_REF, "existing Backlog retry destination publication");
-    const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source);
-    const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "retry admission");
-    const receiptCount = [...views.values()].filter((view) => {
-      const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
-      return comments.some((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "").includes(RECEIPT_MARKER));
-    }).length;
-    if (receiptCount > 1 || views.size !== Object.keys(mapping).length + receiptCount
-        || (Object.keys(mapping).length === 0 && receiptCount === 0)) {
-      throw new Error("existing Backlog retry destination cannot be proven as the exact same destination for this source snapshot");
-    }
+    const selected = detectExplicitTaskProvider(source.projectRoot, "backlog", runner);
+    if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || !selected.evidence.storeDir) throw new Error("existing Backlog destination native identity is unavailable");
+    checkBacklogCapabilities(source.projectRoot, runner);
+    existingBacklogMigrationMappings(runner, source.projectRoot, selected.evidence.storeDir, source);
     return;
   }
+
   throw new Error("same-destination retry requires different supported source and target providers");
 }
 
@@ -2086,9 +2354,9 @@ function activateBeadsCodeMetadata(projectRoot: string, runner: CommandRunner): 
   return files;
 }
 
-function publishProviderCutoverCodeState(snapshot: SourceSnapshot, runner: CommandRunner): string {
+function publishProviderCutoverCodeState(snapshot: SourceSnapshot, runner: CommandRunner, codePaths: string[] = []): string {
   const projectRoot = snapshot.projectRoot;
-  const allowed = new Set<string>([".prime-claw/ownership.json"]);
+  const allowed = new Set<string>([".prime-claw/ownership.json", ...codePaths]);
   if (snapshot.provider === "backlog") {
     for (const path of activateBeadsCodeMetadata(projectRoot, runner)) allowed.add(path);
   } else if (retireBeadsRootGitignoreBlock(projectRoot)) {
@@ -2106,9 +2374,20 @@ function publishProviderCutoverCodeState(snapshot: SourceSnapshot, runner: Comma
   const foreign = [...changed, ...untracked].filter((path) => !permitted(path));
   if (foreign.length) throw new Error(`provider cutover encountered unrelated code changes: ${foreign.join(", ")}`);
   if (changed.length || untracked.length) {
-    const modified = [...changed, ...untracked];
-    const stagePaths = [...allowed].filter((base) => modified.some((path) => path === base || path.startsWith(`${base}/`)));
-    runRequired(runner, "git", ["-C", projectRoot, "add", "-A", "--", ...stagePaths], projectRoot, "stage provider cutover state");
+    // Adoption already staged exact code-index deletions for the preserved
+    // task store. Re-adding those absent/ignored paths would either fail or try
+    // to reattach the independent clone. Stage only remaining worktree changes.
+    const unstaged = runRequired(runner, "git", ["-C", projectRoot, "diff", "--name-only", "-z"], projectRoot, "inspect unstaged cutover metadata").stdout.split("\0").filter(Boolean);
+    const stagePaths = [...new Set([...unstaged, ...untracked])];
+    if (stagePaths.length) runRequired(runner, "git", ["-C", projectRoot, "add", "-A", "--", ...stagePaths], projectRoot, "stage provider cutover state");
+    const staged = runRequired(runner, "git", ["-C", projectRoot, "diff", "--cached", "--name-only", "-z"], projectRoot, "verify full staged provider cutover scope").stdout.split("\0").filter(Boolean);
+    if (staged.some((path) => !permitted(path))) throw new Error("provider cutover contains unrelated staged changes");
+    const target = detectExplicitTaskProvider(projectRoot, "backlog", runner);
+    if (target.kind === "selected" && target.evidence.provider === "backlog" && target.evidence.storeDir) {
+      const storeRelative = relative(projectRoot, target.evidence.storeDir).replace(/\\/g, "/");
+      const entries = runRequired(runner, "git", ["-C", projectRoot, "ls-files", "--stage", "-z", "--", storeRelative], projectRoot, "verify detached destination has no code gitlink").stdout.split("\0").filter(Boolean);
+      if (entries.some((entry) => entry.startsWith("160000 "))) throw new Error("provider cutover would stage the independent task store as a gitlink");
+    }
     runRequired(runner, "git", ["-C", projectRoot, "-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-m", `prime-claw: activate ${snapshot.provider === "backlog" ? "Beads" : "Backlog"} task provider`], projectRoot, "commit provider cutover state");
     runRequired(runner, "git", ["-C", projectRoot, "push"], projectRoot, "publish provider cutover state");
   }
@@ -2137,18 +2416,24 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     if (!options.semanticPlacement.trim()) return blocked("placement-required", "provider switch requires managed semantic-placement prose for non-equivalent fields", "inspect exact source fields and supply concise placement prose without omitting any value", { targetProvider: options.targetProvider });
     const project = resolveNearestProjectRoot(options.cwd, process.env.HOME ?? "", runner);
     if (project.kind === "linked-worktree") return blocked("primary-required", "provider migration must run from the canonical primary checkout", "rerun from the canonical primary Conversation", { targetProvider: options.targetProvider });
-    const codeHead = cleanGitRevision(runner, project.root);
+    const codeHead = runRequired(runner, "git", ["-C", project.root, "rev-parse", "HEAD"], project.root, "read current migration code HEAD").stdout.trim();
+    if (!GIT_OID.test(codeHead)) throw new Error("provider migration has no exact code HEAD");
     if (!directPublishedGitHead(runner, project.root, codeHead)) throw new Error("provider migration requires an exact directly published code head");
+    const initialCodeStatus = runRequired(runner, "git", ["-C", project.root, "status", "--porcelain=v1"], project.root, "inspect initial migration code state").stdout;
     source = captureConfirmedSource(project.root, options.targetProvider, options.expectedSourceRevision, runner);
     if (source.provider === options.targetProvider) return blocked("same-provider", `the selected provider is already ${source.provider}`, "choose the other supported provider", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     if (source.revision !== options.expectedSourceRevision) return blocked("source-revision-changed", `confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`, "quiesce mutations, request a fresh inspection, and confirm that exact revision", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
+    const replayProjection = initialCodeStatus && source.provider === "beads" ? freshBacklogMigrationReplay(source, runner) : undefined;
+    if (initialCodeStatus && !replayProjection) throw new Error(`source task history is not clean: ${initialCodeStatus.trim()}`);
+    const verifyInitialProjection = replayProjection?.(project.root);
+    verifyInitialProjection?.();
     const beadsPlacements = source.provider === "backlog" && options.targetProvider === "beads"
       ? validateBeadsNativePlacements(source, options.beadsNativePlacements)
       : {};
     if (source.provider !== "backlog" && (options.beadsNativePlacements?.length ?? 0) > 0) {
       throw new Error("beadsNativePlacements applies only to Backlog-to-Beads migration");
     }
-    const ownershipRows = activeOwnership(project.root, source.provider, runner);
+    const ownershipRows = activeOwnership(project.root, source.provider, runner, replayProjection);
     for (const owner of ownershipRows) verifyActiveSourceWorkspace(source, owner, runner);
     const sourceIds = new Set(source.tasks.map((task) => task.sourceTaskId));
     const missing = ownershipRows.filter((row) => !sourceIds.has(row.taskId));
@@ -2156,15 +2441,22 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     await proveActiveRuntimeContinuity(ownershipRows, options.verifyActiveRuntime);
     const timestamp = (options.now ?? (() => new Date().toISOString()))();
     if (Number.isNaN(Date.parse(timestamp))) throw new Error("migration timestamp is not RFC3339");
+    verifyInitialProjection?.();
     const candidate = source.provider === "backlog"
       ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), beadsPlacements, ownershipRows)
       : migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows);
-    for (const owner of ownershipRows) candidate.prepareActiveWorktree(owner.worktree);
+    for (const owner of ownershipRows) {
+      candidate.prepareActiveWorktree(owner.worktree);
+      owner.verifyCodeProjection = candidate.activeCodeProjections?.get(owner.worktree);
+    }
     const sourceAfterMigration = captureSameSource(source, runner);
     exactSnapshotUnchanged(source, sourceAfterMigration);
     const refreshed = candidate.refreshAfterReceipt();
     if (refreshed.revision !== candidate.revision || refreshed.digest !== candidate.digest) throw new Error("destination changed after receipt verification");
-    const codeBeforeOwnership = cleanGitRevision(runner, project.root);
+    candidate.verifyCodeProjection?.();
+    const codeBeforeOwnership = candidate.verifyCodeProjection
+      ? runRequired(runner, "git", ["-C", project.root, "rev-parse", "HEAD"], project.root, "code head after layout projection").stdout.trim()
+      : cleanGitRevision(runner, project.root);
     if (codeBeforeOwnership !== codeHead) throw new Error("code repository changed during provider migration proof");
     for (const owner of ownershipRows) {
       verifyActiveCodeIdentity(project.root, owner, runner);
@@ -2173,6 +2465,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     const runtimeProofs = await proveActiveRuntimeContinuity(ownershipRows, options.verifyActiveRuntime);
     const destinationAtSwitch = candidate.refreshAfterReceipt();
     if (destinationAtSwitch.revision !== candidate.revision || destinationAtSwitch.digest !== candidate.digest) throw new Error("destination changed at ownership cutover");
+    candidate.verifyCodeProjection?.();
     const sourceAtSwitch = captureSameSource(source, runner);
     exactSnapshotUnchanged(source, sourceAtSwitch);
     for (const owner of ownershipRows) {
@@ -2204,6 +2497,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
         }
       }
       withCurrentTaskProviderOwnershipSwitch(project.root, ownershipSwitch, () => {
+        candidate.verifyCodeProjection?.();
         const destinationBeforeDelete = candidate.refreshAfterReceipt();
         if (destinationBeforeDelete.revision !== candidate.revision || destinationBeforeDelete.digest !== candidate.digest) throw new Error("destination changed before guarded source deletion");
         const sourceBeforeDelete = captureSameSource(source!, runner);
@@ -2239,7 +2533,13 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     if (remainingActiveSourceStores.length) throw new Error(`active Episode source stores still exist after guarded deletion: ${remainingActiveSourceStores.join(", ")}`);
     const destinationAfterDelete = candidate.refreshAfterReceipt();
     if (destinationAfterDelete.revision !== candidate.revision || destinationAfterDelete.digest !== candidate.digest) throw new Error("destination changed after guarded source deletion");
-    publishProviderCutoverCodeState(source, runner);
+    publishProviderCutoverCodeState(source, runner, candidate.codePaths);
+    for (const owner of ownershipRows) {
+      if (candidate.publishActiveCodeLayout) {
+        owner.currentCodeHead = candidate.publishActiveCodeLayout(owner.worktree);
+        owner.verifyCodeProjection = undefined;
+      }
+    }
     const finalRegistry = readEpisodeOwnershipRegistry(project.root);
     for (const transition of ownershipSwitch.transitions) {
       const owner = ownershipRows.find((row) => row.ownerSessionId === transition.ownerSessionId)!;

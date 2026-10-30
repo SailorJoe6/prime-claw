@@ -6,12 +6,15 @@
 manually copying lifecycle files, so that it gains the standard Prime Claw
 skills and workflows.**
 
-`/initialize-prime-claw` and `initialize_prime_claw(action="reconcile")`
-install or reconcile the project-owned `prepare`, `design`, `spec-it-out`,
+The globally discoverable `initialize-prime-claw` Markdown skill guides the
+agent through `initialize_prime_claw(action="reconcile")` to install or reconcile the project-owned `prepare`, `design`, `spec-it-out`,
 `design-legacy`, `spec-it-out-legacy`, `execute`, and `blocked` skills plus the
 `handoff`, task-native planning/implementation workflows, and the retained
 `plan-prep`, `plan-spec`, `implement-prep`, and `implement-spec` runtime
-workflows. Reconciliation never stages or commits project files.
+workflows. Template assets are never staged or committed by reconciliation.
+Explicit task-history preservation may commit/publish the separate task DAG and
+stage only original task-path deletions in the code index. Code branch HEAD
+stays unchanged; root-link and ignore bookkeeping remain explicit code changes.
 
 The first explicit initialization or upgrade also records the exact unfinished
 retained-legacy locations and accepted specification digests in one
@@ -35,29 +38,17 @@ reports per-asset conflicts without blocking independent safe updates.
 upstream version, so that I can deliberately preserve it, accept it, or reset
 it.**
 
-The comparison is the primary user outcome. Preserve, accept, and reset are the
-decisions that the comparison enables; the comparison is not an optional step
-after one of those decisions.
+The comparison is an ordinary readable Git patch as text, made from disposable
+copies of current asset bytes and upstream bytes. It does not overwrite, stage,
+restore, or foreground the real skill or workflow. Clean, dirty, and staged
+assets retain their exact bytes and Git index. No specialized viewer or
+ready/visibility choreography is required.
 
-The required UX is an in-product, focused Orca side-by-side comparison. Because
-Orca cannot compare two arbitrary files, a clean tracked worktree asset may be
-temporarily replaced with the upstream version so Orca can display its
-source-control diff. The lifecycle explains the visible overwrite and focus
-change, waits until the operator is ready, holds the comparison until the
-operator confirms it is visible, and restores the exact original bytes when the
-review completes or is cancelled.
-
-Prime Claw falls back to a native Git comparison when the worktree asset is
-already dirty or when Orca cannot display the comparison. A dirty asset must not
-be overwritten. After an Orca failure on a clean asset, Prime Claw restores the
-exact original bytes before falling back. In both cases, the Git comparison uses
-the worktree asset and upstream version without explicitly disabling a custom
-Git diff experience configured by the user.
-
-The lifecycle supports `accept-override`, `reset`, `review-request`,
-`review-start`, `review-complete`, `review-cancel`, and interrupted-review
-`restore` or `keep`. It must restore exact original bytes unless the operator
-explicitly chooses otherwise.
+Viewing a patch is not acceptance. `accept-override` and `reset` require separate
+explicit operator decisions. Legacy interrupted overwrite evidence remains held
+until the operator explicitly chooses restore or keep; comparison never clears
+that evidence silently. This supersedes DD-001's old overwrite/viewer policy,
+while retaining its historical probes.
 
 ## US-06 — Reconcile a registered project when a session starts
 
@@ -82,51 +73,48 @@ requiring conventional files and tools that the project does not use.**
 the existing upgrade UX, so that every task and its native history survives and
 active Episodes continue with the same identity.**
 
-`switch-request` performs a read-only inventory and returns the exact source
-revision, digest, open/closed/archived counts, active owner count, semantic
-placement prompt, and confirmation text. `switch-confirm` requires that exact
-revision plus an actor, managed semantic-placement prose, and literal operator
-confirmation. When inspection finds a source value without one exact destination
-equivalent, structured confirmation also carries the managed role's exact
-provider-native literal in one task-specific `beadsNativePlacements` entry. An
-ambiguous Backlog priority uses a Beads `0..4` value; a multi-assignee Backlog
-source uses one non-empty native Beads assignee, and one entry may carry both.
-Prose remains audit evidence and is never parsed into a value. The destination
-must read back every literal applied value before the source can be deleted. The
-operation creates the target only through
-supported native interfaces, preserves safe IDs or records immutable mappings,
-publishes and verifies every field, absence, relationship, comment, complete Git
-commit-message body and history, actor, timestamp, transition, applied native
-value, and provenance record, and writes one final destination-native receipt.
+The same initialization Markdown skill guides **Beads to Backlog only**.
+Inspection reports the exact source capture token, digest, complete counts,
+active-owner count, and semantic-placement context without writes. A separate
+explicit confirmation binds that token and the operator-approved actor. Reverse
+migration is not supported. Startup never migrates automatically.
 
-The source remains intact, clean, read-only, and authoritative through complete
-target proof. Beads export filters are rejected and a complete native export
-must equal an independent issue inventory. Backlog active and archived drafts
-are included with exact Markdown, native view, Git history, original kind, and
-placement; completion counts use native status while archive placement retains
-abandonment meaning. Every active Episode
-must also be clean and directly published at its exact code branch. Its preserved
-ownership head remains historical while migration captures the actual current
-head, proves the base/historical/current ancestry chain, and keeps that head
-stable through native Git and Orca checks. The same branch-local Backlog task
-bytes or exact shared provider revision, one idle durable runtime route, and
-matching Orca resources are required when applicable.
-Active version-2 ownership changes atomically only after those proofs; Episode,
-session, worktree, branch, code/runtime, and resource identity remain unchanged.
-Repeated source, frozen-destination-remote, active-code/runtime, registry,
-sole-target, and source-absence proofs guard deletion. A failed deletion restores
-ownership only after a complete unchanged source proof. Partial retirement keeps
-the verified destination binding and reports `cutover-incomplete`; directory
-existence never establishes source authority. An intact pre-cutover failure keeps
-source authority and reports exact cleanup or an explicit same-destination retry
-that must re-prove all existing markers,
-mappings, receipt, digest, and publication. A previously created clean active-
-Episode Backlog clone may advance only by exact-remote fetch and fast-forward to
-the verified receipt; unsafe or divergent clones block. There is no automatic retry,
-duplicate destination, dual write,
-mirror, provider-selection file, sidecar receipt, persistent coordinator, phase,
-checkpoint, or resume state. Production cutover remains a separately confirmed
-operator action and never occurs during startup reconciliation.
+A valid existing default `backlog/`, hidden `.backlog/`, or native root-config
+selected custom store is preserved, not treated as a collision. Normalize only
+the default `backlog/` into `.backlog/` with the standard native root symlink in
+both installation/initialization and migration; hidden/custom stores stay in
+place. Existing IDs, physical records (including same-ID archives), configuration,
+Git history, and clone/publication identity remain protected. Counts include
+preserved records, imports, and the single destination-native receipt.
+
+Native ID allocation and the existing importer mapping/provenance/relationships
+are reused. Archives are deleted/history, never dependency targets or fallback;
+only actual `tasks/` and `completed/` records are eligible. A reused live ID is
+not ambiguous because history retains it. Archive-only targets refuse as
+missing/deleted, as do true live/completed ambiguity, self references, and
+cycles. A genuine source relationship to a deleted task is reported before any
+destination mutation, not dropped or automatically repaired.
+
+Read retiring Beads as-is, including embedded/local-only stores without custom
+statuses or a Dolt remote. Complete native inventory/export, raw source version,
+status catalog, views/comments/history/events/provenance and stable identity are
+required; source setup, SQL, server conversion, or source publication are not.
+Unused catalog values do not block. Unsupported used statuses and ambiguous
+archive evidence report exact source IDs/statuses before writes. Legacy open
+maps to In Design; ordinary closed maps to Done/completed. Archive needs exact
+positive prior-archive/Prime Claw abandonment evidence, not keywords/categories.
+
+Confirmation, quiescence, source recapture, code/runtime/ownership continuity,
+verified destination content and publication all precede source retirement. The
+same active Episode/session/worktree/branch/resources continue. Destination and
+source proofs repeat beside ownership cutover and guarded deletion. A failed
+pre-cutover proof preserves source authority. Failed deletion restores ownership
+only after proving the complete source intact; partial retirement retains the
+verified destination and reports `cutover-incomplete`. Dirty/foreign/divergent
+active destination clones refuse; exact published clones may fast-forward only.
+No automatic retry, duplicate destination, dual write, sidecar authority, or
+persistent migration coordinator is introduced. Production migration remains a
+separately confirmed operator action, not an implementation test.
 
 ## Primary implementation surfaces
 

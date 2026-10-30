@@ -20,7 +20,7 @@ FROM ubuntu:24.04 AS backlog_builder
 
 ARG BUN_VERSION=1.3.11
 ARG BACKLOG_VERSION=1.53.0
-ARG BACKLOG_COMMIT=5d556c1954f7724abd180f6211cf528e9253ad4c
+ARG BACKLOG_COMMIT=431e95612d6167e418c507ec206d95df43c38c54
 ENV DEBIAN_FRONTEND=noninteractive
 ENV BUN_INSTALL=/usr/local/bun
 ENV PATH="/usr/local/bun/bin:${PATH}"
@@ -32,7 +32,7 @@ RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" \
 RUN set -eux; \
     git init -q /tmp/backlog; \
     git -C /tmp/backlog remote add origin https://github.com/SailorJoe6/Backlog.md.git; \
-    git -C /tmp/backlog fetch -q --depth 2 origin "$BACKLOG_COMMIT"; \
+    git -C /tmp/backlog fetch -q --depth 4 origin "$BACKLOG_COMMIT"; \
     git -C /tmp/backlog checkout -q --detach FETCH_HEAD; \
     git -C /tmp/backlog fetch -q --depth 1 origin "refs/tags/v${BACKLOG_VERSION}:refs/tags/v${BACKLOG_VERSION}"; \
     test "$(git -C /tmp/backlog rev-parse HEAD)" = "$BACKLOG_COMMIT"; \
@@ -67,7 +67,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 
 # --- Exact provider-native task tools used by Docker-only plugin validation ---
 ARG BACKLOG_VERSION=1.53.0
-ARG BACKLOG_COMMIT=5d556c1954f7724abd180f6211cf528e9253ad4c
+ARG BACKLOG_COMMIT=431e95612d6167e418c507ec206d95df43c38c54
 ARG BEADS_VERSION=1.3.1
 ARG DOLT_VERSION=2.5.0
 LABEL org.prime-claw.backlog-version="${BACKLOG_VERSION}" \

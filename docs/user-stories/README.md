@@ -84,8 +84,9 @@ keeps `/plan-spec` with `plan_spec`, `/implement-spec` with
 `restore_blocked_spec_episode`, `handoff_spec_episode`, and
 `finalize_spec_episode`.
 Ordinary `/handoff` and `ralph_handoff` remain the non-Episode pair, while
-`/initialize-prime-claw` and `initialize_prime_claw` remain the initialization
-pair.
+the globally discoverable `initialize-prime-claw` Markdown skill guides the
+agent-facing `initialize_prime_claw` tool. The custom initializer slash command
+is removed; operators do not need its action syntax.
 
 ## Candidate simplification seams
 
@@ -105,7 +106,8 @@ underlying story:
    handoff, and cleanup and should remain proportional to each resource boundary.
 7. Preferred Orca creation and narrow local fallback maintain parallel
    provisioning and recovery paths.
-8. Template comparison uses a substantial state machine for a temporary diff.
+8. Current template comparison uses an ordinary Git text patch without changing
+   actual assets or the index. Legacy interrupted-review recovery stays separate.
 9. Asset truth is spread across the inventory, apply/check allowlists, helper
    managers, and retired-file lists.
 10. Oversight and goals/heartbeat policy is reinforced through role policy,

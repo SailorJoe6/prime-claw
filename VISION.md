@@ -197,7 +197,7 @@ path or mirrored task model. Specification approval authorizes planning only.
 Provider choice is not permanent, but it changes only through a separate,
 explicit initialization/upgrade maintenance window. A read-only inspection
 binds the current source revision and complete open/closed/archived inventory.
-A confirmed Backlog↔Beads switch then uses native histories and creates, maps,
+A confirmed one-way Beads→Backlog migration then uses native histories and creates, maps,
 publishes, and re-reads every task before one destination-native receipt remaps
 active version-2 ownership. The same Episode, session, worktree, branch, runtime,
 and resources continue. The source stays authoritative until a second exact

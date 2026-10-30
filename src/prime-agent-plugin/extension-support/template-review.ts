@@ -1,17 +1,7 @@
-import {
-  closeSync,
-  constants,
-  existsSync,
-  fsyncSync,
-  lstatSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { createHash, randomUUID } from "node:crypto";
-import { dirname, join, relative, resolve } from "node:path";
+import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ProcessCommandRunner,
@@ -19,12 +9,12 @@ import {
   acquireProjectMutationLock,
   assertSafePathAncestors,
   fsyncDirectory,
-  episodeWorktreeActivity,
   loadAssetInventory,
   resolveNearestProjectRoot,
   type CommandRunner,
 } from "./project-initialization.ts";
 
+// Read only: retained evidence from the former actual-file overwrite workflow.
 interface ReviewState {
   schemaVersion: 1;
   projectRoot: string;
@@ -32,90 +22,36 @@ interface ReviewState {
   destination: string;
   originalSha256: string;
   upstreamSha256: string;
-  selector: string;
   status: "prepared" | "held" | "interrupted";
-  startedAt: string;
-  ownerPid?: number;
 }
 
 export interface ReviewOptions {
   pluginRoot?: string;
   home?: string;
   runner?: CommandRunner;
-  isActiveEpisode?: (projectRoot: string) => boolean;
 }
 
 function digest(bytes: Buffer | string): string { return createHash("sha256").update(bytes).digest("hex"); }
-
 function statePath(root: string): string { return join(root, TEMPLATE_REVIEW_STATE); }
-
 function lstatIfPresent(path: string) {
   try { return lstatSync(path); }
   catch (error: any) { if (error?.code === "ENOENT") return null; throw error; }
-}
-
-function processIsActive(pid: unknown): boolean {
-  if (!Number.isSafeInteger(pid) || (pid as number) <= 0) return false;
-  try { process.kill(pid as number, 0); return true; }
-  catch (error: any) { return error?.code !== "ESRCH"; }
-}
-
-function writeState(path: string, state: ReviewState): void {
-  const tmp = join(dirname(path), `.template-review.tmp-${process.pid}-${randomUUID()}`);
-  const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
-  try { writeFileSync(fd, `${JSON.stringify(state, null, 2)}\n`); fsyncSync(fd); } finally { closeSync(fd); }
-  renameSync(tmp, path);
-  fsyncDirectory(dirname(path));
 }
 
 function readState(root: string): ReviewState {
   const path = statePath(root);
   assertSafePathAncestors(root, path);
   const stat = lstatIfPresent(path);
-  if (!stat) throw new Error("no Prime Claw template review is active");
+  if (!stat) throw new Error("no legacy Prime Claw template review requires recovery");
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("template review state is not a regular file");
   const value = JSON.parse(readFileSync(path, "utf8"));
-  if (!value || value.schemaVersion !== 1 || value.projectRoot !== root || typeof value.assetId !== "string") throw new Error("template review state is invalid");
+  if (!value || value.schemaVersion !== 1 || value.projectRoot !== root
+    || typeof value.assetId !== "string" || typeof value.destination !== "string"
+    || !["prepared", "held", "interrupted"].includes(value.status)
+    || !/^[a-f0-9]{64}$/.test(value.originalSha256)
+    || !/^[a-f0-9]{64}$/.test(value.upstreamSha256)) throw new Error("template review state is invalid");
+  assertSafePathAncestors(root, join(root, value.destination));
   return value as ReviewState;
-}
-
-function run(runner: CommandRunner, command: string, args: string[], cwd: string, allowFailure = false) {
-  return runner.run(command, args, { cwd, allowFailure });
-}
-
-function assertCleanTrackedRegular(root: string, destination: string, runner: CommandRunner): void {
-  const stat = lstatSync(destination);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("template review requires a tracked regular file");
-  const rel = relative(root, destination);
-  if (run(runner, "git", ["-C", root, "ls-files", "--error-unmatch", "--", rel], root, true).status !== 0) throw new Error("template review requires a tracked file");
-  if (run(runner, "git", ["-C", root, "diff", "--quiet", "--", rel], root, true).status !== 0
-    || run(runner, "git", ["-C", root, "diff", "--cached", "--quiet", "--", rel], root, true).status !== 0) {
-    throw new Error("template review refuses a staged or unstaged file");
-  }
-}
-
-function restoreHeld(root: string, state: ReviewState, runner: CommandRunner): void {
-  const destination = join(root, state.destination);
-  assertSafePathAncestors(root, destination);
-  const current = digest(readFileSync(destination));
-  if (current !== state.upstreamSha256) {
-    writeState(statePath(root), { ...state, status: "interrupted" });
-    throw new Error("template review content changed while held; preserved for explicit keep or restore decision");
-  }
-  const restored = run(runner, "git", ["-C", root, "restore", "--worktree", "--", state.destination], root, true);
-  if (restored.status !== 0) {
-    writeState(statePath(root), { ...state, status: "interrupted" });
-    throw new Error(`template review restore failed; preserved recovery state: ${restored.stderr.trim()}`);
-  }
-  fsyncDirectory(dirname(destination));
-  if (run(runner, "git", ["-C", root, "diff", "--quiet", "--", state.destination], root, true).status !== 0
-    || run(runner, "git", ["-C", root, "diff", "--cached", "--quiet", "--", state.destination], root, true).status !== 0
-    || digest(readFileSync(destination)) !== state.originalSha256) {
-    writeState(statePath(root), { ...state, status: "interrupted" });
-    throw new Error("template review restore did not recover the exact original bytes and clean index");
-  }
-  unlinkSync(statePath(root));
-  fsyncDirectory(dirname(statePath(root)));
 }
 
 function selectedAsset(cwd: string, assetId: string, options: ReviewOptions) {
@@ -128,86 +64,31 @@ function selectedAsset(cwd: string, assetId: string, options: ReviewOptions) {
 }
 
 export function requestTemplateReview(cwd: string, assetId: string, options: ReviewOptions = {}) {
-  const { project, asset, destination } = selectedAsset(cwd, assetId, options);
-  if (lstatIfPresent(statePath(project.root))) throw new Error("another template review requires completion or recovery");
-  if (!existsSync(destination)) throw new Error("template review destination is missing");
-  return {
-    projectRoot: project.root,
-    assetId,
-    destination: asset.destination,
-    message: `Review will temporarily overwrite ${asset.destination} with the upstream template and foreground its Orca worktree. Say ready to continue or cancel to make no change.`,
-  };
-}
-
-export function startTemplateReview(cwd: string, assetId: string, confirmedReady: boolean, options: ReviewOptions = {}) {
-  if (!confirmedReady) throw new Error("template review requires the operator's explicit ready confirmation");
   const { runner, project, pluginRoot, asset, destination } = selectedAsset(cwd, assetId, options);
-  if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
-  const release = acquireProjectMutationLock(project.root);
+  assertSafePathAncestors(project.root, statePath(project.root));
+  if (lstatIfPresent(statePath(project.root))) throw new Error("legacy interrupted template review requires an explicit keep or restore decision before comparison");
+  assertSafePathAncestors(project.root, destination);
+  if (!existsSync(destination)) throw new Error("template review destination is missing");
+  const stat = lstatSync(destination);
+  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("template review destination is not a regular file");
+  const original = readFileSync(destination);
+  const upstream = readFileSync(join(pluginRoot, asset.source));
+  // Git reads copies only. Neither the real worktree nor its index is an input
+  // workspace, even when the asset has staged and unstaged changes at once.
+  const scratch = mkdtempSync(join(tmpdir(), "prime-claw-template-diff-"));
   try {
-    if (options.isActiveEpisode?.(project.root) ?? (episodeWorktreeActivity(project.root, project.kind, runner) !== "inactive")) throw new Error("active or uncertain Episode worktree retains its starting template snapshot");
-    const path = statePath(project.root);
-    assertSafePathAncestors(project.root, path);
-    assertSafePathAncestors(project.root, destination);
-    if (lstatIfPresent(path)) throw new Error("another template review requires completion or recovery");
-    assertCleanTrackedRegular(project.root, destination, runner);
-    const original = readFileSync(destination);
-    const upstream = readFileSync(join(pluginRoot, asset.source));
-    const state: ReviewState = {
-      schemaVersion: 1,
-      projectRoot: project.root,
-      assetId,
-      destination: asset.destination,
-      originalSha256: digest(original),
-      upstreamSha256: digest(upstream),
-      selector: `path:${project.root}`,
-      status: "prepared",
-      startedAt: new Date().toISOString(),
-      ownerPid: process.pid,
-    };
-    const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
-    try { writeFileSync(fd, `${JSON.stringify(state, null, 2)}
-`); fsyncSync(fd); } finally { closeSync(fd); }
-    fsyncDirectory(dirname(path));
-    const tmp = join(dirname(destination), `.prime-claw-review-${randomUUID()}`);
-    try {
-      const out = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o644);
-      try { writeFileSync(out, upstream); fsyncSync(out); } finally { closeSync(out); }
-      renameSync(tmp, destination);
-      fsyncDirectory(dirname(destination));
-      writeState(path, { ...state, status: "held" });
-      const opened = run(runner, "orca", ["file", "diff", asset.destination, "--worktree", state.selector, "--focus", "--json"], project.root, true);
-      if (opened.status !== 0) {
-        const fallback = run(runner, "git", ["-C", project.root, "diff", "--no-ext-diff", "--", asset.destination], project.root, true);
-        const diff = fallback.stdout || fallback.stderr;
-        restoreHeld(project.root, { ...state, status: "held" }, runner);
-        return { held: false, restored: true, fallback: "git-diff", diff, error: opened.stderr.trim() || "Orca diff unavailable" };
-      }
-      return { held: true, projectRoot: project.root, assetId, destination: asset.destination, selector: state.selector, opened: opened.stdout.trim(), message: "Upstream overwrite is held. Confirm the comparison is visible, then explicitly complete or cancel review." };
-    } catch (error) {
-      try { if (existsSync(tmp)) unlinkSync(tmp); } catch { /* best effort */ }
-      if (existsSync(path)) {
-        const current = existsSync(destination) ? digest(readFileSync(destination)) : "missing";
-        if (current === state.upstreamSha256) restoreHeld(project.root, { ...state, status: "held" }, runner);
-        else writeState(path, { ...state, status: "interrupted" });
-      }
-      throw error;
+    const before = `a/${asset.destination}`, after = `b/${asset.destination}`;
+    for (const [path, bytes] of [[before, original], [after, upstream]] as const) {
+      mkdirSync(dirname(join(scratch, path)), { recursive: true });
+      writeFileSync(join(scratch, path), bytes, { mode: 0o600 });
     }
-  } finally { release(); }
-}
-
-export function finishTemplateReview(cwd: string, action: "complete" | "cancel", visibleConfirmed: boolean, options: ReviewOptions = {}) {
-  const runner = options.runner ?? new ProcessCommandRunner();
-  const project = resolveNearestProjectRoot(cwd, options.home, runner);
-  const release = acquireProjectMutationLock(project.root);
-  try {
-    if (action === "cancel" && !lstatIfPresent(statePath(project.root))) return { restored: false, cancelled: true, noOp: true };
-    const state = readState(project.root);
-    if (state.status !== "held") throw new Error("template review is interrupted; choose explicit restore or keep recovery");
-    if (action === "complete" && !visibleConfirmed) throw new Error("completion requires the operator to confirm the focused comparison was visible");
-    restoreHeld(project.root, state, runner);
-    return { restored: true, clean: true, action, assetId: state.assetId };
-  } finally { release(); }
+    const result = runner.run("git", ["--no-pager", "diff", "--no-index", "--no-ext-diff", "--no-textconv", "--no-color", "--text", "--src-prefix=", "--dst-prefix=", "--", before, after], { cwd: scratch, allowFailure: true });
+    if (result.status !== 0 && result.status !== 1) throw new Error(`template comparison failed: ${result.stderr.trim()}`);
+    return {
+      projectRoot: project.root, assetId, destination: asset.destination, diff: result.stdout,
+      message: "Text comparison only: current project bytes to upstream template. Worktree and index are unchanged. Viewing this patch accepts no override or reset.",
+    };
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
 }
 
 export function recoverTemplateReview(cwd: string, action: "restore" | "keep", options: ReviewOptions = {}) {
@@ -216,24 +97,28 @@ export function recoverTemplateReview(cwd: string, action: "restore" | "keep", o
   const release = acquireProjectMutationLock(project.root);
   try {
     const state = readState(project.root);
-    if (state.status === "held" && processIsActive(state.ownerPid)) throw new Error("normal held review must complete or cancel; recovery is only for an interrupted or abandoned owner process");
     if (action === "keep") {
       unlinkSync(statePath(project.root));
       fsyncDirectory(dirname(statePath(project.root)));
       return { kept: true, assetId: state.assetId, destination: state.destination, message: "Current bytes were kept without staging or committing; reconcile will preserve them as customization." };
     }
     const destination = join(project.root, state.destination);
-    assertSafePathAncestors(project.root, destination);
-    const restored = run(runner, "git", ["-C", project.root, "restore", "--worktree", "--", state.destination], project.root, true);
+    const stat = lstatIfPresent(destination);
+    if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error("legacy template restore destination is not a regular file");
+    // The old workflow admitted only a clean tracked asset. Prove its original
+    // bytes still exist in the index before any explicit worktree restore.
+    const indexed = runner.run("git", ["-C", project.root, "show", `:${state.destination}`], { cwd: project.root, allowFailure: true });
+    if (indexed.status !== 0 || digest(indexed.stdout) !== state.originalSha256) {
+      throw new Error("legacy template restore cannot prove original bytes in the index; recovery evidence and current bytes were preserved");
+    }
+    // Unlike restore --worktree, checkout-index without --index does not
+    // refresh cached stat data or rewrite the real index while restoring bytes.
+    const restored = runner.run("git", ["-C", project.root, "checkout-index", "--force", "--", state.destination], { cwd: project.root, allowFailure: true });
     if (restored.status !== 0) throw new Error(`explicit template restore failed: ${restored.stderr.trim()}`);
     fsyncDirectory(dirname(destination));
-    if (run(runner, "git", ["-C", project.root, "diff", "--quiet", "--", state.destination], project.root, true).status !== 0
-      || run(runner, "git", ["-C", project.root, "diff", "--cached", "--quiet", "--", state.destination], project.root, true).status !== 0
-      || digest(readFileSync(destination)) !== state.originalSha256) {
-      throw new Error("explicit template restore did not recover the exact original bytes and clean index");
-    }
+    if (digest(readFileSync(destination)) !== state.originalSha256) throw new Error("explicit template restore did not recover the exact original bytes; recovery evidence was preserved");
     unlinkSync(statePath(project.root));
     fsyncDirectory(dirname(statePath(project.root)));
-    return { restored: true, clean: true, assetId: state.assetId };
+    return { restored: true, assetId: state.assetId };
   } finally { release(); }
 }

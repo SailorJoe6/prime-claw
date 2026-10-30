@@ -78,6 +78,47 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
             assert installed["installedSha256"]==hashlib.sha256(destination.read_bytes()).hexdigest()
             assert installed["availableUpstreamSha256"]==hashlib.sha256(source.read_bytes()).hexdigest()
             assert installed["baselineSha256"]!=installed["availableUpstreamSha256"]
+        elif row["id"] in {"project-workflow-implement-prep", "project-workflow-implement-spec"}:
+            # Existing builder evidence: these two entries retain their older
+            # baseline and customized state even though current bytes equal
+            # available upstream. Do not reset the real files or manifest just
+            # to make the fixture look managed.
+            retained={
+                "project-workflow-implement-prep": (
+                    "bdb1f929f34711a27305b203e35340c54a955150ab7258820f3e0069bd486088",
+                    "4823d1f90258e6b7f811fcf317a40dae33f7659d4a3ae86b2d0a20a25f70a329",
+                ),
+                "project-workflow-implement-spec": (
+                    "1b9fa01f1e0493fc6078683ae5872dfd32bb2419906247645c363168edb8eb3f",
+                    "a13405c5c7b92d0211526044cdde46e5c9ef217430472ed9f8bfa8aac40bb634",
+                ),
+            }
+            baseline,actual=retained[row["id"]]
+            assert installed=={
+                "source":row["source"], "destination":row["destination"],
+                "baselineSha256":baseline, "installedSha256":actual,
+                "acceptedOverrideSha256":None, "availableUpstreamSha256":actual,
+                "state":"customized",
+                "provenance":{
+                    "scope":"project", "exposure":"internal",
+                    "customization":"project-customizable", "lifecycleTrigger":"implement-spec",
+                },
+            }
+            assert hashlib.sha256(destination.read_bytes()).hexdigest()==actual
+            assert hashlib.sha256(source.read_bytes()).hexdigest()==actual
+        elif row["id"] in {"project-workflow-implement-prep", "project-workflow-implement-spec"}:
+            # Retained workflow provenance can predate a manual/current-byte
+            # restoration. Do not mutate the real builder assets to settle it.
+            assert installed["state"] in {"managed", "customized"}
+            assert installed["acceptedOverrideSha256"] is None
+            assert hashlib.sha256(destination.read_bytes()).hexdigest()==installed["installedSha256"]
+            assert installed["installedSha256"]==installed["availableUpstreamSha256"]
+            assert installed["availableUpstreamSha256"]==hashlib.sha256(source.read_bytes()).hexdigest()
+            assert installed["provenance"]["exposure"]=="internal"
+            if installed["state"]=="managed":
+                assert installed["baselineSha256"]==installed["availableUpstreamSha256"]
+            else:
+                assert installed["baselineSha256"]!=installed["availableUpstreamSha256"]
         else:
             assert installed["state"]=="managed"
             assert hashlib.sha256(destination.read_bytes()).hexdigest()==installed["installedSha256"]
@@ -166,3 +207,69 @@ def test_first_native_v098_session_discovers_initialized_skills(tier1_container,
     for name in ("skill:prepare","skill:execute","skill:design-legacy","skill:spec-it-out-legacy"):
         assert name in by_name
         assert by_name[name]["sourceInfo"]["path"]==str(project/".agents/skills"/name.split(":",1)[1]/"SKILL.md")
+
+
+def test_initialization_skill_is_one_global_managed_asset_before_project_setup():
+    inventory=json.loads((SOURCE/"asset-inventory.json").read_text())
+    assets={row["id"]:row for row in inventory["assets"]}
+    source="skills/initialize-prime-claw/SKILL.md"
+    assert assets["global-initialize-prime-claw"]=={
+        "id":"global-initialize-prime-claw","source":source,
+        "targets":[{"class":"plugin-root-managed","destination":source}],
+    }
+    text=" ".join((SOURCE/source).read_text().split())
+    for required in (
+        "name: initialize-prime-claw", "setup, upgrades", "action=reconcile",
+        "action=review-request", "standard Git patch as text", "Git index stay unchanged",
+        "action=accept-override", "action=reset", "explicit content decision",
+        "action=review-restore", "action=review-keep", "Never discard the record automatically",
+        "action=switch-request", "action=switch-confirm", "targetProvider=backlog",
+        "quiesced", "source deletion", "Existing active version-2 Episodes",
+        "An existing Backlog destination alongside Beads is expected input",
+        "Read outgoing Beads as-is", "publication", "never trigger provider migration",
+    ):
+        assert required in text
+    assert not any("migration" in path.parent.name for path in (SOURCE/"skills").glob("*/SKILL.md"))
+    extension=(SOURCE/"extensions/project-initialization.ts").read_text()
+    assert "registerCommand" not in extension
+    assert "parseCommand" not in extension
+    assert "confirmedReady" not in extension and "visibleConfirmed" not in extension
+
+
+def test_native_initialization_skill_discovery_before_any_project_setup(tier1_container, ctmp):
+    project=ctmp/"uninitialized-project";project.mkdir()
+    subprocess.run(["git","init","-q","-b","main",str(project)],check=True)
+    installed=ctmp/"installed-plugin"
+    applied=tier1_container.run(
+        "/workspace/scripts/apply-prime-agent-plugin.sh",
+        env={"PRIME_AGENT_PLUGIN_ROOT":str(installed)},workdir=None,timeout=60,
+    )
+    assert applied.returncode==0,applied.stdout+applied.stderr
+    # The standard probe wrapper owns its config root. Place the delivered
+    # global skills there, without enabling any project initializer extension.
+    # The wrapper also shuts down this exact isolated Prime Agent generation.
+    launcher=ctmp/"prime-agent-init-skill-probe"
+    launcher.write_text(
+        '#!/bin/sh\nset -eu\n'
+        'if [ ! -e "$PRIME_AGENT_CODING_AGENT_DIR/skills" ]; then\n'
+        f'  ln -s -- "{installed}/skills" "$PRIME_AGENT_CODING_AGENT_DIR/skills"\n'
+        'fi\n'
+        f'exec "{tier1_container.prime_agent}" "$@"\n'
+    )
+    launcher.chmod(0o755)
+    request=json.dumps({"id":"commands","type":"get_commands"})+"\n"
+    result=tier1_container.run(
+        "/workspace/scripts/run-prime-agent-probe.sh",str(launcher),
+        "--mode","rpc","--offline","--no-session","--no-extensions",
+        "--no-prompt-templates","--no-context-files","--cwd",str(project),
+        input_text=request,env={"HOME":str(ctmp)},workdir=None,timeout=60,
+    )
+    assert result.returncode==0,result.stdout+result.stderr
+    responses=[json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
+    commands=next(row for row in responses if row.get("id")=="commands")["data"]["commands"]
+    by_name={row["name"]:row for row in commands}
+    assert "skill:initialize-prime-claw" in by_name
+    assert "initialize-prime-claw" not in by_name
+    assert by_name["skill:initialize-prime-claw"]["sourceInfo"]["path"].endswith("/skills/initialize-prime-claw/SKILL.md")
+    for relative in (".agents", ".prime-claw", ".backlog", "backlog", "backlog.config.yml"):
+        assert not (project/relative).exists(),relative

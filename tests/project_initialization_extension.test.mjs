@@ -19,7 +19,7 @@ import {
 } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { createProjectInitializationExtension, summarizeReconcile } from "../src/prime-agent-plugin/extensions/project-initialization.ts";
 import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
-import { startTemplateReview } from "../src/prime-agent-plugin/extension-support/template-review.ts";
+import { requestTemplateReview } from "../src/prime-agent-plugin/extension-support/template-review.ts";
 import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import {
   LEGACY_SPECIFICATION_INVENTORY,
@@ -451,7 +451,7 @@ test("lock collision and active Episode skip make no asset mutation",t=>{
   execFileSync("rm",["-f",join(root,".prime-claw/reconcile.lock")]); const skipped=reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner,isActiveEpisode:()=>true}); assert.equal(skipped.skippedActiveEpisode,true); assert.equal(existsSync(join(root,".agents/skills/prepare/SKILL.md")),false);
 });
 
-test("extension shares core across command, tool, and awaited startup without a model turn",async t=>{
+test("skill-led extension exposes only its tool and keeps awaited startup separate",async t=>{
   const root=repo(t); const runner=new Runner([{id:"exact",path:root,displayName:"preserve"}]); const commands=new Map(),tools=new Map(),events=new Map(),notifications=[];
   const pi={registerCommand(n,d){commands.set(n,d)},registerTool(d){tools.set(d.name,d)},on(n,h){events.set(n,h)}};
   createProjectInitializationExtension({
@@ -466,15 +466,20 @@ test("extension shares core across command, tool, and awaited startup without a 
       return {status:"prepared",storeDir:join(primaryRoot,".backlog"),head:"a".repeat(40)};
     },
   })(pi);
-  assert.deepEqual([...commands.keys()],["initialize-prime-claw"]); assert.deepEqual([...tools.keys()],["initialize_prime_claw"]); assert.ok(events.has("session_start")); assert.ok(events.has("resources_discover"));
+  assert.deepEqual([...commands.keys()],[]); assert.deepEqual([...tools.keys()],["initialize_prime_claw"]); assert.ok(events.has("session_start")); assert.ok(events.has("resources_discover"));
   const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}}; await events.get("session_start")({},ctx); assert.ok(existsSync(join(root,".prime-claw/templates.json"))); assert.equal(notifications.length,1); const discovered=await events.get("resources_discover")({},ctx); assert.equal(discovered.skillPaths.length,7); assert.ok(discovered.skillPaths.every(path=>path.endsWith("SKILL.md"))); assert.equal(await events.get("resources_discover")({},ctx),undefined); await events.get("session_start")({},ctx); assert.equal(notifications.length,1);
   const result=await tools.get("initialize_prime_claw").execute("id",{action:"reconcile"},null,null,ctx); assert.equal(result.isError,undefined); assert.equal(runner.adds,0);
-  await commands.get("initialize-prime-claw").handler("--review project-skill-prepare",ctx);
-  assert.match(notifications.at(-1).message,/temporarily overwrite/);
-  assert.match(notifications.at(-1).message,/ready to continue or cancel/);
-  const customized=join(root,".agents/skills/prepare/SKILL.md");writeFileSync(customized,readFileSync(customized,"utf8")+"\ncustom command policy\n");
-  await commands.get("initialize-prime-claw").handler("",ctx);
-  assert.match(notifications.at(-1).message,/project-skill-prepare/);assert.match(notifications.at(-1).message,/--review project-skill-prepare/);
+  const comparison=await tools.get("initialize_prime_claw").execute("review",{action:"review-request",assetId:"project-skill-prepare"},null,null,ctx);
+  assert.match(comparison.content[0].text,/Text comparison only/);
+  assert.match(comparison.content[0].text,/no textual differences/);
+  const customized=join(root,".agents/skills/prepare/SKILL.md");writeFileSync(customized,readFileSync(customized,"utf8")+"\ncustom project policy\n");
+  const reconciled=await tools.get("initialize_prime_claw").execute("upgrade",{action:"reconcile"},null,null,ctx);
+  assert.match(reconciled.content[0].text,/project-skill-prepare/);assert.match(reconciled.content[0].text,/text comparison of project-skill-prepare/);
+  assert.equal(runner.diffs,0);
+  const schema=tools.get("initialize_prime_claw").parameters;
+  for(const retired of ["review-start","review-complete","review-cancel"])assert.ok(!schema.properties.action.enum.includes(retired));
+  assert.equal(schema.properties.confirmedReady,undefined);assert.equal(schema.properties.visibleConfirmed,undefined);
+
 });
 
 
@@ -489,7 +494,8 @@ test("one owner-worktree record protects the linked Episode snapshot", (t) => {
   assert.equal(existsSync(join(worktree,".prime-claw/templates.json")),false);
   assert.throws(()=>acceptProjectOverride(worktree,"project-skill-prepare",{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/active or uncertain Episode/);
   assert.throws(()=>resetProjectAsset(worktree,"project-skill-prepare",{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/active or uncertain Episode/);
-  assert.throws(()=>startTemplateReview(worktree,"project-skill-prepare",true,{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()}),/active or uncertain Episode/);
+  // Text comparison is read-only; mutating override/reset still protect the Episode snapshot.
+  assert.equal(existsSync(join(worktree,".prime-claw/template-review.json")),false);
 });
 
 test("multi-record ownership detects each exact active worktree", (t) => {
@@ -696,12 +702,15 @@ test("dangling project skill and workflow leaf symlinks are preserved as indepen
 });
 
 
-test("adapter exposes restored terminal fallback diff to both tool and slash-command callers", async (t) => {
+test("adapter returns ordinary Git patch text without invoking any viewer", async (t) => {
   const root=repo(t),runner=new Runner();reconcilePrimeClawProject({cwd:root,pluginRoot:PLUGIN,home:dirname(root),runner});git(root,"add",".");git(root,"commit","-qm","initialize");
-  const target=join(root,".agents/skills/prepare/SKILL.md");writeFileSync(target,readFileSync(target,"utf8")+"\nadapter fallback customization\n");git(root,"add",target);git(root,"commit","-qm","customize");runner.orcaError="Orca diff unavailable";
-  const commands=new Map(),tools=new Map(),notifications=[];createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})({registerCommand(name,value){commands.set(name,value)},registerTool(value){tools.set(value.name,value)},on(){}});const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}};
-  const tool=await tools.get("initialize_prime_claw").execute("fallback",{action:"review-start",assetId:"project-skill-prepare",confirmedReady:true},null,null,ctx);assert.equal(tool.isError,undefined);assert.match(tool.content[0].text,/adapter fallback customization/);assert.match(tool.content[0].text,/git-diff fallback/);
-  await commands.get("initialize-prime-claw").handler("--review-ready project-skill-prepare",ctx);assert.match(notifications.at(-1).message,/adapter fallback customization/);assert.match(notifications.at(-1).message,/git-diff fallback/);
+  const target=join(root,".agents/skills/prepare/SKILL.md");writeFileSync(target,readFileSync(target,"utf8")+"\nadapter customization\n");git(root,"add",target);writeFileSync(target,readFileSync(target,"utf8")+"unstaged edit\n");runner.orcaError="Orca unavailable";
+  const before=readFileSync(target),index=readFileSync(join(root,".git/index"));
+  const commands=new Map(),tools=new Map();createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})({registerCommand(name,value){commands.set(name,value)},registerTool(value){tools.set(value.name,value)},on(){}});const ctx={cwd:root,ui:{notify(){}}};
+  const tool=await tools.get("initialize_prime_claw").execute("patch",{action:"review-request",assetId:"project-skill-prepare"},null,null,ctx);
+  assert.equal(tool.isError,undefined);assert.match(tool.content[0].text,/diff --git a\/\.agents/);assert.match(tool.content[0].text,/-adapter customization/);assert.match(tool.content[0].text,/-unstaged edit/);
+  assert.deepEqual(readFileSync(target),before);assert.deepEqual(readFileSync(join(root,".git/index")),index);assert.equal(runner.diffs,0);assert.equal(commands.size,0);
+  for(const action of ["review-start","review-complete","review-cancel"]){const retired=await tools.get("initialize_prime_claw").execute("retired",{action},null,null,ctx);assert.equal(retired.isError,true);assert.match(retired.content[0].text,/unsupported initialization action/);}
 });
 
 
@@ -973,7 +982,7 @@ test("initialization UX separates read-only provider-switch inspection from exac
     migrationInspector(input) {
       calls.push({ kind: "inspect", input });
       return {
-        status: "ready", projectRoot: "/fixture", sourceProvider: "backlog", targetProvider: input.targetProvider,
+        status: "ready", projectRoot: "/fixture", sourceProvider: "beads", targetProvider: input.targetProvider,
         sourceRevision: "a".repeat(40), sourceDigest: "b".repeat(64),
         taskCounts: { open: 2, closed: 1, archived: 1, total: 4 }, activeOwnership: [],
         semanticPlacementPrompt: "decide native placement", confirmation: "confirm exact destructive switch",
@@ -986,7 +995,7 @@ test("initialization UX separates read-only provider-switch inspection from exac
         status: "completed", receiptTaskId: "RECEIPT-1", sourceAbsent: true, selectedProvider: input.targetProvider,
         receipt: {
           schemaVersion: 1, marker: "prime-claw-task-provider-migration-receipt-v1",
-          sourceProvider: "backlog", targetProvider: input.targetProvider, sourceRevision: input.expectedSourceRevision,
+          sourceProvider: "beads", targetProvider: input.targetProvider, sourceRevision: input.expectedSourceRevision,
           sourceDigest: "b".repeat(64), destinationDataRevision: "c".repeat(32), destinationDataDigest: "d".repeat(64),
           destinationReceiptRevision: "e".repeat(32), taskCounts: { open: 2, closed: 1, archived: 1, total: 4 },
           mappings: [], ownershipTransitions: [], actor: input.actor, timestamp: "2026-10-27T12:00:00.000Z",
@@ -998,26 +1007,23 @@ test("initialization UX separates read-only provider-switch inspection from exac
   const notices = [];
   const ctx = { cwd: "/fixture", ui: { notify(message, level) { notices.push({ message, level }); } } };
   const tool = tools.get("initialize_prime_claw");
-  const inspected = await tool.execute("inspect", { action: "switch-request", targetProvider: "beads" }, undefined, undefined, ctx);
+  const inspected = await tool.execute("inspect", { action: "switch-request", targetProvider: "backlog" }, undefined, undefined, ctx);
   assert.equal(inspected.isError, undefined);
-  assert.match(inspected.content[0].text, /backlog->beads/);
+  assert.match(inspected.content[0].text, /beads->backlog/);
   assert.match(inspected.content[0].text, /tasks\(open=2,closed=1,archived=1,total=4\)/);
   assert.match(inspected.content[0].text, /digest=b{64}/);
   assert.match(inspected.content[0].text, /Semantic placement: decide native placement/);
   assert.equal(calls.length, 1);
   const unconfirmed = await tool.execute("blocked", {
-    action: "switch-confirm", targetProvider: "beads", expectedSourceRevision: "a".repeat(40),
+    action: "switch-confirm", targetProvider: "backlog", expectedSourceRevision: "a".repeat(40),
     confirmedSwitch: false, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
   }, undefined, undefined, ctx);
   assert.match(unconfirmed.content[0].text, /confirmation-required/);
-  const placements = [{ sourceTaskId: "TASK-1", priority: 1, assignee: "bob" }];
-  assert.equal(tool.parameters.properties.beadsNativePlacements.items.properties.priority.maximum, 4);
-  assert.equal(tool.parameters.properties.beadsNativePlacements.items.properties.assignee.minLength, 1);
-  assert.deepEqual(tool.parameters.properties.beadsNativePlacements.items.required, ["sourceTaskId"]);
+  assert.deepEqual(tool.parameters.properties.targetProvider.enum,["backlog"]);
+  assert.equal(tool.parameters.properties.beadsNativePlacements,undefined);
   const completed = await tool.execute("confirm", {
-    action: "switch-confirm", targetProvider: "beads", expectedSourceRevision: "a".repeat(40),
+    action: "switch-confirm", targetProvider: "backlog", expectedSourceRevision: "a".repeat(40),
     confirmedSwitch: true, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
-    beadsNativePlacements: placements,
   }, undefined, undefined, ctx);
   assert.equal(completed.isError, undefined);
   assert.match(completed.content[0].text, /source-absent=true/);
@@ -1025,23 +1031,31 @@ test("initialization UX separates read-only provider-switch inspection from exac
   assert.equal(calls[2].input.confirmedSwitch, true);
   assert.equal(calls[2].input.expectedSourceRevision, "a".repeat(40));
   assert.equal(calls[2].input.semanticPlacement, "keep unsupported fields in native metadata");
-  assert.deepEqual(calls[2].input.beadsNativePlacements, placements);
+  assert.equal(calls[2].input.beadsNativePlacements,undefined);
+  assert.equal(commands.size,0);
 });
 
-test("provider-switch slash confirmation requires exact revision actor and semantic placement", async () => {
-  const commands = new Map(), tools = new Map(), notices = [], calls = [];
+test("retired command and reverse direction cannot invoke migration mechanics", async () => {
+  const commands=new Map(),tools=new Map(),calls=[];
   createProjectInitializationExtension({
-    migrationInspector(input) { calls.push({ kind: "inspect", input }); return { status: "blocked", code: "fixture", detail: "fixture", remediation: "fixture" }; },
-    migrationRunner(input) { calls.push({ kind: "run", input }); return { status: "blocked", code: "fixture", detail: "fixture", remediation: "fixture" }; },
-  })({ registerCommand(name, value) { commands.set(name, value); }, registerTool(name) { tools.set(name.name, name); }, on() {} });
-  const ctx = { cwd: "/fixture", ui: { notify(message, level) { notices.push({ message, level }); } } };
-  await commands.get("initialize-prime-claw").handler("--switch-request beads", ctx);
-  assert.equal(calls[0].kind, "inspect");
-  await commands.get("initialize-prime-claw").handler(`--switch-confirm beads ${"a".repeat(40)} operator preserve exact unsupported fields in destination metadata`, ctx);
-  assert.equal(calls[1].kind, "run");
-  assert.equal(calls[1].input.confirmedSwitch, true);
-  assert.equal(calls[1].input.actor, "operator");
-  assert.equal(calls[1].input.semanticPlacement, "preserve exact unsupported fields in destination metadata");
-  await commands.get("initialize-prime-claw").handler("--switch-confirm beads", ctx);
-  assert.match(notices.at(-1).message, /usage:/);
+    migrationInspector(input){calls.push(input);throw Error("must not inspect");},
+    migrationRunner(input){calls.push(input);throw Error("must not migrate");},
+  })({registerCommand(name,value){commands.set(name,value);},registerTool(tool){tools.set(tool.name,tool);},on(){}});
+  assert.equal(commands.size,0);
+  const ctx={cwd:"/fixture",ui:{notify(){}}};
+  for(const action of ["switch-request","switch-confirm"]){
+    const result=await tools.get("initialize_prime_claw").execute("reverse",{action,targetProvider:"beads",expectedSourceRevision:"a".repeat(40),confirmedSwitch:true},null,null,ctx);
+    assert.equal(result.isError,true);assert.match(result.content[0].text,/only Beads to Backlog/);
+  }
+  assert.deepEqual(calls,[]);
+});
+
+test("startup never inspects or confirms a provider migration",async t=>{
+  const root=repo(t),runner=new Runner([{id:"exact",path:root}]),events=new Map(),calls=[];
+  createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner,
+    migrationInspector(input){calls.push(input);throw Error("must not inspect");},
+    migrationRunner(input){calls.push(input);throw Error("must not migrate");},
+  })({registerTool(){},on(name,handler){events.set(name,handler);}});
+  await events.get("session_start")({}, {cwd:root,ui:{notify(){}}});
+  assert.deepEqual(calls,[]);
 });

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SOURCE="$ROOT/deps/backlog"
 VERSION=1.53.0
-COMMIT=5d556c1954f7724abd180f6211cf528e9253ad4c
+COMMIT=431e95612d6167e418c507ec206d95df43c38c54
 
 [ "$(git -C "$SOURCE" rev-parse HEAD)" = "$COMMIT" ]
 git -C "$SOURCE" merge-base --is-ancestor "refs/tags/v$VERSION" "$COMMIT"

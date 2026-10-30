@@ -118,3 +118,15 @@ def test_native_populated_backlog_allocation_node_suite(tier1_container) -> None
         result.stdout + result.stderr
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_populated_backlog_migration_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
+        "confirmed populated Backlog|invalid deleted-target source graph|native populated Backlog allocation",
+        WS_NODE_SUITE, timeout=2400,
+    )
+    (tier1_container.share.parent / "populated-backlog-migration-node.tap").write_text(
+        result.stdout + result.stderr
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

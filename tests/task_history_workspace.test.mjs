@@ -19,6 +19,7 @@ import {
   selectTaskHistoryRemote,
   ensureTaskHistoryBranch,
   prepareTaskHistoryWorkspace,
+  prepareExistingBacklogTaskHistoryWorkspace,
   prepareEpisodeTaskHistoryWorkspace,
   resolveSynchronizedProviderTask,
   cleanupEpisodeTaskHistoryStore,
@@ -1691,4 +1692,148 @@ test("remote loss during publication preserves the clean unpublished local commi
   assert.match(result.localDiff, /retained while offline/);
   assert.equal(git(storeDir, "status", "--porcelain", "--ignored", "--untracked-files=all"), "");
   renameSync(offline, remote);
+});
+
+test("explicit default independent normalization preserves clone identity and published ancestry", t => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote } = fixtureRepo();
+  const initial = publishTaskBranch(remote, { "config.yml": FULL_CANONICAL_CONFIG, "tasks/original.txt": "untouched record\n" });
+  execFileSync("git", ["clone", "-q", "--branch", "prime-claw/tasks", remote, join(root, "backlog")], { stdio: "pipe" });
+  writeFileSync(join(root, ".gitignore"), "/backlog/\n");
+  git(root, "add", ".gitignore"); git(root, "commit", "-qm", "ignore original task workspace"); git(root, "push", "-q");
+  const beforeHead = git(root, "rev-parse", "HEAD");
+  const gitIdentity = lstatSync(join(root, "backlog", ".git")).ino;
+  const prepared = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
+  assert.equal(prepared.storeDir, join(root, ".backlog"));
+  assert.equal(lstatSync(join(root, ".backlog", ".git")).ino, gitIdentity, "the original clone is moved, never recreated");
+  assert.equal(git(root, "rev-parse", "HEAD"), beforeHead);
+  assert.equal(git(prepared.storeDir, "merge-base", "--is-ancestor", initial, prepared.head), "");
+  assert.equal(readFileSync(join(prepared.storeDir, "tasks", "original.txt"), "utf8"), "untouched record\n");
+  assert.equal(readlinkSync(join(root, "backlog.config.yml")), ".backlog/config.yml");
+  assert.equal(git(prepared.storeDir, "status", "--porcelain"), "");
+});
+
+test("explicit existing-store preparation refuses dirty tracked tasks without changing their Git/index identity", t => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root } = fixtureRepo();
+  mkdirSync(join(root, "backlog")); writeFileSync(join(root, "backlog", "config.yml"), FULL_CANONICAL_CONFIG);
+  writeFileSync(join(root, "backlog", "record.txt"), "committed\n");
+  git(root, "add", "backlog"); git(root, "commit", "-qm", "tracked task store"); git(root, "push", "-q");
+  writeFileSync(join(root, "backlog", "record.txt"), "dirty original\n");
+  const before = primarySnapshot(root);
+  const result = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(result.status, "blocked", JSON.stringify(result));
+  assert.equal(result.code, "uncommitted-task-content");
+  assert.deepEqual(primarySnapshot(root), before);
+  assert.equal(existsSync(join(root, "backlog", ".git")), false);
+  assert.equal(existsSync(join(root, ".backlog")), false);
+});
+
+test("independent native root override retains both configs and replays a dangling Episode root link", t => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote, dir } = fixtureRepo();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const initial = publishTaskBranch(remote, { "config.yml": FULL_CANONICAL_CONFIG, "original.txt": "preserved\n" });
+  const storeRel = "planning/task store", store = join(root, storeRel);
+  mkdirSync(dirname(store), { recursive: true });
+  execFileSync("git", ["clone", "-q", "--branch", "prime-claw/tasks", remote, store], { stdio: "pipe" });
+  const rootBytes = FULL_CANONICAL_CONFIG.replace("labels: []", 'labels: ["root-only"]') + `backlogDirectory: "${storeRel}"\n`;
+  writeFileSync(join(root, "backlog.config.yml"), rootBytes);
+  writeFileSync(join(root, ".gitignore"), `/${storeRel}/\n`);
+  git(root, "add", "backlog.config.yml", ".gitignore"); git(root, "commit", "-qm", "native custom root authority"); git(root, "push", "-q");
+  const originalIdentity = lstatSync(join(store, ".git")).ino;
+  const prepared = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
+  assert.equal(lstatSync(join(store, ".git")).ino, originalIdentity);
+  assert.equal(readFileSync(join(store, "config.yml"), "utf8"), FULL_CANONICAL_CONFIG);
+  assert.equal(readFileSync(join(store, "backlog.config.yml"), "utf8"), rootBytes);
+  assert.equal(readlinkSync(join(root, "backlog.config.yml")), `${storeRel}/backlog.config.yml`);
+  assert.equal(git(store, "merge-base", "--is-ancestor", initial, prepared.head), "");
+  // Ordinary code metadata publication establishes the root-link projection.
+  // No task bytes or task clone are staged into the code branch.
+  git(root, "add", "backlog.config.yml"); git(root, "commit", "-qm", "publish native root link"); git(root, "push", "-q");
+  const target = join(dir, "episode");
+  git(root, "worktree", "add", "-qb", "episode", target, "HEAD");
+  assert.equal(existsSync(join(target, "backlog.config.yml")), false, "expected dangling native root link before clone");
+  const replay = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(replay.status, "prepared", JSON.stringify(replay));
+  assert.equal(readFileSync(join(target, "backlog.config.yml"), "utf8"), rootBytes);
+  assert.equal(readFileSync(join(replay.storeDir, "config.yml"), "utf8"), FULL_CANONICAL_CONFIG);
+  assert.equal(git(replay.storeDir, "status", "--porcelain"), "");
+});
+
+test("explicit local-only custom root override preserves the original independent store without publication", t => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, dir } = fixtureRepo();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  git(root, "remote", "remove", "origin");
+  const storeRel = "planning/task store", store = join(root, storeRel);
+  mkdirSync(store, { recursive: true });
+  git(store, "init", "-q", "-b", "prime-claw/tasks");
+  writeFileSync(join(store, "config.yml"), FULL_CANONICAL_CONFIG);
+  writeFileSync(join(store, "record.txt"), "original local task bytes\n");
+  git(store, "add", ".");
+  git(store, "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "original local native task history");
+  const originalHead = git(store, "rev-parse", "HEAD"), originalInode = lstatSync(join(store, ".git")).ino;
+  const rootBytes = FULL_CANONICAL_CONFIG.replace("labels: []", 'labels: ["local-root-only"]') + `backlogDirectory: "${storeRel}"\n`;
+  writeFileSync(join(root, "backlog.config.yml"), rootBytes);
+  writeFileSync(join(root, ".gitignore"), `/${storeRel}/\n`);
+  git(root, "add", "backlog.config.yml", ".gitignore");
+  git(root, "commit", "-qm", "existing local-only custom root authority");
+  const codeHead = git(root, "rev-parse", "HEAD"), codeIndex = git(root, "ls-files", "--stage", "-z");
+  const runner = realRunnerWithPushAction();
+  const nativeRun = runner.run.bind(runner), transportCalls = [];
+  runner.run = (command, args, options) => {
+    if (command === "git" && args.some(arg => ["fetch", "push", "ls-remote"].includes(arg))) {
+      transportCalls.push(args);
+      throw new Error("local-only preservation must not fetch, push, or probe a remote");
+    }
+    return nativeRun(command, args, options);
+  };
+  const before = primarySnapshot(root);
+  const withoutChoice = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root, runner });
+  assert.equal(withoutChoice.status, "blocked", JSON.stringify(withoutChoice));
+  assert.equal(withoutChoice.code, "no-remote");
+  assert.deepEqual(primarySnapshot(root), before);
+  assert.equal(git(store, "rev-parse", "HEAD"), originalHead);
+  assert.equal(readFileSync(join(root, "backlog.config.yml"), "utf8"), rootBytes);
+  // The extracted proof retains its existing dirty/remotes/branch refusals.
+  writeFileSync(join(store, "record.txt"), "uncommitted local bytes\n");
+  const dirty = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root, runner, unpublishedLocalOnly: true });
+  assert.equal(dirty.status, "blocked", JSON.stringify(dirty));
+  assert.equal(dirty.code, "uncommitted-task-content");
+  assert.equal(git(store, "rev-parse", "HEAD"), originalHead);
+  writeFileSync(join(store, "record.txt"), "original local task bytes\n");
+  git(store, "remote", "add", "unexpected", join(dir, "never-used.git"));
+  const foreignRemote = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root, runner, unpublishedLocalOnly: true });
+  assert.equal(foreignRemote.status, "blocked", JSON.stringify(foreignRemote));
+  assert.equal(foreignRemote.code, "unreadable");
+  git(store, "remote", "remove", "unexpected");
+  git(store, "switch", "-qc", "wrong-local-branch");
+  const wrongBranch = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root, runner, unpublishedLocalOnly: true });
+  assert.equal(wrongBranch.status, "blocked", JSON.stringify(wrongBranch));
+  assert.equal(wrongBranch.code, "unreadable");
+  git(store, "switch", "-q", "prime-claw/tasks");
+  const prepared = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root, runner, unpublishedLocalOnly: true });
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
+  assert.equal(prepared.unpublished, true);
+  assert.equal(prepared.remote, null);
+  assert.equal(prepared.remoteUrl, null);
+  assert.equal(prepared.remoteVia, "local-only");
+  assert.equal(prepared.storeDir, store);
+  assert.equal(lstatSync(join(store, ".git")).ino, originalInode);
+  assert.equal(git(store, "merge-base", "--is-ancestor", originalHead, prepared.head), "");
+  assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
+  assert.equal(git(root, "ls-files", "--stage", "-z"), codeIndex);
+  assert.equal(git(store, "remote"), "");
+  assert.equal(git(store, "status", "--porcelain", "--untracked-files=all"), "");
+  assert.equal(readFileSync(join(store, "config.yml"), "utf8"), FULL_CANONICAL_CONFIG);
+  assert.equal(readFileSync(join(store, "backlog.config.yml"), "utf8"), rootBytes);
+  assert.equal(readFileSync(join(store, "record.txt"), "utf8"), "original local task bytes\n");
+  assert.equal(readlinkSync(join(root, "backlog.config.yml")), `${storeRel}/backlog.config.yml`);
+  const replay = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: root, runner, unpublishedLocalOnly: true });
+  assert.equal(replay.status, "prepared", JSON.stringify(replay));
+  assert.equal(replay.head, prepared.head);
+  assert.deepEqual(transportCalls, []);
 });
