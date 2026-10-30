@@ -4,7 +4,7 @@ title: Make initialization skill-led and support existing Backlog destinations
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:55'
-updated_date: '2026-10-30 20:07'
+updated_date: '2026-10-30 20:12'
 labels: []
 dependencies: []
 references:
@@ -190,6 +190,8 @@ Retain47 ensurePrimeClawDirectory, all source/extension/ownership/legacy-invento
 Archive=deleted/history remains authoritative: tasks/completed only dependency corpus; preserve archive data and normal native allocation/reuse. Keep reviewed native431e95612d6167e418c507ec206d95df43c38c54, all exact pins/frozen-lock/stable-tag protections. No new allocator/prefix/config policy/reservations/renumbering/dependency dropping/controllers/speculative fixes. If a real conflict needs a product decision, report it rather than guess.
 Validate the coherent integrated generation in Docker: mandatory Tier1 after plugin changes plus proportional affected44/47 native/container checks, including creation-only exclusion, initializer/skill loading, text/index, history/layout/populated migration/active continuity/publication-before-retirement. Preserve pre-integration full47/final44/static24 as proofs of their own generations, NOT post-merge proof; preserve failures/native full-red attribution limits and do not redo completed native fork review or fix unrelated MCP/TUI. Record actual integrated heads/commands/results/limits in this task/docs.
 Commit/push clean integrated code AND native task on this same branch; prove local/upstream/direct heads, task identity/status and resources, retire only completed internal workers, then STOP for Conversation's separate independent candidate review. No merge INTO main, lifecycle Ready for Merge/Done, global apply/restart, live migrations, model/config/credential changes, PrimeAgent development, abandonment, Episode cleanup, new Episode/resources or second initial assignment. Canonical execute is already queued by the owning handoff; this checkpoint does not integrate main or dispatch another pass.
+
+Integration execution: merge fresh published main be0efe0eed9b692b72a8062376ee5fe1540ac676 into cf1372a7413baa93a3a72145ce299a78a310320f; preserve44/47 conflict decisions recorded in Notes. Next run coherent integrated Docker Tier1 and affected44/47, then record exact proof and publish/stop for owner review. No acceptance/lifecycle expansion.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -423,6 +425,11 @@ Retain47 ensurePrimeClawDirectory, all source/extension/ownership/legacy-invento
 Archive=deleted/history remains authoritative: tasks/completed only dependency corpus; preserve archive data and normal native allocation/reuse. Keep reviewed native431e95612d6167e418c507ec206d95df43c38c54, all exact pins/frozen-lock/stable-tag protections. No new allocator/prefix/config policy/reservations/renumbering/dependency dropping/controllers/speculative fixes. If a real conflict needs a product decision, report it rather than guess.
 Validate the coherent integrated generation in Docker: mandatory Tier1 after plugin changes plus proportional affected44/47 native/container checks, including creation-only exclusion, initializer/skill loading, text/index, history/layout/populated migration/active continuity/publication-before-retirement. Preserve pre-integration full47/final44/static24 as proofs of their own generations, NOT post-merge proof; preserve failures/native full-red attribution limits and do not redo completed native fork review or fix unrelated MCP/TUI. Record actual integrated heads/commands/results/limits in this task/docs.
 Commit/push clean integrated code AND native task on this same branch; prove local/upstream/direct heads, task identity/status and resources, retire only completed internal workers, then STOP for Conversation's separate independent candidate review. No merge INTO main, lifecycle Ready for Merge/Done, global apply/restart, live migrations, model/config/credential changes, PrimeAgent development, abandonment, Episode cleanup, new Episode/resources or second initial assignment. Canonical execute is already queued by the owning handoff; this checkpoint does not integrate main or dispatch another pass.
+
+2026-10-30 — Actual ordinary Git main integration in this same Episode.
+Started from clean/published task-only handoff cf1372a7413baa93a3a72145ce299a78a310320f (complete pre-integration implementation af4ec8d5498355493227d3a13db308786b97d80a). Fetched origin/main and proved direct published head be0efe0eed9b692b72a8062376ee5fe1540ac676; common ancestor81b83ab657cd5c3650bf78be5e2091ed0314359f. Ordinary --no-commit --no-ff merge had five textual conflicts: this task, initialization docs, traceability, initializer extension, initializer tests. Kept this task's entire Episode-owned native record through Git conflict resolution, then made this supported native notes/plan update; frozen Description/AC text, ten checks, ID/path/parent/status remain unchanged. Other accepted main planning guard/ownership/task47 were retained untouched.
+Resolved source/docs to combine47 creation-only local exclusion and warning propagation with44 global skill/no custom initializer/text-patch interface. Preserved ensurePrimeClawDirectory exactly, all source/ownership/legacy calls and both delivery entries. Adapted only the retired-command warning fixture to existing startup + agent-facing tool, retaining every warning/path/assets/no-retry assertion and explicitly asserting no custom command is registered. No product/scope decision or speculative source repair was needed.
+Coherent integrated-generation Docker validation and final publication are pending; old47/final44/static24 are pre-integration proof only. Do not claim integrated green until actual results. No merge into main, lifecycle or ownership mutation, global/live actions or Episode resource changes.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
