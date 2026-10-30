@@ -4,7 +4,7 @@ title: Make initialization skill-led and support existing Backlog destinations
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:55'
-updated_date: '2026-10-30 00:58'
+updated_date: '2026-10-30 01:13'
 labels: []
 dependencies: []
 references:
@@ -16,6 +16,12 @@ references:
     Allow-legacy-Beads-export-without-unused-Prime-Claw-lifecycle-statuses.md
 documentation:
   - docs/user-stories/B-project-initialization.md
+  - docs/evidence/beads-embedded-source-capture-20261030.md
+modified_files:
+  - docs/project-initialization.md
+  - docs/evidence/beads-embedded-source-capture-20261030.md
+  - tests/beads_retiring_source_capture.test.mjs
+  - tests/test_beads_retiring_source_capture.py
 priority: p1
 type: enhancement
 ordinal: 129000
@@ -83,4 +89,24 @@ Implement the reviewed specification, including the consolidated PRIMECLAW-46 fi
 6. **Prove the outcomes and update the shipped guidance.** Extend the existing Docker-native suites: `template_review.test.mjs`, `project_initialization_extension.test.mjs`, `task_provider_migration.test.mjs`, `task_history_workspace.test.mjs`, `task_providers.test.mjs`, their Python container bridges, and delivery/discovery tests where affected. Cover non-mutating text comparison for clean/dirty/staged assets plus interrupted legacy review; default normalization and custom in-place stores in both initialization and migration; existing active/completed/archive/history/config preservation including the duplicate-ID archive probe; embedded/local-only and built-in-only/partial-custom catalogs without any source setup/push/server-only calls; completed versus positively evidenced archived issues; exact unsupported-status preflight refusal; full capture/history/catalog/reason drift and incomplete/unreadable inventory refusal; active-source continuity, repeated checks, receipt/publication drift and retirement failures. Include a confirmed native end-to-end embedded-source migration into a populated Backlog destination, not only adapter mocks, and retain active Beads safety regressions. Run mandatory Docker Tier 1 (`scripts/test-tier1.sh --probe`) after plugin-source changes and the relevant container suites; no host/global candidate apply/check or plugin probes. Update `docs/project-initialization.md`, US-03/04/05/28 and traceability, relevant README/provider guidance and stale bidirectional-switch descriptions in VISION/LONG_RANGE_PLAN, and supersede DD-001's old overwrite/viewer requirement with this ticket's approved text-patch decision while preserving its historical evidence. Record implementation/test results in this same task and commit/push the candidate through the separately admitted Episode. Do not make the superseded PRIMECLAW-46 plan an implementation dependency or inherit its outgoing-source publication requirements.
 
 Stop for candidate review. This plan does not authorize implementation, merge, global refresh/restart, migration of this builder's live store, or any live ralph-pva/nemo-setup operation; those retain their separate operator boundaries.
+
+Execution checkpoint — 2026-10-30: Slice 1a is complete as a native evidence/de-risk slice only. tests/beads_retiring_source_capture.test.mjs and its guarded Python bridge prove direct strict-readonly embedded/local-only issue inventory/export, per-issue current/history/events/provenance, full built-in/partial-custom catalogs, identity/version, stable recapture, and filtered-export omission detection. Canonical source capture/transport code is unchanged. Next slice: use this native evidence to separate captureBeads/completeBeadsExport from active provider preparation, retain raw source version/catalog in the in-memory snapshot/provenance, and carry source-read proof through repeated checks per steps 1–2. Full destination/layout/import/skill work remains; no full-task acceptance criterion is checked.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-30 — Slice 1a selected: prove a complete native embedded/local-only retiring-source read on a disposable Docker fixture before changing migration capture. No custom lifecycle statuses, remote, publication, engine conversion, or live-project mutation. Include multiple revisions, closed/open issues, relationships/comments/provenance, full catalog, inventory/export comparison, and a precise record of unavailable direct commands. This is a de-risk/evidence slice, not a claim that canonical migration is fixed.
+
+2026-10-30 — Slice 1a candidate: native embedded/local-only source-read proof, not production migration acceptance. Added tests/beads_retiring_source_capture.test.mjs (2 native tests) and tests/test_beads_retiring_source_capture.py (guarded Docker bridge). Updated docs/project-initialization.md with an explicitly evidence-only link and documented exact commands/results/limits in docs/evidence/beads-embedded-source-capture-20261030.md.
+
+Validation: python3 -m pytest tests/test_beads_retiring_source_capture.py -q -m container => 1 passed in 114.94s (both Node subtests pass), run 20261030T011041Z-3867-acbbb0fc; manifest .test-results/20261030T011041Z-3867-acbbb0fc/tier1/manifest.json, repository content SHA-256 7cd47144e94d172d207dcb3b6002d578aaa15cc32a8acd33037b4c545f4a1d0d, runtime image sha256:a0643345237047a34ccb73ff130ef05bba712201eed200f714886e6b09ed3da2. Offline network absence and clean absent builder/runtime teardown verified. Host-safe guard/static check: python3 -m pytest tests/test_beads_retiring_source_capture.py tests/test_task_provider_migration.py -q => 2 passed, 2 skipped. Native bd 1.3.1 confirms embedded SQL inventory is unsupported; direct readonly list/export/show/history/events/provenance succeed without source remote/publication/custom lifecycle setup. Exact native historical values, opaque fields, label/comment/relationships, ordinary closed reason and raw catalogs are asserted. Filtered export is detected without clearing source filter; raw catalog-only change is observable.
+
+Initial exploratory/regression failures exposed and corrected test-only assumptions (embedded data directory, ancestor/blocking edge conflict, native created_by filtering, blocked close, status_changed event). Failed-run IDs and limits are preserved in the evidence doc. No plugin source changed, no global apply/check/restart, no live migration, no lifecycle status mutation, no provider transport weakening. Remaining implementation and full-task acceptance remain open. This slice is ready for Conversation review only.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Partial candidate — Slice 1a only: direct native embedded-source read evidence is tested and documented. Canonical migration remains unchanged and the full task is not complete. Await Conversation review of this bounded slice.
+<!-- SECTION:FINAL_SUMMARY:END -->
