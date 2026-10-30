@@ -4,7 +4,7 @@ title: Make initialization skill-led and support existing Backlog destinations
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:55'
-updated_date: '2026-10-30 01:13'
+updated_date: '2026-10-30 01:20'
 labels: []
 dependencies: []
 references:
@@ -103,10 +103,14 @@ Execution checkpoint — 2026-10-30: Slice 1a is complete as a native evidence/d
 Validation: python3 -m pytest tests/test_beads_retiring_source_capture.py -q -m container => 1 passed in 114.94s (both Node subtests pass), run 20261030T011041Z-3867-acbbb0fc; manifest .test-results/20261030T011041Z-3867-acbbb0fc/tier1/manifest.json, repository content SHA-256 7cd47144e94d172d207dcb3b6002d578aaa15cc32a8acd33037b4c545f4a1d0d, runtime image sha256:a0643345237047a34ccb73ff130ef05bba712201eed200f714886e6b09ed3da2. Offline network absence and clean absent builder/runtime teardown verified. Host-safe guard/static check: python3 -m pytest tests/test_beads_retiring_source_capture.py tests/test_task_provider_migration.py -q => 2 passed, 2 skipped. Native bd 1.3.1 confirms embedded SQL inventory is unsupported; direct readonly list/export/show/history/events/provenance succeed without source remote/publication/custom lifecycle setup. Exact native historical values, opaque fields, label/comment/relationships, ordinary closed reason and raw catalogs are asserted. Filtered export is detected without clearing source filter; raw catalog-only change is observable.
 
 Initial exploratory/regression failures exposed and corrected test-only assumptions (embedded data directory, ancestor/blocking edge conflict, native created_by filtering, blocked close, status_changed event). Failed-run IDs and limits are preserved in the evidence doc. No plugin source changed, no global apply/check/restart, no live migration, no lifecycle status mutation, no provider transport weakening. Remaining implementation and full-task acceptance remain open. This slice is ready for Conversation review only.
+
+2026-10-30 — Owning Conversation accepted Slice 1a at pushed 4ff0aa4c763ecd83bc10f7fed4a1a87598fa9062 as EVIDENCE ONLY. Parent review and independent openai-codex/gpt-6-astra review found no material defect. Frozen Description and 10 Acceptance Criteria are unchanged; living task/docs updates were compatible; clean published candidate and idle Episode were verified. This is not full-task acceptance, migration/retirement proof, or merge authority.
+
+Accepted continuation focus: implement one bounded chunk of existing steps 1–2. Integrate supported migration-only as-is source reads in captureBeads/completeBeadsExport and existing in-memory identity/provenance/recapture evidence; retain raw version/catalog, native history/reason/package, complete inventory, and unsupported-used-status preflight before destination writes. Carry the approved source-read boundary through later owner-workspace/recheck/retirement seams as work proceeds. Do not claim completion while outgoing server/publication requirements remain in those seams. Ordinary active Beads execution safety is unchanged. Prefer native provider behavior, then concise managed LLM judgment, then narrow integrity code; no new mapping/classification/approval/coordinator framework. Preserve first-slice limits in docs/evidence/beads-embedded-source-capture-20261030.md. Use disposable native Docker evidence and mandatory Tier 1 for plugin changes. No live stores, host/global candidate apply/check/probe, deployment, or builder migration. Update this same native task, commit/push one bounded candidate, and stop for review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Partial candidate — Slice 1a only: direct native embedded-source read evidence is tested and documented. Canonical migration remains unchanged and the full task is not complete. Await Conversation review of this bounded slice.
+Partial candidate — Slice 1a evidence at 4ff0aa4c763ecd83bc10f7fed4a1a87598fa9062 is accepted after parent and independent review. The full task is not accepted or complete. Continue one bounded production source-read integration chunk of existing steps 1–2 under the accepted limits in Implementation Notes; commit/push and stop for separate review. No merge or live migration authority.
 <!-- SECTION:FINAL_SUMMARY:END -->
