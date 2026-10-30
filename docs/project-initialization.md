@@ -391,6 +391,15 @@ refuses unsupported reverse requests before native commands. Confirmation
 retains its existing exact-retry/destination guards; populated imports and layout
 normalization remain unfinished, not bypassed by inspection permission.
 
+[The populated hidden-store attempt](evidence/populated-hidden-backlog-import-20261030.md)
+records a native allocation blocker, not a production increment. Native Backlog
+can allocate an ID already held by an original archived record and then refuse
+its ambiguous dependency. No supported reservation/explicit-ID option was found;
+existing IDs/configuration were not changed to work around it. The unvalidated
+production attempt was rolled back; the same destination guards remain. Any
+resolution needs a supported native capability or an explicit product decision,
+not a silent allocation-policy change or permission to recreate the destination.
+
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,
 `registerTool`, and awaited `session_start`). Prime Claw remains pinned to v0.9.8

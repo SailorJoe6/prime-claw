@@ -107,3 +107,14 @@ def test_task_provider_migration_stays_pair_specific_and_receipt_only() -> None:
         "while (retry",
     ):
         assert forbidden not in source
+
+
+def test_native_populated_backlog_allocation_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
+        "native populated Backlog allocation", WS_NODE_SUITE, timeout=300,
+    )
+    (tier1_container.share.parent / "native-populated-backlog-allocation-node.tap").write_text(
+        result.stdout + result.stderr
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

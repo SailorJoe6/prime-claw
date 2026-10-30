@@ -1596,3 +1596,123 @@ test("migration admission refuses absent Beads even when Backlog is selected", {
     });
   }
 });
+
+
+// Independent native destination published before any migration attempt. Keep
+// its archived highest ID: native allocation intentionally considers only the
+// active/completed corpus and can reuse that ID.
+function publishedPopulatedBacklogDestination(fixture) {
+  const seed = join(fixture.outer, "native-allocation-seed");
+  mkdirSync(seed);
+  command(seed, "git", ["init", "-q", "-b", "main"]);
+  git(seed, "config", "user.name", "Existing Task Author");
+  git(seed, "config", "user.email", "existing@example.invalid");
+  writeFileSync(join(seed, "README.md"), "Disposable native destination authoring.\n");
+  git(seed, "add", "README.md");
+  git(seed, "commit", "-qm", "destination authoring setup");
+  backlog(seed, "init", "Preserved destination", "--defaults", "--backlog-dir", "backlog",
+    "--config-location", "folder", "--task-prefix", "BASE", "--integration-mode", "none");
+  canonicalBacklogConfig(seed);
+  const configPath = join(seed, "backlog", "config.yml");
+  writeFileSync(configPath, readFileSync(configPath, "utf8")
+    .replace(/^default_port:.*$/m, "default_port: 6459") + "\n# Preserve the complete operator configuration.\n");
+  const active = backlog(seed, "task", "create", "Existing active", "--status", "In Progress",
+    "--description", "existing description", "--notes", "original notes", "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
+  backlog(seed, "task", "edit", active, "--comment", "existing native comment", "--comment-author", "baseline-author", "--plain");
+  const completed = backlog(seed, "task", "create", "Existing completed", "--status", "Done",
+    "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
+  backlog(seed, "task", "complete", completed);
+  const archived = backlog(seed, "task", "create", "Existing archived", "--description", "original archive content",
+    "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
+  backlog(seed, "task", "archive", archived);
+  const activePath = JSON.parse(backlog(seed, "task", "view", "--json", "--", active)).task.path;
+  writeFileSync(join(seed, "backlog", "archive", "tasks", `${active} - historical-prefix-probe.md`),
+    readFileSync(join(seed, activePath), "utf8") + "\nDistinct same-ID historical archive probe.\n");
+  const history = join(seed, "backlog");
+  command(history, "git", ["init", "-q", "-b", "prime-claw/tasks"]);
+  git(history, "config", "user.name", "Existing Task Author");
+  git(history, "config", "user.email", "existing@example.invalid");
+  git(history, "add", "-A");
+  git(history, "commit", "-qm", "original native corpus with archive records");
+  backlog(seed, "task", "edit", active, "--append-notes", "preserved second native revision", "--plain");
+  git(history, "add", "-A");
+  git(history, "commit", "-qm", "existing native task history");
+  git(history, "remote", "add", "origin", fixture.remote);
+  git(history, "push", "-qu", "origin", TASK_HISTORY_REF);
+  const store = join(fixture.root, ".backlog");
+  command(fixture.root, "git", ["clone", "-q", "--branch", "prime-claw/tasks", "--single-branch", fixture.remote, store]);
+  const exclude = join(fixture.root, ".git", "info", "exclude");
+  writeFileSync(exclude, readFileSync(exclude, "utf8") + "\n.backlog/\n");
+  const baseline = Object.fromEntries(git(store, "ls-files").split(/\r?\n/).map((path) => [path, {
+    bytes: readFileSync(join(store, path)).toString("base64"),
+    history: git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path),
+  }]));
+  return { store, active, completed, archived, baseline };
+}
+
+test("native populated Backlog allocation reuses an archived ID and refuses its ambiguous dependency without an ID override", { timeout: 180_000 }, (t) => {
+  const fixture = embeddedBeadsSource(t, "native-populated-allocation-blocker");
+  const destination = publishedPopulatedBacklogDestination(fixture);
+  const { store } = destination;
+  console.info(`native Backlog version: ${backlog(fixture.root, "--version")}`);
+  assert.deepEqual([destination.active, destination.completed, destination.archived], ["BASE-1", "BASE-2", "BASE-3"]);
+  const source = () => ({ authority: sourceAuthorityFiles(fixture.root),
+    inventory: bd(fixture.root, ...BEADS_INVENTORY),
+    exported: bd(fixture.root, "--readonly", "export", "--all"),
+    history: bd(fixture.root, "--readonly", "history", fixture.ids.parent, "--json", "--limit", "0"),
+  });
+  const sourceBefore = source();
+  const rootHead = git(fixture.root, "rev-parse", "HEAD"), rootIndex = git(fixture.root, "ls-files", "--stage");
+  const storeHead = git(store, "rev-parse", "HEAD"), storeIndex = git(store, "ls-files", "--stage");
+  const identity = { gitDir: realpathSync(join(store, ".git")), config: readFileSync(join(store, ".git", "config"), "utf8"),
+    branch: git(store, "symbolic-ref", "HEAD") };
+  const refs = git(fixture.root, "ls-remote", "--refs", fixture.remote);
+  const exclude = readFileSync(join(fixture.root, ".git", "info", "exclude"), "utf8");
+  const beforeOverride = admissionTree(store);
+  const override = RUNNER.run("backlog", ["task", "create", "Unsupported literal ID", "--id", "BASE-99", "--plain"],
+    { cwd: fixture.root, allowFailure: true });
+  assert.notEqual(override.status, 0);
+  assert.match(`${override.stdout}\n${override.stderr}`, /unknown option.*--id/i);
+  assert.deepEqual(admissionTree(store), beforeOverride, "unsupported --id must refuse before destination writes");
+
+  // These are the existing importer's native allocation/relationship operations,
+  // not a canonical migration or an alternative ID-allocation policy.
+  const parent = backlog(fixture.root, "task", "create", "Prospective imported parent", "--status", "In Progress",
+    "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
+  assert.equal(parent, destination.archived, "native allocator intentionally reuses the archived highest ID");
+  const child = backlog(fixture.root, "task", "create", "Prospective imported child", "--status", "In Progress",
+    "--parent", parent, "--no-dod-defaults", "--plain").match(/BASE-\d+(?:\.\d+)*/)[0];
+  const childBefore = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", child)).task;
+  assert.equal(childBefore.parentTaskId, parent);
+  const beforeDependency = admissionTree(store);
+  const dependency = RUNNER.run("backlog", ["task", "edit", child, "--depends-on", parent, "--plain"],
+    { cwd: fixture.root, allowFailure: true });
+  console.info("native populated Backlog allocation evidence:", JSON.stringify({
+    originalOccupiedIds: [destination.active, destination.completed],
+    originalArchivedIds: [destination.archived, destination.active],
+    allocatedParent: parent, allocatedChild: child,
+    dependencyWriteStatus: dependency.status,
+    dependencyWriteDiagnostic: `${dependency.stdout}\n${dependency.stderr}`.trim(),
+  }));
+  assert.notEqual(dependency.status, 0);
+  assert.match(`${dependency.stdout}\n${dependency.stderr}`, /ambiguous/i);
+  assert.match(`${dependency.stdout}\n${dependency.stderr}`, /BASE-3/i);
+  assert.deepEqual(admissionTree(store), beforeDependency, "ambiguous native dependency must refuse before writes");
+  assert.deepEqual(JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", child)).task, childBefore);
+  for (const [path, expected] of Object.entries(destination.baseline)) {
+    assert.equal(readFileSync(join(store, path)).toString("base64"), expected.bytes, `original bytes and placement: ${path}`);
+    assert.equal(git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path), expected.history, `original history: ${path}`);
+  }
+  assert.equal(git(store, "rev-parse", "HEAD"), storeHead);
+  assert.equal(git(store, "ls-files", "--stage"), storeIndex);
+  assert.equal(realpathSync(join(store, ".git")), identity.gitDir);
+  assert.equal(readFileSync(join(store, ".git", "config"), "utf8"), identity.config);
+  assert.equal(git(store, "symbolic-ref", "HEAD"), identity.branch);
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), rootHead);
+  assert.equal(git(fixture.root, "ls-files", "--stage"), rootIndex);
+  assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote), refs);
+  assert.equal(readFileSync(join(fixture.root, ".git", "info", "exclude"), "utf8"), exclude);
+  assert.deepEqual(source(), sourceBefore, "retiring source was neither configured, changed, published nor deleted");
+  assert.equal(existsSync(join(fixture.root, ".beads")), true);
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+});
