@@ -323,3 +323,130 @@ Acceptance Criteria remain unchecked. In particular, no unsupported-status
 projection, ordinary closed/archive correction, populated Backlog preservation,
 layout normalization, skill-led flow or live migration acceptance is claimed.
 Shared/external server retirement is not newly established by this fixture.
+
+
+## Slice 1d: used-status preflight and exact archive evidence
+
+Implemented and Docker-validated as one bounded continuation of existing plan
+step 2, for separate Conversation review. This is not full-task acceptance.
+
+The source read must inspect every actually used status before Backlog
+preparation or writes. Unsupported statuses are reported together with exact
+source IDs/statuses; unused catalog definitions do not block. Existing
+`statusFromBeads` projections remain unchanged: legacy `open` becomes `In Design`
+and ordinary `closed` becomes `Done` with physical `completed/` placement.
+
+Archive is not inferred from a nonempty reason, keywords or catalog category.
+The existing exact positive formats are:
+
+- A coherent retained `prime_claw_migration` source package with the existing
+  source marker, Backlog source identity, explicit `archived` classification and
+  matching archived task/draft placement/native task identity.
+- The complete task-specific reason already emitted by Prime Claw:
+  `Prime Claw abandonment: task TASK-ID; pushed Episode head HEAD; code was not merged.`
+  `HEAD` is a lowercase 40–64-hex Git object name.
+
+These signals apply to native `closed` records. Contradictory/malformed marked
+archive evidence, or an archive signal on a nonclosed record, requires a bounded
+agent/operator decision; it must be reported alongside unsupported-used-status
+records before destination mutation. Arbitrary metadata and ordinary closure
+reasons are not such evidence. This adds no new mapping, semantic-placement API,
+classifier or approval mechanism.
+
+Ordinary completion uses the existing projected `Done` status and native
+`task complete`. Native Backlog refuses archiving a `Done` task; exact-positive
+archives therefore retain the existing importer's native archive operation and
+its created `In Progress` status, with physical `archive/tasks/` placement and no
+`task complete`. This does not restore an inferred historical lifecycle or add a
+new status mapping. Both native status and actual physical placement are checked
+for every record. Verification uses actual walked files, not the temporary path
+reported while a disposable clone reads an archived task. Raw source status,
+catalog/category, reason, history/events/provenance remain in the complete source
+package and stable recapture.
+
+### Focused native proof and corrections
+
+```sh
+python3 -m pytest tests/test_task_provider_migration.py::test_beads_status_archive_preflight_node_suite -q -m container
+```
+
+The corrected focused bridge passed **1 test in 184.28s**, run
+`20261030T043053Z-17384-99ccd474`. Its manifest records `passed`, no failure
+codes, network absent and clean absent builder/runtime teardown. The two actual
+Node groups prove:
+
+- Inspection and confirmation capture report every used unsupported
+  `deferred/pinned/hooked/finished:done/paused:wip` issue and contradictory exact
+  archive record with exact IDs/statuses, with no destination directory or source
+  change. Unused catalog definitions do not block.
+- Nine-task embedded/local-only migration produces counts
+  `open=3, closed=3, archived=3`; ordinary reasons/keywords/nonarchive metadata
+  complete normally, while exact native abandonment and retained task/draft
+  archive packages use native archive placement. Native views and physical paths
+  agree, full raw version/catalog/export/view/history/events/provenance survives,
+  and Backlog is published with source intact before local retirement.
+
+Initial focused run `20261030T042733Z-7447-60dbe7ae` passed the preflight group
+but failed migration because native Backlog prohibits archiving `Done`. This was
+an integration mistake in the agent's initial status-first implementation, not a
+fixture-only issue. The correction preserves the existing importer archive
+operation/status and verifies it; no native guard was bypassed or new mapping
+policy introduced. Failure output is retained in that run's
+`tier1/migration-pytest-output.txt` and its teardown is clean/absent.
+
+Initial Tier 1 `20261030T042455Z-97932-4e2f35df` passed before that correction.
+The next probe run `20261030T043053Z-17490-d2a3492d` failed in the source builder
+before plugin/runtime checks; its `source-build.json` records `builder-failed`,
+null release/image and absent clean not-needed builder teardown, while setup
+records `manifest-failed` with no final manifest. The bounded cause is not
+established; upstream checkout inventories stayed identical and no config,
+upstream or test-driver change was made. A serialized probe rerun follows the
+successful corrected focused test.
+
+The serialized mandatory probe subsequently passed, exit 0, run
+`20261030T043404Z-27562-5486de10`. Its final manifest records `passed`, no
+failure codes, network absent and clean absent builder/runtime teardown. The
+corrected focused test and this final-source probe used unchanged production/test
+bytes. The complete selected migration/capture/active-provider bridge set is
+running before publication; it excludes only the two duplicate focused Python
+bridges while its full Node suite remains unfiltered.
+
+### Final Slice 1d regression evidence
+
+```sh
+scripts/test-tier1.sh --probe
+python3 -m pytest tests/test_task_provider_migration.py::test_beads_status_archive_preflight_node_suite -q -m container
+python3 -m pytest tests/test_task_provider_migration.py tests/test_beads_retiring_source_capture.py tests/test_task_providers.py -q -m container -k "not retiring_beads_source_boundary and not beads_status_archive_preflight"
+python3 -m pytest tests/test_task_provider_migration.py tests/test_beads_retiring_source_capture.py tests/test_task_providers.py -q
+```
+
+- Corrected focused native bridge: **1 passed in 184.28s**, run
+  `20261030T043053Z-17384-99ccd474`.
+- Corrected mandatory Tier 1 probe: **exit 0**, run
+  `20261030T043404Z-27562-5486de10`.
+- Complete selected migration/capture/active-provider bridge set:
+  **6 passed, 7 deselected in 723.12s**, run
+  `20261030T043539Z-32429-a5620c7e`. The full Node migration suite is
+  unfiltered and includes the new status/archive groups; only duplicate focused
+  Python bridges and host-safe checks are deselected.
+- All three final manifests record `passed`, no failure codes, network verified
+  absent and clean absent builder/runtime teardown.
+- Full regression repository content SHA-256:
+  `918b2a314df06aae3ab4630735fbe88211113e97edc862d1a44f91a2a325eccf`.
+  Runtime image:
+  `sha256:a2dfa58e75e327fcfbd3015d42f10b2c364cb2e5e6b4b9ae6fa34652aa66f0e4`.
+- Host-safe targeted structural checks: **5 passed, 8 skipped**.
+- Production/test bytes were unchanged after the corrected focused run began.
+  Final task/evidence prose was updated after tests.
+
+**Limits:** this is one bounded status/preflight/native-placement candidate, not
+completion of steps 1–2 or all task criteria. Unsupported statuses remain refused,
+not assigned guessed projections. Exact-looking contradictory archive evidence
+requires bounded agent/operator resolution; no new task-specific placement API,
+semantic classifier or approval mechanism was added. The existing importer is
+retained, including native `In Progress` archive status rather than a prohibited
+`Done` archive. Populated-destination merge/preservation, layout normalization,
+initialization skill/text patches and broader shared/external/full-corpus variants
+remain unfinished or unestablished. All 10 task Acceptance Criteria remain
+unchecked. No live migration, lifecycle/ownership change, merge, deployment,
+global candidate apply/check/probe, config/model or upstream edit occurred.

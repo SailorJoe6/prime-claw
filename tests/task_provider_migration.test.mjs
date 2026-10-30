@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -153,7 +153,7 @@ function beadsSource(t, name = "beads-source") {
   const child = JSON.parse(bd(fixture.root, "create", "Beads child", "--status", "in_progress", "--parent", parent, "--description", "closed child", "--json")).id;
   bd(fixture.root, "update", child, "--status", "done", "--force", "--json");
   const archived = JSON.parse(bd(fixture.root, "create", "Beads archived", "--status", "in_progress", "--description", "archived source task", "--json")).id;
-  bd(fixture.root, "close", archived, "--reason", "explicitly abandoned fixture", "--json");
+  bd(fixture.root, "close", archived, "--reason", `Prime Claw abandonment: task ${archived}; pushed Episode head ${git(fixture.root, "rev-parse", "HEAD")}; code was not merged.`, "--json");
   bd(fixture.root, "comments", "add", parent, "native Beads comment", "--author", "beads-author");
   bd(fixture.root, "provenance", "record", "--issue", parent, "--kind", "commit", "--source", "fixture", "--ref", git(fixture.root, "rev-parse", "HEAD"), "--ref-kind", "git-sha", "--actor", "beads-actor", "--payload", '{"opaque":true}');
   bd(fixture.root, "dolt", "push", "--remote", "origin", "--no-adopt");
@@ -234,6 +234,19 @@ function sourcePackageFromBacklogComments(task) {
   assert.ok(parts.length > 0, "native Backlog comments have no exact source package");
   assert.ok(parts.every((part, index) => Number(part[1]) === index + 1 && Number(part[2]) === parts.length));
   return JSON.parse(Buffer.from(parts.map((part) => part[3]).join(""), "base64").toString("utf8"));
+}
+
+function retainedBacklogArchivePackage(entityKind) {
+  const sourceTaskId = entityKind === "draft" ? "DRAFT-12" : "OLD-7";
+  return {
+    marker: "prime-claw-task-provider-migration-source-v1", sourceProvider: "backlog",
+    sourceTaskId, entityKind, classification: "archived",
+    relativePath: `backlog/archive/${entityKind === "draft" ? "drafts" : "tasks"}/${sourceTaskId.toLowerCase()} - Prior archive.md`,
+    nativeView: { task: { id: sourceTaskId, title: "Prior archive", status: "In Progress" } },
+    markdownBase64: Buffer.from(`---\nid: ${sourceTaskId}\nstatus: In Progress\n---\nPrior archived ${entityKind}\n`).toString("base64"),
+    gitHistoryBase64: Buffer.from("retained exact previous native history\n").toString("base64"),
+    semanticPlacement: "Retain the original archive package without reinterpretation.",
+  };
 }
 
 function addActiveBeadsOwner(fixture) {
@@ -1009,6 +1022,170 @@ test("Backlog native drafts are counted and preserved exactly before source dele
   assert.equal(archivedDraft.status, "closed");
 });
 
+
+
+
+test("used unsupported Beads statuses and ambiguous archive records aggregate before inspection or confirmation destination writes", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "embedded-status-archive-preflight", "unused:active,finished:done,paused:wip");
+  const runner = new AsIsBeadsRunner();
+  const baseline = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(baseline.status, "ready", baseline.detail);
+  const offenders = [];
+  for (const status of ["deferred", "pinned", "hooked", "finished", "paused"]) {
+    const id = JSON.parse(bd(fixture.root, "create", `Unsupported ${status}`, "--status", status, "--json")).id;
+    offenders.push({ id, status });
+  }
+  const malformed = JSON.parse(bd(fixture.root, "create", "Malformed claimed prior archive", "--metadata", JSON.stringify({
+    prime_claw_migration: { marker: "prime-claw-task-provider-migration-source-v1", sourceProvider: "backlog", classification: "archived" },
+  }), "--json")).id;
+  bd(fixture.root, "close", malformed, "--reason", "ordinary closed task with malformed archive claim", "--json");
+  offenders.push({ id: malformed, status: "closed" });
+  const contradictory = JSON.parse(bd(fixture.root, "create", "Open task with retained archive evidence", "--metadata", JSON.stringify({
+    prime_claw_migration: retainedBacklogArchivePackage("task"),
+  }), "--json")).id;
+  offenders.push({ id: contradictory, status: "open" });
+  const wrongAbandonment = JSON.parse(bd(fixture.root, "create", "Abandonment reason names another task", "--json")).id;
+  bd(fixture.root, "close", wrongAbandonment, "--reason", `Prime Claw abandonment: task OTHER-1; pushed Episode head ${git(fixture.root, "rev-parse", "HEAD")}; code was not merged.`, "--json");
+  offenders.push({ id: wrongAbandonment, status: "closed" });
+  const before = sourceAuthorityFiles(fixture.root);
+  const exportBefore = bd(fixture.root, "--readonly", "export", "--all");
+  const historyBefore = Object.fromEntries(offenders.map(({ id }) => [id, bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")]));
+  const sourceHead = git(fixture.root, "rev-parse", "HEAD");
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  let deletions = 0;
+  const confirmed = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: baseline.sourceRevision,
+    confirmedSwitch: true, actor: "status-preflight-operator", semanticPlacement: "Preserve complete source fields and history.",
+    deleteSource() { deletions += 1; },
+  });
+  for (const result of [inspection, confirmed]) {
+    assert.equal(result.status, "blocked");
+    for (const { id, status } of offenders) {
+      assert.ok(result.detail.includes(`${id} status=${JSON.stringify(status)}`), `diagnostic omitted exact task/status ${id}/${status}: ${result.detail}`);
+    }
+    assert.equal(result.detail.includes('status="unused"'), false, "unused catalog entries must not be status offenders");
+  }
+  assert.equal(deletions, 0);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
+  assert.equal(bd(fixture.root, "--readonly", "export", "--all"), exportBefore);
+  for (const { id } of offenders) assert.equal(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0"), historyBefore[id]);
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), sourceHead);
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+  assert.equal(existsSync(join(fixture.root, ".beads")), true);
+  assert.deepEqual(JSON.parse(bd(fixture.root, "--readonly", "dolt", "remote", "list", "--json")), []);
+  assert.deepEqual(runner.sourcePublicationCommands, []);
+});
+
+
+
+test("Beads closed reasons and categories complete normally while exact archive evidence retains native archive placement", { timeout: 300_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "embedded-closed-versus-archive", "unused_archive_hint:done");
+  const expectedClass = Object.fromEntries(Object.values(fixture.ids).map((id) => [id, "open"]));
+  for (const [index, reason] of [
+    "Delivered requested changes",
+    "abandoned archive cancel rejected keywords are ordinary closure text",
+    "Completed normally with unrelated migration metadata",
+  ].entries()) {
+    const metadata = index === 2 ? { prime_claw_migration: {
+      marker: "prime-claw-task-provider-migration-source-v1", sourceProvider: "backlog", classification: "closed",
+      sourceTaskId: "OLD-6", relativePath: "backlog/tasks/old-6 - Ordinary completion.md",
+    } } : { opaque: { reasonCategory: "abandoned", values: [1, null, false] } };
+    const id = JSON.parse(bd(fixture.root, "create", `Ordinary closed ${index}`, "--metadata", JSON.stringify(metadata), "--json")).id;
+    bd(fixture.root, "close", id, "--reason", reason, "--json");
+    expectedClass[id] = "closed";
+  }
+  const abandoned = JSON.parse(bd(fixture.root, "create", "Exact native Prime Claw abandonment", "--json")).id;
+  bd(fixture.root, "close", abandoned, "--reason", `Prime Claw abandonment: task ${abandoned}; pushed Episode head ${git(fixture.root, "rev-parse", "HEAD")}; code was not merged.`, "--json");
+  expectedClass[abandoned] = "archived";
+  for (const entityKind of ["task", "draft"]) {
+    const id = JSON.parse(bd(fixture.root, "create", `Retained prior Backlog ${entityKind} archive`, "--metadata", JSON.stringify({
+      prime_claw_migration: retainedBacklogArchivePackage(entityKind),
+    }), "--json")).id;
+    bd(fixture.root, "close", id, "--reason", "Original archive lifecycle is retained in the exact prior source package", "--json");
+    expectedClass[id] = "archived";
+  }
+  const before = sourceAuthorityFiles(fixture.root);
+  const sourceVersion = command(fixture.root, "bd", ["--version"]);
+  const statusCatalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
+  const exportRows = Object.fromEntries(bd(fixture.root, "--readonly", "export", "--all").split(/\r?\n/).filter(Boolean).map((line) => {
+    const row = JSON.parse(line);
+    return [row.id, row];
+  }));
+  const native = Object.fromEntries(Object.keys(expectedClass).map((id) => [id, {
+    view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
+    history: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")),
+    events: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--events", "--json", "--limit", "0")),
+    provenance: JSON.parse(bd(fixture.root, "--readonly", "provenance", "log", id, "--json")),
+  }]));
+  class ArchivePublicationRunner extends AsIsBeadsRunner {
+    constructor() { super(); this.destinationPublications = 0; }
+    run(commandName, args, options = {}) {
+      const publishingDestination = commandName === "git" && args.includes("push") && options.cwd === join(fixture.root, ".backlog");
+      if (publishingDestination) assert.deepEqual(sourceAuthorityFiles(fixture.root), before, "source retired before destination publication");
+      const result = super.run(commandName, args, options);
+      if (publishingDestination && result.status === 0) {
+        this.destinationPublications += 1;
+        assert.deepEqual(sourceAuthorityFiles(fixture.root), before, "source changed during destination publication");
+      }
+      return result;
+    }
+  }
+  const runner = new ArchivePublicationRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.deepEqual(inspection.taskCounts, { open: 3, closed: 3, archived: 3, total: 9 });
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "archive-migration-operator", semanticPlacement: "Retain exact source lifecycle evidence and raw native content.",
+  });
+  assert.equal(result.status, "completed", result.detail);
+  assert.equal(result.sourceAbsent, true);
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  assert.ok(runner.destinationPublications > 0, "destination must publish while source is intact");
+  assert.deepEqual(result.receipt.taskCounts, inspection.taskCounts);
+  assert.equal(result.receipt.mappings.length, 9);
+  const store = join(fixture.root, ".backlog");
+  assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], result.receipt.destinationReceiptRevision);
+  const receipt = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", result.receiptTaskId)).task;
+  assert.ok(receipt.comments.some((comment) => String(comment.text ?? comment.content ?? comment.body).includes("prime-claw-task-provider-migration-receipt-v1")));
+  const paths = git(store, "ls-files").split(/\r?\n/).filter((path) => path.endsWith(".md"));
+  // Archived tasks need a disposable native view. The live destination stays untouched.
+  const archiveReadRoot = join(fixture.outer, "archive-native-read");
+  mkdirSync(archiveReadRoot);
+  const archiveReadStore = join(archiveReadRoot, ".backlog");
+  command(archiveReadRoot, "git", ["clone", "-q", "--no-hardlinks", store, archiveReadStore]);
+  for (const mapping of result.receipt.mappings) {
+    const classification = expectedClass[mapping.sourceTaskId];
+    const matching = paths.filter((path) => new RegExp(`^id:\\s*${mapping.destinationTaskId}\\s*$`, "m").test(readFileSync(join(store, path), "utf8")));
+    assert.equal(matching.length, 1, `one physical destination task required for ${mapping.sourceTaskId}`);
+    const physicalPath = matching[0];
+    assert.ok(physicalPath.startsWith(classification === "archived" ? "archive/tasks/" : classification === "closed" ? "completed/" : "tasks/"), physicalPath);
+    let task;
+    if (classification === "archived") {
+      renameSync(join(archiveReadStore, physicalPath), join(archiveReadStore, "tasks", physicalPath.split("/").at(-1)));
+      task = JSON.parse(backlog(archiveReadRoot, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
+    } else {
+      task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
+    }
+    const expected = native[mapping.sourceTaskId];
+    assert.equal(task.status, classification === "archived" ? "In Progress" : classification === "open" ? ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked" })[expected.view.status] : "Done");
+    const pkg = sourcePackageFromBacklogComments(task);
+    assert.equal(pkg.sourceVersion, sourceVersion);
+    assert.deepEqual(pkg.statusCatalog, statusCatalog);
+    assert.equal(pkg.sourceDigest, inspection.sourceDigest);
+    assert.deepEqual(pkg.exportRow, exportRows[mapping.sourceTaskId]);
+    assert.deepEqual(pkg.nativeView, expected.view);
+    assert.deepEqual(pkg.history, expected.history);
+    assert.deepEqual(pkg.events, expected.events);
+    assert.deepEqual(pkg.provenance, expected.provenance);
+  }
+  assert.equal(git(store, "status", "--porcelain=v1"), "");
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+  assert.deepEqual(runner.sourcePublicationCommands, []);
+});
 
 test("canonical source inspection reads embedded local-only built-in and partial catalogs as-is", { timeout: 180_000 }, async (t) => {
   for (const [name, custom] of [["built-in-only", undefined], ["partial-custom", "in_design:active"]]) {

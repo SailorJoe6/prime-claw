@@ -287,6 +287,22 @@ retirement; task, catalog, history or identity drift refuses cutover. No source
 custom lifecycle setup, server conversion, remote, push or publication is
 required. Ordinary active Beads lifecycle/write checks remain strict.
 
+Before any Backlog destination preparation or write, the complete used-status
+inventory is checked with the existing projections. All unsupported-used statuses
+and genuinely contradictory archive evidence are reported together with exact
+source IDs/statuses; unused catalog entries do not block. Legacy `open` maps to
+`In Design`; ordinary `closed` maps to `Done` and native `completed/` placement.
+A nonempty `close_reason`, keyword or status category does not mean archive.
+Archive requires a coherent retained marked Backlog archive source package or
+the exact task-specific Prime Claw abandonment reason. Ambiguous exact evidence
+stops for agent/operator judgment without adding a mapping or approval framework.
+Native Backlog refuses archiving `Done` tasks. Exact-positive archives retain
+the existing importer archive operation and its created `In Progress` status;
+ordinary completion uses `Done` plus `task complete`. The importer verifies the
+native status and actual `tasks/`, `completed/` or `archive/tasks/` placement for
+all records, including archives.
+Raw catalog/category, reason and complete history remain in source provenance.
+
 After destination publication and ownership/runtime/source rechecks, retirement
 removes the exact local `.beads` store. Embedded mode makes no server-stop call;
 a server-mode source must identify a non-shared server before the native stop.
@@ -344,10 +360,13 @@ and plugin delivery state retain their distinct ownership records.
 [The PRIMECLAW-44 embedded-source proof](evidence/beads-embedded-source-capture-20261030.md)
 records the native read proof, bounded capture-data integration, and retiring-source
 boundary work without source custom lifecycle setup, a Beads remote or server
-mode. The bounded embedded fixture uses only supported open/in-progress/blocked
-statuses and a fresh Backlog destination. It does not prove unsupported-status
-projection, ordinary closed/archive correction, populated-destination preservation,
-layout normalization, or the complete initialization task.
+mode. The accepted Slice 1c embedded fixture uses only supported
+open/in-progress/blocked statuses and a fresh Backlog destination. The bounded
+Slice 1d adds used-status preflight and ordinary closure versus exact-evidence
+archive handling; its separate validation state is recorded in that evidence
+file. Unsupported statuses still require semantic resolution, not a new guessed
+projection. Populated-destination preservation, layout normalization and the
+complete initialization task remain unproven by these fixtures.
 
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,

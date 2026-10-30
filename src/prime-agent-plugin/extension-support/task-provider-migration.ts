@@ -570,11 +570,9 @@ function captureBeads(
     const history = jsonCommand(runner, "bd", ["--readonly", "history", taskId, "--json", "--limit", "0"], projectRoot, `bd history ${taskId}`);
     const events = jsonCommand(runner, "bd", ["--readonly", "history", taskId, "--events", "--json", "--limit", "0"], projectRoot, `bd history ${taskId} --events`);
     const provenance = jsonCommand(runner, "bd", ["--readonly", "provenance", "log", taskId, "--json"], projectRoot, `bd provenance log ${taskId}`);
-    const nativeStatus = String(nativeView.status);
-    const classification = nativeStatus === "closed" ? "archived" : nativeStatus === "done" ? "closed" : "open";
     return {
       sourceTaskId: taskId,
-      classification,
+      classification: "open",
       exportRow,
       exportLineBase64: Buffer.from(line).toString("base64"),
       nativeView,
@@ -584,6 +582,9 @@ function captureBeads(
     };
   }).sort((a, b) => a.sourceTaskId.localeCompare(b.sourceTaskId));
   if (new Set(tasks.map((task) => task.sourceTaskId)).size !== tasks.length) throw new Error("Beads source export repeats a canonical task ID");
+  // Inspect the complete used inventory before any destination preparation. Every
+  // recapture uses this same preflight; unused catalog entries remain raw context.
+  validateBeadsTaskLifecycles(tasks);
   const counts = {
     open: tasks.filter((task) => task.classification === "open").length,
     closed: tasks.filter((task) => task.classification === "closed").length,
@@ -794,6 +795,55 @@ function statusFromBeads(value: unknown): CanonicalLifecycleStatus {
   if (status === "open") return "In Design";
   if (status === "closed") return "Done";
   throw new Error(`Beads task has unmapped status ${JSON.stringify(status)}`);
+}
+
+/** Existing native archive evidence only; reasons/categories are not classifiers. */
+function validateBeadsTaskLifecycles(tasks: BeadsTaskPackage[]): void {
+  const problems: string[] = [];
+  for (const pkg of tasks) {
+    const status = String(pkg.nativeView.status ?? pkg.exportRow.status ?? "");
+    let projectedStatus: CanonicalLifecycleStatus | undefined;
+    try {
+      projectedStatus = statusFromBeads(status);
+    } catch {
+      problems.push(`${pkg.sourceTaskId} status=${JSON.stringify(status)}: unsupported status`);
+    }
+    let archived = false;
+    let ambiguous = false;
+    // Inspect both retained native surfaces. A malformed claimed archive must
+    // not disappear merely because the other surface lacks that evidence.
+    for (const row of [pkg.nativeView, pkg.exportRow]) {
+      const prior = beadsMigrationMetadata(row);
+      const path = prior?.relativePath;
+      const claimsArchive = prior && (prior.classification === "archived"
+        || (typeof path === "string" && /(?:^|\/)archive\/(?:tasks|drafts)(?:\/|$)/.test(path)));
+      if (claimsArchive) {
+        const sourceId = prior.sourceTaskId;
+        const kind = prior.entityKind;
+        const safePath = typeof path === "string" && !isAbsolute(path)
+          && !path.includes("\\") && !path.split("/").some((part) => !part || part === "." || part === "..");
+        const archiveFolder = kind === "task" ? "tasks" : kind === "draft" ? "drafts" : null;
+        const exact = prior.marker === SOURCE_MARKER && prior.sourceProvider === "backlog"
+          && prior.classification === "archived" && typeof sourceId === "string"
+          && sourceId !== "" && !/\s/.test(sourceId) && !sourceId.startsWith("-")
+          && archiveFolder !== null && safePath
+          && new RegExp(`(?:^|/)archive/${archiveFolder}/[^/]+\\.md$`).test(path)
+          && prior.nativeView?.task?.id === sourceId;
+        if (exact) archived = true;
+        else ambiguous = true;
+      }
+      const reason = row.close_reason;
+      if (typeof reason === "string" && reason.startsWith("Prime Claw abandonment:")) {
+        const match = /^Prime Claw abandonment: task ([^;]+); pushed Episode head ([0-9a-f]{40,64}); code was not merged\.$/.exec(reason);
+        if (match && match[1] === pkg.sourceTaskId) archived = true;
+        else ambiguous = true;
+      }
+    }
+    if (archived && status !== "closed") ambiguous = true;
+    if (ambiguous) problems.push(`${pkg.sourceTaskId} status=${JSON.stringify(status)}: ambiguous archive evidence`);
+    pkg.classification = archived ? "archived" : projectedStatus === "Done" ? "closed" : "open";
+  }
+  if (problems.length) throw new Error(`Beads source lifecycle preflight failed: ${problems.join("; ")}`);
 }
 
 function backlogAcceptance(task: JsonObject): string {
@@ -1377,6 +1427,30 @@ function backlogDestinationViews(runner: CommandRunner, projectRoot: string, sto
   }
 }
 
+function backlogPhysicalTaskPaths(storeDir: string): Map<string, string[]> {
+  const paths = new Map<string, string[]>();
+  for (const path of walkTaskFiles(storeDir)) {
+    const id = backlogTaskId(readFileSync(path, "utf8"), path);
+    paths.set(id, [...(paths.get(id) ?? []), path]);
+  }
+  return paths;
+}
+
+function assertBacklogLifecyclePlacement(
+  pkg: BeadsTaskPackage, id: string, view: JsonObject, storeDir: string, paths: Map<string, string[]>,
+): string {
+  const expectedStatus = pkg.classification === "archived" ? "In Progress" : statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
+  if (view.task.status !== expectedStatus) throw new Error(`Backlog destination status projection mismatch for ${pkg.sourceTaskId}`);
+  const matches = paths.get(id) ?? [];
+  const folder = pkg.classification === "archived" ? "archive/tasks/" : pkg.classification === "closed" ? "completed/" : "tasks/";
+  if (matches.length !== 1 || !relative(storeDir, matches[0]).replace(/\\/g, "/").startsWith(folder)) {
+    throw new Error(`Backlog destination physical placement mismatch for ${pkg.sourceTaskId}: expected one ${folder} record for ${id}`);
+  }
+  // Archived native views come from a relocated disposable clone. Only the
+  // actual walked destination file proves its archived physical placement.
+  return matches[0];
+}
+
 function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: string, storeDir: string, source: BeadsSnapshot): Record<string, string> {
   const mapping: Record<string, string> = {};
   for (const [id, view] of backlogDestinationViews(runner, projectRoot, storeDir, "reuse")) {
@@ -1641,7 +1715,10 @@ function migrateBeadsToBacklog(
     const deps = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId);
     if (deps.length) runRequired(runner, "backlog", ["task", "edit", "--depends-on", deps.join(","), "--plain", "--", id], source.projectRoot, `migrate dependencies for ${pkg.sourceTaskId}`);
     if (pkg.classification === "archived") {
-      runRequired(runner, "backlog", ["task", "archive", id], source.projectRoot, `archive abandoned Backlog task ${id}`);
+      // Native Backlog refuses archiving Done tasks. Preserve the existing
+      // importer archive operation and its created In Progress status instead
+      // of bypassing that rule or inventing a completed-archive projection.
+      runRequired(runner, "backlog", ["task", "archive", id], source.projectRoot, `archive evidenced Backlog task ${id}`);
     } else {
       const status = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
       runRequired(runner, "backlog", ["task", "edit", "--status", status, "--plain", "--", id], source.projectRoot, `migrate status for ${pkg.sourceTaskId}`);
@@ -1650,6 +1727,7 @@ function migrateBeadsToBacklog(
   }
   const dataRevision = commitBacklogDestination(runner, prepared, "prime-claw: migrate Beads task history");
   const dataViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "data");
+  const dataPaths = backlogPhysicalTaskPaths(storeDir);
   if (dataViews.size !== source.counts.total + 1) throw new Error(`Backlog destination count mismatch: expected ${source.counts.total} migrated tasks plus one receipt, found ${dataViews.size}`);
   const destinationTasks: DestinationTask[] = source.tasks.map((pkg) => {
     const id = mapping[pkg.sourceTaskId];
@@ -1674,17 +1752,14 @@ function migrateBeadsToBacklog(
     for (const [field, actual, expected] of projectionPairs) {
       if (canonical(actual) !== canonical(expected)) throw new Error(`Backlog destination ${field} projection mismatch for ${pkg.sourceTaskId}: expected ${canonical(expected)}, observed ${canonical(actual)}`);
     }
-    if (pkg.classification !== "archived") {
-      const expectedStatus = statusFromBeads(sourceRow.status ?? pkg.exportRow.status);
-      if (view.task.status !== expectedStatus) throw new Error(`Backlog destination status projection mismatch for ${pkg.sourceTaskId}`);
-    }
+    const taskPath = relative(source.projectRoot, assertBacklogLifecyclePlacement(pkg, id, view, storeDir, dataPaths)).replace(/\\/g, "/");
     const sourceParent = typeof pkg.nativeView.parent === "string" ? pkg.nativeView.parent : typeof pkg.exportRow.parent === "string" ? pkg.exportRow.parent : "";
     const expectedParent = sourceParent ? mapping[sourceParent] ?? sourceParent : "";
     const actualParent = String(view.task.parentTaskId ?? "");
     if (expectedParent !== actualParent) throw new Error(`Backlog destination parent mapping mismatch for ${pkg.sourceTaskId}`);
     const expectedDependencies = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId).sort();
     assertSameIds(relationshipIds(view.task.dependencies, id), expectedDependencies, `Backlog destination dependencies for ${pkg.sourceTaskId}`);
-    return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath: String(view.task.path), taskEvidence: view };
+    return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath, taskEvidence: view };
   });
   const destinationDataDigest = sha256(canonical(destinationTasks.map((task) => task.taskEvidence)));
   const transitions = ownershipRows.map((row) => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));
@@ -1700,9 +1775,12 @@ function migrateBeadsToBacklog(
     const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "refresh");
     if (views.size !== source.counts.total + 1) throw new Error(`Backlog destination receipt count changed: expected ${source.counts.total + 1}, found ${views.size}`);
     assertExactBacklogReceipt(views, receiptTaskId, receiptBase);
+    const paths = backlogPhysicalTaskPaths(storeDir);
+    const sourceById = new Map(source.tasks.map((pkg) => [pkg.sourceTaskId, pkg]));
     const refreshed = destinationTasks.map((task) => {
       const taskEvidence = views.get(task.destinationTaskId);
       if (!taskEvidence) throw new Error(`Backlog destination task ${task.destinationTaskId} is not exactly readable after receipt`);
+      assertBacklogLifecyclePlacement(sourceById.get(task.sourceTaskId)!, task.destinationTaskId, taskEvidence, storeDir, paths);
       return { ...task, taskEvidence };
     });
     return { revision: exact, digest: sha256(canonical(refreshed.map((task) => task.taskEvidence))), tasks: refreshed, receiptTaskId };
