@@ -14,6 +14,7 @@ import {
 } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { ensurePrimeClawDirectory } from "./prime-claw-directory.ts";
 import {
   readAllEpisodeOwnership,
   type EpisodeOwnershipRecord,
@@ -272,6 +273,7 @@ function readInventory(projectRoot: string): LegacySpecificationInventory | null
 function writeInventoryOnce(projectRoot: string, inventory: LegacySpecificationInventory): void {
   const path = join(projectRoot, LEGACY_SPECIFICATION_INVENTORY);
   const parent = dirname(path);
+  ensurePrimeClawDirectory(projectRoot);
   mkdirSync(parent, { recursive: true });
   const parentStat = lstatSync(parent);
   if (!parentStat.isDirectory() || parentStat.isSymbolicLink()) throw new Error("legacy specification inventory parent must be a real directory");

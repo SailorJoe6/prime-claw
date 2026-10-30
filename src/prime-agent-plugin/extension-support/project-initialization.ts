@@ -21,6 +21,7 @@ import { execFileSync } from "node:child_process";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { activeLegacyPlanFiles } from "./legacy-workflow.ts";
+import { ensurePrimeClawDirectory } from "./prime-claw-directory.ts";
 import {
   reconcileLegacySpecificationInventory,
   type LegacySpecificationInventoryResult,
@@ -130,6 +131,7 @@ export interface ReconcileResult {
   legacyRemaining: string[];
   skippedActiveEpisode: boolean;
   skipReason?: "active-episode" | "uncertain-episode-activity";
+  warnings?: string[];
   taskProvider: TaskProviderSetup;
   legacySpecifications: LegacySpecificationInventoryResult | { status: "not-run"; reason: string };
 }
@@ -305,7 +307,7 @@ export function assertSafePathAncestors(projectRoot: string, path: string): void
   }
 }
 
-export function ensureSafeDirectory(projectRoot: string, path: string): void {
+export function ensureSafeDirectory(projectRoot: string, path: string, onWarning?: (message: string) => void): void {
   if (!containedBy(projectRoot, path)) throw new Error(`destination escapes project root: ${path}`);
   const rel = relative(projectRoot, path);
   let current = projectRoot;
@@ -314,6 +316,10 @@ export function ensureSafeDirectory(projectRoot: string, path: string): void {
     const stat = lstatIfPresent(current);
     if (stat) {
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`unsafe managed directory collision: ${relative(projectRoot, current)}`);
+    } else if (current === join(projectRoot, ".prime-claw")) {
+      ensurePrimeClawDirectory(projectRoot, onWarning);
+      const created = lstatSync(current);
+      if (!created.isDirectory() || created.isSymbolicLink()) throw new Error(`unsafe managed directory collision: ${relative(projectRoot, current)}`);
     } else {
       mkdirSync(current, { mode: 0o755 });
     }
@@ -490,10 +496,10 @@ function removeEmptyLegacy(projectRoot: string): string[] {
   return remaining;
 }
 
-export function acquireProjectMutationLock(projectRoot: string): () => void {
+export function acquireProjectMutationLock(projectRoot: string, onWarning?: (message: string) => void): () => void {
   const lockPath = join(projectRoot, RECONCILE_LOCK);
   const recoveryPath = `${lockPath}.recovery`;
-  ensureSafeDirectory(projectRoot, dirname(lockPath));
+  ensureSafeDirectory(projectRoot, dirname(lockPath), onWarning);
   const token = randomUUID();
   const open = (): number => openSync(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
   let fd: number;
@@ -800,7 +806,8 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
     };
   }
   const inventory = loadAssetInventory(pluginRoot);
-  const release = acquireProjectMutationLock(project.root);
+  const warnings: string[] = [];
+  const release = acquireProjectMutationLock(project.root, (message) => warnings.push(message));
   const items: ReconcileItem[] = [];
   let registration: ReconcileResult["registration"] = { status: "not-requested" };
   let manifestWritten = false;
@@ -936,6 +943,7 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
       + remaining.length + (registration.status === "unavailable" ? 1 : 0) + providerConflicts + legacyConflicts;
     return {
       project, registration, items, manifestWritten,
+      ...(warnings.length ? { warnings } : {}),
       changed: manifestWritten
         || items.some((item) => ["created", "migrated", "updated", "recovered", "retired"].includes(item.action))
         || taskProvider.status === "initialized"

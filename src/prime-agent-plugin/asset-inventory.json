@@ -22,6 +22,7 @@
     {"id":"plugin-extension-support-legacy-workflow-ts","source":"extension-support/legacy-workflow.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/legacy-workflow.ts"}]},
     {"id":"plugin-extension-support-legacy-specification-inventory-ts","source":"extension-support/legacy-specification-inventory.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/legacy-specification-inventory.ts"}]},
     {"id":"plugin-extension-support-prep-chain-ts","source":"extension-support/prep-chain.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/prep-chain.ts"}]},
+    {"id":"plugin-extension-support-prime-claw-directory-ts","source":"extension-support/prime-claw-directory.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/prime-claw-directory.ts"}]},
     {"id":"plugin-extension-support-project-initialization-ts","source":"extension-support/project-initialization.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/project-initialization.ts"}]},
     {"id":"plugin-extension-support-reviewed-plan-support-ts","source":"extension-support/reviewed-plan-support.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/reviewed-plan-support.ts"}]},
     {"id":"plugin-extension-support-spec-episode-ts","source":"extension-support/spec-episode.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/spec-episode.ts"}]},

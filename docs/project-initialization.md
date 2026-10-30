@@ -1,7 +1,7 @@
 # Prime Claw project initialization and template reconciliation
 
 Prime Claw installs one global plugin generation and keeps project policy as
-regular, tracked, customizable files. `/initialize-prime-claw` and the
+regular, customizable files that the operator may track. `/initialize-prime-claw` and the
 model-callable `initialize_prime_claw` tool expose the same initialization and
 upgrade UX. Template reconciliation never stages or commits files. An explicit,
 confirmed task-provider switch is a separate maintenance operation described
@@ -86,9 +86,38 @@ is visible; independently safe file reconciliation is not rolled back. Automatic
 startup reconciliation is lookup-only and never auto-registers arbitrary Git
 repositories.
 
+## Local Git exclusion on first directory creation
+
+Only when Prime Claw itself creates a previously absent root `.prime-claw/`
+directory, it appends the exact root-anchored `/.prime-claw/` rule to Git's
+local exclusions. This applies to explicit initialization, registered-project
+`session_start` reconciliation, and the ownership or retained-inventory paths
+that first create the directory. Existing comments, patterns, bytes, and order
+are preserved. An existing exact rule is not duplicated. Other generated
+project skills and unrelated untracked files are not hidden by this rule.
+
+The exclude path comes from `git -C <root> rev-parse --git-path info/exclude`,
+not a constructed `<root>/.git/info/exclude` path. Linked worktrees normally
+share the main repository's exclude file; Prime Claw keeps Git's sharing
+semantics. It never edits `.gitignore`, stages files, or commits as part of this
+behavior. Exclusions do not untrack files already in Git's index.
+
+If `.prime-claw/` already exists when the operation starts, Prime Claw does not
+change exclusions. To deliberately track the directory, remove `/.prime-claw/`
+from the Git-resolved exclude file, then add and commit the desired files.
+Later initialization and startup reconciliation do not restore the removed
+rule or repair a missing exclusion for an existing directory.
+
+If resolving or updating the exclusion fails, directory and asset creation
+continue. Command/tool output and startup notifications warn that the worktree
+may remain dirty, include the cause, and give manual remediation using the
+resolved path when available. There is no later retry while the directory
+exists. Skipped reconciliation and operations that do not create the directory
+do not authorize an exclusion edit.
+
 ## Template manifest and reconciliation
 
-Projects track `.prime-claw/templates.json`. It stores hashes and provenance,
+Projects may track `.prime-claw/templates.json`. It stores hashes and provenance,
 not duplicate template bodies. Every project asset records:
 
 - the current available upstream hash;
