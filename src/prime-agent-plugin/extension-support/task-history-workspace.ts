@@ -518,6 +518,11 @@ function validateContainment(
   return null;
 }
 
+function taskStoreConfigPath(storeDir: string): string {
+  return ["config.yml", "config.yaml"].map((name) => join(storeDir, name))
+    .find((path) => existsSync(path)) ?? join(storeDir, "config.yml");
+}
+
 function directoryTreeHasMaterialContent(root: string): boolean {
   if (!existsSync(root)) return false;
   const entry = lstatSync(root);
@@ -551,12 +556,6 @@ function validateRootConfigCandidate(
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
-}
-
-function folderConfigFromRootConfig(content: string, preserveDirectory: boolean): string {
-  if (preserveDirectory) return content;
-  const normalized = content.replace(/^backlog_directory\s*:\s*.*(?:\r?\n|$)/m, "");
-  return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
 function hasTrackedTaskContent(runner: CommandRunner, primaryRoot: string, storeDir: string): boolean {
@@ -681,6 +680,16 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   const remote = remoteSelection.status === "selected" ? remoteSelection.name : null;
   const remoteUrl = remoteSelection.status === "selected" ? remoteSelection.url : null;
 
+  // A missing primary clone must not turn its retained root link into
+  // no-provider evidence and bootstrap a different task-store location.
+  const primaryRootConfig = join(primaryRoot, "backlog.config.yml");
+  if (lstatIfPresent(primaryRootConfig)?.isSymbolicLink() && !existsSync(primaryRootConfig)) {
+    return {
+      status: "blocked", code: "config-not-preserved",
+      detail: `the primary root configuration symlink ${primaryRootConfig} is dangling; its selected task store is unavailable`,
+      remediation: "restore the exact published primary task-store clone before preparation; do not replace the retained root configuration",
+    };
+  }
   const { detection, blocked: detectionBlocked } = providerEvidence(primaryRoot);
   if (detectionBlocked) return detectionBlocked;
   if (detection!.kind === "blocked") {
@@ -717,7 +726,10 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       };
     }
     customLayout = rootLayout.layout === "custom";
-    relocatedConfigContent = folderConfigFromRootConfig(rootConfigContent, customLayout);
+    // Root discovery reads the whole configuration, not a pointer overlay.
+    // Keep both supported directory-key spellings and every other byte; the
+    // relative root symlink below preserves the same native selection.
+    relocatedConfigContent = rootConfigContent;
     // Validate the exact native configuration before any filesystem or Git
     // mutation. Relocation changes only discovery placement.
     try {
@@ -739,6 +751,20 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   const containment = validateContainment(primaryRoot, storeDir);
   if (containment) return containment;
 
+  // Prove an existing root link before any task-branch publication or clone.
+  // Native root configuration is whole-file authority; an alternate link must
+  // not publish its target bytes before being refused.
+  if (rootLayout && lstatIfPresent(rootLayout.configPath)?.isSymbolicLink()) {
+    const expectedLink = relative(dirname(rootLayout.configPath), taskStoreConfigPath(storeDir)).split(sep).join("/");
+    const actualLink = readlinkSync(rootLayout.configPath);
+    if (isAbsolute(actualLink) || actualLink !== expectedLink) {
+      return {
+        status: "blocked", code: "config-not-preserved",
+        detail: `root configuration symlink is ${JSON.stringify(actualLink)}, not the exact relative target ${JSON.stringify(expectedLink)}`,
+        remediation: "retain only the exact relative root symlink into the selected published task configuration before preparation",
+      };
+    }
+  }
   const nestedGit = join(storeDir, ".git");
   const storeExists = existsSync(storeDir);
   if (hasTrackedTaskContent(runner, primaryRoot, storeDir)) {
@@ -937,15 +963,14 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   // bootstrap publishes the exact lifecycle-ready config). The nested clone
   // checks it out tracked; this seam NEVER writes an untracked, unpublished,
   // or non-lifecycle-ready local config.
-  const nestedConfigCandidates = [join(storeDir, "config.yml"), join(storeDir, "config.yaml")];
-  if (!nestedConfigCandidates.some((path) => existsSync(path))) {
+  const nestedConfigPath = taskStoreConfigPath(storeDir);
+  if (!existsSync(nestedConfigPath)) {
     return {
       status: "blocked", code: "config-not-preserved",
       detail: `the published task-history branch carries no folder configuration in ${storeDir}; establishing one locally would be an untracked, unpublished, non-lifecycle-ready config, which this seam never returns as prepared`,
       remediation: "publish the lifecycle-ready task store config through a separately reviewed existing-store adoption, then re-run preparation",
     };
   }
-  const nestedConfigPath = nestedConfigCandidates.find((path) => existsSync(path))!;
   if (relocatedConfigContent !== null && readFileSync(nestedConfigPath, "utf8") !== relocatedConfigContent) {
     return {
       status: "blocked", code: "config-not-preserved",
@@ -1025,38 +1050,29 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       };
     }
     let changedRoot = false;
-    if (customLayout) {
-      const expectedLink = relative(dirname(rootLayout.configPath), nestedConfigPath).split(sep).join("/");
-      if (rootEntry.isSymbolicLink()) {
-        const actualLink = readlinkSync(rootLayout.configPath);
-        if (isAbsolute(actualLink) || actualLink !== expectedLink) {
-          return {
-            status: "blocked", code: "config-not-preserved",
-            detail: `custom-layout root configuration symlink is ${JSON.stringify(actualLink)}, not the exact relative target ${JSON.stringify(expectedLink)}`,
-            remediation: `replace it with the relative symlink ${rootLayout.configPath} -> ${expectedLink}; absolute or alternate targets are refused`,
-          };
-        }
-      } else if (rootEntry.isFile()) {
-        unlinkSync(rootLayout.configPath);
-        symlinkSync(expectedLink, rootLayout.configPath);
-        changedRoot = true;
-      } else {
+    const expectedLink = relative(dirname(rootLayout.configPath), nestedConfigPath).split(sep).join("/");
+    if (rootEntry.isSymbolicLink()) {
+      const actualLink = readlinkSync(rootLayout.configPath);
+      if (isAbsolute(actualLink) || actualLink !== expectedLink) {
         return {
           status: "blocked", code: "config-not-preserved",
-          detail: `${rootLayout.configPath} is neither a regular configuration file nor the required relative symlink`,
-          remediation: "restore a regular root configuration so Prime Claw can relocate it safely",
+          detail: `root configuration symlink is ${JSON.stringify(actualLink)}, not the exact relative target ${JSON.stringify(expectedLink)}`,
+          remediation: `replace it with the relative symlink ${rootLayout.configPath} -> ${expectedLink}; absolute or alternate targets are refused`,
         };
       }
-      layoutWarning = `custom Backlog layout retained through relative symlink ${relative(primaryRoot, rootLayout.configPath)} -> ${expectedLink}; this compatibility layout is more brittle than .backlog/ or backlog/`;
     } else if (rootEntry.isFile()) {
       unlinkSync(rootLayout.configPath);
+      symlinkSync(expectedLink, rootLayout.configPath);
       changedRoot = true;
     } else {
       return {
         status: "blocked", code: "config-not-preserved",
-        detail: `${rootLayout.configPath} must be a regular file before built-in root configuration can move into ${nestedConfigPath}`,
-        remediation: "restore the root configuration as a regular file and retry",
+        detail: `${rootLayout.configPath} is neither a regular configuration file nor the required relative symlink`,
+        remediation: "restore a regular root configuration so Prime Claw can relocate it safely",
       };
+    }
+    if (customLayout) {
+      layoutWarning = `custom Backlog layout retained through relative symlink ${relative(primaryRoot, rootLayout.configPath)} -> ${expectedLink}; this compatibility layout is more brittle than .backlog/ or backlog/`;
     }
 
     try {
@@ -1085,7 +1101,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     }
   }
 
-  const finalConfigSource = rootLayout ? (customLayout ? "root" : "folder") : configSource;
+  const finalConfigSource = rootLayout ? "root" : configSource;
   if (localOnly) {
     return {
       status: "prepared",
@@ -1373,6 +1389,21 @@ function verifyTargetBacklogAuthority(
   runner: CommandRunner,
   allowNone: boolean,
 ): EpisodeAuthorityBlocked | null {
+  const rootConfigPath = join(targetWorktree, "backlog.config.yml");
+  let expectedDanglingRoot = false;
+  if (lstatIfPresent(rootConfigPath)?.isSymbolicLink() && !existsSync(rootConfigPath)) {
+    const link = readlinkSync(rootConfigPath);
+    const expectedLinks = ["config.yml", "config.yaml"].map((name) =>
+      relative(targetWorktree, join(storeDir, name)).split(sep).join("/"));
+    expectedDanglingRoot = allowNone && expectedLinks.includes(link);
+    if (!expectedDanglingRoot) {
+      return {
+        status: "blocked", code: "config-not-preserved",
+        detail: `the target root configuration link ${JSON.stringify(link)} does not resolve to the derived published task configuration`,
+        remediation: "retain the exact relative root link into this task store; a dangling link is allowed only while its clone is absent",
+      };
+    }
+  }
   let detection: ReturnType<typeof detectTaskProvider>;
   try {
     detection = detectTaskProvider(targetWorktree, runner);
@@ -1424,9 +1455,12 @@ function verifyTargetBacklogAuthority(
       remediation: "complete or remove the conflicting target provider evidence before preparing the Backlog Episode workspace",
     };
   }
+  // A competing built-in can be visible only until the exact clone arrives.
+  // Project identity, Beads and dual-provider refusals above still apply.
+  if (expectedDanglingRoot) return null;
   if (detection.evidence.configSource === "root") {
     const rootEntry = lstatIfPresent(detection.evidence.configPath);
-    const expectedConfig = join(storeDir, "config.yml");
+    const expectedConfig = taskStoreConfigPath(storeDir);
     let exactRelativeLink = false;
     if (rootEntry?.isSymbolicLink()) {
       const target = readlinkSync(detection.evidence.configPath);
@@ -1617,7 +1651,7 @@ function inspectPrimaryTaskAuthority(
   }
   if (detection.kind === "selected" && detection.evidence.provider === "backlog" && detection.evidence.configSource === "root") {
     const configEntry = lstatIfPresent(detection.evidence.configPath);
-    const expectedConfig = detection.evidence.storeDir ? join(detection.evidence.storeDir, "config.yml") : "";
+    const expectedConfig = detection.evidence.storeDir ? taskStoreConfigPath(detection.evidence.storeDir) : "";
     let exactRelativeLink = false;
     if (configEntry?.isSymbolicLink() && expectedConfig) {
       const target = readlinkSync(detection.evidence.configPath);

@@ -376,6 +376,14 @@ proves neither populated-store adoption into independent history nor complete
 native cross-branch visibility after relocation. Those remain separate unfinished
 integration seams, not a reason to recreate existing tasks or relax safeguards.
 
+[The bounded root-configuration preservation increment](evidence/backlog-root-config-preservation-20261030.md)
+extends existing independent workspace preparation: built-in and custom selected
+root configurations retain their whole bytes through exact relative root links,
+with replay and native folder filename checks. Its validation state and limits
+are recorded there. Default-folder relocation, ordinary-store adoption, full
+initialization/migration layout integration and populated imports remain
+unfinished; this increment does not replace their existing safeguards.
+
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,
 `registerTool`, and awaited `session_start`). Prime Claw remains pinned to v0.9.8

@@ -18,6 +18,9 @@ def test_task_history_workspace_node_suite(tier1_container) -> None:
         "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
         timeout=900,
     )
+    (tier1_container.share.parent / "task-history-workspace-node.tap").write_text(
+        result.stdout + result.stderr
+    )
     assert result.returncode == 0, result.stdout + result.stderr
 
 

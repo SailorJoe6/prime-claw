@@ -537,13 +537,214 @@ backlog_directory: "backlog"
   const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root });
   assert.equal(prepared.status, "prepared");
   assert.equal(prepared.storeDir, store);
-  assert.equal(prepared.configSource, "folder");
-  assert.equal(existsSync(rootConfig), false);
+  assert.equal(prepared.configSource, "root");
+  assert.ok(lstatSync(rootConfig).isSymbolicLink());
+  assert.equal(readlinkSync(rootConfig), "backlog/config.yml");
   const folderBytes = readFileSync(join(store, "config.yml"), "utf8");
-  assert.doesNotMatch(folderBytes, /^backlog_directory\s*:/m);
-  assert.match(folderBytes, /^project_name: "x"$/m);
+  assert.equal(folderBytes, rootBytes);
   assert.equal(git(store, "status", "--porcelain"), "");
   assert.equal(prepareTaskHistoryWorkspace({ primaryRoot: root }).status, "prepared");
+});
+
+
+// PRIMECLAW-44 Slice1f: root configuration is whole-file published authority.
+// These fixtures ALREADY have independent task history. No ordinary-store
+// adoption, default-folder rename, importer or new store authority is involved.
+for (const storeName of ["backlog", ".backlog", "planning/task store"]) {
+  for (const key of ["backlog_directory", "backlogDirectory"]) {
+    const configName = key === "backlogDirectory" ? "config.yaml" : "config.yml";
+    test(`whole root config ${storeName}/${configName} (${key}) survives primary/Episode replay`, (t) => {
+      assert.ok(backlogAvailable(), "managed native Backlog is required for this proof");
+      const { dir, root, remote } = fixtureRepo();
+      t.after(() => rmSync(dir, { recursive: true, force: true }));
+      const store = join(root, storeName), rootConfig = join(root, "backlog.config.yml");
+      const bytes = "# Preserve this complete native configuration verbatim.\n" + FULL_CANONICAL_CONFIG
+        .replace("labels: []", 'labels: ["retained-label"]')
+        .replace("default_port: 6420", "default_port: 6543")
+        .replace("remote_operations: true", "remote_operations: false")
+        + `${key}: "${storeName}"\n`;
+      const records = {
+        "tasks/task-1 - Active.md": taskMarkdown("TASK-1", "Active"),
+        "completed/task-2 - Complete.md": taskMarkdown("TASK-2", "Complete").replace("status: In Progress", "status: Done"),
+        "archive/tasks/task-3 - Archive.md": taskMarkdown("TASK-3", "Archive"),
+        "archive/tasks/task-1 - historical-prefix-probe.md": taskMarkdown("TASK-1", "Distinct archived prefix probe"),
+      };
+      const seed = publishTaskBranch(remote, { [configName]: bytes, ".gitignore": "*.attachment\n", ...records });
+      records["tasks/task-1 - Active.md"] = taskMarkdown("TASK-1", "Active", "second preserved revision");
+      const published = publishTaskBranch(remote, records);
+      writeFileSync(rootConfig, bytes);
+      writeFileSync(join(root, ".gitignore"), `/${storeName}/\n`);
+      // An explicit native key must beat this conflicting built-in config.
+      const decoy = storeName === "backlog" ? ".backlog" : "backlog";
+      mkdirSync(join(root, decoy), { recursive: true });
+      writeFileSync(join(root, decoy, "config.yml"), FULL_CANONICAL_CONFIG.replace('project_name: "x"', 'project_name: "decoy"'));
+      git(root, "add", ".gitignore", "backlog.config.yml", `${decoy}/config.yml`);
+      git(root, "commit", "-qm", "seed root configuration and conflicting builtin");
+      git(root, "push", "-q");
+      execFileSync("git", ["clone", "-q", "--branch", "prime-claw/tasks", remote, store], { stdio: "pipe" });
+      writeFileSync(join(store, "retained.attachment"), "ignored attachment bytes\n");
+      const native = (cwd, ...args) => execFileSync("backlog", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 }).trim();
+      const settings = cwd => ["projectName", "statuses", "defaultStatus", "labels", "defaultPort", "autoCommit"]
+        .map(name => native(cwd, "config", "get", name));
+      const view = (cwd, id) => JSON.parse(native(cwd, "task", "view", "--json", "--", id)).task;
+      const baselineSettings = settings(root);
+      const baselineViews = [view(root, "TASK-1"), view(root, "TASK-2")];
+      const codeHead = git(root, "rev-parse", "HEAD"), codeIndex = git(root, "ls-files", "--stage");
+      const dotGit = realpathSync(join(store, ".git"));
+      const verifyStore = path => {
+        assert.equal(readFileSync(join(path, configName), "utf8"), bytes);
+        for (const [name, content] of Object.entries(records)) assert.equal(readFileSync(join(path, name), "utf8"), content);
+        assert.equal(git(path, "rev-parse", "HEAD"), published);
+        assert.equal(git(path, "remote", "get-url", "origin"), remote);
+        assert.equal(git(path, "branch", "--show-current"), "prime-claw/tasks");
+        assert.equal(git(path, "status", "--porcelain"), "");
+        assert.deepEqual(git(path, "log", "--format=%H", "--", "tasks/task-1 - Active.md").split("\n"), [published, seed]);
+      };
+      const first = prepareTaskHistoryWorkspace({ primaryRoot: root });
+      assert.equal(first.status, "prepared", JSON.stringify(first));
+      assert.equal(first.storeDir, store);
+      assert.equal(first.configSource, "root");
+      assert.equal(readlinkSync(rootConfig), `${storeName}/${configName}`);
+      assert.equal(readFileSync(rootConfig, "utf8"), bytes);
+      assert.equal(realpathSync(join(store, ".git")), dotGit, "existing clone was not replaced");
+      assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
+      assert.equal(git(root, "ls-files", "--stage"), codeIndex, "preparation never stages the code index");
+      assert.equal(readFileSync(join(store, "retained.attachment"), "utf8"), "ignored attachment bytes\n");
+      verifyStore(store);
+      const replayBefore = primarySnapshot(root);
+      assert.equal(prepareTaskHistoryWorkspace({ primaryRoot: root }).status, "prepared");
+      assert.deepEqual(primarySnapshot(root), replayBefore);
+      mkdirSync(join(root, "code-subdir"));
+      for (const cwd of [root, join(root, "code-subdir"), store]) assert.deepEqual(settings(cwd), baselineSettings);
+      assert.deepEqual([view(root, "TASK-1"), view(root, "TASK-2")], baselineViews);
+      verifyStore(store);
+      git(root, "add", "backlog.config.yml");
+      git(root, "commit", "-qm", "retain exact relative root config link");
+      const target = join(dir, "config-episode");
+      git(root, "worktree", "add", "-q", "-b", "config-episode", target);
+      const primaryBefore = primarySnapshot(root), targetBefore = primarySnapshot(target);
+      const episodeStore = join(target, storeName);
+      assert.ok(lstatSync(join(target, "backlog.config.yml")).isSymbolicLink());
+      assert.equal(existsSync(join(target, "backlog.config.yml")), false, "root link starts dangling before clone materialization");
+      const episode = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+      assert.equal(episode.status, "prepared", JSON.stringify(episode));
+      assert.equal(episode.storeDir, episodeStore);
+      verifyStore(episodeStore);
+      assert.deepEqual(settings(target), baselineSettings);
+      assert.deepEqual([view(target, "TASK-1"), view(target, "TASK-2")], baselineViews);
+      assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+      assert.deepEqual(primarySnapshot(root), primaryBefore);
+      assert.deepEqual(primarySnapshot(target), targetBefore);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+        assert.equal(cleanup.status, "cleaned", JSON.stringify(cleanup));
+        assert.equal(existsSync(episodeStore), false, "cleanup is an idempotent no-op once absent");
+      }
+      assert.equal(existsSync(episodeStore), false);
+      assert.equal(readlinkSync(join(target, "backlog.config.yml")), `${storeName}/${configName}`);
+      const restored = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+      assert.equal(restored.status, "prepared", JSON.stringify(restored));
+      verifyStore(episodeStore);
+      verifyStore(store);
+      assert.equal(git(root, "ls-remote", "origin", TASK_HISTORY_REF).split(/\s/)[0], published);
+      assert.deepEqual(primarySnapshot(root), primaryBefore);
+      assert.deepEqual(primarySnapshot(target), targetBefore);
+    });
+  }
+}
+
+for (const linkKind of ["absolute", "alternate-relative"]) {
+  test(`primary ${linkKind} root config link refuses before publication`, (t) => {
+    assert.ok(backlogAvailable());
+    const { dir, root, remote } = fixtureRepo();
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    mkdirSync(join(root, ".backlog"));
+    writeFileSync(join(root, ".backlog", "config.yml"), FULL_CANONICAL_CONFIG + 'backlog_directory: ".backlog"\n');
+    const link = linkKind === "absolute" ? join(root, ".backlog", "config.yml") : "./.backlog/config.yml";
+    symlinkSync(link, join(root, "backlog.config.yml"));
+    const before = primarySnapshot(root);
+    const result = prepareTaskHistoryWorkspace({ primaryRoot: root });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.code, "config-not-preserved");
+    assert.equal(readlinkSync(join(root, "backlog.config.yml")), link);
+    assert.deepEqual(primarySnapshot(root), before);
+    assert.equal(git(root, "ls-remote", "origin", TASK_HISTORY_REF), "");
+    assert.notEqual(gitAllow(root, "rev-parse", "--verify", TASK_HISTORY_REF).status, 0);
+    assert.equal(existsSync(join(root, ".backlog", ".git")), false);
+  });
+}
+
+test("missing primary root-linked store refuses without default fallback or overwrite", (t) => {
+  assert.ok(backlogAvailable());
+  const { dir, root } = fixtureRepo();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(root, "backlog"));
+  writeFileSync(join(root, "backlog.config.yml"), FULL_CANONICAL_CONFIG + 'backlog_directory: "backlog"\n');
+  const first = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(first.status, "prepared", JSON.stringify(first));
+  const held = join(dir, "held-clone");
+  renameSync(first.storeDir, held);
+  const before = primarySnapshot(root), head = git(held, "rev-parse", "HEAD");
+  const result = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "config-not-preserved");
+  assert.equal(readlinkSync(join(root, "backlog.config.yml")), "backlog/config.yml");
+  assert.equal(existsSync(join(root, ".backlog")), false);
+  assert.equal(existsSync(first.storeDir), false);
+  assert.equal(git(held, "rev-parse", "HEAD"), head);
+  assert.equal(git(held, "status", "--porcelain"), "");
+  assert.deepEqual(primarySnapshot(root), before);
+});
+
+
+for (const evidence of ["canonical-dual", "canonical-malformed", "target-malformed-backlog"]) {
+  test(`expected dangling Episode root link retains ${evidence} provider refusal`, (t) => {
+    assert.ok(backlogAvailable());
+    const { dir, root, target, storeDir } = episodeFixture();
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    symlinkSync(".backlog/config.yml", join(target, "backlog.config.yml"));
+    if (evidence === "target-malformed-backlog") {
+      mkdirSync(join(target, "backlog"));
+      writeFileSync(join(target, "backlog", "config.yml"), "not_initialized: true\n");
+    } else {
+      // Repository-global provider authority comes from canonical primary.
+      // Local stale linked Beads metadata is intentionally ignored after cutover.
+      mkdirSync(join(root, ".beads"));
+      writeFileSync(join(root, ".beads", "config.yaml"), "no-db: false\n");
+      if (evidence === "canonical-dual") {
+        writeFileSync(join(root, ".beads", "metadata.json"), JSON.stringify({ backend: "dolt", dolt_database: "fixture" }));
+      }
+    }
+    const before = primarySnapshot(target), primaryBefore = primarySnapshot(root);
+    const prepared = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+    assert.equal(prepared.status, "blocked", JSON.stringify(prepared));
+    assert.match(prepared.detail, evidence === "canonical-dual" ? /both Backlog.*Beads/i : /missing|malformed|not valid initialized/i);
+    assert.equal(existsSync(storeDir), false, "provider conflict refuses before clone");
+    const cleaned = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
+    assert.equal(cleaned.status, "refused", JSON.stringify(cleaned));
+    assert.equal(existsSync(storeDir), false);
+    assert.equal(readlinkSync(join(target, "backlog.config.yml")), ".backlog/config.yml");
+    assert.deepEqual(primarySnapshot(target), before);
+    assert.deepEqual(primarySnapshot(root), primaryBefore);
+  });
+}
+
+test("expected dangling Episode root link preserves canonical Backlog precedence over stale linked Beads", (t) => {
+  assert.ok(backlogAvailable());
+  const { dir, root, target, storeDir } = episodeFixture();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  symlinkSync(".backlog/config.yml", join(target, "backlog.config.yml"));
+  mkdirSync(join(target, ".beads"));
+  const stale = "no-db: false\n";
+  writeFileSync(join(target, ".beads", "config.yaml"), stale);
+  const before = primarySnapshot(target), primaryBefore = primarySnapshot(root);
+  const prepared = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target });
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
+  assert.equal(cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target }).status, "cleaned");
+  assert.equal(existsSync(storeDir), false);
+  assert.equal(readFileSync(join(target, ".beads", "config.yaml"), "utf8"), stale);
+  assert.deepEqual(primarySnapshot(target), before);
+  assert.deepEqual(primarySnapshot(root), primaryBefore);
 });
 
 test("valid custom root layout relocates config into task history and carries through Episode cleanup", (t) => {
