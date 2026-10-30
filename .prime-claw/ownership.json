@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "owners": {
+    "01a1363a-e0f9-7628-aee4-81b03eb1e3fb": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "7beff785-644f-4c9b-9e70-86677e86c55c",
+      "engine": "orca",
+      "ownerSessionId": "01a1363a-e0f9-7628-aee4-81b03eb1e3fb",
+      "taskId": "PRIMECLAW-44",
+      "taskPath": "backlog/tasks/primeclaw-44 - Make-initialization-skill-led-and-support-existing-Backlog-destinations.md",
+      "baseRef": "81b83ab657cd5c3650bf78be5e2091ed0314359f",
+      "createdAt": "2026-10-30T00:58:24.111Z",
+      "updatedAt": "2026-10-30T00:58:39.334Z",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-44-episode-7beff785",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-44-episode-7beff785",
+      "worktreeIdentity": "wt2:local:22d955df-c47b-4445-b59f-fab6a78eff5f",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-44-episode-7beff785",
+      "branch": "JLanders/prime-claw-primeclaw-44-episode-7beff785",
+      "head": "81b83ab657cd5c3650bf78be5e2091ed0314359f",
+      "launchAutomationName": "prime-claw-launch-7beff785-644f-4c9b-9e70-86677e86c55c",
+      "episodeId": "01a18a50-d674-708d-82e0-1f413df3f89f",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a18a50-d674-708d-82e0-1f413df3f89f.jsonl",
+      "episodeActiveSessionId": "dbe4c0200ea5",
+      "terminalHandle": "term_f90f9ae0-3527-4a45-8c01-df55d408503f",
+      "terminalHandles": [
+        "term_15ab7545-cc55-4dcc-8345-ce3c247fd965",
+        "term_f90f9ae0-3527-4a45-8c01-df55d408503f"
+      ]
+    },
+    "01a18d82-1a5d-70d5-ab1d-4addbb6831df": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "5e79c03f-3889-49f3-83f1-8ef5da73e199",
+      "engine": "orca",
+      "ownerSessionId": "01a18d82-1a5d-70d5-ab1d-4addbb6831df",
+      "taskId": "PRIMECLAW-47",
+      "taskPath": "backlog/tasks/primeclaw-47 - Fresh-.prime-claw-creation-dirties-clean-repositories-and-blocks-automations.md",
+      "baseRef": "819f1b70095c1bfdc760ac7e68f41331bad78512",
+      "createdAt": "2026-10-30T17:07:14.439Z",
+      "updatedAt": "2026-10-30T17:07:32.966Z",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-47-episode-5e79c03f",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-47-episode-5e79c03f",
+      "worktreeIdentity": "wt2:local:94cc4548-7882-4ead-a583-7982dfba1bc1",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-47-episode-5e79c03f",
+      "branch": "JLanders/prime-claw-primeclaw-47-episode-5e79c03f",
+      "head": "819f1b70095c1bfdc760ac7e68f41331bad78512",
+      "launchAutomationName": "prime-claw-launch-5e79c03f-3889-49f3-83f1-8ef5da73e199",
+      "episodeId": "01a18dc7-e0b8-74cc-9d50-d2f36a015b2a",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a18dc7-e0b8-74cc-9d50-d2f36a015b2a.jsonl",
+      "episodeActiveSessionId": "0e879248ea6e",
+      "terminalHandle": "term_d72b5b7a-3716-48f4-b5d3-2e275715e9f0",
+      "terminalHandles": [
+        "term_d3a82791-fc87-40ee-a10e-8c71d6f557ef",
+        "term_d72b5b7a-3716-48f4-b5d3-2e275715e9f0"
+      ]
+    }
+  }
+}
