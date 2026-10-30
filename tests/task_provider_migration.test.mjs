@@ -28,19 +28,14 @@ class CandidateRunner extends ProcessCommandRunner {
 const RUNNER = new CandidateRunner();
 
 class RecordingBeadsRunner extends CandidateRunner {
-  constructor() { super(); this.reads = []; this.sourceVersionSuffix = ""; this.sourceCatalogExtra = false; this.previousCommand = null; }
+  constructor() { super(); this.reads = []; this.sourceVersionSuffix = ""; this.sourceCatalogExtra = false; }
   run(commandName, args, options = {}) {
-    const previous = this.previousCommand;
     const result = super.run(commandName, args, options);
-    this.previousCommand = { commandName, args: [...args] };
     if (commandName !== "bd") return result;
     this.reads.push({ args: [...args], cwd: options.cwd, ...result });
     if (result.status !== 0) return result;
-    // Source capture asks for the raw version immediately after transport proof.
-    // Do not alter the version calls made by the unchanged capability checks.
-    if (args.length === 1 && args[0] === "--version" && this.sourceVersionSuffix
-        && previous?.commandName === "git" && previous.args.includes("ls-remote")
-        && previous.args.includes("refs/dolt/data")) {
+    // Migration source capture reads the raw version without transport preparation.
+    if (args.length === 1 && args[0] === "--version" && this.sourceVersionSuffix) {
       return { ...result, stdout: `${result.stdout}${this.sourceVersionSuffix}` };
     }
     if (args[0] === "--readonly" && args[1] === "statuses" && this.sourceCatalogExtra) {
@@ -168,6 +163,60 @@ function beadsSource(t, name = "beads-source") {
   }
   git(fixture.root, "push", "-q");
   return { ...fixture, ids: { parent, child, archived } };
+}
+
+// This source is deliberately not prepared as an active Prime Claw Beads provider.
+// Its Git origin publishes code/destination history only; the outgoing store has
+// neither a Dolt remote nor a published source revision.
+function embeddedBeadsSource(t, name = "embedded-beads-source", customStatuses) {
+  const fixture = repository(t, name);
+  bd(fixture.root, "init", "--skip-hooks", "--skip-agents", "--prefix", "EMB", "--quiet", "--non-interactive");
+  // bd init adopts the code origin by default. Fixture setup removes that native
+  // Dolt remote so canonical migration must really support an outgoing local store.
+  bd(fixture.root, "dolt", "remote", "remove", "origin");
+  if (customStatuses) bd(fixture.root, "config", "set", "status.custom", customStatuses);
+  const parent = JSON.parse(bd(fixture.root, "create", "Embedded original", "--description", "original description",
+    "--design", "living source plan", "--notes", "original notes", "--metadata", '{"opaque":{"shape":[1,null,false]}}', "--json")).id;
+  bd(fixture.root, "update", parent, "--title", "Embedded revised", "--status", "in_progress", "--notes", "final source notes", "--json");
+  const child = JSON.parse(bd(fixture.root, "create", "Embedded open child", "--parent", parent, "--json")).id;
+  const blocked = JSON.parse(bd(fixture.root, "create", "Embedded blocked", "--status", "blocked", "--json")).id;
+  bd(fixture.root, "dep", "add", blocked, child);
+  bd(fixture.root, "comments", "add", parent, "embedded native comment", "--author", "source-author");
+  bd(fixture.root, "provenance", "record", "--issue", parent, "--kind", "commit", "--source", "fixture",
+    "--ref", git(fixture.root, "rev-parse", "HEAD"), "--ref-kind", "git-sha", "--actor", "source-actor", "--payload", '{"opaque":true}');
+  git(fixture.root, "add", "-A");
+  if (git(fixture.root, "status", "--porcelain=v1")) git(fixture.root, "commit", "-qm", "seed embedded source metadata");
+  git(fixture.root, "push", "-q");
+  assert.equal(JSON.parse(bd(fixture.root, "--readonly", "context", "--json")).dolt_mode, "embedded");
+  assert.deepEqual(JSON.parse(bd(fixture.root, "--readonly", "dolt", "remote", "list", "--json")), []);
+  return { ...fixture, ids: { parent, child, blocked } };
+}
+
+function sourceAuthorityFiles(root) {
+  return Object.fromEntries(["config.yaml", "metadata.json"].map((name) => [name,
+    readFileSync(join(root, ".beads", name)).toString("base64"),
+  ]));
+}
+
+class AsIsBeadsRunner extends RecordingBeadsRunner {
+  constructor() { super(); this.sourcePublicationCommands = []; }
+  run(commandName, args, options = {}) {
+    if (commandName === "bd") {
+      // Sole-provider discovery is unchanged and has its own read-only probes.
+      const discovery = JSON.stringify(args) === JSON.stringify(["config", "get", "no-db"])
+        || JSON.stringify(args) === JSON.stringify(["context", "--json"]);
+      assert.ok(args[0] === "--readonly" || (args.length === 1 && args[0] === "--version") || discovery,
+        `retiring-source migration attempted active preparation/write: bd ${args.join(" ")}`);
+      assert.equal(args.includes("sql"), false, "source capture must not require embedded SQL");
+      assert.equal(args.includes("remote"), false, "source capture must not require a Dolt remote");
+      assert.equal(args.includes("stop"), false, "embedded source retirement must not stop a server");
+    }
+    if (commandName === "git" && args.some((arg) => String(arg).includes("refs/dolt/data"))) {
+      this.sourcePublicationCommands.push([...args]);
+      assert.fail("retiring-source migration must not inspect, publish or delete a source Dolt publication");
+    }
+    return super.run(commandName, args, options);
+  }
 }
 
 async function proveFixtureRuntime(records) {
@@ -472,7 +521,7 @@ test("read-only inspection captures complete published Beads history and provena
   assert.equal(inspection.status, "ready", inspection.detail);
   assert.equal(inspection.sourceProvider, "beads");
   assert.deepEqual(inspection.taskCounts, { open: 1, closed: 1, archived: 1, total: 3 });
-  assert.match(inspection.sourceRevision, /^[0-9a-v]{32}$/);
+  assert.equal(inspection.sourceRevision, `capture-sha256:${inspection.sourceDigest}`);
   assert.equal(detectTaskProvider(fixture.root, RUNNER).evidence.provider, "beads");
   assert.equal(existsSync(join(fixture.root, ".backlog")), false);
   const sourceReads = runner.reads.filter(({ args }) => ["show", "history", "provenance", "export", "list"].includes(args[0] === "--readonly" ? args[1] : args[0]));
@@ -498,7 +547,8 @@ test("Beads source digest binds raw version and complete catalog independently o
   runner.sourceVersionSuffix = "\n";
   const versionChanged = inspect();
   assert.equal(versionChanged.status, "ready", versionChanged.detail);
-  assert.equal(versionChanged.sourceRevision, baseline.sourceRevision);
+  assert.equal(versionChanged.sourceRevision, `capture-sha256:${versionChanged.sourceDigest}`);
+  assert.notEqual(versionChanged.sourceRevision, baseline.sourceRevision);
   assert.deepEqual(versionChanged.taskCounts, baseline.taskCounts);
   assert.notEqual(versionChanged.sourceDigest, baseline.sourceDigest);
   runner.sourceVersionSuffix = "";
@@ -506,7 +556,8 @@ test("Beads source digest binds raw version and complete catalog independently o
   runner.sourceCatalogExtra = true;
   const catalogChanged = inspect();
   assert.equal(catalogChanged.status, "ready", catalogChanged.detail);
-  assert.equal(catalogChanged.sourceRevision, baseline.sourceRevision);
+  assert.equal(catalogChanged.sourceRevision, `capture-sha256:${catalogChanged.sourceDigest}`);
+  assert.notEqual(catalogChanged.sourceRevision, baseline.sourceRevision);
   assert.deepEqual(catalogChanged.taskCounts, baseline.taskCounts);
   assert.notEqual(catalogChanged.sourceDigest, baseline.sourceDigest);
   assert.notEqual(catalogChanged.sourceDigest, versionChanged.sourceDigest);
@@ -613,83 +664,80 @@ test("Beads to Backlog migration preserves the selected non-origin remote for or
 });
 
 
-test("independent Backlog source ref is retired so a later reverse provider switch is selectable", { timeout: 360_000 }, async (t) => {
-  const fixture = beadsSource(t, "beads-backlog-beads-roundtrip");
+test("independent Backlog publication retires before Beads import while outgoing Dolt history remains untouched", { timeout: 300_000 }, async (t) => {
+  const fixture = repository(t, "independent-backlog-retirement");
   const operatorIgnore = "operator-cache/\n";
-  writeFileSync(join(fixture.root, ".gitignore"), `${readFileSync(join(fixture.root, ".gitignore"), "utf8")}${operatorIgnore}`);
+  writeFileSync(join(fixture.root, ".gitignore"), operatorIgnore);
   git(fixture.root, "add", ".gitignore");
   git(fixture.root, "commit", "-qm", "preserve operator ignore rule");
   git(fixture.root, "push", "-q");
-  const toBacklog = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
-  assert.equal(toBacklog.status, "ready", toBacklog.detail);
-  const backlogResult = await migrateTaskProvider({
-    cwd: fixture.root,
-    targetProvider: "backlog",
-    runner: RUNNER,
-    expectedSourceRevision: toBacklog.sourceRevision,
-    confirmedSwitch: true,
-    actor: "roundtrip-operator",
-    semanticPlacement: "Preserve complete native fields and place Beads design in the Backlog living plan.",
-    verifyActiveRuntime: proveFixtureRuntime,
-  });
-  assert.equal(backlogResult.status, "completed", backlogResult.detail);
-  const firstPreparation = prepareTaskHistoryWorkspace({ primaryRoot: fixture.root, runner: RUNNER });
-  assert.equal(firstPreparation.status, "prepared", firstPreparation.detail);
-  const firstPrimaryTaskRef = git(fixture.root, "rev-parse", TASK_HISTORY_REF);
-  assert.equal(firstPrimaryTaskRef, backlogResult.receipt.destinationReceiptRevision);
-  assert.equal(existsSync(join(fixture.root, ".beads.gate.lock")), false, "retired Beads native gate lock must not survive cutover");
-  assert.match(git(fixture.root, "ls-remote", "--heads", fixture.remote, "refs/heads/prime-claw/tasks"), /refs\/heads\/prime-claw\/tasks/);
-  assert.equal(readFileSync(join(fixture.root, ".gitignore"), "utf8"), `\n${operatorIgnore}`, "cutover must retire only the exact Beads ignore block and preserve every operator byte");
-
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: fixture.root, runner: RUNNER });
+  assert.equal(prepared.status, "prepared", prepared.detail);
+  const store = join(fixture.root, ".backlog");
+  git(store, "config", "user.name", "Migration Fixture");
+  git(store, "config", "user.email", "migration@example.invalid");
+  backlog(fixture.root, "task", "create", "Independent source", "--status", "In Progress",
+    "--description", "independent native history", "--no-dod-defaults", "--plain");
+  git(store, "add", "-A");
+  git(store, "commit", "-qm", "seed independent Backlog source");
+  git(store, "push", "-q", "origin", TASK_HISTORY_REF);
+  // Workspace setup adds its native ignore projection to the code repository.
+  // Publish fixture setup before exercising the unchanged clean-source gate.
+  git(fixture.root, "add", ".gitignore");
+  git(fixture.root, "commit", "-qm", "record independent task-store ignore projection");
+  git(fixture.root, "push", "-q");
+  const sourceHead = git(store, "rev-parse", "HEAD");
+  assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote, TASK_HISTORY_REF).split(/\s+/)[0], sourceHead);
   const toBeads = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
   assert.equal(toBeads.status, "ready", toBeads.detail);
-  const backlogStore = join(fixture.root, ".backlog");
-  const backlogStatusAfterInspection = git(backlogStore, "status", "--porcelain=v1");
-  assert.equal(backlogStatusAfterInspection, "", "read-only inspection must leave independent Backlog history clean");
+  assert.equal(git(store, "status", "--porcelain=v1"), "", "inspection must leave independent history clean");
+  // This pre-existing reverse setup covers independent Backlog ref retirement.
+  // PRIMECLAW-44's retiring-source operation is Beads->Backlog, not recreation of
+  // unrelated Beads history over an outgoing remote publication left intact.
   const beadsResult = await migrateTaskProvider({
-    cwd: fixture.root,
-    targetProvider: "beads",
-    runner: RUNNER,
-    expectedSourceRevision: toBeads.sourceRevision,
-    confirmedSwitch: true,
-    actor: "roundtrip-operator",
-    semanticPlacement: "Restore provider-native Beads fields and preserve exact Backlog provenance in native metadata.",
+    cwd: fixture.root, targetProvider: "beads", runner: RUNNER, expectedSourceRevision: toBeads.sourceRevision,
+    confirmedSwitch: true, actor: "retirement-operator", semanticPlacement: "Preserve complete Backlog fields in native Beads metadata.",
     verifyActiveRuntime: proveFixtureRuntime,
   });
   assert.equal(beadsResult.status, "completed", beadsResult.detail);
   assert.equal(beadsResult.selectedProvider, "beads");
   assert.equal(git(fixture.root, "ls-remote", "--heads", fixture.remote, TASK_HISTORY_REF), "");
-  assert.equal(command(fixture.root, "git", ["rev-parse", "--verify", "--quiet", TASK_HISTORY_REF], true), null, "retired primary task ref must not survive cutover");
-  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
-  assert.equal(detectTaskProvider(fixture.root, RUNNER).evidence.provider, "beads");
-
-  const toBacklogAgain = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
-  assert.equal(toBacklogAgain.status, "ready", toBacklogAgain.detail);
-  const secondBacklog = await migrateTaskProvider({
-    cwd: fixture.root,
-    targetProvider: "backlog",
-    runner: RUNNER,
-    expectedSourceRevision: toBacklogAgain.sourceRevision,
-    confirmedSwitch: true,
-    actor: "roundtrip-operator",
-    semanticPlacement: "Restore Backlog native task history after exact retirement of the prior independent source ref.",
+  assert.equal(command(fixture.root, "git", ["rev-parse", "--verify", "--quiet", TASK_HISTORY_REF], true), null,
+    "retired primary task ref must not survive cutover");
+  assert.equal(existsSync(store), false);
+  const sourcePublication = git(fixture.root, "ls-remote", "--refs", fixture.remote, "refs/dolt/data");
+  assert.match(sourcePublication, /refs\/dolt\/data$/);
+  const beforeIgnore = readFileSync(join(fixture.root, ".gitignore"), "utf8");
+  // The existing reverse setup uses bd init --stealth and does not add the
+  // ordinary native root ignore block. Preserve its actual input bytes.
+  const toBacklog = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  assert.equal(toBacklog.status, "ready", toBacklog.detail);
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: toBacklog.sourceRevision,
+    confirmedSwitch: true, actor: "retirement-operator", semanticPlacement: "Preserve exact native source history in published Backlog provenance.",
     verifyActiveRuntime: proveFixtureRuntime,
   });
-  assert.equal(secondBacklog.status, "completed", secondBacklog.detail);
-  assert.equal(secondBacklog.selectedProvider, "backlog");
-  assert.match(git(fixture.root, "ls-remote", "--heads", fixture.remote, TASK_HISTORY_REF), /refs\/heads\/prime-claw\/tasks/);
+  assert.equal(result.status, "completed", result.detail);
+  assert.equal(result.selectedProvider, "backlog");
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  assert.equal(existsSync(join(fixture.root, ".beads.gate.lock")), false, "retired native gate lock must not survive cutover");
+  assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote, "refs/dolt/data"), sourcePublication,
+    "local source retirement must retain outgoing remote history without changing its ref");
+  assert.equal(readFileSync(join(fixture.root, ".gitignore"), "utf8"), beforeIgnore,
+    "cutover must preserve every operator/project ignore byte from this stealth source");
+  assert.match(readFileSync(join(fixture.root, ".gitignore"), "utf8"), /operator-cache\//);
   const finalPreparation = prepareTaskHistoryWorkspace({ primaryRoot: fixture.root, runner: RUNNER });
   assert.equal(finalPreparation.status, "prepared", finalPreparation.detail);
-  assert.equal(git(fixture.root, "rev-parse", TASK_HISTORY_REF), secondBacklog.receipt.destinationReceiptRevision);
+  assert.equal(git(fixture.root, "rev-parse", TASK_HISTORY_REF), result.receipt.destinationReceiptRevision);
 });
 
+
 test("Beads source inspection rejects effective owner-filter omissions before destination creation", { timeout: 120_000 }, (t) => {
-  const fixture = beadsSource(t, "beads-filtered-source");
+  const fixture = embeddedBeadsSource(t, "beads-filtered-source");
   const filtered = JSON.parse(bd(fixture.root, "create", "Filtered ordinary task", "--status", "in_progress", "--actor", "excluded-reviewer", "--json"));
   const view = JSON.parse(bd(fixture.root, "--readonly", "show", filtered.id, "--json", "--long", "--include-comments"))[0];
   assert.ok(view.created_by);
   bd(fixture.root, "config", "set", "export.exclude_owners", view.created_by);
-  bd(fixture.root, "dolt", "push", "--remote", "origin", "--no-adopt");
   git(fixture.root, "add", "-A");
   if (git(fixture.root, "status", "--porcelain=v1")) git(fixture.root, "commit", "-qm", "configure supported export filter");
   git(fixture.root, "push", "-q");
@@ -961,6 +1009,185 @@ test("Backlog native drafts are counted and preserved exactly before source dele
   assert.equal(archivedDraft.status, "closed");
 });
 
+
+test("canonical source inspection reads embedded local-only built-in and partial catalogs as-is", { timeout: 180_000 }, async (t) => {
+  for (const [name, custom] of [["built-in-only", undefined], ["partial-custom", "in_design:active"]]) {
+    await t.test(name, (t) => {
+      const fixture = embeddedBeadsSource(t, `inspect-${name}`, custom);
+      const before = sourceAuthorityFiles(fixture.root);
+      const catalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
+      const runner = new AsIsBeadsRunner();
+      const inspect = () => inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+      const first = inspect();
+      assert.equal(first.status, "ready", first.detail);
+      assert.equal(first.sourceProvider, "beads");
+      assert.equal(first.sourceRevision, `capture-sha256:${first.sourceDigest}`);
+      assert.deepEqual(first.taskCounts, { open: 3, closed: 0, archived: 0, total: 3 });
+      const second = inspect();
+      assert.equal(second.status, "ready", second.detail);
+      assert.equal(second.sourceRevision, first.sourceRevision);
+      assert.equal(second.sourceDigest, first.sourceDigest);
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
+      assert.deepEqual(JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json")), catalog);
+      assert.deepEqual(catalog.custom_statuses, custom ? [{ name: "in_design", category: "active" }] : undefined);
+      assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+      assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+      assert.ok(runner.reads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "context", "--json"])));
+      assert.ok(runner.reads.some(({ args }) => JSON.stringify(args) === JSON.stringify(BEADS_INVENTORY)));
+      assert.deepEqual(runner.sourcePublicationCommands, []);
+    });
+  }
+});
+
+test("confirmed embedded local-only migration publishes Backlog before retiring source and preserves compatible active ownership", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "embedded-active-retirement");
+  const before = sourceAuthorityFiles(fixture.root);
+  const sourceVersion = command(fixture.root, "bd", ["--version"]);
+  const statusCatalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
+  const native = Object.fromEntries(Object.values(fixture.ids).map((id) => [id, {
+    view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
+    history: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")),
+    events: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--events", "--json", "--limit", "0")),
+    provenance: JSON.parse(bd(fixture.root, "--readonly", "provenance", "log", id, "--json")),
+  }]));
+  const owner = addActiveBeadsOwner(fixture);
+  writeFileSync(join(owner.episode, "compatible-progress.txt"), "compatible active source progress\n");
+  git(owner.episode, "add", "compatible-progress.txt");
+  git(owner.episode, "commit", "-qm", "compatible later Episode implementation");
+  git(owner.episode, "push", "-q");
+  const laterHead = git(owner.episode, "rev-parse", "HEAD");
+  const runner = new AsIsBeadsRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.deepEqual(inspection.activeOwnership, [{ ownerSessionId: owner.ownerSessionId, taskId: fixture.ids.parent }]);
+  let runtimeProofs = 0;
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "embedded-migration-operator",
+    semanticPlacement: "Preserve exact native source data and history in Backlog provenance.",
+    async verifyActiveRuntime(records) {
+      runtimeProofs += 1;
+      assert.ok(records.every((record) => record.head === laterHead));
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), before, "source authority changed before guarded retirement");
+      if (runtimeProofs >= 3) {
+        const store = join(fixture.root, ".backlog");
+        assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], git(store, "rev-parse", "HEAD"),
+          "Backlog must already be published while source authority is still intact");
+      }
+      return proveFixtureRuntime(records);
+    },
+  });
+  assert.equal(result.status, "completed", result.detail);
+  assert.equal(result.sourceAbsent, true);
+  assert.equal(result.selectedProvider, "backlog");
+  assert.ok(runtimeProofs >= 3, "active continuity must be proved through ownership cutover");
+  assert.deepEqual(result.receipt.taskCounts, { open: 3, closed: 0, archived: 0, total: 3 });
+  assert.equal(result.receipt.sourceRevision, inspection.sourceRevision);
+  assert.equal(result.receipt.sourceDigest, inspection.sourceDigest);
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  const store = join(fixture.root, ".backlog");
+  assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], result.receipt.destinationReceiptRevision);
+  for (const mapping of result.receipt.mappings) {
+    const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
+    const pkg = sourcePackageFromBacklogComments(task);
+    const expected = native[mapping.sourceTaskId];
+    assert.equal(pkg.sourceVersion, sourceVersion);
+    assert.deepEqual(pkg.statusCatalog, statusCatalog);
+    assert.equal(pkg.sourceDigest, inspection.sourceDigest);
+    assert.equal(pkg.sourceIdentity.storeDir, join(fixture.root, ".beads"));
+    assert.equal(pkg.sourceIdentity.doltMode, "embedded");
+    assert.equal(pkg.sourceIdentity.database, "EMB");
+    assert.deepEqual(pkg.nativeView, expected.view);
+    assert.deepEqual(pkg.history, expected.history);
+    assert.deepEqual(pkg.events, expected.events);
+    assert.deepEqual(pkg.provenance, expected.provenance);
+    assert.equal(task.status, ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked" })[expected.view.status]);
+  }
+  const current = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8")).owners[owner.ownerSessionId];
+  assert.equal(current.provider, "backlog");
+  assert.equal(current.taskId, result.receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId);
+  for (const field of ["ownerSessionId", "operationId", "engine", "baseRef", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
+    assert.deepEqual(current[field], owner.record[field], field);
+  }
+  assert.equal(git(owner.episode, "rev-parse", "HEAD"), laterHead);
+  assert.equal(git(owner.episode, "status", "--porcelain=v1"), "");
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+  assert.ok(runner.reads.filter(({ args }) => JSON.stringify(args) === JSON.stringify(BEADS_INVENTORY)).length >= 6,
+    "complete source must be recaptured through active workspace and guarded retirement proofs");
+  assert.ok(runner.reads.some(({ cwd, args }) => cwd === owner.episode && args[0] === "--readonly" && args[1] === "context"),
+    "active source workspace needs its own native source identity proof");
+  assert.deepEqual(runner.sourcePublicationCommands, []);
+});
+
+test("embedded source refuses mismatched active workspace identity and unreadable native history before destination creation", { timeout: 180_000 }, async (t) => {
+  for (const kind of ["active identity", "history"]) {
+    await t.test(kind, (t) => {
+      const fixture = embeddedBeadsSource(t, `embedded-refuse-${kind.replaceAll(" ", "-")}`);
+      const owner = kind === "active identity" ? addActiveBeadsOwner(fixture) : null;
+      const before = sourceAuthorityFiles(fixture.root);
+      let refused = false;
+      class UnreadableSourceRunner extends AsIsBeadsRunner {
+        run(commandName, args, options = {}) {
+          const result = super.run(commandName, args, options);
+          if (commandName === "bd" && args[0] === "--readonly" && result.status === 0) {
+            if (kind === "active identity" && args[1] === "context" && options.cwd === owner.episode) {
+              refused = true;
+              return { ...result, stdout: JSON.stringify({ ...JSON.parse(result.stdout), database: "OTHER" }) };
+            }
+            if (kind === "history" && args[1] === "history") {
+              refused = true;
+              return { status: 1, stdout: "", stderr: "fixture cannot read required native history" };
+            }
+          }
+          return result;
+        }
+      }
+      const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: new UnreadableSourceRunner() });
+      assert.equal(refused, true);
+      assert.equal(inspection.status, "blocked");
+      assert.match(inspection.detail, kind === "history" ? /cannot read required native history/ : /source context.*store, database and mode/);
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
+      assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+      assert.equal(existsSync(join(fixture.root, ".beads")), true);
+      assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+    });
+  }
+});
+
+test("repeated embedded source proofs reject task and catalog drift without source publication", { timeout: 240_000 }, async (t) => {
+  for (const kind of ["task", "catalog"]) {
+    await t.test(kind, async (t) => {
+      const fixture = embeddedBeadsSource(t, `embedded-${kind}-drift`);
+      const owner = addActiveBeadsOwner(fixture);
+      const runner = new AsIsBeadsRunner();
+      const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+      assert.equal(inspection.status, "ready", inspection.detail);
+      const ownershipBefore = readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8");
+      let changed = false, deletions = 0;
+      const result = await migrateTaskProvider({
+        cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+        confirmedSwitch: true, actor: "drift-operator", semanticPlacement: "Preserve exact source evidence.",
+        async verifyActiveRuntime(records) {
+          if (!changed) {
+            changed = true;
+            if (kind === "task") bd(fixture.root, "update", fixture.ids.parent, "--notes", "changed during maintenance", "--json");
+            else bd(fixture.root, "config", "set", "status.custom", "in_design:active");
+          }
+          return proveFixtureRuntime(records);
+        },
+        deleteSource() { deletions += 1; },
+      });
+      assert.equal(changed, true);
+      assert.equal(result.status, "blocked");
+      assert.match(result.detail, /source provider changed during the maintenance window/);
+      assert.equal(deletions, 0);
+      assert.equal(existsSync(join(fixture.root, ".beads")), true);
+      assert.equal(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8"), ownershipBefore);
+      assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
+      assert.deepEqual(runner.sourcePublicationCommands, []);
+    });
+  }
+});
 
 test("production export helper captures embedded local-only native inventory without lifecycle or transport setup", { timeout: 120_000 }, (t) => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-migration-embedded-export-")));

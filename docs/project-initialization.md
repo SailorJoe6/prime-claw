@@ -263,8 +263,8 @@ clean, directly published linked code worktree and branch. The ownership head is
 preserved as historical identity; migration separately captures the actual
 current code head, proves `baseRef → historical head → current head` ancestry,
 keeps that current head stable, and uses it for the native Git and Orca
-continuity proofs. Its branch-local Backlog task bytes or shared provider revision
-must equal the captured source. The migration also reuses the ordinary Episode
+continuity proofs. Its branch-local Backlog task bytes or complete shared Beads
+capture must equal the captured source. The migration also reuses the ordinary Episode
 continuity checks: one exact idle durable session, current runtime route, and
 exact Orca worktree/terminal resources when applicable. Those code, source, registry, and
 runtime checks repeat beside the atomic ownership replacement and guarded
@@ -278,11 +278,22 @@ require SQL or clear source export filters. A filter that actually omits an
 issue produces an inventory mismatch and leaves the source configuration
 unchanged. Beads source packages retain the raw CLI version and complete raw
 status-catalog response alongside issue views, unbounded issue history/events,
-and provenance. Version or catalog drift participates in the existing source
-digest/recapture proof. This capture-data improvement does **not** yet remove
-the active-provider capability/transport checks, owner-workspace publication
-proof, or server retirement requirement; embedded/local-only end-to-end
-migration remains unfinished under PRIMECLAW-44. Backlog completion counts come from exact native lifecycle status;
+and provenance. Migration-only source reads bind the native `context` and
+`dolt show` store/database/connection identity. The confirmation revision is a
+`capture-sha256:` token over that identity, raw version/catalog, and complete
+issue/history packages, not a required outgoing published Dolt commit. The same
+capture is repeated from primary and active source workspaces through guarded
+retirement; task, catalog, history or identity drift refuses cutover. No source
+custom lifecycle setup, server conversion, remote, push or publication is
+required. Ordinary active Beads lifecycle/write checks remain strict.
+
+After destination publication and ownership/runtime/source rechecks, retirement
+removes the exact local `.beads` store. Embedded mode makes no server-stop call;
+a server-mode source must identify a non-shared server before the native stop.
+Any outgoing remote history is retained untouched; it is not local live provider
+authority. Broader PRIMECLAW-44 status preflight/classification and existing
+destination/layout/skill work remain unfinished. Backlog completion counts come
+from exact native lifecycle status;
 physical archive placement remains separate abandonment evidence. A Backlog
 destination is repeatedly proved against the originally selected remote URL and
 `refs/heads/prime-claw/tasks`, not a mutable local upstream alias.
@@ -331,10 +342,12 @@ and plugin delivery state retain their distinct ownership records.
 ## Validation and migration boundary
 
 [The PRIMECLAW-44 embedded-source proof](evidence/beads-embedded-source-capture-20261030.md)
-records a disposable native read path without custom statuses, a Beads remote,
-or server mode. It is evidence for the planned retiring-source repair, not a
-claim that the current migration supports that source or that destination
-publication and source retirement have been proven.
+records the native read proof, bounded capture-data integration, and retiring-source
+boundary work without source custom lifecycle setup, a Beads remote or server
+mode. The bounded embedded fixture uses only supported open/in-progress/blocked
+statuses and a fresh Backlog destination. It does not prove unsupported-status
+projection, ordinary closed/archive correction, populated-destination preservation,
+layout normalization, or the complete initialization task.
 
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,

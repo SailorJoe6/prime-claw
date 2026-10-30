@@ -44,11 +44,9 @@ import {
   detectExplicitTaskProvider,
   detectTaskProvider,
   normalizedDoltGitRemote,
-  prepareBeadsWorkspaceTransport,
   prepareExplicitBeadsWorkspaceTransport,
   type BacklogProviderEvidence,
   type BeadsProviderEvidence,
-  type BeadsWorkspaceTransportEvidence,
   type CanonicalLifecycleStatus,
   type TaskProviderId,
 } from "./task-providers.ts";
@@ -190,8 +188,8 @@ interface BeadsSnapshot {
   provider: "beads";
   projectRoot: string;
   evidence: BeadsProviderEvidence;
-  transport: BeadsWorkspaceTransportEvidence;
-  /** Raw native read evidence; independent of the active-provider transport proof. */
+  /** Native store/connection identity, without active-provider publication requirements. */
+  sourceIdentity: JsonObject;
   sourceVersion: string;
   statusCatalog: JsonObject;
   revision: string;
@@ -520,17 +518,42 @@ export function completeBeadsExport(runner: CommandRunner, projectRoot: string, 
   return exported;
 }
 
+/** Migration reads bind the native store, not active lifecycle/write readiness. */
+function beadsSourceIdentity(projectRoot: string, evidence: BeadsProviderEvidence, runner: CommandRunner): JsonObject {
+  const repositoryRoot = dirname(evidence.storeDir);
+  const selected = detectExplicitTaskProvider(repositoryRoot, "beads", runner);
+  if (selected.kind !== "selected" || selected.evidence.provider !== "beads"
+      || canonical(selected.evidence) !== canonical(evidence)) {
+    throw new Error("Beads source store identity changed or became unreadable");
+  }
+  const context = asObject(jsonCommand(runner, "bd", ["--readonly", "context", "--json"], projectRoot, "Beads source context"), "Beads source context");
+  if (context.schema_version !== 1 || context.backend !== "dolt"
+      || context.repo_root !== repositoryRoot || context.cwd_repo_root !== projectRoot
+      || context.beads_dir !== evidence.storeDir || context.database !== evidence.doltDatabase
+      || context.is_redirected !== false || context.dolt_mode !== evidence.doltMode
+      || (context.dolt_mode !== "embedded" && context.dolt_mode !== "server")) {
+    throw new Error("Beads source context does not match the selected repository, store, database and mode");
+  }
+  const connection = asObject(jsonCommand(runner, "bd", ["--readonly", "dolt", "show", "--json"], projectRoot, "Beads source connection"), "Beads source connection");
+  if (connection.schema_version !== 1 || connection.backend !== "dolt"
+      || connection.database !== context.database || connection.embedded !== (context.dolt_mode === "embedded")) {
+    throw new Error("Beads source connection does not match the selected database and mode");
+  }
+  // Exclude per-invocation cwd/worktree flags and transient connection health.
+  // The same native store must compare identically from its linked Episodes.
+  return {
+    repositoryRoot, storeDir: evidence.storeDir, database: context.database, doltMode: context.dolt_mode,
+    connection: Object.fromEntries(["database", "embedded", "data_dir", "host", "port", "user", "shared_server", "branch"]
+      .filter((key) => Object.hasOwn(connection, key)).map((key) => [key, connection[key]])),
+  };
+}
+
 function captureBeads(
   projectRoot: string,
   evidence: BeadsProviderEvidence,
   runner: CommandRunner,
-  explicit: boolean,
 ): BeadsSnapshot {
-  checkBeadsCapabilities(projectRoot, runner);
-  const prepared = explicit
-    ? prepareExplicitBeadsWorkspaceTransport(projectRoot, runner)
-    : prepareBeadsWorkspaceTransport(projectRoot, runner);
-  if (prepared.status !== "ready") throw new Error(`Beads publication proof failed (${prepared.code}): ${prepared.detail}; ${prepared.remediation}`);
+  const sourceIdentity = beadsSourceIdentity(projectRoot, evidence, runner);
   const sourceVersion = runRequired(runner, "bd", ["--version"], projectRoot, "Beads source version").stdout;
   const statusCatalog = asObject(
     jsonCommand(runner, "bd", ["--readonly", "statuses", "--json"], projectRoot, "Beads source status catalog"),
@@ -567,11 +590,11 @@ function captureBeads(
     archived: tasks.filter((task) => task.classification === "archived").length,
     total: tasks.length,
   };
-  const digest = sha256(canonical({ sourceVersion, statusCatalog, tasks }));
+  const digest = sha256(canonical({ sourceIdentity, sourceVersion, statusCatalog, tasks }));
   return {
-    provider: "beads", projectRoot, evidence, transport: prepared.evidence,
+    provider: "beads", projectRoot, evidence, sourceIdentity,
     sourceVersion, statusCatalog,
-    revision: prepared.evidence.publishedRevision, digest, tasks, counts,
+    revision: `capture-sha256:${digest}`, digest, tasks, counts,
   };
 }
 
@@ -589,11 +612,10 @@ function captureProviderEvidence(
   provider: TaskProviderId,
   evidence: BacklogProviderEvidence | BeadsProviderEvidence,
   runner: CommandRunner,
-  explicit = false,
 ): SourceSnapshot {
   return provider === "backlog"
     ? captureBacklog(projectRoot, evidence as BacklogProviderEvidence, runner)
-    : captureBeads(projectRoot, evidence as BeadsProviderEvidence, runner, explicit);
+    : captureBeads(projectRoot, evidence as BeadsProviderEvidence, runner);
 }
 
 function captureSelectedSource(projectRoot: string, runner: CommandRunner): SourceSnapshot {
@@ -604,7 +626,7 @@ function captureSelectedSource(projectRoot: string, runner: CommandRunner): Sour
 function captureSameSource(snapshot: SourceSnapshot, runner: CommandRunner): SourceSnapshot {
   return snapshot.provider === "backlog"
     ? captureBacklog(snapshot.projectRoot, snapshot.evidence, runner, true)
-    : captureBeads(snapshot.projectRoot, snapshot.evidence, runner, true);
+    : captureBeads(snapshot.projectRoot, snapshot.evidence, runner);
 }
 
 function exactSnapshotUnchanged(before: SourceSnapshot, after: SourceSnapshot): void {
@@ -681,9 +703,8 @@ function activeOwnership(projectRoot: string, sourceProvider: TaskProviderId, ru
 
 function verifyActiveSourceWorkspace(source: SourceSnapshot, row: ActiveMigrationOwnership, runner: CommandRunner): void {
   if (source.provider === "beads") {
-    const proof = prepareExplicitBeadsWorkspaceTransport(row.worktree, runner);
-    if (proof.status !== "ready") throw new Error(`active task Episode ${row.ownerSessionId} cannot prove its source Beads workspace: ${proof.detail}; ${proof.remediation}`);
-    if (proof.evidence.publishedRevision !== source.revision) throw new Error(`active task Episode ${row.ownerSessionId} resolves Beads revision ${proof.evidence.publishedRevision} instead of source revision ${source.revision}`);
+    const proof = captureBeads(row.worktree, source.evidence, runner);
+    exactSnapshotUnchanged(source, proof);
     return;
   }
   if (source.repositoryRoot === source.projectRoot) {
@@ -1274,6 +1295,7 @@ function backlogSourcePackage(pkg: BeadsTaskPackage, source: BeadsSnapshot, sema
     sourceProvider: "beads",
     sourceRevision: source.revision,
     sourceDigest: source.digest,
+    sourceIdentity: source.sourceIdentity,
     sourceVersion: source.sourceVersion,
     statusCatalog: source.statusCatalog,
     sourceTaskId: pkg.sourceTaskId,
@@ -1750,7 +1772,7 @@ function captureConfirmedSource(
   if (explicit.kind !== "selected" || explicit.evidence.provider !== sourceProvider) {
     throw new Error(`same-destination retry cannot prove the exact ${sourceProvider} source store`);
   }
-  const source = captureProviderEvidence(projectRoot, sourceProvider, explicit.evidence, runner, true);
+  const source = captureProviderEvidence(projectRoot, sourceProvider, explicit.evidence, runner);
   if (source.revision !== expectedSourceRevision) {
     throw new Error(`same-destination retry source revision ${source.revision} does not equal confirmed ${expectedSourceRevision}`);
   }
@@ -1892,17 +1914,15 @@ function deleteBeadsSource(snapshot: BeadsSnapshot, runner: CommandRunner): void
   if (!existsSync(store)) throw new Error("Beads source store disappeared before guarded deletion");
   const entry = lstatSync(store);
   if (!entry.isDirectory() || entry.isSymbolicLink() || realpathSync(store) !== store || !contained(snapshot.projectRoot, store)) throw new Error("Beads source store identity changed before guarded deletion");
-  const remoteUrl = snapshot.transport.remoteUrl.replace(/^git\+/, "");
-  runRequired(
-    runner,
-    "git",
-    ["push", `--force-with-lease=${snapshot.transport.publicationRef}:${snapshot.transport.publicationHead}`, remoteUrl, `:${snapshot.transport.publicationRef}`],
-    snapshot.projectRoot,
-    "retire exact Beads source publication",
-  );
-  const retained = runner.run("git", ["ls-remote", "--exit-code", "--refs", remoteUrl, snapshot.transport.publicationRef], { cwd: snapshot.projectRoot, allowFailure: true });
-  if (retained.status === 0 || retained.stdout.trim()) throw new Error("Beads source publication still exists after guarded retirement");
-  runRequired(runner, "bd", ["dolt", "stop"], snapshot.projectRoot, "stop Beads source server before deletion");
+  // The caller has reverified this exact complete capture and the published
+  // destination under the ownership lock. Outgoing remotes are not migration
+  // authority and are neither required nor mutated by local source retirement.
+  if (snapshot.sourceIdentity.doltMode === "server") {
+    if (snapshot.sourceIdentity.connection.shared_server !== false) {
+      throw new Error("cannot safely stop a shared or unidentified Beads source server for local retirement");
+    }
+    runRequired(runner, "bd", ["dolt", "stop"], snapshot.projectRoot, "stop Beads source server before deletion");
+  }
   const gateLock = join(snapshot.projectRoot, ".beads.gate.lock");
   if (existsSync(gateLock)) {
     const tracked = runner.run("git", ["-C", snapshot.projectRoot, "ls-files", "--error-unmatch", "--", ".beads.gate.lock"], { cwd: snapshot.projectRoot, allowFailure: true });

@@ -5,10 +5,11 @@
 The original Slice 1a below is evidence-only: it tests direct native reads of a
 disposable embedded/local-only Beads source. The subsequent bounded Slice 1b
 integrates the inventory reads and raw capture context into production code;
-its results and remaining limits are recorded at the end of this document.
-Neither slice proves complete embedded-source destination publication/retirement
-or authorizes a live migration. Active-provider transport requirements still
-remain in the migration path.
+its results and remaining limits are recorded below. Slice 1c subsequently
+integrates the migration-only source identity/capture boundary through rechecks
+and local retirement. These are bounded increments, not full-task acceptance
+or authority for a live migration. Each slice's evidence and limits remain
+separate below.
 
 No ralph-pva, nemo-setup, builder task-store migration, user-global plugin apply,
 Prime Agent restart, or upstream Prime Agent edit is part of this proof.
@@ -196,3 +197,129 @@ embedded/local-only migration support. The broader destination-preservation,
 layout and initialization-skill work also remains. Earlier corpus/history limits
 above still apply. This is one partial production candidate for review, not full
 PRIMECLAW-44 completion or merge/deployment authority.
+
+
+## Slice 1c — as-is source boundary through guarded local retirement
+
+Migration-only `captureBeads` no longer calls active lifecycle capabilities or
+workspace transport/publication preparation. It binds strict-readonly native
+`context --json` and `dolt show --json` to the selected real store, canonical
+repository, database and mode. The existing capture digest now includes stable
+store/connection identity as well as raw version, complete catalog and complete
+issue/view/history/event/provenance packages. The source confirmation revision
+is `capture-sha256:<digest>`, explicitly a stable capture token rather than a
+required outgoing Dolt publication. No persistent snapshot/controller is added.
+
+Per-invocation cwd/worktree flags and transient connection health are excluded
+from identity comparison. Each active source Episode resolves the same native
+store from its own worktree and repeats the complete capture, so primary and
+linked source identity/data must agree. Existing code ancestry/publication,
+quiescence, exact owner records, runtime continuity and destination publication
+checks remain unchanged and repeat through ownership cutover and deletion.
+
+Guarded retirement removes the exact local `.beads` authority only after those
+proofs. Embedded retirement invokes no server command. A server-mode source must
+positively identify a non-shared server before native `bd dolt stop`; a shared
+or unidentified server refuses safe local retirement. Outgoing remote history
+is neither required, pushed, inspected nor deleted by Beads-source retirement.
+A disposable regression explicitly preserves an existing `refs/dolt/data` ref.
+The ordinary active Beads lifecycle/write safety implementation in
+`task-providers.ts` is unchanged.
+
+### Focused native proof
+
+```sh
+python3 -m pytest tests/test_task_provider_migration.py::test_retiring_beads_source_boundary_node_suite -q -m container
+```
+
+Result: **1 passed in 199.06s**, guarded run
+`20261030T032024Z-1760-ab5529fd`. Its manifest records `passed`, no failure codes,
+network absent and clean absent runtime/builder teardown. The focused bridge
+runs the real native cases for:
+
+- Built-in-only and partial-custom embedded/local-only source inspection, stable
+  repeated capture and unchanged source authority bytes.
+- Confirmed migration of supported open/in-progress/blocked issues into a fresh
+  Backlog store, publication before local retirement, exact raw source packages,
+  and compatible active-Episode ownership/runtime/code continuity.
+- Mismatched linked source identity and unreadable required history refusal
+  before destination creation, with source authority intact.
+- Task and catalog drift between proofs, with no source deletion or ownership
+  cutover.
+The earlier focused snapshot did not establish the subsequently revised fresh
+independent Backlog fixture. The corrected focused bridge subsequently passed
+**1 test in 228.79s**, run `20261030T035346Z-1826-039dfdf6`, including that exact
+fixture and all source-boundary groups above. Its manifest records `passed`,
+network absent and clean absent builder/runtime teardown. The fixture retains
+independent Backlog source-ref retirement coverage through a fresh legacy reverse
+setup, then proves approved forward retirement preserves outgoing Dolt history
+and exact actual operator/project ignore bytes.
+
+Intermediate runs `20261030T032353Z-12829-6c5116df`,
+`20261030T033733Z-53633-acf0c352`, and `20261030T034917Z-87991-bf079225`
+exposed only revised fixture setup/expectation errors: missing local author in
+the nested test clone, an uncommitted generated `.gitignore` projection, and an
+ordinary-ignore-block assumption for a source seeded by `bd init --stealth`.
+Corrections are confined to fixture seeding and exact input-byte expectations.
+No production safety gate was bypassed and no host/global Git identity was set.
+Each failure output is retained in its run-owned
+`tier1/migration-pytest-output.txt`; final full validation is recorded below.
+
+The embedded fixture removes an origin automatically adopted by native `bd init`
+during **fixture seeding only**, before the guarded immutable source read. The
+migration runner forbids source configuration writes, SQL, remote/server commands
+and access to `refs/dolt/data`; only unchanged provider-discovery reads are
+allowed outside strict-readonly data calls. The initial run
+`20261030T030741Z-62503-fdb70b76` failed before new embedded identity checks because
+that fixture remote was unexpectedly present; its output is retained under
+`tier1/migration-pytest-output.txt`. It also exposed an old unrelated reverse
+recreation expectation that depended on deleting outgoing Beads publication.
+The revised fixture preserves independent Backlog source-ref retirement
+coverage without recreating unrelated Beads history over a retained source ref.
+No production reverse importer rewrite or source publication deletion was added.
+
+**Limits:** this proves one bounded source-as-is boundary, not all of plan steps
+1–2 or the complete migration contract. Unsupported-used-status preflight and
+ordinary closed versus positively evidenced archive classification are still
+unfinished and remain required before full acceptance. The fresh destination
+fixture does not prove merging into populated Backlog stores, default/custom
+layout normalization or the initialization skill/text-patch flow. Full-corpus
+history coverage remains limited as noted above. No live store migration,
+merge, deployment, global activation, settings/model or upstream edit occurred.
+
+
+### Final Slice 1c regression evidence
+
+```sh
+scripts/test-tier1.sh --probe
+python3 -m pytest tests/test_task_provider_migration.py::test_retiring_beads_source_boundary_node_suite -q -m container
+python3 -m pytest tests/test_task_provider_migration.py tests/test_beads_retiring_source_capture.py tests/test_task_providers.py -q -m container -k "not retiring_beads_source_boundary"
+python3 -m pytest tests/test_task_provider_migration.py tests/test_beads_retiring_source_capture.py tests/test_task_providers.py -q
+```
+
+- Mandatory Tier 1: exit 0, run `20261030T030649Z-59705-61731a7e`.
+  Production code was unchanged after this pass; subsequent repairs were test
+  fixture seeding/expectations only.
+- Corrected focused native bridge: **1 passed in 228.79s**, run
+  `20261030T035346Z-1826-039dfdf6`.
+- Complete native migration/capture/active-provider bridge set:
+  **6 passed, 6 deselected in 679.38s**, run
+  `20261030T035741Z-13439-340dd01f`. The selector excludes only the duplicate
+  focused Python bridge plus ordinary host-safe checks; the complete migration
+  Node suite still executes every source-boundary and independent-history case.
+- All three final receipts record `passed`, no failure codes, network verified
+  absent and clean absent builder/runtime teardown in their run-owned
+  `tier1/manifest.json`.
+- Final full regression repository content SHA-256:
+  `028e8ed0381c93739d54045097416ea8d014419faebf4ab7ed62c6c0b189b7da`.
+  Runtime image:
+  `sha256:76b2da2595b8ae79ecb8d3391e405171e1b77a75b548d2911a8440aa207de51e`.
+- Host-safe targeted inventory/structural checks: **5 passed, 7 skipped**.
+  Final task/evidence prose was updated after tests; production/test bytes were
+  not changed after the final full native run started.
+
+This is a bounded candidate for separate Conversation review. All full-task
+Acceptance Criteria remain unchecked. In particular, no unsupported-status
+projection, ordinary closed/archive correction, populated Backlog preservation,
+layout normalization, skill-led flow or live migration acceptance is claimed.
+Shared/external server retirement is not newly established by this fixture.

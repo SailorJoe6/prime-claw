@@ -19,6 +19,16 @@ def test_task_provider_migration_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_retiring_beads_source_boundary_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test",
+        "--test-name-pattern",
+        "canonical source inspection|confirmed embedded|embedded source refuses|repeated embedded|independent Backlog publication",
+        WS_NODE_SUITE, timeout=900,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_task_provider_migration_module_is_inventoried_plugin_source() -> None:
     inventory = json.loads(
         (REPO / "src" / "prime-agent-plugin" / "asset-inventory.json").read_text()
