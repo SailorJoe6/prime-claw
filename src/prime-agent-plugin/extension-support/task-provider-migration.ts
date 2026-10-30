@@ -1,8 +1,8 @@
 /**
  * One-shot selected-provider migration for Prime Claw initialization/upgrade.
  *
- * This module deliberately implements two native directions rather than a
- * universal task model. Backlog snapshots retain the exact structured view,
+ * Public entry points admit only Beads to Backlog. Existing pair-specific
+ * native helpers are retained rather than introducing a universal task model. Backlog snapshots retain the exact structured view,
  * Markdown bytes, placement, and Git history. Beads snapshots retain the exact
  * export row, long native view, Dolt history/events, and append-only
  * provenance. Pair-specific writers use only supported native CLIs, preserve
@@ -601,11 +601,20 @@ function captureBeads(
 
 function selectedEvidence(projectRoot: string, runner: CommandRunner): { provider: TaskProviderId; evidence: BacklogProviderEvidence | BeadsProviderEvidence } {
   const detection = detectTaskProvider(projectRoot, runner);
-  if (detection.kind !== "selected") {
-    if (detection.kind === "blocked") throw new Error(`provider authority blocked (${detection.code}): ${detection.detail}; ${detection.remediation}`);
-    throw new Error("provider migration requires one selected live source provider");
+  // Coexistence is expected only at this explicit migration read boundary.
+  // Ordinary discovery and every malformed-store refusal remain unchanged.
+  if (detection.kind === "blocked" && detection.code === "dual-providers") {
+    const source = detectExplicitTaskProvider(projectRoot, "beads", runner);
+    if (source.kind !== "selected" || source.evidence.provider !== "beads") {
+      throw new Error("Beads-to-Backlog inspection cannot identify the exact readable Beads source store");
+    }
+    return { provider: "beads", evidence: source.evidence };
   }
-  return { provider: detection.evidence.provider, evidence: detection.evidence };
+  if (detection.kind === "blocked") throw new Error(`provider authority blocked (${detection.code}): ${detection.detail}; ${detection.remediation}`);
+  if (detection.kind !== "selected" || detection.evidence.provider !== "beads") {
+    throw new Error("Beads-to-Backlog migration requires a readable Beads source store");
+  }
+  return { provider: "beads", evidence: detection.evidence };
 }
 
 function captureProviderEvidence(
@@ -753,6 +762,7 @@ export function inspectTaskProviderMigration(options: {
 }): ProviderMigrationInspection | ProviderMigrationBlocked {
   const runner = options.runner ?? new ProcessCommandRunner();
   try {
+    if (options.targetProvider !== "backlog") return blocked("unsupported-direction", "provider migration supports only Beads-to-Backlog", "request an explicit Beads-to-Backlog inspection; reverse migration is not supported", { targetProvider: options.targetProvider });
     const project = resolveNearestProjectRoot(options.cwd, process.env.HOME ?? "", runner);
     if (project.kind === "linked-worktree") return blocked("primary-required", "provider migration must run from the canonical primary checkout", "rerun /initialize-prime-claw from the canonical primary Conversation", { targetProvider: options.targetProvider });
     const codeHead = cleanGitRevision(runner, project.root);
@@ -2121,6 +2131,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
   let source: SourceSnapshot | undefined;
   let ownershipSwitch: ActiveTaskProviderOwnershipSwitchResult | undefined;
   try {
+    if (options.targetProvider !== "backlog") return blocked("unsupported-direction", "provider migration supports only Beads-to-Backlog", "request an explicit Beads-to-Backlog inspection; reverse migration is not supported", { targetProvider: options.targetProvider });
     if (!options.confirmedSwitch) return blocked("confirmation-required", "provider switch requires explicit operator confirmation", "inspect the migration, present the exact source revision and semantic placement, then call switch-confirm with confirmedSwitch=true", { targetProvider: options.targetProvider });
     if (!options.actor.trim()) return blocked("actor-required", "provider switch receipt requires an exact actor", "supply the operator-approved actor identifier", { targetProvider: options.targetProvider });
     if (!options.semanticPlacement.trim()) return blocked("placement-required", "provider switch requires managed semantic-placement prose for non-equivalent fields", "inspect exact source fields and supply concise placement prose without omitting any value", { targetProvider: options.targetProvider });

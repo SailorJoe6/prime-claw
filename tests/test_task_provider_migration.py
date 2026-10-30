@@ -16,6 +16,31 @@ def test_task_provider_migration_node_suite(tier1_container) -> None:
         "node", "--experimental-strip-types", "--test", WS_NODE_SUITE,
         timeout=2400,
     )
+    (tier1_container.share.parent / "task-provider-migration-node.tap").write_text(
+        result.stdout + result.stderr
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_migration_entry_admission_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
+        "migration admission", WS_NODE_SUITE, timeout=900,
+    )
+    (tier1_container.share.parent / "migration-entry-admission-node.tap").write_text(
+        result.stdout + result.stderr
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_forward_beads_retirement_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
+        "forward Beads retirement", WS_NODE_SUITE, timeout=600,
+    )
+    (tier1_container.share.parent / "forward-beads-retirement-node.tap").write_text(
+        result.stdout + result.stderr
+    )
     assert result.returncode == 0, result.stdout + result.stderr
 
 

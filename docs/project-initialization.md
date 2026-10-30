@@ -185,28 +185,31 @@ an OS permission prompt, or another GUI-control API for this workflow.
 
 ## Confirmed task-provider switch
 
-An initialized project can inspect and then explicitly confirm a one-time switch
-between Backlog and Beads without a second tracker command or durable migration
-coordinator. `/initialize-prime-claw --switch-request <backlog|beads>` is
-read-only. It reports the selected source provider, exact source revision and
-digest, complete open/closed/archived counts, active version-2 ownership count,
-the semantic-placement prompt, and the exact confirmation requirement. It does
-not create a destination, change ownership, or write a receipt.
+The public migration entry points support **Beads to Backlog only**. Reverse
+requests refuse before project lookup or native commands. The existing
+`/initialize-prime-claw --switch-request backlog` interface is read-only. It
+reports exact Beads identity/capture revision and digest, complete
+open/closed/archived counts, active version-2 ownership count, the
+semantic-placement prompt and explicit confirmation requirement. Inspection does
+not create a destination, change ownership or write a receipt.
 
-`/initialize-prime-claw --switch-confirm <provider> <revision> <actor> <semantic-placement-prose>` is itself the explicit confirmation and requires the
-reported source revision, a non-empty actor, and the managed semantic-placement
-prose. The tool equivalent uses `action="switch-confirm"`, `targetProvider`,
-`expectedSourceRevision`, `actor`, `semanticPlacement`, and
-`confirmedSwitch=true`. When inspection lists a Backlog field that cannot
-project to one Beads value without a decision, the structured tool also requires
-one task-specific `beadsNativePlacements` entry with the actual
-destination-native field. Priority
-is a Beads integer `0..4`; a multi-assignee Backlog source requires one non-empty
-native `assignee` string. One entry can carry both fields. The slash form remains
-available when no structured native value is required. Managed prose is retained
-for audit and is never parsed into a provider value. The literal value is applied
-and read back from the native destination before guarded source deletion. The
-confirmed maintenance window is one linear operation:
+Explicit inspection can read Beads alongside a valid default, hidden or
+root-config-selected custom Backlog destination. Ordinary discovery still blocks
+dual providers, and active Beads lifecycle readiness remains strict. This
+inspection permission does **not** yet implement populated destination imports:
+confirmation retains its exact same-destination retry/publication/preparation
+and import guards. Existing records/config/history must be preserved; a refusal
+is not permission to replace or recreate the destination. The bounded evidence
+and unfinished work are linked below.
+
+`/initialize-prime-claw --switch-confirm backlog <revision> <actor> <semantic-placement-prose>`
+requires the inspected exact source revision, a non-empty actor and managed
+semantic-placement prose. The tool equivalent uses `action="switch-confirm"`,
+`targetProvider="backlog"`, `expectedSourceRevision`, `actor`,
+`semanticPlacement` and `confirmedSwitch=true`. Viewing inspection output never
+confirms a switch. The existing native Beads package importer keeps every raw
+value/history; managed prose may choose human-facing placement but never permit
+omission. The confirmed maintenance window is one linear operation:
 
 1. capture every source task plus its provider-native bytes or rows, all open,
    closed, and archived states, relationships, comments, native history,
@@ -228,10 +231,8 @@ confirmed maintenance window is one linear operation:
    `.prime-claw/ownership.json`, preserving every Episode, session, worktree,
    branch, operation, runtime route, resource, and provider-native task view;
 6. re-prove the source is unchanged, activate and re-prove the sole target, and
-   remove the source only after every check succeeds. Backlog-to-Beads cutover
-   then publishes Beads' native `.gitignore`, `config.yaml`, `metadata.json`,
-   and `README.md` so the provider choice survives a fresh code checkout; the
-   live Dolt database and runtime files remain provider-managed and ignored.
+   remove the source only after every check succeeds. Outgoing remote Beads
+   history is retained; source publication is not a retirement prerequisite.
 
 A preserved active Episode can still have code-tracked bytes for the old
 provider at its historical head after either cutover direction. Those bytes
@@ -383,6 +384,12 @@ with replay and native folder filename checks. Its validation state and limits
 are recorded there. Default-folder relocation, ordinary-store adoption, full
 initialization/migration layout integration and populated imports remain
 unfinished; this increment does not replace their existing safeguards.
+
+[The migration-only entry-admission increment](evidence/migration-entry-admission-20261030.md)
+allows explicit read-only Beads capture alongside valid Backlog evidence and
+refuses unsupported reverse requests before native commands. Confirmation
+retains its existing exact-retry/destination guards; populated imports and layout
+normalization remain unfinished, not bypassed by inspection permission.
 
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,
