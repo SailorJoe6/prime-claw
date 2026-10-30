@@ -368,6 +368,14 @@ file. Unsupported statuses still require semantic resolution, not a new guessed
 projection. Populated-destination preservation, layout normalization and the
 complete initialization task remain unproven by these fixtures.
 
+[The separate native destination-layout de-risk proof](evidence/backlog-destination-layout-20261030.md)
+tests whole-configuration root symlinks and same-repository Git moves for default,
+hidden and custom selected stores. Its validation state and limits are recorded
+there. It changes no production initialization/preparation/migration path and
+proves neither populated-store adoption into independent history nor complete
+native cross-branch visibility after relocation. Those remain separate unfinished
+integration seams, not a reason to recreate existing tasks or relax safeguards.
+
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,
 `registerTool`, and awaited `session_start`). Prime Claw remains pinned to v0.9.8
