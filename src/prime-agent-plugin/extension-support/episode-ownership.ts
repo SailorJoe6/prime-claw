@@ -2,6 +2,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, wri
 import { dirname, isAbsolute, join, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { ensurePrimeClawDirectory } from "./prime-claw-directory.ts";
 
 export type EpisodeLifecycleStatus = "provisioning" | "active" | "uncertain" | "inactive";
 export type EpisodeLifecycleEngine = "orca" | "local";
@@ -373,6 +374,7 @@ function orderedRegistry(registry: EpisodeOwnershipRegistry): EpisodeOwnershipRe
 function persistOwnershipRegistry(projectRoot: string, registry: EpisodeOwnershipRegistry): void {
   validateActiveBindingUniqueness(registry);
   const path = episodeOwnershipPath(projectRoot);
+  ensurePrimeClawDirectory(projectRoot);
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(orderedRegistry(registry), null, 2)}\n`, { mode: 0o600 });
@@ -380,6 +382,7 @@ function persistOwnershipRegistry(projectRoot: string, registry: EpisodeOwnershi
 }
 
 function withDirectoryLock<T>(lockPath: string, timeoutMs: number, label: string, operation: () => T): T {
+  ensurePrimeClawDirectory(dirname(dirname(lockPath)));
   mkdirSync(dirname(lockPath), { recursive: true });
   const deadline = Date.now() + timeoutMs;
   while (true) {

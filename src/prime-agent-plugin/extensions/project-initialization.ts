@@ -55,7 +55,8 @@ export function summarizeReconcile(result: ReconcileResult, detailed = false): s
         : result.legacySpecifications.status === "blocked"
           ? `legacy-specs=blocked(${result.legacySpecifications.detail})`
           : `legacy-specs=${result.legacySpecifications.status}`;
-  const base = `Prime Claw project ${result.project.root} (${result.project.kind}): ${actions || "no-assets"} conflicts=${result.conflicts} ${registration} ${provider} ${legacy}`;
+  const warnings = (result.warnings ?? []).map((warning) => `Warning: ${warning}`);
+  const base = [`Prime Claw project ${result.project.root} (${result.project.kind}): ${actions || "no-assets"} conflicts=${result.conflicts} ${registration} ${provider} ${legacy}`, ...warnings].join("\n");
   if (!detailed || result.conflicts === 0) return base;
   const unresolved = result.items.filter((item) => item.action === "preserved" || item.action === "blocked");
   const lines = unresolved.map((item) => item.action === "preserved"
@@ -236,8 +237,8 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
           .map((item) => join(result.project.root, item.destination));
         if (result.skipReason === "uncertain-episode-activity") {
           ctx.ui.notify(summarizeReconcile(result), "warning");
-        } else if (result.changed || result.conflicts > 0 || result.registration.status === "unavailable") {
-          ctx.ui.notify(summarizeReconcile(result), result.conflicts > 0 ? "warning" : "info");
+        } else if (result.changed || result.conflicts > 0 || result.registration.status === "unavailable" || result.warnings?.length) {
+          ctx.ui.notify(summarizeReconcile(result), result.conflicts > 0 || result.warnings?.length ? "warning" : "info");
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

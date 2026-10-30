@@ -16,6 +16,14 @@ Explicit task-history preservation may commit/publish the separate task DAG and
 stage only original task-path deletions in the code index. Code branch HEAD
 stays unchanged; root-link and ignore bookkeeping remain explicit code changes.
 
+When Prime Claw itself first creates an absent `.prime-claw/`, it adds the
+root-only `/.prime-claw/` local exclusion using Git's resolved exclude path,
+including the shared path for linked worktrees. Existing exclusions are
+preserved. An existing directory prevents any exclusion repair. Operators can
+remove the rule to track state deliberately; later reconciliation does not
+restore it. Already tracked files stay tracked. Exclusion failures warn and
+continue creating assets, without a later retry while the directory exists.
+
 The first explicit initialization or upgrade also records the exact unfinished
 retained-legacy locations and accepted specification digests in one
 `.prime-claw/legacy-specifications.json` allowlist. Startup is verification-only:
@@ -57,7 +65,7 @@ before I begin work, so that newly installed skills are discoverable without
 silently changing active Episode snapshots.**
 
 Startup reconciliation is awaited. No-op starts remain quiet; changes,
-conflicts, or degraded registration produce a concise notice. Active or
+conflicts, exclusion failures, or degraded registration produce a concise notice. Active or
 uncertain Episode worktrees retain their starting template snapshot.
 
 ## US-07 — Orient a fresh project agent
@@ -120,6 +128,7 @@ separately confirmed operator action, not an implementation test.
 
 - `extensions/project-initialization.ts`
 - `extension-support/project-initialization.ts`
+- `extension-support/prime-claw-directory.ts`
 - `extension-support/template-review.ts`
 - `extension-support/task-provider-migration.ts`
 - `extension-support/episode-ownership.ts`

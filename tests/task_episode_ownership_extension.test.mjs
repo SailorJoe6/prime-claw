@@ -391,6 +391,10 @@ function transition(f, overrides = {}, dependencies = {}) {
 
 test("guarded transition replaces only the exact owner's legacy authority and preserves other owners", () => {
   const f = transitionFixture();
+  // Exercise the supported operator choice to expose existing state for tracking.
+  // First creation now excludes it locally; later owner writes must not repair that rule.
+  const exclude = resolve(f.root, git(f.root, "rev-parse", "--git-path", "info/exclude"));
+  writeFileSync(exclude, readFileSync(exclude, "utf8").split("\n").filter(line => line !== "/.prime-claw/").join("\n"));
   const other = taskOwnership("other-owner", "PRIMECLAW-10.39");
   writeEpisodeOwnership(f.root, other);
   assert.equal(new CliLegacyTaskOwnershipTransitionGit().status(f.root), "?? .prime-claw/ownership.json");

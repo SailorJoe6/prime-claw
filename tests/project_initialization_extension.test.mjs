@@ -20,7 +20,7 @@ import {
 import { createProjectInitializationExtension, summarizeReconcile } from "../src/prime-agent-plugin/extensions/project-initialization.ts";
 import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 import { requestTemplateReview } from "../src/prime-agent-plugin/extension-support/template-review.ts";
-import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
+import { writeEpisodeOwnership, withEpisodeAdmissionLock } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import {
   LEGACY_SPECIFICATION_INVENTORY,
   assertGrandfatheredLegacySpecification,
@@ -1058,4 +1058,181 @@ test("startup never inspects or confirms a provider migration",async t=>{
   })({registerTool(){},on(name,handler){events.set(name,handler);}});
   await events.get("session_start")({}, {cwd:root,ui:{notify(){}}});
   assert.deepEqual(calls,[]);
+});
+
+
+// PRIMECLAW-47: real Git evidence, not just manifest or runner assertions.
+function localExclude(root) { return resolve(root, git(root, "rev-parse", "--git-path", "info/exclude").trim()); }
+function exclusionFixture(t) {
+  const root = repo(t);
+  writeFileSync(join(root, ".gitignore"), "/.agents/\n/.backlog/\n");
+  git(root, "add", ".gitignore"); git(root, "commit", "-qm", "ignore unrelated generated fixture assets");
+  return root;
+}
+function reconcileFixture(root, overrides = {}) {
+  return reconcilePrimeClawProject({ cwd: root, pluginRoot: PLUGIN, home: dirname(root), runner: new Runner(), ...overrides });
+}
+function gitBoundary(root) {
+  return {
+    head: git(root, "rev-parse", "HEAD"),
+    index: readFileSync(resolve(root, git(root, "rev-parse", "--git-path", "index").trim())),
+    ignore: readFileSync(join(root, ".gitignore")),
+    tracked: git(root, "diff", "HEAD", "--"),
+  };
+}
+function assertGitBoundary(root, before) { assert.deepEqual(gitBoundary(root), before); }
+function assertStateIgnored(root) {
+  assert.equal(git(root, "check-ignore", ".prime-claw/templates.json").trim(), ".prime-claw/templates.json");
+  assert.equal(git(root, "status", "--porcelain", "--", ".prime-claw"), "");
+}
+
+test("fresh directory creation excludes only root state and preserves Git-owned boundaries", (t) => {
+  const root = exclusionFixture(t), before = gitBoundary(root), exclude = localExclude(root);
+  const original = Buffer.from("# keep this comment\n*.scratch\n# final comment without newline");
+  writeFileSync(exclude, original);
+  reconcileFixture(root);
+  assert.deepEqual(readFileSync(exclude), Buffer.concat([original, Buffer.from("\n/.prime-claw/\n")]));
+  assertStateIgnored(root);
+  assert.equal(git(root, "status", "--porcelain"), "");
+  mkdirSync(join(root, "nested/.prime-claw"), { recursive: true });
+  writeFileSync(join(root, "nested/.prime-claw/user.txt"), "not root state\n");
+  writeFileSync(join(root, "unrelated.txt"), "still visible\n");
+  assert.match(git(root, "status", "--porcelain", "--untracked-files=all"), /nested\/\.prime-claw\/user.txt/);
+  assert.match(git(root, "status", "--porcelain"), /unrelated.txt/);
+  assertGitBoundary(root, before);
+});
+
+test("fresh creation handles missing excludes and existing exact rules without duplicates", (t) => {
+  for (const content of [null, "# preserved\n/.prime-claw/\n", "# preserved\n/.prime-claw/"]) {
+    const root = exclusionFixture(t), exclude = localExclude(root);
+    if (content === null) rmSync(dirname(exclude), { recursive: true }); else writeFileSync(exclude, content);
+    reconcileFixture(root);
+    const expected = content === null ? "/.prime-claw/\n" : content;
+    assert.equal(readFileSync(exclude, "utf8"), expected);
+    assertStateIgnored(root);
+    reconcileFixture(root);
+    assert.equal(readFileSync(exclude, "utf8"), expected);
+  }
+});
+
+test("pre-existing directory and user-removed exclusion are never repaired", (t) => {
+  for (const initiallyPresent of [true, false]) {
+    const root = exclusionFixture(t), exclude = localExclude(root);
+    if (initiallyPresent) mkdirSync(join(root, ".prime-claw")); else reconcileFixture(root);
+    const deliberate = "# user chooses tracking\n*.scratch\n";
+    writeFileSync(exclude, deliberate);
+    reconcileFixture(root);
+    reconcileFixture(root);
+    assert.equal(readFileSync(exclude, "utf8"), deliberate);
+    assert.match(git(root, "status", "--porcelain", "--", ".prime-claw"), /\?\? \.prime-claw\//);
+    // The rule does not untrack files that the operator deliberately commits.
+    git(root, "add", ".prime-claw"); git(root, "commit", "-qm", "deliberately track project state");
+    writeFileSync(exclude, deliberate + "/.prime-claw/\n");
+    appendFileSync(join(root, ".prime-claw/templates.json"), "\n");
+    assert.match(git(root, "status", "--porcelain", "--", ".prime-claw"), /M \.prime-claw\/templates.json/);
+  }
+});
+
+test("linked worktree creation uses Git's shared exclude path and leaves its index and HEAD alone", (t) => {
+  const root = exclusionFixture(t), linked = join(dirname(root), "linked-exclusion");
+  git(root, "worktree", "add", "-q", "-b", "exclusion-fixture", linked);
+  t.after(() => { git(root, "worktree", "remove", "--force", linked); });
+  assert.equal(lstatSync(join(linked, ".git")).isFile(), true);
+  assert.equal(localExclude(linked), localExclude(root));
+  const before = gitBoundary(linked);
+  reconcileFixture(linked);
+  assertStateIgnored(linked);
+  assert.equal(git(linked, "status", "--porcelain"), "");
+  assertGitBoundary(linked, before);
+  assert.equal(readFileSync(localExclude(root), "utf8").split("\n").filter(line => line === "/.prime-claw/").length, 1);
+  // A later first creation in main shares the existing rule rather than duplicating it.
+  const shared = readFileSync(localExclude(root));
+  reconcileFixture(root);
+  assert.deepEqual(readFileSync(localExclude(root)), shared);
+});
+
+test("no directory creation means no exclusion mutation for skipped or colliding roots", async (t) => {
+  const skipped = exclusionFixture(t), before = readFileSync(localExclude(skipped));
+  assert.equal(reconcileFixture(skipped, { isActiveEpisode: () => true }).skippedActiveEpisode, true);
+  assert.equal(existsSync(join(skipped, ".prime-claw")), false);
+  assert.deepEqual(readFileSync(localExclude(skipped)), before);
+  const collision = exclusionFixture(t), collisionBefore = readFileSync(localExclude(collision));
+  writeFileSync(join(collision, ".prime-claw"), "not a directory\n");
+  assert.throws(() => reconcileFixture(collision), /collision|directory/);
+  assert.deepEqual(readFileSync(localExclude(collision)), collisionBefore);
+  const events = new Map();
+  createProjectInitializationExtension({ pluginRoot: PLUGIN, home: dirname(skipped), runner: new Runner() })({
+    registerCommand() {}, registerTool() {}, on(n, h) { events.set(n, h); },
+  });
+  await events.get("session_start")({}, { cwd: skipped, ui: { notify() {} } });
+  assert.equal(existsSync(join(skipped, ".prime-claw")), false);
+  assert.deepEqual(readFileSync(localExclude(skipped)), before);
+});
+
+test("startup first creation excludes state but never restores a user-removed rule", async (t) => {
+  const root = exclusionFixture(t), events = new Map(), notifications = [];
+  createProjectInitializationExtension({ pluginRoot: PLUGIN, home: dirname(root), runner: new Runner([{ id: "fixture", path: root }]) })({
+    registerCommand() {}, registerTool() {}, on(n, h) { events.set(n, h); },
+  });
+  const ctx = { cwd: root, ui: { notify(message, level) { notifications.push({ message, level }); } } };
+  await events.get("session_start")({}, ctx);
+  assertStateIgnored(root);
+  const deliberate = "# removed by operator\n";
+  writeFileSync(localExclude(root), deliberate);
+  await events.get("session_start")({}, ctx);
+  assert.equal(readFileSync(localExclude(root), "utf8"), deliberate);
+});
+
+test("exclude write failure warns in startup and agent-facing tool while creating assets, with no later retry", async (t) => {
+  for (const surface of ["startup", "tool"]) {
+    const root = exclusionFixture(t), exclude = localExclude(root);
+    unlinkSync(exclude); mkdirSync(exclude); // Fails even as container root; not a permissions-dependent fixture.
+    const events = new Map(), commands = new Map(), tools = new Map(), notifications = [];
+    createProjectInitializationExtension({ pluginRoot: PLUGIN, home: dirname(root), runner: new Runner([{ id: "fixture", path: root }]) })({
+      registerCommand(n, d) { commands.set(n, d); }, registerTool(d) { tools.set(d.name, d); }, on(n, h) { events.set(n, h); },
+    });
+    assert.equal(commands.has("initialize-prime-claw"), false);
+    const ctx = { cwd: root, ui: { notify(message, level) { notifications.push({ message, level }); } } };
+    let text;
+    if (surface === "startup") {
+      await events.get("session_start")({}, ctx);
+      text = notifications.map(n => n.message).join("\n");
+      assert.ok(notifications.some(n => n.level === "warning"));
+    } else {
+      const result = await tools.get("initialize_prime_claw").execute("fixture", { action: "reconcile" }, null, null, ctx);
+      assert.equal(result.isError, undefined);
+      assert.equal(result.details.warnings.length, 1);
+      text = result.content[0].text;
+    }
+    assert.match(text, /warn|dirty/i);
+    assert.ok(text.includes(exclude), text);
+    assert.ok(text.includes("/.prime-claw/"), text);
+    assert.ok(existsSync(join(root, ".prime-claw/templates.json")));
+    assert.ok(existsSync(join(root, ".agents/skills/prepare/SKILL.md")));
+    rmSync(exclude, { recursive: true }); writeFileSync(exclude, "# repaired manually, no rule\n");
+    const later = reconcileFixture(root);
+    assert.equal((later.warnings ?? []).length, 0);
+    assert.equal(readFileSync(exclude, "utf8"), "# repaired manually, no rule\n");
+  }
+});
+
+test("ownership and legacy inventory first creators share the same creation-only default", (t) => {
+  for (const create of [
+    root => writeEpisodeOwnership(root, activeOwnership("creation-only", root)),
+    root => withEpisodeAdmissionLock(root, () => {}),
+    root => reconcileLegacySpecificationInventory(root, "initialize"),
+  ]) {
+    const root = exclusionFixture(t), before = gitBoundary(root), exclude = localExclude(root);
+    create(root);
+    assert.equal(readFileSync(exclude, "utf8").split("\n").filter(line => line === "/.prime-claw/").length, 1);
+    assert.equal(git(root, "status", "--porcelain", "--", ".prime-claw"), "");
+    assertGitBoundary(root, before);
+    writeFileSync(exclude, "# removed\n");
+    create(root);
+    assert.equal(readFileSync(exclude, "utf8"), "# removed\n");
+    const existing = exclusionFixture(t), prior = readFileSync(localExclude(existing));
+    mkdirSync(join(existing, ".prime-claw"));
+    create(existing);
+    assert.deepEqual(readFileSync(localExclude(existing)), prior);
+  }
 });
