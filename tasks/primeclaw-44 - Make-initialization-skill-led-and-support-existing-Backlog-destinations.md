@@ -4,7 +4,7 @@ title: Make initialization skill-led and support existing Backlog destinations
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:55'
-updated_date: '2026-10-30 02:27'
+updated_date: '2026-10-30 02:46'
 labels: []
 dependencies: []
 references:
@@ -22,6 +22,8 @@ modified_files:
   - docs/evidence/beads-embedded-source-capture-20261030.md
   - tests/beads_retiring_source_capture.test.mjs
   - tests/test_beads_retiring_source_capture.py
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
+  - tests/task_provider_migration.test.mjs
 priority: p1
 type: enhancement
 ordinal: 129000
@@ -91,6 +93,8 @@ Implement the reviewed specification, including the consolidated PRIMECLAW-46 fi
 Stop for candidate review. This plan does not authorize implementation, merge, global refresh/restart, migration of this builder's live store, or any live ralph-pva/nemo-setup operation; those retain their separate operator boundaries.
 
 Execution checkpoint — 2026-10-30: Slice 1a is complete as a native evidence/de-risk slice only. tests/beads_retiring_source_capture.test.mjs and its guarded Python bridge prove direct strict-readonly embedded/local-only issue inventory/export, per-issue current/history/events/provenance, full built-in/partial-custom catalogs, identity/version, stable recapture, and filtered-export omission detection. Canonical source capture/transport code is unchanged. Next slice: use this native evidence to separate captureBeads/completeBeadsExport from active provider preparation, retain raw source version/catalog in the in-memory snapshot/provenance, and carry source-read proof through repeated checks per steps 1–2. Full destination/layout/import/skill work remains; no full-task acceptance criterion is checked.
+
+Execution checkpoint — 2026-10-30, Slice 1b: capture-data integration is implemented and Docker-validated (see Implementation Notes and evidence doc). Native list/export replaces SQL in completeBeadsExport; source snapshot/package now bind raw version/catalog; per-issue source reads are readonly with unbounded history/events. Do not treat this as completion of steps 1–2: initial active capability/server/publication preparation, owner-workspace and retirement transport requirements remain, along with unsupported-used-status preflight and closed/archive classification. These are the next in-scope production seams after this candidate receives review. Preserve ordinary active Beads safety and all remaining specification constraints. Stop at this candidate; no second slice or full-task acceptance.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -109,10 +113,18 @@ Initial exploratory/regression failures exposed and corrected test-only assumpti
 Accepted continuation focus: implement one bounded chunk of existing steps 1–2. Integrate supported migration-only as-is source reads in captureBeads/completeBeadsExport and existing in-memory identity/provenance/recapture evidence; retain raw version/catalog, native history/reason/package, complete inventory, and unsupported-used-status preflight before destination writes. Carry the approved source-read boundary through later owner-workspace/recheck/retirement seams as work proceeds. Do not claim completion while outgoing server/publication requirements remain in those seams. Ordinary active Beads execution safety is unchanged. Prefer native provider behavior, then concise managed LLM judgment, then narrow integrity code; no new mapping/classification/approval/coordinator framework. Preserve first-slice limits in docs/evidence/beads-embedded-source-capture-20261030.md. Use disposable native Docker evidence and mandatory Tier 1 for plugin changes. No live stores, host/global candidate apply/check/probe, deployment, or builder migration. Update this same native task, commit/push one bounded candidate, and stop for review.
 
 2026-10-30 — Runtime continuation update from the owning Conversation/operator: the operator explicitly updated models.json, cleared the recorded compaction/runtime blocker, and instructed "Just try to send the execute command again." Continue this SAME Episode and the already approved next bounded production capture/recapture work in living steps 1–2. Slice 1a remains accepted as evidence only. The owning Conversation reports canonical-main task In Progress restored/published; this Episode native task reread is also In Progress. No further configuration investigation or model/settings changes are requested. Source-as-is, Docker-only validation and all existing scope boundaries remain unchanged. The queued execute should begin planned implementation rather than another preparation-only status response; successful compaction is not a semantic implementation prerequisite.
+
+2026-10-30 — Production Slice 1b in progress: replace the migration export helper's SQL inventory and outgoing export-filter setup gate with the proven strict-readonly unbounded native list/export comparison. Retain raw bd version and complete status-catalog response in the existing Beads snapshot digest and destination source-package provenance; make per-issue native source reads readonly and history/events explicitly unbounded. This is deliberately a bounded data-capture sub-slice: existing active capability/transport, owner-workspace and retirement checks, status/classification repair and full source-as-is admission remain unfinished. No claim of embedded canonical migration/retirement readiness. No ordinary active Beads safety changes or new mapping framework.
+
+2026-10-30 — Slice 1b candidate completed for review: production completeBeadsExport now uses strict --readonly export --all and independent unbounded native list with every inclusion flag instead of SQL and an unconditional configured-filter gate. Actual omissions refuse without source filter changes; an unmatched configured filter succeeds. captureBeads retains raw bd version stdout and complete status-catalog object in its existing digest and Backlog package; source full views/history/events/provenance are readonly and history/events use --limit 0. Native helper coverage proves seven built-in statuses on embedded/local-only Beads without server/custom statuses/remote/publication setup. Existing server/published migration coverage asserts exact readonly command shapes, version/catalog-only digest sensitivity and raw destination provenance. Existing active-provider safety regressions remain intact.
+
+Validation: scripts/test-tier1.sh --probe exit 0 (run 20261030T022952Z-48070-299609c0). python3 -m pytest tests/test_task_provider_migration.py tests/test_beads_retiring_source_capture.py tests/test_task_providers.py -q -m container => 6 passed, 5 deselected in 635.42s, run 20261030T023343Z-62900-0aa24605. Both tier1/manifest.json receipts passed with no failure codes, network absent and clean absent builder/runtime teardown. Native-regression repository content SHA-256 dfd4cbf2e346840ec7f859072ddb9ccd396b88fd936bb484746f4f9848b8031a; runtime image sha256:7c38a6b82a05542416d519b8383d46abd9232f8990fc91fc3797e5ebb47add4c. Host-safe targeted check => 5 passed, 6 skipped. Detailed reproduction and unchanged corpus limits: docs/evidence/beads-embedded-source-capture-20261030.md.
+
+Partial scope only: source capture still invokes active capability/server/publication preparation; owner-workspace/recheck/retirement transport contract, unsupported-used-status preflight and closed/archive repair remain unfinished. No canonical embedded migration/retirement or full-task criterion is claimed. No lifecycle, ownership, live-store, model/settings, host/global candidate apply/check/probe, deployment or upstream edits. Compaction retry succeeded (native event 92aa2f17); execution resumed only after that event was verified. Publish one bounded candidate and stop for owning Conversation review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Partial candidate — Slice 1a evidence at 4ff0aa4c763ecd83bc10f7fed4a1a87598fa9062 is accepted after parent and independent review. The full task is not accepted or complete. Continue one bounded production source-read integration chunk of existing steps 1–2 under the accepted limits in Implementation Notes; commit/push and stop for separate review. No merge or live migration authority.
+Partial candidate — Slice 1a evidence remains accepted at 4ff0aa4c763ecd83bc10f7fed4a1a87598fa9062. Slice 1b implements native readonly complete inventory/export and raw version/catalog/history capture-data integration. Mandatory Docker Tier1 passed; selected migration/embedded-capture/active-provider bridges passed (6 passed, 5 deselected). This is not full-task acceptance or complete as-is embedded migration: initial capability/transport, owner/recheck/retirement seams, unsupported-used-status preflight, closed/archive correction and later specification work remain. One published bounded candidate is for separate Conversation review only; no merge, deployment, live migration or lifecycle authority.
 <!-- SECTION:FINAL_SUMMARY:END -->
