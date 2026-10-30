@@ -191,6 +191,9 @@ interface BeadsSnapshot {
   projectRoot: string;
   evidence: BeadsProviderEvidence;
   transport: BeadsWorkspaceTransportEvidence;
+  /** Raw native read evidence; independent of the active-provider transport proof. */
+  sourceVersion: string;
+  statusCatalog: JsonObject;
   revision: string;
   digest: string;
   tasks: BeadsTaskPackage[];
@@ -493,18 +496,9 @@ function jsonCommand(runner: CommandRunner, command: string, args: string[], cwd
   return parseJson(runRequired(runner, command, args, cwd, label).stdout, label);
 }
 
-function completeBeadsExport(runner: CommandRunner, projectRoot: string, label: string): Array<{ row: JsonObject; line: string }> {
-  const filter = asObject(
-    jsonCommand(runner, "bd", ["config", "get", "export.exclude_owners", "--json"], projectRoot, `${label} export filter`),
-    `${label} export filter`,
-  );
-  if (filter.schema_version !== 1 || filter.key !== "export.exclude_owners" || typeof filter.value !== "string") {
-    throw new Error(`${label} returned malformed export.exclude_owners evidence`);
-  }
-  if (filter.value.trim() !== "") {
-    throw new Error(`${label} cannot prove a complete inventory while export.exclude_owners is configured`);
-  }
-  const result = runRequired(runner, "bd", ["export", "--all"], projectRoot, `${label} complete export`);
+/** Complete migration inventory without source configuration changes or SQL. */
+export function completeBeadsExport(runner: CommandRunner, projectRoot: string, label: string): Array<{ row: JsonObject; line: string }> {
+  const result = runRequired(runner, "bd", ["--readonly", "export", "--all"], projectRoot, `${label} complete export`);
   const exported = result.stdout.split(/\r?\n/).filter((line) => line.trim() !== "").map((line) => ({
     line,
     row: asObject(parseJson(line, `${label} export row`), `${label} export row`),
@@ -512,7 +506,7 @@ function completeBeadsExport(runner: CommandRunner, projectRoot: string, label: 
   const inventory = jsonCommand(
     runner,
     "bd",
-    ["--readonly", "sql", "--json", "SELECT id FROM issues ORDER BY id"],
+    ["--readonly", "list", "--all", "--limit", "0", "--include-infra", "--include-templates", "--include-gates", "--include-ephemeral", "--json"],
     projectRoot,
     `${label} independent issue inventory`,
   );
@@ -537,17 +531,22 @@ function captureBeads(
     ? prepareExplicitBeadsWorkspaceTransport(projectRoot, runner)
     : prepareBeadsWorkspaceTransport(projectRoot, runner);
   if (prepared.status !== "ready") throw new Error(`Beads publication proof failed (${prepared.code}): ${prepared.detail}; ${prepared.remediation}`);
+  const sourceVersion = runRequired(runner, "bd", ["--version"], projectRoot, "Beads source version").stdout;
+  const statusCatalog = asObject(
+    jsonCommand(runner, "bd", ["--readonly", "statuses", "--json"], projectRoot, "Beads source status catalog"),
+    "Beads source status catalog",
+  );
   const exported = completeBeadsExport(runner, projectRoot, "Beads source");
   const tasks = exported.map(({ line, row: exportRow }): BeadsTaskPackage => {
     const taskId = exactTaskId(exportRow.id, "Beads export row");
-    const rawView = jsonCommand(runner, "bd", ["show", taskId, "--json", "--long", "--include-comments"], projectRoot, `bd show ${taskId}`);
+    const rawView = jsonCommand(runner, "bd", ["--readonly", "show", taskId, "--json", "--long", "--include-comments"], projectRoot, `bd show ${taskId}`);
     const views = Array.isArray(rawView) ? rawView : [];
     if (views.length !== 1) throw new Error(`bd show ${taskId} did not return one exact native task`);
     const nativeView = asObject(views[0], `bd show ${taskId}`);
     if (nativeView.id !== taskId) throw new Error(`bd show ${taskId} returned a different ID`);
-    const history = jsonCommand(runner, "bd", ["history", taskId, "--json"], projectRoot, `bd history ${taskId}`);
-    const events = jsonCommand(runner, "bd", ["history", taskId, "--events", "--json"], projectRoot, `bd history ${taskId} --events`);
-    const provenance = jsonCommand(runner, "bd", ["provenance", "log", taskId, "--json"], projectRoot, `bd provenance log ${taskId}`);
+    const history = jsonCommand(runner, "bd", ["--readonly", "history", taskId, "--json", "--limit", "0"], projectRoot, `bd history ${taskId}`);
+    const events = jsonCommand(runner, "bd", ["--readonly", "history", taskId, "--events", "--json", "--limit", "0"], projectRoot, `bd history ${taskId} --events`);
+    const provenance = jsonCommand(runner, "bd", ["--readonly", "provenance", "log", taskId, "--json"], projectRoot, `bd provenance log ${taskId}`);
     const nativeStatus = String(nativeView.status);
     const classification = nativeStatus === "closed" ? "archived" : nativeStatus === "done" ? "closed" : "open";
     return {
@@ -568,9 +567,10 @@ function captureBeads(
     archived: tasks.filter((task) => task.classification === "archived").length,
     total: tasks.length,
   };
-  const digest = sha256(canonical(tasks));
+  const digest = sha256(canonical({ sourceVersion, statusCatalog, tasks }));
   return {
     provider: "beads", projectRoot, evidence, transport: prepared.evidence,
+    sourceVersion, statusCatalog,
     revision: prepared.evidence.publishedRevision, digest, tasks, counts,
   };
 }
@@ -1274,6 +1274,8 @@ function backlogSourcePackage(pkg: BeadsTaskPackage, source: BeadsSnapshot, sema
     sourceProvider: "beads",
     sourceRevision: source.revision,
     sourceDigest: source.digest,
+    sourceVersion: source.sourceVersion,
+    statusCatalog: source.statusCatalog,
     sourceTaskId: pkg.sourceTaskId,
     exportRow: pkg.exportRow,
     exportLineBase64: pkg.exportLineBase64,

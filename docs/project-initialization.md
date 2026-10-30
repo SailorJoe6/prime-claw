@@ -271,10 +271,18 @@ runtime checks repeat beside the atomic ownership replacement and guarded
 source-deletion boundary. The existing ownership lock refuses deletion if the
 complete switched registry changes.
 
-Beads capture rejects any effective `export.exclude_owners` filter, exports all
-native issue records, and requires its duplicate-free IDs to equal an
-independent read-only `issues` inventory before either counts or deletion can be
-certified. Backlog completion counts come from exact native lifecycle status;
+The migration export helper reads `bd --readonly export --all` and compares its
+duplicate-free IDs with `bd --readonly list --all --limit 0 --include-infra
+--include-templates --include-gates --include-ephemeral --json`. It does not
+require SQL or clear source export filters. A filter that actually omits an
+issue produces an inventory mismatch and leaves the source configuration
+unchanged. Beads source packages retain the raw CLI version and complete raw
+status-catalog response alongside issue views, unbounded issue history/events,
+and provenance. Version or catalog drift participates in the existing source
+digest/recapture proof. This capture-data improvement does **not** yet remove
+the active-provider capability/transport checks, owner-workspace publication
+proof, or server retirement requirement; embedded/local-only end-to-end
+migration remains unfinished under PRIMECLAW-44. Backlog completion counts come from exact native lifecycle status;
 physical archive placement remains separate abandonment evidence. A Backlog
 destination is repeatedly proved against the originally selected remote URL and
 `refs/heads/prime-claw/tasks`, not a mutable local upstream alias.

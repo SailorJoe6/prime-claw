@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
+import { completeBeadsExport, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
@@ -17,6 +17,8 @@ const BACKLOG = process.platform === "linux" && existsSync(RUNTIME_BACKLOG)
   ? RUNTIME_BACKLOG
   : existsSync(BACKLOG_CANDIDATE) ? realpathSync(BACKLOG_CANDIDATE) : "backlog";
 const CUSTOM = "in_design:active,in_planning:active,ready_for_merge:wip,done:done";
+const BEADS_INVENTORY = ["--readonly", "list", "--all", "--limit", "0", "--include-infra",
+  "--include-templates", "--include-gates", "--include-ephemeral", "--json"];
 
 class CandidateRunner extends ProcessCommandRunner {
   run(commandName, args, options = {}) {
@@ -24,6 +26,29 @@ class CandidateRunner extends ProcessCommandRunner {
   }
 }
 const RUNNER = new CandidateRunner();
+
+class RecordingBeadsRunner extends CandidateRunner {
+  constructor() { super(); this.reads = []; this.sourceVersionSuffix = ""; this.sourceCatalogExtra = false; this.previousCommand = null; }
+  run(commandName, args, options = {}) {
+    const previous = this.previousCommand;
+    const result = super.run(commandName, args, options);
+    this.previousCommand = { commandName, args: [...args] };
+    if (commandName !== "bd") return result;
+    this.reads.push({ args: [...args], cwd: options.cwd, ...result });
+    if (result.status !== 0) return result;
+    // Source capture asks for the raw version immediately after transport proof.
+    // Do not alter the version calls made by the unchanged capability checks.
+    if (args.length === 1 && args[0] === "--version" && this.sourceVersionSuffix
+        && previous?.commandName === "git" && previous.args.includes("ls-remote")
+        && previous.args.includes("refs/dolt/data")) {
+      return { ...result, stdout: `${result.stdout}${this.sourceVersionSuffix}` };
+    }
+    if (args[0] === "--readonly" && args[1] === "statuses" && this.sourceCatalogExtra) {
+      return { ...result, stdout: JSON.stringify({ ...JSON.parse(result.stdout), source_catalog_context: { opaque: [1, null, false] } }) };
+    }
+    return result;
+  }
+}
 
 function command(cwd, executable, args, allowFailure = false) {
   try {
@@ -151,6 +176,15 @@ async function proveFixtureRuntime(records) {
     expectedPreviousEpisodeActiveSessionId: record.episodeActiveSessionId,
     verifiedCurrentEpisodeActiveSessionId: record.episodeActiveSessionId,
   }));
+}
+
+function sourcePackageFromBacklogComments(task) {
+  const parts = task.comments.map((comment) => String(comment.text ?? comment.content ?? comment.body))
+    .map((text) => /^prime-claw-task-provider-migration-source-v1 part=(\d+)\/(\d+)\n([A-Za-z0-9+/=]+)$/.exec(text))
+    .filter(Boolean).sort((a, b) => Number(a[1]) - Number(b[1]));
+  assert.ok(parts.length > 0, "native Backlog comments have no exact source package");
+  assert.ok(parts.every((part, index) => Number(part[1]) === index + 1 && Number(part[2]) === parts.length));
+  return JSON.parse(Buffer.from(parts.map((part) => part[3]).join(""), "base64").toString("utf8"));
 }
 
 function addActiveBeadsOwner(fixture) {
@@ -433,18 +467,62 @@ test("partial source deletion preserves verified destination ownership and repor
 
 test("read-only inspection captures complete published Beads history and provenance", { timeout: 120_000 }, (t) => {
   const fixture = beadsSource(t, "inspect-beads");
-  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  const runner = new RecordingBeadsRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
   assert.equal(inspection.status, "ready", inspection.detail);
   assert.equal(inspection.sourceProvider, "beads");
   assert.deepEqual(inspection.taskCounts, { open: 1, closed: 1, archived: 1, total: 3 });
   assert.match(inspection.sourceRevision, /^[0-9a-v]{32}$/);
   assert.equal(detectTaskProvider(fixture.root, RUNNER).evidence.provider, "beads");
   assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+  const sourceReads = runner.reads.filter(({ args }) => ["show", "history", "provenance", "export", "list"].includes(args[0] === "--readonly" ? args[1] : args[0]));
+  assert.ok(sourceReads.length > 0);
+  assert.ok(sourceReads.every(({ args }) => args[0] === "--readonly"), "source task reads must fail closed in readonly mode");
+  for (const id of Object.values(fixture.ids)) {
+    assert.ok(sourceReads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "show", id, "--json", "--long", "--include-comments"])));
+    assert.ok(sourceReads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "history", id, "--json", "--limit", "0"])));
+    assert.ok(sourceReads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "history", id, "--events", "--json", "--limit", "0"])));
+    assert.ok(sourceReads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "provenance", "log", id, "--json"])));
+  }
+  assert.ok(runner.reads.some(({ args }) => JSON.stringify(args) === JSON.stringify(BEADS_INVENTORY)));
+  assert.ok(runner.reads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "statuses", "--json"])));
+});
+
+test("Beads source digest binds raw version and complete catalog independently of task rows", { timeout: 180_000 }, (t) => {
+  const fixture = beadsSource(t, "beads-source-context-digest");
+  const runner = new RecordingBeadsRunner();
+  const inspect = () => inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  const baseline = inspect();
+  assert.equal(baseline.status, "ready", baseline.detail);
+  // Raw whitespace must remain digest evidence; the semantic CLI version is unchanged.
+  runner.sourceVersionSuffix = "\n";
+  const versionChanged = inspect();
+  assert.equal(versionChanged.status, "ready", versionChanged.detail);
+  assert.equal(versionChanged.sourceRevision, baseline.sourceRevision);
+  assert.deepEqual(versionChanged.taskCounts, baseline.taskCounts);
+  assert.notEqual(versionChanged.sourceDigest, baseline.sourceDigest);
+  runner.sourceVersionSuffix = "";
+  // Preserve unknown catalog context, not just statuses used by current tasks.
+  runner.sourceCatalogExtra = true;
+  const catalogChanged = inspect();
+  assert.equal(catalogChanged.status, "ready", catalogChanged.detail);
+  assert.equal(catalogChanged.sourceRevision, baseline.sourceRevision);
+  assert.deepEqual(catalogChanged.taskCounts, baseline.taskCounts);
+  assert.notEqual(catalogChanged.sourceDigest, baseline.sourceDigest);
+  assert.notEqual(catalogChanged.sourceDigest, versionChanged.sourceDigest);
+  runner.sourceCatalogExtra = false;
+  const restored = inspect();
+  assert.equal(restored.status, "ready", restored.detail);
+  assert.equal(restored.sourceDigest, baseline.sourceDigest);
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
 });
 
 
 test("confirmed Beads to Backlog migration preserves active Episode identity and continues on canonical-primary Backlog", { timeout: 180_000 }, async (t) => {
   const fixture = beadsSource(t, "beads-active-owner");
+  const sourceVersion = command(fixture.root, "bd", ["--version"]);
+  const statusCatalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
   const owner = addActiveBeadsOwner(fixture);
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
   assert.equal(inspection.status, "ready", inspection.detail);
@@ -476,6 +554,11 @@ test("confirmed Beads to Backlog migration preserves active Episode identity and
     const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
     const text = task.comments.map((comment) => String(comment.text ?? comment.content ?? comment.body)).join("\n");
     assert.match(text, /prime-claw-task-provider-migration-source-v1/);
+    const sourcePackage = sourcePackageFromBacklogComments(task);
+    assert.equal(sourcePackage.sourceTaskId, mapping.sourceTaskId);
+    assert.equal(sourcePackage.sourceVersion, sourceVersion, "preserve raw version stdout, including its newline");
+    assert.deepEqual(sourcePackage.statusCatalog, statusCatalog);
+    assert.equal(sourcePackage.sourceDigest, inspection.sourceDigest);
   }
   const registry = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8"));
   const current = registry.owners[owner.ownerSessionId];
@@ -600,17 +683,21 @@ test("independent Backlog source ref is retired so a later reverse provider swit
   assert.equal(git(fixture.root, "rev-parse", TASK_HISTORY_REF), secondBacklog.receipt.destinationReceiptRevision);
 });
 
-test("Beads source inspection rejects configured owner filters before destination creation", { timeout: 120_000 }, (t) => {
+test("Beads source inspection rejects effective owner-filter omissions before destination creation", { timeout: 120_000 }, (t) => {
   const fixture = beadsSource(t, "beads-filtered-source");
-  bd(fixture.root, "create", "Filtered ordinary task", "--status", "in_progress", "--actor", "excluded-reviewer", "--json");
-  bd(fixture.root, "config", "set", "export.exclude_owners", "excluded-reviewer");
+  const filtered = JSON.parse(bd(fixture.root, "create", "Filtered ordinary task", "--status", "in_progress", "--actor", "excluded-reviewer", "--json"));
+  const view = JSON.parse(bd(fixture.root, "--readonly", "show", filtered.id, "--json", "--long", "--include-comments"))[0];
+  assert.ok(view.created_by);
+  bd(fixture.root, "config", "set", "export.exclude_owners", view.created_by);
   bd(fixture.root, "dolt", "push", "--remote", "origin", "--no-adopt");
   git(fixture.root, "add", "-A");
   if (git(fixture.root, "status", "--porcelain=v1")) git(fixture.root, "commit", "-qm", "configure supported export filter");
   git(fixture.root, "push", "-q");
+  const filterBefore = bd(fixture.root, "--readonly", "config", "get", "export.exclude_owners", "--json");
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
   assert.equal(inspection.status, "blocked");
-  assert.match(inspection.detail, /export\.exclude_owners/);
+  assert.match(inspection.detail, /does not exactly match the independent native issue inventory/);
+  assert.equal(bd(fixture.root, "--readonly", "config", "get", "export.exclude_owners", "--json"), filterBefore);
   assert.equal(existsSync(join(fixture.root, ".backlog")), false);
   assert.equal(existsSync(join(fixture.root, ".beads")), true);
 });
@@ -874,12 +961,60 @@ test("Backlog native drafts are counted and preserved exactly before source dele
   assert.equal(archivedDraft.status, "closed");
 });
 
+
+test("production export helper captures embedded local-only native inventory without lifecycle or transport setup", { timeout: 120_000 }, (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-migration-embedded-export-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  command(root, "git", ["init", "-q", "-b", "main"]);
+  git(root, "config", "user.name", "Embedded Export Fixture");
+  git(root, "config", "user.email", "embedded-export@example.invalid");
+  // Fixture writes only. Deliberately no --server, custom statuses, remote or push.
+  bd(root, "init", "--skip-hooks", "--skip-agents", "--prefix", "EMB", "--quiet", "--non-interactive");
+  const ids = [];
+  for (const status of ["open", "in_progress", "blocked", "deferred", "pinned", "hooked"]) {
+    ids.push(JSON.parse(bd(root, "create", `Embedded ${status}`, "--status", status, "--json")).id);
+  }
+  const closed = JSON.parse(bd(root, "create", "Embedded closed", "--json")).id;
+  bd(root, "close", closed, "--reason", "fixture native closure", "--json");
+  ids.push(closed);
+  assert.equal(JSON.parse(bd(root, "--readonly", "context", "--json")).dolt_mode, "embedded");
+  assert.deepEqual(JSON.parse(bd(root, "--readonly", "dolt", "remote", "list", "--json")), []);
+  const identityBefore = Object.fromEntries(["config.yaml", "metadata.json"].map((name) => [name, readFileSync(join(root, ".beads", name)).toString("base64")]));
+  const runner = new RecordingBeadsRunner();
+  const exported = completeBeadsExport(runner, root, "embedded fixture");
+  const inventory = JSON.parse(bd(root, ...BEADS_INVENTORY));
+  assert.deepEqual(exported.map(({ row }) => row.id).sort(), [...ids].sort());
+  assert.deepEqual(exported.map(({ row }) => row.id).sort(), inventory.map((row) => row.id).sort());
+  assert.ok(exported.every(({ row, line }) => JSON.stringify(JSON.parse(line)) === JSON.stringify(row)));
+  assert.deepEqual(runner.reads.map(({ args }) => args), [["--readonly", "export", "--all"], BEADS_INVENTORY]);
+  assert.deepEqual(completeBeadsExport(runner, root, "embedded fixture"), exported);
+  assert.deepEqual(Object.fromEntries(["config.yaml", "metadata.json"].map((name) => [name, readFileSync(join(root, ".beads", name)).toString("base64")])), identityBefore);
+
+  // A configured filter alone is not a reason to demand source reconfiguration.
+  bd(root, "config", "set", "export.exclude_owners", "absent-owner@example.invalid");
+  assert.deepEqual(completeBeadsExport(runner, root, "embedded unmatched filter"), exported);
+
+  // Native created_by is the filter authority; do not assume actor or Git author.
+  const sourceView = JSON.parse(bd(root, "--readonly", "show", ids[0], "--json", "--long", "--include-comments"))[0];
+  assert.equal(typeof sourceView.created_by, "string");
+  assert.ok(sourceView.created_by);
+  bd(root, "config", "set", "export.exclude_owners", sourceView.created_by);
+  const filterBefore = bd(root, "--readonly", "config", "get", "export.exclude_owners", "--json");
+  const filteredIdentity = Object.fromEntries(["config.yaml", "metadata.json"].map((name) => [name, readFileSync(join(root, ".beads", name)).toString("base64")]));
+  runner.reads = [];
+  assert.throws(() => completeBeadsExport(runner, root, "embedded filtered fixture"), /does not exactly match the independent native issue inventory/);
+  assert.deepEqual(runner.reads.map(({ args }) => args), [["--readonly", "export", "--all"], BEADS_INVENTORY]);
+  assert.equal(bd(root, "--readonly", "config", "get", "export.exclude_owners", "--json"), filterBefore);
+  assert.deepEqual(JSON.parse(bd(root, ...BEADS_INVENTORY)).map((row) => row.id).sort(), [...ids].sort());
+  assert.deepEqual(Object.fromEntries(["config.yaml", "metadata.json"].map((name) => [name, readFileSync(join(root, ".beads", name)).toString("base64")])), filteredIdentity);
+});
+
 class DroppedBeadsExportRunner extends CandidateRunner {
   constructor() { super(); this.dropped = false; this.sawInventory = false; }
   run(commandName, args, options = {}) {
     const result = super.run(commandName, args, options);
-    if (commandName === "bd" && args.includes("SELECT id FROM issues ORDER BY id")) this.sawInventory = true;
-    if (commandName === "bd" && args[0] === "export" && args.includes("--all") && !this.dropped && result.status === 0) {
+    if (commandName === "bd" && JSON.stringify(args) === JSON.stringify(BEADS_INVENTORY)) this.sawInventory = true;
+    if (commandName === "bd" && args[0] === "--readonly" && args[1] === "export" && args.includes("--all") && !this.dropped && result.status === 0) {
       this.dropped = true;
       const lines = result.stdout.split(/\r?\n/).filter(Boolean);
       return { ...result, stdout: `${lines.slice(1).join("\n")}${lines.length > 1 ? "\n" : ""}` };

@@ -2,11 +2,13 @@
 
 ## Scope
 
-This is the first, evidence-only slice of PRIMECLAW-44. It tests direct native
-reads of a disposable embedded/local-only Beads source. It does **not** change
-production migration, prove destination publication/retirement, or authorize a
-live migration. The current migration still requires active-provider transport
-and SQL inventory evidence; those changes remain in the task's living plan.
+The original Slice 1a below is evidence-only: it tests direct native reads of a
+disposable embedded/local-only Beads source. The subsequent bounded Slice 1b
+integrates the inventory reads and raw capture context into production code;
+its results and remaining limits are recorded at the end of this document.
+Neither slice proves complete embedded-source destination publication/retirement
+or authorizes a live migration. Active-provider transport requirements still
+remain in the migration path.
 
 No ralph-pva, nemo-setup, builder task-store migration, user-global plugin apply,
 Prime Agent restart, or upstream Prime Agent edit is part of this proof.
@@ -136,9 +138,61 @@ The export filter test demonstrates refusal, not a production filter bypass or
 an approved source-configuration change. Unsupported statuses are captured for
 inventory evidence; this does not approve their projection to Backlog.
 
-The remaining implementation must integrate source-read evidence with the
-existing in-memory capture and destination provenance; bind version/catalog and
-stable recaptures; preserve ownership continuity and quiescence; keep ordinary
-active Beads lifecycle/write checks strict; preflight unsupported projections;
-and prove verified/published Backlog content before guarded source retirement.
-No acceptance criterion for the full task is marked complete by this slice.
+At the end of Slice 1a, production integration, raw version/catalog provenance,
+recaptures, ownership continuity, unsupported-projection preflight and guarded
+retirement still remained. Slice 1b below advances only the capture-data portion.
+No acceptance criterion for the full task is marked complete by either slice.
+
+## Slice 1b — bounded production capture-data integration
+
+`completeBeadsExport` now uses the strict-readonly native export and unbounded
+native list inventory above instead of SQL and an unconditional configured-filter
+refusal. It compares exact duplicate-free IDs and refuses actual export omissions
+without clearing the source filter. A nonempty filter that omits no current
+issue is accepted. The production helper is tested directly against a disposable
+embedded source containing all seven built-in statuses, with no lifecycle-status,
+server, remote or publication setup. This is helper-level evidence, not canonical
+embedded migration admission or approval to map every captured status.
+
+`captureBeads` now retains raw `bd --version` stdout and the entire native
+`statuses --json` object in the existing snapshot digest and Backlog source
+package. It uses readonly full issue views/history/events/provenance and disables
+history/event limits explicitly. Existing published-server fixtures verify the
+readonly/unbounded command shapes, raw version/catalog digest sensitivity, and
+exact raw context in destination-native provenance comments. Unknown catalog
+context is retained, not reduced to statuses used by tasks. No importer status
+mapping, ownership format, receipt format or ordinary active Beads safety code
+was redesigned.
+
+Validation from the Episode worktree:
+
+```sh
+scripts/test-tier1.sh --probe
+python3 -m pytest tests/test_task_provider_migration.py tests/test_beads_retiring_source_capture.py tests/test_task_providers.py -q -m container
+python3 -m pytest tests/test_task_provider_migration.py tests/test_beads_retiring_source_capture.py tests/test_task_providers.py -q
+```
+
+- Mandatory Docker Tier 1: exit 0; run
+  `20261030T022952Z-48070-299609c0`, offline RPC probe and apply/check passed.
+- Guarded native regression bridges: **6 passed, 5 deselected**, 635.42 seconds;
+  run `20261030T023343Z-62900-0aa24605`. This includes the complete migration
+  suite, embedded capture proof and active-provider safety bridges.
+- Host-safe static/collection check: **5 passed, 6 skipped**.
+- Both run-owned `tier1/manifest.json` receipts record `passed`, no failure
+  codes, network verified absent, and clean absent builder/runtime teardown.
+- The native-regression input repository content SHA-256 is
+  `dfd4cbf2e346840ec7f859072ddb9ccd396b88fd936bb484746f4f9848b8031a`;
+  runtime image is
+  `sha256:7c38a6b82a05542416d519b8383d46abd9232f8990fc91fc3797e5ebb47add4c`.
+  Final task/evidence prose was updated after those tests; source and test code
+  were unchanged.
+
+**Still unfinished:** initial capture still calls active capabilities and
+server/publication transport preparation. Owner-workspace rechecks and source
+retirement still impose that outgoing transport contract. The closed-as-archived
+branch and unsupported-used-status preflight are not fixed here. Source identity
+and recapture must be carried through those seams before claiming as-is
+embedded/local-only migration support. The broader destination-preservation,
+layout and initialization-skill work also remains. Earlier corpus/history limits
+above still apply. This is one partial production candidate for review, not full
+PRIMECLAW-44 completion or merge/deployment authority.
