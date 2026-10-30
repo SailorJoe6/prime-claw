@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-44
 title: Make initialization skill-led and support existing Backlog destinations
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: '2026-10-28 02:55'
-updated_date: '2026-10-30 21:30'
+updated_date: '2026-10-30 21:42'
 labels: []
 dependencies: []
 references:
