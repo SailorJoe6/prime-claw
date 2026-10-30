@@ -178,6 +178,15 @@ slash commands and model-visible skill entries. It sends no user message and sta
 no model turn. Changes, conflicts, or degraded state produce one
 concise UI notice; a current project is silent.
 
+Explicit Backlog adoption on canonical primary also preserves nonterminal
+Backlog Episode task bindings. If detaching an ordinary selected store or moving
+its default path would change a bound task's authority or exact path, preparation
+refuses before store, index, or task-history publication changes. The result names
+the affected owner and task. Continue or resolve that Episode through its existing
+lifecycle before retrying adoption; initialization does not rewrite its binding
+or perform a continuity transition. Unrelated bindings and providers do not block
+adoption, and an already independent store at an unchanged path remains usable.
+
 An active Episode worktree is skipped. It retains the project workflow snapshot
 with which it started. Runtime handoff readers prefer the new topology but retain
 read-only fallback to the corresponding legacy `.ralph/skills/{handoff,execute}`

@@ -543,3 +543,64 @@ proof. Existing source-aware evidence and its limits above remain useful, but
 do not cover this defect. The native living Plan/Notes/FinalSummary hold the
 complete bounded direction. No repair or new acceptance is claimed by this
 handoff checkpoint; same Episode/In Progress and all resources remain.
+
+## Accepted continuity finding — bounded repair validated
+
+Supersedes the pending-revision checkpoint above, not the independent-review
+boundary. The sole production change is 16 added lines in existing
+`prepareExistingBacklogTaskHistoryWorkspace`: use existing validated ownership
+reading and Backlog/path logic to refuse non-inactive version-2 Backlog task
+bindings inside the selected store before ordinary detachment or default
+relocation. The existing `unsafe-store-location` result identifies the exact
+owner, task and path. No owner write, binding promotion, automatic transition,
+resource replacement, handoff relaxation or new protocol is introduced. Ordinary
+hidden/custom detachment has the same branch-local authority concern; published
+independent default relocation has the same exact-path concern. Inactive or
+unrelated bindings and unrelated providers do not trigger this refusal. An
+already independent hidden/custom store at its unchanged path remains usable.
+
+### New-generation Docker proof
+
+- Command: `python3 -m pytest tests/test_project_initialization.py tests/test_task_providers.py::test_backlog_task_episode_admission_node_suite tests/test_task_providers.py::test_task_episode_ownership_node_suite tests/test_task_history_workspace.py::test_task_history_workspace_node_suite tests/test_backlog_destination_layout.py::test_backlog_destination_layout_node_suite tests/test_task_provider_migration.py::test_populated_backlog_migration_node_suite -q -m container`
+- Run `20261030T211131Z-93989-b93d437b`: **10 passed, 6 deselected**,
+  **870.19s**. Full initializer/text/admission/ownership suites pass; workspace
+  **80/80**, layout **13/13**, populated migration **9/9** includes all seven
+  existing populated layouts plus native archive-ID/dependency eligibility and
+  invalid-source-graph refusal. This subset covers the shared adoption seam's
+  actual confirmed-migration caller without repeating the entire native suite.
+- Combined manifest SHA-256 `1a73e640c847a1d83a9cf4c64c3567e27eebcc33f6d77a027f8628bd1eb93544`;
+  repository HEAD `b193a9fb864da39a0f1d0a393446956785daa844`, content SHA-256
+  `dda48b333f9982b7779d9aa5508d10854a231f93d1283d28108897ea93180331`. All **17** declared
+  artifacts verified. Log `/tmp/primeclaw44-continuity-container.log`.
+- The only executable follow-up was three lines retaining successful TAP in the
+  new pytest wrapper, with no production or assertion change. Command
+  `python3 -m pytest tests/test_project_initialization.py::test_project_initialization_active_backlog_node_suite -q -m container`; run `20261030T212708Z-41680-34be84a1`:
+  **1 passed**, **157.74s**. Retained native TAP proves **12 passed, 0 failed,
+  0 skipped** (36.35s): actual registered primary reconcile and ordinary
+  handoff pass exact task path/status/plan/Git validation to the injected
+  publisher sentinel both before and after refusal, without contacting runtime.
+- Affected scenarios: provider-absent/explicit grandfathered default; ordinary
+  hidden/custom; provisioning/uncertain; published independent default. Controls:
+  inactive exact binding, unrelated path-prefix binding, Beads binding, active
+  independent hidden/custom. Refusal snapshots preserve store/task/config/owner,
+  code and nested indexes/HEAD/refs and direct publication. No subtree extraction,
+  clone, fetch, push or update-ref occurs through the tool runner before refusal.
+- Focused manifest SHA-256 `a6bcb169bb96faaa008ad7d11f13dc16609e79da99c2c0e8258898567fd4d6d7`;
+  repository content SHA-256 `7b1d2945f8761b8ba47c6b3f97a0c83edc6ce60ea2e3bf26f7a7118ab2e1f796`.
+  All **15** declared artifacts verified, including
+  `project-initialization-active-backlog-node.tap`. Log `/tmp/primeclaw44-continuity-public-regression.log`.
+
+Both runs prove offline execution, runtime/source-builder clean absent teardown,
+unchanged native builder checkout inventories and frozen plugin/test bytes. The
+exact captured five-path dirty-status SHA-256
+`1fd9deaabf40e4f1c5c675cf3414225f60a720cc83d3fe74072d4ebf6e1c071d` matches the
+pre-publication worktree. The retained TAP proves execution of the new untracked
+regression file. The final task/evidence updates are prose only.
+
+Earlier full integrated46PASS2FAIL/focused7PASS/boundary2PASS/static24PASS remain
+for their original source generations, not newly rerun or called full48green.
+Native431 exactpins/gitlink/frozen-lock/stabletags and original full-native
+2901pass8skip9fail1error UNWAIVED limits remain. Accepted main47 helper/ownership/
+inventory/guard/tracked ownership/task47 and both reviewed deliberate tracking
+fixture opt-ins are unchanged. This repair awaits separate Conversation closure;
+no acceptance/lifecycle/main/global/live migration or Episode cleanup is implied.

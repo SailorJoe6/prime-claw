@@ -43,6 +43,7 @@ import {
   resolveProviderTask,
   type ProviderTaskResolution,
 } from "./task-providers.ts";
+import { isBacklogTaskEpisodeOwnership, readAllEpisodeOwnership } from "./episode-ownership.ts";
 
 /** The disconnected task-history branch Prime Claw manages. */
 export const TASK_HISTORY_REF = "refs/heads/prime-claw/tasks";
@@ -1236,6 +1237,21 @@ export function prepareExistingBacklogTaskHistoryWorkspace(
     const nestedGit = join(original, ".git");
     const gitEntry = lstatIfPresent(nestedGit);
     if (gitEntry && (!gitEntry.isDirectory() || gitEntry.isSymbolicLink())) return refuse("unsafe-store-location", "existing task .git must be a real independent directory");
+    // Adoption changes an ordinary store's authority even when its path stays
+    // hidden/custom; relocation also invalidates published exact-path bindings.
+    // Refuse before touching either Git index, the store, or its publication.
+    if (!gitEntry || target !== original) {
+      const affected = readAllEpisodeOwnership(root).find(record => record.status !== "inactive"
+        && record.version === 2 && isBacklogTaskEpisodeOwnership(record)
+        && record.taskPath.startsWith(`${originalRel}/`));
+      if (affected?.version === 2 && isBacklogTaskEpisodeOwnership(affected)) {
+        return {
+          status: "blocked", code: "unsafe-store-location",
+          detail: `cannot adopt ${originalRel}: nonterminal Backlog owner ${affected.ownerSessionId} task ${affected.taskId} binds ${affected.taskPath}; adoption would ${target !== original ? "relocate its exact task path" : "detach its existing task authority from code history"}`,
+          remediation: "leave this store and ownership binding unchanged; continue or resolve the affected Episode through its existing lifecycle before retrying adoption; no automatic continuity transition is performed",
+        };
+      }
+    }
     // In-place hidden/custom adoption leaves only the original task entries'
     // staged deletions pending in the code index. This exact projection is
     // not an uncommitted edit to the now-independent task authority. Require

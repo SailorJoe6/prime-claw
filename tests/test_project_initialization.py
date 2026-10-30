@@ -160,6 +160,14 @@ def test_project_initialization_node_suite(tier1_container):
     result=tier1_container.run("node","--experimental-strip-types","--test","/workspace/tests/project_initialization_extension.test.mjs",timeout=180)
     assert result.returncode==0,result.stdout+result.stderr
 
+def test_project_initialization_active_backlog_node_suite(tier1_container):
+    result=tier1_container.run("node","--experimental-strip-types","--test","/workspace/tests/project_initialization_active_backlog.test.mjs",timeout=180)
+    (tier1_container.share.parent / "project-initialization-active-backlog-node.tap").write_text(
+        result.stdout + result.stderr
+    )
+    assert result.returncode==0,result.stdout+result.stderr
+
+
 def test_template_review_node_suite(tier1_container):
     result=tier1_container.run("node","--experimental-strip-types","--test","/workspace/tests/template_review.test.mjs",timeout=180)
     assert result.returncode==0,result.stdout+result.stderr
