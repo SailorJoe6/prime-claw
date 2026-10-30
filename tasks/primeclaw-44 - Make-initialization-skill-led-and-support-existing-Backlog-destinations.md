@@ -4,7 +4,7 @@ title: Make initialization skill-led and support existing Backlog destinations
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:55'
-updated_date: '2026-10-30 01:20'
+updated_date: '2026-10-30 02:27'
 labels: []
 dependencies: []
 references:
@@ -107,6 +107,8 @@ Initial exploratory/regression failures exposed and corrected test-only assumpti
 2026-10-30 — Owning Conversation accepted Slice 1a at pushed 4ff0aa4c763ecd83bc10f7fed4a1a87598fa9062 as EVIDENCE ONLY. Parent review and independent openai-codex/gpt-6-astra review found no material defect. Frozen Description and 10 Acceptance Criteria are unchanged; living task/docs updates were compatible; clean published candidate and idle Episode were verified. This is not full-task acceptance, migration/retirement proof, or merge authority.
 
 Accepted continuation focus: implement one bounded chunk of existing steps 1–2. Integrate supported migration-only as-is source reads in captureBeads/completeBeadsExport and existing in-memory identity/provenance/recapture evidence; retain raw version/catalog, native history/reason/package, complete inventory, and unsupported-used-status preflight before destination writes. Carry the approved source-read boundary through later owner-workspace/recheck/retirement seams as work proceeds. Do not claim completion while outgoing server/publication requirements remain in those seams. Ordinary active Beads execution safety is unchanged. Prefer native provider behavior, then concise managed LLM judgment, then narrow integrity code; no new mapping/classification/approval/coordinator framework. Preserve first-slice limits in docs/evidence/beads-embedded-source-capture-20261030.md. Use disposable native Docker evidence and mandatory Tier 1 for plugin changes. No live stores, host/global candidate apply/check/probe, deployment, or builder migration. Update this same native task, commit/push one bounded candidate, and stop for review.
+
+2026-10-30 — Runtime continuation update from the owning Conversation/operator: the operator explicitly updated models.json, cleared the recorded compaction/runtime blocker, and instructed "Just try to send the execute command again." Continue this SAME Episode and the already approved next bounded production capture/recapture work in living steps 1–2. Slice 1a remains accepted as evidence only. The owning Conversation reports canonical-main task In Progress restored/published; this Episode native task reread is also In Progress. No further configuration investigation or model/settings changes are requested. Source-as-is, Docker-only validation and all existing scope boundaries remain unchanged. The queued execute should begin planned implementation rather than another preparation-only status response; successful compaction is not a semantic implementation prerequisite.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
