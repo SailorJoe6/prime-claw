@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import test from "node:test";
@@ -894,6 +894,13 @@ test("retained promotion tolerates an unrelated task admission while selecting i
   writeFileSync(join(f.root, location, "SPECIFICATION.md"), "Bounded retained specification.\n");
   writeFileSync(join(f.root, location, "IMPLEMENTATION_PLAN.md"), "1. Promote exact source.\n2. Verify it.\n");
   assert.equal(reconcileLegacySpecificationInventory(f.root, "initialize").status, "created");
+  // This retained-publication fixture deliberately tracks the allowlist. Model
+  // the documented operator opt-in without changing the creation-only default.
+  const exclude = resolve(f.root, git(f.root, "rev-parse", "--git-path", "info/exclude").trim());
+  const exclusions = readFileSync(exclude, "utf8");
+  assert.match(exclusions, /^\/\.prime-claw\/$/m);
+  assert.equal(git(f.root, "check-ignore", "--", ".prime-claw/legacy-specifications.json").trim(), ".prime-claw/legacy-specifications.json");
+  writeFileSync(exclude, exclusions.replace(/^\/\.prime-claw\/\r?\n/gm, ""));
   mkdirSync(join(f.root, ".agents", "skills", "execute"), { recursive: true });
   writeFileSync(join(f.root, ".agents", "skills", "execute", "SKILL.md"), "Retained execute fixture.\n");
   git(f.root, "add", "--", location, ".prime-claw/legacy-specifications.json", ".agents/skills/execute/SKILL.md");

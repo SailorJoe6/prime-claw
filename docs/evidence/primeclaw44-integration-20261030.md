@@ -427,3 +427,89 @@ Implementation acceptance does not authorize merge, deployment, global apply,
 restart, live ralph-pva/nemo/builder migration, provider lifecycle status edits
 or Episode cleanup. The same owning Conversation independently reviews the
 complete committed/pushed candidate and decides the later lifecycle.
+
+## Operator-authorized main integration — pending integrated validation
+
+Merged published main `be0efe0eed9b692b72a8062376ee5fe1540ac676` into task-only handoff
+`cf1372a7413baa93a3a72145ce299a78a310320f` (complete pre-integration implementation `af4ec8d`).
+The coherent integrated code generation is `fedd0509cbf4ceb61b609a5df75a0f40a438dd91`.
+Five textual conflicts were resolved without a product-policy change: the exact
+Episode task44 record was retained through Git, skill-only initializer/patch
+guidance stayed, and accepted47 helper/call sites/delivery/tests stayed. The
+warning fixture now uses startup and the agent-facing tool, not the retired
+custom command. All warning/path/assets/no-retry assertions remain. Accepted
+main ownership, planning guard and task47 were not edited; native44 identity,
+Description/AC text/ten checks and In Progress remained unchanged.
+
+New integrated-generation executions (results pending, not yet green):
+
+- `python3 -m pytest tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_project_initialization.py tests/test_prime_agent_plugin_install.py tests/test_beads_retiring_source_capture.py tests/test_task_providers.py tests/test_task_history_workspace.py tests/test_backlog_destination_layout.py tests/test_reviewed_plan_extension.py::test_prime_agent_rpc_loads_renamed_commands_and_simplified_tools -q -m container` — `/tmp/primeclaw44-main-integration-container.log`.
+- `python3 -m pytest tests/test_task_provider_migration.py::test_migration_entry_admission_node_suite tests/test_task_provider_migration.py::test_retiring_beads_source_boundary_node_suite -q -m container` — `/tmp/primeclaw44-main-integration-boundary.log`.
+- `python3 -m pytest tests/test_backlog_build.py tests/test_backlog_workflow.py tests/test_project_initialization.py tests/test_task_history_workspace.py tests/test_task_provider_migration.py tests/test_task_providers.py tests/test_beads_retiring_source_capture.py tests/test_backlog_destination_layout.py -q -m 'not container'` — `/tmp/primeclaw44-main-integration-static.log`.
+
+Old full47/final44/static24 evidence above applies only to its pre-integration
+generations. No native fork change/re-review or unrelated MCP/TUI repair, main
+merge, lifecycle publication, global apply, live migration or resource change
+is part of this integration. New results will be recorded below after completion.
+
+### Read-only47 preservation audit
+
+Read-only child integration47-preservation audited integrated fedd0509cbf4ceb61b609a5df75a0f40a438dd91 against accepted main be0efe0eed9b692b72a8062376ee5fe1540ac676. No reviewed47 merge regression found. Helper/ownership/legacy inventory byte-identical; source root creation/symlink checks, warning aggregation/startup severity/tool details and both inventory entries retained. All8 accepted47 native cases plus ownership guarded-transition assertion retained. Retired-command case correctly uses startup+tool and asserts absence.44 disposable comparison does not take mutation lock/create root; explicit history staging is intentionally distinct from47 helper's no-index/no-HEAD effects. No new approval/repair policy. Audit read-only, not runtime proof. mkdir EEXIST race is source-audited but not directly injected by accepted8cases; no new speculative coverage required.
+
+### Integrated admission/source-boundary result
+
+Run `20261030T201408Z-30047-6e75b6af`: **2 passed**, 318.67s. Native
+admission TAP: **8 passed, zero failed/skipped**. Manifest head is exactly
+`fedd0509cbf4ceb61b609a5df75a0f40a438dd91`; its dirty-status hash matches only this evidence
+map update (not source/test changes). All **15** declared artifact hashes were
+verified, offline networks absent, source-builder checkout inventories unchanged,
+and runtime plus source-builder teardown clean/absent. Source/test frozen hashes
+remain unchanged. Full affected integrated Docker run remains pending.
+
+### Full integrated run and observed fixture integration correction
+
+2026-10-30 — Full integrated regression completed, not all green: run20261030T201314Z-27898-e4a60d0c,46 passed/2 failed/11 deselected in1316.86s. All17 artifact hashes, offline state, clean absent runtime/builder teardown, unchanged builder checkout and frozen source/test hashes verified before any edits. Full native migration53:41passed0fail12explicitreverse skips/all7populated layouts. Workspace80/80 and layout13/13 passed. Integrated boundary run20261030T201408Z-30047-6e75b6af:2passed318.67s, admission8/8;15artifact hashes/offline/clean teardown verified. Static24passed4.97s.
+Exact failures: template_review17 native cases had4workflow setup failures at git add .prime-claw/workflows/handoff.md; task_episode_admission20 cases had1retained-promotion setup failure at git add .prime-claw/legacy-specifications.json. Both stop BEFORE their tested comparison/concurrency operations because47 now correctly creates the root local exclusion. These fixtures intentionally require tracked state, supported by47's documented operator removal of the local rule. This is an observed integration mismatch, not a waiver of semantic failures or a production-policy change.
+Minimal correction only in the2fixture setups: assert actual rule and ignored path, remove only exact /.prime-claw/ line from Git-resolved local exclude as the explicit test operator, then stage the original files. Workflow additionally asserts actual tracked path. No -f, global config, shared.gitignore or production-helper change. All original byte/index/mtime/patch/recovery and retained-source concurrency assertions remain. Source47 default/eight safety cases remain. Revalidate both full failing native suites plus initializer/default/discovery/loading/ownership coverage in Docker. Do not call the old48-test execution green; source-aware combined evidence will distinguish failed full and repaired focused generations.
+
+## Integrated-generation final validation and review boundary
+
+The only post-full-run executable changes are the two fixture setup adaptations
+shown above. Every delivered plugin source byte remains identical to integrated
+merge `fedd0509cbf4ceb61b609a5df75a0f40a438dd91`. The final focused runtime
+snapshot precisely records those two test changes plus task/evidence prose,
+with its captured dirty-status SHA matching that exact four-path set. All frozen
+source/test bytes were verified unchanged after the run.
+
+- Run `20261030T201314Z-27898-e4a60d0c`: **46 passed, 2 failed, 11 deselected; 1316.86s. Full migration41/0/12reverse skips, workspace80/80, layout13/13; both failed fixture suites were corrected and rerun below.** Manifest SHA-256 `982aaf5e53c5ab2f7f12bbe07aa6bc852dc1b9de033f0245419e599588f68979`; repository `fedd0509cbf4ceb61b609a5df75a0f40a438dd91` / content SHA-256 `d95f7cf230abb01704cf82cbbf52fe21bb93978d333ce63b8c2407e2b733af42`.
+
+- Run `20261030T201408Z-30047-6e75b6af`: **2 passed; 318.67s. Admission8/8 and retiring-source boundary.** Manifest SHA-256 `44311dd627168789d01cd3938e78f1d8fe7fef6a1a9e03b39fd8c79c309aee7f`; repository `fedd0509cbf4ceb61b609a5df75a0f40a438dd91` / content SHA-256 `f19b108d2bc63aafba71b70cce31085a5eb374b5f5687006dab97ee2b71f2f53`.
+
+- Run `20261030T203710Z-85706-fc27ee87`: **7 passed, 6 deselected; 204.61s. Full initializer/exclusion/text/discovery, task admission, ownership and native tool/command loading; both former failures now pass.** Manifest SHA-256 `8dcd66899535d056edc51feb2cfaf1d60284ede47ec1c569021221aa2e04ca31`; repository `fedd0509cbf4ceb61b609a5df75a0f40a438dd91` / content SHA-256 `58b031d2f2b4b50a8d3213e3eb4553af7120e333eb11dd4aa75df74db4456dd3`.
+
+Focused reproduction: `python3 -m pytest tests/test_project_initialization.py tests/test_task_providers.py::test_backlog_task_episode_admission_node_suite tests/test_task_providers.py::test_task_episode_ownership_node_suite tests/test_reviewed_plan_extension.py::test_prime_agent_rpc_loads_renamed_commands_and_simplified_tools -q -m container`. Log:
+`/tmp/primeclaw44-main-integration-fixtures.log`. All **14** focused-run artifact hashes, **17** full-run
+and **15** boundary-run artifact hashes were verified. All three runs prove
+offline execution and clean/absent runtime and source-builder teardown; native
+builder checkout inventories match before/after. Integrated static validation:
+**24 passed, 18 deselected**, 4.97s, `/tmp/primeclaw44-main-integration-static.log`.
+
+Read-only fixture review: Read-only integration47-preservation reviewed both fixture-only diffs and surrounding assertions: no findings. Native exclude resolution, exact rule/path-ignored preconditions and documented operator opt-in retained production47 behavior. Workflow explicit tracked-path proof added; all patch-content/current bytes/index/inode/mtime/manifest/HEAD/disposable application checks unchanged. Retained-promotion barriers/interleaving/both active outcomes/captured-base ancestry/unchanged bundle digest/two-owner registry assertions unchanged. No child edits/tests.
+
+The full48 execution remains recorded as **46 passed / 2 failed**, not green.
+The repaired focused7 execution includes both full failing suites and repeats
+creation-only/default/warning behavior, text/index safety, native discovery,
+ownership and loading checks. This is proportional source-aware coverage of
+the unchanged integrated production generation; no full48 rerun after the
+test-only changes is claimed. No assertion was waived, removed or replaced by
+a status-only check. No production behavior was changed to obtain green output.
+
+All ten task44 implementation criteria remain checked with their original text;
+Description/identity/parent/path and In Progress remain unchanged. Accepted main
+planning guard, ownership registry and task47 stay intact;47 helper and original
+ownership/inventory implementations remain byte-identical to incoming main.
+Both helper/skill delivery entries survive. The exact431 native fork/pins and
+original full-native red limits remain unchanged/unwaived. Final task/code
+publication stays on this Episode branch; separate owning-Conversation review
+is next. No independent acceptance, main merge, lifecycle/global/live migration
+or Episode cleanup is implied.

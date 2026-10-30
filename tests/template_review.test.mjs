@@ -39,9 +39,17 @@ for (const state of ["clean", "dirty", "staged", "mixed"]) {
       const assetId=asset==="skill"?"project-skill-prepare":"project-workflow-handoff";
       if(asset==="workflow") {
         f.rel=".prime-claw/workflows/handoff.md";f.path=join(f.root,f.rel);
+        // Model the documented operator choice to track project state. Fresh
+        // initialization correctly excludes it; comparison must not repair that choice.
+        const exclude=resolve(f.root,git(f.root,"rev-parse","--git-path","info/exclude").trim());
+        const exclusions=readFileSync(exclude,"utf8");
+        assert.match(exclusions,/^\/\.prime-claw\/$/m);
+        assert.equal(git(f.root,"check-ignore","--",f.rel).trim(),f.rel);
+        writeFileSync(exclude,exclusions.replace(/^\/\.prime-claw\/\r?\n/gm,""));
         f.custom=readFileSync(f.path,"utf8")+"\ncommitted workflow customization\n";
         f.upstream=readFileSync(join(PLUGIN,"workflows/handoff.md"),"utf8");
         writeFileSync(f.path,f.custom);git(f.root,"add",f.rel);git(f.root,"commit","-qm","customize workflow");
+        assert.equal(git(f.root,"ls-files","--error-unmatch","--",f.rel).trim(),f.rel);
       }
       if(state!=="clean")writeFileSync(f.path,f.custom+"dirty customization\n");
       if(state==="staged"||state==="mixed")git(f.root,"add",f.rel);
