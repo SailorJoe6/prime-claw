@@ -513,3 +513,7 @@ original full-native red limits remain unchanged/unwaived. Final task/code
 publication stays on this Episode branch; separate owning-Conversation review
 is next. No independent acceptance, main merge, lifecycle/global/live migration
 or Episode cleanup is implied.
+
+### Publication transport recovery (no implementation change)
+
+2026-10-30 — Git publication recovery, no source/test change. Final evidence/fixture checkpoint b543032ab4aa6db3806438a5d1fc234cae2bfdb2 was committed clean. Ordinary git pull --rebase attempted replay of already-merged main history and conflicted on historical852267f task44 content. No rebase continue/skip or push was attempted. git rebase --abort succeeded and restored exactb543032, clean state and exact verified native task. Direct remote Episode remainedcf1372a7413baa93a3a72145ce299a78a310320f; its tracking ref agreed. Explicit git pull --ff-only origin JLanders/prime-claw-primeclaw-44-episode-7beff785 then succeeded Already up to date, leaving candidate HEAD unchanged. Preserve the deliberate main merge/ancestry; publish normal fast-forward, never force or replay obsolete task content. Attempt/abort/ref evidence retained at/tmp/primeclaw44-main-integration-git-publication.log. No ownership/main/source/test/lifecycle change or additional runtime proof needed for this Git-only recovery.
