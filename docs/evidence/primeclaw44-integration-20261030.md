@@ -517,3 +517,29 @@ or Episode cleanup is implied.
 ### Publication transport recovery (no implementation change)
 
 2026-10-30 — Git publication recovery, no source/test change. Final evidence/fixture checkpoint b543032ab4aa6db3806438a5d1fc234cae2bfdb2 was committed clean. Ordinary git pull --rebase attempted replay of already-merged main history and conflicted on historical852267f task44 content. No rebase continue/skip or push was attempted. git rebase --abort succeeded and restored exactb543032, clean state and exact verified native task. Direct remote Episode remainedcf1372a7413baa93a3a72145ce299a78a310320f; its tracking ref agreed. Explicit git pull --ff-only origin JLanders/prime-claw-primeclaw-44-episode-7beff785 then succeeded Already up to date, leaving candidate HEAD unchanged. Preserve the deliberate main merge/ancestry; publish normal fast-forward, never force or replay obsolete task content. Attempt/abort/ref evidence retained at/tmp/primeclaw44-main-integration-git-publication.log. No ownership/main/source/test/lifecycle change or additional runtime proof needed for this Git-only recovery.
+
+## Accepted independent finding — bounded revision pending
+
+Conversation accepted the sole material finding in
+`/tmp/primeclaw44-conversation-integrated-review.md` against published `56e704a`:
+actual PRIMARY registered `initialize_prime_claw action=reconcile` can detach
+and normalize default Backlog while a supported active grandfathered Backlog
+Episode still binds the old task path. Ordinary continuation then refuses before
+delivery. Owner bytes/code HEAD preservation does not preserve task authority.
+
+Actual adapter diagnostic run `20261030T205628Z-45506-aeed0422` under
+`/tmp/primeclaw44-review-active-init-adapter-results/` proved the broken behavior
+on exact clean56e/offline/unchanged native builder/clean absent teardown, with
+15 artifact hashes independently verified. Its diagnostic **1 passed is NOT
+production acceptance**. Repro: `/tmp/primeclaw44-active-init-review.mjs`,
+`/tmp/test_primeclaw44_active_init_review.py`; adapter log:
+`/tmp/primeclaw44-active-init-review-adapter-pytest.log`.
+
+The accepted next repair is one minimal affected-binding integrity refusal
+before task-store/index/publication mutations, not an owner rewrite/transition
+or unrelated-provider/active-Episode ban. Add the actual primary adapter plus
+subsequent existing-Episode continuation regression and unaffected normalization
+proof. Existing source-aware evidence and its limits above remain useful, but
+do not cover this defect. The native living Plan/Notes/FinalSummary hold the
+complete bounded direction. No repair or new acceptance is claimed by this
+handoff checkpoint; same Episode/In Progress and all resources remain.
