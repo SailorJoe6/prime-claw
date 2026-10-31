@@ -366,11 +366,18 @@ def test_phase_prep_composes_context_aware_hint_without_fixed_inventory(
         assert "supervise the resulting Episode" in hint_policy
     for fragment in (
         "fixed text", "substituting only", "<selected-folder>", "<task-id>",
-        "Preserve", "Retain", "operator review decisions", "acceptance criteria",
+        "Retain", "operator review decisions", "acceptance criteria",
         "constraints", "material non-goals", "durable artifact and bead references",
         "Conversation-to-Episode authority",
     ):
         assert fragment not in hint_policy
+    if name == "implement-task-prep":
+        # Carry operator authority and placement facts, not a fixed context inventory.
+        assert "conditional implementation authority" in hint_policy
+        assert "<operator-implementation-host>" in hint_policy
+        assert "Planning-only authority must remain planning-only" in hint_policy
+    else:
+        assert "Preserve" not in hint_policy
     assert skill.count("await compact.run(focus_hint)") == 1
     for fragment in (
         "sole follow-up",
@@ -611,7 +618,11 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "Do not demand standard threat, failure, recovery, complexity, hardening",
         "Do not call `create_task_episode`",
         "call `create_task_episode` exactly once",
-        "exact canonical task ID as its sole `taskId` argument",
+        "exact canonical `taskId` and optional stable `host`",
+        "<operator-implementation-host>",
+        "requires no prior entry invocation, approval store, or turn receipt",
+        "planning-only request does not authorize implementation",
+        "no separate phase-history receipt is required",
         "from `In Planning` to `In Progress` through Backlog",
         "Grandfathered branch-local mode commits and verifies that exact task path",
         "publishes the exact task-path-only status commit on `refs/heads/prime-claw/tasks` without force",
@@ -639,7 +650,8 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "complete raw native view",
         "Do not invent a task path or translate it into a normalized task model",
         "provider-native status and plan/design evidence",
-        "approval is then consumed once",
+        "An explicit stable host must still be a ready local setup",
+        "never retry an uncertain dispatch as fresh work",
         "published provider revision",
         "complete raw task evidence",
         "exact code `baseRef`",
@@ -667,7 +679,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     assert "admitProviderTaskPrepChain" in extension
     assert "providerTaskResolver" in extension
     assert "requireLiveImplementationTask" in extension
-    assert "samePlacement" in extension
+    assert 'name: "implement_task"' in extension
     assert 'name: "handoff_task_episode"' in extension
     assert 'name: "finalize_task_episode"' in extension
     assert 'name: "transition_spec_episode_to_task"' in extension
@@ -675,6 +687,58 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     assert 'name: "create_spec_episode"' in extension
     assert 'name: "handoff_spec_episode"' in extension
     assert 'name: "finalize_spec_episode"' in extension
+
+
+def test_task_implementation_entry_is_thin_global_guidance_with_skill_owned_authority() -> None:
+    source = ROOT / "src/prime-agent-plugin"
+    entry = " ".join((source / "skills/implement-task/SKILL.md").read_text().split())
+    for fragment in (
+        "name: implement-task",
+        "implement_task(taskId, host?)",
+        "no custom slash command is a prerequisite",
+        ".prime-claw/workflows/implement-task-prep.md",
+        "do not demand a fresh approval solely because planning finished",
+        "planning-only request does not authorize implementation",
+        "explicitly delegated selection",
+        "`In Planning` (Beads native `in_planning`) after design and planning",
+        "not from dependency readiness alone",
+        "exact canonical task ID before calling the tool",
+        "stored or turn-scoped receipt",
+        "Admission is not proof of compaction, readiness, or Episode creation",
+        "end the turn",
+        "do not automatically retry",
+        "incremental cutover",
+        "existing custom commands",
+    ):
+        assert fragment in entry
+    assert "backlog task edit" not in entry
+    assert "bd update" not in entry
+    inventory = json.loads((source / "asset-inventory.json").read_text())
+    row = next(asset for asset in inventory["assets"] if asset["id"] == "global-implement-task")
+    assert row == {
+        "id": "global-implement-task",
+        "source": "skills/implement-task/SKILL.md",
+        "targets": [{"class": "plugin-root-managed", "destination": "skills/implement-task/SKILL.md"}],
+    }
+    assert not (ROOT / ".agents/skills/implement-task/SKILL.md").exists()
+    for name in ("implement-task-prep", "implement-task"):
+        policy = " ".join(workflow(name).read_text().split())
+        assert "<operator-implementation-host>" in policy
+        assert "<operator-implementation-task-provider>" in policy
+        assert "<operator-implementation-task-project-root>" in policy
+        assert "<operator-implementation-task-path>" in policy
+        assert "Genuine provider, canonical identity, root, or Backlog path drift blocks creation" in policy
+        assert "not approval, revision/content locks, or invocation receipts" in policy
+        assert "Compatible same-task content refinements" in policy
+        assert "compaction" in policy
+        assert "conditional" in policy
+        assert "not authorize implementation" in policy
+        assert "receipt" in policy
+        asset = next(row for row in inventory["assets"] if row["id"] == f"project-workflow-{name}")
+        customizable = next(target for target in asset["targets"] if target["class"] == "project-customizable")
+        assert customizable["destination"] == f".prime-claw/workflows/{name}.md"
+        assert customizable["exposure"] == "internal"
+        assert customizable["lifecycleTrigger"] == "implement-task"
 
 
 def test_grandfathered_legacy_managed_policy_freezes_specs_but_keeps_plans_living() -> None:

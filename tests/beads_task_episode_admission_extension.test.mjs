@@ -240,7 +240,7 @@ async function create(f) {
   return createTaskEpisode(f.taskId, "tool-call", f.ctx, f.dependencies, { engine: "local" });
 }
 
-test("registered Beads implement-task path consumes one approval and delegates once to accepted admission", async () => {
+test("registered Beads implement-task path delegates once without invocation-proof authority", async () => {
   const f = fixture();
   const workflows = join(f.root, ".prime-claw", "workflows");
   mkdirSync(workflows, { recursive: true });
@@ -302,9 +302,25 @@ test("registered Beads implement-task path consumes one approval and delegates o
     "registered-replay", { taskId: f.taskId }, undefined, undefined, ctx,
   );
   assert.equal(replay.isError, true);
-  assert.match(replay.content[0].text, /no matching active/);
+  assert.match(replay.content[0].text, /Non-terminal Episode ownership/);
   assert.deepEqual(f.statusCalls, ["In Progress"]);
   assert.equal(f.allocatorCalls, 1);
+});
+
+test("registered create_task_episode admits Beads directly without prior command or entry tool", async () => {
+  const f = fixture(), tools = new Map(), sent = [];
+  const pi = {
+    registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
+    sendUserMessage(message) { sent.push(message); }, async sendMessage() {},
+  };
+  createReviewedPlanExtension({ ...f.dependencies, async placementResolver() { return { engine: "local" }; } })(pi);
+  const result = await tools.get("create_task_episode").execute("direct", { taskId: f.taskId }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined);
+  assert.equal(result.details.provider, "beads");
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(f.reservationCalls.length, 1);
+  assert.equal(f.allocatorCalls, 1);
+  assert.equal(sent.length, 0);
 });
 
 test("direct Beads admission publishes, reserves, allocates, and proves one exact active identity", async () => {

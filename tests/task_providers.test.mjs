@@ -667,7 +667,7 @@ test("linked Beads discovery blocks missing, forged, and foreign native context 
   }
 });
 
-test("real Beads 1.3.1 resolves one task and drives the registered compact-first create gate", { timeout: 60_000 }, async () => {
+test("real Beads 1.3.1 resolves one task, supports direct create, and rejects later native status drift", { timeout: 60_000 }, async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-real-linked-beads-")));
   const primary = join(root, "primary");
   const linked = join(root, "linked");
@@ -761,31 +761,44 @@ test("real Beads 1.3.1 resolves one task and drives the registered compact-first
       },
     })(pi);
 
+    // Final creation has no prior entry-tool or command-invocation requirement.
+    const admitted = await tools.get("create_task_episode").execute(
+      "real-beads-create", { taskId: created.id }, undefined, undefined, ctx,
+    );
+    assert.equal(admitted.isError, undefined);
+    assert.equal(sent.length, 0);
+    assert.match(admitted.content[0].text, /One fixed execute assignment/);
+    assert.match(admitted.content[0].text, /Exact provider-native result/);
+    assert.deepEqual(creates, [{ taskId: created.id, toolCallId: "real-beads-create", placement: { engine: "local" } }]);
+    assert.deepEqual(JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"])), beforeView);
+
+    // The temporary native command still routes the same compact-first chain.
     await commands.get("implement-task").handler(created.id, ctx);
     assert.equal(sent.length, 2);
     assert.match(sent[0].message, /REAL BEADS PREP/);
     assert.match(sent[1].message, /REAL BEADS IMPLEMENT/);
     assert.deepEqual(sent[1].options, { deliverAs: "followUp" });
-    assert.equal(creates.length, 0);
-    await events.get("agent_end")({}, ctx);
-    const admitted = await tools.get("create_task_episode").execute(
-      "real-beads-create", { taskId: created.id }, undefined, undefined, ctx,
-    );
-    assert.equal(admitted.isError, undefined);
-    assert.match(admitted.content[0].text, /One fixed execute assignment/);
-    assert.match(admitted.content[0].text, /Exact provider-native result/);
-    assert.deepEqual(creates, [{ taskId: created.id, toolCallId: "real-beads-create", placement: { engine: "local" } }]);
+    assert.equal(creates.length, 1);
     assert.deepEqual(placements, [
       { projectRoot: realpathSync(primary), host: undefined },
       { projectRoot: realpathSync(primary), host: undefined },
     ]);
+
+    // The creation action is mocked above; prove the real native reread, not
+    // the removed invocation-proof store, blocks a task that left In Planning.
+    run("bd", ["update", created.id, "--status", "in_progress"]);
+    const progressed = JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"]));
+    assert.equal(progressed[0].status, "in_progress");
+    assert.equal(progressed[0].id, created.id);
+    assert.equal(progressed[0].design, beforeView[0].design);
     const replay = await tools.get("create_task_episode").execute(
       "real-beads-replay", { taskId: created.id }, undefined, undefined, ctx,
     );
     assert.equal(replay.isError, true);
-    assert.match(replay.content[0].text, /no matching active/);
+    assert.match(replay.content[0].text, /implementation requires In Planning/);
     assert.equal(creates.length, 1);
-    assert.deepEqual(JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"])), beforeView);
+    assert.equal(placements.length, 2);
+    assert.deepEqual(JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"])), progressed);
   } finally {
     try { run("bd", ["dolt", "stop"]); } catch {}
     rmSync(root, { recursive: true, force: true });

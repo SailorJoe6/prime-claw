@@ -131,6 +131,12 @@ function parseTaskImplementationArgs(args: string): TaskCommandSelection | null 
   return selected ? { taskId: selected.location, ...(selected.host ? { host: selected.host } : {}) } : null;
 }
 
+function validTaskToolSelection(taskId: unknown, host: unknown): taskId is string {
+  return typeof taskId === "string" && !!taskId && taskId === taskId.trim()
+    && !/\s/.test(taskId) && !taskId.startsWith("-")
+    && (host === undefined || (typeof host === "string" && /^id:[0-9a-f-]+$/.test(host)));
+}
+
 type ImplementationApproval = {
   location: string;
   host?: string;
@@ -151,72 +157,6 @@ function activeLegacyReplay(
   const files = assertLiveLegacyEpisodeFiles(record, "Retained Episode replay");
   assertGrandfatheredLegacySpecificationFile(selected.projectRoot, record.sourceLocation, files.specification);
   return { projectRoot: selected.projectRoot, location: selected.location, record };
-}
-
-type TaskImplementationApprovalBase = {
-  ownerSessionId: string;
-  taskId: string;
-  projectRoot: string;
-  placement: TaskEpisodeAdmissionOptions;
-  skipNextAgentEnd: boolean;
-};
-
-export type TaskImplementationApproval =
-  | (TaskImplementationApprovalBase & { provider: "backlog"; taskPath: string })
-  | (TaskImplementationApprovalBase & { provider: "beads"; taskPath?: never });
-
-/** One-turn, single-use authority for the exact task and preselected placement. */
-export class TaskImplementationApprovalStore {
-  private readonly approvals = new Map<string, TaskImplementationApproval>();
-
-  grant(
-    ctx: ExtensionContext,
-    task: ProviderTaskResolution,
-    placement: TaskEpisodeAdmissionOptions,
-  ): void {
-    const ownerSessionId = ctx.sessionManager.getSessionId();
-    const common = {
-      ownerSessionId,
-      taskId: task.taskId,
-      projectRoot: task.projectRoot,
-      placement: { ...placement },
-      skipNextAgentEnd: true,
-    };
-    this.approvals.set(ownerSessionId, task.provider === "backlog"
-      ? { ...common, provider: "backlog", taskPath: task.taskPath }
-      : { ...common, provider: "beads" });
-  }
-
-  consume(
-    ctx: ExtensionContext,
-    task: ProviderTaskResolution,
-  ): TaskImplementationApproval | null {
-    const ownerSessionId = ctx.sessionManager.getSessionId();
-    const approval = this.approvals.get(ownerSessionId);
-    if (!approval || approval.skipNextAgentEnd
-      || approval.ownerSessionId !== ownerSessionId
-      || approval.provider !== task.provider
-      || approval.taskId !== task.taskId
-      || approval.projectRoot !== task.projectRoot
-      || (approval.provider === "backlog"
-        && (task.provider !== "backlog" || approval.taskPath !== task.taskPath))) return null;
-    this.approvals.delete(ownerSessionId);
-    return { ...approval, placement: { ...approval.placement } };
-  }
-
-  agentEnd(ownerSessionId: string): void {
-    const approval = this.approvals.get(ownerSessionId);
-    if (!approval) return;
-    if (approval.skipNextAgentEnd) {
-      this.approvals.set(ownerSessionId, { ...approval, skipNextAgentEnd: false });
-      return;
-    }
-    this.approvals.delete(ownerSessionId);
-  }
-
-  clear(ownerSessionId: string): void {
-    this.approvals.delete(ownerSessionId);
-  }
 }
 
 export interface TaskImplementationAdmissionDependencies {
@@ -259,26 +199,25 @@ export async function admitTaskPlanningPrepChain(
 
 /**
  * Admit the task-native compact-first implementation chain. Placement is
- * resolved before either workflow message, and approval is recorded only after
- * both messages are admitted.
+ * resolved before either message. Semantic implementation authority belongs to
+ * the managed skills, not an ephemeral command-invocation proof.
  */
 export async function admitTaskImplementationPrepChain(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
   args: string,
-  approvals: TaskImplementationApprovalStore,
+  source: "native" | "tool",
   dependencies: TaskImplementationAdmissionDependencies = {},
 ): Promise<ProviderTaskPrepChainAdmissionResult> {
   const parsed = parseTaskImplementationArgs(args);
   if (!parsed) return { ok: false, message: IMPLEMENT_TASK_USAGE, level: "warning" };
-  let selected: ProviderTaskResolution | undefined;
   let placement: TaskEpisodeAdmissionOptions | undefined;
-  const result = await admitProviderTaskPrepChain(
+  return admitProviderTaskPrepChain(
     pi,
     ctx,
     parsed.taskId,
     IMPLEMENT_TASK_PREP_WORKFLOW,
-    "native",
+    source,
     taskProviderResolver(dependencies),
     async (callCtx, task) => {
       if (task.provider === "beads" && task.taskId !== parsed.taskId) {
@@ -287,17 +226,33 @@ export async function admitTaskImplementationPrepChain(
       if (task.provider === "beads" && task.nativeStatus !== "in_planning") {
         throw new Error(`Beads task ${task.taskId} must be In Planning/in_planning for implementation admission`);
       }
-      selected = task;
       const resolvePlacement = dependencies.placementResolver ?? resolveTaskEpisodePlacement;
       placement = await resolvePlacement(task.projectRoot, parsed.host, callCtx, dependencies.placement);
     },
     conversationGuideText({ guideRoot: dependencies.guideRoot }),
+    "implementation",
+    (task) => {
+      if (!placement) throw new Error("Task implementation admission lost its selected placement");
+      const host = placementHost(placement);
+      const facts = `<operator-implementation-task-provider>
+${task.provider}
+</operator-implementation-task-provider>
+
+<operator-implementation-task-project-root>
+${task.projectRoot}
+</operator-implementation-task-project-root>`;
+      const path = task.provider === "backlog" ? `
+
+<operator-implementation-task-path>
+${task.taskPathRelative}
+</operator-implementation-task-path>` : "";
+      return `${facts}${path}${host ? `
+
+<operator-implementation-host>
+${host}
+</operator-implementation-host>` : ""}`;
+    },
   );
-  if (result.ok) {
-    if (!selected || !placement) throw new Error("Task implementation admission lost its exact provider and placement binding");
-    approvals.grant(ctx, selected, placement);
-  }
-  return result;
 }
 
 type PrepChainCommandOptions = {
@@ -513,7 +468,6 @@ type ReviewedPlanDependencies = EpisodeDependencies & EpisodeOwnershipTransition
   handoffEpisode?: typeof handoffSpecEpisode;
   transitionLegacyOwnership?: typeof transitionSpecEpisodeToTaskOwnership;
   taskResolver?: (cwd: string, rawTaskId: string) => BacklogTaskSelection | null;
-  taskImplementationApprovals?: TaskImplementationApprovalStore;
   placementResolver?: typeof resolveTaskEpisodePlacement;
   taskActions?: Partial<TaskEpisodePublicActions>;
   taskCleanup?: TaskEpisodeCleanupDependencies["cleanup"];
@@ -552,11 +506,6 @@ function placementHost(placement: TaskEpisodeAdmissionOptions): string | undefin
   return placement.engine === "orca" ? `id:${placement.projectSetupId}` : undefined;
 }
 
-function samePlacement(left: TaskEpisodeAdmissionOptions, right: TaskEpisodeAdmissionOptions): boolean {
-  return left.engine === right.engine
-    && left.projectSetupId === right.projectSetupId
-    && left.routingEnvironmentId === right.routingEnvironmentId;
-}
 
 async function runTaskEpisodeCleanup(
   params: TaskEpisodeCleanupParams,
@@ -602,8 +551,6 @@ async function runTaskEpisodeCleanup(
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
     const implementationApprovalBySession = new Map<string, ImplementationApproval>();
-    const taskImplementationApprovals = dependencies?.taskImplementationApprovals
-      ?? new TaskImplementationApprovalStore();
     const oversightOptions = { guideRoot: dependencies?.guideRoot };
     registerConversationOversight(pi, oversightOptions);
     const planSpecHandler = registerPrepChainCommand(pi, {
@@ -662,7 +609,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           pi,
           ctx,
           args,
-          taskImplementationApprovals,
+          "native",
           {
             taskResolver: dependencies?.taskResolver,
             providerTaskResolver: dependencies?.providerTaskResolver,
@@ -765,14 +712,62 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       },
     });
 
+    pi.registerTool({
+      name: "implement_task",
+      label: "Review task implementation readiness",
+      description: "Queue canonical implementation readiness for one exact provider-native In Planning task. The managed skill evaluates approval and readiness before creating an Episode; admission alone creates no resources.",
+      promptSnippet: "Queue canonical implementation readiness for one exact planned provider-native task",
+      promptGuidelines: [
+        "Use implement_task for an explicit implementation request, including a conditional request to implement only if ready.",
+        "An exact task may be operator-selected or selected within an explicit bounded delegation restricted to In Planning; never infer open-ended selection authority.",
+        "If the task or delegated boundary is materially ambiguous, ask before calling. The managed skill owns semantic approval and readiness.",
+        "Pass an optional stable id:<project-host-setup-id> host only when selected; otherwise resolve placement before delivery. Preserve the selected host through readiness and final creation.",
+        "Treat admission as terminal routing, not readiness or creation completion. On delivery uncertainty, inspect current state and never retry automatically.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string", description: "Exact provider-native In Planning task ID selected by the operator or within explicit bounded delegation" },
+          host: { type: "string", description: "Optional stable id:<project-host-setup-id> placement" },
+        },
+        required: ["taskId"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        if (!validTaskToolSelection(params.taskId, params.host)) {
+          return { content: [{ type: "text", text: IMPLEMENT_TASK_USAGE }], details: { admitted: false, error: IMPLEMENT_TASK_USAGE }, isError: true };
+        }
+        const result = await admitTaskImplementationPrepChain(
+          pi, ctx, `${params.taskId}${params.host ? ` --host ${params.host}` : ""}`, "tool",
+          {
+            taskResolver: dependencies?.taskResolver,
+            providerTaskResolver: dependencies?.providerTaskResolver,
+            placementResolver: dependencies?.placementResolver,
+            placement: dependencies,
+            guideRoot: dependencies?.guideRoot,
+          },
+        );
+        if (!result.ok) {
+          return {
+            content: [{ type: "text", text: result.message }],
+            details: { admission: result.deliveryUncertain ? "unconfirmed" : "rejected", ...(result.deliveryUncertain ? { stage: result.stage } : { admitted: false }), error: result.message },
+            isError: true,
+          };
+        }
+        return {
+          content: [{ type: "text", text: `Implementation readiness admitted for ${result.taskId}: canonical implement-task-prep was steered and canonical implement-task was queued as the sole follow-up. Readiness has not completed, and no Episode was created by this admission.` }],
+          details: { admitted: true, taskId: result.taskId },
+        };
+      },
+    });
+
     pi.on("session_start", (_event, ctx) => {
       const sessionId = ctx.sessionManager.getSessionId();
       implementationApprovalBySession.delete(sessionId);
-      taskImplementationApprovals.clear(sessionId);
     });
     pi.on("agent_end", (_event, ctx) => {
       const sessionId = ctx.sessionManager.getSessionId();
-      taskImplementationApprovals.agentEnd(sessionId);
       const approval = implementationApprovalBySession.get(sessionId);
       if (!approval) return;
       if (approval.skipNextAgentEnd) {
@@ -787,7 +782,6 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.on("session_shutdown", (_event, ctx) => {
       const sessionId = ctx.sessionManager.getSessionId();
       implementationApprovalBySession.delete(sessionId);
-      taskImplementationApprovals.clear(sessionId);
     });
 
     pi.registerTool({
@@ -844,44 +838,47 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "create_task_episode",
       label: "Create task Episode",
-      description: "Create or return the one isolated Episode for the exact provider-native task admitted by the current /implement-task chain.",
+      description: "Create one isolated Episode for an exact implementation-ready provider-native In Planning task. Resolve the live task and placement directly; no prior command or entry-tool invocation proof is required.",
       promptSnippet: "Create one exact task-native Episode after implementation readiness succeeds",
       promptGuidelines: [
-        "Call create_task_episode exactly once only after the current /implement-task readiness workflow approves its exact In Planning task.",
-        "Pass only the exact canonical task ID selected by the operator; placement is already bound by /implement-task and cannot be overridden here.",
-        "The host publishes In Progress, reserves ownership, creates one Episode, and sends one fixed execute assignment; never add an initial handoff or second assignment.",
+        "Call create_task_episode exactly once after the managed implementation readiness skill approves its exact In Planning task, whether entered through implement_task or directly through the skill.",
+        "Semantic authority comes from the operator's explicit implementation request, including a conditional request or explicit bounded delegated selection among In Planning tasks; never infer authority from task status alone.",
+        "Pass the exact canonical task ID and the same optional stable host carried by readiness. This tool independently resolves the current provider, task, and safe placement; no prior invocation proof or content-revision approval receipt is required.",
+        "The host validates primary-main, native task state and required plan evidence, publishes In Progress, reserves ownership before allocation, creates one Episode, and sends one fixed execute assignment; never add an initial handoff or second assignment.",
         "Treat uncertain or partial creation as a blocker. Never retry it as a fresh Episode.",
       ],
       executionMode: "sequential",
       parameters: {
         type: "object",
-        properties: { taskId: { type: "string", description: "Exact canonical provider-native task ID admitted by /implement-task" } },
+        properties: {
+          taskId: { type: "string", description: "Exact canonical provider-native In Planning task ID approved by the managed readiness skill" },
+          host: { type: "string", description: "Optional stable id:<project-host-setup-id> selected during readiness" },
+        },
         required: ["taskId"],
         additionalProperties: false,
       } as any,
       async execute(toolCallId, params, _signal, _onUpdate, ctx) {
         const resolver = taskProviderResolver(dependencies ?? {});
         try {
+          if (!validTaskToolSelection(params.taskId, params.host)) {
+            throw new Error("Task Episode creation requires one exact canonical task ID and optional stable id:<project-host-setup-id> host");
+          }
           const task = resolver(ctx.cwd, params.taskId);
           if (!task) throw new Error(`Task ${params.taskId} is unavailable through the live provider`);
-          if (task.provider === "beads" && task.taskId !== params.taskId) {
-            throw new Error(`Beads task ${params.taskId} resolved to a different canonical ID ${task.taskId}`);
+          if (task.provider !== "backlog" && task.provider !== "beads") {
+            throw new Error("Task Episode creation requires a supported live task provider");
+          }
+          if (task.taskId !== params.taskId) {
+            throw new Error(`Task ${params.taskId} resolved to a different canonical ID ${task.taskId}`);
           }
           requireLiveImplementationTask(task);
-          const approval = taskImplementationApprovals.consume(ctx, task);
-          if (!approval) throw new Error("no matching active /implement-task approval");
           const resolvePlacement = dependencies?.placementResolver ?? resolveTaskEpisodePlacement;
-          const currentPlacement = await resolvePlacement(
-            task.projectRoot,
-            placementHost(approval.placement),
-            ctx,
-            dependencies,
-          );
-          if (!samePlacement(currentPlacement, approval.placement)) {
-            throw new Error("the preselected task Episode placement changed after /implement-task approval");
-          }
+          const placement = await resolvePlacement(task.projectRoot, params.host, ctx, dependencies);
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
-          const result = await actions.create(task.taskId, toolCallId, ctx, dependencies, approval.placement);
+          // The provider-native admission primitive re-resolves exact root/path,
+          // status and plan under its lock, proves primary-main, reserves this
+          // owner's identity, and revalidates placement before allocation.
+          const result = await actions.create(task.taskId, toolCallId, ctx, dependencies, placement);
           return {
             content: [{
               type: "text",

@@ -24,7 +24,7 @@ export interface PrepChainWorkflow {
 
 export type PrepChainAdmissionResult =
   | { ok: true; location: string }
-  | { ok: false; message: string; level: "warning" | "error" };
+  | { ok: false; message: string; level: "warning" | "error"; deliveryUncertain?: true; stage?: "first" | "followUp" };
 
 export interface TaskPrepChainWorkflow extends PrepChainWorkflow {
   allowedStatuses: readonly string[];
@@ -32,11 +32,11 @@ export interface TaskPrepChainWorkflow extends PrepChainWorkflow {
 
 export type TaskPrepChainAdmissionResult =
   | { ok: true; taskId: string; taskPath: string; projectRoot: string }
-  | { ok: false; message: string; level: "warning" | "error" };
+  | { ok: false; message: string; level: "warning" | "error"; deliveryUncertain?: true; stage?: "first" | "followUp" };
 
 export type ProviderTaskPrepChainAdmissionResult =
   | ({ ok: true } & ProviderTaskResolution)
-  | { ok: false; message: string; level: "warning" | "error" };
+  | { ok: false; message: string; level: "warning" | "error"; deliveryUncertain?: true; stage?: "first" | "followUp" };
 
 type BacklogTaskResolver = (cwd: string, rawTaskId: string) => BacklogTaskSelection | null;
 export type LegacySourceAbsentSelectionResolver = (
@@ -126,8 +126,10 @@ async function admitResolvedPrepChain(
   if (!admission.ok) return {
     ok: false,
     level: "error",
+    deliveryUncertain: true,
+    stage: admission.stage,
     message: admission.stage === "first"
-      ? `reviewed-plan: canonical ${workflow.prepSkillName} could not be admitted`
+      ? `reviewed-plan: canonical ${workflow.prepSkillName} delivery is unconfirmed; inspect before retrying`
       : `reviewed-plan: ${workflow.prepSkillName} was admitted, but ${workflow.phaseSkillName} follow-up admission is unconfirmed; inspect before retrying`,
   };
 
@@ -268,6 +270,7 @@ export async function admitProviderTaskPrepChain(
   ) => void | Promise<void>,
   phasePreamble?: string,
   purpose: "planning" | "implementation" = "implementation",
+  promptContext?: (selection: ProviderTaskResolution) => string | undefined,
 ): Promise<ProviderTaskPrepChainAdmissionResult> {
   let selected: ProviderTaskResolution | null;
   try {
@@ -307,7 +310,7 @@ export async function admitProviderTaskPrepChain(
     source,
     undefined,
     phasePreamble,
-    purpose === "planning" ? planningProviderPromptContext(selected) : undefined,
+    purpose === "planning" ? planningProviderPromptContext(selected) : promptContext?.(selected),
   );
   return result.ok ? { ok: true, ...selected } : result;
 }

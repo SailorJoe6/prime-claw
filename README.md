@@ -38,7 +38,12 @@ full phase status and blockers.
 - [Task-native specification authoring and retained bundle compatibility](docs/future-specification-bundles.md)
   — author or revise one exact `In Design` task with `/skill:design` or
   `/skill:spec-it-out`, then use `/plan TASK-ID` for separate plan review.
-  Use `/implement-task TASK-ID` for new task-native Episodes. The generic plugin
+  For new task-native Episodes, ask the agent to implement the approved task;
+  the discoverable `implement-task` skill routes to `implement_task`. The custom
+  `/implement-task TASK-ID` command remains during this incremental cutover.
+  Planning alone never authorizes implementation; an explicit conditional
+  plan-then-implement request may authorize that sequence within its scope.
+  The generic plugin
   retains `/plan-spec` and `/implement-spec` for initialized projects that still
   have version-1 bundles; this builder repository no longer stores a local
   `.ralph/plans` tree.

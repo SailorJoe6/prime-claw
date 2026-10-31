@@ -72,7 +72,7 @@ function fixture() {
   const rawRoot = mkdtempSync(join(tmpdir(), "prime-claw-task-admission-"));
   const root = realpathSync(rawRoot);
   mkdirSync(join(root, "backlog"), { recursive: true });
-  copyFileSync(join(ROOT, "backlog", "config.yml"), join(root, "backlog", "config.yml"));
+  copyFileSync(join(ROOT, "tests", "fixtures", "backlog-admission-config.yml"), join(root, "backlog", "config.yml"));
   git(root, "init", "-q");
   git(root, "config", "user.name", "Prime Claw Test");
   git(root, "config", "user.email", "prime-claw@example.invalid");

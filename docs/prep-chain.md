@@ -10,7 +10,22 @@ plan_task({"taskId":"TASK-ID"})
 plan_spec({"location":".ralph/plans/future/<slug>"})
 /implement-spec .ralph/plans/future/<slug> [--host id:<project-host-setup-id>]
 /implement-task TASK-ID [--host id:<project-host-setup-id>]
+implement_task({"taskId":"TASK-ID","host":"id:<project-host-setup-id>"})
 ```
+
+The globally discoverable `implement-task` Markdown skill routes conversational
+implementation requests to `implement_task`; `host` is optional. It binds one
+exact canonical task, including selection explicitly delegated within the
+operator's bounds. Implementation selection requires native `In Planning`
+(Beads `in_planning`) after design and planning, not dependency readiness alone.
+The skill owns approval judgment: an explicit conditional request to plan then
+implement when ready may remain valid within scope, while planning alone never
+authorizes implementation. Material ambiguity or new scope requires clarification.
+
+This is an incremental cutover. All existing custom commands above remain
+registered, as does ordinary `/handoff`; retained version-1 invocation guards
+and folder workflows are unchanged. Other entry skills and command removal are
+later slices, not claims of this task-native increment.
 
 Task planning resolves one exact task through the repository's selected native
 provider and admits only canonical `In Design` or `In Planning`. Backlog keeps
@@ -38,6 +53,7 @@ old-layout Episode can finish from its unchanged snapshot.
 | `plan_spec` | wrapped `plan-prep`, `steer` delivery | wrapped `plan-spec` |
 | Native `/implement-spec` | wrapped `implement-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-spec` |
 | Native `/implement-task` | wrapped `implement-task-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-task` |
+| `implement_task` | wrapped `implement-task-prep`, `steer` delivery | full ordinary oversight guide followed by wrapped `implement-task` |
 
 The task-native implementation chain is registered alongside the retained folder path. Before
 it admits either message, deterministic code resolves the exact `In Planning`
@@ -82,21 +98,27 @@ assignment. The guard survives the prep turn, is consumed by one exact
 `create_spec_episode` call during the phase turn, and is cleared if that turn
 ends without creation.
 
-The task-native chain records the same kind of ephemeral authority only
-after exact placement and both workflow messages succeed. It binds owner
-session, canonical task ID, canonical task path and project root, plus the exact
-`orca` setup or proven-unavailable `local` fallback. The guard is unavailable in
-the prep turn, consumable once only for the same re-resolved task during the
-semantic phase, and cleared on phase end, session start, or shutdown. Neither
-guard is a durable approval or guide receipt.
+The task-native chain has no invocation-proof approval store or turn receipt.
+Both canonical messages carry the exact task ID and, for selected Orca
+placement, `<operator-implementation-host>id:<setup-id></operator-implementation-host>`.
+A selected local fallback is reported explicitly without inventing a host ID.
+Preparation preserves the operator's actual instruction, approved scope,
+conditional implementation authority, and optional stable host through
+compaction. It cannot turn planning-only authority into implementation approval.
+The project-customizable phase policy owns semantic readiness and approval
+judgment; task lifecycle state is not supplemented by a phase-history receipt.
 
 `create_spec_episode` remains the retained folder promotion boundary or exact
-active replay return, while `create_task_episode` consumes only the exact
-matching task approval. Semantic
-readiness stays in the corresponding phase workflow; deterministic code owns
-placement, status publication, reservation, session binding, and one fixed
-execute assignment. Missing or mismatched admission fails before lifecycle
-mutation.
+active replay return. `create_task_episode(taskId, host?)` is self-contained:
+it resolves current native provider, canonical task/root/path, `In Planning`
+state, meaningful plan, and placement without requiring any prior entry
+invocation. A carried stable host is revalidated before mutation; absent host
+uses the same safe sole-ready/picker/definitive-unavailability rules. Native
+code retains identity, publication, ownership, reservation, session binding,
+and one fixed execute assignment checks. Invalid concrete state fails before
+lifecycle mutation; uncertainty never authorizes a duplicate admission. Successful
+entry admission reports queued work, not completed compaction, readiness, or
+creation, and the caller ends its turn.
 
 
 ## Validation policy

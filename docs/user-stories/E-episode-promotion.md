@@ -6,11 +6,27 @@
 Episode creation, so that incomplete or contradictory work creates no
 implementation resources.**
 
-The primary `/implement-task TASK-ID` path resolves one exact `In Planning`
-task and placement before its compact-first readiness workflow. Its consumable
-approval binds the owner session, canonical task ID/path, project root, and
-placement. `create_task_episode` can consume that approval once; a failed
-semantic review creates no Episode.
+The globally discoverable `implement-task` skill routes an approved
+conversational request through `implement_task(taskId, host?)`. It binds one
+exact canonical task, including selection explicitly delegated within the
+operator's bounds. Implementation selection requires `In Planning` (Beads native
+`in_planning`) after design and planning, not dependency readiness alone. The
+entry resolves native task and placement before its compact-first readiness
+workflow; a failed semantic review creates no Episode.
+
+Markdown owns approval judgment. An explicit conditional instruction to plan
+then implement when ready may authorize that sequence within approved scope;
+planning alone does not authorize implementation. Preparation and compaction
+preserve the operator's instruction, scope, conditional authority, exact task,
+and optional stable host. Material ambiguity or new scope requires clarification.
+Final `create_task_episode(taskId, host?)` independently resolves concrete native
+identity, state, readiness, placement, and ownership; it requires no prior entry
+invocation, approval store, or turn receipt.
+
+This incremental slice adds the task entry skill/tool and removes only the
+task-native invocation-proof guard. All existing custom commands, including
+`/implement-task`, remain registered. Retained version-1 guards and workflows
+remain unchanged; later slices complete the broader interface cutover.
 
 For retained version-1 compatibility, `/implement-spec
 .ralph/plans/future/<slug>` performs the same final review for one existing
@@ -29,7 +45,8 @@ new assignment.
 Episode, so that implementation occurs against one exact durable authority
 outside the canonical checkout.**
 
-The primary `create_task_episode(taskId=...)` transaction commits the exact
+The primary `create_task_episode(taskId=..., host=...)` transaction (with optional
+stable `id:<setup-id>` host) commits the exact
 task's `In Progress` transition, persists version-2 ownership, and creates one
 matching Episode only when that Conversation has no non-terminal ownership and
 no other owner holds the same task binding. A short cross-process lock covers
@@ -139,12 +156,16 @@ absent and never when an explicit setup was requested. Malformed JSON, a
 negative inventory envelope, and other inventory failures propagate and fail
 closed rather than selecting local execution.
 
-Only after placement and both workflow messages succeed does the helper grant
-one ephemeral approval bound to the owner session, canonical task ID/path and
-project root, and exact placement. The prep-turn end exposes it to the semantic
-turn; one exact consume removes it, while phase end, session start, or shutdown
-clears it. The full ordinary oversight guide precedes `implement-task` semantic
-readiness. No approval is durable or inferred from planning.
+The helper delivers the exact task and optional stable host as operation data,
+not private approval. Both canonical messages carry
+`<operator-implementation-host>id:<setup-id></operator-implementation-host>` for
+selected Orca placement; local fallback is explicit and has no host ID.
+The full ordinary oversight guide precedes `implement-task` semantic readiness.
+The phase policy interprets actual operator authority, including an explicit
+conditional plan-then-implement instruction within scope. Planning alone adds
+no implementation authority. There is no task-native approval store, turn
+receipt, or separate phase-history proof. Entry success means queued work, not
+completed compaction, readiness, or Episode creation, and ends the caller's turn.
 
 The ownership store now accepts either retained version-1 folder identity or
 strict version-2 task identity, never a mixture. An internal reservation seam
@@ -177,14 +198,22 @@ failure before ownership or resource mutation commits the exact task back to
 `In Planning`. Any durable or uncertain mutation instead commits `Blocked` plus
 the exact inspection/reconciliation condition and preserves all evidence.
 
-`/implement-task` and `create_task_episode` now expose this complete guarded
-transaction. The public create tool consumes only the matching one-turn
-approval and accepts no caller-supplied placement or resource identity. Retained version-1 compatibility folder Episode creation remains available
-through the explicitly labeled workflow above.
+The `implement-task` skill, `implement_task` entry tool, retained `/implement-task`
+command, and `create_task_episode` expose this task-native path. Final create is
+self-contained: it re-resolves the current provider, exact canonical task/root/
+Backlog path and valid native status/plan, then resolves placement before
+mutation. An optional stable host is revalidated, never silently substituted;
+without one, the existing sole-ready/picker/definitive-unavailability rules apply.
+It accepts no arbitrary root, path, worktree, session, or engine identity and
+requires no earlier entry invocation as approval proof. Concrete ownership and
+resource checks still refuse duplicate admission. Retained version-1
+compatibility folder Episode creation remains available through the explicitly
+labeled unchanged workflow above.
 
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/reviewed-plan.ts`
+- `src/prime-agent-plugin/skills/implement-task/SKILL.md` (global entry guidance)
 - `src/prime-agent-plugin/extension-support/spec-episode.ts` (retained allocator plus public task-native admission transaction)
 - `src/prime-agent-plugin/extension-support/episode-ownership.ts`
 - `src/prime-agent-plugin/extension-support/task-episode-ownership.ts` (task-native reservation foundation)
