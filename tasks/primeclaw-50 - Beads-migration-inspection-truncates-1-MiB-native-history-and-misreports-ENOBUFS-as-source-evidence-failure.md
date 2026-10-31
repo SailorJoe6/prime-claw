@@ -3,10 +3,10 @@ id: PRIMECLAW-50
 title: >-
   Beads migration inspection truncates >1 MiB native history and misreports
   ENOBUFS as source evidence failure
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 17:42'
+updated_date: '2026-10-31 18:15'
 labels: []
 dependencies: []
 references:
@@ -83,3 +83,27 @@ Ticket creation authorizes no implementation, live Ralph command/retry/migration
 - [ ] #4 When complete capture is not proven, inspection fails safely without destination writes or source mutation/retirement; existing preservation, identity, stable capture, quiescence, ownership, publication, receipt and explicit cutover/deletion safeguards remain intact.
 - [ ] #5 Disposable synthetic Docker regression coverage exercises >1 MiB valid history/events, ENOBUFS with empty stderr/null status, ordinary command errors and genuinely malformed native JSON, without live Ralph access or global plugin changes.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+## Implementation approach
+
+Keep the existing synchronous `CommandRunner.run` and native snapshot/package flow. Replace fixed pipe-buffer capture with private temporary-file/file-descriptor capture for migration commands; successful results still return complete strings for the existing parsers. This removes the per-command capture ceiling without an async migration rewrite. Memory/string and temporary-storage exhaustion remain resource failures, not a promise of unlimited capacity. Do not add a migration framework, persistent spool registry, retry loop, new state machine, task-reconciliation classifier, or preservation-approval gate. Semantic decisions stay with the Conversation/Episode.
+
+1. **Repair capture at the existing runner seam.** In `extension-support/project-initialization.ts`, add the smallest migration-scoped file-backed capture path. Redirect child stdout and stderr to private files rather than `execFileSync` pipes, wait for completion, and read complete successful stdout. Keep other runner consumers compatible and avoid changing unrelated command behavior. Wire both `inspectTaskProviderMigration` and `migrateTaskProvider` in `extension-support/task-provider-migration.ts` to use this path throughout source capture and recapture, including export, independent inventory, task views, histories, events, provenance and identity/version/catalog reads. Close descriptors and remove only this invocation's temporary files in `finally`, on success and failure. File creation, child execution and output-read failures must fail closed; never parse or certify a partial captured result. No fixed `maxBuffer` increase, output clipping, history pagination/omission, or source-data workaround.
+
+2. **Preserve failure metadata and render safe diagnostics.** Extend the runner result with backward-compatible optional native error code, original nullable exit status and signal (retain the existing numeric status convention for callers). Preserve these values for spawn/capture/resource failures and nonzero exits; empty stderr must not hide `ENOBUFS`. In migration `runRequired`/`commandFailure`, classify transport/resource failure separately from malformed native data. Use a bounded safe command label and available metadata plus an optional short bounded stderr excerpt; never fall back to captured stdout, dump an error's output/cause object, or print payload-bearing command arguments. Bound the complete rendered diagnostic, not just stderr. Make migration JSON parse errors identify the command/data kind without echoing input or raw parser messages that can quote private history. Update inspection/migration error advice so command transport/resource failures advise resolving that failure, not repairing readable source data; genuinely invalid/incomplete native data remains a distinct actionable failure.
+
+3. **Add focused synthetic Docker regressions.** Extend `tests/task_provider_migration.test.mjs` and, where needed, `tests/project_initialization_extension.test.mjs` through their existing Docker pytest bridges; do not create a new test harness. Exercise the production capture runner, not only fake string-returning runners: generate valid 108-record history representing the reported 1,305,475-byte case, retain a tail sentinel, and compare full output/record content. Cover large history and events and prove that export, inventory, show and provenance use the same uncapped path. Add a larger-than-baseline case and multibyte content to catch incorrect byte handling. Finite stress tests are not proof of no fixed ceiling: also review source capture for finite pipe-buffer limits or byte cutoffs. Existing fixture helpers use capped `execFileSync`; oversized fixture reads/assertions must use the repaired production path or known fixture bytes instead. Inject `ENOBUFS` with empty stderr/null native status and signal, ordinary nonzero command failures with short/oversized/empty stderr, and temporary-storage/output-read resource failures; assert bounded actionable metadata, private stdout/tail sentinels absent from diagnostics, cleanup on handled success/failure, and no destination writes or source/ownership mutation when initial capture fails. A real malformed native JSON case must fail as invalid data without exposing its payload. Keep existing migration preservation, stable recapture, exact revision/inventory, ownership continuity, receipt, publication and cutover/deletion tests intact.
+
+4. **Validate and document only this repair.** Update `docs/project-initialization.md` to explain complete migration capture subject to available resources, private temporary-file cleanup, and bounded transport-versus-data diagnostics. Run the focused Docker suites and required tier-1 probe after plugin-source changes; record results in this task's native Implementation Notes:
+   - `python3 -m pytest tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_project_initialization.py::test_project_initialization_node_suite tests/test_beads_retiring_source_capture.py -q -m container`
+   - `scripts/test-tier1.sh --probe`
+   - Before candidate review, `python3 -m pytest tests/ -q -m container` for shared-runner and lifecycle regression coverage.
+   The probe alone does not run migration regressions. Inject resource failures deterministically; do not exhaust real host/container resources. Reuse current native migration fixtures to verify that retained history/events/provenance arrive losslessly in destination packages. Check existing shared-runner behavior if its interface changes. No live Ralph reads/retries/migration, private payload access, Prime Agent edits, user-global apply/check/probes, new lifecycle statuses, outgoing publication requirement, concurrency-gate repair, or automatic migration confirmation. Existing task/config/provenance preservation and explicit one-way cutover authority remain unchanged.
+
+## Execution and review boundary
+
+Implement only after separate operator `/implement-task PRIMECLAW-50` approval. Use disposable synthetic projects and Docker candidate validation. PRIMECLAW-49 covers native memory records independently; do not fold that work or the unrelated hard-coded lifecycle gates into this bug. Recheck the current main baseline at implementation time and preserve compatible upstream changes. Leave source authority intact on every unproven capture. Publish the candidate and task evidence through the normal Episode review flow; global activation and any real source deletion require their own existing operator authority.
+<!-- SECTION:PLAN:END -->
