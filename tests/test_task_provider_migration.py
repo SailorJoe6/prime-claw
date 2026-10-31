@@ -48,8 +48,11 @@ def test_retiring_beads_source_boundary_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test",
         "--test-name-pattern",
-        "canonical source inspection|confirmed embedded|embedded source refuses|repeated embedded|independent Backlog publication",
+        "canonical source inspection|confirmed embedded|embedded source refuses|repeated embedded|independent Backlog publication|typed Beads export|native Beads memory capture|native Beads memory outputs|active Beads Episode deletion refusal",
         WS_NODE_SUITE, timeout=900,
+    )
+    (tier1_container.share.parent / "retiring-beads-source-boundary-node.tap").write_text(
+        result.stdout + result.stderr
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

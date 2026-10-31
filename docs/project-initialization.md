@@ -340,21 +340,55 @@ runtime checks repeat beside the atomic ownership replacement and guarded
 source-deletion boundary. The existing ownership lock refuses deletion if the
 complete switched registry changes.
 
-The migration export helper reads `bd --readonly export --all` and compares its
-duplicate-free IDs with `bd --readonly list --all --limit 0 --include-infra
---include-templates --include-gates --include-ephemeral --json`. It does not
-require SQL or clear source export filters. A filter that actually omits an
-issue produces an inventory mismatch and leaves the source configuration
-unchanged. Beads source packages retain the raw CLI version and complete raw
-status-catalog response alongside issue views, unbounded issue history/events,
-and provenance. Migration-only source reads bind the native `context` and
+The migration export helper reads `bd --readonly export --all` as a native
+mixed export. Rows with `_type: "memory"` retain their original `key`, `value`
+and export line; only issues participate in the duplicate-free ID comparison
+with `bd --readonly list --all --limit 0 --include-infra --include-templates
+--include-gates --include-ephemeral --json`. Memories are not issues and are
+never sent to issue show/history/provenance commands or included in task counts.
+Malformed memory rows, unsupported record types and genuine invalid, duplicate
+or missing issues refuse inspection. The reader does not require SQL or clear
+source export filters. A filter that actually omits an issue produces an
+inventory mismatch and leaves the source configuration unchanged. Beads source
+packages retain the raw CLI version and complete raw status-catalog response
+alongside issue views, unbounded issue history/events, and provenance. Migration-only source reads bind the native `context` and
 `dolt show` store/database/connection identity. The confirmation revision is a
 `capture-sha256:` token over that identity, raw version/catalog, and complete
-issue/history packages, not a required outgoing published Dolt commit. The same
-capture is repeated from primary and active source workspaces through guarded
-retirement; task, catalog, history or identity drift refuses cutover. No source
+issue/history and memory packages, not a required outgoing published Dolt
+commit. A memory-only change also changes this revision. The same capture is
+repeated from primary and active source workspaces through guarded retirement;
+task, memory, catalog, history or identity drift refuses cutover. No source
 custom lifecycle setup, server conversion, remote, push or publication is
 required. Ordinary active Beads lifecycle/write checks remain strict.
+
+Confirmed migration creates one native Backlog document per memory, one
+source/index document and exactly one USER curation task through the supported
+Backlog CLI. Memory documents keep readable source text plus the complete escaped
+native JSON record for exact key/value round-trip, including whitespace, Unicode
+and control characters. The index records the source project/store and links to
+the actual native document paths. The single task is explicitly `In Design` and
+links to the index. The user, not the migration agent, reviews and integrates
+useful material into project documentation or deletes unwanted imports.
+Zero-memory input makes no native output commands and creates none of these
+outputs. Native readback checks the actual document body and task evidence,
+and verifies that every captured memory/index path still contains the same
+native document. Native moves that leave stale index or USER task links refuse;
+a successful missing-document CLI exit alone is not proof.
+
+These outputs are part of the existing destination data commit and publication,
+exact native readback, destination digest and single migration receipt. Source
+issue counts/mappings stay issue-only; the optional USER task is counted
+separately. Post-receipt and pre-retirement checks repeat the document/path/task
+proofs and exact destination publication. A read-only Git blob check proves the
+memory, index and USER paths contain the exact native bytes in the verified data
+and receipt commits, including on replay. Ignored outputs refuse; migration never
+force-adds files or changes ignore policy. Missing, changed or unpublished outputs
+block source retirement. An exact-source same-destination replay reuses the native
+identities in that receipt; it does not create duplicate imports, index or USER
+work. An incomplete memory import without complete receipt-bound output evidence
+remains a blocker, not permission for automatic retry, repair or a second destination.
+Beads stays authoritative until all destination, source, runtime and ownership
+proofs succeed. Imported text is data, not instructions to execute.
 
 Before any Backlog destination preparation or write, the complete used-status
 inventory is checked with the existing projections. All unsupported-used statuses
@@ -405,6 +439,39 @@ resume state. The final destination-native receipt is the only durable
 migration artifact. Actual migration of a production repository remains an
 operator-authorized upgrade action; initialization and ordinary startup never
 perform it automatically.
+
+### PRIMECLAW-49 bounded-slice regressions
+
+The focused Docker bridge covers a public synthetic 33-issue/19-memory export,
+native typed issues and legacy untagged issues, malformed/incomplete inventories,
+and a small native memory fixture with Unicode, whitespace and frontmatter-like
+text. It checks memory-only value and raw-line digest changes, issue-only counts,
+no memory keys in issue reads, and refusal before destination writes/deletion.
+The existing populated Backlog bridge retains issue-only migration coverage.
+
+Reproduce with the verified supported Prime Agent source selector described in
+[`prime-agent-installation.md`](prime-agent-installation.md):
+
+```bash
+python3 -m pytest tests/test_task_provider_migration.py -q -m container -k "retiring_beads_source_boundary or populated_backlog_migration"
+scripts/test-tier1.sh --probe
+```
+
+The native-output slice also exercises real CLI document create/update/view,
+working index links, exactly one USER task, complete record round-trip, changed
+or missing native output refusal, and zero-memory no-op. A focused native-move
+regression also checks refusal for stale memory and index paths. Public controls use
+supported native Beads writes; a synthetic NUL-bearing package passes through the
+same native Backlog writer because NUL cannot be passed in process argv.
+
+The final combined focused run passed both selectors (`2 passed, 7 deselected`).
+Two earlier runs failed on fixture assumptions before exercising the importer:
+a leading `---` value required the native `--` argument separator, and a fixture
+SQL update did not change exported memory content. Those were corrected without
+weakening source/refusal checks. The capture candidate's earlier intermediate
+failures remain recorded in the task. This is not proof of migration-wide memory
+publication, receipt/replay behavior, a live Nemo migration or host activation.
+Those remain later work under the existing operator boundaries.
 
 ## Global drift
 

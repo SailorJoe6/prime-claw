@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { completeBeadsExport, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
+import { completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { checkBeadsCapabilities, detectExplicitTaskProvider, detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
@@ -962,8 +962,59 @@ test("post-switch runtime continuity loss rolls ownership back before source del
 });
 
 
-test("active Beads Episode deletion refusal preserves source and exact Backlog destination retry completes", { timeout: 360_000 }, async (t) => {
+test("active Beads Episode deletion refusal preserves source and exact Backlog destination retry completes", { timeout: 600_000 }, async (t) => {
+  await t.test("ignored memory documents refuse published data and preserve source and exact ownership", async (t) => {
+    const fixture = embeddedBeadsSource(t, "ignored-memory-publication");
+    bd(fixture.root, "remember", "Public ignored memory λ\n  exact whitespace  \n", "--key", "public-ignored");
+    const destination = publishedPopulatedBacklogDestination(fixture);
+    writeFileSync(join(destination.store, ".gitignore"), "docs/\n");
+    git(destination.store, "add", ".gitignore");
+    git(destination.store, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "existing docs ignore policy");
+    git(destination.store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+    addActiveBeadsOwner(fixture);
+    const registryPath = join(fixture.root, ".prime-claw", "ownership.json");
+    const registry = readFileSync(registryPath).toString("base64");
+    const source = sourceAuthorityFiles(fixture.root);
+    const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+    assert.equal(inspection.status, "ready", inspection.detail);
+    let deletions = 0;
+    const request = { cwd: fixture.root, targetProvider: "backlog", runner: RUNNER,
+      expectedSourceRevision: inspection.sourceRevision, confirmedSwitch: true, actor: "migration-operator",
+      semanticPlacement: "Preserve the complete native source without curation.", verifyActiveRuntime: proveFixtureRuntime,
+      deleteSource() { deletions += 1; } };
+    const refused = await migrateTaskProvider(request);
+    assert.equal(refused.status, "blocked", refused.detail);
+    assert.equal(refused.code, "pre-cutover-failed");
+    assert.match(refused.detail, /verify committed Backlog memory output/);
+    const head = git(destination.store, "rev-parse", "HEAD");
+    assert.equal(git(destination.store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], head);
+    assert.equal(git(destination.store, "status", "--porcelain=v1"), "", "ignored local documents do not dirty Git");
+    const imported = readdirSync(join(destination.store, "docs")).filter((path) => /Imported-Beads/.test(path));
+    assert.equal(imported.length, 2, "memory and index still exist locally");
+    for (const path of imported) {
+      const docId = readFileSync(join(destination.store, "docs", path), "utf8").match(/^id: (doc-\d+)$/m)[1];
+      assert.ok(backlog(fixture.root, "doc", "view", docId, "--plain").includes("Migrated from Beads"));
+      assert.equal(command(destination.store, "git", ["cat-file", "-e", `${head}:docs/${path}`], true), null);
+    }
+    assert.equal(readFileSync(join(destination.store, ".gitignore"), "utf8"), "docs/\n", "ignore policy is never repaired");
+    assert.equal(deletions, 0);
+    assert.equal(existsSync(join(fixture.root, ".beads")), true);
+    assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
+    assert.equal(readFileSync(registryPath).toString("base64"), registry);
+    const replay = await migrateTaskProvider(request);
+    assert.equal(replay.status, "blocked", replay.detail);
+    assert.equal(deletions, 0);
+    assert.equal(git(destination.store, "rev-parse", "HEAD"), head, "partial import is not retried or repaired");
+    assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
+    assert.equal(readFileSync(registryPath).toString("base64"), registry);
+  });
   const fixture = beadsSource(t, "beads-delete-refusal-retry");
+  const memoryRows = [
+    { _type: "memory", key: "public-replay-λ", value: "  ---\nstatus: source data\n---\nPublic café 🐙\n\ttrailing  \n" },
+    { _type: "memory", key: "public-second", value: "Second public memory with ``` and \u0001" },
+  ];
+  for (const row of memoryRows) bd(fixture.root, "remember", "--key", row.key, "--", row.value);
+  bd(fixture.root, "dolt", "push", "--no-adopt");
   const owner = addActiveBeadsOwner(fixture);
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
   assert.equal(inspection.status, "ready", inspection.detail);
@@ -977,6 +1028,25 @@ test("active Beads Episode deletion refusal preserves source and exact Backlog d
   assert.equal(first.code, "pre-cutover-failed");
   assert.equal(existsSync(join(fixture.root, ".beads")), true);
   assert.equal(detectTaskProvider(fixture.root, RUNNER).code, "dual-providers");
+  const store = join(fixture.root, ".backlog");
+  const receiptId = Object.values(physicalDestinationRecords(store)).map((bytes) => Buffer.from(bytes, "base64").toString("utf8"))
+    .find((text) => text.includes("title: Prime Claw task-provider migration receipt")).match(/^id: (.+)$/m)[1];
+  const receiptView = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", receiptId));
+  const receipt = JSON.parse(receiptView.task.implementationNotes.match(/^```json\n([\s\S]+)\n```$/)[1]);
+  const memoryOutputs = receipt.backlogMemoryOutputs;
+  assert.equal(memoryOutputs.documents.length, memoryRows.length);
+  assert.equal(receipt.taskCounts.total, inspection.taskCounts.total);
+  assert.equal(receipt.mappings.length, inspection.taskCounts.total);
+  verifyBacklogMemoryOutputs(memoryOutputs, fixture.root, RUNNER);
+  const importedRows = memoryOutputs.documents.map((doc) => JSON.parse(doc.body.match(/## Complete native memory record \(lossless JSON\)\n\n```json\n([^\n]+)\n```/)[1]));
+  assert.deepEqual(importedRows.sort((a, b) => a.key.localeCompare(b.key)), memoryRows.sort((a, b) => a.key.localeCompare(b.key)));
+  for (const output of [...memoryOutputs.documents, memoryOutputs.index, memoryOutputs.userTask]) {
+    for (const revision of [receipt.destinationDataRevision, git(store, "rev-parse", "HEAD")]) {
+      assert.equal(command(store, "git", ["show", `${revision}:${output.path.slice(".backlog/".length)}`]),
+        readFileSync(join(fixture.root, output.path), "utf8"), "data/receipt commits preserve exact output bytes without trimming");
+    }
+  }
+  assert.equal(JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", memoryOutputs.userTask.taskId)).task.status, "In Design");
   const firstEpisodeDestinationHead = git(join(owner.episode, ".backlog"), "rev-parse", "HEAD");
   const destinationIds = git(join(fixture.root, ".backlog"), "ls-files").split(/\r?\n/).filter((path) => path.endsWith(".md") && path !== "TASKS.md")
     .map((path) => /^id:\s*([A-Z][A-Z0-9_-]*-\d+(?:\.\d+)*)/m.exec(readFileSync(join(fixture.root, ".backlog", path), "utf8"))?.[1]).filter(Boolean).sort();
@@ -1005,6 +1075,72 @@ test("active Beads Episode deletion refusal preserves source and exact Backlog d
     assert.deepEqual(sourceAuthorityFiles(fixture.root), replaySource);
     writeFileSync(actual, original);
   }
+  await t.test("missing, changed and unpublished memory outputs refuse replay without source retirement", async () => {
+    const target = join(fixture.root, memoryOutputs.documents[0].path);
+    const original = readFileSync(target);
+    const source = sourceAuthorityFiles(fixture.root);
+    const registry = readFileSync(replayRegistryPath).toString("base64");
+    async function denied(diagnostic) {
+      let deletions = 0;
+      const result = await migrateTaskProvider({
+        cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
+        confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve exact unsupported values in native provenance.",
+        verifyActiveRuntime: proveFixtureRuntime, deleteSource() { deletions += 1; },
+      });
+      assert.equal(result.status, "blocked", result.detail);
+      assert.match(result.detail, diagnostic);
+      assert.equal(deletions, 0);
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
+      assert.equal(readFileSync(replayRegistryPath).toString("base64"), registry);
+    }
+    rmSync(target);
+    await denied(/not clean|mismatch/);
+    writeFileSync(target, original);
+    backlog(fixture.root, "doc", "update", memoryOutputs.documents[0].docId, "--content=Changed public memory output");
+    git(store, "add", "-A");
+    git(store, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "unpublished changed memory");
+    await denied(/publication|exact revision/);
+    git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+    await denied(/native identity\/body mismatch/);
+    writeFileSync(target, original);
+    const nativePath = memoryOutputs.documents[0].path.slice(".backlog/".length);
+    git(store, "update-index", "--assume-unchanged", "--", nativePath);
+    try {
+      assert.equal(git(store, "status", "--porcelain=v1"), "");
+      verifyBacklogMemoryOutputs(memoryOutputs, fixture.root, RUNNER);
+      await denied(/committed bytes differ/);
+    } finally {
+      git(store, "update-index", "--no-assume-unchanged", "--", nativePath);
+    }
+    git(store, "add", "-A");
+    git(store, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "restore exact public memory output");
+    git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+    verifyBacklogMemoryOutputs(memoryOutputs, fixture.root, RUNNER);
+  });
+  await t.test("pre-retirement memory loss rolls ownership back and never calls source deletion", async () => {
+    const target = join(fixture.root, memoryOutputs.index.path);
+    const original = readFileSync(target);
+    const registry = readFileSync(replayRegistryPath).toString("base64");
+    const source = sourceAuthorityFiles(fixture.root);
+    let proofs = 0, deletions = 0;
+    const denied = await migrateTaskProvider({
+      cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
+      confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve exact unsupported values in native provenance.",
+      async verifyActiveRuntime(records) {
+        proofs += 1;
+        if (proofs === 3) rmSync(target);
+        return proveFixtureRuntime(records);
+      },
+      deleteSource() { deletions += 1; },
+    });
+    assert.equal(proofs, 3);
+    assert.equal(denied.status, "blocked");
+    assert.match(denied.detail, /not clean|mismatch/);
+    assert.equal(deletions, 0);
+    assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
+    assert.equal(readFileSync(replayRegistryPath).toString("base64"), registry);
+    writeFileSync(target, original);
+  });
   const retried = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve exact unsupported values in native provenance.",
@@ -1012,7 +1148,10 @@ test("active Beads Episode deletion refusal preserves source and exact Backlog d
   });
   assert.equal(retried.status, "completed", retried.detail);
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
-  assert.deepEqual(retried.receipt.mappings.map((row) => row.destinationTaskId).concat(retried.receiptTaskId).sort(), destinationIds);
+  assert.deepEqual(retried.receipt.mappings.map((row) => row.destinationTaskId).concat(retried.receiptTaskId, memoryOutputs.userTask.taskId).sort(), destinationIds);
+  assert.deepEqual(retried.receipt.backlogMemoryOutputs, memoryOutputs, "exact replay reuses every document/index/USER identity");
+  assert.equal(git(store, "ls-files", "docs").split(/\r?\n/).filter(Boolean).length, memoryRows.length + 1);
+  verifyBacklogMemoryOutputs(memoryOutputs, fixture.root, RUNNER);
   const finalDestinationHead = git(join(fixture.root, ".backlog"), "rev-parse", "HEAD");
   assert.notEqual(finalDestinationHead, firstEpisodeDestinationHead);
   assert.equal(git(join(owner.episode, ".backlog"), "rev-parse", "HEAD"), finalDestinationHead);
@@ -1501,6 +1640,265 @@ test("Beads export must exactly match independent native issue inventory", { tim
   assert.equal(existsSync(join(fixture.root, ".beads")), true);
 });
 
+// PRIMECLAW-49 capture slice: public data only, never the reported private store.
+function syntheticBeadsExport(rows, inventory) {
+  const calls = [];
+  return {
+    calls,
+    run(commandName, args) {
+      calls.push({ commandName, args: [...args] });
+      assert.equal(commandName, "bd");
+      if (JSON.stringify(args) === JSON.stringify(["--readonly", "export", "--all"])) {
+        return { status: 0, stdout: rows.map((row) => typeof row === "string" ? row : JSON.stringify(row)).join("\n") + "\n", stderr: "" };
+      }
+      assert.deepEqual(args, BEADS_INVENTORY);
+      return { status: 0, stdout: JSON.stringify(inventory), stderr: "" };
+    },
+  };
+}
+
+test("typed Beads export preserves 33 issues and 19 native memories with strict issue inventory", () => {
+  const issues = Array.from({ length: 33 }, (_, i) => ({ _type: "issue", id: `PUBLIC-${i + 1}`, title: `Public issue ${i + 1}`, status: "open" }));
+  const memories = Array.from({ length: 19 }, (_, i) => ({ _type: "memory", key: ` public-memory-${i} λ `,
+    value: i === 0 ? "" : `  ---\nstatus: not task metadata\n---\nPublic café 🐙 ${i}\n\ttrailing whitespace  \n` }));
+  const rows = [...issues.slice(0, 10), ...memories, ...issues.slice(10)];
+  // Native row bytes (including JSON whitespace) are evidence, not normalized text.
+  const lines = rows.map((row) => `  ${JSON.stringify(row)}  `);
+  const runner = syntheticBeadsExport(lines, issues);
+  const exported = completeBeadsExport(runner, "/public-synthetic", "public mixed fixture");
+  assert.equal(exported.length, 52);
+  assert.deepEqual(exported.filter(({ kind }) => kind === "issue").map(({ row }) => row), issues);
+  assert.deepEqual(exported.filter(({ kind }) => kind === "memory").map(({ row }) => row), memories);
+  assert.deepEqual(exported.map(({ line }) => line), lines);
+  assert.equal(runner.calls.length, 2, "helper performs only readonly export and independent inventory");
+  const issueOnly = completeBeadsExport(syntheticBeadsExport(issues, issues), "/public-synthetic", "public issue-only fixture");
+  assert.equal(issueOnly.length, 33);
+  assert.ok(issueOnly.every(({ kind }) => kind === "issue"));
+  const legacyIssues = issues.map(({ _type, ...row }) => row);
+  const legacy = completeBeadsExport(syntheticBeadsExport(legacyIssues, legacyIssues), "/public-synthetic", "legacy issue-only fixture");
+  assert.deepEqual(legacy.map(({ row }) => row), legacyIssues);
+  assert.ok(legacy.every(({ kind }) => kind === "issue"));
+});
+
+test("typed Beads export refuses malformed records and genuine issue identity omissions", () => {
+  const issue = { _type: "issue", id: "PUBLIC-1", title: "Public issue", status: "open" };
+  const memory = { _type: "memory", key: "public", value: "not an issue" };
+  for (const [name, rows, inventory, error] of [
+    ["missing issue ID", [{ _type: "issue", title: "missing" }, memory], [issue], /no exact canonical task ID/],
+    ["missing legacy issue ID", [{ title: "missing" }, memory], [issue], /no exact canonical task ID/],
+    ["malformed issue ID", [{ ...issue, id: "bad id" }, memory], [issue], /no exact canonical task ID/],
+    ["duplicate issue ID", [issue, memory, issue], [issue], /independent native issue inventory/],
+    ["missing exported issue", [memory], [issue], /independent native issue inventory/],
+    ["duplicate inventory ID", [issue, memory], [issue, issue], /independent native issue inventory/],
+    ["missing inventory ID", [issue, memory], [{}], /no exact canonical task ID/],
+    ["unknown type with valid issue ID", [{ ...issue, _type: "config" }], [issue], /unsupported.*type/],
+    ["null type", [{ ...issue, _type: null }], [issue], /unsupported.*type/],
+    ["memory missing value", [{ _type: "memory", key: "public" }], [], /malformed.*memory/],
+    ["memory nonstring value", [{ ...memory, value: { nested: true } }], [], /malformed.*memory/],
+    ["memory nonstring key", [{ ...memory, key: 7 }], [], /malformed.*memory/],
+    ["memory empty key", [{ ...memory, key: "" }], [], /malformed.*memory/],
+    ["memory with issue ID", [{ ...memory, id: issue.id }], [], /malformed.*memory/],
+    ["nonobject", [null], [], /not a JSON object/],
+  ]) {
+    assert.throws(() => completeBeadsExport(syntheticBeadsExport(rows, inventory), "/public-synthetic", name), error, name);
+  }
+});
+
+test("native Beads memory capture binds exact content without inspection writes", { timeout: 180_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "native-memory-capture");
+  const key = "public-memory-λ";
+  const value = "  ---\nstatus: not task metadata\n---\nPublic café 🐙\n\ttrailing spaces  \n";
+  bd(fixture.root, "remember", value, "--key", key);
+  bd(fixture.root, "remember", "Second public memory", "--key", "public-second-memory");
+  const sourceBefore = command(fixture.root, "bd", ["--readonly", "export", "--all"]);
+  const authorityBefore = sourceAuthorityFiles(fixture.root);
+  const codeBefore = git(fixture.root, "rev-parse", "HEAD");
+  class MemoryLineRunner extends AdmissionRunner {
+    constructor() { super(); this.padMemoryLines = false; }
+    run(commandName, args, options = {}) {
+      const result = super.run(commandName, args, options);
+      if (this.padMemoryLines && commandName === "bd" && args[0] === "--readonly" && args[1] === "export" && result.status === 0) {
+        return { ...result, stdout: result.stdout.split("\n").map((line) => line && JSON.parse(line)._type === "memory" ? `  ${line}  ` : line).join("\n") };
+      }
+      return result;
+    }
+  }
+  const runner = new MemoryLineRunner();
+  const exported = completeBeadsExport(runner, fixture.root, "native memory fixture");
+  const memories = exported.filter(({ kind }) => kind === "memory");
+  assert.deepEqual(memories.map(({ row }) => row).sort((a, b) => a.key.localeCompare(b.key)), [
+    { _type: "memory", key, value }, { _type: "memory", key: "public-second-memory", value: "Second public memory" },
+  ].sort((a, b) => a.key.localeCompare(b.key)));
+  for (const { row, line } of memories) assert.deepEqual(JSON.parse(line), row);
+  const inspect = () => inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  const first = inspect();
+  assert.equal(first.status, "ready", first.detail);
+  assert.deepEqual(first.taskCounts, { open: 3, closed: 0, archived: 0, total: 3 });
+  const issueReads = runner.reads.filter(({ args }) => ["show", "history", "provenance"].includes(args[1]));
+  assert.ok(issueReads.length > 0);
+  assert.ok(issueReads.every(({ args }) => Object.values(fixture.ids).includes(args[1] === "provenance" ? args[3] : args[2])),
+    "native memory keys must never enter task show/history/events/provenance");
+  assert.equal(inspect().sourceRevision, first.sourceRevision);
+  runner.padMemoryLines = true;
+  const rawLineChanged = inspect();
+  assert.equal(rawLineChanged.status, "ready", rawLineChanged.detail);
+  assert.notEqual(rawLineChanged.sourceDigest, first.sourceDigest, "original memory export line bytes remain snapshot digest evidence");
+  runner.padMemoryLines = false;
+  assert.equal(inspect().sourceRevision, first.sourceRevision);
+  bd(fixture.root, "remember", value + "\n", "--key", key);
+  const changed = inspect();
+  assert.equal(changed.status, "ready", changed.detail);
+  assert.notEqual(changed.sourceRevision, first.sourceRevision, "memory-only whitespace change changes exact revision");
+  assert.notEqual(changed.sourceDigest, first.sourceDigest);
+  assert.deepEqual(changed.taskCounts, first.taskCounts);
+  bd(fixture.root, "remember", value, "--key", key);
+  // Native writes may add history even after the exported value is restored.
+  // Confirm the current exact capture, never assume the old history returns.
+  const restored = inspect();
+  assert.equal(restored.status, "ready", restored.detail);
+  assert.equal(inspect().sourceRevision, restored.sourceRevision);
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+  assert.equal(existsSync(join(fixture.root, ".beads")), true);
+  assert.equal(command(fixture.root, "bd", ["--readonly", "export", "--all"]), sourceBefore);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), authorityBefore);
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), codeBefore);
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+});
+
+test("native Beads memory outputs preserve exact records and link one USER task", { timeout: 180_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "native-memory-outputs");
+  const key = "  public λ key\n\tends  ";
+  const value = "---\nid: not-metadata\n---\nPublic café 🐙\n```\n  leading / trailing  \n\tline\r\n";
+  bd(fixture.root, "remember", "--key", key, "--", value);
+  bd(fixture.root, "remember", "Second public value\n\x01\x1b", "--key", "public-second");
+  const entries = completeBeadsExport(RUNNER, fixture.root, "native output fixture");
+  const memories = entries.filter(({ kind }) => kind === "memory").map(({ row, line }) => ({ exportRow: row, exportLineBase64: Buffer.from(line).toString("base64") }));
+  assert.equal(memories.length, 2);
+  assert.deepEqual(memories.find(({ exportRow }) => exportRow.key === key).exportRow, { _type: "memory", key, value });
+  assert.equal(memories.find(({ exportRow }) => exportRow.key === "public-second").exportRow.value, "Second public value\n\x01\x1b");
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const source = { projectRoot: fixture.root, sourceIdentity: { repositoryRoot: fixture.root, storeDir: join(fixture.root, ".beads") },
+    revision: inspection.sourceRevision, digest: inspection.sourceDigest, memories };
+  const sourceBefore = command(fixture.root, "bd", ["--readonly", "export", "--all"]);
+  backlog(fixture.root, "init", "Memory destination", "--defaults", "--backlog-dir", ".backlog", "--config-location", "root", "--task-prefix", "MEM", "--integration-mode", "none");
+  const configPath = join(fixture.root, "backlog.config.yml");
+  writeFileSync(configPath, readFileSync(configPath, "utf8")
+    .replace(/^statuses:.*$/m, 'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]')
+    .replace(/^default_status:.*$/m, 'default_status: "In Design"')
+    .replace(/^auto_commit:.*$/m, "auto_commit: false"));
+  class OutputRunner extends CandidateRunner {
+    constructor() { super(); this.calls = []; }
+    run(commandName, args, options = {}) {
+      this.calls.push({ commandName, args: [...args] });
+      return super.run(commandName, args, options);
+    }
+  }
+  const runner = new OutputRunner();
+  const outputs = importBeadsMemoryDocuments(source, runner);
+  assert.equal(outputs.documents.length, 2);
+  assert.ok(outputs.index);
+  assert.ok(outputs.userTask);
+  assert.equal(new Set([...outputs.documents, outputs.index].map(({ docId }) => docId)).size, 3);
+  const docs = readdirSync(join(fixture.root, ".backlog", "docs"));
+  assert.equal(docs.length, 3);
+  for (const [index, document] of outputs.documents.entries()) {
+    assert.ok(document.path.startsWith(".backlog/docs/"));
+    const plain = command(fixture.root, BACKLOG, ["doc", "view", document.docId, "--plain"]);
+    assert.ok(plain.endsWith(`${document.body}\n`));
+    const complete = plain.match(/## Complete native memory record \(lossless JSON\)\n\n```json\n([^\n]+)\n```/);
+    assert.ok(complete);
+    assert.deepEqual(JSON.parse(complete[1]), memories[index].exportRow, "complete original native row, including exact key/value, round-trips");
+    const provenance = JSON.parse(plain.match(/Source provenance:\n\n```json\n([\s\S]*?)\n```/)[1]);
+    assert.deepEqual(provenance, { sourceProvider: "beads", sourceProject: fixture.root, sourceStore: join(fixture.root, ".beads"), sourceRevision: source.revision, sourceDigest: source.digest });
+    assert.match(plain, /# Imported Beads memory/);
+    assert.match(plain, /## Original key/);
+    assert.match(plain, /## Original value/);
+  }
+  const indexPlain = command(fixture.root, BACKLOG, ["doc", "view", outputs.index.docId, "--plain"]);
+  const links = [...indexPlain.matchAll(/^- \[(doc-\d+)\]\(([^)]+)\)$/gm)];
+  assert.equal(links.length, memories.length);
+  for (const [, id, link] of links) {
+    assert.ok(link.includes("%20"), "native filenames are URL-encoded");
+    const path = join(fixture.root, ".backlog", "docs", decodeURIComponent(link));
+    assert.ok(existsSync(path), "index link reaches the actual native document path");
+    assert.match(readFileSync(path, "utf8"), new RegExp(`^id: ${id}$`, "m"));
+  }
+  const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", outputs.userTask.taskId)).task;
+  assert.equal(task.status, "In Design");
+  assert.match(task.title, /^USER:/);
+  assert.match(task.description, /Integrate useful material properly into the project's documentation, or delete imported material/);
+  assert.deepEqual(task.documentation, [outputs.index.path]);
+  assert.deepEqual(task.assignees, []);
+  assert.equal(readdirSync(join(fixture.root, ".backlog", "tasks")).length, 1);
+  assert.equal(runner.calls.filter(({ args }) => args[0] === "task" && args[1] === "create").length, 1);
+  assert.equal(runner.calls.filter(({ args }) => args[0] === "doc" && args[1] === "create").length, 3);
+  assert.ok(runner.calls.filter(({ args }) => args[0] === "doc" && args[1] === "update").every(({ args }) => args[3].startsWith("--content=")));
+  assert.equal(command(fixture.root, "bd", ["--readonly", "export", "--all"]), sourceBefore);
+  verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+  // No extra outputs or commands for the existing issue-only source case.
+  runner.calls = [];
+  assert.deepEqual(importBeadsMemoryDocuments({ ...source, memories: [] }, runner), { documents: [] });
+  verifyBacklogMemoryOutputs({ documents: [] }, fixture.root, runner);
+  assert.deepEqual(runner.calls, []);
+  await t.test("native moves of a memory document or index refuse stale captured paths", () => {
+    for (const document of [outputs.documents[0], outputs.index]) {
+      backlog(fixture.root, "doc", "update", document.docId, "--path", "relocated", `--content=${document.body}`);
+      try {
+        assert.equal(existsSync(join(fixture.root, document.path)), false, "native move removes the captured link target");
+        assert.ok(command(fixture.root, BACKLOG, ["doc", "view", document.docId, "--plain"]).endsWith(`${document.body}\n`),
+          "native ID readback still succeeds with the unchanged body after the move");
+        assert.ok(backlog(fixture.root, "doc", "view", outputs.index.docId, "--plain").includes(encodeURIComponent(outputs.documents[0].path.split("/").at(-1))),
+          "index still links the original memory path");
+        assert.deepEqual(JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", outputs.userTask.taskId)).task.documentation, [outputs.index.path],
+          "USER task still references the original index path");
+        assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /native identity\/body mismatch/);
+      } finally {
+        backlog(fixture.root, "doc", "update", document.docId, "--path", "", `--content=${document.body}`);
+      }
+    }
+    verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+  });
+  // Native content corruption is refused on re-read, not accepted via exit code.
+  for (const document of [...outputs.documents, outputs.index]) {
+    backlog(fixture.root, "doc", "update", document.docId, "--content=Changed public output");
+    assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /native identity\/body mismatch/);
+    backlog(fixture.root, "doc", "update", document.docId, `--content=${document.body}`);
+  }
+  backlog(fixture.root, "task", "edit", outputs.userTask.taskId, "--status", "In Progress", "--plain");
+  assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /USER task.*content\/status\/index mismatch/);
+  backlog(fixture.root, "task", "edit", outputs.userTask.taskId, "--status", "In Design", "--plain");
+  backlog(fixture.root, "task", "edit", outputs.userTask.taskId, "--doc", "", "--plain");
+  assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /USER task.*content\/status\/index mismatch/);
+  backlog(fixture.root, "task", "edit", outputs.userTask.taskId, "--doc", outputs.index.path, "--plain");
+  verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+  for (const document of [outputs.documents[0], outputs.index]) {
+    const path = join(fixture.root, document.path);
+    renameSync(path, `${path}.missing`);
+    const missing = runner.run("backlog", ["doc", "view", document.docId, "--plain"], { cwd: fixture.root });
+    assert.equal(missing.status, 0, "native missing document can exit successfully");
+    assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /native identity\/body mismatch/);
+    renameSync(`${path}.missing`, path);
+  }
+  const taskPath = join(fixture.root, task.path);
+  renameSync(taskPath, `${taskPath}.missing`);
+  assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /Backlog task|backlog task view/);
+  renameSync(`${taskPath}.missing`, taskPath);
+  verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+  // NUL cannot enter bd argv. One public synthetic package proves the same
+  // native Backlog writer preserves it without passing raw NUL in argv.
+  const nulRow = { _type: "memory", key: "public\0key", value: "public\0value\n" };
+  const nulSource = { ...source, revision: "public-synthetic-nul-revision", digest: "public-synthetic-nul-digest",
+    memories: [{ exportRow: nulRow, exportLineBase64: Buffer.from(JSON.stringify(nulRow)).toString("base64") }] };
+  runner.calls = [];
+  const nulOutputs = importBeadsMemoryDocuments(nulSource, runner);
+  const nulPlain = command(fixture.root, BACKLOG, ["doc", "view", nulOutputs.documents[0].docId, "--plain"]);
+  assert.deepEqual(JSON.parse(nulPlain.match(/## Complete native memory record \(lossless JSON\)\n\n```json\n([^\n]+)\n```/)[1]), nulRow);
+  assert.ok(runner.calls.every(({ args }) => args.every((arg) => !arg.includes("\0"))));
+  assert.equal(runner.calls.filter(({ args }) => args[0] === "task" && args[1] === "create").length, 1);
+  verifyBacklogMemoryOutputs(nulOutputs, fixture.root, runner);
+});
+
 // PRIMECLAW-44 Slice 1g: inspection coexistence is NOT populated import permission.
 function admissionTree(path) {
   return Object.fromEntries(readdirSync(path, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
@@ -1856,6 +2254,8 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
       destination = coexistenceDestination(fixture, selected);
       destination.store = join(fixture.root, selected);
     }
+    const hasMemories = kind === "code-default" || kind === "independent-custom";
+    if (hasMemories) bd(fixture.root, "remember", "Public populated destination memory λ\n", "--key", "public-populated");
     const owner = kind === "code-default" ? addActiveBeadsOwner(fixture) : null;
     const originalEpisodeHead = owner ? git(owner.episode, "rev-parse", "HEAD") : null;
     const originalReadmeIndex = owner ? git(owner.episode, "ls-files", "--stage", "--", "README.md") : null;
@@ -1897,7 +2297,22 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
     assert.equal(runner.publishedBeforeRetirement, true, "verified receipt publication must precede source deletion");
     const store = join(fixture.root, selected === "backlog" ? ".backlog" : selected);
     for (const [path, bytes] of Object.entries(records)) assert.equal(readFileSync(join(store, path)).toString("base64"), bytes, path);
-    assert.equal(Object.keys(physicalDestinationRecords(store)).length, Object.keys(records).length + inspection.taskCounts.total + 1);
+    assert.equal(Object.keys(physicalDestinationRecords(store)).length, Object.keys(records).length + inspection.taskCounts.total + 1 + (hasMemories ? 1 : 0));
+    if (hasMemories) {
+      assert.equal(result.receipt.backlogMemoryOutputs.documents.length, 1);
+      const outputs = result.receipt.backlogMemoryOutputs;
+      verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+      for (const output of [...outputs.documents, outputs.index, outputs.userTask]) {
+        const path = output.path.slice(`${store.slice(fixture.root.length + 1)}/`.length);
+        for (const revision of [result.receipt.destinationDataRevision, result.receipt.destinationReceiptRevision]) {
+          assert.equal(command(store, "git", ["show", `${revision}:${path}`]), readFileSync(join(fixture.root, output.path), "utf8"));
+        }
+      }
+    } else {
+      assert.equal(result.receipt.backlogMemoryOutputs, undefined, "issue-only migration creates no memory outputs");
+      assert.equal(git(store, "ls-files", "docs").split(/\r?\n/).filter((path) => /Imported-Beads|imported-beads/.test(path)).length, 0);
+      assert.ok(!Object.values(physicalDestinationRecords(store)).some((bytes) => Buffer.from(bytes, "base64").toString("utf8").includes("USER: Review imported Beads memories")));
+    }
     assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], result.receipt.destinationReceiptRevision);
     if (kind.startsWith("independent")) git(store, "merge-base", "--is-ancestor", originalHead, "HEAD");
     const finalConfig = readFileSync(join(fixture.root, "backlog.config.yml"), "utf8");
