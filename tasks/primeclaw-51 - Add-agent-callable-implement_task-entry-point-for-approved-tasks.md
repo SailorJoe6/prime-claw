@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-51
 title: Add agent-callable implement_task entry point for approved tasks
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 20:48'
+updated_date: '2026-10-31 21:16'
 labels: []
 dependencies: []
 references:
