@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 22:14'
+updated_date: '2026-10-31 22:17'
 labels: []
 dependencies: []
 references:
@@ -229,6 +229,16 @@ Primary has its own generated ownership observations plus unclaimed .prime-claw/
 Rerun affected documented Docker suites including migration, project initialization and retiring-source/memory regressions: python3 -m pytest tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_project_initialization.py::test_project_initialization_node_suite tests/test_beads_retiring_source_capture.py -q -m container. Then run mandatory scripts/test-tier1.sh --probe and planned full python3 -m pytest tests/ -q -m container on the combined generation. Prior tests do NOT validate merged bytes. Observe actual full results fresh: historical integrated83 passed/2 baseline failures/1 skipped and old-base reproductions remain historical; newer main changes some fixtures, so do not assume old failures persist or classify new failures without evidence. No unrelated fixture/infrastructure repair under PRIMECLAW-50. All testing remains isolated Docker-only; no host/global apply/check/probes, restart/deploy, live migration or private source reads.
 
 Record exact current main/candidate/code parents, current validation and honest limits through this Episode-owned native task content only. Publish clean code and task heads independently without force and stop for focused owner integration review. No Ready/Done/Blocked, main merge, terminal cleanup, new Episode/resources, architecture/taxonomy/registry or reconciliation/iterative-plan machinery. This continues the previously requested main reintegration within approved scope, not new product work or merge approval. This handoff performs no integration or tests; canonical execute is already independently queued.
+
+### Newly advanced main integrated — combined-generation validation started
+
+Freshly verified canonical primary HEAD and direct remote refs/heads/main both equal 05f9f8abfef1e8ea918871867e0c2d4f8dd0e6be. Ordinary --no-ff Git merge into this same Episode completed without textual conflicts, preserving all prior merge ancestry. Local candidate bbadcf8ca0b3562970115beeb4aed898bb5ee957 has exact parents c697a88759d4626d23faa3f58ff7b7a0696441ad and 05f9f8abfef1e8ea918871867e0c2d4f8dd0e6be; it is not yet published or validated. The only delta from that main is PRIMECLAW-50's five-path repair (465 insertions/19 deletions). Its four capture/diagnostic production and regression paths are byte-identical to the accepted safe-label repair; docs/project-initialization.md auto-merged both parents and retains the complete-capture/privacy/resource guidance. Accepted PRIMECLAW-51 changes are included through the exact main parent, not reimplemented. Accepted P2 label finding remains CLOSED, 5/5 criteria and In Progress unchanged.
+
+Canonical primary dirty .prime-claw/ownership.json, .prime-claw/templates.json and .prime-claw/workflows/implement-task-prep.md were not copied/stashed/reset/staged/committed/moved. Hashes verified unchanged across integration. Only committed directly published main was integrated. No foreign resources or ownership edits.
+
+Combined-generation documented affected Docker command is running: python3 -m pytest tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_project_initialization.py::test_project_initialization_node_suite tests/test_beads_retiring_source_capture.py -q -m container. Log /tmp/primeclaw50-reintegrated-focused.log. Required scripts/test-tier1.sh --probe and full python3 -m pytest tests/ -q -m container follow serially. TIER1_ENV_FILE=/tmp/primeclaw50-tier1.env selects the read-only cwd-fix-v0.9.8-r1 dependency; its clean status, exact tag/commit/tree and lockfile were reverified against docs/prime-agent-installation.md. No host/global probe, installation, restart/deployment, live migration or private source access.
+
+No combined-generation pass is claimed yet. Historical tests and original baseline failures remain historical; current main includes a changed task-admission fixture, so actual new full results will be observed without assuming old failures persist or assigning causes without evidence. No unrelated fixture/infrastructure repair is authorized. After actual validation, publish code and task evidence separately and stop for focused owner integration review; no main merge, lifecycle mutation or cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
