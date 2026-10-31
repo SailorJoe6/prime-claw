@@ -4,6 +4,7 @@ title: Handle native Beads memory records in migration export inspection
 status: In Design
 assignee: []
 created_date: '2026-10-30 23:43'
+updated_date: '2026-10-31 14:28'
 labels: []
 dependencies: []
 references:
@@ -42,7 +43,19 @@ The reported installed reader location is `task-provider-migration.ts`, `complet
 
 Recognize native issue versus memory records so valid mixed exports can be inspected. Compare the issue subset against the independently captured issue inventory, while preserving the complete typed native export and memory contents in source capture and the existing evidence/digest/receipt path. Do not silently discard memory records merely to make issue validation pass.
 
-Keep this a narrow migration-reader repair using supported native format and existing capture mechanics. Do not introduce heuristic record classifiers, another mapping framework, lifecycle receipts or coordination machinery.
+Use supported native format and existing capture mechanics for the reader repair and the operator-approved memory import outputs below. Do not introduce heuristic record classifiers, another mapping framework, additional lifecycle receipts or coordination machinery.
+
+## Required memory import outputs
+
+A future operator-confirmed Beads-to-Backlog migration must make the imported memories directly available as native Backlog documentation, not merely bury them in migration evidence:
+
+- Create one Backlog document per Beads memory in `.backlog/docs/`, through the supported Backlog CLI. Preserve each memory's original key and value losslessly; importing is not permission to summarize, rewrite or curate its contents. These are Backlog documents, not ordinary project `docs/` files or task records, and must not be authored by direct storage edits.
+- Create one additional native Backlog origin/index document through the CLI. Explain that these are memories migrated from Beads and identify their source project/store. Link to every imported memory document so a user can find all of them from the index.
+- Create exactly one user-facing Backlog follow-up task for the imported memory collection, through the CLI. Link it to the index and explain that the user must review the memories, integrate useful material properly into the project's documentation, or delete the imported material they do not want. This is a task for the user, not permission for an agent to perform that curation or deletion during migration. Do not create one follow-up task per memory.
+
+The imported documents, origin/index and user task belong to the destination's normal native publication and verification before source retirement; a partial memory import is not a successful lossless migration. Keep the issue inventory and original issue identity checks distinct from memory documents and this newly authored user task.
+
+These are requirements for the future migration behavior. This specification update does not create any of these outputs in Nemo now and does not authorize a live migration, memory cleanup or implementation.
 
 ## Safety, scope and evidence limits
 
@@ -58,6 +71,10 @@ This bug is Prime Claw work only. It does not reopen the closed PRIMECLAW-44 Epi
 - [ ] #1 Canonical switch inspection accepts the native bd 1.3.1 mixed issue/memory export shape without treating valid memory rows as missing-ID issues; the reported 33-issue/19-memory case is represented in regression evidence.
 - [ ] #2 Only actual issue records participate in issue-ID and independent issue-inventory comparison. Genuine malformed or duplicate issue IDs and incomplete issue inventories still refuse inspection without migration writes.
 - [ ] #3 Full typed export and native memory contents remain preserved in source capture and the existing evidence/digest/receipt path; memory records are not silently dropped, source memories are not deleted, and no credentials or private memory contents enter test fixtures.
-- [ ] #4 Focused Docker regression coverage proves mixed-export handling and memory preservation, retains existing supported issue-only export behavior, and exercises a genuine invalid-issue refusal without adding a broad new harness or matrix.
+- [ ] #4 Focused Docker regression coverage proves mixed-export handling, memory preservation and the native memory-document/index/user-task outputs, retains existing supported issue-only export behavior, and exercises a genuine invalid-issue refusal without adding a broad new harness or matrix.
 - [ ] #5 The repair preserves existing read-only inspection, explicit migration confirmation, publication-before-retirement and failure-safety boundaries; it does not mutate Nemo, reopen PRIMECLAW-44, or add unrelated architecture or Prime Agent changes.
+- [ ] #6 A confirmed migration creates one native Backlog document per Beads memory in .backlog/docs/ through the supported Backlog CLI, preserving the original memory key and value losslessly without rewriting, curating or treating it as an issue.
+- [ ] #7 One additional Backlog document explains that the memories were migrated from Beads, identifies their source, and contains a working link to each imported memory document; it is created through the supported Backlog CLI.
+- [ ] #8 Exactly one user-facing Backlog task for the imported memory collection is created through the supported CLI and links to the index. It asks the user to integrate useful memories into the project documentation or delete unwanted imports; migration does not perform that user curation/deletion.
+- [ ] #9 Memory documents, the index and the single user task are verified and published through the existing destination-native process before Beads source retirement; the original issue-ID/inventory checks remain intact and do not miscount these distinct destination outputs.
 <!-- AC:END -->
