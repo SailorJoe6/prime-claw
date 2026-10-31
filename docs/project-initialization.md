@@ -351,7 +351,9 @@ the actual native document paths. The single task is explicitly `In Design` and
 links to the index. The user, not the migration agent, reviews and integrates
 useful material into project documentation or deletes unwanted imports.
 Zero-memory input makes no native output commands and creates none of these
-outputs. Native readback checks the actual document body and task evidence;
+outputs. Native readback checks the actual document body and task evidence,
+and verifies that every captured memory/index path still contains the same
+native document. Native moves that leave stale index or USER task links refuse;
 a successful missing-document CLI exit alone is not proof.
 
 This helper is tested in disposable fixtures but is **not yet enabled in the
@@ -433,7 +435,8 @@ scripts/test-tier1.sh --probe
 
 The native-output slice also exercises real CLI document create/update/view,
 working index links, exactly one USER task, complete record round-trip, changed
-or missing native output refusal, and zero-memory no-op. Public controls use
+or missing native output refusal, and zero-memory no-op. A focused native-move
+regression also checks refusal for stale memory and index paths. Public controls use
 supported native Beads writes; a synthetic NUL-bearing package passes through the
 same native Backlog writer because NUL cannot be passed in process argv.
 

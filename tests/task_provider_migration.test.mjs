@@ -1662,6 +1662,24 @@ test("native Beads memory outputs preserve exact records and link one USER task"
   assert.deepEqual(importBeadsMemoryDocuments({ ...source, memories: [] }, runner), { documents: [] });
   verifyBacklogMemoryOutputs({ documents: [] }, fixture.root, runner);
   assert.deepEqual(runner.calls, []);
+  await t.test("native moves of a memory document or index refuse stale captured paths", () => {
+    for (const document of [outputs.documents[0], outputs.index]) {
+      backlog(fixture.root, "doc", "update", document.docId, "--path", "relocated", `--content=${document.body}`);
+      try {
+        assert.equal(existsSync(join(fixture.root, document.path)), false, "native move removes the captured link target");
+        assert.ok(command(fixture.root, BACKLOG, ["doc", "view", document.docId, "--plain"]).endsWith(`${document.body}\n`),
+          "native ID readback still succeeds with the unchanged body after the move");
+        assert.ok(backlog(fixture.root, "doc", "view", outputs.index.docId, "--plain").includes(encodeURIComponent(outputs.documents[0].path.split("/").at(-1))),
+          "index still links the original memory path");
+        assert.deepEqual(JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", outputs.userTask.taskId)).task.documentation, [outputs.index.path],
+          "USER task still references the original index path");
+        assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /native identity\/body mismatch/);
+      } finally {
+        backlog(fixture.root, "doc", "update", document.docId, "--path", "", `--content=${document.body}`);
+      }
+    }
+    verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+  });
   // Native content corruption is refused on re-read, not accepted via exit code.
   for (const document of [...outputs.documents, outputs.index]) {
     backlog(fixture.root, "doc", "update", document.docId, "--content=Changed public output");

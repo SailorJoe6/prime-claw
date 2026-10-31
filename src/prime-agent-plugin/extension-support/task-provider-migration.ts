@@ -1512,8 +1512,13 @@ export function verifyBacklogMemoryOutputs(outputs: BacklogMemoryOutputs, projec
   for (const document of [...outputs.documents, ...(outputs.index ? [outputs.index] : [])]) {
     const plain = runRequired(runner, "backlog", ["doc", "view", document.docId, "--plain"], projectRoot, `read Backlog memory document ${document.docId}`).stdout;
     const markdown = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(plain);
+    // Native doc view resolves by ID, not path. Check the captured link target
+    // read-only against that exact native readback (view adds one newline).
+    let captured: string | undefined;
+    try { captured = readFileSync(join(projectRoot, document.path), "utf8"); }
+    catch { /* An unreadable/moved target is the same readback mismatch below. */ }
     if (!markdown || markdown[1].split("\n").filter((line) => line.startsWith("id:")).join("\n") !== `id: ${document.docId}`
-        || markdown[2] !== `${document.body}\n`) {
+        || markdown[2] !== `${document.body}\n` || captured === undefined || `${captured}\n` !== plain) {
       throw new Error(`Backlog memory document ${document.docId} native identity/body mismatch`);
     }
   }
