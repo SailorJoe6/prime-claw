@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 20:16'
+updated_date: '2026-10-31 20:19'
 labels: []
 dependencies: []
 references:
@@ -161,6 +161,14 @@ Resolve only in-scope integration conflicts; surface a genuine semantic/product 
 Rerun affected documented Docker suites (including the accepted memory regressions), mandatory scripts/test-tier1.sh --probe, and the planned full python3 -m pytest tests/ -q -m container on the integrated generation. Prior focused/probe passes do not validate a merged tree. Preserve the historical pre-integration result: 83 passed, 2 failed, 1 skipped; both exact failures independently reproduced at original base 7380afe1526647eef3dbc7fa0b62ce8796a19641. Do not repair those unrelated prep-kernel/missing backlog/config.yml fixtures under this task.
 
 Update only Episode-owned native task content/evidence. Publish clean code and task heads separately, report the exact integrated canonical-main and Episode heads plus actual validation results, then stop for owner review. Status stays In Progress. No merge into main, lifecycle change, deployment/restart, live Ralph/private data access, live migration, speculative hardening, deterministic task-reconciliation/iterative-plan machinery or new architecture is authorized. Existing specification/implementation approach and prior evidence remain retained; the current resumable work is integration and revalidation, not a new feature slice.
+
+### Integrated generation — validation started
+
+Fresh canonical main and direct remote refs/heads/main both resolved to 2e3377593f6a281feaed209c90bb1d53838d81ab. The canonical primary's only dirty path was .prime-claw/ownership.json (foreign runtime ownership); its bytes were left untouched. Ordinary Git --no-ff merge into this same Episode branch completed without textual conflicts. Local integration commit 6742ae7c86303f905127bbe9a0fa9891998e9399 has exact parents 2f89592e07c6ec69d506ba6b3e77c7f9fb9f9bac and 2e3377593f6a281feaed209c90bb1d53838d81ab; it is not yet a published validated candidate. Relative to integrated main, only this task's original five-path 443-insertion/18-deletion repair remains. Committed upstream ownership was integrated from published Git, not copied from dirty primary state.
+
+Accepted PRIMECLAW-49 native memory capture/import, exact output publication/receipt proofs, pre-retirement checks, replay guards, docs/skill text and regressions are included. This task's file-backed capture/bounded diagnostics remain present. A read-only independent preservation audit is running; it grants no new scope.
+
+Integrated-generation documented focused Docker command is running, including the complete migration suite with accepted native-memory regressions: python3 -m pytest tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_project_initialization.py::test_project_initialization_node_suite tests/test_beads_retiring_source_capture.py -q -m container. TIER1_ENV_FILE=/tmp/primeclaw50-tier1.env; log /tmp/primeclaw50-integrated-focused.log. Required tier1 --probe and full-container validation follow. Old green results do not validate this tree. Historical 83 passed/2 failed/1 skipped and exact baseline reproductions remain as recorded, not repaired. Status remains In Progress. No merge into main, foreign resource mutation, host/global activation or live migration occurred.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
