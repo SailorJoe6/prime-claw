@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 20:12'
+updated_date: '2026-10-31 20:16'
 labels: []
 dependencies: []
 references:
@@ -151,10 +151,20 @@ Final validation on unchanged candidate bytes:
 Failure metadata preserves ENOBUFS with empty stderr/nativeStatus=null/SIGTERM. Diagnostic rendering is capped at 768 characters, with bounded labels/error metadata and at most 256 stderr characters; no stdout fallback or raw JSON-parser message. Ordinary required native-provider failures are intercepted before discovery can misreport capture failure as source repair. Existing negative Git probes remain compatible. Native migration packages retain exact synthetic large history/events; real Ralph/private payloads were never read.
 
 Both workers were observed idle/non-streaming and removed after completion. Task remains In Progress. This Episode did not merge, mark Ready for Merge/Done/Blocked, change ownership, migrate a live repository, activate globally, restart Prime Agent or retire any real source. Owning Conversation receives the exact separate code/task published heads and decides review/lifecycle. The two independently reproduced baseline fixture failures remain a known validation limitation, not fixed by this task.
+
+### Accepted continuation — reintegrate current published main
+
+Owning Conversation accepts slice 2f89592e07c6ec69d506ba6b3e77c7f9fb9f9bac for in-scope continuation only, NOT merge readiness. Joe requested reintegration of current main. In the next execute pass, freshly read and ordinarily integrate the latest clean directly published canonical main into this same Episode branch. Main was observed at a712ea68ba33f14ed04925dac2bad1fe63e0472f during review; that is historical context, not a fixed integration target. Preserve accepted PRIMECLAW-49 native-memory capture/import behavior and its publication, readback, receipt and pre-retirement proofs together with this task's complete-capture/safe-diagnostics behavior.
+
+Resolve only in-scope integration conflicts; surface a genuine semantic/product conflict instead of expanding scope. Preserve all foreign ownership and resources. Canonical primary ownership has a foreign dirty entry: do not stash, reset, commit or copy it into this branch. Integrate committed published code through ordinary Git only; do not treat foreign primary state as Episode task work.
+
+Rerun affected documented Docker suites (including the accepted memory regressions), mandatory scripts/test-tier1.sh --probe, and the planned full python3 -m pytest tests/ -q -m container on the integrated generation. Prior focused/probe passes do not validate a merged tree. Preserve the historical pre-integration result: 83 passed, 2 failed, 1 skipped; both exact failures independently reproduced at original base 7380afe1526647eef3dbc7fa0b62ce8796a19641. Do not repair those unrelated prep-kernel/missing backlog/config.yml fixtures under this task.
+
+Update only Episode-owned native task content/evidence. Publish clean code and task heads separately, report the exact integrated canonical-main and Episode heads plus actual validation results, then stop for owner review. Status stays In Progress. No merge into main, lifecycle change, deployment/restart, live Ralph/private data access, live migration, speculative hardening, deterministic task-reconciliation/iterative-plan machinery or new architecture is authorized. Existing specification/implementation approach and prior evidence remain retained; the current resumable work is integration and revalidation, not a new feature slice.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Published candidate 2f89592e07c6ec69d506ba6b3e77c7f9fb9f9bac removes the fixed migration command-output ceiling with private file-backed capture while preserving the synchronous native snapshot/package flow. It adds bounded payload-safe diagnostics with errorCode/nativeStatus/signal, separates command/resource advice from invalid JSON, and documents resource limits/cleanup. Synthetic Docker tests retain exact 108-record 1,305,475-byte history and 2,610,950-byte multibyte events, prove full default capture routing, metadata, cleanup/resource safety, malformed JSON handling and no initial-capture mutations. Focused suites: 3 passed. Required tier1 probe: passed. Full container suite: 83 passed, 2 failed, 1 skipped; both failures independently reproduced on original base (prep-kernel fixture and removed backlog/config.yml fixture). Full suite is not green. No live data/global change or lifecycle mutation. Candidate ready for Conversation review with that explicit baseline limitation.
+Accepted pre-integration slice: 2f89592e07c6ec69d506ba6b3e77c7f9fb9f9bac. Complete file-backed capture and bounded safe diagnostics are implemented and published. Prior focused suites/probe passed; prior full suite had 83 passed, 2 failed, 1 skipped, with both exact failures reproduced on original base. Owner now requests in-scope reintegration of fresh clean directly published canonical main, preserving accepted PRIMECLAW-49 native-memory behavior and all foreign ownership/resources. Integrated-generation Docker suites/probe/full validation and clean code/task publication are pending. Not merge readiness. Status remains In Progress; no live/global/lifecycle changes authorized.
 <!-- SECTION:FINAL_SUMMARY:END -->
