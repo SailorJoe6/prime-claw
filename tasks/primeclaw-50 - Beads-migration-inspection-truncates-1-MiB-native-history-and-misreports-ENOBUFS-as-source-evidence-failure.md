@@ -3,10 +3,10 @@ id: PRIMECLAW-50
 title: >-
   Beads migration inspection truncates >1 MiB native history and misreports
   ENOBUFS as source evidence failure
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 18:32'
+updated_date: '2026-10-31 18:42'
 labels: []
 dependencies: []
 references:
