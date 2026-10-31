@@ -33,59 +33,78 @@ work but do not create Episode identity.
 
 ### Primary task-native path
 
-Use `/plan TASK-ID` or `plan_task({"taskId":"TASK-ID"})` to plan one exact
-selected-provider `In Design` or `In Planning` task. The compact-first chain
-binds the exact provider and root, writes Backlog's native Implementation Plan
-or Beads' raw `design`, retains or publishes native `In Planning`, and stops for
-separate operator approval without creating implementation resources. The
-preceding `/design` or `/spec-it-out` review remains a separate provider-native
-specification gate and never authorizes this planning step implicitly.
+The globally discoverable `plan` skill routes conversational planning to
+`plan_task({"taskId":"TASK-ID"})` for one exact selected-provider `In Design` or
+`In Planning` task. The compact-first chain binds provider/root, writes Backlog's
+Implementation Plan or Beads' living raw `design`, and publishes native
+`In Planning`. Planning alone stops for review and creates no Episode.
+`design` and `spec-it-out` remain native project skills, also invocable through
+`/skill:design` and `/skill:spec-it-out`.
 
-After approval, use `/implement-task TASK-ID`. Before either workflow message,
-it resolves one exact selected live provider and one exact ready local Orca
-setup, or uses direct local fallback only when the production Orca command is
-absent and no explicit setup was requested. Backlog keeps its ID/path and
-structured task contract. Beads uses its exact canonical ID, raw native design
-and task view, `in_planning` status, and project root without inventing a path or
-normalized task. Cancellation, ambiguity, provider drift, zero ready setups,
-remote selection, malformed or negative inventory, and other inventory failures
-grant no approval and queue no workflow. Placement performs no task, Git,
-ownership, or resource mutation.
+Markdown interprets actual operator authority. An explicit conditional request
+to plan then implement when ready may authorize that sequence within scope,
+without fresh approval solely because planning finished. Planning or entry
+invocation itself grants no implementation authority. Material ambiguity or new
+scope requires clarification. Explicitly delegated task selection stays within
+stated bounds and binds one exact canonical ID before native task operations.
+Implementation eligibility requires existing `In Planning` after design and
+planning, not dependency readiness alone or a separate phase-history proof.
 
-After both messages are admitted, the ephemeral approval binds the owner
-session, provider, canonical task ID and project root, exact placement, and a
-task path only for Backlog. The first phase boundary exposes it to the semantic
-turn; one exact consume removes it. A completed phase without creation, session
-start, or shutdown clears it. The complete ordinary
-`prime-claw-oversee-episode` guidance precedes provider-native semantic
-readiness. `create_task_episode` then re-resolves provider evidence and consumes
-this approval exactly once; callers cannot override its placement or resource
-identity.
+For authorized implementation, `implement-task` invokes `implement_task(taskId,
+host?)`. Before either workflow message, native code resolves the sole selected
+provider and exact ready local Orca placement, or definitive-Orca-unavailable
+local fallback only with no explicit setup request. Backlog retains its exact
+ID/path and structured task; Beads retains exact canonical ID/root, native
+`in_planning`, complete raw view and meaningful `design` without a task path.
+Cancellation, ambiguity, provider drift, no ready setup, remote selection, and
+malformed/negative inventory fail before messages or mutation.
+
+The messages carry exact task/provider/root and optional stable host as facts,
+not private approval. Preparation preserves the operator's actual instruction,
+scope and conditional authority through compaction. The complete ordinary
+`prime-claw-oversee-episode` guidance precedes semantic readiness. Self-contained
+`create_task_episode(taskId, host?)` re-resolves current native identity/state,
+meaningful plan, publication, placement, ownership, and resources before mutation.
+It revalidates carried stable placement and never silently substitutes it. There
+is no approval store, consume/expiry guard, or required prior-entry sequence.
 
 ### Retained version-1 compatibility path
 
-Use `/plan-spec .ralph/plans/future/<slug>` or model tool `plan_spec` only for
-reviewed planning of an existing version-1 compatibility bundle. Both paths run
-`plan-prep` first and queue `plan-spec` as the sole follow-up, preserving the
-compact-first boundary.
-
-Use `/implement-spec .ralph/plans/future/<slug>` to review that approved bundle.
-An optional stable location bypass is:
+The global `plan-spec` and `implement-spec` skills use `plan_spec(location)` and
+`implement_spec(location, host?)` for one exact operator-selected retained
+`.ralph/plans/future/<slug>` folder. Ask if that location is missing or materially
+ambiguous; never search for or invent it. Existing canonical `plan-prep` /
+`plan-spec` and `implement-prep` / `implement-spec` IDs and customizable paths
+remain unchanged. Optional explicit placement is structured operation data:
 
 ```text
-/implement-spec .ralph/plans/future/<slug> --host id:<project-host-setup-id>
+implement_spec({"location":".ralph/plans/future/<slug>","host":"id:<setup-id>"})
 ```
 
-`implement-prep` runs first and `implement-spec` is the sole queued follow-up.
-The post-preparation message contains the complete ordinary
-`prime-claw-oversee-episode` guidance before the semantic readiness workflow.
-There is no guide activation, disclosure, hash, version, receipt, readiness
-query, collision check, consumed state, or transcript redaction protocol.
+The complete ordinary `prime-claw-oversee-episode` guidance precedes the retained
+semantic-readiness phase. There is no guide activation, disclosure, hash, version,
+receipt, readiness query, consumed state, or transcript redaction protocol.
+Self-contained `create_spec_episode(location, host?)` checks current complete
+bundle integrity and grandfathered frozen specification, capturing the current
+bundle digest at concrete creation rather than requiring an invocation receipt.
+Exact active version-1 ownership is checked before obsolete source lookup;
+source-absent replay returns the same verified resources without another execute
+assignment. Planning-only and conditional authority follow the same Markdown
+boundary as task-native work.
 
-A failed or interrupted pre-creation chain is rerun visibly. The retained
-version-1 folder approval guard exists only to bind the current owner session,
-selected folder, and optional setup ID across the two-turn compact-first chain.
-It is not a second approval UX.
+Prime Claw registers no custom `/plan`, `/plan-spec`, `/implement-task`,
+`/implement-spec`, or `/handoff` commands. Native built-ins and `/skill:` remain.
+Successful admission queues work and ends the calling turn; it does not prove
+compaction, readiness, or creation completed. Failed or uncertain admission is
+not permission to retry or create duplicate resources. Ordinary `handoff` uses
+`ralph_handoff`; owning Conversations use exact Episode lifecycle tools.
+
+This interface change does not retire or migrate retained workflows or resources.
+Keep supported old-layout handoff/execute fallback and every resource the loaded
+generation may read. A later separately approved accepted-main refresh requires
+quiescence, one coordinated full restart, and resumed owner/Episode plus
+ordinary-session UAT. Copy success, `/reload`, or a fresh probe alone is not
+cutover proof.
 
 ## One durable Conversation-keyed ownership registry
 
@@ -156,7 +175,7 @@ Conversation-owned through the selected primary native history.
 Retained version-1 compatibility ownership keeps its existing folder plan
 workflow. Owned-resource recovery validates exact active resources before
 reopening without reassigning. For version 2 this is an internal recovery seam:
-public `/implement-task` and `create_task_episode` admission reject existing
+public `implement_task` and `create_task_episode` admission reject existing
 non-terminal ownership, and the owner continues through the existing Episode's
 lifecycle surfaces. Partial provisioning or allocation failure becomes
 `uncertain` and cannot replay fresh. The trusted task-admission

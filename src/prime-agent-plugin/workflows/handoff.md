@@ -115,7 +115,7 @@ their authorities.
 ## Request compaction once
 
 Compaction is a best-effort context improvement, not the continuation trigger.
-The native `/handoff` command or owning Conversation has already queued
+The `ralph_handoff` operation or owning Conversation has already queued
 canonical `execute` independently as one follow-up.
 
 When the handoff prompt appends an `<operator-compaction-guidance>` block, treat

@@ -86,11 +86,11 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
             retained={
                 "project-workflow-implement-prep": (
                     "bdb1f929f34711a27305b203e35340c54a955150ab7258820f3e0069bd486088",
-                    "4823d1f90258e6b7f811fcf317a40dae33f7659d4a3ae86b2d0a20a25f70a329",
+                    "d98d71db19eeb99420c011e6afc9a2ee01d7b760bca79a8f3412139930f02009",
                 ),
                 "project-workflow-implement-spec": (
                     "1b9fa01f1e0493fc6078683ae5872dfd32bb2419906247645c363168edb8eb3f",
-                    "a13405c5c7b92d0211526044cdde46e5c9ef217430472ed9f8bfa8aac40bb634",
+                    "4bf58556ef76c8315a99ad6f863d9a796a1c5af8b1417e575ad57a65a04da576",
                 ),
             }
             baseline,actual=retained[row["id"]]
@@ -276,8 +276,9 @@ def test_native_initialization_skill_discovery_before_any_project_setup(tier1_co
     responses=[json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
     commands=next(row for row in responses if row.get("id")=="commands")["data"]["commands"]
     by_name={row["name"]:row for row in commands}
-    assert "skill:initialize-prime-claw" in by_name
-    assert "initialize-prime-claw" not in by_name
-    assert by_name["skill:initialize-prime-claw"]["sourceInfo"]["path"].endswith("/skills/initialize-prime-claw/SKILL.md")
+    for name in ("initialize-prime-claw", "plan", "plan-spec", "implement-task", "implement-spec", "handoff"):
+        assert f"skill:{name}" in by_name
+        assert name not in by_name
+        assert by_name[f"skill:{name}"]["sourceInfo"]["path"].endswith(f"/skills/{name}/SKILL.md")
     for relative in (".agents", ".prime-claw", ".backlog", "backlog", "backlog.config.yml"):
         assert not (project/relative).exists(),relative

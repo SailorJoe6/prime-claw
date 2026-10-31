@@ -11,9 +11,15 @@ backlog task view --json -- <id>
 backlog task create "Short title" --status "In Design" --description "Outcome and context" --type task --priority P2 --plain
 ```
 
-Use `/design` or `/spec-it-out`, `/plan TASK-ID`, and `/implement-task TASK-ID`
-for phase transitions. The owning Conversation controls later lifecycle status;
-do not use a generic claim, completion, or archive edit to bypass it.
+Use `/skill:design` or `/skill:spec-it-out` for specification authoring. Ask the
+agent to plan or implement work; the `plan` and `implement-task` skills route to
+`plan_task` and `implement_task`. Planning alone does not authorize implementation.
+An explicit plan-then-implement instruction may continue within scope after
+readiness. Bounded delegated selection must bind an exact canonical task;
+implementation requires `In Planning` after design/planning, not `--ready` alone.
+The owning Conversation controls later lifecycle status; do not use a generic
+claim, completion, or archive edit to bypass it. Native `/skill:` invocation and
+Prime Agent built-ins remain available; custom workflow commands are removed.
 
 ## What this repo is
 

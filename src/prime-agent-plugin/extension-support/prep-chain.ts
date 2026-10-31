@@ -24,7 +24,7 @@ export interface PrepChainWorkflow {
 
 export type PrepChainAdmissionResult =
   | { ok: true; location: string }
-  | { ok: false; message: string; level: "warning" | "error" };
+  | { ok: false; message: string; level: "warning" | "error"; deliveryUncertain?: true; stage?: "first" | "followUp" };
 
 export interface TaskPrepChainWorkflow extends PrepChainWorkflow {
   allowedStatuses: readonly string[];
@@ -32,11 +32,11 @@ export interface TaskPrepChainWorkflow extends PrepChainWorkflow {
 
 export type TaskPrepChainAdmissionResult =
   | { ok: true; taskId: string; taskPath: string; projectRoot: string }
-  | { ok: false; message: string; level: "warning" | "error" };
+  | { ok: false; message: string; level: "warning" | "error"; deliveryUncertain?: true; stage?: "first" | "followUp" };
 
 export type ProviderTaskPrepChainAdmissionResult =
   | ({ ok: true } & ProviderTaskResolution)
-  | { ok: false; message: string; level: "warning" | "error" };
+  | { ok: false; message: string; level: "warning" | "error"; deliveryUncertain?: true; stage?: "first" | "followUp" };
 
 type BacklogTaskResolver = (cwd: string, rawTaskId: string) => BacklogTaskSelection | null;
 export type LegacySourceAbsentSelectionResolver = (
@@ -84,9 +84,9 @@ async function admitResolvedPrepChain(
   selection: string,
   workflow: PrepChainWorkflow,
   source: "native" | "tool",
-  preflight?: (ctx: ExtensionContext, selection: string) => void,
+  preflight?: (ctx: ExtensionContext, selection: string) => void | Promise<void>,
   phasePreamble?: string,
-  promptContext?: string,
+  promptContext?: string | (() => string | undefined),
 ): Promise<PrepChainAdmissionResult> {
   // Preflight both project-owned workflows before beginning a partial
   // transition. Loading them here also keeps every model instruction in the
@@ -112,10 +112,16 @@ async function admitResolvedPrepChain(
     };
   }
 
-  const contextualPrepPrompt = promptContext ? `${prepPrompt}\n\n${promptContext}` : prepPrompt;
-  const contextualPhasePrompt = promptContext ? `${canonicalPhasePrompt}\n\n${promptContext}` : canonicalPhasePrompt;
+  let context: string | undefined;
+  try {
+    await preflight?.(ctx, selection);
+    context = typeof promptContext === "function" ? promptContext() : promptContext;
+  } catch (error) {
+    return { ok: false, level: "error", message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  const contextualPrepPrompt = context ? `${prepPrompt}\n\n${context}` : prepPrompt;
+  const contextualPhasePrompt = context ? `${canonicalPhasePrompt}\n\n${context}` : canonicalPhasePrompt;
   const phasePrompt = phasePreamble ? `${phasePreamble}\n\n${contextualPhasePrompt}` : contextualPhasePrompt;
-  preflight?.(ctx, selection);
 
   const admission = await admitWorkflowChain({
     deliverFirst: () => source === "tool"
@@ -126,8 +132,10 @@ async function admitResolvedPrepChain(
   if (!admission.ok) return {
     ok: false,
     level: "error",
+    deliveryUncertain: true,
+    stage: admission.stage,
     message: admission.stage === "first"
-      ? `reviewed-plan: canonical ${workflow.prepSkillName} could not be admitted`
+      ? `reviewed-plan: canonical ${workflow.prepSkillName} delivery is unconfirmed; inspect before retrying`
       : `reviewed-plan: ${workflow.prepSkillName} was admitted, but ${workflow.phaseSkillName} follow-up admission is unconfirmed; inspect before retrying`,
   };
 
@@ -145,28 +153,25 @@ export async function admitPrepChain(
   rawLocation: string,
   workflow: PrepChainWorkflow,
   source: "native" | "tool",
-  preflight?: (ctx: ExtensionContext, location: string) => void,
+  preflight?: (ctx: ExtensionContext, location: string) => void | Promise<void>,
   phasePreamble?: string,
   sourceAbsentReplay?: LegacySourceAbsentSelectionResolver,
+  promptContext?: () => string | undefined,
 ): Promise<PrepChainAdmissionResult> {
   let selected;
   let replay = false;
   try {
-    selected = validateFutureLocation(ctx.cwd, rawLocation);
-  } catch {
-    selected = null;
-  }
-  if (!selected && sourceAbsentReplay) {
-    try {
-      selected = sourceAbsentReplay(ctx, rawLocation);
-      replay = selected !== null;
-    } catch (error) {
-      return {
-        ok: false,
-        message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
-        level: "error",
-      };
-    }
+    // Exact active ownership is authoritative even after promotion removes the
+    // obsolete future folder. Never look up that source before replay checks.
+    selected = sourceAbsentReplay?.(ctx, rawLocation) ?? null;
+    replay = selected !== null;
+    if (!selected) selected = validateFutureLocation(ctx.cwd, rawLocation);
+  } catch (error) {
+    return {
+      ok: false,
+      message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
+      level: "error",
+    };
   }
   if (!selected) {
     return { ok: false, message: workflow.usage, level: "warning" };
@@ -189,6 +194,7 @@ export async function admitPrepChain(
     source,
     preflight,
     phasePreamble,
+    promptContext,
   );
 }
 
@@ -217,7 +223,7 @@ export async function admitTaskPrepChain(
   if (!workflow.allowedStatuses.includes(selected.status)) {
     return {
       ok: false,
-      message: `Task ${selected.taskId} is ${selected.status}; /plan accepts only ${workflow.allowedStatuses.join(" or ")}.`,
+      message: `Task ${selected.taskId} is ${selected.status}; plan_task accepts only ${workflow.allowedStatuses.join(" or ")}.`,
       level: "warning",
     };
   }
@@ -268,6 +274,7 @@ export async function admitProviderTaskPrepChain(
   ) => void | Promise<void>,
   phasePreamble?: string,
   purpose: "planning" | "implementation" = "implementation",
+  promptContext?: (selection: ProviderTaskResolution) => string | undefined,
 ): Promise<ProviderTaskPrepChainAdmissionResult> {
   let selected: ProviderTaskResolution | null;
   try {
@@ -283,7 +290,7 @@ export async function admitProviderTaskPrepChain(
   if (!workflow.allowedStatuses.includes(selected.status)) {
     return {
       ok: false,
-      message: `Task ${selected.taskId} is ${selected.status}; ${purpose === "planning" ? "/plan" : "implementation"} accepts only ${workflow.allowedStatuses.join(" or ")}.`,
+      message: `Task ${selected.taskId} is ${selected.status}; ${purpose === "planning" ? "plan_task" : "implementation"} accepts only ${workflow.allowedStatuses.join(" or ")}.`,
       level: "warning",
     };
   }
@@ -307,7 +314,7 @@ export async function admitProviderTaskPrepChain(
     source,
     undefined,
     phasePreamble,
-    purpose === "planning" ? planningProviderPromptContext(selected) : undefined,
+    purpose === "planning" ? planningProviderPromptContext(selected) : promptContext?.(selected),
   );
   return result.ok ? { ok: true, ...selected } : result;
 }

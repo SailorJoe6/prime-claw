@@ -168,42 +168,49 @@ trees available only to initialized projects still using the ordered version-1
 migration path. This
 builder repository removes its own tree at the final task-native cutover.
 
-- **4a — phase skills and proven transitions.** Discoverable project skills
-  under `.agents/skills/` and internal workflows under `.prime-claw/workflows/`
-  remain editable per operator and project. Native commands load that Markdown
-  rather than duplicating workflow policy. Dogfooding established one stable
-  transition, implemented and regression-tested as native `/handoff` → focused
+- **4a — phase skills and proven transitions.** Project skills under
+  `.agents/skills/` and internal workflows under `.prime-claw/workflows/` remain
+  customizable. Thin global `plan`, `plan-spec`, `implement-task`,
+  `implement-spec`, and `handoff` entry skills route conversational requests to
+  existing agent-callable operations and load canonical phase policy. Prime
+  Claw's five custom command registrations are removed, not Prime Agent built-ins
+  or native `/skill:`. Ordinary `handoff` uses `ralph_handoff` → focused
   compaction → execute; see [docs/handoff-chain.md](docs/handoff-chain.md).
-  Folder-based `/plan-spec` was delivered first. `/design` and `/spec-it-out` now
-  author or revise an exact selected-provider `In Design` task and `/plan
-  TASK-ID` writes its native Backlog Implementation Plan or Beads `design`. The generic plugin retains folder compatibility for initialized projects
-  that still use version 1; this builder repository no longer carries a local
-  plan tree.
-- **4b — episode mechanics.** `/implement-task TASK-ID` now creates a
-  worktree-rooted Episode from one meaningful provider-native plan and
-  exact-task ownership. `handoff_task_episode` continues that exact durable
-  session. Conversation instructions use ordinary Git and the selected provider's native history for review
-  outcomes. After an operator-authorized terminal outcome is committed and
-  pushed, the Conversation automatically calls cleanup-only
-  `finalize_task_episode` for exact resource removal without separate cleanup
-  confirmation. Before merge readiness it verifies provider-reported idle
-  completion of the exact Episode and explicitly proven descendants, refusing
-  active or unprovably idle work. Error interpretation and safe re-invocation
-  from current ownership, provider, Git, and selected-provider evidence remain prompt-led. Generic
-  `/implement-spec <future-folder>` mechanics remain active for retained bundles
-  in initialized version-1 projects; they are not this builder
-  repository's workflow authority.
-- **4c — reviewed conversation → episode workflow.** `/design` and
-  `/spec-it-out` retain different customizable starting assumptions but share
-  one exact-task specification contract and stop for operator review. The
-  operator invokes `/plan TASK-ID` for a second review gate. Only the explicit
-  `/implement-task TASK-ID` boundary may authorize and create the
-  worktree-rooted Episode. `/plan-spec` and `/implement-spec` remain a bounded
-  generic compatibility route for already-created future bundles in projects
-  that retain them. Manual proof must show that one task and owner identity survive
-  execute/handoff iterations, useful EXPERT reviews, candidate revision,
-  operator-authorized merge or abandonment decisions, and automatic prompt-led
-  cleanup after the terminal outcome is committed and pushed.
+  `design` and `spec-it-out` author an exact provider-native `In Design` task;
+  `plan_task` writes Backlog's Implementation Plan or Beads' living `design`.
+  Retained `plan_spec` supports existing version-1 bundles. Stable phase IDs,
+  customizable destinations, and supported old-layout handoff/execute fallback
+  remain; this builder has no local plan tree.
+- **4b — episode mechanics.** `implement_task(taskId, host?)` prepares one exact
+  `In Planning` task; self-contained `create_task_episode` revalidates native
+  provider/identity/state/readiness, placement, ownership, and resource safety,
+  then reserves ownership before allocating one isolated Episode and one fixed
+  execute assignment. `handoff_task_episode` continues the exact durable session.
+  Retained `implement_spec` and `create_spec_episode` preserve frozen bundle
+  integrity, source-absent active replay with no new assignment, and the same
+  version-1 resources and lifecycle. Neither creation path requires a prior-entry
+  approval receipt. Failed or uncertain admission never permits duplicate work.
+  Conversation policy uses ordinary Git and native provider history for review
+  outcomes. After an operator-authorized terminal outcome is committed and pushed,
+  it automatically invokes cleanup-only `finalize_task_episode`, without another
+  cleanup confirmation. Before merge readiness it verifies exact Episode and
+  explicitly proven descendant idle completion. Error interpretation and safe
+  re-invocation from current evidence remain prompt-led, not a coordinator.
+- **4c — reviewed conversation → episode workflow.** Markdown owns phase
+  authority. Planning alone stops for review and creates no resources. Explicit
+  conditional plan-then-implement authority may continue within scope after
+  readiness without fresh approval solely because planning finished. Bounded
+  delegated selection binds an exact canonical task before native operations;
+  implementation requires existing `In Planning` after design/planning, not
+  dependency readiness alone or a second phase-history proof. Material ambiguity
+  and new scope require clarification. Manual proof must show one authority and
+  owner survive execute/handoff, useful EXPERT review, revision, explicit merge
+  or abandonment, and safe terminal cleanup. The invocation cutover does not
+  migrate/retire retained workflows or delete their plans/resources. Live refresh
+  remains separately authorized: quiesce, refresh accepted main, perform one full
+  restart, and prove resumed owner/Episode plus ordinary-session UAT before
+  removing anything the old generation may read. Candidate tests are not that
+  cutover proof.
 - **4d — `upgrade-this-to-prime-agent` command.** Convert a Ralph
   codex/claude-skills project to prime-agent skills without manual copy-paste;
   dogfood on the ralph repo. The same initialization/upgrade UX inspects and,
@@ -211,16 +218,16 @@ builder repository removes its own tree at the final task-native cutover.
   task/history migration with active-Episode continuity and a sole
   destination-native receipt.
 
-Done when: a project conversation has created or revised one provider-native
-`In Design` task through `/design` or `/spec-it-out`, received operator
-specification approval, written and reviewed its native Backlog Implementation
-Plan or Beads `design` through `/plan TASK-ID`,
-and promoted it through `/implement-task TASK-ID` into a worktree-rooted Episode
-that shipped a real feature through bounded execute/handoff iterations, merge,
-and safe cleanup. The task-native cutover candidate removes this builder
-repository's `.ralph/plans` tree; the customizable-policy versus deterministic-mechanics boundary, context crossing,
-ownership, and review gates are documented and proven by manual dogfood before
-wider orchestration.
+Done when: a project conversation has authored one provider-native `In Design`
+task through `design` or `spec-it-out`, planned it through `plan`/`plan_task`,
+and, with actual implementation authority and readiness, admitted it through
+`implement-task`/`implement_task` into a worktree-rooted Episode that shipped a
+real feature through bounded execute/handoff, merge, and safe cleanup. Planning-
+only and explicit conditional requests must retain their distinct authority.
+Document and prove the customizable-policy versus deterministic-mechanics
+boundary, context crossing, ownership, and review gates through manual dogfood
+before wider orchestration. Candidate interface checks do not establish this
+whole-phase acceptance or live activation.
 
 ## Phase 5 — Communication channels
 

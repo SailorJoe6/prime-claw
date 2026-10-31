@@ -11,6 +11,14 @@ native admission. Verify that the bound provider remains the sole unambiguous
 live provider, but never reselect or substitute it. Do not guess or search for a
 task, invent a task path, or leave the exact root.
 
+Preserve the operator's actual instruction and approved scope. Explicit
+conditional “plan this task, then implement it when ready” authority survives
+planning, preparation, and compaction; planning alone does not authorize
+implementation. An explicitly delegated task selection must already be bound
+to this exact canonical ID within the operator's stated bounds. Delegation
+never skips design or planning. Clarify material ambiguity or new scope; do not
+require a prior invocation or a separate phase-history receipt as authority.
+
 The canonical `plan-task` workflow is already queued independently as the sole
 follow-up. This prep turn cannot cancel, replace, reconstruct, retry, or invoke
 that workflow. Do not run `prepare`; the queued planning turn performs the
@@ -45,8 +53,10 @@ If the sniff passes, reason from your current conversation context and compose
 a concise `focus_hint` to plan the selected task. Keep the selected provider,
 project root, canonical ID, native status, relevant specification context, and
 complete raw Beads view when applicable. Provider observations are factual
-context, not semantic acceptance. Use your judgment to decide what context will
-be most useful for that mission.
+context, not semantic acceptance. Preserve the exact binding, approved scope,
+actual operator instruction, and any conditional implementation authority.
+A planning-only request must remain planning-only. Use your judgment to decide
+what context will be most useful for that mission.
 
 Then call exactly once:
 

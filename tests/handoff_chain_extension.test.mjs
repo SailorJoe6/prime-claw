@@ -83,17 +83,17 @@ function writeCanonicalSkills(f, handoffBody = "handoff body", executeBody = "ex
   };
 }
 
-test("registers native handoff and one narrow tool without lifecycle listeners", (t) => {
+test("registers no custom commands and one narrow tool without lifecycle listeners", (t) => {
   const f = fixture(t);
-  assert.deepEqual([...f.commands.keys()], ["handoff"]);
+  assert.deepEqual([...f.commands.keys()], []);
   assert.deepEqual([...f.tools.keys()], ["ralph_handoff"]);
-  assert.match(f.commands.get("handoff").description, /queued independently/);
   const tool = f.tools.get("ralph_handoff");
   assert.equal(tool.executionMode, "sequential");
   assert.deepEqual(Object.keys(tool.parameters.properties), ["guidance"]);
   assert.equal(tool.parameters.required, undefined);
   assert.equal(tool.parameters.additionalProperties, false);
-  assert.ok(tool.promptGuidelines.every((guideline) => guideline.includes("ralph_handoff")));
+  assert.match(tool.promptGuidelines.join(" "), /handoff skill.*bind the current implementation pass/);
+  assert.match(tool.promptGuidelines.join(" "), /never retry uncertain delivery automatically/);
   assert.deepEqual([...f.events.keys()], []);
 });
 
@@ -101,10 +101,10 @@ test("preflights then admits handoff followed by one execute follow-up", async (
   const f = fixture(t);
   const { handoffPath, executePath } = writeCanonicalSkills(f, "custom handoff", "custom execute");
 
-  await f.commands.get("handoff").handler("", f.ctx);
+  await f.tools.get("ralph_handoff").execute("tool", {}, undefined, undefined, f.ctx);
 
   assert.deepEqual(f.messages, [
-    { message: wrappedSkill("handoff", handoffPath, "custom handoff"), options: undefined },
+    { message: wrappedSkill("handoff", handoffPath, "custom handoff"), options: { deliverAs: "steer" } },
     { message: wrappedSkill("execute", executePath, "custom execute"), options: { deliverAs: "followUp" } },
   ]);
   assert.deepEqual(f.notices, []);
@@ -116,10 +116,10 @@ test("preserves exact trimmed trailing guidance without changing execute routing
   const guidance = `focus on bead xyz; preserve ../../review!
 Keep punctuation & spaces.`;
 
-  await f.commands.get("handoff").handler(`  ${guidance}  `, f.ctx);
+  await f.tools.get("ralph_handoff").execute("tool", { guidance: `  ${guidance}  ` }, undefined, undefined, f.ctx);
 
   assert.deepEqual(f.messages, [
-    { message: wrappedSkill("handoff", handoffPath, "handoff body", guidance), options: undefined },
+    { message: wrappedSkill("handoff", handoffPath, "handoff body", guidance), options: { deliverAs: "steer" } },
     { message: wrappedSkill("execute", executePath, "execute body"), options: { deliverAs: "followUp" } },
   ]);
 });
@@ -152,7 +152,7 @@ preserve punctuation & spacing.`;
   assert.equal(result.isError, undefined);
   assert.deepEqual(result.details, { admitted: true });
   assert.match(result.content[0].text, /admitted/);
-  assert.doesNotMatch(result.content[0].text, /completed/);
+  assert.match(result.content[0].text, /completion are not confirmed by admission/);
   assert.deepEqual(f.notices, []);
 });
 
@@ -169,7 +169,7 @@ test("conversational tool preflights both skills before either send", async (t) 
   assert.match(result.content[0].text, /execute\/SKILL\.md not found/);
 });
 
-test("conversational tool reports first-send admission failure", async (t) => {
+test("conversational tool reports first-send uncertainty without claiming nonadmission", async (t) => {
   const f = fixture(t, 1);
   writeCanonicalSkills(f);
 
@@ -179,7 +179,10 @@ test("conversational tool reports first-send admission failure", async (t) => {
 
   assert.deepEqual(f.messages, []);
   assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /handoff could not be admitted/);
+  assert.match(result.content[0].text, /handoff delivery is unconfirmed; inspect and do not retry/);
+  assert.equal(result.details.admission, "unconfirmed");
+  assert.equal(result.details.stage, "first");
+  assert.equal(Object.hasOwn(result.details, "admitted"), false);
 });
 
 test("conversational tool reports second-send failure without claiming continuation", async (t) => {
@@ -196,6 +199,9 @@ test("conversational tool reports second-send failure without claiming continuat
   }]);
   assert.equal(result.isError, true);
   assert.match(result.content[0].text, /follow-up admission is unconfirmed/);
+  assert.equal(result.details.admission, "unconfirmed");
+  assert.equal(result.details.stage, "followUp");
+  assert.equal(Object.hasOwn(result.details, "admitted"), false);
   assert.doesNotMatch(result.content[0].text, /Handoff admitted/);
 });
 
@@ -203,62 +209,20 @@ test("missing handoff fails before a partial transition", async (t) => {
   const f = fixture(t);
   writeSkill(f.cwd, "execute", "execute body");
 
-  await f.commands.get("handoff").handler("focus", f.ctx);
+  const result = await f.tools.get("ralph_handoff").execute("missing", { guidance: "focus" }, undefined, undefined, f.ctx);
 
   assert.deepEqual(f.messages, []);
-  assert.deepEqual(f.notices, [{
-    message: "handoff-chain: .prime-claw/workflows/handoff.md not found",
-    level: "warning",
-  }]);
-});
-
-test("missing execute fails before handoff admission", async (t) => {
-  const f = fixture(t);
-  writeSkill(f.cwd, "handoff", "handoff body");
-
-  await f.commands.get("handoff").handler("", f.ctx);
-
-  assert.deepEqual(f.messages, []);
-  assert.deepEqual(f.notices, [{
-    message: "handoff-chain: .agents/skills/execute/SKILL.md not found",
-    level: "warning",
-  }]);
-});
-
-test("a synchronous handoff admission failure is visible", async (t) => {
-  const f = fixture(t, 1);
-  writeCanonicalSkills(f);
-
-  await f.commands.get("handoff").handler("", f.ctx);
-
-  assert.deepEqual(f.messages, []);
-  assert.deepEqual(f.notices, [{
-    message: "handoff-chain: canonical handoff could not be admitted",
-    level: "error",
-  }]);
-});
-
-test("a synchronous follow-up queue failure is visible without claiming success", async (t) => {
-  const f = fixture(t, 2);
-  const { handoffPath } = writeCanonicalSkills(f);
-
-  await f.commands.get("handoff").handler("", f.ctx);
-
-  assert.deepEqual(f.messages, [{
-    message: wrappedSkill("handoff", handoffPath, "handoff body"),
-    options: undefined,
-  }]);
-  assert.deepEqual(f.notices, [{
-    message: "handoff-chain: handoff was admitted, but execute follow-up admission is unconfirmed; inspect and do not retry",
-    level: "error",
-  }]);
+  assert.equal(result.isError, true);
+  assert.equal(result.details.admitted, false);
+  assert.match(result.content[0].text, /handoff\.md not found/);
+  assert.deepEqual(f.notices, []);
 });
 
 test("late or repeated compaction signals have no execute-admission path", async (t) => {
   const f = fixture(t);
   writeCanonicalSkills(f);
 
-  await f.commands.get("handoff").handler("", f.ctx);
+  await f.tools.get("ralph_handoff").execute("tool", {}, undefined, undefined, f.ctx);
   const admitted = structuredClone(f.messages);
 
   assert.equal(f.events.get("session_compact"), undefined);

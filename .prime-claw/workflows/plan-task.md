@@ -15,6 +15,14 @@ For Backlog, run the `prepare` skill normally. For Beads, perform `prepare`'s
 repository-orientation reads but skip its Backlog-only queue inventory. That
 unrelated queue is not Beads planning authority and must not mix providers.
 
+Preserve the operator's actual instruction and approved scope. Explicit
+conditional “plan this task, then implement it when ready” authority survives
+planning, preparation, and compaction; planning alone does not authorize
+implementation. An explicitly delegated task selection must already be bound
+to this exact canonical ID within the operator's stated bounds. Delegation
+never skips design or planning. Clarify material ambiguity or new scope; do not
+require a prior invocation or a separate phase-history receipt as authority.
+
 ## Reload and check planning readiness
 
 Use only the selected provider:
@@ -124,17 +132,24 @@ Beads planning performs no Backlog command, Git task-file commit, content
 mirror, ownership write, branch/worktree/session creation, or implementation
 admission.
 
-## Stop for operator plan review
+## Report the plan and apply operator authority
 
 Report the selected provider, canonical task ID, exact project root, resulting
 native status, and the reviewable native plan. For Backlog also report and link
 the exact task path plus local commit and push evidence. For Beads report the
 exact pre-write, post-write, and final published raw task views, provider
 revision/publication ref, and any transport uncertainty without dumping
-unrelated provider data. Explicitly ask the operator to review the plan and stop
-without creating Episode resources.
+unrelated provider data.
 
 Apply requested planning revisions to the same provider-native task with these
 same identity, status, mutation, publication, and proof rules. Planning does not
-authorize implementation. Wait for a separate explicit `/implement-task
-TASK-ID` command.
+authorize implementation. For a planning-only request, explicitly ask the
+operator to review the plan and stop without creating Episode resources.
+If the operator already gave explicit conditional plan-then-implement authority
+within this scope, do not stop solely to request the same approval again.
+After successful publication, load the `implement-task` entry skill and invoke
+`implement_task` for this exact ID. Implementation requires native `In Planning`
+(Beads `in_planning`) after design and planning and the full semantic readiness
+review; dependency readiness alone is insufficient. No separate phase-history
+receipt is required. Any failed or uncertain publication, material ambiguity,
+missing authority, blocker, or new scope stops advancement without retry.

@@ -16,6 +16,13 @@ Explicit task-history preservation may commit/publish the separate task DAG and
 stage only original task-path deletions in the code index. Code branch HEAD
 stays unchanged; root-link and ignore bookkeeping remain explicit code changes.
 
+Global delivery includes thin `plan`, `plan-spec`, `implement-task`,
+`implement-spec`, and `handoff` entry skills, discoverable even when an active
+Episode skips project reconciliation. They route through existing operations to
+stable customizable phase IDs and paths. No lifecycle workflow becomes a second
+scanned skill copy. Removed custom workflow commands do not remove native
+`/skill:` or Prime Agent built-ins.
+
 When Prime Claw itself first creates an absent `.prime-claw/`, it adds the
 root-only `/.prime-claw/` local exclusion using Git's resolved exclude path,
 including the shared path for linked worktrees. Existing exclusions are
@@ -66,7 +73,13 @@ silently changing active Episode snapshots.**
 
 Startup reconciliation is awaited. No-op starts remain quiet; changes,
 conflicts, exclusion failures, or degraded registration produce a concise notice. Active or
-uncertain Episode worktrees retain their starting template snapshot.
+uncertain Episode worktrees retain their starting template snapshot. Supported
+old-layout handoff/execute fallback remains. Entry cutover does not retire
+version-1 ownership, plans, or resources. Later accepted-main global refresh
+requires separate authority, one coordinated full restart, and resumed
+owner/Episode plus ordinary-session UAT. Keep everything the old generation may
+read until that proof succeeds; copy success, `/reload`, and a fresh probe alone
+are not proof.
 
 ## US-07 — Orient a fresh project agent
 

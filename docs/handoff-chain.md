@@ -7,18 +7,22 @@ the queued continuation.
 
 ## Ordinary handoff
 
-The native `/handoff` command and `ralph_handoff` tool load project
+The thin globally discoverable `handoff` skill routes an explicit ordinary Ralph
+handoff request to `ralph_handoff`. The tool loads project
 `.prime-claw/workflows/handoff.md` and `.agents/skills/execute/SKILL.md` before
-sending either message. Native handoff uses an ordinary prompt; the model tool
-uses `steer`. Execute is queued with `followUp` in both cases. This uses the
-same internal loader and two-message admission sequence as planning and
-implementation preparation without merging their public or authority surfaces.
+sending handoff through `steer` and queueing execute with `followUp`. It reuses
+the internal loader and two-message sequence without merging authority surfaces.
+No custom `/handoff` registration is required; native `/skill:handoff` and Prime
+Agent built-ins remain available.
 
-Optional guidance is operator text or a bounded synthesis of already accepted
-in-scope findings. It is not arbitrary chat, a product decision, or scope
-expansion. A synchronous admission failure is reported without claiming
-continuation. Later compaction success or failure belongs to Prime Agent's
-normal queue lifecycle.
+Ordinary handoff guidance is optional operator-supplied focus, not inferred
+product decisions, arbitrary chat, or scope expansion. Ask if the handoff
+objective would be materially inferred. Successful admission ends the calling
+turn and proves only queued work, not compaction or execute completion. Failed
+or uncertain transport is reported honestly and never retried automatically.
+Later compaction success or failure belongs to Prime Agent's normal queue
+lifecycle. Owned-Episode continuation uses the separate tools below, whose
+bounded guidance may synthesize accepted recorded in-scope findings.
 
 ## Owned Episode continuation
 
@@ -85,7 +89,7 @@ trigger a best-effort compaction of the owning Conversation's own context.
 Resume and Request Changes continuations are covered by the same
 `handoff_task_episode` adapter after their ordinary Git/Backlog status steps,
 so no separate trigger exists for them. Creation, blocking, candidate
-acceptance, delay, merge, abandonment, cleanup, ordinary `/handoff`, and
+acceptance, delay, merge, abandonment, cleanup, ordinary `ralph_handoff`, and
 heartbeat ticks never trigger it.
 
 After the admitted handoff result is returned, the plugin loads

@@ -6,10 +6,15 @@
 deliberate focus, and queue the next execute pass, so that the next iteration
 starts with useful context rather than an amnesiac handoff document.**
 
-`/handoff` and `ralph_handoff(guidance?)` preflight the canonical handoff and
-execute assets, admit handoff, and queue exactly one execute follow-up.
-Compaction is requested once by the handoff workflow; scheduling it is not
-reported as completion and compaction itself never triggers execute.
+The thin global `handoff` skill invokes `ralph_handoff(guidance?)` for an explicit
+ordinary Ralph handoff request. Optional guidance is operator-supplied; clarify a
+materially inferred objective. The tool preflights canonical project handoff and
+execute assets, admits handoff through `steer`, and queues exactly one execute
+follow-up. The calling turn ends after admission. Compaction is requested once;
+admission and scheduling are not completion. Compaction itself never triggers
+execute. Failed or uncertain transport is not automatically retried. No custom
+`/handoff` registration is needed; native `/skill:handoff` and built-ins remain.
+Owned Episode continuation uses the separate lifecycle tools below.
 
 ## US-23 — Continue one exact owned Episode
 
@@ -49,6 +54,7 @@ Episode, or scope expansion.
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/handoff-chain.ts`
+- `src/prime-agent-plugin/skills/handoff/SKILL.md`
 - `src/prime-agent-plugin/extension-support/workflow-chain.ts`
 - `src/prime-agent-plugin/extension-support/spec-episode.ts`
 - `src/prime-agent-plugin/workflows/handoff.md`

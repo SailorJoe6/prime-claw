@@ -29,11 +29,10 @@ def test_handoff_chain_node_suite(tier1_container):
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_prime_agent_rpc_loads_native_handoff_command_and_conversational_tool(
+def test_prime_agent_rpc_loads_handoff_tool_without_custom_commands(
     tier1_container, ctmp,
 ):
-    """Probe the container's installed offline Prime Agent for both explicit
-    entry surfaces."""
+    """Probe native tool loading without registering custom slash commands."""
     request = json.dumps({"id": "loader", "type": "get_commands"}) + "\n"
     probe_source = """export default function probe(pi) {
   pi.on("session_start", () => {
@@ -68,16 +67,21 @@ def test_prime_agent_rpc_loads_native_handoff_command_and_conversational_tool(
     response = json.loads(result.stdout.strip().splitlines()[-1])
     assert response["success"] is True
     commands = response["data"]["commands"]
-    handoff = [command for command in commands if command["name"] == "handoff"]
-    assert len(handoff) == 1
-    assert handoff[0]["sourceInfo"]["path"] == WS_EXTENSION
+    assert not any(command["name"] in {"handoff", "plan", "plan-spec", "implement-task", "implement-spec"} for command in commands)
+    assert not any(command.get("sourceInfo", {}).get("path") == WS_EXTENSION for command in commands)
     assert [command["name"] for command in commands].count(
         "probe-ralph-handoff-tool"
     ) == 1
 
 
-def test_handoff_skill_has_only_one_slash_command_surface():
-    """The native /handoff command must not compete with /skill:handoff."""
+def test_handoff_entry_is_a_skill_and_internal_workflow_stays_separate():
+    """Native /skill: discovery is not a custom command registration."""
+    source = EXTENSION.read_text()
+    assert "registerCommand" not in source
+    assert 'name: "ralph_handoff"' in source
+    entry = (REPO / "src/prime-agent-plugin/skills/handoff/SKILL.md").read_text()
+    assert "name: handoff" in entry
+    assert "ralph_handoff" in entry
     assert not (REPO / ".agents" / "skills" / "handoff").exists()
 
 

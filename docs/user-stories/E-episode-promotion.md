@@ -6,22 +6,46 @@
 Episode creation, so that incomplete or contradictory work creates no
 implementation resources.**
 
-The primary `/implement-task TASK-ID` path resolves one exact `In Planning`
-task and placement before its compact-first readiness workflow. Its consumable
-approval binds the owner session, canonical task ID/path, project root, and
-placement. `create_task_episode` can consume that approval once; a failed
-semantic review creates no Episode.
+The globally discoverable `implement-task` skill routes an approved
+conversational request through `implement_task(taskId, host?)`. It binds one
+exact canonical task, including selection explicitly delegated within the
+operator's bounds. Implementation selection requires `In Planning` (Beads native
+`in_planning`) after design and planning, not dependency readiness alone. The
+entry resolves native task and placement before its compact-first readiness
+workflow; a failed semantic review creates no Episode.
 
-For retained version-1 compatibility, `/implement-spec
-.ralph/plans/future/<slug>` performs the same final review for one existing
-bundle only when its exact location and current `SPECIFICATION.md` bytes match
-the explicit-upgrade grandfathered inventory. The specification is frozen; its
-plan remains living. Its approval binds the exact session, source location,
-optional host, and complete bundle digest and is consumable once. When that
-obsolete source folder is absent, the same registered route admits only the
-exact already-active version-1 owner after verifying its promoted frozen
-specification; the creation call can then return only that same Episode with no
-new assignment.
+Markdown owns approval judgment. An explicit conditional instruction to plan
+then implement when ready may authorize that sequence within approved scope;
+planning alone does not authorize implementation. Preparation and compaction
+preserve the operator's instruction, scope, conditional authority, exact task,
+and optional stable host. Material ambiguity or new scope requires clarification.
+Final `create_task_episode(taskId, host?)` independently resolves concrete native
+identity, state, readiness, placement, and ownership; it requires no prior entry
+invocation, approval store, or turn receipt.
+
+The five custom workflow command registrations are removed. Thin global entry
+skills reuse agent-callable operations and canonical project policy; Prime Agent
+built-ins and native `/skill:` remain available. Entry admission means queued
+work, not completed compaction, readiness, or creation. End the calling turn and
+never retry failed or uncertain admission as fresh allocation.
+
+For retained version-1 compatibility, the discoverable `implement-spec` skill
+routes one exact operator-selected `.ralph/plans/future/<slug>` through
+`implement_spec(location, host?)` and the project's customizable readiness
+policies. It asks when the folder is missing or ambiguous; it never selects a
+replacement. Fresh creation still
+requires its exact location and frozen `SPECIFICATION.md` bytes to match the
+explicit-upgrade grandfathered inventory; its execution plan remains living.
+Markdown interprets operator authority, including an explicit conditional
+plan-then-implement instruction within scope. Planning alone, entry invocation,
+and stored or turn-scoped receipts supply no implementation authority.
+Preparation carries the exact location, authority, scope, and optional stable
+host through compaction. Final create independently checks current concrete
+integrity, placement, ownership, and resources without any prior entry proof.
+When the obsolete source folder is absent, exact already-active version-1
+ownership is resolved before source lookup and its promoted frozen specification
+is verified. Creation then returns only that same Episode with no new execute
+assignment, not a new admission.
 
 ## US-14 — Create one isolated implementation Episode
 
@@ -29,7 +53,8 @@ new assignment.
 Episode, so that implementation occurs against one exact durable authority
 outside the canonical checkout.**
 
-The primary `create_task_episode(taskId=...)` transaction commits the exact
+The primary `create_task_episode(taskId=..., host=...)` transaction (with optional
+stable `id:<setup-id>` host) commits the exact
 task's `In Progress` transition, persists version-2 ownership, and creates one
 matching Episode only when that Conversation has no non-terminal ownership and
 no other owner holds the same task binding. A short cross-process lock covers
@@ -51,9 +76,12 @@ fresh task-native Episode receives:
 - durable ownership by that originating Conversation, which the Episode resolves
   by the supplied key rather than its own session ID.
 
-For retained version-1 compatibility, `create_spec_episode(location=...)`
+For retained version-1 compatibility, `create_spec_episode(location, host?)`
 creates a matching folder Episode only after rechecking the inventory's exact
-specification digest. An already-owned exact Episode replays from persisted
+specification digest. It reloads the current complete bundle and captures its
+digest at the concrete create boundary as integrity evidence, not invocation
+proof. A carried stable `id:<setup-id>` host is revalidated before mutation;
+explicit placement never silently falls back. An already-owned exact Episode replays from persisted
 ownership and its promoted frozen specification even when the obsolete future
 source is absent; it does not require a task provider. Fresh admission promotes the approved
 bundle into active `.ralph/plans` from its captured base and records its
@@ -139,12 +167,16 @@ absent and never when an explicit setup was requested. Malformed JSON, a
 negative inventory envelope, and other inventory failures propagate and fail
 closed rather than selecting local execution.
 
-Only after placement and both workflow messages succeed does the helper grant
-one ephemeral approval bound to the owner session, canonical task ID/path and
-project root, and exact placement. The prep-turn end exposes it to the semantic
-turn; one exact consume removes it, while phase end, session start, or shutdown
-clears it. The full ordinary oversight guide precedes `implement-task` semantic
-readiness. No approval is durable or inferred from planning.
+The helper delivers the exact task and optional stable host as operation data,
+not private approval. Both canonical messages carry
+`<operator-implementation-host>id:<setup-id></operator-implementation-host>` for
+selected Orca placement; local fallback is explicit and has no host ID.
+The full ordinary oversight guide precedes `implement-task` semantic readiness.
+The phase policy interprets actual operator authority, including an explicit
+conditional plan-then-implement instruction within scope. Planning alone adds
+no implementation authority. There is no task-native approval store, turn
+receipt, or separate phase-history proof. Entry success means queued work, not
+completed compaction, readiness, or Episode creation, and ends the caller's turn.
 
 The ownership store now accepts either retained version-1 folder identity or
 strict version-2 task identity, never a mixture. An internal reservation seam
@@ -177,14 +209,34 @@ failure before ownership or resource mutation commits the exact task back to
 `In Planning`. Any durable or uncertain mutation instead commits `Blocked` plus
 the exact inspection/reconciliation condition and preserves all evidence.
 
-`/implement-task` and `create_task_episode` now expose this complete guarded
-transaction. The public create tool consumes only the matching one-turn
-approval and accepts no caller-supplied placement or resource identity. Retained version-1 compatibility folder Episode creation remains available
-through the explicitly labeled workflow above.
+The `implement-task` skill, `implement_task` entry tool, and
+`create_task_episode` expose this task-native path. Final create is
+self-contained: it re-resolves the current provider, exact canonical task/root/
+Backlog path and valid native status/plan, then resolves placement before
+mutation. An optional stable host is revalidated, never silently substituted;
+without one, the existing sole-ready/picker/definitive-unavailability rules apply.
+It accepts no arbitrary root, path, worktree, session, or engine identity and
+requires no earlier entry invocation as approval proof. Concrete ownership and
+resource checks still refuse duplicate admission. Retained version-1
+compatibility folder Episode creation remains available through the retained
+entry and self-contained creation boundary above, with its integrity and exact
+active-replay checks preserved.
+
+## Invocation cutover safety
+
+The interface change does not migrate or retire retained workflows, change
+ownership, delete plans, or recreate resources. Preserve stable customizable
+phase IDs and supported old-layout handoff/execute fallback. Later live refresh
+requires separately authorized accepted-main apply, one coordinated full
+restart, and resumed owner/Episode plus ordinary-session UAT. Keep resources the
+old generation may read until proof succeeds. Copy success, `/reload`, and a
+fresh probe alone are not cutover proof; candidate validation is not activation.
 
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/reviewed-plan.ts`
+- `src/prime-agent-plugin/skills/implement-task/SKILL.md` (global task entry guidance)
+- `src/prime-agent-plugin/skills/implement-spec/SKILL.md` (global retained-folder entry guidance)
 - `src/prime-agent-plugin/extension-support/spec-episode.ts` (retained allocator plus public task-native admission transaction)
 - `src/prime-agent-plugin/extension-support/episode-ownership.ts`
 - `src/prime-agent-plugin/extension-support/task-episode-ownership.ts` (task-native reservation foundation)

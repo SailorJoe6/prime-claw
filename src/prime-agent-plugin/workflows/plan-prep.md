@@ -10,6 +10,12 @@ folder. Native admission has already matched this location and its frozen
 `SPECIFICATION.md` digest against the grandfathered inventory. Do not edit the
 specification or inventory; the later execution plan remains living.
 
+Preserve the operator's actual instruction, exact location, and approved scope.
+Explicit conditional “plan this specification, then implement it when ready”
+authority survives planning, preparation, and compaction; planning alone does
+not authorize implementation. Clarify material ambiguity, missing authority,
+or scope expansion instead of guessing or requiring a prior invocation receipt.
+
 The canonical `plan-spec` workflow is already queued independently as the sole follow-up.
 This prep turn cannot cancel, replace, reconstruct, retry, or invoke
 that workflow. Do not run `prepare`; the queued planning turn does that after
@@ -32,7 +38,10 @@ readiness decision.
 
 If the sniff passes, reason from your current conversation context and compose a
 concise `focus_hint` that best prepares you to plan the selected specification.
-Use your judgment to decide what context will be most useful for that mission.
+Preserve the exact binding, approved scope, actual operator instruction, and
+any conditional implementation authority. A planning-only request must remain
+planning-only. Use your judgment to decide what context will be most useful for
+that mission.
 
 Then call exactly once:
 
@@ -49,7 +58,7 @@ Interpret only the immediate result:
 - If the call raises, report that the request failed without pasting a traceback
   or raw provider data.
 
-In every case, the canonical `plan` follow-up remains independently queued. Do not wait for a compaction event or infer a later outcome from its absence.
+In every case, the canonical `plan-spec` follow-up remains independently queued. Do not wait for a compaction event or infer a later outcome from its absence.
 
 After the sniff or compaction call, output only:
 

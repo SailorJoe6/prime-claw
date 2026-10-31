@@ -10,7 +10,7 @@ First, run the `prepare` skill.
 If `.prime-claw/legacy-specifications.json` exists, stop this authoring workflow.
 Do not create a later future folder, revise a listed specification, or edit the
 inventory. The listed specifications are frozen compatibility inputs; their
-plans may still evolve through `/plan-spec`. Route new or materially revised
+plans may still evolve through the `plan-spec` skill and `plan_spec` operation. Route new or materially revised
 work through the selected provider's ordinary `/design` or `/spec-it-out` task
 UX instead.
 
@@ -71,4 +71,7 @@ After saving the specification:
 
 Apply requested specification revisions to the same future folder and link the
 updated specification again. Do not advance to planning unless the operator
-later invokes the separate planning workflow.
+requests planning through the `plan-spec` entry skill and exact `plan_spec`
+operation. No custom slash command is required. Planning alone does not
+authorize implementation; preserve any separate explicit conditional
+plan-then-implement instruction through planning and compaction.

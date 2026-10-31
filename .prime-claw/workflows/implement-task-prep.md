@@ -4,13 +4,38 @@ description: Request focused compaction before provider-native task Episode admi
 ---
 
 Read the canonical task ID from the `<operator-implementation-task-id>` block
-appended by native admission. Treat it only as the one exact operator-selected
-task. Do not guess, substitute, search for, or select another task.
+appended by native admission. Treat it only as the exact selected task, including
+selection explicitly delegated within the operator's bounds. Do not guess,
+substitute, search for, or select another task here. Preserve any optional
+`<operator-implementation-host>` stable `id:<setup-id>` unchanged as placement
+data for the final create call, not as authority.
+
+Keep the operator's actual implementation authority and approved scope in
+context. Explicit conditional “plan this task, then implement it when ready”
+authority may survive planning, preparation, and compaction; planning alone does
+not authorize implementation. Neither entry invocation nor a stored or
+turn-scoped receipt supplies authority. The readiness turn must clarify missing
+authority, material ambiguity, or new scope before creation. Implementation
+selection requires `In Planning` (Beads native `in_planning`) after design and
+planning, not dependency readiness alone; no separate phase-history proof is
+required.
 
 The canonical `implement-task` workflow is already queued independently as the
 sole follow-up. This prep turn cannot cancel, replace, reconstruct, retry, or
 invoke that workflow. Do not run `prepare`; the queued implementation-readiness
 turn does that after the context boundary.
+
+Read any `<operator-implementation-task-provider>` and
+`<operator-implementation-task-project-root>` blocks as factual observations
+from entry. Backlog may also carry `<operator-implementation-task-path>`;
+Beads has no task path. Compare these observations and the exact task ID with
+fresh native resolution below. Genuine provider, canonical identity, root, or
+Backlog path drift blocks creation and must be reported for clarification; do
+not silently rebind to another task or workspace. These observations are not
+approval, revision/content locks, or invocation receipts. Compatible same-task
+content refinements remain facts for semantic readiness review, not an automatic
+reapproval gate. Do not require an earlier entry or manufacture missing receipt
+evidence when current native resolution and operator authority are sufficient.
 
 ## Light readiness sniff
 
@@ -42,9 +67,12 @@ responsible for the complete semantic readiness decision.
 If the sniff passes, reason from your current conversation context and compose a
 concise `focus_hint` that best prepares you to review the selected task for
 implementation admission and supervise the resulting Episode. Keep
-its exact provider, project root, task ID, native readiness fields, and raw Beads
-view when applicable. Use your judgment to decide what context will be most
-useful for that mission.
+its exact provider, project root, task ID, observed Backlog task path when
+applicable, native readiness fields, and raw Beads view when applicable. Preserve the operator's actual instruction, approved
+scope, any conditional implementation authority, and optional stable host in
+`<operator-implementation-host>`. Planning-only authority must remain
+planning-only. Use your judgment to decide what context will be most useful for
+that mission.
 
 Then call exactly once:
 
