@@ -1638,6 +1638,27 @@ function backlogMemoryEvidence(source: BeadsMemorySource, outputs: BacklogMemory
   return { documents, ...(userTask ? { userTask } : {}) };
 }
 
+/** Local native readback is not publication: ignored files can leave Git clean. */
+function assertCommittedBacklogMemoryOutputs(
+  outputs: BacklogMemoryOutputs, projectRoot: string, storeDir: string, revisions: string[], runner: CommandRunner,
+): void {
+  const paths = [...outputs.documents, ...(outputs.index ? [outputs.index] : []), ...(outputs.userTask ? [outputs.userTask] : [])];
+  for (const { path } of paths) {
+    const localPath = resolve(projectRoot, path);
+    if (!contained(storeDir, localPath)) throw new Error(`Backlog memory output is outside the published destination: ${path}`);
+    const nativePath = relative(storeDir, localPath).replace(/\\/g, "/");
+    // --no-filters hashes the exact native bytes, not an index/clean-filter view.
+    const expected = runRequired(runner, "git", ["-C", storeDir, "hash-object", "--no-filters", "--", localPath], storeDir,
+      `hash exact Backlog memory output ${path}`).stdout.trim();
+    for (const revision of revisions) {
+      if (!GIT_OID.test(revision)) throw new Error("Backlog memory publication requires an exact destination revision");
+      const committed = runRequired(runner, "git", ["-C", storeDir, "rev-parse", "--verify", `${revision}:${nativePath}`], storeDir,
+        `verify committed Backlog memory output ${path}`).stdout.trim();
+      if (committed !== expected) throw new Error(`Backlog memory output ${path} committed bytes differ at ${revision}`);
+    }
+  }
+}
+
 function beadsTaskType(value: unknown): string {
   const raw = String(value ?? "task").toLowerCase();
   const aliases: Record<string, string> = { story: "feature", milestone: "task", epic: "task", decision: "task", "merge-request": "task", molecule: "task", gate: "task", convoy: "task" };
@@ -2061,6 +2082,7 @@ function freshBacklogMigrationReplay(
   const expectedMappings = source.tasks.map((pkg) => ({ sourceTaskId: pkg.sourceTaskId, destinationTaskId: mapping[pkg.sourceTaskId] }));
   const memoryOutputs = receipt.backlogMemoryOutputs ?? { documents: [] };
   const memory = backlogMemoryEvidence(source, memoryOutputs, runner);
+  assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [receipt.destinationDataRevision, head], runner);
   if (views.size !== source.counts.total + 1 + (source.memories.length ? 1 : 0) || Object.keys(mapping).length !== source.counts.total
       || canonical(receipt.mappings) !== canonical(expectedMappings)) throw new Error("fresh same-migration replay inventory/mappings do not match the verified receipt");
   const paths = backlogPhysicalTaskPaths(storeDir);
@@ -2156,7 +2178,11 @@ function migrateBeadsToBacklog(
   if (source.memories.length && (existingReceiptId || Object.keys(mapping).length) && !reusedMemoryOutputs) {
     throw new Error("existing migration has no complete receipt-bound memory outputs; preserve source and inspect the partial destination without retrying import");
   }
-  if (reusedMemoryOutputs) backlogMemoryEvidence(source, reusedMemoryOutputs, runner);
+  if (reusedMemoryOutputs) {
+    backlogMemoryEvidence(source, reusedMemoryOutputs, runner);
+    assertCommittedBacklogMemoryOutputs(reusedMemoryOutputs, source.projectRoot, storeDir,
+      [String(existingReceipt!.destinationDataRevision), prepared.head], runner);
+  }
   const baseline = captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, originalViews, reusedMemoryOutputs ?? { documents: [] });
   const expectedCount = baseline.records.size + source.counts.total + 1 + (source.memories.length ? 1 : 0);
   const reusedDestinationIds = new Set(Object.values(mapping));
@@ -2185,6 +2211,7 @@ function migrateBeadsToBacklog(
   backlogMemoryEvidence(source, memoryOutputs, runner);
   assertPreservedBacklogBaseline(baseline, storeDir, runner);
   const dataRevision = commitBacklogDestination(runner, prepared, "prime-claw: migrate Beads task history");
+  assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [dataRevision], runner);
   const dataViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "data");
   const dataPaths = backlogPhysicalTaskPaths(storeDir);
   if (dataViews.size !== expectedCount) throw new Error(`Backlog destination count mismatch: expected ${baseline.records.size} preserved records + ${source.counts.total} issue imports + one receipt + ${source.memories.length ? 1 : 0} USER task, found ${dataViews.size}`);
@@ -2239,6 +2266,7 @@ function migrateBeadsToBacklog(
     const exact = cleanGitRevision(runner, storeDir);
     if (exact !== receiptRevision) throw new Error("Backlog destination revision changed after receipt publication");
     assertPublishedGitRef(runner, storeDir, receiptRevision, prepared.remoteName, prepared.remoteUrl, TASK_HISTORY_REF, "Backlog destination receipt publication");
+    assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [dataRevision, receiptRevision], runner);
     const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "refresh");
     if (views.size !== expectedCount) throw new Error(`Backlog destination receipt count changed: expected ${expectedCount} preserved/import/receipt records, found ${views.size}`);
     assertPreservedBacklogBaseline(baseline, storeDir, runner, views);

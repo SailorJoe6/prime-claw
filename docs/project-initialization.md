@@ -360,7 +360,10 @@ These outputs are part of the existing destination data commit and publication,
 exact native readback, destination digest and single migration receipt. Source
 issue counts/mappings stay issue-only; the optional USER task is counted
 separately. Post-receipt and pre-retirement checks repeat the document/path/task
-proofs and exact destination publication. Missing, changed or unpublished outputs
+proofs and exact destination publication. A read-only Git blob check proves the
+memory, index and USER paths contain the exact native bytes in the verified data
+and receipt commits, including on replay. Ignored outputs refuse; migration never
+force-adds files or changes ignore policy. Missing, changed or unpublished outputs
 block source retirement. An exact-source same-destination replay reuses the native
 identities in that receipt; it does not create duplicate imports, index or USER
 work. An incomplete memory import without complete receipt-bound output evidence
