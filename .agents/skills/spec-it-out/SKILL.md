@@ -110,19 +110,28 @@ path, or content mirror.
 
 ### Backlog
 
-Before mutation, record Git status and require the selected existing task path
-and Git index to be clean. After creation or revision, reload the exact task
-through `backlog task view --json -- TASK-ID` and verify its canonical ID,
+Before mutation, record Git status for the code checkout and selected task
+store. Require the selected existing task path and the task store's Git index
+to be clean. After creation or revision, reload the exact task through
+`backlog task view --json -- TASK-ID` and verify its canonical ID,
 `In Design` status, meaningful Description, native Acceptance Criteria, and
-returned regular task path. Verify no path other than that exact returned task
-path was newly changed and do not stage unrelated pre-existing changes.
+returned regular task path. Verify this operation changes only that exact
+returned task path. Do not stage unrelated pre-existing or concurrent changes.
 
 Preserve the selected store topology. If the selected Backlog store is a
 validated ignored independent ordinary-Git clone, whether built-in or custom,
-require canonical code HEAD clean and upstream-equal, require the nested clone
-clean at the direct remote `refs/heads/prime-claw/tasks` head, commit only the
-returned task path inside that clone, push `HEAD:refs/heads/prime-claw/tasks`
-without force, and prove the direct remote head while code HEAD stays unchanged.
+require the nested clone clean at the direct remote
+`refs/heads/prime-claw/tasks` head, commit only the returned task path inside
+that clone, push `HEAD:refs/heads/prime-claw/tasks` without force, and prove the
+direct remote head. Independent task publication does not require the code
+checkout to be clean or upstream-equal. Multiple Conversations may work in the
+same main-tracking checkout and drive separate Episodes concurrently; unrelated
+code changes, including `.prime-claw/ownership.json`, are not a blocker. Do not
+write the code checkout's HEAD, index, or files as part of independent task
+publication, and never stash, revert, commit, or delete another Conversation's
+changes to satisfy a cleanliness check. An unrelated concurrent code change is
+not evidence that this task publication changed code. This authoring policy
+does not bypass separate hard-coded lifecycle admission or status gates.
 Only for an actual branch-local store, keep the existing flow: commit only the
 returned task path in the code repository, prove the commit contains no other
 path, and attempt one prompt push when a remote is available. A push failure is transport evidence to
