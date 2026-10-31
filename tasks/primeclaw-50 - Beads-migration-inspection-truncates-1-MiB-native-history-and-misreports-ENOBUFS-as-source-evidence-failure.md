@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 18:44'
+updated_date: '2026-10-31 19:22'
 labels: []
 dependencies: []
 references:
@@ -116,4 +116,16 @@ Implement only after separate operator `/implement-task PRIMECLAW-50` approval. 
 Verified exact active version-2 binding for this Episode at code base 7380afe1526647eef3dbc7fa0b62ce8796a19641 and clean published task revision 000da477c0418137aba0e1638903b3ea1b1a32c0. This bounded pass implements the approved synchronous file-backed migration capture seam, transport/data diagnostics, focused synthetic Docker regressions and documentation. Two independent workers own the runner and migration integration; the Episode owns integration, Docker validation and publication. No live Ralph reads, private history access, source migration, user-global installation or lifecycle status change is authorized or planned.
 
 The builder-relative deps/backlog/dist/backlog artifact is absent in this new worktree. The already activated native backlog CLI (1.53.0 on PATH) resolves the exact independent .backlog task clone; no dependency or task-store copy was made. Status remains In Progress. Finite synthetic tests will be paired with source review proving regular file descriptors, not a raised fixed pipe buffer.
+
+### Final-generation validation milestone
+
+Both implementation workers are finished and frozen. Migration entrypoints now use private file-descriptor capture for discovery, every complete source read and recapture. Existing synchronous parser/package flow remains unchanged. Command results preserve errorCode/nativeStatus/signal. Bounded diagnostics never fall back to stdout or echo JSON parser payloads; command/resource failures carry separate advice from invalid native data.
+
+Docker validation uses TIER1_ENV_FILE=/tmp/primeclaw50-tier1.env selecting the verified read-only TypeScript source tag cwd-fix-v0.9.8-r1 (tag 8ca4d5c39b7c738f71b5c86422ea46394c3d0558; HEAD a1faacd53ac4473a75de1d434afaf50945c2f647; tree and lockfile match docs/prime-agent-installation.md).
+- Initial documented focused command: 3 passed in 998.45s; log /tmp/primeclaw50-focused.log, evidence .test-results/20261031T184707Z-78534-14889051/tier1. A final adapter correction landed while this snapshot was being prepared, so this is not the final-generation proof.
+- Final documented focused command (task-provider migration suite, project-initialization suite, retiring-source capture suite): 3 passed in 997.23s; log /tmp/primeclaw50-focused-final.log, evidence .test-results/20261031T190350Z-29585-ff029127/tier1.
+- Mandatory scripts/test-tier1.sh --probe: exit 0; offline checks passed, teardown verified and manifest published. Log /tmp/primeclaw50-probe.log, evidence .test-results/20261031T192034Z-74845-88b4e942/tier1.
+- Final full python3 -m pytest tests/ -q -m container is currently running; log /tmp/primeclaw50-full.log. No full-suite result or candidate completion is claimed yet.
+
+Synthetic production-path evidence includes exact 108-record 1,305,475-byte history and 2,610,950-byte multibyte events retained in the existing destination-package fixture; default-route assertions for export/inventory/show/history/events/provenance/identity; ENOBUFS with empty stderr/null native status/SIGTERM; ordinary stderr cases; deterministic storage/output-read resource failures; private temporary cleanup; genuine invalid JSON without payload disclosure; and initial-capture refusal before source/ownership/destination mutation. Source review confirms FD stdio with no maxBuffer increase or capture byte cutoff. No live Ralph, global install, source retirement, status mutation or merge occurred.
 <!-- SECTION:NOTES:END -->
