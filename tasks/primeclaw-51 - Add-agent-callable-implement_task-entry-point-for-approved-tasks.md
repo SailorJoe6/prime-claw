@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Progress
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 19:40'
+updated_date: '2026-10-31 19:46'
 labels: []
 dependencies: []
 references:
@@ -160,4 +160,12 @@ Remaining baseline static failures:
 - tests/test_reviewed_plan_extension.py::test_repository_status_cutover_uses_task_native_order_without_to_do
 
 Remaining approved work: remove all five custom command registrations/adapters; replace retained ImplementationApproval invocation proof while preserving frozen bundle integrity/source-absent replay and resource lifecycle; add remaining plan/plan-spec/implement-spec/handoff global entries; align actual planning/handoff/oversight policy, conditional authority and delegated selection across all loaded guidance; update full product docs and final discovery probes; complete remaining focused/full acceptance coverage. No full acceptance criterion is marked complete by this slice. Lifecycle status remains In Progress. No global apply/check/probe, live deployment, restart, merge, abandonment, cleanup, task-provider migration, or second Episode assignment occurred. Continue only after the owning Conversation reviews this checkpoint.
+
+Accepted handoff checkpoint (2026-10-31)
+
+The owning Conversation accepted slice 1 as an incremental candidate, not full-task acceptance. It verified native changes limited to Implementation Notes, modified-file metadata and timestamp with unchanged scope/plan/AC/status; clean pushed code 25615430ba173be461fac7ee66a8f03c6fbc0329; passing Docker Tier-1 and final reviewed-plan bridge; and no candidate-only static failures against baseline. Its independent read-only GPT-6 Astra source/test review reported no material defect. Continue this same Episode only.
+
+Next bounded execute slice: retained-folder parity. Add implement_spec(location, optional stable host) tool-origin entry and discoverable global skill; make create_spec_episode self-contained without the remaining legacy invocation-proof ImplementationApproval map. Capture the current implementation-ready bundle digest at the concrete create boundary and retain the existing capture/promotion/post-copy integrity checks, grandfathered frozen-specification verification and meaningful-plan checks. Check exact active version-1 replay before requiring an obsolete future source; source-absent replay must return the same resources with no execute assignment. Preserve placement, explicit stable host/no silent fallback, ownership/resource safety, stable customizable workflow IDs and retained .ralph/skills lookup support.
+
+Do not add tokens, receipts, approval classifiers or binding frameworks. Do not migrate, retire, delete or recreate retained work. Keep command removals, other global entry skills and complete policy/docs/probe alignment pending unless this slice needs a proportionate related change. Validate changed plugin source only through Docker and the mandatory Tier-1 probe. Publish truthful native task evidence and one clean pushed code slice, then stop for Conversation review. No host/global candidate apply/check/probe, merge, activation, restart, cleanup, new Episode or second assignment. This task remains In Progress; product scope, plan and AC remain unchanged.
 <!-- SECTION:NOTES:END -->
