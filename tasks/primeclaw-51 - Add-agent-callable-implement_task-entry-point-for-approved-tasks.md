@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Progress
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 19:23'
+updated_date: '2026-10-31 19:26'
 labels: []
 dependencies: []
 references:
@@ -100,3 +100,9 @@ Replace invocation surfaces, not the Episode lifecycle. Reuse the existing prepa
 
 Prefer existing provider-native behavior, then concise LLM instructions, then the narrow integrity/transport changes above. No deterministic approval classifier, task reconciliation, iterative-plan controller, phase-history receipt, persistent coordination framework, orchestrator, autonomous backlog loop or speculative hardening. Keep explicit operator authority for product/scope, merge, abandonment and destructive actions. Planning does not authorize implementation; stop for operator review of this saved plan.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Execution slice 1 (2026-10-31): implement the task-native agent entry end to end: implement_task(taskId, optional stable host), self-contained create_task_episode with current provider/task/placement checks, and removal of only TaskImplementationApprovalStore invocation proof. Add the discoverable implement-task entry and align its customizable task workflows/docs. Keep all custom command registrations and retained version-1 invocation guard unchanged in this incremental slice. Later slices still remove commands, replace retained entry guards, add remaining entry skills, and align full product documentation. No acceptance criterion is claimed complete yet. Validate through Docker suites and tier-1 probe only; do not activate globally or change lifecycle status.
+<!-- SECTION:NOTES:END -->
