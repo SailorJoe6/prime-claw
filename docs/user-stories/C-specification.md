@@ -6,7 +6,7 @@
 discovery, so that the conversation produces a bounded, reviewable
 specification without beginning implementation.**
 
-`/design` keeps its discovery-first posture. It uses the repository's sole
+`/skill:design` keeps its discovery-first posture. It uses the repository's sole
 valid live task provider to create exactly one native task with explicit
 `In Design` status or revise one exact operator-selected native task that is
 already `In Design`.
@@ -17,7 +17,7 @@ already `In Design`.
 conversation synthesized into a durable specification, so that I only need to
 answer the remaining material questions.**
 
-`/spec-it-out` uses the same exact-task contract with a synthesis-first posture.
+`/skill:spec-it-out` uses the same exact-task contract with a synthesis-first posture.
 It asks only the material questions that remain.
 
 Both paths store the living product contract in supported provider-native

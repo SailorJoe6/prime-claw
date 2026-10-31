@@ -21,7 +21,11 @@ user-level goals skill, the selected-context role block, and customizable
 project files.
 
 Global discoverable skills include `initialize-prime-claw`, `goals-and-heartbeats`,
-`prime-claw-expert-review`, and `prime-claw-oversee-episode`. `ROLE_KERNEL.md`
+`prime-claw-expert-review`, `prime-claw-oversee-episode`, and the five thin workflow
+entries `plan`, `plan-spec`, `implement-task`, `implement-spec`, and `handoff`.
+They remain discoverable for active Episode snapshots that skip reconciliation.
+Prime Claw's five custom workflow command registrations are removed, not Prime
+Agent built-ins or native `/skill:` invocation. `ROLE_KERNEL.md`
 and the goal-continuation fragment are global internal assets. Project skill
 sources remain under `src/prime-agent-plugin/skills/project-templates/` but use
 plain `.md` filenames, so installing the plugin cannot expose them as global
@@ -41,11 +45,17 @@ An initialized project contains these regular customizable files:
 - `.prime-claw/workflows/plan-task-prep.md`
 - `.prime-claw/workflows/plan-task.md`
 
-The workflows are lifecycle inputs, not slash-discoverable skills. Native
-`/plan TASK-ID` and `plan_task` load `plan-task-prep` and `plan-task`. `/implement-task TASK-ID` now loads the reconciled `implement-task-prep` and
-`implement-task` policies before one exact `create_task_episode` call. The
-retained `implement-prep` and `implement-spec`
-assets continue to serve existing future-folder bundles during the migration.
+The workflows are lifecycle inputs, not separately scanned skills. Global entry
+skills route through `plan_task`, `plan_spec`, `implement_task`, `implement_spec`,
+and `ralph_handoff` to load canonical project policy. Stable workflow IDs and
+customizable destinations are unchanged. `implement_task` loads
+`implement-task-prep` and `implement-task` before one exact `create_task_episode`
+call. Retained `implement-prep` and `implement-spec` continue to serve existing
+future-folder bundles. Markdown owns conditional phase authority: planning alone
+stops; an explicit within-scope plan-then-implement request may continue after
+readiness. Bounded delegated selection binds an exact task; implementation
+requires native `In Planning` after design/planning, not dependency readiness
+alone or an invocation-sequence receipt.
 The legacy `.ralph/skills` tree and `.agents/skills` symlinks are migrated away.
 `.ralph/plans` is never moved or interpreted as template content.
 
@@ -470,6 +480,16 @@ The selected role block remains under the final-only role reconciler
 because `AGENTS.md` can contain independently owned surrounding content. Its
 source and generation come from the delivery manifest. Project `templates.json`
 and plugin delivery state retain their distinct ownership records.
+
+## Workflow invocation cutover safety
+
+Changing entry registrations does not authorize global activation, ownership
+migration, retained-plan deletion, or Episode recreation. After separately
+approved merge and primary-main user-global refresh, quiesce affected work and
+perform one coordinated full Prime Agent restart. Keep every resource the old
+generation may read, including retained active plan pairs, until resumed
+owner/Episode and designated ordinary-session UAT prove the new skills/tools.
+Copy success, `/reload`, and a fresh probe alone do not establish cutover.
 
 ## Validation and migration boundary
 

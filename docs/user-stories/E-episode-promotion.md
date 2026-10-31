@@ -23,16 +23,17 @@ Final `create_task_episode(taskId, host?)` independently resolves concrete nativ
 identity, state, readiness, placement, and ownership; it requires no prior entry
 invocation, approval store, or turn receipt.
 
-This incremental slice adds task and retained-folder implementation entry
-skills/tools without removing existing custom commands, including
-`/implement-task` and `/implement-spec`. Other entry skills and broad
-policy/probe alignment remain pending.
+The five custom workflow command registrations are removed. Thin global entry
+skills reuse agent-callable operations and canonical project policy; Prime Agent
+built-ins and native `/skill:` remain available. Entry admission means queued
+work, not completed compaction, readiness, or creation. End the calling turn and
+never retry failed or uncertain admission as fresh allocation.
 
 For retained version-1 compatibility, the discoverable `implement-spec` skill
 routes one exact operator-selected `.ralph/plans/future/<slug>` through
 `implement_spec(location, host?)` and the project's customizable readiness
 policies. It asks when the folder is missing or ambiguous; it never selects a
-replacement. The existing command remains an alternative. Fresh creation still
+replacement. Fresh creation still
 requires its exact location and frozen `SPECIFICATION.md` bytes to match the
 explicit-upgrade grandfathered inventory; its execution plan remains living.
 Markdown interprets operator authority, including an explicit conditional
@@ -208,8 +209,8 @@ failure before ownership or resource mutation commits the exact task back to
 `In Planning`. Any durable or uncertain mutation instead commits `Blocked` plus
 the exact inspection/reconciliation condition and preserves all evidence.
 
-The `implement-task` skill, `implement_task` entry tool, retained `/implement-task`
-command, and `create_task_episode` expose this task-native path. Final create is
+The `implement-task` skill, `implement_task` entry tool, and
+`create_task_episode` expose this task-native path. Final create is
 self-contained: it re-resolves the current provider, exact canonical task/root/
 Backlog path and valid native status/plan, then resolves placement before
 mutation. An optional stable host is revalidated, never silently substituted;
@@ -220,6 +221,16 @@ resource checks still refuse duplicate admission. Retained version-1
 compatibility folder Episode creation remains available through the retained
 entry and self-contained creation boundary above, with its integrity and exact
 active-replay checks preserved.
+
+## Invocation cutover safety
+
+The interface change does not migrate or retire retained workflows, change
+ownership, delete plans, or recreate resources. Preserve stable customizable
+phase IDs and supported old-layout handoff/execute fallback. Later live refresh
+requires separately authorized accepted-main apply, one coordinated full
+restart, and resumed owner/Episode plus ordinary-session UAT. Keep resources the
+old generation may read until proof succeeds. Copy success, `/reload`, and a
+fresh probe alone are not cutover proof; candidate validation is not activation.
 
 ## Primary implementation surfaces
 

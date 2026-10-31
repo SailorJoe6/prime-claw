@@ -69,7 +69,6 @@ def test_legacy_authoring_preserves_current_main_folder_behavior_without_duplica
 def test_retained_legacy_entry_surfaces_and_snapshot_fallback_remain_bounded() -> None:
     extension = (ROOT / "src/prime-agent-plugin/extensions/reviewed-plan.ts").read_text()
     for surface in (
-        'command: "plan-spec"', 'pi.registerCommand("implement-spec"',
         'name: "plan_spec"', 'name: "implement_spec"', 'name: "create_spec_episode"',
         'name: "handoff_spec_episode"', 'name: "finalize_spec_episode"',
         'name: "restore_blocked_spec_episode"',
@@ -177,7 +176,8 @@ def test_authoring_skill_binds_one_exact_provider_native_in_design_task(skill_na
         "Creation is one mutation attempt",
         "do not issue another create",
         "This invocation never issues a second create after uncertainty",
-        "Never search either provider's queue",
+        "selection within stated bounds",
+        "Delegated selection never skips design or planning",
     ):
         assert fragment in text
 
@@ -235,7 +235,7 @@ def test_authoring_skill_publishes_only_through_the_selected_provider_and_stops_
         "explicitly ask the operator to review the saved specification",
         "stop without planning, writing an implementation plan",
         "same exact native `In Design` task",
-        "/plan TASK-ID",
+        "`plan_task` with this exact canonical ID",
         "never authorizes implementation",
     ):
         assert fragment in text
@@ -377,7 +377,8 @@ def test_phase_prep_composes_context_aware_hint_without_fixed_inventory(
         assert "<operator-implementation-host>" in hint_policy
         assert "Planning-only authority must remain planning-only" in hint_policy
     else:
-        assert "Preserve" not in hint_policy
+        assert "conditional implementation authority" in hint_policy
+        assert "planning-only" in hint_policy
     assert skill.count("await compact.run(focus_hint)") == 1
     for fragment in (
         "sole follow-up",
@@ -552,7 +553,7 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
         "bd dolt push --no-adopt",
         "compatible owner-authored refinement or outside same-task planning change",
         "does not authorize implementation",
-        "/implement-task",
+        "invoke `implement_task` for this exact ID",
     ):
         assert fragment in plan
 
@@ -567,9 +568,9 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
     ).read_text()
     assert 'prepSkillName: "plan-task-prep"' in extension
     assert 'phaseSkillName: "plan-task"' in extension
-    assert 'pi.registerCommand("plan"' in extension
+    assert 'pi.registerCommand("plan"' not in extension
     assert 'name: "plan_task"' in extension
-    assert 'command: "plan-spec"' in extension
+    assert 'command: "plan-spec"' not in extension
     assert 'name: "plan_spec"' in extension
 
 
@@ -674,7 +675,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     extension = (
         ROOT / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.ts"
     ).read_text()
-    assert 'pi.registerCommand("implement-task"' in extension
+    assert 'pi.registerCommand("implement-task"' not in extension
     assert 'name: "create_task_episode"' in extension
     assert "admitProviderTaskPrepChain" in extension
     assert "providerTaskResolver" in extension
@@ -683,7 +684,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     assert 'name: "handoff_task_episode"' in extension
     assert 'name: "finalize_task_episode"' in extension
     assert 'name: "transition_spec_episode_to_task"' in extension
-    assert 'pi.registerCommand("implement-spec"' in extension
+    assert 'pi.registerCommand("implement-spec"' not in extension
     assert 'name: "create_spec_episode"' in extension
     assert 'name: "handoff_spec_episode"' in extension
     assert 'name: "finalize_spec_episode"' in extension
@@ -707,8 +708,8 @@ def test_task_implementation_entry_is_thin_global_guidance_with_skill_owned_auth
         "Admission is not proof of compaction, readiness, or Episode creation",
         "end the turn",
         "do not automatically retry",
-        "incremental cutover",
-        "existing custom commands",
+        "Custom slash commands are not workflow prerequisites",
+        "Retained version-1 workflows, ownership, plans, and resources remain supported",
     ):
         assert fragment in entry
     assert "backlog task edit" not in entry
@@ -788,8 +789,8 @@ def test_retained_implementation_entry_is_thin_global_guidance_with_skill_owned_
         "Admission is not proof of compaction, readiness, or Episode creation",
         "end the turn",
         "do not automatically retry",
-        "incremental cutover",
-        "existing custom commands",
+        "Custom slash commands are not workflow prerequisites",
+        "Retained version-1 workflows, ownership, plans, and resources remain supported",
     ):
         assert fragment in entry
     assert "backlog task edit" not in entry
@@ -857,3 +858,109 @@ def test_retained_implementation_policies_use_current_integrity_not_invocation_p
         assert target["destination"] == f".prime-claw/workflows/{name}.md"
         assert target["lifecycleTrigger"] == "implement-spec"
         assert target["migrateFrom"] == f".ralph/skills/{name}/SKILL.md"
+
+
+@pytest.mark.parametrize(
+    ("name", "tool", "policies"),
+    (
+        ("plan", "plan_task", ("plan-task-prep", "plan-task")),
+        ("plan-spec", "plan_spec", ("plan-prep", "plan-spec")),
+        ("handoff", "ralph_handoff", ("handoff",)),
+    ),
+)
+def test_replacement_entries_are_global_thin_routes_to_canonical_policy(name, tool, policies):
+    source = ROOT / "src/prime-agent-plugin"
+    relative = f"skills/{name}/SKILL.md"
+    entry = " ".join((source / relative).read_text().split())
+    inventory = json.loads((source / "asset-inventory.json").read_text())
+    row = next(row for row in inventory["assets"] if row["id"] == f"global-{name}")
+    assert row == {
+        "id": f"global-{name}", "source": relative,
+        "targets": [{"class": "plugin-root-managed", "destination": relative}],
+    }
+    assert f"name: {name}" in entry
+    assert tool in entry
+    assert "No custom slash command is required" in entry
+    assert "End the turn after admission" in entry
+    assert "uncertainty without automatic retry" in entry
+    assert "does not prove compaction" in entry
+    assert len(entry) < 3200
+    assert "backlog task edit" not in entry
+    assert "bd --dolt-auto-commit" not in entry
+    assert "await compact.run" not in entry
+    assert not (ROOT / ".agents/skills" / name / "SKILL.md").exists()
+    for policy_name in policies:
+        assert f"{policy_name}.md" in entry
+        policy = next(row for row in inventory["assets"] if row["id"] == f"project-workflow-{policy_name}")
+        target = next(target for target in policy["targets"] if target["class"] == "project-customizable")
+        assert target["destination"] == f".prime-claw/workflows/{policy_name}.md"
+        assert target["exposure"] == "internal"
+    if name == "plan":
+        for phrase in ("explicitly delegated", "stated bounds", "`In Design` or `In Planning`", "canonical task ID", "semantic readiness", "not dependency readiness alone", "phase-history receipt"):
+            assert phrase in entry
+    elif name == "plan-spec":
+        for phrase in ("missing or materially ambiguous", "do not search for, select, invent, or substitute", "frozen grandfathered specifications", "`.ralph/skills` fallback"):
+            assert phrase in entry
+    else:
+        assert "operator-supplied bounded compaction focus" in entry
+        assert "handoff_task_episode" in entry and "handoff_spec_episode" in entry
+        assert "not Conversation supervision" in entry
+        assert "blocked recovery, pause, consultation, merge, abandonment, cleanup, or scope expansion" in entry
+
+
+@pytest.mark.parametrize("name", ("plan-task", "plan-spec"))
+def test_actual_planning_completion_honors_conditional_authority_without_a_sequence_receipt(name):
+    for path in (workflow(name), ROOT / ".prime-claw/workflows" / f"{name}.md"):
+        text = " ".join(path.read_text().split())
+        completion = text.split("## Report the plan and apply operator authority", 1)[1]
+        assert "planning-only request" in completion
+        assert "explicitly ask the operator to review the plan and stop" in completion
+        assert "explicit conditional plan-then-implement authority" in completion
+        assert "do not stop solely to request the same approval again" in completion
+        assert "material ambiguity" in completion and "new scope" in completion
+        assert "Planning does not authorize implementation" in text
+        assert "Wait for a separate explicit" not in text
+        assert "command" not in completion
+        if name == "plan-task":
+            assert "invoke `implement_task` for this exact ID" in completion
+            assert "native `In Planning` (Beads `in_planning`) after design and planning" in completion
+            assert "full semantic readiness review" in completion
+            assert "dependency readiness alone is insufficient" in completion
+            assert "No separate phase-history receipt is required" in completion
+        else:
+            assert "invoke `implement_spec` for this exact location" in completion
+            assert "complete retained-bundle readiness review" in completion
+
+
+def test_changed_loaded_policy_keeps_phase_ids_fallback_and_builder_customization():
+    source = ROOT / "src/prime-agent-plugin"
+    inventory = json.loads((source / "asset-inventory.json").read_text())
+    rows = {row["id"]: row for row in inventory["assets"]}
+    retained = {
+        "plan-prep": ("plan-spec", "plan-prep"),
+        "plan-spec": ("plan-spec", "plan"),
+        "handoff": ("handoff", "handoff"),
+        "implement-prep": ("implement-spec", "implement-prep"),
+        "implement-spec": ("implement-spec", "implement-spec"),
+    }
+    for name, (trigger, old_name) in retained.items():
+        row = rows[f"project-workflow-{name}"]
+        assert row["source"] == f"workflows/{name}.md"
+        target = next(target for target in row["targets"] if target["class"] == "project-customizable")
+        assert target["lifecycleTrigger"] == trigger
+        assert target["migrateFrom"] == f".ralph/skills/{old_name}/SKILL.md"
+    chain = (source / "extension-support/workflow-chain.ts").read_text()
+    assert 'new Set(["handoff", "execute"])' in chain
+    assert 'join(root, ".ralph", "skills", name, "SKILL.md")' in chain
+    # Preserve local publication customizations, not just the new entry wording.
+    for path in (ROOT / ".prime-claw/workflows/plan-task.md", ROOT / ".agents/skills/spec-it-out/SKILL.md"):
+        text = path.read_text()
+        assert "Independent task publication does not require the code" in text
+        assert "never stash, revert, commit, or delete another Conversation's" in text
+    oversee = " ".join((source / "skills/prime-claw-oversee-episode/SKILL.md").read_text().split())
+    assert "Explicit conditional plan-then-implement authority" in oversee
+    assert "planning alone never authorizes implementation" in oversee
+    assert "not dependency readiness alone or a separate phase-history receipt" in oversee
+    handoff = " ".join(workflow("handoff").read_text().split())
+    assert "`ralph_handoff` operation or owning Conversation" in handoff
+    assert "native `/handoff` command" not in handoff

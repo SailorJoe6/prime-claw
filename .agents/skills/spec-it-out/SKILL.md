@@ -16,16 +16,19 @@ not executable presence: a valid Backlog configuration selects Backlog, while a
 valid `.beads/` Dolt store selects Beads. Run every provider command from the
 exact project root. If provider evidence is absent, malformed, dual, redirected,
 or unavailable, explain the exact remediation and stop without creating,
-initializing, switching, or mutating a provider. Never search either provider's
-queue to choose work, mix provider commands, mirror content, or create a folder
-under `.ralph/plans`.
+initializing, switching, or mutating a provider. Never mix provider commands, mirror content, or create a folder under
+`.ralph/plans`. Search the provider's queue to select work only when the operator
+explicitly delegates selection within stated bounds; bind one exact canonical
+`In Design` task before any task-specific mutation. Clarify unclear bounds.
+Delegated selection never skips design or planning.
 
 ## Bind or create exactly one task
 
 If the operator explicitly selected an existing task, use only that entire exact
-canonical ID. Do not search for, infer, or substitute another task. If the
-request might mean either create new work or revise existing work but no exact
-ID is given, ask the operator before mutation.
+canonical ID. Do not infer or substitute another task. Explicit bounded
+selection as described above may resolve an existing task before mutation.
+Otherwise, if the request might mean either create new work or revise existing
+work but no exact ID is given, ask the operator before mutation.
 
 Reload a selected task through only its provider:
 
@@ -191,6 +194,11 @@ After verified publication:
 
 Apply requested specification revisions to the same exact native `In Design`
 task with these identity, mutation, publication, and proof rules. Do not advance
-to planning unless the operator later invokes the separate `/plan TASK-ID`
-workflow. Specification approval authorizes planning only; it never authorizes
-implementation.
+to planning without operator authority; load the `plan` entry skill and use
+`plan_task` with this exact canonical ID when planning is requested.
+Specification approval authorizes planning only; it never authorizes
+implementation. A separate explicit conditional instruction to plan, then
+implement when ready may authorize that sequence within approved scope; preserve
+it through planning and compaction rather than requesting duplicate approval.
+Implementation still requires native `In Planning` after design and planning
+plus semantic readiness, not dependency readiness alone or a phase-history receipt.

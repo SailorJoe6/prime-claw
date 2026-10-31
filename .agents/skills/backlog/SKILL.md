@@ -43,12 +43,15 @@ auditable.
 
 4. Respect the task-native lifecycle and its authority boundaries:
 
-- `/design` and `/spec-it-out` create or revise only `In Design` tasks through
-  supported `backlog task create` or `backlog task edit` operations.
-- `/plan TASK-ID` writes the native Implementation Plan and publishes
-  `In Planning` through one supported task edit.
-- `/implement-task TASK-ID` admits one exact approved `In Planning` task; the
-  owning Conversation publishes `In Progress` before Episode allocation.
+- The `design` and `spec-it-out` skills create or revise only `In Design` tasks
+  through supported `backlog task create` or `backlog task edit` operations.
+- The `plan` skill calls `plan_task` for one exact task. Its canonical workflow
+  writes the native Implementation Plan and publishes `In Planning` through one
+  supported task edit.
+- The `implement-task` skill calls `implement_task` for one exact implementation-ready
+  `In Planning` task. The owning Conversation publishes `In Progress` before
+  Episode allocation. Planning alone does not authorize implementation; an explicit
+  conditional plan-then-implement instruction may remain valid within approved scope.
 - Later `Blocked`, resumed `In Progress`, `Ready for Merge`, and terminal `Done`
   transitions belong to the owning Conversation under the reviewed lifecycle.
 

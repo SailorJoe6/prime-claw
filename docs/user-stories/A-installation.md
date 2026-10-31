@@ -14,7 +14,11 @@ The installation contract includes:
 - installation of extensions, support modules, managed skills, workflows, and
   role policy;
 - exact post-install checking that detects incomplete or mixed generations;
-- a separate coordinated restart requirement after accepted activation.
+- a separate coordinated full restart after authorized accepted-main activation,
+  followed by resumed owner/Episode and designated ordinary-session UAT;
+- retention of every resource the old generation may read, including active
+  retained plan pairs, until cutover is proven. Copy success, `/reload`, and a
+  fresh probe alone are insufficient; candidate validation does not activate it.
 
 ## US-02 — Preserve unrelated global configuration
 

@@ -169,10 +169,10 @@ routing.
 
 ## The conversation → episode transition
 
-The boundary begins when the operator invokes `/design` or `/spec-it-out`
-inside a project conversation. `/design` is for work that still needs
-requirements discovery; `/spec-it-out` is for work whose design is already
-substantially present in the conversation. Their exact questions and mutation
+The boundary begins when the operator asks to use `design` or `spec-it-out`
+inside a project conversation (native `/skill:design` and `/skill:spec-it-out`
+remain available). `design` discovers requirements; `spec-it-out` synthesizes a
+design already present in the conversation. Their exact questions and mutation
 policy remain project-customizable Markdown under `.agents/skills/`.
 
 Both skills use the repository's sole live provider to create one explicit
@@ -186,13 +186,22 @@ clean working set. Uncertain creation never permits another create. Each
 workflow asks the operator to review the living specification and allocates no
 Episode. The operator may request as many specification revisions as needed.
 
-When the specification is ready for planning, the operator invokes `/plan
-TASK-ID`. Native command code resolves the exact task through the repository's
-selected provider and accepts only canonical `In Design` or `In Planning`; the
-project-customizable workflow writes Backlog's native Implementation Plan or
-Beads' raw living `design`, publishes native `In Planning`, proves the exact
-provider result, and stops for a separate operator review. Beads carries no task
-path or mirrored task model. Specification approval authorizes planning only.
+When the specification is ready for planning, the discoverable `plan` skill
+routes a conversational request to `plan_task(taskId)`. Native code resolves the
+exact task through the selected provider and accepts only `In Design` or
+`In Planning`. The customizable workflow writes Backlog's native Implementation
+Plan or Beads' raw living `design` and publishes native `In Planning`. A
+planning-only request stops for review and allocates no Episode. Markdown owns
+phase authority: an explicit instruction to plan then implement when ready may
+continue within approved scope after readiness without new approval solely
+because planning finished. Specification approval alone does not grant that
+sequence. Material ambiguity or scope changes require clarification.
+
+The operator may delegate task selection within stated bounds. The skill binds
+one exact canonical task before invoking task-specific operations. Implementation
+selection requires `In Planning` after design and planning plus semantic readiness;
+dependency readiness alone is insufficient. No phase-history receipt or required
+entry sequence supplements native lifecycle state.
 
 Provider choice is not permanent, but it changes only through a separate,
 explicit initialization/upgrade maintenance window. A read-only inspection
@@ -205,20 +214,36 @@ proof, and is deleted only after destination activation; any pre-cutover
 failure preserves the source and never starts a duplicate, retry loop, mirror,
 or dual write.
 
-The primary implementation boundary is the active `/implement-task TASK-ID`
-path. It resolves one exact approved `In Planning` task, performs the final
-semantic readiness check, commits its transition to `In Progress`, reserves
+The primary implementation entry is the discoverable `implement-task` skill and
+`implement_task(taskId, host?)`. It resolves an authorized `In Planning` task and
+placement, then queues compact-first semantic readiness. Self-contained
+`create_task_episode` revalidates concrete provider/identity/state/readiness,
+placement, ownership, and resources. It publishes `In Progress`, reserves
 version-2 ownership before resource creation, and creates one isolated Episode
-whose sole durable authority is that task. Planning approval never implicitly
-authorizes implementation, and the Conversation retains lifecycle status while
-the Episode owns task content on its branch.
+with one fixed execute assignment. No prior entry invocation is proof of
+approval. The Conversation retains lifecycle status while the Episode owns task
+content on its branch.
 
-Already-created `.ralph/plans/future/<slug>` bundles in initialized projects
-remain operational through the retained version-1 compatibility path:
-`/plan-spec`, `/implement-spec`, and the existing folder-based Episode
-mechanics. New `/design` and `/spec-it-out` invocations do not create those
-folders, and this task-native builder repository no longer stores a local
-`.ralph/plans` tree.
+Already-created `.ralph/plans/future/<slug>` bundles remain operational through
+the retained version-1 compatibility skills `plan-spec` and `implement-spec`,
+backed by `plan_spec` and `implement_spec`. Their self-contained creation,
+continuation, exact active replay, frozen-spec integrity, and resource lifecycle
+remain supported. This invocation change neither migrates ownership nor deletes
+plans or resources. New `/skill:design` and `/skill:spec-it-out` invocations do
+not create those folders; this task-native builder stores no local plan tree.
+
+Prime Claw's five custom workflow command registrations are removed. Native
+Prime Agent built-ins and `/skill:` remain unchanged. Entry skills load the
+canonical project policy rather than duplicating it. Ordinary `handoff` routes
+to `ralph_handoff`; owner lifecycle operations remain separate tools. Admission
+means queued work, not completed compaction, readiness, or creation. Failed or
+uncertain admission never permits automatic duplicate allocation or delivery.
+
+A separately authorized accepted-generation refresh still requires quiescence,
+one coordinated full restart, and resumed owner/Episode and designated ordinary-
+session UAT. Keep all resources the previous generation may read, including
+retained active plan pairs, until cutover is proven. Copy success, `/reload`,
+and a fresh probe alone do not prove it. No activation is implied here.
 
 A task-native Episode remains available through bounded execute and handoff
 iterations, independent review, refreshed-candidate verification, and explicit

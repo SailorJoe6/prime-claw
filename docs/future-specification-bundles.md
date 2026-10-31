@@ -1,6 +1,6 @@
 # Future specification bundles — migration compatibility
 
-New specification authoring is provider-native. `/design` and `/spec-it-out`
+New specification authoring is provider-native. `/skill:design` and `/skill:spec-it-out`
 use the repository's sole live provider to create one explicit native
 `In Design` task or revise one exact operator-selected task already in
 `In Design`. Backlog publishes Description, native Acceptance Criteria,
@@ -12,12 +12,20 @@ or Episode admission.
 
 ## Primary task-native lifecycle
 
-1. Create or revise one exact `In Design` task with `/design` or `/spec-it-out`.
-2. Run `/plan TASK-ID`; review the provider-native Backlog Implementation Plan
-   or Beads raw `design`, and approve it separately while the task remains
-   `In Planning`.
-3. Run `/implement-task TASK-ID`. The compact-first readiness chain binds the
-   exact task and placement, then calls `create_task_episode` once.
+1. Create or revise one exact `In Design` task with `design` or `spec-it-out`
+   (native `/skill:design` and `/skill:spec-it-out` remain available).
+2. Ask the agent to plan it. The global `plan` skill binds the exact task and
+   invokes `plan_task`; the workflow writes Backlog's Implementation Plan or
+   Beads' raw `design`, publishing native `In Planning`. Planning alone stops
+   for review. Explicit conditional plan-then-implement authority may continue
+   within scope after readiness, without fresh approval solely because planning
+   finished.
+3. The global `implement-task` skill invokes `implement_task(taskId, host?)` for
+   authorized implementation. Explicitly delegated selection stays within bounds
+   and binds an exact canonical ID. Implementation requires `In Planning` after
+   design and planning, not dependency readiness alone. The compact-first chain
+   binds task and placement, performs semantic readiness, then calls
+   self-contained `create_task_episode` once. No prior-entry receipt is required.
 4. Trusted admission publishes the exact task as `In Progress` in its selected
    provider-native topology, persists version-2 ownership, and creates one isolated
    Episode from the exact clean code base. Independent task history binds its
@@ -71,13 +79,13 @@ A retained bundle contains `SPECIFICATION.md` and `EXECUTION_PLAN.md`, plus any
 supporting artifacts needed to make the work self-contained. The accepted
 specification is frozen, while its execution plan remains living. Planning and
 fresh admission reject a later location or changed specification and direct new
-work to the selected-provider task UX. New `/design` and `/spec-it-out`
+work to the selected-provider task UX. New `/skill:design` and `/skill:spec-it-out`
 invocations do not create this folder.
 
 Active version-1 ownership remains provider-independent. Its promoted active or
 blocked specification must match the inventory digest, but the original future
-source may be absent. In that state, the registered `/implement-spec` and
-`create_spec_episode` path recognizes only the exact active owner, reviews its
+source may be absent. In that state, the `implement-spec` skill, `implement_spec`,
+and `create_spec_episode` path recognizes only the exact active owner, reviews its
 promoted active pair, returns the same Episode, and sends no new assignment.
 Handoff, expert and owner review, operator-authorized blocked recovery, and
 bookkeeping finalization keep the same Episode, session, worktree, branch, and
@@ -143,11 +151,14 @@ later separately reviewed data-cutover step, not part of the bridge.
 ## Retained version-1 bundle lifecycle
 
 1. Select one exact existing future folder.
-2. Run `/plan-spec .ralph/plans/future/<slug>` or ask the Conversation to use
+2. Ask the Conversation to plan that folder. The `plan-spec` skill invokes
    `plan_spec` for that exact path.
-3. Review and revise `EXECUTION_PLAN.md` in the same folder. Planning stops for
-   operator approval and does not start implementation.
-4. When approved, run `/implement-spec .ralph/plans/future/<slug>`.
+3. Review and revise `EXECUTION_PLAN.md` in the same folder. Planning alone stops
+   for review and grants no implementation authority. An explicit conditional
+   request to plan then implement may continue within approved scope after
+   readiness.
+4. For authorized implementation, the `implement-spec` skill invokes
+   `implement_spec` for that same folder.
 5. The compact-first implementation chain loads ordinary oversight guidance,
    performs the full readiness review, and calls `create_spec_episode` only if
    the bundle is implementation-ready.
@@ -162,10 +173,13 @@ retains those directories.
 
 ## Retained version-1 planning surface
 
-The native command is `/plan-spec`, the internal workflow is `plan-spec`, and
-the model tool is `plan_spec`. All use the same compact-first prep chain. The
-tool requires an exact operator-selected location and never searches for or
-invents a folder.
+The globally discoverable `plan-spec` skill uses `plan_spec` to load the
+canonical `plan-prep` and `plan-spec` workflows. It requires an exact operator-
+selected location and never searches for or invents a folder. `implement-spec`
+similarly uses `implement_spec`. Prime Claw no longer registers custom workflow
+commands; native `/skill:` invocation and Prime Agent built-ins remain available.
+Admission is queued work, not completed planning, compaction, or creation. End
+the calling turn after admission and never retry uncertain transport.
 
 ## Retained version-1 implementation readiness
 
@@ -190,7 +204,7 @@ when known, path, and stable ID. A
 noninteractive caller uses:
 
 ```text
-/implement-spec .ralph/plans/future/<slug> --host id:<setup-id>
+implement_spec({"location":".ralph/plans/future/<slug>","host":"id:<setup-id>"})
 ```
 
 Labels are not identifiers. Cancellation and noninteractive ambiguity create
@@ -200,8 +214,9 @@ never falls back locally.
 
 ## Retained version-1 promotion and fresh Episode
 
-A deterministic recursive content digest binds the exact approved bundle at
-implementation admission. It is rechecked before mutation, after the isolated
+At concrete `create_spec_episode` creation, a deterministic recursive content
+digest binds the current implementation-ready bundle for integrity, not proof
+of an earlier entry invocation. It is rechecked before mutation, after the isolated
 copy, in active `.ralph/plans`, and against the canonical source. This
 Conversation's exact entry in the project-level `.prime-claw/ownership.json`
 registry persists that digest before external mutation; independent owners may
@@ -267,6 +282,16 @@ decide merge/abandonment. Any retained-folder archival requires separate explici
 that successful terminal close. This repair adds no archival tool, so the plans
 remain in place until such a later action is approved.
 
+
+## Invocation cutover boundary
+
+Entry changes preserve supported version-1 workflows, ownership, active plan
+pairs, resources, and read-only old-layout handoff/execute fallback. They do not
+authorize retirement, migration, cleanup, activation, or restart. A separately
+approved accepted-generation refresh requires one coordinated full restart and
+resumed owner/Episode plus ordinary-session UAT. Keep every resource the old
+generation may read until that proof succeeds; copy success, `/reload`, and a
+fresh probe alone are insufficient.
 
 ## Validation policy
 

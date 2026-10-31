@@ -1,38 +1,32 @@
 # Compact-first planning and implementation chains
 
-Prime Claw exposes task-native planning alongside the folder-compatible
-planning and implementation surfaces:
+Prime Claw exposes globally discoverable Markdown entry skills and agent-callable
+operations. The operator can ask conversationally or use native `/skill:`:
 
-```text
-/plan TASK-ID
-plan_task({"taskId":"TASK-ID"})
-/plan-spec .ralph/plans/future/<slug>
-plan_spec({"location":".ralph/plans/future/<slug>"})
-/implement-spec .ralph/plans/future/<slug> [--host id:<project-host-setup-id>]
-implement_spec({"location":".ralph/plans/future/<slug>","host":"id:<project-host-setup-id>"})
-/implement-task TASK-ID [--host id:<project-host-setup-id>]
-implement_task({"taskId":"TASK-ID","host":"id:<project-host-setup-id>"})
-```
+| Entry skill | Agent operation |
+| --- | --- |
+| `plan` | `plan_task({"taskId":"TASK-ID"})` |
+| `plan-spec` | `plan_spec({"location":".ralph/plans/future/<slug>"})` |
+| `implement-task` | `implement_task({"taskId":"TASK-ID","host":"id:<setup-id>"})` |
+| `implement-spec` | `implement_spec({"location":".ralph/plans/future/<slug>","host":"id:<setup-id>"})` |
+| `handoff` | `ralph_handoff({"guidance":"optional operator focus"})` |
 
-The globally discoverable `implement-task` Markdown skill routes conversational
-implementation requests to `implement_task`; `host` is optional. It binds one
-exact canonical task, including selection explicitly delegated within the
-operator's bounds. Implementation selection requires native `In Planning`
-(Beads `in_planning`) after design and planning, not dependency readiness alone.
-The skill owns approval judgment: an explicit conditional request to plan then
-implement when ready may remain valid within scope, while planning alone never
-authorizes implementation. Material ambiguity or new scope requires clarification.
+`host` and handoff guidance are optional. The thin entries route to canonical
+project phase policy; they do not duplicate it. Prime Claw registers no custom
+`/plan`, `/plan-spec`, `/implement-task`, `/implement-spec`, or `/handoff`
+commands. Prime Agent built-ins and native `/skill:` remain available.
 
-The globally discoverable `implement-spec` skill similarly routes one exact
-operator-selected retained future folder to `implement_spec(location, host?)`.
-It does not search for or invent a folder. Both implementation skills preserve
-conditional authority within scope; neither invocation supplies approval.
-
-This is an incremental cutover. All existing custom commands above remain
-registered, as does ordinary `/handoff`. Both implementation entries and final
-create tools use current concrete checks, not invocation-proof approval stores.
-Other entry skills, command removal, and broad policy/probe alignment remain
-pending for later slices.
+Markdown owns phase authority. Planning alone stops for review and grants no
+implementation permission. An explicit conditional request to plan then implement
+when ready may remain valid within approved scope, without new approval solely
+because planning finished. Material ambiguity or scope changes require
+clarification. Explicitly delegated task selection stays within stated bounds
+and binds an exact canonical task before invoking task-specific operations.
+Implementation requires existing `In Planning` (Beads `in_planning`) after design
+and planning, not dependency readiness alone. No separate phase-history or prior-
+invocation proof supplements that state. Retained folder selection still requires
+an exact operator-selected location; skills do not search for or invent one.
+Both final create tools retain concrete integrity checks, not approval stores.
 
 Task planning resolves one exact task through the repository's selected native
 provider and admits only canonical `In Design` or `In Planning`. Backlog keeps
@@ -52,15 +46,11 @@ separate.
 Read-only legacy lookup is limited to `handoff` and `execute` so an active
 old-layout Episode can finish from its unchanged snapshot.
 
-| Entry point | First message | Sole follow-up |
+| Agent entry | First message | Sole follow-up |
 | --- | --- | --- |
-| Native `/plan TASK-ID` | wrapped `plan-task-prep`, ordinary delivery | wrapped `plan-task` |
 | `plan_task` | wrapped `plan-task-prep`, `steer` delivery | wrapped `plan-task` |
-| Native `/plan-spec` | wrapped `plan-prep`, ordinary delivery | wrapped `plan-spec` |
 | `plan_spec` | wrapped `plan-prep`, `steer` delivery | wrapped `plan-spec` |
-| Native `/implement-spec` | wrapped `implement-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-spec` |
 | `implement_spec` | wrapped `implement-prep`, `steer` delivery | full ordinary oversight guide followed by wrapped `implement-spec` |
-| Native `/implement-task` | wrapped `implement-task-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-task` |
 | `implement_task` | wrapped `implement-task-prep`, `steer` delivery | full ordinary oversight guide followed by wrapped `implement-task` |
 
 The task-native implementation chain is registered alongside the retained folder path. Before
@@ -94,8 +84,11 @@ guarded raw `design` plus `in_planning` update, one non-force publication, and
 exact native reread/publication proof; it never consults the Backlog-only queue,
 creates a task path, or mirrors content. Compatible same-task refinements are
 facts for the planning LLM rather than approval locks. Folder-compatible
-planning updates only the selected future bundle. Both stop for operator review
-and never authorize implementation.
+planning updates only the selected future bundle. Planning alone stops for review
+and never authorizes implementation. If the operator already explicitly authorized
+planning then implementation within scope, the agent may invoke the implementation
+entry after the plan is complete and readiness is satisfied. Planning admission
+itself remains terminal routing: end that turn and let its sole follow-up run.
 
 Retained implementation uses no legacy approval map, consumed guard, or turn
 receipt. Both canonical messages carry the exact selected source location and

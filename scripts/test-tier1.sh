@@ -213,8 +213,15 @@ read -r -d '' PROBE_VALIDATOR <<'PYEOF' || true
 import json
 import sys
 
-REQUIRED = ("handoff", "plan", "plan-spec", "implement-spec")
-EXT_PREFIX = "/root/.prime/agent/extensions/"
+REMOVED_COMMANDS = ("plan", "plan-spec", "implement-task", "implement-spec", "handoff")
+REQUIRED_TOOLS = ("plan_task", "plan_spec", "implement_task", "implement_spec", "ralph_handoff",
+                  "create_task_episode", "handoff_task_episode", "finalize_task_episode",
+                  "create_spec_episode", "handoff_spec_episode", "finalize_spec_episode",
+                  "restore_blocked_spec_episode", "transition_spec_episode_to_task")
+SKILL_PREFIX = "/root/.prime/agent/skills/"
+# get_commands lists extension commands, prompts, and native skill invocations,
+# NOT Prime Agent built-ins. Check for shadowing; do not claim built-in discovery.
+BUILTIN_CONTROLS = ("compact", "goal", "refine", "reload", "settings")
 
 
 def die(msg):
@@ -222,8 +229,8 @@ def die(msg):
     sys.exit(1)
 
 
-if len(sys.argv) != 2:
-    die("usage: validate.py <probe.jsonl>")
+if len(sys.argv) != 3:
+    die("usage: validate.py <probe.jsonl> <tools.json>")
 
 replies = []
 with open(sys.argv[1], "r", encoding="utf-8", errors="replace") as fh:
@@ -241,10 +248,8 @@ with open(sys.argv[1], "r", encoding="utf-8", errors="replace") as fh:
                 and obj.get("command") == "get_commands"):
             replies.append(obj)
 
-if not replies:
-    die("no matching get_commands reply (id=loader)")
-if len(replies) > 1:
-    die("duplicate get_commands replies: " + str(len(replies)))
+if len(replies) != 1:
+    die("expected one matching get_commands reply (id=loader), found " + str(len(replies)))
 reply = replies[0]
 if reply.get("success") is not True:
     die("reply success is not true: " + repr(reply.get("success")))
@@ -256,20 +261,43 @@ by_name = {}
 for cmd in commands:
     if isinstance(cmd, dict) and isinstance(cmd.get("name"), str):
         by_name.setdefault(cmd["name"], []).append(cmd)
-for name in REQUIRED:
-    entries = by_name.get(name, [])
+for name in REMOVED_COMMANDS:
+    if name in by_name:
+        die("removed custom command is still present: " + name)
+    entries = by_name.get("skill:" + name, [])
     if len(entries) != 1:
-        die("command " + repr(name) + " present " + str(len(entries))
-            + " times (expected exactly 1)")
-    info = entries[0].get("sourceInfo")
+        die("native skill:" + name + " present " + str(len(entries)) + " times (expected 1)")
+    entry = entries[0]
+    info = entry.get("sourceInfo")
     path = info.get("path") if isinstance(info, dict) else None
-    if not (isinstance(path, str) and path.startswith(EXT_PREFIX)
-            and path.endswith(".ts")):
-        die("command " + repr(name)
-            + " not sourced from container extensions: " + repr(path))
-print("tier-1 probe validation OK: handoff, plan, plan-spec, implement-spec each "
-      "registered exactly once from " + EXT_PREFIX)
+    if entry.get("source") != "skill" or path != SKILL_PREFIX + name + "/SKILL.md":
+        die("skill:" + name + " not sourced from installed global skill: " + repr(path))
+for name in BUILTIN_CONTROLS:
+    if any(entry.get("source") == "extension" for entry in by_name.get(name, [])):
+        die("extension shadows native built-in: " + name)
+try:
+    with open(sys.argv[2], "r", encoding="utf-8") as fh:
+        tools = json.load(fh)
+except (OSError, ValueError) as error:
+    die("tool discovery unavailable: " + str(error))
+if not isinstance(tools, list) or not all(isinstance(name, str) for name in tools):
+    die("tool discovery must be a list of tool names")
+for name in REQUIRED_TOOLS:
+    if tools.count(name) != 1:
+        die("tool " + name + " present " + str(tools.count(name)) + " times (expected 1)")
+print("tier-1 probe validation OK: five custom commands absent; five native /skill: "
+      "entries and replacement/lifecycle tools discovered; no built-in shadowing")
 PYEOF
+
+read -r -d '' PROBE_TOOL_SOURCE <<'JSEOF' || true
+import { writeFileSync } from "node:fs";
+export default function probe(pi) {
+    pi.on("session_start", () => {
+        writeFileSync("/tmp/tier1-probe/tools.json",
+            JSON.stringify(pi.getAllTools().map((tool) => tool.name).sort()));
+    });
+}
+JSEOF
 
 BUILD_INPUT_HASH=""
 IMAGE_TAG="prime-claw-test-tier1:<captured>"
@@ -835,7 +863,8 @@ else
     phase plugin-checked
     if [ "$PROBE" -eq 1 ]; then
         PROBE_VALIDATOR_B64="$(printf '%s' "$PROBE_VALIDATOR" | base64)"
-        PROBE_STEP="mkdir -p /tmp/tier1-probe; set +e; printf '%s\n' '{\"id\":\"loader\",\"type\":\"get_commands\"}' | timeout --kill-after=$PROBE_KILL_GRACE $PROBE_DEADLINE prime-agent --mode rpc --offline --no-session --no-skills --no-prompt-templates --no-context-files --cwd /tmp/tier1-probe > /tmp/tier1-probe/probe.jsonl 2> /tmp/tier1-probe/probe.err; probe_rc=\$?; set -e; if [ \"\$probe_rc\" -ne 0 ]; then tail -c 2000 /tmp/tier1-probe/probe.err || true; exit 1; fi; printf '%s' '$PROBE_VALIDATOR_B64' | base64 -d > /tmp/tier1-probe/validate.py; python3 /tmp/tier1-probe/validate.py /tmp/tier1-probe/probe.jsonl"
+        PROBE_TOOL_SOURCE_B64="$(printf '%s' "$PROBE_TOOL_SOURCE" | base64)"
+        PROBE_STEP="mkdir -p /tmp/tier1-probe; printf '%s' '$PROBE_TOOL_SOURCE_B64' | base64 -d > /tmp/tier1-probe/tools.ts; set +e; printf '%s\n' '{\"id\":\"loader\",\"type\":\"get_commands\"}' | timeout --kill-after=$PROBE_KILL_GRACE $PROBE_DEADLINE /workspace/scripts/run-prime-agent-probe.sh prime-agent --mode rpc --offline --no-session --no-skills --no-extensions --no-prompt-templates --no-context-files --cwd /tmp/tier1-probe -e /root/.prime/agent/extensions/goal-continuation-nudge.ts -e /root/.prime/agent/extensions/project-initialization.ts -e /root/.prime/agent/extensions/handoff-chain.ts -e /root/.prime/agent/extensions/reviewed-plan.ts -e /tmp/tier1-probe/tools.ts --skill /root/.prime/agent/skills/plan/SKILL.md --skill /root/.prime/agent/skills/plan-spec/SKILL.md --skill /root/.prime/agent/skills/implement-task/SKILL.md --skill /root/.prime/agent/skills/implement-spec/SKILL.md --skill /root/.prime/agent/skills/handoff/SKILL.md > /tmp/tier1-probe/probe.jsonl 2> /tmp/tier1-probe/probe.err; probe_rc=\$?; set -e; if [ \"\$probe_rc\" -ne 0 ]; then tail -c 2000 /tmp/tier1-probe/probe.err || true; exit 1; fi; printf '%s' '$PROBE_VALIDATOR_B64' | base64 -d > /tmp/tier1-probe/validate.py; python3 /tmp/tier1-probe/validate.py /tmp/tier1-probe/probe.jsonl /tmp/tier1-probe/tools.json"
         bounded "$PROBE_OUTER_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc "$PROBE_STEP" >/dev/null 2>&1
         phase probe-passed
     fi

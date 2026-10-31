@@ -6,8 +6,6 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
-  admitTaskImplementationPrepChain,
-  admitSpecImplementationPrepChain,
   createReviewedPlanExtension,
   maybeDeliverConversationAfterHandoff,
   normalizeConversationCompactionThreshold,
@@ -57,7 +55,7 @@ AFTER-HANDOFF POLICY
 
 test("registers complete task lifecycle beside retained folder compatibility", () => {
   const f = fixture();
-  assert.deepEqual([...f.commands.keys()].sort(), ["implement-spec", "implement-task", "plan", "plan-spec"]);
+  assert.deepEqual([...f.commands.keys()], []);
   assert.deepEqual([...f.tools.keys()].sort(), [
     "create_spec_episode", "create_task_episode", "finalize_spec_episode", "finalize_task_episode",
     "handoff_spec_episode", "handoff_task_episode", "implement_spec", "implement_task", "plan_spec", "plan_task", "restore_blocked_spec_episode",
@@ -69,19 +67,6 @@ test("registers complete task lifecycle beside retained folder compatibility", (
   const planTaskSchema = f.tools.get("plan_task").parameters;
   assert.deepEqual(Object.keys(planTaskSchema.properties), ["taskId"]);
   assert.deepEqual(planTaskSchema.required, ["taskId"]);
-});
-
-test("native plan-spec preserves prep then sole phase follow-up", async () => {
-  const f = fixture(); await f.commands.get("plan-spec").handler(".ralph/plans/future/alpha", f.ctx);
-  assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /PLAN-PREP POLICY/); assert.equal(f.sent[0].options, undefined);
-  assert.match(f.sent[1].message, /PLAN-SPEC POLICY/); assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
-});
-
-test("common plan command dispatches one exact grandfathered path to the guarded legacy route", async () => {
-  const f = fixture(); await f.commands.get("plan").handler(".ralph/plans/future/alpha", f.ctx);
-  assert.deepEqual(f.resolved, []);
-  assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /PLAN-PREP POLICY/);
-  assert.match(f.sent[1].message, /PLAN-SPEC POLICY/); assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
 });
 
 test("plan_spec tool steers prep and queues sole plan-spec follow-up", async () => {
@@ -114,14 +99,14 @@ test("registered retained routes reject a symlinked source directory before deli
   symlinkSync(join(future, ".alpha-storage"), join(future, "alpha"), "dir");
   const planned = await f.tools.get("plan_spec").execute("unsafe", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
   assert.equal(planned.isError, true); assert.equal(f.sent.length, 0); assert.match(planned.content[0].text, /must be a real directory/);
-  await f.commands.get("implement-spec").handler(".ralph/plans/future/alpha", f.ctx);
-  assert.equal(f.sent.length, 1); assert.match(f.sent[0].notify, /must be a real directory/);
+  const implemented = await f.tools.get("implement_spec").execute("entry", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(implemented.isError, true); assert.equal(f.sent.length, 0); assert.match(implemented.content[0].text, /must be a real directory/);
 });
 
-test("native plan resolves one exact task and preserves prep then sole phase follow-up", async () => {
-  const f = fixture(); await f.commands.get("plan").handler("10.38", f.ctx);
+test("plan_task resolves one exact task and preserves prep then sole phase follow-up", async () => {
+  const f = fixture(); await f.tools.get("plan_task").execute("entry", { taskId: "10.38" }, undefined, undefined, f.ctx);
   assert.deepEqual(f.resolved, [{ cwd: f.root, rawTaskId: "10.38" }]);
-  assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /PLAN-TASK-PREP POLICY/); assert.equal(f.sent[0].options, undefined);
+  assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /PLAN-TASK-PREP POLICY/); assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
   assert.ok(f.sent[0].message.includes("<operator-plan-task-id>\nPRIMECLAW-10.38\n</operator-plan-task-id>"));
   for (const message of f.sent.map(({ message }) => message)) {
     assert.ok(message.includes("<operator-plan-task-provider>\nbacklog\n</operator-plan-task-provider>"));
@@ -145,10 +130,10 @@ test("registered Beads planning route binds exact provider/root with no invented
     };
   };
   const native = fixture({ providerTaskResolver });
-  await native.commands.get("plan").handler("BEADS-42", native.ctx);
+  await native.tools.get("plan_task").execute("entry", { taskId: "BEADS-42" }, undefined, undefined, native.ctx);
   assert.deepEqual(calls, [{ cwd: native.root, taskId: "BEADS-42" }]);
   assert.equal(native.sent.length, 2);
-  assert.equal(native.sent[0].options, undefined);
+  assert.deepEqual(native.sent[0].options, { deliverAs: "steer" });
   assert.deepEqual(native.sent[1].options, { deliverAs: "followUp" });
   for (const message of native.sent.map(({ message }) => message)) {
     assert.ok(message.includes("<operator-plan-task-id>\nBEADS-42\n</operator-plan-task-id>"));
@@ -196,8 +181,8 @@ test("plan_task steers prep, queues sole phase follow-up, and returns canonical 
 });
 
 test("task planning rejects missing and disallowed-state tasks before workflow admission", async () => {
-  const missing = fixture(); await missing.commands.get("plan").handler("missing", missing.ctx);
-  assert.equal(missing.sent.length, 1); assert.match(missing.sent[0].notify, /Usage: \/plan TASK-ID/);
+  const missing = fixture(); const absent = await missing.tools.get("plan_task").execute("missing", { taskId: "missing" }, undefined, undefined, missing.ctx);
+  assert.equal(absent.isError, true); assert.equal(missing.sent.length, 0); assert.match(absent.content[0].text, /plan_task requires one exact/);
   for (const taskStatus of ["To Do", "In Progress", "Blocked", "Ready for Merge", "Done"]) {
     const later = fixture({ taskStatus }); const result = await later.tools.get("plan_task").execute("tool", { taskId: "PRIMECLAW-10.38" }, undefined, undefined, later.ctx);
     assert.equal(result.isError, true); assert.equal(later.sent.length, 0); assert.match(result.content[0].text, /accepts only In Design or In Planning/);
@@ -211,15 +196,15 @@ test("task planning missing phase workflow fails before either message is sent",
 });
 
 test("implement-spec queues full ordinary guide in post-prep phase before semantic workflow", async () => {
-  const f = fixture(); await f.commands.get("implement-spec").handler(".ralph/plans/future/alpha", f.ctx);
+  const f = fixture(); await f.tools.get("implement_spec").execute("entry", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
   assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
   assert.ok(f.sent[1].message.indexOf("FULL OVERSIGHT GUIDE") < f.sent[1].message.indexOf("IMPLEMENT-SPEC POLICY"));
   assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
 });
 
-test("common implement-task command dispatches exact retained path and factual host through the shared helper", async () => {
+test("implement_spec carries exact retained path and factual host to final create", async () => {
   const f = fixture();
-  await f.commands.get("implement-task").handler(".ralph/plans/future/alpha --host id:123e4567-e89b-12d3-a456-426614174000", f.ctx);
+  await f.tools.get("implement_spec").execute("entry", { location: ".ralph/plans/future/alpha", host: "id:123e4567-e89b-12d3-a456-426614174000" }, undefined, undefined, f.ctx);
   assert.deepEqual(f.resolved, []);
   assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
   assert.match(f.sent[1].message, /IMPLEMENT-SPEC POLICY/);
@@ -244,7 +229,7 @@ test("registered implement-spec replays the exact active Episode after its sourc
     return { ...record, reused: true };
   };
 
-  await f.commands.get("implement-spec").handler(record.sourceLocation, f.ctx);
+  await f.tools.get("implement_spec").execute("entry", { location: record.sourceLocation }, undefined, undefined, f.ctx);
   assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
   assert.match(f.sent[1].message, /IMPLEMENT-SPEC POLICY/);
   const result = await f.tools.get("create_spec_episode").execute("replay", { location: record.sourceLocation }, undefined, undefined, f.ctx);
@@ -275,16 +260,16 @@ test("source-absent replay rejects promoted specification drift before workflow 
   writeFileSync(join(plans, "EXECUTION_PLAN.md"), "living replay plan\n");
   const { reused: _reused, ...record } = f.episode; writeEpisodeOwnership(f.root, record);
   rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true });
-  await f.commands.get("implement-spec").handler(record.sourceLocation, f.ctx);
-  assert.equal(f.sent.length, 1); assert.match(f.sent[0].notify, /changed after grandfathering/);
+  const result = await f.tools.get("implement_spec").execute("entry", { location: record.sourceLocation }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, true); assert.equal(f.sent.length, 0); assert.match(result.content[0].text, /changed after grandfathering/);
 });
 
-test("native implement-task preserves compact-first routing without task invocation proof", async () => {
+test("implement_task preserves compact-first routing without task invocation proof", async () => {
   const f = fixture({ taskStatus: "In Planning" });
-  await f.commands.get("implement-task").handler("10.38", f.ctx);
+  await f.tools.get("implement_task").execute("entry", { taskId: "10.38" }, undefined, undefined, f.ctx);
   assert.equal(f.sent.length, 2);
   assert.match(f.sent[0].message, /IMPLEMENT-TASK-PREP POLICY/);
-  assert.equal(f.sent[0].options, undefined);
+  assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
   assert.match(f.sent[1].message, /IMPLEMENT-TASK POLICY/);
   assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
   assert.equal(f.taskCalls.length, 0);
@@ -431,12 +416,34 @@ test("finalize_task_episode schema rejects lifecycle receipts and action multipl
   }
 });
 
-test("plan_spec reports uncertain second-send admission without retrying", async () => {
-  const f = fixture({ throwOnSend: 2 });
-  const result = await f.tools.get("plan_spec").execute("tool", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
-  assert.equal(result.isError, true); assert.equal(f.sent.length, 1);
-  assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
-  assert.match(result.content[0].text, /follow-up admission is unconfirmed; inspect before retrying/);
+test("planning tools report first versus sole-follow-up uncertainty without retry or allocation", async () => {
+  for (const name of ["plan_spec", "plan_task"]) {
+    for (const throwOnSend of [1, 2]) {
+      const f = fixture({ throwOnSend });
+      const params = name === "plan_spec" ? { location: ".ralph/plans/future/alpha" } : { taskId: "10.38" };
+      const result = await f.tools.get(name).execute("tool", params, undefined, undefined, f.ctx);
+      assert.equal(result.isError, true); assert.equal(f.sent.length, throwOnSend - 1);
+      assert.equal(result.details.admission, "unconfirmed");
+      assert.equal(result.details.stage, throwOnSend === 1 ? "first" : "followUp");
+      assert.equal(Object.hasOwn(result.details, "admitted"), false);
+      if (f.sent.length) assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
+      assert.equal(f.created.length, 0); assert.equal(f.taskCalls.length, 0);
+      assert.match(result.content[0].text, /unconfirmed; inspect before retrying/);
+    }
+  }
+});
+
+test("planning tools defer semantic and conditional phase authority to skills", () => {
+  const f = fixture();
+  for (const name of ["plan_spec", "plan_task"]) {
+    const tool = f.tools.get(name), guidance = tool.promptGuidelines.join(" ");
+    assert.match(guidance, /skill.*interpret planning authority/);
+    assert.match(guidance, /bounded delegation/);
+    assert.match(guidance, /material ambiguity/);
+    assert.match(guidance, /conditional/);
+    assert.match(guidance, /terminal routing/);
+    assert.doesNotMatch(guidance, /never search for, select/);
+  }
 });
 
 test("standalone retained create forwards exact source and selected stable host without entry or agent-end hooks", async () => {
@@ -455,8 +462,8 @@ test("standalone retained create forwards exact source and selected stable host 
 });
 
 test("invalid retained host syntax delivers nothing and final create rejects injection", async () => {
-  const f = fixture(); await f.commands.get("implement-spec").handler(".ralph/plans/future/alpha --host local", f.ctx);
-  assert.equal(f.sent.length, 1); assert.match(f.sent[0].notify, /Usage: \/implement-spec/);
+  const f = fixture(); const entry = await f.tools.get("implement_spec").execute("entry", { location: ".ralph/plans/future/alpha", host: "local" }, undefined, undefined, f.ctx);
+  assert.equal(entry.isError, true); assert.equal(f.sent.length, 0); assert.match(entry.content[0].text, /implement_spec requires one exact/);
   for (const params of [
     { location: ".ralph/plans/future/alpha", host: "local" },
     { location: ".ralph/plans/future/alpha --host id:abcd" },
@@ -618,13 +625,11 @@ test("implement_spec steers prep and queues exactly one phase follow-up with sel
   assert.ok(f.sent[1].message.indexOf("FULL OVERSIGHT GUIDE") < f.sent[1].message.indexOf("IMPLEMENT-SPEC POLICY"));
 });
 
-test("retained native helper carries auto-selected stable host in both canonical messages", async () => {
+test("implement_spec carries auto-selected stable host in both canonical messages", async () => {
   const host = "id:123e4567-e89b-12d3-a456-426614174000";
   const f = fixture({ placementResolver: async () => ({ engine: "orca", projectSetupId: host.slice(3) }) });
-  const result = await admitSpecImplementationPrepChain(f.pi, f.ctx, ".ralph/plans/future/alpha", "native", {
-    placementResolver: f.deps.placementResolver, guideRoot: f.deps.guideRoot,
-  });
-  assert.equal(result.ok, true); assert.equal(f.sent.length, 2); assert.equal(f.sent[0].options, undefined);
+  const result = await f.tools.get("implement_spec").execute("entry", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.equal(result.details.admitted, true); assert.equal(f.sent.length, 2); assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
   for (const sent of f.sent) assert.ok(sent.message.includes(host));
 });
 
@@ -683,15 +688,14 @@ test("implement_task steers prep and queues the sole phase follow-up with select
   assert.equal(f.taskCalls.length, 0);
 });
 
-test("native implementation helper carries auto-selected stable host before both messages", async () => {
-  const f = fixture({ taskStatus: "In Planning" });
+test("implement_task carries auto-selected stable host before both messages", async () => {
   const id = "123e4567-e89b-12d3-a456-426614174000";
-  const result = await admitTaskImplementationPrepChain(f.pi, f.ctx, "10.38", "native", {
-    guideRoot: f.deps.guideRoot, taskResolver: f.deps.taskResolver,
-    async placementResolver() { assert.equal(f.sent.length, 0); return { engine: "orca", projectSetupId: id }; },
-  });
-  assert.equal(result.ok, true);
-  assert.equal(f.sent[0].options, undefined);
+  const f = fixture({ taskStatus: "In Planning", async placementResolver() {
+    assert.equal(f.sent.length, 0); return { engine: "orca", projectSetupId: id };
+  } });
+  const result = await f.tools.get("implement_task").execute("entry", { taskId: "10.38" }, undefined, undefined, f.ctx);
+  assert.equal(result.details.admitted, true);
+  assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
   for (const { message } of f.sent) assert.ok(message.includes(`<operator-implementation-host>\nid:${id}\n</operator-implementation-host>`));
 });
 

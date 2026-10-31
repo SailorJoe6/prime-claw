@@ -28,7 +28,7 @@ export default function control(pi: ExtensionAPI) {
   pi.registerCommand("loader-control", { description: "fixture control", handler: async () => {} });
 }`);
 const result = await discoverAndLoadExtensions(
-  [control, "/candidate/extensions/reviewed-plan.ts"],
+  [control, "/candidate/extensions/reviewed-plan.ts", "/candidate/extensions/handoff-chain.ts"],
   "/tmp/cwd", process.env.PRIME_AGENT_CODING_AGENT_DIR,
 );
 console.log("SOURCE_LOADER_RESULT=" + JSON.stringify({

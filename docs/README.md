@@ -48,7 +48,7 @@ prime-claw builds on four prior projects. Read these before designing:
   inventory, project initialization and migration topology, template manifest,
   safe reconciliation, Orca registration, startup ordering, review recovery,
   and global-drift controls.
-- [handoff-chain.md](handoff-chain.md) — the Phase 4a native `/handoff` →
+- [handoff-chain.md](handoff-chain.md) — the Phase 4a `handoff` skill / `ralph_handoff` →
   focused compaction → next-skill transition, its legacy Ralph-loop lineage,
   marker lifecycle, regression tests, evidence, and short-session recovery.
 - [prep-chain.md](prep-chain.md) — the compaction-first planning and
@@ -56,8 +56,8 @@ prime-claw builds on four prior projects. Read these before designing:
   two-skill preflight, deterministic admission ordering, one-deep approval
   survival, and best-effort compaction semantics.
 - [future-specification-bundles.md](future-specification-bundles.md) — migration
-  boundary between task-native `/design` and `/spec-it-out` authoring and the
-  retained future-folder `/plan-spec` and `/implement-spec` compatibility path,
+  boundary between task-native `design` / `spec-it-out` skills and the
+  retained future-folder `plan-spec` / `implement-spec` skill-and-tool path,
   including unresolved admission handling and validation scope.
 - [lab-global-plugin.md](lab-global-plugin.md) — the final plugin layout,
   selected-global-context ownership, manifest-authoritative delivery,

@@ -17,7 +17,7 @@ def test_global_assets_create_converge_and_check(tmp_path):
     second=run("apply",root);assert second.returncode==0,second.stderr
     checked=run("check",root);assert checked.returncode==0,checked.stderr
     state=json.loads((root/".prime-claw/delivery-state.json").read_text())
-    assert set(state["assets"])=={"global-goals-and-heartbeats","global-goal-continuation","global-expert-review","global-oversee-episode","global-initialize-prime-claw","global-implement-task","global-implement-spec"}
+    assert set(state["assets"])=={"global-goals-and-heartbeats","global-goal-continuation","global-expert-review","global-oversee-episode","global-initialize-prime-claw","global-implement-task","global-implement-spec","global-plan","global-plan-spec","global-handoff"}
 
 def test_unknown_or_changed_global_asset_is_preserved_by_default(tmp_path):
     root=tmp_path/"agent";root.mkdir(); target=root/"skills/goals-and-heartbeats/SKILL.md";target.parent.mkdir(parents=True);target.write_text("local edit\n")

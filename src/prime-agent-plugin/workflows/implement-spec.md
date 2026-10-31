@@ -104,4 +104,4 @@ assignment. Do not begin implementation in the owner Conversation.
 
 Once the tool reports success, set up one bounded heartbeat only while waiting
 for observable Episode work. Then stop without implementing or invoking
-`/handoff`.
+ordinary `ralph_handoff` or sending another assignment.

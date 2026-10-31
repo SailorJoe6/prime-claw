@@ -84,7 +84,7 @@ ID normalization without allowing an ID to become a command option.
 
 ## Primary task-native lifecycle
 
-Specification authoring is provider-native. `/design` and `/spec-it-out`
+Specification authoring is provider-native. `/skill:design` and `/skill:spec-it-out`
 select only the repository's sole valid live provider, then create exactly one
 native task with explicit `In Design` status or revise only one exact
 operator-selected task already in `In Design`. Backlog uses Description, native
@@ -98,13 +98,16 @@ second create. Both paths preserve every unrelated native field, reject later
 states before mutation, keep a living specification, and stop for operator
 review without writing a plan or authorizing an Episode.
 
-The `/plan TASK-ID` command and `plan_task({"taskId":"TASK-ID"})` tool resolve
+The global `plan` skill and `plan_task({"taskId":"TASK-ID"})` tool resolve
 one exact task through the live native provider and admit it only in canonical
 `In Design` or `In Planning`. They preload the project-customizable
 `plan-task-prep` and `plan-task` workflows, bind the exact provider/project root
 (and a task path only for Backlog) into both messages, request focused
 compaction on a best-effort basis, queue the semantic planning turn as the sole
-follow-up, and stop without authorizing implementation. Backlog preserves its
+follow-up. A planning-only request stops for review without authorizing
+implementation. Explicit conditional plan-then-implement authority may continue
+within scope after readiness, without fresh approval solely because planning
+finished. Backlog preserves its
 meaningful native Implementation Plan, exact task-only commit, and prompt push.
 Beads uses the complete raw task view and raw `design` as the living plan,
 publishes one guarded `in_planning` transition plus design update through the
@@ -112,8 +115,11 @@ supported native CLI, and proves the exact provider revision, publication ref,
 raw reread, and clean working set without a task path or mirror. Compatible
 same-task refinements are factual LLM context rather than an approval lock.
 
-After separate operator approval, `/implement-task TASK-ID` is the primary
-implementation path. It resolves one exact `In Planning` task through the live
+The global `implement-task` skill invokes `implement_task(taskId, host?)` for
+authorized implementation. Explicit delegated selection stays within bounds and
+binds an exact canonical ID before task-specific operations. Implementation
+requires existing `In Planning` after design/planning, not dependency readiness
+alone or a separate phase-history proof. It resolves one exact `In Planning` task through the live
 provider and preselects placement before it queues the compact-first readiness
 turn. Backlog retains its exact returned task path and native Implementation
 Plan. Beads retains the exact canonical ID, project root, complete raw native
@@ -124,9 +130,11 @@ Beads performs the same repository-orientation reads while skipping the
 Backlog-only queue inventory so preparation cannot select or mix providers.
 
 `create_task_episode` re-resolves the live provider, task identity, root,
-provider-native status and plan/design, and preselected placement before it
-consumes the owner/provider/task/root-bound approval once. Any provider,
-identity, status, or placement drift fails before creation. Backlog retains its
+provider-native status and plan/design, and current placement at its self-contained
+creation boundary. Carried stable placement is revalidated, never silently
+substituted. No approval store or prior-entry receipt is required. Actual
+provider, identity, state, publication, placement, ownership, and resource
+failures still refuse creation. Backlog retains its
 existing exact task-only status commit and rollback transaction. Beads delegates
 once to the accepted provider-native admission: one non-force native
 `in_progress` publication, exact raw task/revision/ref proof, clean code
@@ -152,8 +160,8 @@ remains the exact-resource boundary, not a coordinator or retry loop.
 ## Retained version-1 compatibility
 
 The generic plugin keeps only explicitly grandfathered future folders available
-through `/plan-spec`, `plan_spec`, `/implement-spec`, and their folder ownership
-mechanics. The first explicit initialization/upgrade records exact unfinished
+through the `plan-spec`/`implement-spec` skills, `plan_spec`/`implement_spec`
+operations, and their existing folder ownership mechanics. The first explicit initialization/upgrade records exact unfinished
 locations and SHA-256 digests of accepted specification bytes in
 `.prime-claw/legacy-specifications.json`. Startup and repeated reconciliation
 verify that one allowlist but never enroll a later folder or rebaseline a
@@ -225,8 +233,8 @@ category (`in_design:active`, `in_planning:active`, built-in `in_progress` and
 smoke-checks the exact Backlog version; these runtime gates are behavioral
 capability checks, not version assertions.
 
-The exact provider-aware task-resolution call sites (`/plan` admission,
-`/implement-task`, task Episode creation, ownership reservation, and
+The exact provider-aware task-resolution call sites (`plan_task` admission,
+`implement_task`, task Episode creation, ownership reservation, and
 transition) resolve through `resolveProviderTask`, which returns a
 discriminated native result: the Backlog branch is the existing
 `BacklogTaskSelection` plus provider identity, and the Beads branch is the
@@ -387,8 +395,10 @@ whose lifecycle status does not match the phase being entered.
 New ordinary work should continue to pass `--status "In Design"` explicitly so
 the intended authoring state is visible even though it is now the project default.
 
-Use `/design` or `/spec-it-out` for specification authoring, `/plan TASK-ID` for
-native planning, and `/implement-task TASK-ID` for approved admission. There is
+Use `/skill:design` or `/skill:spec-it-out` for specification authoring, the `plan`
+skill with `plan_task` for native planning, and `implement-task` with
+`implement_task` for authorized admission. The five custom workflow commands are
+removed; Prime Agent built-ins and native `/skill:` remain. There is
 no generic claim edit: implementation admission and later `Blocked`, resumed
 `In Progress`, and terminal `Done` transitions remain explicit Conversation
 work through the supported Backlog CLI. `backlog task complete` is reserved for
@@ -795,7 +805,10 @@ be the failure being recovered, and recovery never mutates code, `baseRef`, or
 resources. Provider review/block results, failed recovery publication,
 ownership drift, or unreadable ownership fail closed with raw evidence preserved.
 
-The direct admission/allocation seam is now reached by provider-aware
+Historical provider-integration checkpoint (superseded invocation surface):
+the following paragraph records the earlier single-use/expiry design, not the
+current self-contained creation contract above. The direct admission/allocation
+seam was reached by provider-aware
 `/implement-task` prep/readiness and `create_task_episode` gating. The gate keeps
 its existing compact-first two-message flow, expiry and single-use behavior, and
 preselected placement. It binds the exact owner, provider, task, and project

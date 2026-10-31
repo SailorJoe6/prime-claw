@@ -88,7 +88,10 @@ def test_episode_creation_uses_fresh_host_session_without_runtime_package_import
     assert "appendEpisodeIdentity" not in source
 
 
-def test_prime_agent_rpc_loads_renamed_commands_and_simplified_tools(tier1_container, ctmp) -> None:
+def test_prime_agent_rpc_loads_tools_without_custom_commands_and_preserves_native_skill_discovery(tier1_container, ctmp) -> None:
+    native_skill = ctmp / ".agents/skills/native-control/SKILL.md"
+    native_skill.parent.mkdir(parents=True)
+    native_skill.write_text("---\nname: native-control\ndescription: Native skill discovery control\n---\nControl policy.\n")
     request = json.dumps({"id": "loader", "type": "get_commands"}) + "\n"
     probe = ctmp / "tool-probe.ts"
     probe.write_text("""import {writeFileSync} from "node:fs";
@@ -96,7 +99,7 @@ const out=process.env.TOOL_SNAPSHOT;
 export default function probe(pi){pi.on("session_start",()=>{const names=pi.getAllTools().map(t=>t.name).sort();writeFileSync(out,JSON.stringify(names));if(names.includes("plan_spec")&&names.includes("plan_task")&&names.includes("implement_task")&&names.includes("implement_spec")&&names.includes("create_spec_episode")&&names.includes("handoff_spec_episode")&&names.includes("finalize_spec_episode")&&names.includes("restore_blocked_spec_episode")&&names.includes("create_task_episode")&&names.includes("handoff_task_episode")&&names.includes("finalize_task_episode")&&names.includes("transition_spec_episode_to_task")&&!names.includes("ralph_plan")&&!names.includes("prime_claw_activate_conversation_guide")&&!names.includes("prime_claw_conversation_guide_status")){pi.registerCommand("probe-reviewed-plan-tools",{description:"proof",handler:async()=>{}})}})}""")
     snapshot = ctmp / "tools.json"
     result = tier1_container.run(
-        "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent, "--mode", "rpc", "--offline", "--no-session", "--no-skills",
+        "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent, "--mode", "rpc", "--offline", "--no-session",
         "--no-prompt-templates", "--no-context-files", "--no-extensions", "--cwd", str(ctmp),
         "-e", WS_EXTENSION, "-e", str(probe), input_text=request, timeout=40, workdir=None,
         env={"TOOL_SNAPSHOT": str(snapshot)},
@@ -105,10 +108,14 @@ export default function probe(pi){pi.on("session_start",()=>{const names=pi.getA
     response = json.loads(result.stdout.strip().splitlines()[-1])
     assert response["success"] is True
     commands = response["data"]["commands"]
-    for name in ("plan-spec", "plan", "implement-spec", "implement-task"):
-        matches = [command for command in commands if command["name"] == name]
-        assert len(matches) == 1
-        assert matches[0]["sourceInfo"]["path"] == WS_EXTENSION
+    names = {command["name"] for command in commands}
+    assert names.isdisjoint({"plan-spec", "plan", "implement-spec", "implement-task", "handoff"})
+    assert not any(command.get("sourceInfo", {}).get("path") == WS_EXTENSION for command in commands)
+    native = next(command for command in commands if command["name"] == "skill:native-control")
+    assert native["sourceInfo"]["path"] == str(native_skill)
+    # get_commands lists extension/prompt/skill entries, not built-ins. No
+    # plugin registration may shadow a built-in or the native skill namespace.
+    assert names.isdisjoint({"help", "model", "settings", "clear", "compact"})
     assert [command["name"] for command in commands].count("probe-reviewed-plan-tools") == 1
     tools = json.loads(snapshot.read_text())
     for name in ("plan_spec", "plan_task", "implement_task", "implement_spec", "create_spec_episode", "handoff_spec_episode", "finalize_spec_episode", "restore_blocked_spec_episode", "create_task_episode", "handoff_task_episode", "finalize_task_episode", "transition_spec_episode_to_task"):
@@ -153,9 +160,12 @@ def test_compact_first_workflows_and_normal_guide_load_are_explicit() -> None:
     plan_prep = (REPO / "src/prime-agent-plugin/workflows/plan-prep.md").read_text()
     implement_prep = (REPO / "src/prime-agent-plugin/workflows/implement-prep.md").read_text()
     implement = (REPO / "src/prime-agent-plugin/workflows/implement-spec.md").read_text()
-    assert 'command: "plan-spec"' in extension
+    assert "registerCommand" not in extension
+    assert "parseImplementationArgs" not in extension
+    assert "parseTaskImplementationArgs" not in extension
     assert 'name: "plan_spec"' in extension
-    assert 'pi.registerCommand("plan"' in extension
+    assert 'name: "implement_spec"' in extension
+    assert 'name: "implement_task"' in extension
     assert 'name: "plan_task"' in extension
     assert 'name: "ralph_plan"' not in extension
     assert "compact.run(focus_hint)" in plan_prep
@@ -191,15 +201,15 @@ def test_current_docs_preserve_authority_and_transport_boundaries() -> None:
     future = (REPO / "docs/future-specification-bundles.md").read_text()
     oversight = (REPO / "docs/conversation-driven-episode-oversight.md").read_text()
     handoff = (REPO / "docs/handoff-chain.md").read_text()
-    for phrase in ("`/plan-spec`", "`plan_spec`", "Remote selection is rejected", "one fixed execute assignment", "not permission to retry"):
+    for phrase in ("`plan_spec`", "Remote selection is rejected", "one fixed execute assignment", "not permission to retry"):
         assert phrase in future
     assert "operator alone decides" in oversight.lower()
     assert "never retried automatically" in handoff
 
 def test_activation_truth_docs_are_task_native_first_with_explicit_folder_compatibility() -> None:
     expected_terms = {
-        "VISION.md": ("/implement-task task-id", "version-2 ownership", "retained version-1 compatibility"),
-        "docs/backlog.md": ("/plan task-id", "/implement-task task-id", "retained version-1 compatibility"),
+        "VISION.md": ("implement_task", "version-2 ownership", "retained version-1 compatibility"),
+        "docs/backlog.md": ("plan_task", "implement_task", "retained version-1 compatibility"),
         "docs/future-specification-bundles.md": ("primary task-native lifecycle", "create_task_episode", "retained version-1 compatibility"),
         "docs/conversation-driven-episode-oversight.md": (
             "primary task-native path",

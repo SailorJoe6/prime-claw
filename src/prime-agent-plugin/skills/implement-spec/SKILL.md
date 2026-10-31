@@ -49,6 +49,6 @@ or send an initial handoff or second execute assignment. Native retained-bundle
 integrity, ownership, replay, placement, and resource checks remain in force
 without requiring proof of a particular earlier invocation sequence.
 
-This is an incremental cutover: existing custom commands and other entry
-surfaces remain available. This skill grants no merge, abandonment, deployment,
-restart, or destructive cleanup authority.
+Custom slash commands are not workflow prerequisites. Retained version-1
+workflows, ownership, plans, and resources remain supported. This skill grants
+no merge, abandonment, deployment, restart, or destructive cleanup authority.

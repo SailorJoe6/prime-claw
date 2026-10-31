@@ -223,7 +223,7 @@ export async function admitTaskPrepChain(
   if (!workflow.allowedStatuses.includes(selected.status)) {
     return {
       ok: false,
-      message: `Task ${selected.taskId} is ${selected.status}; /plan accepts only ${workflow.allowedStatuses.join(" or ")}.`,
+      message: `Task ${selected.taskId} is ${selected.status}; plan_task accepts only ${workflow.allowedStatuses.join(" or ")}.`,
       level: "warning",
     };
   }
@@ -290,7 +290,7 @@ export async function admitProviderTaskPrepChain(
   if (!workflow.allowedStatuses.includes(selected.status)) {
     return {
       ok: false,
-      message: `Task ${selected.taskId} is ${selected.status}; ${purpose === "planning" ? "/plan" : "implementation"} accepts only ${workflow.allowedStatuses.join(" or ")}.`,
+      message: `Task ${selected.taskId} is ${selected.status}; ${purpose === "planning" ? "plan_task" : "implementation"} accepts only ${workflow.allowedStatuses.join(" or ")}.`,
       level: "warning",
     };
   }

@@ -272,9 +272,14 @@ test("registered Beads implement-task path delegates once without invocation-pro
     },
   })(pi);
 
-  await commands.get("implement-task").handler(f.taskId, ctx);
+  assert.equal(commands.size, 0);
+  const entry = await tools.get("implement_task").execute(
+    "beads-entry", { taskId: f.taskId }, undefined, undefined, ctx,
+  );
+  assert.equal(entry.isError, undefined);
   assert.equal(sent.length, 2);
   assert.match(sent[0].message, /BEADS PREP POLICY/);
+  assert.deepEqual(sent[0].options, { deliverAs: "steer" });
   assert.match(sent[1].message, /BEADS IMPLEMENT POLICY/);
   assert.deepEqual(sent[1].options, { deliverAs: "followUp" });
   assert.equal(f.allocatorCalls, 0);

@@ -74,19 +74,27 @@ These mechanisms support the stories but are not user outcomes by themselves:
 - Docker fixtures and isolated roots, which are mechanisms serving US-27 rather
   than separate outcomes.
 
-Likewise, command and tool variants are usually two interfaces to one story.
-The primary task-native lifecycle uses `/plan` with `plan_task`,
-`/implement-task` with `create_task_episode`, and `handoff_task_episode`.
-Conversation review and outcomes use ordinary Git plus the selected provider's supported native CLI;
-the Conversation automatically invokes cleanup-only `finalize_task_episode` after an authorized terminal outcome is committed and pushed, without separate cleanup confirmation. It remains the narrow resource boundary; error interpretation and safe re-invocation from current evidence remain prompt-led. Retained version-1 compatibility
-keeps `/plan-spec` with `plan_spec`, `/implement-spec` with
-`create_spec_episode`, exact blocked recovery with
-`restore_blocked_spec_episode`, `handoff_spec_episode`, and
-`finalize_spec_episode`.
-Ordinary `/handoff` and `ralph_handoff` remain the non-Episode pair, while
-the globally discoverable `initialize-prime-claw` Markdown skill guides the
-agent-facing `initialize_prime_claw` tool. The custom initializer slash command
-is removed; operators do not need its action syntax.
+Thin global entry skills route conversational requests to agent-callable
+operations; native `/skill:` invocation remains available. The primary task-native
+lifecycle uses `plan` with `plan_task`; `implement-task` uses `implement_task` before self-contained `create_task_episode`,
+and owned task continuation uses `handoff_task_episode`. Retained version-1
+compatibility uses `plan-spec` and `implement-spec` with `plan_spec` and `implement_spec` before self-contained
+`create_spec_episode`; blocked recovery, continuation and bookkeeping remain
+`restore_blocked_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`.
+Ordinary `handoff` uses `ralph_handoff`, not an owner lifecycle shortcut.
+`initialize-prime-claw` uses `initialize_prime_claw` for setup and upgrades.
+The five custom workflow commands are removed, not Prime Agent built-ins.
+
+Markdown owns phase authority: planning alone stops, while explicit conditional
+plan-then-implement authority may continue within scope after readiness. Bounded
+delegated selection binds an exact task; implementation requires existing
+`In Planning` after design/planning, not dependency readiness alone or a sequence
+receipt. Review and terminal outcomes remain prompt-led through ordinary Git and
+the native provider CLI. After an authorized committed/pushed terminal outcome,
+the Conversation automatically invokes cleanup-only `finalize_task_episode`.
+Error interpretation and safe re-invocation from current evidence remain
+prompt-led. Retained version-1 resources and lifecycle remain supported; this
+invocation change does not migrate, retire, or clean them up.
 
 ## Candidate simplification seams
 
@@ -99,7 +107,7 @@ underlying story:
    preserves the corresponding exact-folder pattern.
 3. Ordinary handoff and owned-Episode handoff share the handoff-to-execute
    semantic chain but use different transports.
-4. Slash commands and tools duplicate adapter surfaces over shared operations.
+4. Thin entry skills route to shared tools; detailed policy stays in canonical project workflows.
 5. Planning and implementation-readiness judgment is repeated across several
    Markdown assets and must remain proportional to the actual work.
 6. Path, ownership, and Episode-state checks still overlap across admission,

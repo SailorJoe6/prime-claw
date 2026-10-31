@@ -209,8 +209,12 @@ def test_current_docs_lead_with_task_native_and_label_folder_compatibility():
     assert "## Primary task-native lifecycle" in future
     assert "## Retained version-1 compatibility" in future
     assert "## Retained version-1 bundle lifecycle" in future
-    for surface in ("/plan TASK-ID", "/implement-task TASK-ID", "create_task_episode", "finalize_task_episode", "transition_spec_episode_to_task"):
+    for surface in ("plan_task", "implement_task", "create_task_episode", "finalize_task_episode", "transition_spec_episode_to_task"):
         assert surface in current + future
+    assert "`plan`" in current and "`implement-task`" in current
+    assert "native `/skill:`" in future
+    assert "/plan TASK-ID" not in current + future
+    assert "/implement-task TASK-ID" not in current + future
 
 def test_current_docs_distinguish_episode_edit_scope_and_cleanup_boundary():
     future = " ".join(FUTURE_DOC.read_text().split())

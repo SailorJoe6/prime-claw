@@ -772,10 +772,15 @@ test("real Beads 1.3.1 resolves one task, supports direct create, and rejects la
     assert.deepEqual(creates, [{ taskId: created.id, toolCallId: "real-beads-create", placement: { engine: "local" } }]);
     assert.deepEqual(JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"])), beforeView);
 
-    // The temporary native command still routes the same compact-first chain.
-    await commands.get("implement-task").handler(created.id, ctx);
+    // The agent-callable entry retains the same compact-first chain.
+    assert.equal(commands.size, 0);
+    const entry = await tools.get("implement_task").execute(
+      "real-beads-entry", { taskId: created.id }, undefined, undefined, ctx,
+    );
+    assert.equal(entry.isError, undefined);
     assert.equal(sent.length, 2);
     assert.match(sent[0].message, /REAL BEADS PREP/);
+    assert.deepEqual(sent[0].options, { deliverAs: "steer" });
     assert.match(sent[1].message, /REAL BEADS IMPLEMENT/);
     assert.deepEqual(sent[1].options, { deliverAs: "followUp" });
     assert.equal(creates.length, 1);

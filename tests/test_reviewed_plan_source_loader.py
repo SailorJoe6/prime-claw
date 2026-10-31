@@ -26,7 +26,7 @@ IDENTITY = {
     "tree": "5301c70d9c9d74e474ccaf258fdd3c8de982c52f",
     "lock-sha256": "3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74",
 }
-COMMANDS = {"plan-spec", "plan", "implement-spec", "implement-task"}
+REMOVED_COMMANDS = {"plan-spec", "plan", "implement-spec", "implement-task", "handoff"}
 TOOLS = {
     "plan_spec", "plan_task", "implement_task", "implement_spec", "create_spec_episode", "create_task_episode",
     "transition_spec_episode_to_task", "finalize_spec_episode",
@@ -132,5 +132,9 @@ def test_reviewed_plan_loads_with_default_source_loader(tmp_path):
     assert control["commands"] == ["loader-control"]
     assert loaded["errors"] == [], loaded["errors"]
     reviewed = next(row for row in loaded["loaded"] if row["path"] == "/candidate/extensions/reviewed-plan.ts")
-    assert set(reviewed["commands"]) == COMMANDS
+    assert reviewed["commands"] == []
+    handoff = next(row for row in loaded["loaded"] if row["path"] == "/candidate/extensions/handoff-chain.ts")
+    assert handoff["commands"] == []
+    assert handoff["tools"] == ["ralph_handoff"]
+    assert all(REMOVED_COMMANDS.isdisjoint(row["commands"]) for row in loaded["loaded"])
     assert set(reviewed["tools"]) == TOOLS

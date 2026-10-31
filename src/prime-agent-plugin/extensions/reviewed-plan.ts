@@ -74,14 +74,14 @@ function taskProviderResolver(
 /**
  * Native reviewed planning and implementation-promotion boundaries.
  *
- * Commands perform only deterministic path checks and canonical skill loading.
- * Semantic readiness remains in customizable Markdown. Explicit structured tools
+ * Skills own semantic authority and readiness in customizable Markdown.
+ * Tools enforce concrete identity, state and safe canonical workflow loading. They
  * expose no arbitrary command, prompt, branch, worktree, or session controls.
  */
 
-const PLAN_USAGE = "Usage: /plan-spec .ralph/plans/future/<slug>";
-const PLAN_TASK_USAGE = "Usage: /plan TASK-ID";
-const IMPLEMENT_USAGE = "Usage: /implement-spec .ralph/plans/future/<slug> [--host id:<project-host-setup-id>]";
+const PLAN_USAGE = "plan_spec requires one exact .ralph/plans/future/<slug> location";
+const PLAN_TASK_USAGE = "plan_task requires one exact provider-native task ID";
+const IMPLEMENT_USAGE = "implement_spec requires one exact .ralph/plans/future/<slug> location and optional stable id:<project-host-setup-id> host";
 
 const PLAN_PREP_WORKFLOW: PrepChainWorkflow = {
   usage: PLAN_USAGE,
@@ -102,7 +102,7 @@ const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
   phaseSkillName: "implement-spec",
   locationTag: "operator-implementation-location",
 };
-const IMPLEMENT_TASK_USAGE = "Usage: /implement-task TASK-ID [--host id:<project-host-setup-id>]";
+const IMPLEMENT_TASK_USAGE = "implement_task requires one exact provider-native In Planning task ID and optional stable id:<project-host-setup-id> host";
 const IMPLEMENT_TASK_PREP_WORKFLOW: TaskPrepChainWorkflow = {
   usage: IMPLEMENT_TASK_USAGE,
   prepSkillName: "implement-task-prep",
@@ -112,22 +112,8 @@ const IMPLEMENT_TASK_PREP_WORKFLOW: TaskPrepChainWorkflow = {
 };
 
 
-type CommandSelection = { location: string; host?: string };
-type TaskCommandSelection = { taskId: string; host?: string };
-
-function parseImplementationArgs(args: string): CommandSelection | null {
-  const tokens = args.trim().split(/\s+/).filter(Boolean);
-  if (tokens.length === 1) return { location: tokens[0] };
-  if (tokens.length === 3 && tokens[1] === "--host" && /^id:[0-9a-f-]+$/.test(tokens[2])) {
-    return { location: tokens[0], host: tokens[2] };
-  }
-  return null;
-}
-
-function parseTaskImplementationArgs(args: string): TaskCommandSelection | null {
-  const selected = parseImplementationArgs(args);
-  return selected ? { taskId: selected.location, ...(selected.host ? { host: selected.host } : {}) } : null;
-}
+type SpecImplementationSelection = { location: string; host?: string };
+type TaskImplementationSelection = { taskId: string; host?: string };
 
 function validTaskToolSelection(taskId: unknown, host: unknown): taskId is string {
   return typeof taskId === "string" && !!taskId && taskId === taskId.trim()
@@ -149,7 +135,7 @@ function activeLegacyReplay(
   return { projectRoot: selected.projectRoot, location: selected.location, record };
 }
 
-export interface TaskImplementationAdmissionDependencies {
+interface TaskImplementationAdmissionDependencies {
   /** Backlog-only compatibility injection used by existing callers and tests. */
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   providerTaskResolver?: ProviderTaskResolver;
@@ -159,11 +145,10 @@ export interface TaskImplementationAdmissionDependencies {
 }
 
 /** Admit the provider-native compact-first planning chain for one exact task. */
-export async function admitTaskPlanningPrepChain(
+async function admitTaskPlanningPrepChain(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
   rawTaskId: string,
-  source: "native" | "tool",
   dependencies: Pick<TaskImplementationAdmissionDependencies, "taskResolver" | "providerTaskResolver"> = {},
 ): Promise<ProviderTaskPrepChainAdmissionResult> {
   const exactInput = rawTaskId.trim();
@@ -172,7 +157,7 @@ export async function admitTaskPlanningPrepChain(
     ctx,
     rawTaskId,
     PLAN_TASK_PREP_WORKFLOW,
-    source,
+    "tool",
     taskProviderResolver(dependencies),
     async (_callCtx, task) => {
       if (task.provider === "beads" && task.taskId !== exactInput) {
@@ -192,32 +177,31 @@ export async function admitTaskPlanningPrepChain(
  * resolved before either message. Semantic implementation authority belongs to
  * the managed skills, not an ephemeral command-invocation proof.
  */
-export async function admitTaskImplementationPrepChain(
+async function admitTaskImplementationPrepChain(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
-  args: string,
-  source: "native" | "tool",
+  selection: TaskImplementationSelection,
   dependencies: TaskImplementationAdmissionDependencies = {},
 ): Promise<ProviderTaskPrepChainAdmissionResult> {
-  const parsed = parseTaskImplementationArgs(args);
-  if (!parsed) return { ok: false, message: IMPLEMENT_TASK_USAGE, level: "warning" };
+  const { taskId, host: selectedHost } = selection;
+  if (!validTaskToolSelection(taskId, selectedHost)) return { ok: false, message: IMPLEMENT_TASK_USAGE, level: "warning" };
   let placement: TaskEpisodeAdmissionOptions | undefined;
   return admitProviderTaskPrepChain(
     pi,
     ctx,
-    parsed.taskId,
+    taskId,
     IMPLEMENT_TASK_PREP_WORKFLOW,
-    source,
+    "tool",
     taskProviderResolver(dependencies),
     async (callCtx, task) => {
-      if (task.provider === "beads" && task.taskId !== parsed.taskId) {
-        throw new Error(`Beads task ${parsed.taskId} resolved to a different canonical ID ${task.taskId}`);
+      if (task.provider === "beads" && task.taskId !== taskId) {
+        throw new Error(`Beads task ${taskId} resolved to a different canonical ID ${task.taskId}`);
       }
       if (task.provider === "beads" && task.nativeStatus !== "in_planning") {
         throw new Error(`Beads task ${task.taskId} must be In Planning/in_planning for implementation admission`);
       }
       const resolvePlacement = dependencies.placementResolver ?? resolveTaskEpisodePlacement;
-      placement = await resolvePlacement(task.projectRoot, parsed.host, callCtx, dependencies.placement);
+      placement = await resolvePlacement(task.projectRoot, selectedHost, callCtx, dependencies.placement);
     },
     conversationGuideText({ guideRoot: dependencies.guideRoot }),
     "implementation",
@@ -246,30 +230,29 @@ ${host}
 }
 
 /** Admit retained implementation readiness without recording invocation proof. */
-export async function admitSpecImplementationPrepChain(
+async function admitSpecImplementationPrepChain(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
-  args: string,
-  source: "native" | "tool",
+  selection: SpecImplementationSelection,
   dependencies: Pick<TaskImplementationAdmissionDependencies, "placementResolver" | "placement" | "guideRoot"> = {},
 ): Promise<PrepChainAdmissionResult> {
-  const parsed = parseImplementationArgs(args);
-  if (!parsed) return { ok: false, message: IMPLEMENT_USAGE, level: "warning" };
+  const { location: rawLocation, host: selectedHost } = selection;
+  if (!validTaskToolSelection(rawLocation, selectedHost)) return { ok: false, message: IMPLEMENT_USAGE, level: "warning" };
   let host: string | undefined;
   return admitPrepChain(
-    pi, ctx, parsed.location, IMPLEMENT_PREP_WORKFLOW, source,
+    pi, ctx, rawLocation, IMPLEMENT_PREP_WORKFLOW, "tool",
     async (callCtx, location) => {
       assertConversationPromotionReady(callCtx, location);
       const replay = activeLegacyReplay(callCtx, location);
       if (replay) {
         host = replay.record.engine === "orca" ? `id:${replay.record.projectSetupId}` : undefined;
-        if (parsed.host && parsed.host !== host) throw new Error("Selected host does not match the active retained Episode placement");
+        if (selectedHost && selectedHost !== host) throw new Error("Selected host does not match the active retained Episode placement");
         return;
       }
       const selected = resolveFutureLocationSyntax(callCtx.cwd, location);
       if (!selected) throw new Error("Invalid future-plan source location");
       const resolvePlacement = dependencies.placementResolver ?? resolveTaskEpisodePlacement;
-      host = placementHost(await resolvePlacement(selected.projectRoot, parsed.host, callCtx, dependencies.placement));
+      host = placementHost(await resolvePlacement(selected.projectRoot, selectedHost, callCtx, dependencies.placement));
     },
     conversationGuideText({ guideRoot: dependencies.guideRoot }),
     (callCtx, location) => {
@@ -280,24 +263,6 @@ export async function admitSpecImplementationPrepChain(
 ${host}
 </operator-implementation-host>` : undefined,
   );
-}
-
-type PrepChainCommandOptions = {
-  command: string;
-  description: string;
-  workflow: PrepChainWorkflow;
-};
-
-function registerPrepChainCommand(
-  pi: ExtensionAPI,
-  options: PrepChainCommandOptions,
-): (args: string, ctx: ExtensionContext) => Promise<void> {
-  const handler = async (args: string, ctx: ExtensionContext): Promise<void> => {
-    const result = await admitPrepChain(pi, ctx, args.trim(), options.workflow, "native");
-    if (!result.ok) ctx.ui.notify(result.message, result.level);
-  };
-  pi.registerCommand(options.command, { description: options.description, handler });
-  return handler;
 }
 
 const CONVERSATION_AFTER_HANDOFF_NAME = "conversation-after-handoff";
@@ -553,68 +518,15 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
   return function reviewedPlan(pi: ExtensionAPI): void {
     const oversightOptions = { guideRoot: dependencies?.guideRoot };
     registerConversationOversight(pi, oversightOptions);
-    const planSpecHandler = registerPrepChainCommand(pi, {
-      command: "plan-spec",
-      description: "Plan a reviewed specification from an explicit .ralph/plans/future/<slug> folder",
-      workflow: PLAN_PREP_WORKFLOW,
-    });
-    pi.registerCommand("plan", {
-      description: "Plan one exact reviewed provider-native task or grandfathered future specification",
-      handler: async (args, ctx) => {
-        if (resolveFutureLocationSyntax(ctx.cwd, args.trim())) {
-          await planSpecHandler(args, ctx);
-          return;
-        }
-        const result = await admitTaskPlanningPrepChain(pi, ctx, args, "native", dependencies);
-        if (!result.ok) ctx.ui.notify(result.message, result.level);
-      },
-    });
-    const implementSpecHandler = async (args: string, ctx: ExtensionContext): Promise<void> => {
-      const result = await admitSpecImplementationPrepChain(pi, ctx, args, "native", {
-        placementResolver: dependencies?.placementResolver,
-        placement: dependencies,
-        guideRoot: dependencies?.guideRoot,
-      });
-      if (!result.ok) ctx.ui.notify(result.message, result.level);
-    };
-    pi.registerCommand("implement-spec", {
-      description: "Review and promote an approved future bundle into an isolated implementation episode",
-      handler: implementSpecHandler,
-    });
-    pi.registerCommand("implement-task", {
-      description: "Review and admit one exact planned provider-native task or grandfathered future specification",
-      handler: async (args, ctx) => {
-        const legacySelection = parseImplementationArgs(args);
-        if (legacySelection && resolveFutureLocationSyntax(ctx.cwd, legacySelection.location)) {
-          await implementSpecHandler(args, ctx);
-          return;
-        }
-        const result = await admitTaskImplementationPrepChain(
-          pi,
-          ctx,
-          args,
-          "native",
-          {
-            taskResolver: dependencies?.taskResolver,
-            providerTaskResolver: dependencies?.providerTaskResolver,
-            placementResolver: dependencies?.placementResolver,
-            placement: dependencies,
-            guideRoot: dependencies?.guideRoot,
-          },
-        );
-        if (!result.ok) ctx.ui.notify(result.message, result.level);
-      },
-    });
-
     pi.registerTool({
       name: "plan_spec",
       label: "Plan reviewed Ralph specification",
-      description: "Queue the canonical Ralph planning workflow for one exact .ralph/plans/future/<slug> folder. This creates a plan only and never authorizes implementation.",
+      description: "Queue the canonical Ralph planning workflow for one exact .ralph/plans/future/<slug> folder. Planning alone never authorizes implementation. Skills preserve any explicit conditional implementation authority.",
       promptSnippet: "Queue canonical Ralph planning for one reviewed future-plan folder",
       promptGuidelines: [
-        "Call plan_spec only when the operator clearly asks to plan one exact .ralph/plans/future/<slug> folder.",
-        "Before calling plan_spec, ask the operator if the folder is missing or materially ambiguous; never search for, select, or invent a folder.",
-        "plan_spec queues planning only and never records implementation approval or creates episode resources.",
+        "Use the plan-spec skill to interpret planning authority and bind one exact retained .ralph/plans/future/<slug> source before calling plan_spec.",
+        "Resolve only within explicit operator selection or bounded delegation; clarify material ambiguity and never invent a retained source.",
+        "plan_spec queues planning only and creates no Episode resources. A planning-only request stops for review; explicit conditional implementation authority remains for the skills to interpret.",
         "Treat plan_spec as a terminal routing action: after successful admission, do not continue planning in the current turn.",
       ],
       executionMode: "sequential",
@@ -623,7 +535,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         properties: {
           location: {
             type: "string",
-            description: "Exact project-relative .ralph/plans/future/<slug> folder selected by the operator",
+            description: "Exact project-relative .ralph/plans/future/<slug> folder bound by the skill within operator authority",
           },
         },
         required: ["location"],
@@ -640,14 +552,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         if (!result.ok) {
           return {
             content: [{ type: "text", text: result.message }],
-            details: { admitted: false, error: result.message },
+            details: { admission: result.deliveryUncertain ? "unconfirmed" : "rejected", ...(result.deliveryUncertain ? { stage: result.stage } : { admitted: false }), error: result.message },
             isError: true,
           };
         }
         return {
           content: [{
             type: "text",
-            text: `Planning admitted for ${result.location}: canonical plan-prep was steered and canonical plan was queued as the sole follow-up. Planning has not completed, and implementation is not authorized.`,
+            text: `Planning admitted for ${result.location}: canonical plan-prep was steered and canonical plan-spec was queued as the sole follow-up. Planning has not completed. This admission adds no implementation authority; the skills retain any explicit conditional instruction.`,
           }],
           details: { admitted: true, location: result.location },
         };
@@ -657,12 +569,12 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "plan_task",
       label: "Plan reviewed provider-native task",
-      description: "Queue the canonical task-native planning workflow for one exact provider-native task in In Design or In Planning. This creates or revises a plan only and never authorizes implementation.",
+      description: "Queue the canonical task-native planning workflow for one exact provider-native task in In Design or In Planning. Planning alone never authorizes implementation. Skills preserve any explicit conditional implementation authority.",
       promptSnippet: "Queue canonical planning for one exact reviewed provider-native task",
       promptGuidelines: [
-        "Call plan_task only when the operator clearly asks to plan one exact provider-native task ID.",
-        "Before calling plan_task, ask the operator if the task ID is missing or materially ambiguous; never search for, select, or invent a task.",
-        "plan_task accepts only In Design or In Planning and never authorizes implementation or creates Episode resources.",
+        "Use the plan skill to interpret planning authority and bind one exact provider-native task ID before calling plan_task.",
+        "The task may be operator-selected or selected within explicit bounded delegation; clarify material ambiguity before calling and never infer open-ended selection authority.",
+        "plan_task accepts only In Design or In Planning and creates no Episode resources. Planning alone does not authorize implementation; skills own conditional phase-advancement authority.",
         "Treat plan_task as a terminal routing action: after successful admission, do not continue planning in the current turn.",
       ],
       executionMode: "sequential",
@@ -671,25 +583,25 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         properties: {
           taskId: {
             type: "string",
-            description: "Exact provider-native task ID selected by the operator",
+            description: "Exact provider-native task ID bound by the skill within operator authority",
           },
         },
         required: ["taskId"],
         additionalProperties: false,
       } as any,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-        const result = await admitTaskPlanningPrepChain(pi, ctx, params.taskId, "tool", dependencies);
+        const result = await admitTaskPlanningPrepChain(pi, ctx, params.taskId, dependencies);
         if (!result.ok) {
           return {
             content: [{ type: "text", text: result.message }],
-            details: { admitted: false, error: result.message },
+            details: { admission: result.deliveryUncertain ? "unconfirmed" : "rejected", ...(result.deliveryUncertain ? { stage: result.stage } : { admitted: false }), error: result.message },
             isError: true,
           };
         }
         return {
           content: [{
             type: "text",
-            text: `Planning admitted for ${result.taskId}: canonical plan-task-prep was steered and canonical plan-task was queued as the sole follow-up. Planning has not completed, and implementation is not authorized.`,
+            text: `Planning admitted for ${result.taskId}: canonical plan-task-prep was steered and canonical plan-task was queued as the sole follow-up. Planning has not completed. This admission adds no implementation authority; the skills retain any explicit conditional instruction.`,
           }],
           details: { admitted: true, taskId: result.taskId },
         };
@@ -723,7 +635,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           return { content: [{ type: "text", text: IMPLEMENT_TASK_USAGE }], details: { admitted: false, error: IMPLEMENT_TASK_USAGE }, isError: true };
         }
         const result = await admitTaskImplementationPrepChain(
-          pi, ctx, `${params.taskId}${params.host ? ` --host ${params.host}` : ""}`, "tool",
+          pi, ctx, { taskId: params.taskId, host: params.host },
           {
             taskResolver: dependencies?.taskResolver,
             providerTaskResolver: dependencies?.providerTaskResolver,
@@ -772,7 +684,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           return { content: [{ type: "text", text: IMPLEMENT_USAGE }], details: { admitted: false, error: IMPLEMENT_USAGE }, isError: true };
         }
         const result = await admitSpecImplementationPrepChain(
-          pi, ctx, `${params.location}${params.host ? ` --host ${params.host}` : ""}`, "tool",
+          pi, ctx, { location: params.location, host: params.host },
           { placementResolver: dependencies?.placementResolver, placement: dependencies, guideRoot: dependencies?.guideRoot },
         );
         if (!result.ok) return {
@@ -803,7 +715,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         properties: {
           location: {
             type: "string",
-            description: "Exact project-relative .ralph/plans/future/<slug> folder selected by the operator",
+            description: "Exact project-relative .ralph/plans/future/<slug> folder bound by the skill within operator authority",
           },
           host: { type: "string", description: "Optional stable id:<project-host-setup-id> selected during readiness" },
         },
