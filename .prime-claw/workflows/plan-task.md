@@ -61,18 +61,26 @@ concrete material defect in the approved contract.
 
 ### Backlog publication
 
-Before mutation, record Git status and require the bound task path and Git index
-to be clean. Use `backlog task edit` to replace that exact task's Implementation
+Before mutation, record Git status for the code checkout and selected task
+store. Require the bound task path and the task store's Git index to be clean. Use `backlog task edit` to replace that exact task's Implementation
 Plan and set or retain status `In Planning` in one supported CLI operation.
 Preserve real newlines and never edit task Markdown directly. Reload through
 `backlog task view --json -- TASK-ID` and verify the exact canonical ID, bound
 path, `In Planning` status, and meaningful non-placeholder Implementation Plan.
 Verify no other task path changed and preserve the selected store topology. If
 the selected Backlog store is a validated ignored independent ordinary-Git
-clone, whether built-in or custom, require clean upstream-equal canonical code,
-require the clone clean at the direct published task head, commit only the bound
-task path inside the clone, push `HEAD:refs/heads/prime-claw/tasks` without
-force, and prove direct publication and unchanged code HEAD. Only for an actual
+clone, whether built-in or custom, require the clone clean at the direct
+published task head, commit only the bound task path inside the clone, push
+`HEAD:refs/heads/prime-claw/tasks` without force, and prove direct publication.
+Independent task publication does not require the code checkout to be clean or
+upstream-equal. Multiple Conversations may work in the same main-tracking
+checkout and drive separate Episodes concurrently; unrelated code changes,
+including `.prime-claw/ownership.json`, are not a blocker. Do not write the code
+checkout's HEAD, index, or files as part of independent task publication, and
+never stash, revert, commit, or delete another Conversation's changes to satisfy
+a cleanliness check. An unrelated concurrent code change is not evidence that
+this task publication changed code. This planning policy does not bypass
+separate hard-coded lifecycle admission or status gates. Only for an actual
 branch-local store, keep the existing flow: commit only the bound task path in
 the code repository, prove the commit contains no other path, and attempt one
 prompt push. A push failure is transport evidence,
