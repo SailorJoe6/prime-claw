@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Progress
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 19:26'
+updated_date: '2026-10-31 19:40'
 labels: []
 dependencies: []
 references:
@@ -12,6 +12,30 @@ references:
 documentation:
   - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/traceability.md
+modified_files:
+  - .prime-claw/templates.json
+  - .prime-claw/workflows/implement-task-prep.md
+  - .prime-claw/workflows/implement-task.md
+  - README.md
+  - docs/prep-chain.md
+  - docs/user-stories/E-episode-promotion.md
+  - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/prep-chain.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/workflows/implement-task-prep.md
+  - src/prime-agent-plugin/workflows/implement-task.md
+  - tests/beads_task_episode_admission_extension.test.mjs
+  - tests/reviewed_plan_extension.test.mjs
+  - tests/task_episode_admission_extension.test.mjs
+  - tests/task_providers.test.mjs
+  - tests/test_future_plan_skills.py
+  - tests/test_global_asset_drift.py
+  - tests/test_prime_agent_plugin_install.py
+  - tests/test_reviewed_plan_extension.py
+  - tests/test_reviewed_plan_source_loader.py
+  - src/prime-agent-plugin/skills/implement-task/SKILL.md
+  - tests/fixtures/backlog-admission-config.yml
 priority: p2
 type: feature
 ordinal: 136000
@@ -105,4 +129,35 @@ Prefer existing provider-native behavior, then concise LLM instructions, then th
 
 <!-- SECTION:NOTES:BEGIN -->
 Execution slice 1 (2026-10-31): implement the task-native agent entry end to end: implement_task(taskId, optional stable host), self-contained create_task_episode with current provider/task/placement checks, and removal of only TaskImplementationApprovalStore invocation proof. Add the discoverable implement-task entry and align its customizable task workflows/docs. Keep all custom command registrations and retained version-1 invocation guard unchanged in this incremental slice. Later slices still remove commands, replace retained entry guards, add remaining entry skills, and align full product documentation. No acceptance criterion is claimed complete yet. Validate through Docker suites and tier-1 probe only; do not activate globally or change lifecycle status.
+
+Slice 1 published for Conversation review (2026-10-31)
+
+Code HEAD: 25615430ba173be461fac7ee66a8f03c6fbc0329, non-force pushed and verified on origin/JLanders/prime-claw-primeclaw-51-episode-c8541422. Code checkout is clean and up to date. This is ONE incremental task-native entry slice, not completion of PRIMECLAW-51.
+
+Delivered: structured implement_task(taskId, host?) with tool-origin steer plus one canonical readiness follow-up; global inventory-managed implement-task entry skill; self-contained create_task_episode(taskId, host?) without TaskImplementationApprovalStore, grant/consume, or task-only expiry hooks. Existing provider/canonical identity, primary-main, native In Planning/required plan evidence, publication, placement, ownership-before-allocation and fixed execute-assignment safeguards remain. Selected stable host and factual provider/root/Backlog path observations cross both workflow messages; no content/revision receipt or invocation-sequence gate is added. Markdown retains semantic readiness, explicit conditional plan-then-implement authority, bounded delegated selection and planning-only limits. Updated source and builder task workflows, template hashes, relevant docs, native discovery, and synthetic tests. Retained custom commands and version-1 guard remain unchanged.
+
+Validation (Docker only for plugin behavior; supported annotated source identity cwd-fix-v0.9.8-r1 independently verified):
+- scripts/test-tier1.sh --probe: PASS on final plugin source, including isolation, loading, teardown and manifest publication. Evidence .test-results/20261031T193149Z-27484-542c2bd5/tier1; log .test-results/primeclaw-51-slice1-probe-final.log.
+- python3 -m pytest tests/test_reviewed_plan_extension.py::test_reviewed_plan_node_suite -q -m container: 1 passed (final bytes), all registered Node behavior checks passed. Log .test-results/primeclaw-51-slice1-reviewed-final.log.
+- python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_task_providers.py -q -m container: 9 passed, 1 failed, 12 deselected. Only failure was the already-snapshotted obsolete task placement guidance assertion; the final-byte single bridge above fixes and passes it. The 9 passing bridges cover native discovery, retained Episode lifecycle/close, Backlog admission, Beads admission, task ownership and provider resolution. Log .test-results/primeclaw-51-slice1-admission-final.log.
+- python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_project_initialization.py tests/test_prime_agent_plugin_install.py tests/test_global_asset_drift.py -q -m container: 47 passed, 1 failed, 25 deselected. Sole failure was the same superseded reviewed-plan assertion; initialization, delivery and installation/discovery checks passed. Log .test-results/primeclaw-51-slice1-focused.log.
+- python3 -m pytest tests/test_task_providers.py tests/test_reviewed_plan_source_loader.py -q -m container: initial 3 passed/2 failed/3 deselected. Supported default source-loader, Beads admission and task ownership passed; later provider/admission rerun above passed after replacing retired backlog/config.yml test input with a tracked synthetic fixture and removing an obsolete test-only prior-entry expectation. Log .test-results/primeclaw-51-slice1-providers.log.
+- python3 -m pytest tests/ -q: 678 passed, 12 failed, 89 skipped, 75 subtests passed. No candidate-only failures remain against committed e4bc60d baseline. Logs .test-results/primeclaw-51-slice1-tier0-final.log and .test-results/primeclaw-51-slice1-baseline-tier0.log. Baseline archive has 15 failures: the same 12 plus three archive-only missing Git/submodule-metadata checks. Existing failed nodes below remain outside this slice; no unrelated customization was reset.
+- Focused task-policy subset: 7 passed; git diff --check passed. Full container suite was not run for this incremental slice.
+
+Remaining baseline static failures:
+- tests/test_backlog_workflow.py::test_plan_tree_deletion_receipt_proves_durable_task_owners
+- tests/test_backlog_workflow.py::test_repository_status_migration_receipt_and_live_data_are_consistent
+- tests/test_backlog_workflow.py::test_prompt_led_merge_uses_ff_only_then_exact_backlog_done_commit
+- tests/test_execute_skill.py::test_supported_task_content_edits_leave_status_and_unrelated_work_unchanged
+- tests/test_future_plan_skills.py::test_documented_task_authoring_cli_sequence_is_atomic_and_task_only
+- tests/test_future_plan_skills.py::test_project_customized_authoring_skills_are_preserved_while_new_upstream_is_advertised
+- tests/test_future_plan_skills.py::test_task_native_planning_workflows_are_exposed_without_removing_folder_compatibility
+- tests/test_inventory_integrity.py::test_project_wide_testing_proofs_use_durable_backlog_tasks
+- tests/test_inventory_integrity.py::test_current_proof_surfaces_do_not_depend_on_plan_worktree_paths
+- tests/test_managed_session_protocol.py::test_managed_plugin_has_exact_typescript_inventory_and_no_retired_work_control_transport
+- tests/test_project_initialization.py::test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree
+- tests/test_reviewed_plan_extension.py::test_repository_status_cutover_uses_task_native_order_without_to_do
+
+Remaining approved work: remove all five custom command registrations/adapters; replace retained ImplementationApproval invocation proof while preserving frozen bundle integrity/source-absent replay and resource lifecycle; add remaining plan/plan-spec/implement-spec/handoff global entries; align actual planning/handoff/oversight policy, conditional authority and delegated selection across all loaded guidance; update full product docs and final discovery probes; complete remaining focused/full acceptance coverage. No full acceptance criterion is marked complete by this slice. Lifecycle status remains In Progress. No global apply/check/probe, live deployment, restart, merge, abandonment, cleanup, task-provider migration, or second Episode assignment occurred. Continue only after the owning Conversation reviews this checkpoint.
 <!-- SECTION:NOTES:END -->
