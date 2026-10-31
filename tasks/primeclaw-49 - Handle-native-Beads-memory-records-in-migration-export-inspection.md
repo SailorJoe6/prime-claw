@@ -4,7 +4,7 @@ title: Handle native Beads memory records in migration export inspection
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 16:29'
+updated_date: '2026-10-31 17:02'
 labels: []
 dependencies: []
 references:
@@ -146,10 +146,32 @@ Owner accepted capture candidate 958b9752571f64faab3cc8871d90da5bd3ba0110 after 
 Accepted nonblocking reporting correction: the earlier statement “before any Backlog command” is too broad for an existing destination. Coexistence may perform harmless read-only capability/task/archive verification before refusal. The actual protection is no live destination data mutation or source retirement. Do not reorder guards solely to forbid those reads.
 
 Preserve honest intermediate-failure reporting and Docker-only tests/probe after source changes. Prefer native behavior and the smallest necessary integrity changes; no new frameworks, ledger/controller/receipt/retry protocol or speculative hardening. No live Nemo migration/edits, user curation/deletion, global deployment/restart, Prime Agent changes or reopening PRIMECLAW-44. Return a published bounded candidate and native task evidence; the owner retains lifecycle decisions.
+
+### Episode slice 2 — native memory output boundary (in progress)
+
+Bound this pass to approved approach steps 2–3: a small pair-specific native CLI importer and immediate exact readback for per-memory Backlog documents, one source/index document, and exactly one In Design USER integrate/delete task. Prove the native helper against public disposable fixtures, including lossless JSON key/value round-trip, linked native output identities, missing/changed output refusal, and zero-memory no-op. Keep the top-level memory-import-not-implemented refusal intact: destination publication/digest/receipt/pre-retirement/replay integration remains the next bounded slice. This supplies decisive native-output evidence without enabling incomplete live migration. No new controller, ledger, receipt or retry protocol. The existing approved plan stays unchanged. Docker-only focused bridges and mandatory tier-1 probe follow source changes; no live migration or lifecycle mutation.
+
+### Episode slice 2 — native-output boundary candidate
+
+Code candidate: 811586364ce92d46366f110bb0815db4a8a829e5. Modified files: `docs/project-initialization.md, src/prime-agent-plugin/extension-support/task-provider-migration.ts, tests/task_provider_migration.test.mjs, tests/test_task_provider_migration.py`.
+
+Implemented small pair-specific `importBeadsMemoryDocuments` and `verifyBacklogMemoryOutputs` helpers. Supported native doc create/update/view creates one document per memory and one source/index document with encoded links to returned native paths. Fixed Markdown wrapper contains readable key/value, complete escaped native-row JSON for lossless round-trip, and exact source project/store/revision/digest provenance. One explicit In Design USER integrate/delete task links the actual index. Structured readback verifies ID/path/title/description/status/documentation and empty assignees. Readback rejects changed/missing docs/index (including exit-0 not-found output) and changed task status/link. Zero-memory input returns no outputs or commands. Imported text is data, not instructions; no curation/deletion occurs. Issue identity/mappings/counts are untouched.
+
+Top-level `memory-import-not-implemented` refusal stays intact. Helpers are proven against disposable native outputs, not yet called by confirmed migration. Publication/digest/single-receipt/pre-retirement/replay integration remains next. AC1–2 remain checked; no additional full-migration criterion claimed. Existing-destination reporting correction stands: harmless read-only capability/task/archive verification may precede refusal; protection is no live destination data mutation or source retirement, not a ban on every Backlog command.
+
+Validation (sequential Docker-only; exact supported source selector TIER1_ENV_FILE=/var/folders/4_/twy0wz3s1mq650wnqzn1b8rr0000gq/T/primeclaw49-tier1-selector-vv2sz1do/selection.env):
+- `python3 -m pytest tests/test_task_provider_migration.py -q -m container -k "retiring_beads_source_boundary or populated_backlog_migration"`: **2 passed, 7 deselected in 515.11s**. Log `/tmp/primeclaw49-memory-outputs-focused3.log`; evidence `.test-results/20261031T165013Z-91364-b112d782/tier1/retiring-beads-source-boundary-node.tap` (14 native cases/subtests), `populated-backlog-migration-node.tap` (9 pass).
+- Public native fixture covers multiline/Unicode/whitespace/frontmatter/backtick/control values, complete record/provenance JSON, working links and one USER task. One public synthetic NUL package exercises the same real native destination writer because process argv cannot contain NUL; do not claim native Beads captured that synthetic package.
+- `scripts/test-tier1.sh --probe` with same selector: **exit0**; offline checks passed, teardown verified, manifest published. Log `/tmp/primeclaw49-memory-outputs-probe1.log`; evidence `.test-results/20261031T165854Z-17828-5c9ecb6b/tier1`.
+- `git diff --check`: clean.
+- Intermediate focused1/focused2 each returned **1 failed, 1 passed** (populated Backlog passed both). First, a fixture value starting `---` parsed as flags; fixed with supported `--key key -- value`. Second, a fixture SQL UPDATE did not change exported memory content; removed that assumption, used native remember argv for non-NUL controls plus synthetic NUL. No importer integrity check weakened. Logs `/tmp/primeclaw49-memory-outputs-focused1.log`, `/tmp/primeclaw49-memory-outputs-focused2.log`; evidence `.test-results/20261031T163319Z-41380-8a2d6bce/tier1`, `.test-results/20261031T164138Z-67543-3c5b182a/tier1`.
+- Publication preparation initially tried pull/rebase with unstaged slice files; Git refused without changes. Committed the bounded slice, then pull/rebase succeeded with branch already current.
+
+Next: integrate returned outputs with existing destination publication/readback/digest/single receipt/pre-retirement/replay proofs and optional user-task count; reuse native identities on exact-source same-destination replay. Keep confirmation refused until all proofs/regressions pass. No new ledger/controller/receipt/retry protocol. No live migration/source retirement, Nemo reads/edits, curation/deletion, global deployment/restart, Prime Agent development or reopening PRIMECLAW-44. Status remains In Progress; full approved plan retained. Stop after publishing this bounded candidate.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Slice 1 only: typed Beads issue/memory capture and strict issue inventory checks are implemented at code 958b9752571f64faab3cc8871d90da5bd3ba0110. Focused Docker boundary and populated Backlog tests plus the final tier-1 probe passed as recorded in Implementation Notes. Memory-bearing confirmation remains blocked before destination writes until native memory docs/index/one USER task and publication/replay proofs are implemented. The full task is not complete.
+Bounded slices1–2 only: typed capture at 958b975 and native memory document/index/one USER task writer with exact readback at 811586364ce92d46366f110bb0815db4a8a829e5. Final slice2 Docker bridges: 2 passed, 7 deselected; mandatory tier1 probe exit0. Native helper is not enabled by confirmed migration. Memory-bearing confirmation stays safely refused while existing publication/digest/single-receipt/pre-retirement/replay integration remains pending. Full task not complete; AC1–2 only checked.
 <!-- SECTION:FINAL_SUMMARY:END -->
