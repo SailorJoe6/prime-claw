@@ -80,7 +80,7 @@
       "source": "skills/project-templates/spec-it-out.md",
       "destination": ".agents/skills/spec-it-out/SKILL.md",
       "baselineSha256": "08516d908b38e144b3758ecd0efa1aa2e5ab3cad33b0e941d1926ca3a14dd58a",
-      "installedSha256": "76ac9dac3af46734214e755612f5ca613e830f15acd434222d98651b1ee72856",
+      "installedSha256": "4f51517947c356d34e94601cd7c04be673f66ab607932ca973932938df79e7b7",
       "acceptedOverrideSha256": "76ac9dac3af46734214e755612f5ca613e830f15acd434222d98651b1ee72856",
       "availableUpstreamSha256": "73f01a7d78672e5aeeae27d0de30152213b48f16f4fa354d5e30bb12f461dcee",
       "state": "customized",
