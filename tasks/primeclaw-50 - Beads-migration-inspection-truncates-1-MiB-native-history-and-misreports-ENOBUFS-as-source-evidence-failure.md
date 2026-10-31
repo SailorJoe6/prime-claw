@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 22:17'
+updated_date: '2026-10-31 22:39'
 labels: []
 dependencies: []
 references:
@@ -239,10 +239,19 @@ Canonical primary dirty .prime-claw/ownership.json, .prime-claw/templates.json a
 Combined-generation documented affected Docker command is running: python3 -m pytest tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_project_initialization.py::test_project_initialization_node_suite tests/test_beads_retiring_source_capture.py -q -m container. Log /tmp/primeclaw50-reintegrated-focused.log. Required scripts/test-tier1.sh --probe and full python3 -m pytest tests/ -q -m container follow serially. TIER1_ENV_FILE=/tmp/primeclaw50-tier1.env selects the read-only cwd-fix-v0.9.8-r1 dependency; its clean status, exact tag/commit/tree and lockfile were reverified against docs/prime-agent-installation.md. No host/global probe, installation, restart/deployment, live migration or private source access.
 
 No combined-generation pass is claimed yet. Historical tests and original baseline failures remain historical; current main includes a changed task-admission fixture, so actual new full results will be observed without assuming old failures persist or assigning causes without evidence. No unrelated fixture/infrastructure repair is authorized. After actual validation, publish code and task evidence separately and stop for focused owner integration review; no main merge, lifecycle mutation or cleanup.
+
+### Combined-generation focused suites and mandatory probe passed — full suite running
+
+Unchanged clean local integration candidate bbadcf8ca0b3562970115beeb4aed898bb5ee957, exact parents c697a88759d4626d23faa3f58ff7b7a0696441ad and fresh canonical/directly published main 05f9f8abfef1e8ea918871867e0c2d4f8dd0e6be.
+- Documented affected command (python3 -m pytest tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_project_initialization.py::test_project_initialization_node_suite tests/test_beads_retiring_source_capture.py -q -m container): exit 0, 3 passed in 1230.81s. Log /tmp/primeclaw50-reintegrated-focused.log; evidence .test-results/20261031T221636Z-41820-ea9ef8b8/tier1. Complete migration TAP: 62 tests/subtests, 50 passed, 12 existing skips, 0 failures, including accepted native-memory/output/publication/receipt/replay/retirement and large-capture/safe-label regressions.
+- Mandatory scripts/test-tier1.sh --probe: exit 0 on first attempt for this combined generation. Log /tmp/primeclaw50-reintegrated-probe.log; evidence .test-results/20261031T223727Z-96423-ce1e25dc/tier1. Offline checks passed, runtime network absent, teardown verified and manifest published. Both passing manifests record candidate HEAD bbadcf8ca0b3562970115beeb4aed898bb5ee957, dirty=false, identical repository content_sha256 7f1f96c7f5b3c8999d5c7a334f653848450b7a94231e26d9d9c095f1279be911, empty failure_codes and clean/absent teardown.
+- Planned python3 -m pytest tests/ -q -m container is now running on these unchanged bytes. Log /tmp/primeclaw50-reintegrated-full.log. No new full-suite pass/fail result is claimed. Historical83 passed/2 baseline failures/1 skipped remains historical only; newer main changed fixtures, so current failures will not be assumed or classified without actual evidence. No unrelated fixtures/infrastructure repaired.
+
+TIER1_ENV_FILE=/tmp/primeclaw50-tier1.env selects the previously reverified read-only supported source. No candidate code edits since ordinary integration; task evidence stays in the independent Episode-owned clone. Accepted P2 remains closed and lifecycle remains In Progress. Actual final validation and separate non-force code/task publication follow full-suite completion, then stop for focused owner integration review. No host/global/live/private-source action, main merge or foreign resource mutation.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Focused repair c697a88759d4626d23faa3f58ff7b7a0696441ad and task evidence63b5444352c5c0c5937ef3720ad0525b0a62ffa7 accepted by owning Conversation; P2 safe-operation-label finding CLOSED (5/5 AC checked). Next execute slice: freshly prove latest directly published canonical main, ordinarily integrate it into this same Episode preserving merge ancestry and accepted PRIMECLAW-49/50/51 behaviors, then run documented affected Docker suites, mandatory tier1 probe and full container suite on combined bytes. Observed main05f9f8abfef1e8ea918871867e0c2d4f8dd0e6be is not a fixed target. Do not touch/copy dirty primary ownership/templates/prep drift or foreign resources. Prior tests and baseline failures are historical; observe new results without assuming fixture failures persist. No unrelated repairs or broad review gauntlet. Publish separate clean code/task evidence and stop for focused owner integration review. Status In Progress; no lifecycle/main/live/global/cleanup changes authorized.
+Clean local combined candidate bbadcf8ca0b3562970115beeb4aed898bb5ee957, parents c697a88759d4626d23faa3f58ff7b7a0696441ad and freshly verified canonical/directly published main 05f9f8abfef1e8ea918871867e0c2d4f8dd0e6be; ordinary no-conflict integration preserves accepted PRIMECLAW-49/50/51 work and prior merge ancestry. Affected Docker suites:3 passed, migration TAP50 passed/12 existing skips/0 failures. Mandatory tier1 probe:passed first attempt, same clean candidate/content hash. Full container suite now running at /tmp/primeclaw50-reintegrated-full.log; no full result yet, prior baseline failures historical only. Accepted P2 label finding remains CLOSED,5/5AC,In Progress. No dirty primary bytes copied or foreign/live/global/lifecycle actions. Publish exact code/task evidence separately after full results, then stop for focused owner integration review.
 <!-- SECTION:FINAL_SUMMARY:END -->
