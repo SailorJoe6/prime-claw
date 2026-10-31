@@ -4,7 +4,7 @@ title: Handle native Beads memory records in migration export inspection
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 17:34'
+updated_date: '2026-10-31 17:41'
 labels: []
 dependencies: []
 references:
@@ -191,10 +191,18 @@ Actual validation (sequential Docker-only, TIER1_ENV_FILE=/var/folders/4_/twy0wz
 - `git diff --check`: clean. No populated migration/full-suite rerun claimed for this narrow readback repair. Full helper report `/tmp/primeclaw49-path-repair-report.md`.
 
 Lossless raw-row JSON/readable content/native identities, accepted issue-only capture checks, zero-memory no-op, exactly one In Design USER task and top-level `memory-import-not-implemented` refusal are preserved. Publication/digest/single-receipt/pre-retirement/replay integration remains deferred pending separate accepted continuation. No live migration/Nemo access, curation/deletion, host/global apply/check/probe, deployment/restart, Prime Agent development, reopening44, lifecycle/status change or merge. Task remains In Progress; AC1–2 only checked. Stop after publishing this bounded repair and exact native task evidence for owner review.
+
+### Accepted repaired slice 2 and remaining confirmed-migration integration
+
+Owner accepts repaired slice2 candidate 2f914a6fed4d6cfc32de063a067f55874a026593. Focused independent GPT-6 Astra closure found the accepted memory/index captured-path defect repaired and no new material defect in the actual small diff. No further repair or broad review loop is required. Advance within the existing approved living plan; this acceptance is not full task completion.
+
+Remaining approved work: reuse native memory document/index/one USER-task helpers and their native identities in existing destination publication, exact readback/path/link validation, destination digest, the single existing receipt, post-receipt/pre-retirement checks, and exact-source same-destination replay. Keep source issue counts/mappings issue-only; account separately for the one optional USER task. Zero memories creates no memory outputs. Missing/changed/unpublished outputs must prevent source retirement; compatible replay must not duplicate imports, index or USER task. Replace the temporary memory-import-not-implemented refusal only once the complete real pipeline and existing proofs are in place. Preserve lossless native JSON/provenance, accepted capture/path repair and existing lifecycle/source/ownership proofs.
+
+Extend focused existing native fixtures for end-to-end public memory migration/publication, tampering/refusal, zero-memory and replay as the approved plan specifies. No Nemo/private data. Native behavior first, only the smallest necessary integrity/transport changes; no new framework, mapping ledger, controller, receipt, classifier, automatic retry/repair or approval machinery. Harmless read-only destination verification remains allowed. Preserve truthful intermediate test limits. Update approved docs/managed guidance; run affected Docker selectors sequentially and mandatory tier1 --probe after source changes. Return one clean pushed bounded candidate and native task evidence; claim full task completion only when end-to-end criteria are proven. Use bounded slices if needed, without enabling an incomplete pipeline. No operator curation/deletion, live migration/Nemo reads/edits, global apply/restart/deployment, Prime Agent changes, reopening44, merge or lifecycle status change. Unrelated task-history descendants do not expand scope. Status remains In Progress; current AC1–2 only checked.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Bounded slices1–2 only: accepted typed capture at 958b975; native memory document/index/one USER task helper at 8115863, now revised at 2f914a6fed4d6cfc32de063a067f55874a026593 to refuse missing/moved/mismatched captured paths through exact native readback. The focused native-move red reproduced the defect; final Docker boundary passed 1 passed/8 deselected (15 native TAP pass), and mandatory tier1 probe exit0. Candidate awaits owner review. Confirmed migration remains disabled by memory-import-not-implemented; publication/digest/single-receipt/pre-retirement/replay integration remains pending. Full task not complete, In Progress, AC1–2 only checked.
+Accepted capture and repaired slice2 helper at 2f914a6fed4d6cfc32de063a067f55874a026593; focused independent closure found the captured-path defect repaired, with no new material defect in the small diff. Native helpers and path readback are accepted, not full migration completion. Next: existing publication/digest/single-receipt/post-receipt/pre-retirement/replay integration and focused end-to-end evidence, preserving zero-memory no-op and issue-only mapping/counts. Keep memory-import-not-implemented until the complete real pipeline/proofs are in place. Full task incomplete, In Progress, AC1–2 only checked.
 <!-- SECTION:FINAL_SUMMARY:END -->
