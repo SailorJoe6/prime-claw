@@ -22,7 +22,7 @@ const BEADS_INVENTORY = ["--readonly", "list", "--all", "--limit", "0", "--inclu
 
 class CandidateRunner extends ProcessCommandRunner {
   run(commandName, args, options = {}) {
-    return super.run(commandName === "backlog" ? BACKLOG : commandName, args, options);
+    return super.runFileBacked(commandName === "backlog" ? BACKLOG : commandName, args, options);
   }
 }
 const RUNNER = new CandidateRunner();
@@ -56,7 +56,9 @@ function command(cwd, executable, args, allowFailure = false) {
 
 function git(cwd, ...args) { return command(cwd, "git", args).trim(); }
 function bd(cwd, ...args) { return command(cwd, "bd", args).trim(); }
-function backlog(cwd, ...args) { return command(cwd, BACKLOG, args).trim(); }
+function backlog(cwd, ...args) {
+  return RUNNER.run("backlog", args, { cwd }).stdout.trim();
+}
 
 function repository(t, name) {
   const outer = realpathSync(mkdtempSync(join(tmpdir(), `prime-claw-migration-${name}-`)));
@@ -217,6 +219,40 @@ class AsIsBeadsRunner extends RecordingBeadsRunner {
     }
     return super.run(commandName, args, options);
   }
+}
+
+
+// Match the reported byte count without real native revisions. The final record
+// and multibyte text detect prefix-only capture and incorrect byte decoding.
+function syntheticHistory(taskId, byteLength = 1_305_475, multibyte = false) {
+  const rows = Array.from({ length: 108 }, (_, index) => ({
+    Issue: { id: taskId, description: multibyte ? "界🙂".repeat(1800) : "x".repeat(11_500) },
+    revision: index,
+  }));
+  rows[107].tail = multibyte ? "PRIVATE-MULTIBYTE-EVENT-TAIL-界🙂" : "PRIVATE-HISTORY-TAIL-SENTINEL";
+  rows[107].padding = "";
+  const padding = byteLength - Buffer.byteLength(JSON.stringify(rows));
+  assert.ok(padding >= 0);
+  rows[107].padding = "p".repeat(padding);
+  const text = JSON.stringify(rows);
+  assert.equal(Buffer.byteLength(text), byteLength);
+  assert.equal(rows.length, 108);
+  return { rows, text };
+}
+
+function syntheticHistoryFiles(fixture) {
+  const history = syntheticHistory(fixture.ids.parent);
+  const events = syntheticHistory(fixture.ids.parent, 2_610_950, true);
+  for (const [name, value] of Object.entries({ history, events })) {
+    value.path = join(fixture.outer, `synthetic-${name}.json`);
+    writeFileSync(value.path, value.text);
+  }
+  return { history, events };
+}
+
+function readSyntheticOutput(runner, file, options) {
+  return runner.runFileBacked(process.execPath,
+    ["-e", "process.stdout.write(require('node:fs').readFileSync(process.argv[1]))", file], options);
 }
 
 async function proveFixtureRuntime(records) {
@@ -1234,13 +1270,29 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
     events: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--events", "--json", "--limit", "0")),
     provenance: JSON.parse(bd(fixture.root, "--readonly", "provenance", "log", id, "--json")),
   }]));
+  const large = syntheticHistoryFiles(fixture);
+  native[fixture.ids.parent].history = large.history.rows;
+  native[fixture.ids.parent].events = large.events.rows;
   const owner = addActiveBeadsOwner(fixture);
   writeFileSync(join(owner.episode, "compatible-progress.txt"), "compatible active source progress\n");
   git(owner.episode, "add", "compatible-progress.txt");
   git(owner.episode, "commit", "-qm", "compatible later Episode implementation");
   git(owner.episode, "push", "-q");
   const laterHead = git(owner.episode, "rev-parse", "HEAD");
-  const runner = new AsIsBeadsRunner();
+  class LargeHistoryRunner extends AsIsBeadsRunner {
+    run(commandName, args, options = {}) {
+      if (commandName === "bd" && args[0] === "--readonly" && args[1] === "history" && args[2] === fixture.ids.parent) {
+        const expected = args.includes("--events") ? large.events : large.history;
+        const result = readSyntheticOutput(this, expected.path, options);
+        assert.equal(result.stdout, expected.text);
+        assert.deepEqual(JSON.parse(result.stdout), expected.rows);
+        this.reads.push({ args: [...args], cwd: options.cwd, ...result });
+        return result;
+      }
+      return super.run(commandName, args, options);
+    }
+  }
+  const runner = new LargeHistoryRunner();
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
   assert.equal(inspection.status, "ready", inspection.detail);
   assert.deepEqual(inspection.activeOwnership, [{ ownerSessionId: owner.ownerSessionId, taskId: fixture.ids.parent }]);
@@ -1907,4 +1959,110 @@ test("invalid deleted-target source graph refuses exact evidence before any dest
   assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
   assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote), refs);
   assert.equal(existsSync(join(fixture.root, ".beads")), true);
+});
+
+
+test("default migration capture is file-backed for every native read and reports bounded payload-safe failures", { timeout: 180_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "file-backed-migration");
+  const owner = addActiveBeadsOwner(fixture);
+  const large = syntheticHistoryFiles(fixture);
+  const before = sourceAuthorityFiles(fixture.root);
+  const ownershipPath = join(fixture.root, ".prime-claw", "ownership.json");
+  const ownership = readFileSync(ownershipPath, "utf8");
+  const originalRun = ProcessCommandRunner.prototype.run;
+  const originalFileBacked = ProcessCommandRunner.prototype.runFileBacked;
+  const reads = [];
+  let injection;
+  let failDiscovery = false;
+  let failRequiredGit = false;
+  ProcessCommandRunner.prototype.run = () => { throw new Error("migration used pipe-buffer capture"); };
+  ProcessCommandRunner.prototype.runFileBacked = function (commandName, args, options = {}) {
+    if (commandName === "bd") reads.push([...args]);
+    if ((failDiscovery && commandName === "bd" && args[0] === "config" && args[1] === "get" && args[2] === "no-db")
+        || (failRequiredGit && commandName === "git" && args.includes("--git-dir"))) {
+      assert.equal(options.allowFailure, true, "adapter must collect native metadata before throwing");
+      return injection;
+    }
+    if (commandName === "bd" && args[0] === "--readonly" && args[1] === "history" && args[2] === fixture.ids.parent) {
+      if (injection) return injection;
+      const expected = args.includes("--events") ? large.events : large.history;
+      const result = originalFileBacked.call(this, process.execPath,
+        ["-e", "process.stdout.write(require('node:fs').readFileSync(process.argv[1]))", expected.path], options);
+      assert.equal(result.stdout, expected.text);
+      assert.deepEqual(JSON.parse(result.stdout), expected.rows);
+      return result;
+    }
+    return originalFileBacked.call(this, commandName === "backlog" ? BACKLOG : commandName, args, options);
+  };
+  t.after(() => {
+    ProcessCommandRunner.prototype.run = originalRun;
+    ProcessCommandRunner.prototype.runFileBacked = originalFileBacked;
+  });
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  for (const verb of ["export", "list", "show", "history", "provenance", "context", "statuses", "dolt"]) {
+    assert.ok(reads.some((args) => args[0] === "--readonly" && args[1] === verb), `missing file-backed ${verb}`);
+  }
+  assert.ok(reads.some((args) => args.length === 1 && args[0] === "--version"));
+  assert.ok(reads.some((args) => args[1] === "history" && args.includes("--events")));
+
+  const failures = [
+    { name: "ENOBUFS", stdout: large.history.text, stderr: "", status: 1, errorCode: "ENOBUFS", nativeStatus: null, signal: "SIGTERM" },
+    { name: "ENOSPC", stdout: large.history.text, stderr: "", status: 1, errorCode: "ENOSPC", nativeStatus: null, signal: null },
+    { name: "output-read EIO", stdout: large.events.text, stderr: "", status: 1, errorCode: "EIO", nativeStatus: null, signal: null },
+    { name: "short stderr", stdout: large.history.text, stderr: "fixture command unavailable", status: 7, nativeStatus: 7, signal: null },
+    { name: "large stderr", stdout: large.events.text, stderr: "fixture ordinary error ".repeat(2000) + "PRIVATE-STDERR-TAIL", status: 9, nativeStatus: 9 },
+    { name: "empty stderr", stdout: large.history.text, stderr: "", status: 4 },
+  ];
+  for (const failure of failures) {
+    injection = failure;
+    const refused = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
+    assert.equal(refused.status, "blocked", failure.name);
+    assert.match(refused.detail, /command\/capture failed/);
+    assert.ok(refused.detail.length <= 768, failure.name);
+    assert.match(refused.remediation, /resolve.*command\/capture or resource failure/);
+    assert.doesNotMatch(refused.detail, /PRIVATE-|Issue|description|padding/);
+    if (failure.errorCode) assert.match(refused.detail, new RegExp(`code=${failure.errorCode}`));
+    if (failure.nativeStatus === null) assert.match(refused.detail, /nativeStatus=null/);
+    if (failure.signal) assert.match(refused.detail, /signal=SIGTERM/);
+    const result = await migrateTaskProvider({
+      cwd: fixture.root, targetProvider: "backlog", expectedSourceRevision: inspection.sourceRevision,
+      confirmedSwitch: true, actor: "synthetic-test", semanticPlacement: "Preserve all native values.",
+    });
+    assert.equal(result.status, "blocked", failure.name);
+    assert.match(result.detail, /command\/capture failed/);
+    assert.ok(result.detail.length <= 768);
+    assert.match(result.remediation, /resolve.*command\/capture or resource failure/);
+    assert.doesNotMatch(result.detail, /PRIVATE-|Issue|description|padding/);
+    assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
+    assert.equal(readFileSync(ownershipPath, "utf8"), ownership);
+    assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+    assert.equal(existsSync(join(fixture.root, "backlog.config.yml")), false);
+    assert.equal(existsSync(join(fixture.root, ".beads")), true);
+  }
+  // Discovery helpers used to turn native command failure into source-repair
+  // advice. Required Git discovery also calls the runner with allowFailure=false.
+  injection = failures[0];
+  failDiscovery = true;
+  const discoveryFailure = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
+  assert.equal(discoveryFailure.status, "blocked");
+  assert.match(discoveryFailure.detail, /code=ENOBUFS.*nativeStatus=null.*signal=SIGTERM/);
+  assert.match(discoveryFailure.remediation, /resolve.*command\/capture or resource failure/);
+  assert.doesNotMatch(discoveryFailure.detail, /PRIVATE-|Issue|description|padding/);
+  failDiscovery = false;
+  failRequiredGit = true;
+  const requiredFailure = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
+  assert.equal(requiredFailure.status, "blocked");
+  assert.match(requiredFailure.detail, /code=ENOBUFS.*nativeStatus=null.*signal=SIGTERM/);
+  assert.match(requiredFailure.remediation, /resolve.*command\/capture or resource failure/);
+  failRequiredGit = false;
+  injection = { status: 0, stderr: "", stdout: '{"PRIVATE-MALFORMED-NATIVE-PAYLOAD":' };
+  const malformed = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
+  assert.equal(malformed.status, "blocked");
+  assert.match(malformed.detail, /invalid JSON/);
+  assert.match(malformed.remediation, /invalid or incomplete native/);
+  assert.doesNotMatch(malformed.detail, /PRIVATE-|Unexpected|position|line|column/);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
+  assert.equal(readFileSync(ownershipPath, "utf8"), ownership);
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
 });

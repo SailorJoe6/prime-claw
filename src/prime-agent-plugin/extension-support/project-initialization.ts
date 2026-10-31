@@ -5,6 +5,7 @@ import {
   fsyncSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   openSync,
   readFileSync,
   readdirSync,
@@ -18,6 +19,7 @@ import {
 } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { activeLegacyPlanFiles } from "./legacy-workflow.ts";
@@ -97,8 +99,18 @@ export interface OrcaRegistration {
   [key: string]: unknown;
 }
 
+export interface CommandResult {
+  stdout: string;
+  stderr: string;
+  status: number;
+  errorCode?: string | number;
+  nativeStatus?: number | null;
+  signal?: string | null;
+}
+
 export interface CommandRunner {
-  run(command: string, args: string[], options?: { cwd?: string; allowFailure?: boolean }): { stdout: string; stderr: string; status: number };
+  run(command: string, args: string[], options?: { cwd?: string; allowFailure?: boolean }): CommandResult;
+  runFileBacked?(command: string, args: string[], options?: { cwd?: string; allowFailure?: boolean }): CommandResult;
 }
 
 export interface ReconcileOptions {
@@ -137,8 +149,29 @@ export interface ReconcileResult {
   legacySpecifications: LegacySpecificationInventoryResult | { status: "not-run"; reason: string };
 }
 
+function failedCommandResult(error: any): CommandResult {
+  return {
+    stdout: "",
+    stderr: "",
+    status: Number.isInteger(error?.status) && error.status !== 0 ? error.status : 1,
+    ...(typeof error?.code === "string" || typeof error?.code === "number" ? { errorCode: error.code } : {}),
+    nativeStatus: Number.isInteger(error?.status) ? error.status : null,
+    signal: typeof error?.signal === "string" ? error.signal : null,
+  };
+}
+
+function commandFailureMetadata(result: CommandResult): string {
+  // Never render command arguments, error messages, or captured stdout here.
+  const safe = (value: unknown) => String(value).replace(/[^a-zA-Z0-9_.-]/g, "?").slice(0, 64);
+  return [
+    result.errorCode !== undefined ? `code=${safe(result.errorCode)}` : "",
+    `status=${result.nativeStatus === undefined ? result.status : safe(result.nativeStatus)}`,
+    result.signal ? `signal=${safe(result.signal)}` : "",
+  ].filter(Boolean).join(", ");
+}
+
 export class ProcessCommandRunner implements CommandRunner {
-  run(command: string, args: string[], options: { cwd?: string; allowFailure?: boolean } = {}) {
+  run(command: string, args: string[], options: { cwd?: string; allowFailure?: boolean } = {}): CommandResult {
     try {
       const stdout = execFileSync(command, args, {
         cwd: options.cwd,
@@ -148,13 +181,52 @@ export class ProcessCommandRunner implements CommandRunner {
       return { stdout, stderr: "", status: 0 };
     } catch (error: any) {
       const result = {
+        ...failedCommandResult(error),
         stdout: String(error?.stdout ?? ""),
         stderr: String(error?.stderr ?? error?.message ?? error),
-        status: Number.isInteger(error?.status) ? error.status : 1,
       };
-      if (!options.allowFailure) throw new Error(`${command} ${args.join(" ")} failed: ${result.stderr.trim() || `exit ${result.status}`}`);
+      if (!options.allowFailure) throw new Error(`${command} ${args.join(" ")} failed: ${result.stderr.trim() || commandFailureMetadata(result)}`);
       return result;
     }
+  }
+
+  runFileBacked(command: string, args: string[], options: { cwd?: string; allowFailure?: boolean } = {}): CommandResult {
+    let directory: string | undefined;
+    const descriptors: number[] = [];
+    let result: CommandResult = { stdout: "", stderr: "", status: 0 };
+    try {
+      // mkdtemp creates a private directory; exclusive 0600 files belong only to this invocation.
+      directory = mkdtempSync(join(tmpdir(), "prime-claw-command-"));
+      const stdoutPath = join(directory, "stdout");
+      const stderrPath = join(directory, "stderr");
+      const stdoutFd = openSync(stdoutPath, "wx", 0o600); descriptors.push(stdoutFd);
+      const stderrFd = openSync(stderrPath, "wx", 0o600); descriptors.push(stderrFd);
+      try {
+        // File descriptors avoid spawnSync's finite pipe buffer. No output byte limit is imposed.
+        execFileSync(command, args, { cwd: options.cwd, stdio: ["ignore", stdoutFd, stderrFd] });
+      } catch (error) {
+        result = failedCommandResult(error);
+      }
+      result = {
+        ...result,
+        // Failed output is never certified or handed to a parser.
+        stdout: result.status === 0 ? readFileSync(stdoutPath, "utf8") : "",
+        stderr: readFileSync(stderrPath, "utf8"),
+      };
+    } catch (error) {
+      result = failedCommandResult(error);
+    } finally {
+      for (const descriptor of descriptors) {
+        try { closeSync(descriptor); } catch (error) { result = failedCommandResult(error); }
+      }
+      if (directory !== undefined) {
+        try { rmSync(directory, { recursive: true, force: true }); } catch (error) { result = failedCommandResult(error); }
+      }
+    }
+    if (result.status !== 0 && !options.allowFailure) {
+      throw new Error(`Command capture failed (${commandFailureMetadata(result)})`);
+    }
+    return result;
   }
 }
 

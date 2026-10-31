@@ -230,6 +230,25 @@ open/closed/archived counts, active version-2 ownership count, the
 semantic-placement prompt and explicit confirmation requirement. Inspection does
 not create a destination, change ownership or write a receipt.
 
+Migration commands capture complete stdout through private temporary files and
+file descriptors, not a fixed pipe-output buffer. This applies to source export,
+inventory, task views, full history, events and provenance, including recapture.
+The existing parsers still read complete strings, so available memory, string
+capacity and temporary storage remain real limits. A resource or capture failure
+blocks the operation; partial output is never certified as complete. Each command
+closes its descriptors and removes its own temporary files on handled success or
+failure. Source authority and the existing cutover protections remain intact.
+
+Command/capture failures report a bounded command label and available error code,
+native exit status and signal. Ordinary command failures may include a short
+stderr excerpt, but diagnostics never substitute captured stdout or echo native
+JSON payloads. Empty stderr and a null native status do not hide `ENOBUFS`.
+Transport/resource advice addresses capture or execution, not trimming history,
+changing task status or repairing otherwise readable source data. Invalid native
+JSON is reported separately without quoting its contents. Resolve the reported
+failure before requesting another inspection; no transport retry or migration
+confirmation is automatic.
+
 Explicit inspection can read Beads alongside a valid default, hidden or
 root-config-selected custom Backlog destination. Ordinary discovery still blocks
 dual providers, and active Beads lifecycle readiness remains strict. This

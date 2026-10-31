@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { appendFileSync, chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, renameSync, symlinkSync, unlinkSync, realpathSync, cpSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, dirname, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
+import childProcess, { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { createHash } from "node:crypto";
 import {
   ProcessCommandRunner,
@@ -86,6 +88,136 @@ class Runner {
     throw Error(`unexpected orca ${args.join(" ")}`);
   }
 }
+
+// These spies exercise ProcessCommandRunner itself; no host plugin activation is involved.
+function captureResources(t, overrides = {}) {
+  const original = {
+    mkdtempSync: fs.mkdtempSync, openSync: fs.openSync, readFileSync: fs.readFileSync,
+    execFileSync: childProcess.execFileSync,
+  };
+  const resources = { directories: [], descriptors: [], opened: [], executions: 0 };
+  t.mock.method(fs, "mkdtempSync", (...args) => {
+    if (overrides.mkdtempSync) return overrides.mkdtempSync(...args);
+    const path = original.mkdtempSync(...args);
+    resources.directories.push(path);
+    assert.equal(fs.statSync(path).mode & 0o777, 0o700);
+    return path;
+  });
+  t.mock.method(fs, "openSync", (...args) => {
+    if (overrides.openSync) overrides.openSync(...args);
+    const descriptor = original.openSync(...args);
+    resources.descriptors.push(descriptor); resources.opened.push(args[0]);
+    assert.equal(fs.fstatSync(descriptor).mode & 0o777, 0o600);
+    return descriptor;
+  });
+  t.mock.method(fs, "readFileSync", (...args) => {
+    if (overrides.readFileSync) overrides.readFileSync(...args);
+    return original.readFileSync(...args);
+  });
+  t.mock.method(childProcess, "execFileSync", (...args) => {
+    resources.executions++;
+    if (overrides.execFileSync) return overrides.execFileSync(...args);
+    return original.execFileSync(...args);
+  });
+  syncBuiltinESMExports();
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  return resources;
+}
+
+function assertCaptureCleaned(resources) {
+  for (const directory of resources.directories) assert.equal(existsSync(directory), false);
+  for (const descriptor of resources.descriptors) {
+    assert.throws(() => fs.fstatSync(descriptor), { code: "EBADF" });
+  }
+}
+
+test("file-backed production runner captures complete multibyte output above pipe limits", (t) => {
+  const resources = captureResources(t);
+  const history = Array.from({ length: 108 }, (_, index) => ({
+    id: index, body: "🙂é原".repeat(3500), tail: `private-history-tail-${index}`,
+  }));
+  const expected = JSON.stringify(history);
+  assert.ok(Buffer.byteLength(expected) > 3 * 1024 * 1024);
+  const fixture = join(tmpdir(), `pc-runner-${process.pid}-${Date.now()}.json`);
+  writeFileSync(fixture, expected); t.after(() => rmSync(fixture, { force: true }));
+  const result = new ProcessCommandRunner().runFileBacked(process.execPath, [
+    "-e", "require('node:fs').writeFileSync(1, require('node:fs').readFileSync(process.argv[1]))", fixture,
+  ]);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, expected);
+  assert.deepEqual(JSON.parse(result.stdout), history);
+  assert.equal(result.stderr, "");
+  assert.equal(resources.executions, 1);
+  assertCaptureCleaned(resources);
+});
+
+test("file-backed runner preserves native nonzero status and stderr and cleans resources", (t) => {
+  const resources = captureResources(t);
+  const result = new ProcessCommandRunner().runFileBacked(process.execPath, ["-e", [
+    "require('node:fs').writeFileSync(1, 'private-failed-stdout')",
+    "require('node:fs').writeFileSync(2, 'ordinary command error')", "process.exit(7)",
+  ].join(";")], { allowFailure: true });
+  assert.equal(result.status, 7); assert.equal(result.nativeStatus, 7);
+  assert.equal(result.signal, null); assert.equal(result.stdout, "");
+  assert.equal(result.stderr, "ordinary command error");
+  assertCaptureCleaned(resources);
+});
+
+test("file-backed runner retains ENOBUFS, null status and signal without error payloads", (t) => {
+  const resources = captureResources(t, {
+    execFileSync: () => { throw Object.assign(new Error("private-error-message"), {
+      code: "ENOBUFS", status: null, signal: "SIGTERM", stdout: "private-history-tail", stderr: "",
+    }); },
+  });
+  const runner = new ProcessCommandRunner();
+  const result = runner.runFileBacked("bd", ["private-argument"], { allowFailure: true });
+  assert.deepEqual(result, {
+    stdout: "", stderr: "", status: 1, errorCode: "ENOBUFS", nativeStatus: null, signal: "SIGTERM",
+  });
+  assert.throws(() => runner.runFileBacked("bd", ["private-argument"]), (error) => {
+    assert.match(error.message, /ENOBUFS.*status=null.*SIGTERM/);
+    assert.doesNotMatch(error.message, /private-/); assert.ok(error.message.length < 300); return true;
+  });
+  assertCaptureCleaned(resources);
+});
+
+test("synchronous pipe runner retains native failure metadata for existing callers", (t) => {
+  captureResources(t, {
+    execFileSync: () => { throw Object.assign(new Error("spawnSync bd ENOBUFS"), {
+      code: "ENOBUFS", status: null, signal: "SIGTERM", stdout: "partial", stderr: "",
+    }); },
+  });
+  const result = new ProcessCommandRunner().run("bd", [], { allowFailure: true });
+  assert.deepEqual(result, {
+    stdout: "partial", stderr: "", status: 1, errorCode: "ENOBUFS", nativeStatus: null, signal: "SIGTERM",
+  });
+});
+
+for (const stage of ["directory", "stdout-open", "stderr-open", "stdout-read", "stderr-read"]) {
+  test(`file-backed runner fails closed and cleans resources on ${stage} resource failure`, (t) => {
+    const fail = () => { throw Object.assign(new Error("private-storage-detail"), { code: "ENOSPC" }); };
+    const resources = captureResources(t, {
+      ...(stage === "directory" ? { mkdtempSync: fail } : {}),
+      openSync: (path) => { if (stage === `${basename(path)}-open`) fail(); },
+      readFileSync: (path) => { if (stage === `${basename(path)}-read`) fail(); },
+    });
+    const result = new ProcessCommandRunner().runFileBacked(process.execPath, [
+      "-e", "require('node:fs').writeFileSync(1, 'private-success-payload')",
+    ], { allowFailure: true });
+    assert.equal(result.status, 1); assert.equal(result.errorCode, "ENOSPC");
+    assert.equal(result.nativeStatus, null); assert.equal(result.stdout, ""); assert.equal(result.stderr, "");
+    if (stage === "directory" || stage.endsWith("-open")) assert.equal(resources.executions, 0);
+    assertCaptureCleaned(resources);
+  });
+}
+
+test("file-backed runner cleans private files after a real spawn failure", (t) => {
+  const resources = captureResources(t);
+  const result = new ProcessCommandRunner().runFileBacked("/prime-claw-missing-executable", [], { allowFailure: true });
+  assert.equal(result.status, 1); assert.equal(result.errorCode, "ENOENT");
+  assert.equal(result.nativeStatus, null); assert.equal(result.stdout, "");
+  assertCaptureCleaned(resources);
+});
 
 test("explicit initialization freezes only supported unfinished future specifications", (t) => {
   const root = repo(t);

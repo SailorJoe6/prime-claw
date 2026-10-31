@@ -149,7 +149,7 @@ export interface ProviderMigrationOptions {
   }>>;
 }
 
-type NativeCommand = { stdout: string; stderr: string; status: number };
+type NativeCommand = { stdout: string; stderr: string; status: number; errorCode?: string | number; nativeStatus?: number | null; signal?: string | null };
 type JsonObject = Record<string, any>;
 
 interface BacklogTaskPackage {
@@ -233,19 +233,57 @@ function blocked(
   return { status: "blocked", code, detail, remediation, ...context };
 }
 
-function commandFailure(label: string, result: NativeCommand): string {
-  return `${label}: ${result.stderr.trim() || result.stdout.trim() || `exit ${result.status}`}`;
+// Only this existing command boundary distinguishes transport from native data.
+// Never include argv by default: destination commands can carry source packages.
+class MigrationCommandFailure extends Error {}
+
+function boundedDiagnostic(value: string, limit: number): string {
+  const safe = value.replace(/[\x00-\x1f\x7f]/g, " ");
+  return safe.length > limit ? `${safe.slice(0, limit - 3)}...` : safe;
 }
 
-function runRequired(runner: CommandRunner, command: string, args: string[], cwd: string, label = `${command} ${args.join(" ")}`): NativeCommand {
+function commandFailure(label: string, result: NativeCommand): string {
+  const metadata = [
+    `status=${result.status}`,
+    ...(result.errorCode === undefined ? [] : [`code=${boundedDiagnostic(String(result.errorCode), 64)}`]),
+    ...(result.nativeStatus === undefined ? [] : [`nativeStatus=${result.nativeStatus}`]),
+    ...(result.signal === undefined ? [] : [`signal=${boundedDiagnostic(String(result.signal), 32)}`]),
+  ];
+  const stderr = boundedDiagnostic(result.stderr.trim(), 256);
+  return boundedDiagnostic(`${boundedDiagnostic(label, 192)}: command/capture failed (${metadata.join(", ")})${stderr ? `; stderr: ${stderr}` : ""}`, 768);
+}
+
+/** One file-backed seam reaches discovery, source capture and every recapture. */
+function migrationRunner(supplied?: CommandRunner): CommandRunner {
+  const processRunner = new ProcessCommandRunner();
+  return {
+    run(command, args, options) {
+      // Supplied runners keep their existing seam, including synthetic runners.
+      const captureOptions = { ...options, allowFailure: true };
+      const result = supplied ? supplied.run(command, args, captureOptions) : processRunner.runFileBacked(command, args, captureOptions);
+      // Resource/spawn failures must not be mistaken for a negative discovery
+      // probe. Nonzero native-provider commands also cannot certify source data.
+      // Ordinary negative Git existence/ancestry probes retain their semantics.
+      if (result.errorCode !== undefined || result.nativeStatus === null || result.signal
+          || (result.status !== 0 && (options?.allowFailure !== true || ["bd", "backlog", "dolt"].includes(command)))) {
+        throw new MigrationCommandFailure(commandFailure(`${basename(command)} command`, result));
+      }
+      return result;
+    },
+  };
+}
+
+function runRequired(runner: CommandRunner, command: string, args: string[], cwd: string, label = `${basename(command)} command`): NativeCommand {
   const result = runner.run(command, args, { cwd, allowFailure: true });
-  if (result.status !== 0) throw new Error(commandFailure(label, result));
+  if (result.status !== 0 || result.errorCode !== undefined || result.nativeStatus === null || result.signal) {
+    throw new MigrationCommandFailure(commandFailure(label, result));
+  }
   return result;
 }
 
 function parseJson(text: string, label: string): any {
   try { return JSON.parse(text); }
-  catch (error) { throw new Error(`${label} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
+  catch { throw new Error(`${boundedDiagnostic(label, 192)} returned invalid JSON; complete native data must be readable JSON`); }
 }
 
 function canonical(value: unknown): string {
@@ -815,7 +853,7 @@ export function inspectTaskProviderMigration(options: {
   targetProvider: TaskProviderId;
   runner?: CommandRunner;
 }): ProviderMigrationInspection | ProviderMigrationBlocked {
-  const runner = options.runner ?? new ProcessCommandRunner();
+  const runner = migrationRunner(options.runner);
   try {
     if (options.targetProvider !== "backlog") return blocked("unsupported-direction", "provider migration supports only Beads-to-Backlog", "request an explicit Beads-to-Backlog inspection; reverse migration is not supported", { targetProvider: options.targetProvider });
     const project = resolveNearestProjectRoot(options.cwd, process.env.HOME ?? "", runner);
@@ -842,7 +880,11 @@ export function inspectTaskProviderMigration(options: {
       confirmation: `Confirm one-way ${source.provider}->${options.targetProvider} migration at exact source revision ${source.revision}; all task mutations must remain quiesced until the operation finishes.`,
     };
   } catch (error) {
-    return blocked("preflight", error instanceof Error ? error.message : String(error), "repair the exact native source/publication evidence, then request a new migration inspection", { targetProvider: options.targetProvider });
+    return blocked("preflight", error instanceof Error ? error.message : String(error),
+      error instanceof MigrationCommandFailure
+        ? "resolve the reported command/capture or resource failure, preserve the source and its full history, then request a new migration inspection; do not trim history or repair readable source data"
+        : "repair the exact invalid or incomplete native source/publication evidence, then request a new migration inspection",
+      { targetProvider: options.targetProvider });
   }
 }
 
@@ -1317,7 +1359,7 @@ function migrateBacklogToBeads(
     const input = join(temp, "tasks.jsonl");
     writeJsonLines(input, rows);
     const dry = runner.run("bd", ["import", input, "--dry-run", "--json"], { cwd: source.projectRoot, allowFailure: true });
-    if (dry.status !== 0) throw new Error(commandFailure("bd import --dry-run", dry));
+    if (dry.status !== 0) throw new MigrationCommandFailure(commandFailure("bd import --dry-run", dry));
     runRequired(runner, "bd", ["import", input, "--allow-stale", "--json"], source.projectRoot, "bd import migration tasks");
   } finally { rmSync(temp, { recursive: true, force: true }); }
   runRequired(runner, "bd", ["dolt", "push", "--no-adopt"], source.projectRoot, "publish migrated Beads tasks");
@@ -2406,7 +2448,7 @@ function exactSelectedTarget(projectRoot: string, target: TaskProviderId, runner
 }
 
 export async function migrateTaskProvider(options: ProviderMigrationOptions): Promise<ProviderMigrationResult> {
-  const runner = options.runner ?? new ProcessCommandRunner();
+  const runner = migrationRunner(options.runner);
   let source: SourceSnapshot | undefined;
   let ownershipSwitch: ActiveTaskProviderOwnershipSwitchResult | undefined;
   try {
@@ -2565,7 +2607,9 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       message,
       ownershipSwitch
         ? `stop all task mutation and recover the exact source ${sourcePath}, destination ${destinationPath}, and ownership evidence; do not create another destination`
-        : `the source remains authoritative at ${sourcePath}; preserve it, inspect the exact native error, and either clean only the existing destination ${destinationPath} or retry only that same destination after the stated condition is satisfied`,
+        : error instanceof MigrationCommandFailure
+          ? `the source remains authoritative at ${sourcePath}; resolve the reported command/capture or resource failure without trimming history or repairing readable source data; preserve the existing destination ${destinationPath} and retry only that same destination after the stated condition is satisfied`
+          : `the source remains authoritative at ${sourcePath}; preserve it, inspect the exact invalid or incomplete native evidence, and either clean only the existing destination ${destinationPath} or retry only that same destination after the stated condition is satisfied`,
       { sourceProvider: source?.provider, targetProvider: options.targetProvider, sourceRevision: source?.revision },
     );
   }
