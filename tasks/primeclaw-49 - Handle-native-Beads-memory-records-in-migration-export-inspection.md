@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-49
 title: Handle native Beads memory records in migration export inspection
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 18:48'
+updated_date: '2026-10-31 18:59'
 labels: []
 dependencies: []
 references:
@@ -248,5 +248,5 @@ AC9 checked on this bounded candidate's committed-byte/refusal/publication/repla
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Bounded AC9 committed-publication repair candidate 752f22d58cba961df1506a5a4bb4c21d98c97bd0 adds read-only exact Git blob proofs for native memory/index/USER outputs at existing data/receipt/refresh/replay boundaries. Ignored/missing/different committed outputs block retirement and preserve source/exact ownership; no force-add/ignore edit/automatic repair or new protocol. Existing fixture proves ignored-docs and committed-byte mismatch refusal; normal published/replay/zero-memory cases pass. Focused Docker2passed7deselected726.85s (19+9 native pass), final tier1 probe exit0. All10 AC supported by candidate evidence; In Progress pending focused owner closure. No merge/activation/live migration/full-suite claim.
+Merged on Joe's explicit approval of (PRIMECLAW-49, main a6a7599ca5d7d0673c31d2cb30aae238fc594ea7, candidate cbfb502bc1a6c4304654a6b593f42051b8a820b9). Canonical main was fast-forwarded, pushed, and directly verified at cbfb502bc1a6c4304654a6b593f42051b8a820b9. All ten acceptance criteria are supported: typed Beads memory capture, lossless CLI-native memory documents/index/one USER task, issue-only mappings, exact published-blob/path readback before retirement, same-identity replay and zero-memory no-op. Independent focused closure found the accepted path and publication findings repaired with no new material defect. Final Docker selectors: 2 passed, 7 deselected in 726.85s; native 19+9 passed; mandatory tier1 probe exit0. No full-suite claim. No live Nemo migration/private access, user memory curation/deletion, global activation, deployment or restart. Exact idle Episode cleanup follows verified Done publication.
 <!-- SECTION:FINAL_SUMMARY:END -->
