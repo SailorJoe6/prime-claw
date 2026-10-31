@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Progress
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 20:06'
+updated_date: '2026-10-31 20:12'
 labels: []
 dependencies: []
 references:
@@ -194,4 +194,12 @@ Validation evidence (plugin/runtime behavior Docker-only; supported read-only cw
 - Initial concurrent container attempt did not execute fixture tests: source-builder image ID was absent at inspection (read-only docker image inspect confirmed No such image); receipt showed no builder allocation and identical source checkout inventory before/after. Independent source-loader passed, 54 fixture setup errors. Preserved evidence .test-results/20261031T195205Z-94724-261b599e/tier1 and .test-results/primeclaw-51-slice2-container.log. The serialized rerun above passed all but the superseded Beads fixture; no testing-harness or Prime Agent change was made. Two obsolete static wording assertions and exact current managed-hash fixtures were updated; unrelated customized assets/baseline failures were not reset.
 
 Still pending: removal of all five custom command registrations/adapters; remaining plan/plan-spec/handoff global entry skills; broader loaded planning/handoff/oversight policy and product docs/probe alignment; final acceptance and full-task cutover proof. Custom commands intentionally remain in this slice. No full acceptance criterion is marked complete. Candidate host/global apply/check/probe, merge/rebase, restart, deployment, migration/retirement, new Episode and cleanup remain outside this slice. Stop here for owning Conversation review.
+
+Accepted slice-2 handoff focus (2026-10-31)
+
+The owning Conversation accepted retained-folder parity slice 2 as an incremental candidate, not full-task acceptance. It verified compatible native notes/modified-file/timestamp updates with unchanged Description, plan, eight AC and In Progress status; exact clean pushed code 8dfe2077a4a9e4041a927a6183371586487347e9 and task evidence 696e87c5d1f92d42f9b0ac4dfd35580bf379a4c1; passing Docker Tier-1 and affected bridges after the obsolete test-only Beads hook was corrected; and no candidate-only static failures. Its independent read-only GPT-6 Astra source/test review found no material defect, including current digest/frozen-spec integrity, active source-absent replay/no assignment, host/error refusal and ownership safety. Continue only this same Episode within the original approved plan.
+
+Next bounded execute focus: remaining invocation cutover. Remove the five custom command registrations/adapters. Add the remaining thin globally discoverable plan, plan-spec and ordinary handoff entry skills by reusing existing tools. Align actually loaded planning/handoff/oversight guidance and relevant docs/probes/tests with skill-owned conditional authority and bounded delegated selection. Load canonical phase policy instead of copying detailed procedures into entry skills. Preserve accepted self-contained task/retained creation, stable customizable internal workflow IDs and supported fallback, all provider/identity/state/readiness/placement/ownership/resource safeguards, Prime Agent built-ins/native /skill:, and admission-versus-completion/sole-follow-up/uncertainty behavior. Do not introduce replacement approval tokens, receipts, classifiers or a broad framework.
+
+Use existing focused Docker suites and mandatory scripts/test-tier1.sh --probe after plugin-source changes. Report truthful full-task coverage and remaining gaps/baseline failures without fixing unrelated scope. Publish clean pushed code and native task progress, then stop for Conversation review. No candidate host/global apply/check/probe, merge, activation, restart, migration/retirement, cleanup or new Episode. Product scope, specification, plan, AC and In Progress status remain unchanged.
 <!-- SECTION:NOTES:END -->
