@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Design
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 17:58'
+updated_date: '2026-10-31 18:01'
 labels: []
 dependencies: []
 references:
@@ -39,8 +39,13 @@ Markdown skills own the workflow rules for advancing between phases. They interp
 
 Native tools enforce concrete task/provider identity, valid lifecycle state, semantic readiness, placement, ownership, and resource safety. They must not require proof that a particular earlier entry point or invocation sequence was used as a substitute for the skill's interpretation of operator authority. This does not remove readiness or resource-safety validation.
 
+## Delegated task selection and lifecycle readiness
+The operator may explicitly delegate selection of work within stated bounds. The skill may select a matching task and must bind its exact canonical identity before invoking task-specific native operations. Delegated task selection is not permission to skip design or planning.
+
+Implementation eligibility is represented by the existing task workflow states: a task must have progressed through design and planning and be in `In Planning` before implementation admission. Selecting a "ready to implement" task therefore means selecting from that eligible lifecycle state, not merely taking the highest-priority open task or relying on dependency readiness alone. Preserve the existing semantic readiness checks; do not add a second phase-history receipt or invocation-sequence proof alongside the task's native lifecycle state.
+
 ## Open decisions during operator interview
-- Any further material invocation, task-selection, compatibility, or cutover decisions revealed by examining the existing workflows.
+- Whether retained folder-based workflow outcomes should remain supported through skills and tools after their custom slash commands are removed.
 
 This is a living In Design specification, not ready for planning until the material decisions are resolved and the saved specification is reviewed.
 
@@ -53,7 +58,7 @@ Prime Agent remains an upstream dependency. Changes belong in prime-claw's plugi
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Prime Claw no longer registers its custom /plan, /plan-spec, /implement-task, /implement-spec, or /handoff commands; Prime Agent built-ins and native /skill: invocation are unaffected.
-- [ ] #2 Discoverable Markdown skills instruct the agent how to invoke the supported workflow operations, select exact task or retained-specification identity, resolve material ambiguity, and distinguish admission from completion without requiring custom slash-command syntax.
+- [ ] #2 Discoverable Markdown skills instruct the agent how to invoke supported workflow operations, bind exact task or retained-specification identity, resolve material ambiguity, and distinguish admission from completion without requiring custom slash commands. Explicit delegated task selection stays within the operator's bounds; implementation selection requires the existing In Planning lifecycle state after design and planning, not dependency readiness alone, and preserves semantic readiness checks without a separate phase-history proof.
 - [ ] #3 Every supported workflow outcome formerly reached through those commands remains reachable through agent-callable operations and skill guidance, including implementation entry, task-native planning, ordinary handoff, and supported retained folder-based compatibility; existing tools are reused where sufficient.
 - [ ] #4 Markdown skills own phase-advancement and approval policy, honor explicit conditional approval for planning followed by implementation within approved scope, and do not infer implementation authority from planning alone. Native tools enforce concrete identity/state/readiness/placement/ownership/resource safety without requiring a particular prior workflow-entry invocation sequence.
 - [ ] #5 The new invocation surface preserves provider/canonical identity, required lifecycle states, readiness checks, placement decisions, ownership, isolated Episode creation, and the one fixed execute assignment, without duplicate admission or allocation after failed or uncertain results.
