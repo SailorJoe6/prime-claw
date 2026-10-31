@@ -292,7 +292,17 @@ function migrationRunner(supplied?: CommandRunner): CommandRunner {
 }
 
 function runRequired(runner: CommandRunner, command: string, args: string[], cwd: string, label = `${basename(command)} command`): NativeCommand {
-  const result = runner.run(command, args, { cwd, allowFailure: true });
+  let result: NativeCommand;
+  try {
+    result = runner.run(command, args, { cwd, allowFailure: true });
+  } catch (error) {
+    // The adapter's diagnostic is already payload-safe; retain this operation's
+    // explicit safe label without exposing argv or unclassified runner errors.
+    if (error instanceof MigrationCommandFailure) {
+      throw new MigrationCommandFailure(boundedDiagnostic(`${boundedDiagnostic(label, 192)}: ${error.message}`, 768));
+    }
+    throw error;
+  }
   if (result.status !== 0 || result.errorCode !== undefined || result.nativeStatus === null || result.signal) {
     throw new MigrationCommandFailure(commandFailure(label, result));
   }

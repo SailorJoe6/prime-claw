@@ -2390,9 +2390,11 @@ test("default migration capture is file-backed for every native read and reports
   let injection;
   let failDiscovery = false;
   let failRequiredGit = false;
+  let failExport = false;
   ProcessCommandRunner.prototype.run = () => { throw new Error("migration used pipe-buffer capture"); };
   ProcessCommandRunner.prototype.runFileBacked = function (commandName, args, options = {}) {
     if (commandName === "bd") reads.push([...args]);
+    if (failExport && commandName === "bd" && args[0] === "--readonly" && args[1] === "export") return injection;
     if ((failDiscovery && commandName === "bd" && args[0] === "config" && args[1] === "get" && args[2] === "no-db")
         || (failRequiredGit && commandName === "git" && args.includes("--git-dir"))) {
       assert.equal(options.allowFailure, true, "adapter must collect native metadata before throwing");
@@ -2427,13 +2429,20 @@ test("default migration capture is file-backed for every native read and reports
     { name: "output-read EIO", stdout: large.events.text, stderr: "", status: 1, errorCode: "EIO", nativeStatus: null, signal: null },
     { name: "short stderr", stdout: large.history.text, stderr: "fixture command unavailable", status: 7, nativeStatus: 7, signal: null },
     { name: "large stderr", stdout: large.events.text, stderr: "fixture ordinary error ".repeat(2000) + "PRIVATE-STDERR-TAIL", status: 9, nativeStatus: 9 },
-    { name: "empty stderr", stdout: large.history.text, stderr: "", status: 4 },
+    { name: "empty stderr", stdout: large.history.text, stderr: "", status: 7, nativeStatus: 7, signal: null },
+    { name: "empty export stderr", operation: "export", stdout: large.history.text, stderr: "", status: 7, nativeStatus: 7, signal: null },
   ];
   for (const failure of failures) {
     injection = failure;
+    failExport = failure.operation === "export";
+    const expectedLabel = failExport ? "Beads source complete export" : `bd history ${fixture.ids.parent}`;
     const refused = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
     assert.equal(refused.status, "blocked", failure.name);
+    assert.ok(refused.detail.startsWith(`${expectedLabel}:`), refused.detail);
     assert.match(refused.detail, /command\/capture failed/);
+    assert.ok(refused.detail.includes(`status=${failure.status}`), failure.name);
+    if (failure.nativeStatus !== undefined) assert.ok(refused.detail.includes(`nativeStatus=${failure.nativeStatus}`), failure.name);
+    if (failure.signal === null) assert.match(refused.detail, /signal=null/);
     assert.ok(refused.detail.length <= 768, failure.name);
     assert.match(refused.remediation, /resolve.*command\/capture or resource failure/);
     assert.doesNotMatch(refused.detail, /PRIVATE-|Issue|description|padding/);
@@ -2445,6 +2454,7 @@ test("default migration capture is file-backed for every native read and reports
       confirmedSwitch: true, actor: "synthetic-test", semanticPlacement: "Preserve all native values.",
     });
     assert.equal(result.status, "blocked", failure.name);
+    assert.equal(result.detail, refused.detail, "inspection and migration retain the same safe operation label and metadata");
     assert.match(result.detail, /command\/capture failed/);
     assert.ok(result.detail.length <= 768);
     assert.match(result.remediation, /resolve.*command\/capture or resource failure/);
@@ -2458,6 +2468,7 @@ test("default migration capture is file-backed for every native read and reports
   // Discovery helpers used to turn native command failure into source-repair
   // advice. Required Git discovery also calls the runner with allowFailure=false.
   injection = failures[0];
+  failExport = false;
   failDiscovery = true;
   const discoveryFailure = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
   assert.equal(discoveryFailure.status, "blocked");
