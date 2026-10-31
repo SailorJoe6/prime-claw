@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 18:42'
+updated_date: '2026-10-31 18:44'
 labels: []
 dependencies: []
 references:
@@ -107,3 +107,13 @@ Keep the existing synchronous `CommandRunner.run` and native snapshot/package fl
 
 Implement only after separate operator `/implement-task PRIMECLAW-50` approval. Use disposable synthetic projects and Docker candidate validation. PRIMECLAW-49 covers native memory records independently; do not fold that work or the unrelated hard-coded lifecycle gates into this bug. Recheck the current main baseline at implementation time and preserve compatible upstream changes. Leave source authority intact on every unproven capture. Publish the candidate and task evidence through the normal Episode review flow; global activation and any real source deletion require their own existing operator authority.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+### Episode slice 1 — complete capture and safe diagnostics
+
+Verified exact active version-2 binding for this Episode at code base 7380afe1526647eef3dbc7fa0b62ce8796a19641 and clean published task revision 000da477c0418137aba0e1638903b3ea1b1a32c0. This bounded pass implements the approved synchronous file-backed migration capture seam, transport/data diagnostics, focused synthetic Docker regressions and documentation. Two independent workers own the runner and migration integration; the Episode owns integration, Docker validation and publication. No live Ralph reads, private history access, source migration, user-global installation or lifecycle status change is authorized or planned.
+
+The builder-relative deps/backlog/dist/backlog artifact is absent in this new worktree. The already activated native backlog CLI (1.53.0 on PATH) resolves the exact independent .backlog task clone; no dependency or task-store copy was made. Status remains In Progress. Finite synthetic tests will be paired with source review proving regular file descriptors, not a raised fixed pipe buffer.
+<!-- SECTION:NOTES:END -->
