@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Design
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 17:56'
+updated_date: '2026-10-31 17:58'
 labels: []
 dependencies: []
 references:
@@ -34,11 +34,13 @@ Skills must explain how to bind the intended task or retained specification, res
 
 Preserve task/provider identity, lifecycle-state validation, semantic readiness, placement selection, ownership, isolated Episode allocation, and the single fixed execute assignment. Do not let the interface change bypass resource-safety checks or silently broaden approved scope. Preserve supported legacy outcomes without retaining custom slash commands as a hidden required entry path. Failed or uncertain admission or partial creation must not cause automatic duplicate admission or Episode allocation.
 
-The operator's example of conditional approval exposes an unresolved product decision: an instruction such as "plan this task, then implement it when ready" must be addressed explicitly by the new skill policy. Requiring slash-command provenance is not itself an answer to that question. Do not assume either that fresh approval is always mandatory or that conditional approval is already accepted.
+## Approval and enforcement boundary
+Markdown skills own the workflow rules for advancing between phases. They interpret the operator's approval and decide when to invoke the corresponding operations. An explicit conditional instruction such as "plan this task, then implement it when ready" may authorize that sequence within the approved scope; it does not require fresh approval solely because planning finished. A request to plan alone does not authorize implementation.
+
+Native tools enforce concrete task/provider identity, valid lifecycle state, semantic readiness, placement, ownership, and resource safety. They must not require proof that a particular earlier entry point or invocation sequence was used as a substitute for the skill's interpretation of operator authority. This does not remove readiness or resource-safety validation.
 
 ## Open decisions during operator interview
-- Where the boundary belongs between Markdown workflow/approval policy and native admission enforcement, including whether explicit conditional approval may cover planning followed by implementation.
-- Any further material invocation, compatibility, or cutover decisions revealed by examining the existing workflows.
+- Any further material invocation, task-selection, compatibility, or cutover decisions revealed by examining the existing workflows.
 
 This is a living In Design specification, not ready for planning until the material decisions are resolved and the saved specification is reviewed.
 
@@ -53,7 +55,7 @@ Prime Agent remains an upstream dependency. Changes belong in prime-claw's plugi
 - [ ] #1 Prime Claw no longer registers its custom /plan, /plan-spec, /implement-task, /implement-spec, or /handoff commands; Prime Agent built-ins and native /skill: invocation are unaffected.
 - [ ] #2 Discoverable Markdown skills instruct the agent how to invoke the supported workflow operations, select exact task or retained-specification identity, resolve material ambiguity, and distinguish admission from completion without requiring custom slash-command syntax.
 - [ ] #3 Every supported workflow outcome formerly reached through those commands remains reachable through agent-callable operations and skill guidance, including implementation entry, task-native planning, ordinary handoff, and supported retained folder-based compatibility; existing tools are reused where sufficient.
-- [ ] #4 The resolved operator-approval policy is explicit and consistent across skills and native entry points, including the treatment of conditional instructions to plan and then implement; planning alone is not silently treated as implementation authority.
+- [ ] #4 Markdown skills own phase-advancement and approval policy, honor explicit conditional approval for planning followed by implementation within approved scope, and do not infer implementation authority from planning alone. Native tools enforce concrete identity/state/readiness/placement/ownership/resource safety without requiring a particular prior workflow-entry invocation sequence.
 - [ ] #5 The new invocation surface preserves provider/canonical identity, required lifecycle states, readiness checks, placement decisions, ownership, isolated Episode creation, and the one fixed execute assignment, without duplicate admission or allocation after failed or uncertain results.
 - [ ] #6 Managed installed guidance and relevant workflow/user-story documentation consistently describe skills plus agent-callable operations and no longer prescribe removed custom slash commands as required workflow entry points.
 - [ ] #7 Focused automated coverage proves removal of custom registrations, reachable replacement workflow entry points, relevant authorization guidance, and preserved admission/resource-safety outcomes for supported providers and retained compatibility; plugin-source changes pass Docker-isolated Tier-1 validation.
