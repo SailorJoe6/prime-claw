@@ -23,21 +23,28 @@ Final `create_task_episode(taskId, host?)` independently resolves concrete nativ
 identity, state, readiness, placement, and ownership; it requires no prior entry
 invocation, approval store, or turn receipt.
 
-This incremental slice adds the task entry skill/tool and removes only the
-task-native invocation-proof guard. All existing custom commands, including
-`/implement-task`, remain registered. Retained version-1 guards and workflows
-remain unchanged; later slices complete the broader interface cutover.
+This incremental slice adds task and retained-folder implementation entry
+skills/tools without removing existing custom commands, including
+`/implement-task` and `/implement-spec`. Other entry skills and broad
+policy/probe alignment remain pending.
 
-For retained version-1 compatibility, `/implement-spec
-.ralph/plans/future/<slug>` performs the same final review for one existing
-bundle only when its exact location and current `SPECIFICATION.md` bytes match
-the explicit-upgrade grandfathered inventory. The specification is frozen; its
-plan remains living. Its approval binds the exact session, source location,
-optional host, and complete bundle digest and is consumable once. When that
-obsolete source folder is absent, the same registered route admits only the
-exact already-active version-1 owner after verifying its promoted frozen
-specification; the creation call can then return only that same Episode with no
-new assignment.
+For retained version-1 compatibility, the discoverable `implement-spec` skill
+routes one exact operator-selected `.ralph/plans/future/<slug>` through
+`implement_spec(location, host?)` and the project's customizable readiness
+policies. It asks when the folder is missing or ambiguous; it never selects a
+replacement. The existing command remains an alternative. Fresh creation still
+requires its exact location and frozen `SPECIFICATION.md` bytes to match the
+explicit-upgrade grandfathered inventory; its execution plan remains living.
+Markdown interprets operator authority, including an explicit conditional
+plan-then-implement instruction within scope. Planning alone, entry invocation,
+and stored or turn-scoped receipts supply no implementation authority.
+Preparation carries the exact location, authority, scope, and optional stable
+host through compaction. Final create independently checks current concrete
+integrity, placement, ownership, and resources without any prior entry proof.
+When the obsolete source folder is absent, exact already-active version-1
+ownership is resolved before source lookup and its promoted frozen specification
+is verified. Creation then returns only that same Episode with no new execute
+assignment, not a new admission.
 
 ## US-14 — Create one isolated implementation Episode
 
@@ -68,9 +75,12 @@ fresh task-native Episode receives:
 - durable ownership by that originating Conversation, which the Episode resolves
   by the supplied key rather than its own session ID.
 
-For retained version-1 compatibility, `create_spec_episode(location=...)`
+For retained version-1 compatibility, `create_spec_episode(location, host?)`
 creates a matching folder Episode only after rechecking the inventory's exact
-specification digest. An already-owned exact Episode replays from persisted
+specification digest. It reloads the current complete bundle and captures its
+digest at the concrete create boundary as integrity evidence, not invocation
+proof. A carried stable `id:<setup-id>` host is revalidated before mutation;
+explicit placement never silently falls back. An already-owned exact Episode replays from persisted
 ownership and its promoted frozen specification even when the obsolete future
 source is absent; it does not require a task provider. Fresh admission promotes the approved
 bundle into active `.ralph/plans` from its captured base and records its
@@ -207,13 +217,15 @@ without one, the existing sole-ready/picker/definitive-unavailability rules appl
 It accepts no arbitrary root, path, worktree, session, or engine identity and
 requires no earlier entry invocation as approval proof. Concrete ownership and
 resource checks still refuse duplicate admission. Retained version-1
-compatibility folder Episode creation remains available through the explicitly
-labeled unchanged workflow above.
+compatibility folder Episode creation remains available through the retained
+entry and self-contained creation boundary above, with its integrity and exact
+active-replay checks preserved.
 
 ## Primary implementation surfaces
 
 - `src/prime-agent-plugin/extensions/reviewed-plan.ts`
-- `src/prime-agent-plugin/skills/implement-task/SKILL.md` (global entry guidance)
+- `src/prime-agent-plugin/skills/implement-task/SKILL.md` (global task entry guidance)
+- `src/prime-agent-plugin/skills/implement-spec/SKILL.md` (global retained-folder entry guidance)
 - `src/prime-agent-plugin/extension-support/spec-episode.ts` (retained allocator plus public task-native admission transaction)
 - `src/prime-agent-plugin/extension-support/episode-ownership.ts`
 - `src/prime-agent-plugin/extension-support/task-episode-ownership.ts` (task-native reservation foundation)

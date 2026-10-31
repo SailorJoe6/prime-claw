@@ -9,6 +9,7 @@ plan_task({"taskId":"TASK-ID"})
 /plan-spec .ralph/plans/future/<slug>
 plan_spec({"location":".ralph/plans/future/<slug>"})
 /implement-spec .ralph/plans/future/<slug> [--host id:<project-host-setup-id>]
+implement_spec({"location":".ralph/plans/future/<slug>","host":"id:<project-host-setup-id>"})
 /implement-task TASK-ID [--host id:<project-host-setup-id>]
 implement_task({"taskId":"TASK-ID","host":"id:<project-host-setup-id>"})
 ```
@@ -22,10 +23,16 @@ The skill owns approval judgment: an explicit conditional request to plan then
 implement when ready may remain valid within scope, while planning alone never
 authorizes implementation. Material ambiguity or new scope requires clarification.
 
+The globally discoverable `implement-spec` skill similarly routes one exact
+operator-selected retained future folder to `implement_spec(location, host?)`.
+It does not search for or invent a folder. Both implementation skills preserve
+conditional authority within scope; neither invocation supplies approval.
+
 This is an incremental cutover. All existing custom commands above remain
-registered, as does ordinary `/handoff`; retained version-1 invocation guards
-and folder workflows are unchanged. Other entry skills and command removal are
-later slices, not claims of this task-native increment.
+registered, as does ordinary `/handoff`. Both implementation entries and final
+create tools use current concrete checks, not invocation-proof approval stores.
+Other entry skills, command removal, and broad policy/probe alignment remain
+pending for later slices.
 
 Task planning resolves one exact task through the repository's selected native
 provider and admits only canonical `In Design` or `In Planning`. Backlog keeps
@@ -52,6 +59,7 @@ old-layout Episode can finish from its unchanged snapshot.
 | Native `/plan-spec` | wrapped `plan-prep`, ordinary delivery | wrapped `plan-spec` |
 | `plan_spec` | wrapped `plan-prep`, `steer` delivery | wrapped `plan-spec` |
 | Native `/implement-spec` | wrapped `implement-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-spec` |
+| `implement_spec` | wrapped `implement-prep`, `steer` delivery | full ordinary oversight guide followed by wrapped `implement-spec` |
 | Native `/implement-task` | wrapped `implement-task-prep`, ordinary delivery | full ordinary oversight guide followed by wrapped `implement-task` |
 | `implement_task` | wrapped `implement-task-prep`, `steer` delivery | full ordinary oversight guide followed by wrapped `implement-task` |
 
@@ -89,17 +97,24 @@ facts for the planning LLM rather than approval locks. Folder-compatible
 planning updates only the selected future bundle. Both stop for operator review
 and never authorize implementation.
 
-Retained implementation admission records a minimal in-memory guard for the
-current owner session, exact source location, and optional stable setup ID. For
-fresh work it also binds the complete bundle digest. For source-absent replay it
-binds the persisted digest of the exact active owner and can dispatch only to
-the same idempotent Episode branch, which creates no resource and sends no
-assignment. The guard survives the prep turn, is consumed by one exact
-`create_spec_episode` call during the phase turn, and is cleared if that turn
-ends without creation.
+Retained implementation uses no legacy approval map, consumed guard, or turn
+receipt. Both canonical messages carry the exact selected source location and
+optional stable host as factual operation data. Preparation preserves actual
+operator authority and approved scope through compaction. A planning-only
+instruction remains planning-only. The project-customizable readiness policy
+clarifies missing authority, ambiguity, or new scope before final creation.
 
-The task-native chain has no invocation-proof approval store or turn receipt.
-Both canonical messages carry the exact task ID and, for selected Orca
+`create_spec_episode(location, host?)` is self-contained. For fresh work it
+reloads the current complete bundle and captures its digest at the concrete
+create boundary for integrity checks, not proof of an earlier invocation. The
+specification must still match the frozen grandfathered inventory; the execution
+plan remains living and receives semantic review. Source-absent replay resolves
+exact already-active version-1 ownership before source lookup, verifies the
+promoted active pair and original identity, and returns only those same
+resources with no new execute assignment. It is not a new admission.
+
+The task-native chain likewise has no invocation-proof approval store or turn
+receipt. Both canonical messages carry the exact task ID and, for selected Orca
 placement, `<operator-implementation-host>id:<setup-id></operator-implementation-host>`.
 A selected local fallback is reported explicitly without inventing a host ID.
 Preparation preserves the operator's actual instruction, approved scope,
@@ -109,7 +124,10 @@ The project-customizable phase policy owns semantic readiness and approval
 judgment; task lifecycle state is not supplemented by a phase-history receipt.
 
 `create_spec_episode` remains the retained folder promotion boundary or exact
-active replay return. `create_task_episode(taskId, host?)` is self-contained:
+active replay return. A selected stable `id:<setup-id>` host is carried unchanged
+into final creation and revalidated, never stored privately as approval or
+silently substituted. Exact active replay must keep its recorded placement and
+resource identity. `create_task_episode(taskId, host?)` is also self-contained:
 it resolves current native provider, canonical task/root/path, `In Planning`
 state, meaningful plan, and placement without requiring any prior entry
 invocation. A carried stable host is revalidated before mutation; absent host

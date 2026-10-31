@@ -7,6 +7,7 @@ import test from "node:test";
 
 import {
   admitTaskImplementationPrepChain,
+  admitSpecImplementationPrepChain,
   createReviewedPlanExtension,
   maybeDeliverConversationAfterHandoff,
   normalizeConversationCompactionThreshold,
@@ -21,6 +22,7 @@ function fixture({ throwOnSend = 0, taskStatus = "In Design", providerTaskResolv
     const folder = join(root, ".ralph", "plans", "future", slug);
     mkdirSync(folder, { recursive: true });
     writeFileSync(join(folder, "SPECIFICATION.md"), `${slug} specification\n`);
+    writeFileSync(join(folder, "EXECUTION_PLAN.md"), `Implement ${slug} within its retained scope.\n`);
   }
   reconcileLegacySpecificationInventory(root, "initialize");
   mkdirSync(join(root, ".prime-claw", "workflows"), { recursive: true });
@@ -48,7 +50,7 @@ AFTER-HANDOFF POLICY
     async handoff(taskId, guidance) { taskCalls.push(["handoff", taskId, guidance]); return { admitted: true, taskId, episodeId: "task-episode", episodeActiveSessionId: "task-route", handoffDelivery: "prompt", executeDelivery: "followUp" }; },
     async cleanup(taskId, episodeHead, outcome) { taskCalls.push(["cleanup", taskId, episodeHead, outcome]); return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipRemoved: true }; },
   };
-  const deps = { guideRoot, taskActions, taskCleanup: {}, taskCleanupGit: { repositoryRoot: () => root }, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, ...(providerTaskResolver ? { providerTaskResolver } : {}), async placementResolver(...args) { return placementResolver ? placementResolver(...args) : { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, transitionLegacyOwnership(location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies) { transitioned.push({ location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies }); return { record: { ...episode, version: 2, taskId, taskPath: "task.md" }, reused: false, mainHead, episodeHead, activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "a".repeat(40) }, activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "b".repeat(40) } }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
+  const deps = { guideRoot, taskActions, taskCleanup: {}, taskCleanupGit: { repositoryRoot: () => root }, taskResolver(cwd, rawTaskId) { resolved.push({ cwd, rawTaskId }); if (rawTaskId.trim() === "missing") return null; return { taskId: "PRIMECLAW-10.38", title: "Planning fixture", status: taskStatus, implementationPlan: taskStatus === "In Planning" ? "Implement exact fixture" : null, projectRoot: root, taskPath: join(root, "task.md"), taskPathRelative: "task.md" }; }, ...(providerTaskResolver ? { providerTaskResolver } : {}), async placementResolver(...args) { return placementResolver ? placementResolver(...args) : args[1] ? { engine: "orca", projectSetupId: args[1].slice(3) } : { engine: "local" }; }, async createEpisode(location, toolCallId, callCtx, _deps, options) { created.push({ location, toolCallId, callCtx, options }); return episode; }, async restoreBlockedEpisode(location, confirmedUnblocked) { restored.push({location,confirmedUnblocked}); return { restored:true, sourceLocation:episode.sourceLocation, episodeId:"episode", worktree:episode.worktree, specification:join(episode.worktree,".ralph/plans/SPECIFICATION.md"), implementation:join(episode.worktree,".ralph/plans/EXECUTION_PLAN.md") }; }, transitionLegacyOwnership(location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies) { transitioned.push({ location, taskId, episodeHead, mainHead, confirmedReady, callCtx, transitionDependencies }); return { record: { ...episode, version: 2, taskId, taskPath: "task.md" }, reused: false, mainHead, episodeHead, activeSpecification: { path: ".ralph/plans/SPECIFICATION.md", blob: "a".repeat(40) }, activeImplementationPlan: { path: ".ralph/plans/EXECUTION_PLAN.md", blob: "b".repeat(40) } }; }, async handoffEpisode() { return { admitted: true, sourceLocation: episode.sourceLocation, episodeId: "episode", episodeActiveSessionId: "route", handoffDelivery: "prompt", executeDelivery: "followUp" }; } };
   createReviewedPlanExtension(deps)(pi);
   return { root, commands, tools, events, sent, created, restored, transitioned, resolved, taskCalls, ctx, episode, deps, pi, afterHandoffPath: join(root, ".prime-claw", "workflows", "conversation-after-handoff.md") };
 }
@@ -58,7 +60,7 @@ test("registers complete task lifecycle beside retained folder compatibility", (
   assert.deepEqual([...f.commands.keys()].sort(), ["implement-spec", "implement-task", "plan", "plan-spec"]);
   assert.deepEqual([...f.tools.keys()].sort(), [
     "create_spec_episode", "create_task_episode", "finalize_spec_episode", "finalize_task_episode",
-    "handoff_spec_episode", "handoff_task_episode", "implement_task", "plan_spec", "plan_task", "restore_blocked_spec_episode",
+    "handoff_spec_episode", "handoff_task_episode", "implement_spec", "implement_task", "plan_spec", "plan_task", "restore_blocked_spec_episode",
     "transition_spec_episode_to_task",
   ]);
   assert.equal(f.tools.has("ralph_plan"), false);
@@ -215,14 +217,15 @@ test("implement-spec queues full ordinary guide in post-prep phase before semant
   assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
 });
 
-test("common implement-task command dispatches one exact grandfathered path and host to the guarded legacy route", async () => {
+test("common implement-task command dispatches exact retained path and factual host through the shared helper", async () => {
   const f = fixture();
   await f.commands.get("implement-task").handler(".ralph/plans/future/alpha --host id:123e4567-e89b-12d3-a456-426614174000", f.ctx);
   assert.deepEqual(f.resolved, []);
   assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
   assert.match(f.sent[1].message, /IMPLEMENT-SPEC POLICY/);
-  await f.events.get("agent_end")({}, f.ctx);
-  const result = await f.tools.get("create_spec_episode").execute("common", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+  assert.match(f.sent[0].message, /id:123e4567-e89b-12d3-a456-426614174000/);
+  assert.match(f.sent[1].message, /id:123e4567-e89b-12d3-a456-426614174000/);
+  const result = await f.tools.get("create_spec_episode").execute("common", { location: ".ralph/plans/future/alpha", host: "id:123e4567-e89b-12d3-a456-426614174000" }, undefined, undefined, f.ctx);
   assert.equal(result.isError, undefined, JSON.stringify(result));
   assert.equal(f.created[0].options.host, "id:123e4567-e89b-12d3-a456-426614174000");
 });
@@ -244,11 +247,25 @@ test("registered implement-spec replays the exact active Episode after its sourc
   await f.commands.get("implement-spec").handler(record.sourceLocation, f.ctx);
   assert.equal(f.sent.length, 2); assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/);
   assert.match(f.sent[1].message, /IMPLEMENT-SPEC POLICY/);
-  await f.events.get("agent_end")({}, f.ctx);
   const result = await f.tools.get("create_spec_episode").execute("replay", { location: record.sourceLocation }, undefined, undefined, f.ctx);
   assert.equal(result.isError, undefined, JSON.stringify(result)); assert.equal(result.details.reused, true);
   assert.equal(f.created.length, 1); assert.equal(f.created[0].location, record.sourceLocation);
-  assert.equal(f.created[0].options.approvedBundleDigest, record.bundleDigest);
+  assert.deepEqual(f.created[0].options, { host: undefined });
+});
+
+test("implement_spec checks exact active replay before obsolete source lookup and keeps recorded placement", async () => {
+  const f = fixture({ placementResolver: async () => { throw new Error("replay must not select another placement"); } });
+  const plans = join(f.episode.worktree, ".ralph", "plans"); mkdirSync(plans, { recursive: true });
+  writeFileSync(join(plans, "SPECIFICATION.md"), "alpha specification\n");
+  writeFileSync(join(plans, "EXECUTION_PLAN.md"), "Continue the living retained plan.\n");
+  const { reused: _reused, ...record } = f.episode; writeEpisodeOwnership(f.root, record);
+  rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true });
+  symlinkSync(join(f.root, "missing-obsolete-source"), join(f.root, ".ralph", "plans", "future", "alpha"), "dir");
+  const result = await f.tools.get("implement_spec").execute("replay", { location: record.sourceLocation }, undefined, undefined, f.ctx);
+  assert.equal(result.details.admitted, true, JSON.stringify(result)); assert.equal(f.sent.length, 2); assert.equal(f.created.length, 0);
+  const mismatch = await f.tools.get("implement_spec").execute("wrong-host", { location: record.sourceLocation, host: "id:123e4567-e89b-12d3-a456-426614174000" }, undefined, undefined, f.ctx);
+  assert.equal(mismatch.isError, true); assert.match(mismatch.content[0].text, /does not match.*placement/);
+  assert.equal(f.sent.length, 2);
 });
 
 test("source-absent replay rejects promoted specification drift before workflow delivery", async () => {
@@ -422,37 +439,42 @@ test("plan_spec reports uncertain second-send admission without retrying", async
   assert.match(result.content[0].text, /follow-up admission is unconfirmed; inspect before retrying/);
 });
 
-test("stable --host bypass is bound to the exact implementation approval", async () => {
-  const f = fixture(); await f.commands.get("implement-spec").handler(".ralph/plans/future/alpha --host id:123e4567-e89b-12d3-a456-426614174000", f.ctx);
-  await f.events.get("agent_end")({}, f.ctx);
-  const result = await f.tools.get("create_spec_episode").execute("tool", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+test("standalone retained create forwards exact source and selected stable host without entry or agent-end hooks", async () => {
+  const f = fixture();
+  const host = "id:123e4567-e89b-12d3-a456-426614174000";
+  const result = await f.tools.get("create_spec_episode").execute("standalone", { location: ".ralph/plans/future/alpha", host }, undefined, undefined, f.ctx);
   assert.equal(result.isError, undefined); assert.equal(f.created.length, 1);
-  assert.equal(f.created[0].options.host, "id:123e4567-e89b-12d3-a456-426614174000");
-  assert.match(f.created[0].options.approvedBundleDigest, /^[0-9a-f]{64}$/);
+  assert.deepEqual(f.created[0].options, { host });
+  assert.equal(f.events.has("agent_end"), false);
+  assert.equal(f.events.has("session_start"), false);
+  assert.equal(f.events.has("session_shutdown"), false);
+  const schema = f.tools.get("create_spec_episode").parameters;
+  assert.deepEqual(Object.keys(schema.properties), ["location", "host"]);
+  assert.deepEqual(schema.required, ["location"]);
+  assert.equal(schema.additionalProperties, false);
 });
 
-test("invalid host syntax creates no approval or queued workflow", async () => {
+test("invalid retained host syntax delivers nothing and final create rejects injection", async () => {
   const f = fixture(); await f.commands.get("implement-spec").handler(".ralph/plans/future/alpha --host local", f.ctx);
   assert.equal(f.sent.length, 1); assert.match(f.sent[0].notify, /Usage: \/implement-spec/);
-  const result = await f.tools.get("create_spec_episode").execute("tool", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
-  assert.equal(result.isError, true); assert.match(result.content[0].text, /no matching active/);
+  for (const params of [
+    { location: ".ralph/plans/future/alpha", host: "local" },
+    { location: ".ralph/plans/future/alpha --host id:abcd" },
+    { location: " .ralph/plans/future/alpha" },
+  ]) {
+    const result = await f.tools.get("create_spec_episode").execute("invalid", params, undefined, undefined, f.ctx);
+    assert.equal(result.isError, true); assert.match(result.content[0].text, /requires one exact/);
+  }
+  assert.equal(f.created.length, 0);
 });
 
-test("creation requires exact current post-prep approval and consumes it once", async () => {
-  const f = fixture(); await f.commands.get("implement-spec").handler(".ralph/plans/future/alpha", f.ctx); await f.events.get("agent_end")({}, f.ctx);
-  const mismatch = await f.tools.get("create_spec_episode").execute("bad", { location: ".ralph/plans/future/beta" }, undefined, undefined, f.ctx);
-  assert.equal(mismatch.isError, true); assert.equal(f.created.length, 0);
-  const ok = await f.tools.get("create_spec_episode").execute("ok", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
-  assert.equal(ok.details.episodeId, "episode"); assert.equal(f.created.length, 1);
-  const replay = await f.tools.get("create_spec_episode").execute("again", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
-  assert.equal(replay.isError, true); assert.equal(f.created.length, 1);
-});
-
-test("phase completion without creation clears ephemeral approval", async () => {
-  const f = fixture(); await f.commands.get("implement-spec").handler(".ralph/plans/future/alpha", f.ctx);
-  await f.events.get("agent_end")({}, f.ctx); await f.events.get("agent_end")({}, f.ctx);
-  const result = await f.tools.get("create_spec_episode").execute("late", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
-  assert.equal(result.isError, true);
+test("retained create keeps ownership conflicts without requiring an earlier entry", async () => {
+  const f = fixture();
+  const { reused: _reused, ...record } = f.episode;
+  writeEpisodeOwnership(f.root, record);
+  const result = await f.tools.get("create_spec_episode").execute("different", { location: ".ralph/plans/future/beta" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, true); assert.match(result.content[0].text, /already has non-terminal episode ownership/);
+  assert.equal(f.created.length, 0);
 });
 
 test("blocked restore tool carries explicit operator confirmation to the exact version-one recovery", async () => {
@@ -575,6 +597,65 @@ test("task resolver fails closed on command, schema, and path errors", () => {
   assert.throws(() => resolveBacklogTask(root, "PRIMECLAW-10.38", escaped), /outside the project or disappeared/);
 });
 
+
+test("implement_spec steers prep and queues exactly one phase follow-up with selected stable host", async () => {
+  const calls = [];
+  const host = "id:123e4567-e89b-12d3-a456-426614174000";
+  const f = fixture({ placementResolver: async (root, selectedHost) => {
+    calls.push([root, selectedHost]); return { engine: "orca", projectSetupId: host.slice(3) };
+  } });
+  const tool = f.tools.get("implement_spec");
+  assert.deepEqual(Object.keys(tool.parameters.properties), ["location", "host"]);
+  assert.equal(tool.parameters.additionalProperties, false);
+  const result = await tool.execute("entry", { location: ".ralph/plans/future/alpha", host }, undefined, undefined, f.ctx);
+  assert.equal(result.details.admitted, true); assert.equal(result.details.location, ".ralph/plans/future/alpha");
+  assert.match(result.content[0].text, /Readiness has not completed, and no Episode was created/);
+  assert.deepEqual(calls, [[f.root, host]]); assert.equal(f.sent.length, 2); assert.equal(f.created.length, 0);
+  assert.deepEqual(f.sent[0].options, { deliverAs: "steer" });
+  assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
+  for (const sent of f.sent) assert.ok(sent.message.includes(`<operator-implementation-host>\n${host}\n</operator-implementation-host>`));
+  assert.match(f.sent[0].message, /IMPLEMENT-PREP POLICY/); assert.match(f.sent[1].message, /IMPLEMENT-SPEC POLICY/);
+  assert.ok(f.sent[1].message.indexOf("FULL OVERSIGHT GUIDE") < f.sent[1].message.indexOf("IMPLEMENT-SPEC POLICY"));
+});
+
+test("retained native helper carries auto-selected stable host in both canonical messages", async () => {
+  const host = "id:123e4567-e89b-12d3-a456-426614174000";
+  const f = fixture({ placementResolver: async () => ({ engine: "orca", projectSetupId: host.slice(3) }) });
+  const result = await admitSpecImplementationPrepChain(f.pi, f.ctx, ".ralph/plans/future/alpha", "native", {
+    placementResolver: f.deps.placementResolver, guideRoot: f.deps.guideRoot,
+  });
+  assert.equal(result.ok, true); assert.equal(f.sent.length, 2); assert.equal(f.sent[0].options, undefined);
+  for (const sent of f.sent) assert.ok(sent.message.includes(host));
+});
+
+test("implement_spec cancellation, unavailable selection, missing workflow and invalid arguments send nothing", async () => {
+  for (const message of ["Episode location selection was cancelled", "Explicit Episode host no longer ready", "Remote Episode placement is disabled"]) {
+    const f = fixture({ placementResolver: async () => { throw new Error(message); } });
+    const result = await f.tools.get("implement_spec").execute("blocked", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+    assert.equal(result.isError, true); assert.ok(result.content[0].text.includes(message));
+    assert.equal(f.sent.length, 0); assert.equal(f.created.length, 0);
+  }
+  const missing = fixture(); unlinkSync(join(missing.root, ".prime-claw", "workflows", "implement-spec.md"));
+  const absent = await missing.tools.get("implement_spec").execute("missing", { location: ".ralph/plans/future/alpha" }, undefined, undefined, missing.ctx);
+  assert.equal(absent.isError, true); assert.equal(missing.sent.length, 0);
+  const f = fixture();
+  for (const params of [{ location: ".ralph/plans/future/alpha", host: "local" }, { location: ".ralph/plans/future/alpha --host id:abcd" }, { location: "../alpha" }]) {
+    const result = await f.tools.get("implement_spec").execute("invalid", params, undefined, undefined, f.ctx);
+    assert.equal(result.isError, true); assert.equal(f.sent.length, 0);
+  }
+});
+
+test("implement_spec reports first versus follow-up uncertainty without retry or allocation", async () => {
+  for (const throwOnSend of [1, 2]) {
+    const f = fixture({ throwOnSend });
+    const result = await f.tools.get("implement_spec").execute("uncertain", { location: ".ralph/plans/future/alpha" }, undefined, undefined, f.ctx);
+    assert.equal(result.isError, true); assert.equal(result.details.admission, "unconfirmed");
+    assert.equal(result.details.stage, throwOnSend === 1 ? "first" : "followUp");
+    assert.equal(Object.hasOwn(result.details, "admitted"), false);
+    assert.equal(f.sent.length, throwOnSend - 1); assert.equal(f.created.length, 0);
+    assert.match(result.content[0].text, /unconfirmed; inspect before retrying/);
+  }
+});
 
 test("implement_task steers prep and queues the sole phase follow-up with selected stable host and full guide", async () => {
   const host = "id:123e4567-e89b-12d3-a456-426614174000", placements = [];
@@ -902,7 +983,7 @@ test("failed, partial, or unrelated dispatches never invoke the compaction check
   }, undefined, undefined, f.ctx);
   assert.equal(cleaned.isError, undefined);
   assert.equal(calls.length, 0);
-  assert.equal(created.isError, true); // no admission approval in this fixture; still no compaction check
+  assert.equal(created.isError, true); // task is not In Planning; still no compaction check
 });
 
 test("a throwing compaction hook is contained as a bounded skip on the successful receipt", async () => {

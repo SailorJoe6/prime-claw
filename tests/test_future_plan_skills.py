@@ -69,8 +69,8 @@ def test_legacy_authoring_preserves_current_main_folder_behavior_without_duplica
 def test_retained_legacy_entry_surfaces_and_snapshot_fallback_remain_bounded() -> None:
     extension = (ROOT / "src/prime-agent-plugin/extensions/reviewed-plan.ts").read_text()
     for surface in (
-        'command: "plan-spec"', 'command: "implement-spec"',
-        'name: "plan_spec"', 'name: "create_spec_episode"',
+        'command: "plan-spec"', 'pi.registerCommand("implement-spec"',
+        'name: "plan_spec"', 'name: "implement_spec"', 'name: "create_spec_episode"',
         'name: "handoff_spec_episode"', 'name: "finalize_spec_episode"',
         'name: "restore_blocked_spec_episode"',
     ):
@@ -371,7 +371,7 @@ def test_phase_prep_composes_context_aware_hint_without_fixed_inventory(
         "Conversation-to-Episode authority",
     ):
         assert fragment not in hint_policy
-    if name == "implement-task-prep":
+    if name.startswith("implement"):
         # Carry operator authority and placement facts, not a fixed context inventory.
         assert "conditional implementation authority" in hint_policy
         assert "<operator-implementation-host>" in hint_policy
@@ -435,7 +435,7 @@ def test_plan_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> No
 
 
 def test_implement_prep_skill_owns_compaction_prompt_and_bounded_continuation() -> None:
-    """Implement prep owns model policy while approval mechanics stay in TS."""
+    """Implement prep owns compaction and preserves Markdown-owned authority."""
     skill = workflow("implement-prep").read_text()
 
     assert "name: implement-prep" in skill
@@ -683,7 +683,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     assert 'name: "handoff_task_episode"' in extension
     assert 'name: "finalize_task_episode"' in extension
     assert 'name: "transition_spec_episode_to_task"' in extension
-    assert 'command: "implement-spec"' in extension
+    assert 'pi.registerCommand("implement-spec"' in extension
     assert 'name: "create_spec_episode"' in extension
     assert 'name: "handoff_spec_episode"' in extension
     assert 'name: "finalize_spec_episode"' in extension
@@ -765,3 +765,95 @@ def test_grandfathered_legacy_managed_policy_freezes_specs_but_keeps_plans_livin
     assert "original future source is absent" in handoff
     assert ".prime-claw/legacy-specifications.json" in expert
     assert ".prime-claw/legacy-specifications.json" in oversee
+
+
+def test_retained_implementation_entry_is_thin_global_guidance_with_skill_owned_authority() -> None:
+    source = ROOT / "src/prime-agent-plugin"
+    entry = " ".join((source / "skills/implement-spec/SKILL.md").read_text().split())
+    for fragment in (
+        "name: implement-spec",
+        "implement_spec(location, host?)",
+        "no custom slash command is a prerequisite",
+        ".prime-claw/workflows/implement-prep.md",
+        "do not demand a fresh approval solely because planning finished",
+        "planning-only request does not authorize implementation",
+        "exact operator-selected project-relative future-folder `location`",
+        "Do not search for, select, invent, or substitute another folder",
+        "location is missing or materially ambiguous",
+        "stored or turn-scoped receipt",
+        "obsolete future folder is absent",
+        "same resources and sends no new execute assignment",
+        "exact stable `id:<project-host-setup-id>`",
+        "explicit host cannot silently fall back",
+        "Admission is not proof of compaction, readiness, or Episode creation",
+        "end the turn",
+        "do not automatically retry",
+        "incremental cutover",
+        "existing custom commands",
+    ):
+        assert fragment in entry
+    assert "backlog task edit" not in entry
+    assert "bd update" not in entry
+    inventory = json.loads((source / "asset-inventory.json").read_text())
+    row = next(asset for asset in inventory["assets"] if asset["id"] == "global-implement-spec")
+    assert row == {
+        "id": "global-implement-spec",
+        "source": "skills/implement-spec/SKILL.md",
+        "targets": [{"class": "plugin-root-managed", "destination": "skills/implement-spec/SKILL.md"}],
+    }
+    assert not (ROOT / ".agents/skills/implement-spec/SKILL.md").exists()
+
+
+def test_retained_implementation_policies_use_current_integrity_not_invocation_proof() -> None:
+    import hashlib
+
+    prep = " ".join(workflow("implement-prep").read_text().split())
+    implement = " ".join(workflow("implement-spec").read_text().split())
+    for policy in (prep, implement):
+        assert "<operator-implementation-host>" in policy
+        assert "placement data" in policy
+        assert "conditional" in policy
+        assert "does not authorize implementation" in policy
+        assert "turn-scoped receipt" in policy
+        assert "material ambiguity" in policy
+        assert "never silently fall" in policy
+    for fragment in (
+        "ready and operator authority applies",
+        "call `create_spec_episode` exactly once",
+        "source `location` and optional stable `host`",
+        "Pass that host unchanged as `id:<setup-id>`; omit it when absent",
+        "requires no prior entry invocation, approval store, or turn receipt",
+        "before source lookup",
+        "same verified resources with no new assignment",
+        "current complete bundle",
+        "at the concrete create boundary as an integrity check, not invocation proof",
+        "living execution plan may change compatibly",
+        "not a new admission",
+        "Exact active replay must preserve its recorded placement and resource identity",
+    ):
+        assert fragment in implement
+    for forbidden in (
+        "Invoking this workflow records operator approval",
+        "already bound privately",
+        "sole `location` argument",
+        "host parameter",
+    ):
+        assert forbidden not in implement
+
+    manifest = json.loads((ROOT / ".prime-claw/templates.json").read_text())
+    inventory = json.loads((ROOT / "src/prime-agent-plugin/asset-inventory.json").read_text())
+    for name in ("implement-prep", "implement-spec"):
+        source = workflow(name)
+        installed = ROOT / ".prime-claw/workflows" / f"{name}.md"
+        assert installed.read_bytes() == source.read_bytes()
+        row = manifest["assets"][f"project-workflow-{name}"]
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        assert row["installedSha256"] == digest
+        assert row["availableUpstreamSha256"] == digest
+        assert row["state"] == "customized"  # Preserve the builder's existing decisions.
+        assert row["baselineSha256"] != digest
+        asset = next(item for item in inventory["assets"] if item["id"] == f"project-workflow-{name}")
+        target = next(item for item in asset["targets"] if item["class"] == "project-customizable")
+        assert target["destination"] == f".prime-claw/workflows/{name}.md"
+        assert target["lifecycleTrigger"] == "implement-spec"
+        assert target["migrateFrom"] == f".ralph/skills/{name}/SKILL.md"

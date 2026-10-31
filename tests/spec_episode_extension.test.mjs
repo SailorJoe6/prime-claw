@@ -25,7 +25,7 @@ function diskFixture() {
   const root = realpathSync(rawRoot);
   mkdirSync(join(root, ".ralph", "plans", "future", "alpha"), { recursive: true });
   writeFileSync(join(root, ".ralph", "plans", "future", "alpha", "SPECIFICATION.md"), "spec");
-  writeFileSync(join(root, ".ralph", "plans", "future", "alpha", "EXECUTION_PLAN.md"), "plan");
+  writeFileSync(join(root, ".ralph", "plans", "future", "alpha", "EXECUTION_PLAN.md"), "Implement the retained alpha scope.");
   reconcileLegacySpecificationInventory(root, "initialize");
   mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true });
   writeFileSync(join(root, ".agents", "skills", "execute", "SKILL.md"), `---
@@ -120,9 +120,8 @@ function harness(options = {}) {
   };
   return { ...disk, wt, calls, git, filesystem, ownership, publisher, orca, ctx, deps: { git, filesystem, ownership, publisher, orca, wait: async () => {}, bindingAttempts: 1 }, get record() { return records.get("owner") ?? null; } };
 }
-function createApproved(f, options = {}) {
-  const approvedBundleDigest = bundleContentDigest(join(f.root, ".ralph", "plans", "future", "alpha"));
-  return createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { ...options, approvedBundleDigest });
+function createRetained(f, options = {}) {
+  return createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, options);
 }
 
 const TASK_BASE = "a".repeat(40);
@@ -375,7 +374,7 @@ test("ownership bridge preflight rejects busy, foreign-terminal, and non-owner r
 });
 
 test("Orca creation promotes before exactly one native execute assignment and removes launcher", async () => {
-  const f = harness(); const result = await createApproved(f);
+  const f = harness(); const result = await createRetained(f);
   assert.equal(result.engine, "orca"); assert.equal(result.status, "active"); assert.equal(result.reused, false);
   const names = f.calls.map((call) => call[0]);
   assert.ok(names.indexOf("promote") < names.indexOf("auto-create"));
@@ -390,7 +389,7 @@ test("Orca creation promotes before exactly one native execute assignment and re
 });
 
 test("single ready setup bypasses picker and passes the owning Conversation key", async () => {
-  const f = harness(); await createApproved(f);
+  const f = harness(); await createRetained(f);
   assert.equal(f.calls.some((call) => call[0] === "picker"), false);
   const prompt = f.calls.find((call) => call[0] === "auto-create")[1].prompt;
   assert.match(prompt, /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
@@ -400,7 +399,7 @@ test("multiple setups use stable labeled picker and selected local id", async ()
   const second = setup("setup-second");
   const f = harness({ setups: [setup(), second], pick: (labels) => labels[1] });
   f.orca.createWorktree = async (args) => { f.calls.push(["orca-create", args]); return { ...f.wt, projectSetupId: second.id }; };
-  const result = await createApproved(f);
+  const result = await createRetained(f);
   assert.equal(result.projectSetupId, second.id);
   assert.match(f.calls.find((call) => call[0] === "picker")[1][1], /id:setup-second/);
 });
@@ -408,7 +407,7 @@ test("multiple setups use stable labeled picker and selected local id", async ()
 test("stable host bypass selects exact setup without picker", async () => {
   const second = setup("123e4567-e89b-12d3-a456-426614174000"); const f = harness({ setups: [setup(), second] });
   f.orca.createWorktree = async (args) => ({ ...f.wt, projectSetupId: args.setup.id });
-  const result = await createApproved(f, { host: "id:123e4567-e89b-12d3-a456-426614174000" });
+  const result = await createRetained(f, { host: "id:123e4567-e89b-12d3-a456-426614174000" });
   assert.equal(result.projectSetupId, "123e4567-e89b-12d3-a456-426614174000"); assert.equal(f.calls.some((call) => call[0] === "picker"), false);
 });
 
@@ -417,19 +416,19 @@ for (const [name, options, pattern] of [
   ["noninteractive ambiguity", { setups: [setup(), setup("two")], hasUI: false }, /noninteractive/],
   ["zero ready setups", { setups: [] }, /No ready/],
 ]) test(`${name} creates nothing`, async () => {
-  const f = harness(options); await assert.rejects(createApproved(f), pattern);
+  const f = harness(options); await assert.rejects(createRetained(f), pattern);
   assert.equal(f.calls.some((call) => call[0] === "orca-create" || call[0] === "local-create"), false);
   assert.equal(f.record, null);
 });
 
 test("remote selection is rejected before mutation and never falls back", async () => {
   const remote = setup("remote", "runtime:env", "env"); const f = harness({ setups: [remote] });
-  await assert.rejects(createApproved(f), /Remote Episode placement is disabled/);
+  await assert.rejects(createRetained(f), /Remote Episode placement is disabled/);
   assert.equal(f.calls.some((call) => call[0] === "orca-create" || call[0] === "local-create"), false);
 });
 
 test("definitive pre-mutation Orca unavailability uses fresh local fallback once", async () => {
-  const f = harness({ unavailable: true }); const result = await createApproved(f);
+  const f = harness({ unavailable: true }); const result = await createRetained(f);
   assert.equal(result.engine, "local"); assert.equal(result.status, "active");
   assert.equal(f.calls.filter((call) => call[0] === "fresh").length, 1);
   assert.equal(f.calls.filter((call) => call[0] === "execute").length, 1);
@@ -439,7 +438,7 @@ test("definitive pre-mutation Orca unavailability uses fresh local fallback once
 test("explicit host never falls back locally when Orca inventory is unavailable", async () => {
   const f = harness({ unavailable: true });
   await assert.rejects(
-    createApproved(f, { host: "id:123e4567-e89b-12d3-a456-426614174000" }),
+    createRetained(f, { host: "id:123e4567-e89b-12d3-a456-426614174000" }),
     /Explicit Episode host .* could not be resolved/,
   );
   assert.equal(f.record, null);
@@ -449,7 +448,7 @@ test("explicit host never falls back locally when Orca inventory is unavailable"
 test("local worktree identity is durable before fallback mutation", async () => {
   const f = harness({ unavailable: true });
   f.git.createWorktree = () => { throw new Error("ambiguous local create"); };
-  await assert.rejects(createApproved(f), /ambiguous local create/);
+  await assert.rejects(createRetained(f), /ambiguous local create/);
   assert.equal(f.record.status, "uncertain");
   assert.match(f.record.worktree, /-alpha-episode-/);
   assert.match(f.record.branch, /^episode\/alpha-/);
@@ -461,31 +460,32 @@ for (const [name, option, value] of [
   ["automation run", "runError", new OrcaMutationUncertainError("run", "lost")],
   ["automation removal", "removeError", new OrcaMutationUncertainError("remove", "lost")],
 ]) test(`${name} uncertainty preserves one record and never falls back`, async () => {
-  const f = harness({ [option]: value }); await assert.rejects(createApproved(f));
+  const f = harness({ [option]: value }); await assert.rejects(createRetained(f));
   assert.equal(f.record.status, "uncertain"); assert.equal(f.record.engine, "orca");
   assert.equal(f.calls.some((call) => call[0] === "local-create"), false);
   if (option === "removeError") { assert.equal(f.record.episodeId, "episode"); assert.equal(f.record.launchAutomationId, "automation"); }
 });
 
 test("active replay refreshes route without source-folder dependence or assignment replay", async () => {
-  const f0 = harness(); const active = await createApproved(f0);
+  const f0 = harness(); const active = await createRetained(f0);
   const f = harness({ record: { ...active, reused: undefined }, list: () => [{ sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree }] });
   f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
   f.filesystem.exists = () => true; f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
   rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true, force: true });
-  const result = await createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { approvedBundleDigest: "0".repeat(64) });
-  assert.equal(result.reused, true); assert.equal(f.calls.some((call) => ["auto-run", "execute", "handoff"].includes(call[0])), false);
+  const result = await createSpecEpisode(LOCATION, "tool", f.ctx, f.deps);
+  assert.equal(result.reused, true); assert.equal(f.calls.some((call) => ["setups", "orca-create", "local-create", "auto-run", "execute", "handoff"].includes(call[0])), false);
+  for (const key of ["operationId", "episodeId", "episodeSessionFile", "worktree", "branch", "engine", "projectSetupId"]) assert.equal(result[key], active[key]);
   assert.equal(f.calls.some((call) => call[0] === "reopen"), true);
 });
 
 test("active replay persists an already-live replacement route without reopening", async () => {
-  const f0 = harness(); const active = await createApproved(f0);
+  const f0 = harness(); const active = await createRetained(f0);
   const replacement = { ...active, episodeActiveSessionId: "old-route", reused: undefined };
   const f = harness({ record: replacement, list: () => [{ activeSessionId: "replacement-route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree }] });
   f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
   f.filesystem.exists = () => true;
   f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
-  const result = await createApproved(f);
+  const result = await createRetained(f);
   assert.equal(result.reused, true); assert.equal(result.episodeActiveSessionId, "replacement-route");
   assert.equal(f.record.episodeActiveSessionId, "replacement-route");
   assert.equal(f.calls.some((call) => ["reopen", "execute", "handoff", "fresh"].includes(call[0])), false);
@@ -493,7 +493,7 @@ test("active replay persists an already-live replacement route without reopening
 
 test("uncertain replay never replays assignment", async () => {
   const f = harness({ record: { version: 1, status: "uncertain", operationId: "op", engine: "local", ownerSessionId: "owner", sourceLocation: LOCATION, slug: "alpha", baseRef: "base", bundleDigest: "0".repeat(64), createdAt: "x", updatedAt: "x", uncertaintyReason: "lost" } });
-  await assert.rejects(createApproved(f), /No assignment was replayed/);
+  await assert.rejects(createRetained(f), /No assignment was replayed/);
   assert.equal(f.calls.some((call) => ["auto-run", "execute", "fresh"].includes(call[0])), false);
 });
 
@@ -503,12 +503,12 @@ test("task-native ownership blocks retained folder admission without resource mu
     taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/task.md", baseRef: "a".repeat(40),
     createdAt: "x", updatedAt: "x",
   } });
-  await assert.rejects(createApproved(f), /task-native episode ownership conflicts/);
+  await assert.rejects(createRetained(f), /task-native episode ownership conflicts/);
   assert.equal(f.calls.some((call) => ["setups", "orca-create", "local-create", "fresh", "execute"].includes(call[0])), false);
 });
 
 test("handoff uses exact active ownership and queues canonical execute only after quiescence", async () => {
-  const f0 = harness(); const active = await createApproved(f0);
+  const f0 = harness(); const active = await createRetained(f0);
   const f = harness({ record: { ...active, reused: undefined }, list: () => [{ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree, isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 }] });
   f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
   f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
@@ -521,7 +521,7 @@ test("handoff uses exact active ownership and queues canonical execute only afte
 });
 
 test("retained handoff uses exact ownership when the obsolete promoted source folder is absent", async () => {
-  const created = harness(); const active = await createApproved(created);
+  const created = harness(); const active = await createRetained(created);
   const f = harness({
     record: { ...active, reused: undefined },
     list: () => [{ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree, isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 }],
@@ -552,7 +552,7 @@ test("retained handoff uses exact ownership when the obsolete promoted source fo
 });
 
 test("retained handoff rejects a changed promoted specification before delivery", async () => {
-  const created = harness(); const active = await createApproved(created);
+  const created = harness(); const active = await createRetained(created);
   const f = harness({ record: { ...active, reused: undefined }, list: () => [{ activeSessionId: "route", sessionId: "episode", sessionFile: active.episodeSessionFile, cwd: active.worktree, isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 }] });
   f.git.entries = [{ path: f.root, branch: "main" }, { path: active.worktree, branch: active.branch }];
   f.orca.showWorktree = async () => ({ ...f.wt, id: active.worktreeId, identity: active.worktreeIdentity, path: active.worktree, branch: active.branch, projectSetupId: active.projectSetupId, head: active.head });
@@ -562,11 +562,11 @@ test("retained handoff rejects a changed promoted specification before delivery"
 });
 
 test("legacy active replay and handoff require the promoted active plan pair", async () => {
-  const createdHarness=harness(); const active=await createApproved(createdHarness);
+  const createdHarness=harness(); const active=await createRetained(createdHarness);
   const replay=harness({ record:{...active,reused:undefined}, legacyPlanFiles:false, list:()=>[{sessionId:"episode",sessionFile:active.episodeSessionFile,cwd:active.worktree}] });
   replay.git.entries=[{path:replay.root,branch:"main"},{path:active.worktree,branch:active.branch}]; replay.filesystem.exists=()=>true;
   replay.orca.showWorktree=async()=>({...replay.wt,id:active.worktreeId,identity:active.worktreeIdentity,path:active.worktree,branch:active.branch,projectSetupId:active.projectSetupId,head:active.head});
-  await assert.rejects(createApproved(replay),/ownership is not live.*active specification and implementation plan/);
+  await assert.rejects(createRetained(replay),/ownership is not live.*active specification and implementation plan/);
   assert.equal(replay.calls.some(call=>["reopen","execute","handoff"].includes(call[0])),false);
 
   const handoff=harness({ record:{...active,reused:undefined}, legacyPlanFiles:false, list:(_count,session)=>[session] });
@@ -594,7 +594,7 @@ function writeActiveLegacyPair(f) {
 }
 
 test("operator-cleared blocked pair restores and continues the same version-one Episode after its source is absent", async () => {
-  const f=harness();await createApproved(f);f.calls.length=0;useDiskLegacyGate(f);writeBlockedLegacyPair(f);
+  const f=harness();await createRetained(f);f.calls.length=0;useDiskLegacyGate(f);writeBlockedLegacyPair(f);
   const identity=structuredClone(f.record);
   rmSync(join(f.root, ".ralph", "plans", "future", "alpha"), { recursive: true, force: true });
   const restored=await restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps);
@@ -611,7 +611,7 @@ test("operator-cleared blocked pair restores and continues the same version-one 
 });
 
 test("completed version-one candidate remains live through review and bounded revision handoff", async () => {
-  const f=harness();await createApproved(f);f.calls.length=0;useDiskLegacyGate(f);writeActiveLegacyPair(f);
+  const f=harness();await createRetained(f);f.calls.length=0;useDiskLegacyGate(f);writeActiveLegacyPair(f);
   const identity=structuredClone(f.record), plan=join(f.worktree,".ralph/plans/EXECUTION_PLAN.md");
   appendFileSync(plan,"candidate completed; active for review\n");
   const accepted=await handoffSpecEpisode(LOCATION,"accepted candidate advance",f.ctx,f.deps);
@@ -626,12 +626,12 @@ test("completed version-one candidate remains live through review and bounded re
 
 test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, and collisions", async (t) => {
   await t.test("explicit operator decision is required before mutation",async()=>{
-    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);
+    const f=harness();await createRetained(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,false,f.ctx,f.deps),/explicit unblock decision/);
     assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
   });
   await t.test("changed blocked specification is rejected before either file moves",async()=>{
-    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);
+    const f=harness();await createRetained(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);
     writeFileSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"),"changed\n");
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/changed after grandfathering/);
     assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
@@ -646,45 +646,45 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/task-native episode ownership conflicts/);
   });
   await t.test("foreign owner and inactive ownership fail closed",async()=>{
-    const foreign=harness();await createApproved(foreign);useDiskLegacyGate(foreign);writeBlockedLegacyPair(foreign);
+    const foreign=harness();await createRetained(foreign);useDiskLegacyGate(foreign);writeBlockedLegacyPair(foreign);
     foreign.ctx.sessionManager.getSessionId=()=>"other";
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,foreign.ctx,foreign.deps),/No durable episode ownership/);
-    const inactive=harness();await createApproved(inactive);useDiskLegacyGate(inactive);writeBlockedLegacyPair(inactive);inactive.ownership.write(inactive.root,{...inactive.record,status:"inactive"});
+    const inactive=harness();await createRetained(inactive);useDiskLegacyGate(inactive);writeBlockedLegacyPair(inactive);inactive.ownership.write(inactive.root,{...inactive.record,status:"inactive"});
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,inactive.ctx,inactive.deps),/requires active version-1 ownership/);
   });
   await t.test("worktree mismatch fails before moving files",async()=>{
-    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);f.git.entries=[{path:f.root,branch:"main"}];
+    const f=harness();await createRetained(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);f.git.entries=[{path:f.root,branch:"main"}];
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/missing or different worktree/);
     assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
   });
   await t.test("canonical-main and Orca identity drift fail before moving files",async()=>{
-    const wrongBranch=harness();await createApproved(wrongBranch);useDiskLegacyGate(wrongBranch);writeBlockedLegacyPair(wrongBranch);wrongBranch.git.branch=()=>"feature";
+    const wrongBranch=harness();await createRetained(wrongBranch);useDiskLegacyGate(wrongBranch);writeBlockedLegacyPair(wrongBranch);wrongBranch.git.branch=()=>"feature";
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,wrongBranch.ctx,wrongBranch.deps),/canonical primary main checkout/);
-    const wrongOrca=harness();await createApproved(wrongOrca);useDiskLegacyGate(wrongOrca);writeBlockedLegacyPair(wrongOrca);wrongOrca.orca.showWorktree=async()=>({...wrongOrca.wt,identity:"foreign"});
+    const wrongOrca=harness();await createRetained(wrongOrca);useDiskLegacyGate(wrongOrca);writeBlockedLegacyPair(wrongOrca);wrongOrca.orca.showWorktree=async()=>({...wrongOrca.wt,identity:"foreign"});
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,wrongOrca.ctx,wrongOrca.deps),/Orca worktree identity/);
     assert.equal(existsSync(join(wrongOrca.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
   });
   await t.test("incomplete or empty blocked pair is rejected",async()=>{
-    const incomplete=harness();await createApproved(incomplete);useDiskLegacyGate(incomplete);writeBlockedLegacyPair(incomplete);const blocked=join(incomplete.worktree,".ralph/plans/blocked");rmSync(join(blocked,"EXECUTION_PLAN.md"),{force:true});
+    const incomplete=harness();await createRetained(incomplete);useDiskLegacyGate(incomplete);writeBlockedLegacyPair(incomplete);const blocked=join(incomplete.worktree,".ralph/plans/blocked");rmSync(join(blocked,"EXECUTION_PLAN.md"),{force:true});
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,incomplete.ctx,incomplete.deps),/exactly one implementation plan/);
-    const empty=harness();await createApproved(empty);useDiskLegacyGate(empty);writeBlockedLegacyPair(empty);writeFileSync(join(empty.worktree,".ralph/plans/blocked/EXECUTION_PLAN.md"),"");
+    const empty=harness();await createRetained(empty);useDiskLegacyGate(empty);writeBlockedLegacyPair(empty);writeFileSync(join(empty.worktree,".ralph/plans/blocked/EXECUTION_PLAN.md"),"");
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,empty.ctx,empty.deps),/(?:readable non-empty regular specification|changed after grandfathering)/);
   });
   await t.test("ambiguous plan spelling is rejected",async()=>{
-    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);writeFileSync(join(f.worktree,".ralph/plans/blocked/IMPLEMENTATION_PLAN.md"),"second plan\n");
+    const f=harness();await createRetained(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);writeFileSync(join(f.worktree,".ralph/plans/blocked/IMPLEMENTATION_PLAN.md"),"second plan\n");
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/exactly one implementation plan/);
   });
   await t.test("symlinked blocked input is rejected",async()=>{
-    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);unlinkSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"));symlinkSync(join(f.root,".ralph/plans/future/alpha/SPECIFICATION.md"),join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"));
+    const f=harness();await createRetained(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);unlinkSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"));symlinkSync(join(f.root,".ralph/plans/future/alpha/SPECIFICATION.md"),join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md"));
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/(?:readable non-empty regular specification|changed after grandfathering)/);
   });
   await t.test("symlinked lifecycle directory is rejected",async()=>{
-    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);const blocked=join(f.worktree,".ralph/plans/blocked"), external=join(f.root,"external-blocked");rmSync(blocked,{recursive:true,force:true});mkdirSync(external);writeFileSync(join(external,"SPECIFICATION.md"),"blocked spec\n");writeFileSync(join(external,"EXECUTION_PLAN.md"),"blocked plan\n");symlinkSync(external,blocked,"dir");
+    const f=harness();await createRetained(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);const blocked=join(f.worktree,".ralph/plans/blocked"), external=join(f.root,"external-blocked");rmSync(blocked,{recursive:true,force:true});mkdirSync(external);writeFileSync(join(external,"SPECIFICATION.md"),"blocked spec\n");writeFileSync(join(external,"EXECUTION_PLAN.md"),"blocked plan\n");symlinkSync(external,blocked,"dir");
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/(?:real in-worktree lifecycle directories|changed after grandfathering)/);
     assert.equal(existsSync(join(external,"SPECIFICATION.md")),true);
   });
   await t.test("active destination collision is rejected without overwrite",async()=>{
-    const f=harness();await createApproved(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);const activeSpec=join(f.worktree,".ralph/plans/SPECIFICATION.md");mkdirSync(join(f.worktree,".ralph/plans"),{recursive:true});writeFileSync(activeSpec,"partial active spec\n");
+    const f=harness();await createRetained(f);useDiskLegacyGate(f);writeBlockedLegacyPair(f);const activeSpec=join(f.worktree,".ralph/plans/SPECIFICATION.md");mkdirSync(join(f.worktree,".ralph/plans"),{recursive:true});writeFileSync(activeSpec,"partial active spec\n");
     await assert.rejects(restoreBlockedSpecEpisode(LOCATION,true,f.ctx,f.deps),/destination collision or partial active pair/);
     assert.equal(readFileSync(activeSpec,"utf8"),"partial active spec\n");
     assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
@@ -1793,10 +1793,62 @@ test("ownership parser requires active durable bindings and discards legacy clea
 test("bundle bytes are bound before any ownership or external mutation", async () => {
   const f = harness();
   const folder = join(f.root, ".ralph", "plans", "future", "alpha");
-  const approvedBundleDigest = bundleContentDigest(folder);
-  writeFileSync(join(folder, "SPECIFICATION.md"), "changed after approval");
-  await assert.rejects(createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, { approvedBundleDigest }), /changed after grandfathering/);
+  writeFileSync(join(folder, "SPECIFICATION.md"), "changed after grandfathering");
+  await assert.rejects(createSpecEpisode(LOCATION, "tool", f.ctx, f.deps), /changed after grandfathering/);
   assert.deepEqual(f.calls, [["close"]]); assert.equal(f.record, null);
+});
+
+test("standalone retained create captures the current ready bundle digest, not an entry-time receipt", async () => {
+  const f = harness();
+  const folder = join(f.root, LOCATION);
+  const before = bundleContentDigest(folder);
+  writeFileSync(join(folder, "EXECUTION_PLAN.md"), "Implement the revised living alpha plan within retained scope.");
+  const current = bundleContentDigest(folder);
+  assert.notEqual(current, before);
+  const result = await createSpecEpisode(LOCATION, "standalone", f.ctx, f.deps);
+  assert.equal(result.bundleDigest, current);
+  assert.equal(f.record.bundleDigest, current);
+  assert.equal(result.reused, false);
+  assert.equal(f.calls.filter((call) => call[0] === "auto-run").length, 1);
+});
+
+test("retained create rejects missing, empty, placeholder and symlinked implementation plans before mutation", async () => {
+  for (const value of [null, "", "   \n", "# Implementation Plan\nTODO"]) {
+    const f = harness();
+    const plan = join(f.root, LOCATION, "EXECUTION_PLAN.md");
+    if (value === null) unlinkSync(plan); else writeFileSync(plan, value);
+    await assert.rejects(createSpecEpisode(LOCATION, "invalid", f.ctx, f.deps), /readable meaningful implementation plan/);
+    assert.equal(f.record, null); assert.deepEqual(f.calls, [["close"]]);
+  }
+  const f = harness(); const plan = join(f.root, LOCATION, "EXECUTION_PLAN.md");
+  unlinkSync(plan); const target = join(f.root, "outside-plan.md"); writeFileSync(target, "Implement another source"); symlinkSync(target, plan);
+  await assert.rejects(createSpecEpisode(LOCATION, "symlink", f.ctx, f.deps), /readable meaningful implementation plan/);
+  assert.equal(f.record, null);
+});
+
+test("retained create keeps plan digest integrity through capture, promotion and post-copy checks", async () => {
+  for (const engine of ["orca", "local"]) {
+    const f = harness({ unavailable: engine === "local" });
+    const original = f.filesystem.promoteBundle;
+    f.filesystem.promoteBundle = (...args) => {
+      const expected = args[3]; assert.match(expected, /^[0-9a-f]{64}$/);
+      assert.equal(expected, bundleContentDigest(join(f.root, LOCATION)));
+      original(...args);
+      writeFileSync(join(f.root, LOCATION, "EXECUTION_PLAN.md"), "Plan changed during copy.");
+    };
+    await assert.rejects(createSpecEpisode(LOCATION, "mutating-copy", f.ctx, f.deps), /bundle changed after .* Episode promotion/);
+    assert.equal(f.record.status, "uncertain"); assert.equal(f.record.engine, engine);
+    assert.equal(f.calls.some((call) => ["auto-create", "auto-run", "fresh", "execute"].includes(call[0])), false);
+  }
+});
+
+test("active replay refuses a different explicit stable host before source lookup or assignment", async () => {
+  const f0 = harness(); const active = await createRetained(f0);
+  const f = harness({ record: { ...active, reused: undefined } });
+  rmSync(join(f.root, LOCATION), { recursive: true });
+  await assert.rejects(createSpecEpisode(LOCATION, "replay-host", f.ctx, f.deps, { host: "id:123e4567-e89b-12d3-a456-426614174000" }), /does not match.*placement/);
+  assert.deepEqual(f.calls, [["close"]]);
+  assert.equal(f.record.operationId, active.operationId);
 });
 
 test("uncertain local publication preserves allocated durable session identity", async () => {
@@ -1805,7 +1857,7 @@ test("uncertain local publication preserves allocated durable session identity",
     await args.onAllocated?.({ sessionId: "allocated", sessionFile: join(f.root, "allocated.jsonl") });
     throw new EpisodeStateUncertainError("publication uncertain");
   };
-  await assert.rejects(createApproved(f), /publication uncertain/);
+  await assert.rejects(createRetained(f), /publication uncertain/);
   assert.equal(f.record.status, "uncertain"); assert.equal(f.record.episodeId, "allocated");
   assert.equal(f.record.episodeSessionFile, join(f.root, "allocated.jsonl"));
   assert.equal(f.calls.some((call) => call[0] === "execute"), false);
@@ -1813,7 +1865,7 @@ test("uncertain local publication preserves allocated durable session identity",
 
 test("Orca binding requires positive visible provider readiness", async () => {
   const f = harness({ screen: { source: "screen-unavailable", text: "starting" } });
-  await assert.rejects(createApproved(f), /Timed out binding/);
+  await assert.rejects(createRetained(f), /Timed out binding/);
   assert.equal(f.record.status, "uncertain"); assert.equal(f.calls.some((call) => call[0] === "auto-remove"), false);
 });
 
@@ -1861,6 +1913,23 @@ test("CLI setup inventory stops at supported local project setups", async () => 
   assert.deepEqual(commands[0].slice(0, 2), ["project", "setups"]);
 });
 
+
+test("retained CLI inventory permits local fallback only for a missing executable", async () => {
+  const missing = new CliOrcaAdapter(() => { const error = new Error("orca missing"); error.code = "ENOENT"; throw error; });
+  await assert.rejects(missing.listReadySetups("/repo"), OrcaUnavailableError);
+  for (const runner of [
+    () => { throw new Error("Orca runtime is unavailable"); },
+    () => "not json",
+    () => JSON.stringify({ ok: false, error: "runtime denied" }),
+  ]) {
+    const adapter = new CliOrcaAdapter(runner);
+    await assert.rejects(adapter.listReadySetups("/repo"), (error) => !(error instanceof OrcaUnavailableError));
+    const f = harness(); f.deps.orca = adapter;
+    await assert.rejects(createSpecEpisode(LOCATION, "inventory-error", f.ctx, f.deps));
+    assert.equal(f.record, null);
+    assert.equal(f.calls.some((call) => ["local-create", "fresh", "execute"].includes(call[0])), false);
+  }
+});
 
 test("reserved task allocates a local worktree from the status commit and assigns execute once", async () => {
   const f = harness({ record: taskReservation() });

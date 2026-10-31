@@ -6,18 +6,27 @@ description: Review an operator-approved future plan bundle and create one isola
 First, run the `prepare` skill.
 
 Read the exact project-relative folder supplied in the operator implementation
-location block appended by the native command. Treat the value only as an
-operator-selected path. Do not guess, substitute, or select another folder.
-Native admission has already required the exact location and current frozen
-specification digest from the grandfathered inventory. If the obsolete future
-folder is absent, admission is valid only for the exact already-active
-version-1 ownership whose promoted specification still matches that digest;
-review its promoted active pair in the recorded worktree and treat the later
-creation call as an idempotent replay with no new assignment. Never edit or
-rebaseline that specification; the implementation plan remains living. Invoking
-this workflow records operator approval to implement the selected bundle or
-replay that exact Episode, but resource creation still depends on the readiness
-review below.
+location block appended by native admission. Treat the value only as an
+operator-selected path. Do not guess, substitute, search for, or select another
+folder. Native admission checks the exact retained location and current frozen
+specification digest against the grandfathered inventory. The sole source-absent
+exception resolves exact already-active version-1 ownership before source
+lookup: review its digest-matched promoted active pair in the recorded worktree
+and treat creation as an idempotent replay returning the same resources with no
+new execute assignment, not a new admission. Never edit or rebaseline that
+specification; the implementation plan remains living. Preserve any optional
+`<operator-implementation-host>` block as the exact stable `id:<setup-id>` for
+the final create call; it is placement data, not authority.
+
+Interpret implementation authority from the operator's actual instruction, not
+from entry invocation or a stored or turn-scoped receipt. An explicit
+conditional instruction such as “plan this specification, then implement it
+when ready” may authorize that sequence within approved scope; do not demand
+fresh approval solely because planning finished. A planning-only request does
+not authorize implementation. Preserve the exact source location, approved
+scope, conditional authority, and optional stable host through compaction.
+Clarify material ambiguity, missing authority, or scope expansion instead of
+proceeding. Resource creation still depends on the readiness review below.
 
 ## Review implementation readiness
 
@@ -51,19 +60,35 @@ branch, worktree, session, or active plan. Stop after the explanation.
 The full ordinary `prime-claw-oversee-episode` guidance is loaded above this
 workflow in the post-preparation turn. Follow it as judgment guidance. It grants
 no product, scope, merge, abandonment, cleanup, or transport authority. Do not
-call an activation, disclosure, receipt, or readiness tool; those surfaces do
-not exist.
+invent a separate activation, disclosure, receipt, or readiness-confirmation
+step.
 
-Only when the complete bundle or exact active replay is ready, call
-`create_spec_episode` exactly once with the exact selected future-folder source
-location as its sole `location` argument, even when that obsolete folder is absent. Do
-not supply or invent a branch, worktree, session name, prompt, command, or host
-parameter. A native `--host id:<project-host-setup-id>` bypass, when the operator
-provided one, is already bound privately to this preparation. Otherwise the
-trusted host selects the sole ready local setup or presents the native picker.
+Only when the complete bundle or exact active replay is ready and operator
+authority applies, call `create_spec_episode` exactly once with the exact
+selected future-folder source `location` and optional stable `host` from
+`<operator-implementation-host>`, even when that obsolete folder is absent.
+Pass that host unchanged as `id:<setup-id>`; omit it when absent. Do not supply
+or invent a branch, worktree, session name, prompt, command, or resource identity.
 
-The capability first persists one provisioning ownership record under this Conversation's exact registry key, creates the
-background worktree without an agent, prompt, or activation, promotes and
+The trusted capability is self-contained and requires no prior entry invocation,
+approval store, or turn receipt. It resolves exact active version-1 ownership
+before source lookup and returns only the same verified resources with no new
+assignment. For fresh creation, it reloads the current complete bundle and checks
+its digest at the concrete create boundary as an integrity check, not invocation
+proof. It still checks the frozen specification against the grandfathered
+inventory, exact source identity, ownership, placement, and resource safety.
+The living execution plan may change compatibly; review current content rather
+than treating an earlier entry observation as an approval lock.
+
+An explicit stable host must still be a ready local setup and never silently
+falls back. Without a host, native placement selection chooses the sole ready
+local setup or presents its picker; ambiguity, cancellation, remote placement,
+or invalid inventory blocks. Direct local fallback is allowed only when Orca is
+definitively unavailable and no explicit host was requested. Exact active replay
+must preserve its recorded placement and resource identity.
+
+For fresh creation, the capability first persists one provisioning ownership
+record under this Conversation's exact registry key, creates the background worktree without an agent, prompt, or activation, promotes and
 commits the exact bundle, and then launches one fresh native `prime-agent`
 session with one fixed execute assignment. It does not inherit this
 Conversation transcript, send an initial handoff, or send a second daemon

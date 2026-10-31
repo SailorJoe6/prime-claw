@@ -86,11 +86,11 @@ def test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree():
             retained={
                 "project-workflow-implement-prep": (
                     "bdb1f929f34711a27305b203e35340c54a955150ab7258820f3e0069bd486088",
-                    "4823d1f90258e6b7f811fcf317a40dae33f7659d4a3ae86b2d0a20a25f70a329",
+                    "d98d71db19eeb99420c011e6afc9a2ee01d7b760bca79a8f3412139930f02009",
                 ),
                 "project-workflow-implement-spec": (
                     "1b9fa01f1e0493fc6078683ae5872dfd32bb2419906247645c363168edb8eb3f",
-                    "a13405c5c7b92d0211526044cdde46e5c9ef217430472ed9f8bfa8aac40bb634",
+                    "718ae6ab9def9ab3cb0184795101e34cc6cbd543821614b752bc79882d545067",
                 ),
             }
             baseline,actual=retained[row["id"]]

@@ -262,7 +262,7 @@ export interface EpisodeOwnershipTransitionDependencies extends EpisodeDependenc
   transitionOwnership?: typeof transitionLegacyEpisodeOwnershipToTask;
 }
 
-export interface EpisodeCreationOptions { host?: string; approvedBundleDigest?: string }
+export interface EpisodeCreationOptions { host?: string }
 
 export interface TaskEpisodeAdmissionGit {
   repositoryRoot(cwd: string): string;
@@ -813,10 +813,9 @@ export class CliOrcaAdapter implements OrcaAdapter {
       .map((row) => this.setup(row, "local", "local"));
   }
   async listReadySetups(projectRoot: string): Promise<OrcaProjectSetup[]> {
-    let localResult: JsonObject;
-    try { localResult = this.json(["project", "setups"], "Orca project setup inventory"); }
-    catch (error) { throw new OrcaUnavailableError("Orca CLI/runtime is unavailable before Episode mutation", { cause: error }); }
-    return this.readyLocalSetups(projectRoot, localResult);
+    // Retained creation has the same missing-only fallback as task placement.
+    // Runtime failures and malformed inventory must not select local fallback.
+    return this.listReadyTaskPlacementSetups(projectRoot);
   }
   async listReadyTaskPlacementSetups(projectRoot: string): Promise<OrcaProjectSetup[]> {
     let localResult: JsonObject;
@@ -3381,6 +3380,9 @@ export async function createSpecEpisode(
     const existing = store.read(repo, ownerSessionId);
     if (existing && existing.status !== "inactive") {
       exactOwnedRecord(existing, source.location, ownerSessionId);
+      if (options.host && (existing.engine !== "orca" || options.host !== `id:${existing.projectSetupId}`)) {
+        throw new Error("Selected host does not match the active retained Episode placement");
+      }
       if (existing.status !== "active") throw new EpisodeStateUncertainError(`Existing Episode ownership is ${existing.status}; inspect exact resources before continuing. No assignment was replayed.`);
       validateWorktreeRecord(existing, git, filesystem, repo);
       if (existing.engine === "orca") {
@@ -3394,9 +3396,18 @@ export async function createSpecEpisode(
     const selected = validateFutureLocation(ctx.cwd, rawLocation);
     if (!selected) throw new Error("Invalid future-plan folder");
     assertGrandfatheredLegacySpecification(selected.projectRoot, selected.location);
-    const approvedBundleDigest = options.approvedBundleDigest;
-    if (!approvedBundleDigest || !/^[0-9a-f]{64}$/.test(approvedBundleDigest)) throw new Error("Episode creation is missing the exact approved-bundle digest");
-    if (bundleContentDigest(selected.folder) !== approvedBundleDigest) throw new Error("Approved bundle changed after /implement-spec admission; rerun readiness review");
+    const implementation = ["IMPLEMENTATION_PLAN.md", "EXECUTION_PLAN.md"]
+      .map((name) => join(selected.folder, name))
+      .find((path) => {
+        try {
+          const stat = lstatSync(path);
+          return stat.isFile() && !stat.isSymbolicLink() && meaningfulTaskImplementationPlan(readFileSync(path, "utf8"));
+        } catch { return false; }
+      });
+    if (!implementation) throw new Error("Retained Episode creation requires a readable meaningful implementation plan");
+    // Capture the current ready bundle at the concrete fresh-create boundary.
+    // This is factual copy-integrity data, not an earlier invocation receipt.
+    const approvedBundleDigest = bundleContentDigest(selected.folder);
     const baseRef = git.head(repo);
     const operationId = randomUUID();
     const worktreeName = `${basename(repo)}-${selected.slug}-episode-${operationId.slice(0, 8)}`;

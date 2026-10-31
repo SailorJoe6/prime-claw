@@ -28,7 +28,7 @@ IDENTITY = {
 }
 COMMANDS = {"plan-spec", "plan", "implement-spec", "implement-task"}
 TOOLS = {
-    "plan_spec", "plan_task", "implement_task", "create_spec_episode", "create_task_episode",
+    "plan_spec", "plan_task", "implement_task", "implement_spec", "create_spec_episode", "create_task_episode",
     "transition_spec_episode_to_task", "finalize_spec_episode",
     "finalize_task_episode", "handoff_task_episode",
     "restore_blocked_spec_episode", "handoff_spec_episode",

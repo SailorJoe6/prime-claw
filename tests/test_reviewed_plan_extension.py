@@ -93,7 +93,7 @@ def test_prime_agent_rpc_loads_renamed_commands_and_simplified_tools(tier1_conta
     probe = ctmp / "tool-probe.ts"
     probe.write_text("""import {writeFileSync} from "node:fs";
 const out=process.env.TOOL_SNAPSHOT;
-export default function probe(pi){pi.on("session_start",()=>{const names=pi.getAllTools().map(t=>t.name).sort();writeFileSync(out,JSON.stringify(names));if(names.includes("plan_spec")&&names.includes("plan_task")&&names.includes("implement_task")&&names.includes("create_spec_episode")&&names.includes("handoff_spec_episode")&&names.includes("finalize_spec_episode")&&names.includes("restore_blocked_spec_episode")&&names.includes("create_task_episode")&&names.includes("handoff_task_episode")&&names.includes("finalize_task_episode")&&names.includes("transition_spec_episode_to_task")&&!names.includes("ralph_plan")&&!names.includes("prime_claw_activate_conversation_guide")&&!names.includes("prime_claw_conversation_guide_status")){pi.registerCommand("probe-reviewed-plan-tools",{description:"proof",handler:async()=>{}})}})}""")
+export default function probe(pi){pi.on("session_start",()=>{const names=pi.getAllTools().map(t=>t.name).sort();writeFileSync(out,JSON.stringify(names));if(names.includes("plan_spec")&&names.includes("plan_task")&&names.includes("implement_task")&&names.includes("implement_spec")&&names.includes("create_spec_episode")&&names.includes("handoff_spec_episode")&&names.includes("finalize_spec_episode")&&names.includes("restore_blocked_spec_episode")&&names.includes("create_task_episode")&&names.includes("handoff_task_episode")&&names.includes("finalize_task_episode")&&names.includes("transition_spec_episode_to_task")&&!names.includes("ralph_plan")&&!names.includes("prime_claw_activate_conversation_guide")&&!names.includes("prime_claw_conversation_guide_status")){pi.registerCommand("probe-reviewed-plan-tools",{description:"proof",handler:async()=>{}})}})}""")
     snapshot = ctmp / "tools.json"
     result = tier1_container.run(
         "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent, "--mode", "rpc", "--offline", "--no-session", "--no-skills",
@@ -111,7 +111,7 @@ export default function probe(pi){pi.on("session_start",()=>{const names=pi.getA
         assert matches[0]["sourceInfo"]["path"] == WS_EXTENSION
     assert [command["name"] for command in commands].count("probe-reviewed-plan-tools") == 1
     tools = json.loads(snapshot.read_text())
-    for name in ("plan_spec", "plan_task", "implement_task", "create_spec_episode", "handoff_spec_episode", "finalize_spec_episode", "restore_blocked_spec_episode", "create_task_episode", "handoff_task_episode", "finalize_task_episode", "transition_spec_episode_to_task"):
+    for name in ("plan_spec", "plan_task", "implement_task", "implement_spec", "create_spec_episode", "handoff_spec_episode", "finalize_spec_episode", "restore_blocked_spec_episode", "create_task_episode", "handoff_task_episode", "finalize_task_episode", "transition_spec_episode_to_task"):
         assert name in tools
 
 
@@ -160,8 +160,8 @@ def test_compact_first_workflows_and_normal_guide_load_are_explicit() -> None:
     assert 'name: "ralph_plan"' not in extension
     assert "compact.run(focus_hint)" in plan_prep
     assert "compact.run(focus_hint)" in implement_prep
-    assert "conversationGuideText(oversightOptions)" in extension
-    assert "activation, disclosure, receipt, or readiness tool" in implement
+    assert "conversationGuideText({ guideRoot: dependencies.guideRoot })" in extension
+    assert "activation, disclosure, receipt, or readiness-confirmation step" in " ".join(implement.split())
 
 
 def test_creation_policy_matches_frozen_orca_boundary() -> None:

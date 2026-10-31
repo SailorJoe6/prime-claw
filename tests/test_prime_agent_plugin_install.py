@@ -318,7 +318,7 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     assert manifest["schemaVersion"] == 2
     assert manifest["selectedContext"] == "AGENTS.md"
     discovered = {path.parent.name for path in (destination / "skills").glob("*/SKILL.md")}
-    assert discovered == {"goals-and-heartbeats", "prime-claw-oversee-episode", "prime-claw-expert-review", "initialize-prime-claw", "implement-task"}
+    assert discovered == {"goals-and-heartbeats", "prime-claw-oversee-episode", "prime-claw-expert-review", "initialize-prime-claw", "implement-task", "implement-spec"}
     assert not list((destination / "skills/project-templates").rglob("SKILL.md"))
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode == 0, checked.stdout + checked.stderr
@@ -612,6 +612,7 @@ def test_delivery_retirement_refuses_unproven_or_unsafe_paths_before_mutation(
     "skills/prime-claw-expert-review",
     "skills/initialize-prime-claw",
     "skills/implement-task",
+    "skills/implement-spec",
 ])
 def test_apply_and_check_reject_symlinked_managed_directories_before_mutation(
     tier1_container, ctmp, managed_directory,
@@ -710,7 +711,7 @@ def test_apply_preflights_all_managed_destinations_before_mutation(
         assert unsafe.resolve().read_bytes() == b"outside remains untouched\n"
 
 
-@pytest.mark.parametrize("skill_name", ["prime-claw-expert-review", "initialize-prime-claw", "implement-task"])
+@pytest.mark.parametrize("skill_name", ["prime-claw-expert-review", "initialize-prime-claw", "implement-task", "implement-spec"])
 def test_check_rejects_stale_managed_skill(tier1_container, ctmp, skill_name) -> None:
     destination = ctmp / "agent"
     applied = _run_script(tier1_container, WS_APPLY, destination)

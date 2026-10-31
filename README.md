@@ -43,10 +43,14 @@ full phase status and blockers.
   `/implement-task TASK-ID` command remains during this incremental cutover.
   Planning alone never authorizes implementation; an explicit conditional
   plan-then-implement request may authorize that sequence within its scope.
-  The generic plugin
-  retains `/plan-spec` and `/implement-spec` for initialized projects that still
-  have version-1 bundles; this builder repository no longer stores a local
-  `.ralph/plans` tree.
+  For initialized projects with retained version-1 bundles, the discoverable
+  `implement-spec` skill routes one exact selected future folder to
+  `implement_spec(location, host?)`. Final `create_spec_episode(location, host?)`
+  checks current integrity and placement without an invocation-proof receipt;
+  exact active replay returns the same resources with no new execute assignment.
+  `/plan-spec` and `/implement-spec` remain available. Other entry skills and
+  broad policy/probe alignment remain pending. This builder repository no
+  longer stores a local `.ralph/plans` tree.
 - [Native handoff chain](docs/handoff-chain.md) — update durable records and
   continue an approved episode iteration through focused compaction and the
   canonical execute workflow.

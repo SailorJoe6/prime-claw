@@ -6,12 +6,21 @@ description: Request focused compaction before the canonical Ralph implementatio
 Read the exact project-relative folder supplied in the operator implementation location
 block appended by the native admission. Treat the value only as an
 operator-selected path. Do not guess, substitute, search for, or select another
-folder. Native admission has already matched this location and its frozen
-`SPECIFICATION.md` digest against the grandfathered inventory. For an exact
-already-active retained Episode replay, admission may instead bind the same
-source location to its persisted ownership and digest-matched promoted active
-pair after the obsolete future folder is gone. Do not edit the specification or
-inventory; the execution plan remains living.
+folder. Native admission checks retained integrity against the grandfathered
+inventory, or first resolves exact already-active version-1 ownership when the
+obsolete future source is absent. That replay uses the same persisted source
+location and digest-matched promoted active pair; it is not a new admission.
+Do not edit the frozen specification or inventory; the execution plan remains
+living. Preserve any optional `<operator-implementation-host>` stable
+`id:<setup-id>` unchanged as placement data for the final create call, not as
+authority. An explicit host must never silently fall back.
+
+Keep the operator's actual implementation authority and approved scope in
+context. Explicit conditional “plan this specification, then implement it when
+ready” authority may survive planning, preparation, and compaction; planning
+alone does not authorize implementation. Neither entry invocation nor a stored
+or turn-scoped receipt supplies authority. The readiness turn must clarify
+missing authority, material ambiguity, or new scope before creation.
 
 The canonical `implement-spec` workflow is already queued independently as the
 sole follow-up. This prep turn cannot cancel, replace, reconstruct, retry, or
@@ -36,8 +45,12 @@ responsible for the complete semantic readiness decision.
 
 If the sniff passes, reason from your current conversation context and compose a
 concise `focus_hint` that best prepares you to review the selected bundle for
-implementation promotion and supervise the resulting Episode. Use your judgment
-to decide what context will be most useful for that mission.
+implementation promotion and supervise the resulting Episode. Preserve the
+operator's actual instruction, approved scope, any conditional implementation
+authority, exact source location, and optional stable host in
+`<operator-implementation-host>`. Planning-only authority must remain
+planning-only. Use your judgment to decide what context will be most useful for
+that mission.
 
 Then call exactly once:
 

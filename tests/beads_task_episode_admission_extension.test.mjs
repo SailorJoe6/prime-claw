@@ -278,7 +278,7 @@ test("registered Beads implement-task path delegates once without invocation-pro
   assert.match(sent[1].message, /BEADS IMPLEMENT POLICY/);
   assert.deepEqual(sent[1].options, { deliverAs: "followUp" });
   assert.equal(f.allocatorCalls, 0);
-  await events.get("agent_end")({}, ctx);
+  assert.equal(events.has("agent_end"), false);
 
   const result = await tools.get("create_task_episode").execute(
     "registered-create", { taskId: f.taskId }, undefined, undefined, ctx,

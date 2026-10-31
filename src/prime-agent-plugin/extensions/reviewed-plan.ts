@@ -5,7 +5,6 @@ import yaml from "../extension-support/vendor/yaml/yaml.cjs";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
-  bundleContentDigest,
   createSpecEpisode,
   createTaskEpisode,
   episodeResultText,
@@ -30,6 +29,7 @@ import {
   admitPrepChain,
   admitProviderTaskPrepChain,
   type PrepChainWorkflow,
+  type PrepChainAdmissionResult,
   type ProviderTaskPrepChainAdmissionResult,
   type ProviderTaskResolver,
   type TaskPrepChainWorkflow,
@@ -42,14 +42,12 @@ import {
 import { closeEpisodeOwnership } from "../extension-support/episode-close.ts";
 import {
   resolveFutureLocationSyntax,
-  validateFutureLocation,
   type BacklogTaskSelection,
 } from "../extension-support/reviewed-plan-support.ts";
 import { isLegacyEpisodeOwnership, readEpisodeOwnership, type LegacyEpisodeOwnershipRecord } from "../extension-support/episode-ownership.ts";
 import { resolveSynchronizedProviderTask } from "../extension-support/task-history-workspace.ts";
 import {
   assertGrandfatheredLegacySpecificationFile,
-  assertSafeLegacyFutureLocation,
 } from "../extension-support/legacy-specification-inventory.ts";
 import { assertLiveLegacyEpisodeFiles } from "../extension-support/legacy-workflow.ts";
 import {
@@ -137,20 +135,12 @@ function validTaskToolSelection(taskId: unknown, host: unknown): taskId is strin
     && (host === undefined || (typeof host === "string" && /^id:[0-9a-f-]+$/.test(host)));
 }
 
-type ImplementationApproval = {
-  location: string;
-  host?: string;
-  bundleDigest: string;
-  skipNextAgentEnd: boolean;
-};
-
 function activeLegacyReplay(
   ctx: ExtensionContext,
   rawLocation: string,
 ): { projectRoot: string; location: string; record: LegacyEpisodeOwnershipRecord } | null {
   const selected = resolveFutureLocationSyntax(ctx.cwd, rawLocation);
   if (!selected) return null;
-  assertSafeLegacyFutureLocation(selected.projectRoot, selected.location, true);
   const record = readEpisodeOwnership(selected.projectRoot, ctx.sessionManager.getSessionId());
   if (!record || !isLegacyEpisodeOwnership(record) || record.status !== "active"
     || record.sourceLocation !== selected.location) return null;
@@ -255,15 +245,47 @@ ${host}
   );
 }
 
+/** Admit retained implementation readiness without recording invocation proof. */
+export async function admitSpecImplementationPrepChain(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  args: string,
+  source: "native" | "tool",
+  dependencies: Pick<TaskImplementationAdmissionDependencies, "placementResolver" | "placement" | "guideRoot"> = {},
+): Promise<PrepChainAdmissionResult> {
+  const parsed = parseImplementationArgs(args);
+  if (!parsed) return { ok: false, message: IMPLEMENT_USAGE, level: "warning" };
+  let host: string | undefined;
+  return admitPrepChain(
+    pi, ctx, parsed.location, IMPLEMENT_PREP_WORKFLOW, source,
+    async (callCtx, location) => {
+      assertConversationPromotionReady(callCtx, location);
+      const replay = activeLegacyReplay(callCtx, location);
+      if (replay) {
+        host = replay.record.engine === "orca" ? `id:${replay.record.projectSetupId}` : undefined;
+        if (parsed.host && parsed.host !== host) throw new Error("Selected host does not match the active retained Episode placement");
+        return;
+      }
+      const selected = resolveFutureLocationSyntax(callCtx.cwd, location);
+      if (!selected) throw new Error("Invalid future-plan source location");
+      const resolvePlacement = dependencies.placementResolver ?? resolveTaskEpisodePlacement;
+      host = placementHost(await resolvePlacement(selected.projectRoot, parsed.host, callCtx, dependencies.placement));
+    },
+    conversationGuideText({ guideRoot: dependencies.guideRoot }),
+    (callCtx, location) => {
+      const replay = activeLegacyReplay(callCtx, location);
+      return replay ? { projectRoot: replay.projectRoot, location: replay.location } : null;
+    },
+    () => host ? `<operator-implementation-host>
+${host}
+</operator-implementation-host>` : undefined,
+  );
+}
+
 type PrepChainCommandOptions = {
   command: string;
   description: string;
   workflow: PrepChainWorkflow;
-  onValidated?: (ctx: ExtensionContext, location: string, selection: CommandSelection, preflightValue?: string) => void;
-  preflight?: (ctx: ExtensionContext, location: string) => string | undefined;
-  phasePreamble?: () => string;
-  parseArgs?: (args: string) => CommandSelection | null;
-  sourceAbsentReplay?: (ctx: ExtensionContext, rawLocation: string) => { projectRoot: string; location: string } | null;
 };
 
 function registerPrepChainCommand(
@@ -271,29 +293,8 @@ function registerPrepChainCommand(
   options: PrepChainCommandOptions,
 ): (args: string, ctx: ExtensionContext) => Promise<void> {
   const handler = async (args: string, ctx: ExtensionContext): Promise<void> => {
-    const selection = options.parseArgs?.(args) ?? { location: args.trim() };
-    if (!selection) {
-      ctx.ui.notify(options.workflow.usage, "warning");
-      return;
-    }
-    let preflightValue: string | undefined;
-    const result = await admitPrepChain(
-      pi,
-      ctx,
-      selection.location,
-      options.workflow,
-      "native",
-      options.preflight ? (callCtx, location) => {
-        preflightValue = options.preflight!(callCtx, location);
-      } : undefined,
-      options.phasePreamble?.(),
-      options.sourceAbsentReplay,
-    );
-    if (!result.ok) {
-      ctx.ui.notify(result.message, result.level);
-      return;
-    }
-    options.onValidated?.(ctx, result.location, selection, preflightValue);
+    const result = await admitPrepChain(pi, ctx, args.trim(), options.workflow, "native");
+    if (!result.ok) ctx.ui.notify(result.message, result.level);
   };
   pi.registerCommand(options.command, { description: options.description, handler });
   return handler;
@@ -550,7 +551,6 @@ async function runTaskEpisodeCleanup(
 
 export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependencies) {
   return function reviewedPlan(pi: ExtensionAPI): void {
-    const implementationApprovalBySession = new Map<string, ImplementationApproval>();
     const oversightOptions = { guideRoot: dependencies?.guideRoot };
     registerConversationOversight(pi, oversightOptions);
     const planSpecHandler = registerPrepChainCommand(pi, {
@@ -569,33 +569,17 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         if (!result.ok) ctx.ui.notify(result.message, result.level);
       },
     });
-    const implementSpecHandler = registerPrepChainCommand(pi, {
-      command: "implement-spec",
+    const implementSpecHandler = async (args: string, ctx: ExtensionContext): Promise<void> => {
+      const result = await admitSpecImplementationPrepChain(pi, ctx, args, "native", {
+        placementResolver: dependencies?.placementResolver,
+        placement: dependencies,
+        guideRoot: dependencies?.guideRoot,
+      });
+      if (!result.ok) ctx.ui.notify(result.message, result.level);
+    };
+    pi.registerCommand("implement-spec", {
       description: "Review and promote an approved future bundle into an isolated implementation episode",
-      workflow: IMPLEMENT_PREP_WORKFLOW,
-      preflight: (ctx, location) => {
-        assertConversationPromotionReady(ctx, location);
-        const replay = activeLegacyReplay(ctx, location);
-        if (replay) return replay.record.bundleDigest;
-        const selected = validateFutureLocation(ctx.cwd, location);
-        if (!selected) throw new Error("Validated implementation folder disappeared");
-        return bundleContentDigest(selected.folder);
-      },
-      phasePreamble: () => conversationGuideText(oversightOptions),
-      parseArgs: parseImplementationArgs,
-      sourceAbsentReplay: (ctx, location) => {
-        const replay = activeLegacyReplay(ctx, location);
-        return replay ? { projectRoot: replay.projectRoot, location: replay.location } : null;
-      },
-      onValidated: (ctx, location, selection, bundleDigest) => {
-        if (!bundleDigest) throw new Error("Implementation preflight did not bind the approved bundle");
-        implementationApprovalBySession.set(ctx.sessionManager.getSessionId(), {
-          location,
-          ...(selection.host ? { host: selection.host } : {}),
-          bundleDigest,
-          skipNextAgentEnd: true,
-        });
-      },
+      handler: implementSpecHandler,
     });
     pi.registerCommand("implement-task", {
       description: "Review and admit one exact planned provider-native task or grandfathered future specification",
@@ -762,36 +746,55 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       },
     });
 
-    pi.on("session_start", (_event, ctx) => {
-      const sessionId = ctx.sessionManager.getSessionId();
-      implementationApprovalBySession.delete(sessionId);
-    });
-    pi.on("agent_end", (_event, ctx) => {
-      const sessionId = ctx.sessionManager.getSessionId();
-      const approval = implementationApprovalBySession.get(sessionId);
-      if (!approval) return;
-      if (approval.skipNextAgentEnd) {
-        implementationApprovalBySession.set(sessionId, {
-          ...approval,
-          skipNextAgentEnd: false,
-        });
-        return;
-      }
-      implementationApprovalBySession.delete(sessionId);
-    });
-    pi.on("session_shutdown", (_event, ctx) => {
-      const sessionId = ctx.sessionManager.getSessionId();
-      implementationApprovalBySession.delete(sessionId);
+    pi.registerTool({
+      name: "implement_spec",
+      label: "Review retained specification implementation readiness",
+      description: "Queue canonical implementation readiness for one exact retained future-plan folder, or its exact active version-1 replay. Admission alone creates no resources.",
+      promptSnippet: "Queue canonical readiness for one exact retained specification",
+      promptGuidelines: [
+        "Use implement_spec for an explicit retained-specification implementation request, including a conditional request to implement only if ready. Planning alone does not authorize implementation.",
+        "Bind the exact supported .ralph/plans/future/<slug> source. Clarify a missing or materially ambiguous folder before calling.",
+        "Pass an optional stable id:<project-host-setup-id> host only when selected. Carry the selected host through readiness and final creation as factual placement data.",
+        "Treat admission as terminal routing, not readiness or creation completion. On delivery uncertainty inspect current state and never retry automatically.",
+      ],
+      executionMode: "sequential",
+      parameters: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "Exact retained project-relative .ralph/plans/future/<slug> source location" },
+          host: { type: "string", description: "Optional stable id:<project-host-setup-id> placement" },
+        },
+        required: ["location"],
+        additionalProperties: false,
+      } as any,
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        if (!validTaskToolSelection(params.location, params.host)) {
+          return { content: [{ type: "text", text: IMPLEMENT_USAGE }], details: { admitted: false, error: IMPLEMENT_USAGE }, isError: true };
+        }
+        const result = await admitSpecImplementationPrepChain(
+          pi, ctx, `${params.location}${params.host ? ` --host ${params.host}` : ""}`, "tool",
+          { placementResolver: dependencies?.placementResolver, placement: dependencies, guideRoot: dependencies?.guideRoot },
+        );
+        if (!result.ok) return {
+          content: [{ type: "text", text: result.message }],
+          details: { admission: result.deliveryUncertain ? "unconfirmed" : "rejected", ...(result.deliveryUncertain ? { stage: result.stage } : { admitted: false }), error: result.message },
+          isError: true,
+        };
+        return {
+          content: [{ type: "text", text: `Implementation readiness admitted for ${result.location}: canonical implement-prep was steered and canonical implement-spec was queued as the sole follow-up. Readiness has not completed, and no Episode was created by this admission.` }],
+          details: { admitted: true, location: result.location },
+        };
+      },
     });
 
     pi.registerTool({
       name: "create_spec_episode",
       label: "Create specification episode",
-      description: "Create or return the one worktree-isolated episode for the exact implementation-ready future-plan folder admitted by the current /implement-spec chain.",
+      description: "Create or return the one isolated Episode for an exact implementation-ready retained future-plan source. Resolve current bundle integrity and safe placement directly; no prior entry invocation proof is required.",
       promptSnippet: "Promote one reviewed future-plan folder or return its exact active retained Episode",
       promptGuidelines: [
         "Call create_spec_episode only after the current implement-spec readiness workflow finds its exact selected bundle complete and implementation-ready, or verifies an exact active retained replay whose obsolete source folder is absent.",
-        "Pass create_spec_episode only the exact operator-selected future-folder source location.",
+        "Pass the exact future-folder source location and the same optional stable host carried by readiness. The managed skill owns semantic implementation authority; no prior entry invocation proof is required.",
         "Fresh creation makes one fresh Episode with one fixed execute assignment; an exact active replay preserves its resources and sends no assignment; never send an initial handoff or a second assignment.",
       ],
       executionMode: "sequential",
@@ -802,25 +805,19 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             type: "string",
             description: "Exact project-relative .ralph/plans/future/<slug> folder selected by the operator",
           },
+          host: { type: "string", description: "Optional stable id:<project-host-setup-id> selected during readiness" },
         },
         required: ["location"],
         additionalProperties: false,
       } as any,
       async execute(toolCallId, params, _signal, _onUpdate, ctx) {
-        const sessionId = ctx.sessionManager.getSessionId();
-        const approval = implementationApprovalBySession.get(sessionId);
-        if (approval?.location !== params.location || approval.skipNextAgentEnd) {
-          return {
-            content: [{ type: "text", text: "Episode creation failed: no matching active /implement-spec approval" }],
-            details: { error: "no matching active /implement-spec approval" },
-            isError: true,
-          };
-        }
         try {
-          implementationApprovalBySession.delete(sessionId);
+          if (!validTaskToolSelection(params.location, params.host)) {
+            throw new Error("Specification Episode creation requires one exact future-plan location and optional stable id:<project-host-setup-id> host");
+          }
           assertConversationPromotionReady(ctx, params.location);
           const createEpisode = dependencies?.createEpisode ?? createSpecEpisode;
-          const result = await createEpisode(params.location, toolCallId, ctx, dependencies, { host: approval.host, approvedBundleDigest: approval.bundleDigest });
+          const result = await createEpisode(params.location, toolCallId, ctx, dependencies, { host: params.host });
           return {
             content: [{ type: "text", text: episodeResultText(result) }],
             details: result,

@@ -84,9 +84,9 @@ async function admitResolvedPrepChain(
   selection: string,
   workflow: PrepChainWorkflow,
   source: "native" | "tool",
-  preflight?: (ctx: ExtensionContext, selection: string) => void,
+  preflight?: (ctx: ExtensionContext, selection: string) => void | Promise<void>,
   phasePreamble?: string,
-  promptContext?: string,
+  promptContext?: string | (() => string | undefined),
 ): Promise<PrepChainAdmissionResult> {
   // Preflight both project-owned workflows before beginning a partial
   // transition. Loading them here also keeps every model instruction in the
@@ -112,10 +112,16 @@ async function admitResolvedPrepChain(
     };
   }
 
-  const contextualPrepPrompt = promptContext ? `${prepPrompt}\n\n${promptContext}` : prepPrompt;
-  const contextualPhasePrompt = promptContext ? `${canonicalPhasePrompt}\n\n${promptContext}` : canonicalPhasePrompt;
+  let context: string | undefined;
+  try {
+    await preflight?.(ctx, selection);
+    context = typeof promptContext === "function" ? promptContext() : promptContext;
+  } catch (error) {
+    return { ok: false, level: "error", message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  const contextualPrepPrompt = context ? `${prepPrompt}\n\n${context}` : prepPrompt;
+  const contextualPhasePrompt = context ? `${canonicalPhasePrompt}\n\n${context}` : canonicalPhasePrompt;
   const phasePrompt = phasePreamble ? `${phasePreamble}\n\n${contextualPhasePrompt}` : contextualPhasePrompt;
-  preflight?.(ctx, selection);
 
   const admission = await admitWorkflowChain({
     deliverFirst: () => source === "tool"
@@ -147,28 +153,25 @@ export async function admitPrepChain(
   rawLocation: string,
   workflow: PrepChainWorkflow,
   source: "native" | "tool",
-  preflight?: (ctx: ExtensionContext, location: string) => void,
+  preflight?: (ctx: ExtensionContext, location: string) => void | Promise<void>,
   phasePreamble?: string,
   sourceAbsentReplay?: LegacySourceAbsentSelectionResolver,
+  promptContext?: () => string | undefined,
 ): Promise<PrepChainAdmissionResult> {
   let selected;
   let replay = false;
   try {
-    selected = validateFutureLocation(ctx.cwd, rawLocation);
-  } catch {
-    selected = null;
-  }
-  if (!selected && sourceAbsentReplay) {
-    try {
-      selected = sourceAbsentReplay(ctx, rawLocation);
-      replay = selected !== null;
-    } catch (error) {
-      return {
-        ok: false,
-        message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
-        level: "error",
-      };
-    }
+    // Exact active ownership is authoritative even after promotion removes the
+    // obsolete future folder. Never look up that source before replay checks.
+    selected = sourceAbsentReplay?.(ctx, rawLocation) ?? null;
+    replay = selected !== null;
+    if (!selected) selected = validateFutureLocation(ctx.cwd, rawLocation);
+  } catch (error) {
+    return {
+      ok: false,
+      message: `reviewed-plan: ${error instanceof Error ? error.message : String(error)}`,
+      level: "error",
+    };
   }
   if (!selected) {
     return { ok: false, message: workflow.usage, level: "warning" };
@@ -191,6 +194,7 @@ export async function admitPrepChain(
     source,
     preflight,
     phasePreamble,
+    promptContext,
   );
 }
 
