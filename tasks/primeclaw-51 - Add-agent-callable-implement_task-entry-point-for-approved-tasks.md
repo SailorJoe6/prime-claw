@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Progress
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 20:18'
+updated_date: '2026-10-31 20:39'
 labels: []
 dependencies: []
 references:
@@ -13,37 +13,81 @@ documentation:
   - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/traceability.md
 modified_files:
+  - .agents/skills/backlog/SKILL.md
+  - .agents/skills/design-legacy/SKILL.md
+  - .agents/skills/design/SKILL.md
+  - .agents/skills/spec-it-out/SKILL.md
   - .prime-claw/templates.json
-  - .prime-claw/workflows/implement-task-prep.md
-  - .prime-claw/workflows/implement-task.md
-  - README.md
-  - docs/prep-chain.md
-  - docs/user-stories/E-episode-promotion.md
-  - docs/user-stories/traceability.md
-  - src/prime-agent-plugin/asset-inventory.json
-  - src/prime-agent-plugin/extension-support/prep-chain.ts
-  - src/prime-agent-plugin/extensions/reviewed-plan.ts
-  - src/prime-agent-plugin/workflows/implement-task-prep.md
-  - src/prime-agent-plugin/workflows/implement-task.md
-  - tests/beads_task_episode_admission_extension.test.mjs
-  - tests/reviewed_plan_extension.test.mjs
-  - tests/task_episode_admission_extension.test.mjs
-  - tests/task_providers.test.mjs
-  - tests/test_future_plan_skills.py
-  - tests/test_global_asset_drift.py
-  - tests/test_prime_agent_plugin_install.py
-  - tests/test_reviewed_plan_extension.py
-  - tests/test_reviewed_plan_source_loader.py
-  - src/prime-agent-plugin/skills/implement-task/SKILL.md
-  - tests/fixtures/backlog-admission-config.yml
+  - .prime-claw/workflows/handoff.md
   - .prime-claw/workflows/implement-prep.md
   - .prime-claw/workflows/implement-spec.md
+  - .prime-claw/workflows/implement-task-prep.md
+  - .prime-claw/workflows/implement-task.md
+  - .prime-claw/workflows/plan-prep.md
+  - .prime-claw/workflows/plan-spec.md
+  - .prime-claw/workflows/plan-task-prep.md
+  - .prime-claw/workflows/plan-task.md
+  - AGENTS.md
+  - LONG_RANGE_PLAN.md
+  - README.md
+  - VISION.md
+  - docs/README.md
+  - docs/backlog.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/future-specification-bundles.md
+  - docs/handoff-chain.md
+  - docs/prep-chain.md
+  - docs/project-initialization.md
+  - docs/user-stories/A-installation.md
+  - docs/user-stories/B-project-initialization.md
+  - docs/user-stories/C-specification.md
+  - docs/user-stories/D-planning.md
+  - docs/user-stories/E-episode-promotion.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - docs/user-stories/README.md
+  - docs/user-stories/traceability.md
+  - scripts/test-tier1.sh
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/prep-chain.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extensions/handoff-chain.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/handoff/SKILL.md
+  - src/prime-agent-plugin/skills/implement-spec/SKILL.md
+  - src/prime-agent-plugin/skills/implement-task/SKILL.md
+  - src/prime-agent-plugin/skills/plan-spec/SKILL.md
+  - src/prime-agent-plugin/skills/plan/SKILL.md
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/design-legacy.md
+  - src/prime-agent-plugin/skills/project-templates/design.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
+  - src/prime-agent-plugin/workflows/handoff.md
   - src/prime-agent-plugin/workflows/implement-prep.md
   - src/prime-agent-plugin/workflows/implement-spec.md
+  - src/prime-agent-plugin/workflows/implement-task-prep.md
+  - src/prime-agent-plugin/workflows/implement-task.md
+  - src/prime-agent-plugin/workflows/plan-prep.md
+  - src/prime-agent-plugin/workflows/plan-spec.md
+  - src/prime-agent-plugin/workflows/plan-task-prep.md
+  - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/beads_task_episode_admission_extension.test.mjs
+  - tests/container/reviewed_plan_source_loader.mts
+  - tests/fixtures/backlog-admission-config.yml
+  - tests/handoff_chain_extension.test.mjs
+  - tests/reviewed_plan_extension.test.mjs
   - tests/spec_episode_extension.test.mjs
+  - tests/task_episode_admission_extension.test.mjs
+  - tests/task_providers.test.mjs
+  - tests/test_backlog_workflow.py
+  - tests/test_future_plan_skills.py
+  - tests/test_global_asset_drift.py
+  - tests/test_handoff_chain_extension.py
+  - tests/test_oversee_episode_skill.py
+  - tests/test_prime_agent_plugin_install.py
   - tests/test_project_initialization.py
-  - src/prime-agent-plugin/skills/implement-spec/SKILL.md
+  - tests/test_reviewed_plan_extension.py
+  - tests/test_reviewed_plan_source_loader.py
+  - tests/test_tier1_driver.py
 priority: p2
 type: feature
 ordinal: 136000
@@ -206,4 +250,24 @@ Use existing focused Docker suites and mandatory scripts/test-tier1.sh --probe a
 Invocation-cutover slice in progress (2026-10-31)
 
 Continuing the same approved PRIMECLAW-51 Episode after incremental acceptance of retained-folder parity. Runtime changes remove the five custom command registrations and their command-only adapters/parsers, keep structured planning/implementation/handoff operations, and preserve self-contained create/resource checks. Tool-origin steer, exactly one canonical follow-up, and explicit unconfirmed-delivery/no-retry wording are retained. Remaining global entry skills and actually loaded planning/handoff/oversight policy are being aligned with conditional operator authority and bounded delegated selection. Current docs and isolated discovery probes are being updated in parallel. Code changes are not yet committed, validated, or accepted; final Docker suites and mandatory Tier-1 probe are pending. Existing plan/specification/AC/status and resource ownership remain unchanged; no activation or lifecycle action is authorized by this progress note.
+
+Slice 3: invocation cutover published for Conversation review (2026-10-31)
+
+Code HEAD: 54801a963af97f5c1be6fc57cbda812960c3afba, non-force pushed and directly verified on origin/JLanders/prime-claw-primeclaw-51-episode-c8541422. One bounded invocation-cutover slice in this same Episode, following incremental acceptance of slices 1 and 2. This is a review candidate, not full-task acceptance or live activation. Status remains In Progress; original Description, Implementation Plan and all eight unchecked acceptance criteria remain unchanged.
+
+Delivered: removed all five Prime Claw custom command registrations (plan, plan-spec, implement-task, implement-spec, handoff) and command-only adapters/parsers. Existing plan_task, plan_spec, implement_task, implement_spec, ralph_handoff and lifecycle tools remain. Structured implementation arguments no longer round-trip through command strings. Added thin globally discoverable plan, plan-spec and handoff skills through existing inventory-managed global delivery, completing the five entry skills without another installer. Existing inventory IDs, customizable workflow destinations and supported old-layout handoff/execute fallback are unchanged. Canonical project workflows remain the detailed policy authority rather than being duplicated into entry skills.
+
+Actual loaded source and customized builder planning/prep/completion, implementation, handoff, authoring and oversight guidance now agree: Markdown interprets explicit conditional plan-then-implement authority and bounded delegated selection, planning alone does not authorize implementation, exact task binding precedes native operations, and implementation requires native In Planning after design/planning plus semantic readiness. Native tools retain concrete identity/state/readiness/placement/ownership/resource checks without invocation receipts, content-revision approval locks, classifiers or framework state. Accepted self-contained task/retained create paths, current digest/frozen-spec integrity, exact source-absent retained replay without assignment, stable host/no-silent-fallback and fixed single execute assignment remain intact. Planning/handoff delivery uncertainty now reports unconfirmed transport, not false non-admission; sole-follow-up and no-auto-retry rules remain. Prime Agent built-ins and native /skill: are not changed by this plugin cutover.
+
+Updated current product docs/user stories, Backlog skill guidance, isolated discovery probes and focused tests. All builder baseline hashes, customization states, accepted overrides and provenance remain unchanged; only exact changed installed/upstream SHA256 fields were advanced. Existing inventory rows are byte-for-byte unchanged in parsed data; only global-plan, global-plan-spec and global-handoff entries were added. Oversight guide stays within the existing 1800-word ceiling and its complete nine-test policy module passes.
+
+Final validation (plugin/runtime behavior Docker-only, supported read-only cwd-fix-v0.9.8-r1 source selection unchanged):
+- scripts/test-tier1.sh --probe: PASS on final plugin source, immutable-image/network isolation/teardown/manifest publication verified. Evidence .test-results/20261031T202744Z-19046-bf3e0317/tier1; log .test-results/primeclaw-51-slice3-probe.log.
+- python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_handoff_chain_extension.py tests/test_task_providers.py tests/test_project_initialization.py tests/test_prime_agent_plugin_install.py tests/test_global_asset_drift.py -q -m container tests/test_reviewed_plan_source_loader.py: 60 passed, 32 deselected, on final plugin/source/test bytes. Log .test-results/primeclaw-51-slice3-container-final.log. Covers command absence, replacement tool-origin chains/steer/sole follow-up/uncertainty, provider/placement/ownership/retained integrity/replay/close safeguards, fresh-session publication, native tool and /skill: discovery, initialization/delivery/install, and supported source-loader. Plugin source hashes are unchanged between mandatory probe, final Docker snapshot and publication.
+- python3 -m pytest tests/ -q: 690 passed, 12 baseline failures, 94 skipped, 104 subtests passed. Failed-node set exactly equals the recorded pre-cutover/slice-2 twelve, with no candidate-only failure. Log .test-results/primeclaw-51-slice3-tier0-verified.log. No unrelated baseline/config/customization repair was made.
+- Final evidence-only traceability update subsequently passed its affected host-safe doc checks: 7 passed, 17 deselected. git diff --check passed. Final full container suite was not run.
+
+Bounded validation repairs: initial static sweep found four stale doc/wording expectations plus oversized guide; guide shortening exposed two more existing phrase checks, all repaired without raising ceilings or weakening authority/resource checks. A later old Backlog-skill command-presence assertion was updated with positive replacement-operation/conditional-authority checks. Initial focused Docker run had 58 passed / 1 failed / 32 deselected; sole failure was an obsolete exact installed-skill set omitting the three new skills. Corrected that test-only set, then the final 60-bridge run above passed. No plugin runtime defect or testing-harness/Prime Agent change was needed.
+
+Coverage limits and next boundary: discovery verifies installed native skills/tools, absence of the five custom commands, and representative built-in-name nonshadowing; get_commands does not enumerate built-ins, so actual native built-in command execution is not claimed. Existing semantic planning/readiness and live cutover evidence gaps remain explicit in user-story traceability. No full acceptance criterion is marked complete by this slice. Stop for owning Conversation review of this exact pushed candidate and separate native task publication. No candidate host/global apply/check/probe, merge/rebase, activation/restart, migration/retirement/deletion, cleanup, new Episode, second assignment or task lifecycle mutation occurred. Separate accepted-main refresh, coordinated full restart and retained-resource owner/Episode/ordinary-session UAT remain separately authorized work, not completion of this Episode slice.
 <!-- SECTION:NOTES:END -->
