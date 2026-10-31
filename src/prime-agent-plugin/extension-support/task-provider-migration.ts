@@ -175,6 +175,21 @@ interface BacklogSnapshot {
   counts: { open: number; closed: number; archived: number; total: number };
 }
 
+interface BeadsMemoryRow {
+  _type: "memory";
+  key: string;
+  value: string;
+}
+
+type BeadsExportEntry =
+  | { kind: "issue"; row: JsonObject; line: string }
+  | { kind: "memory"; row: BeadsMemoryRow; line: string };
+
+interface BeadsMemoryPackage {
+  exportRow: BeadsMemoryRow;
+  exportLineBase64: string;
+}
+
 interface BeadsTaskPackage {
   sourceTaskId: string;
   classification: "open" | "closed" | "archived";
@@ -197,6 +212,7 @@ interface BeadsSnapshot {
   revision: string;
   digest: string;
   tasks: BeadsTaskPackage[];
+  memories: BeadsMemoryPackage[];
   counts: { open: number; closed: number; archived: number; total: number };
 }
 
@@ -514,12 +530,20 @@ function jsonCommand(runner: CommandRunner, command: string, args: string[], cwd
 }
 
 /** Complete migration inventory without source configuration changes or SQL. */
-export function completeBeadsExport(runner: CommandRunner, projectRoot: string, label: string): Array<{ row: JsonObject; line: string }> {
+export function completeBeadsExport(runner: CommandRunner, projectRoot: string, label: string): BeadsExportEntry[] {
   const result = runRequired(runner, "bd", ["--readonly", "export", "--all"], projectRoot, `${label} complete export`);
-  const exported = result.stdout.split(/\r?\n/).filter((line) => line.trim() !== "").map((line) => ({
-    line,
-    row: asObject(parseJson(line, `${label} export row`), `${label} export row`),
-  }));
+  const exported = result.stdout.split(/\r?\n/).filter((line) => line.trim() !== "").map((line): BeadsExportEntry => {
+    const row = asObject(parseJson(line, `${label} export row`), `${label} export row`);
+    // Native typed issues and supported older untagged issues share identity
+    // checks. Only native memory records are exempt; unknown types must refuse.
+    if (!Object.hasOwn(row, "_type") || row._type === "issue") return { kind: "issue", row, line };
+    if (row._type !== "memory") throw new Error(`${label} export row has unsupported native record type`);
+    if (canonical(Object.keys(row).sort()) !== canonical(["_type", "key", "value"])
+        || typeof row.key !== "string" || !row.key || typeof row.value !== "string") {
+      throw new Error(`${label} export row has malformed native memory record`);
+    }
+    return { kind: "memory", row: row as unknown as BeadsMemoryRow, line };
+  });
   const inventory = jsonCommand(
     runner,
     "bd",
@@ -529,7 +553,8 @@ export function completeBeadsExport(runner: CommandRunner, projectRoot: string, 
   );
   if (!Array.isArray(inventory)) throw new Error(`${label} independent issue inventory is not an array`);
   const inventoryIds = inventory.map((value) => exactTaskId(asObject(value, `${label} inventory row`).id, `${label} inventory row`)).sort();
-  const exportIds = exported.map(({ row }) => exactTaskId(row.id, `${label} export row`)).sort();
+  const exportIds = exported.filter((entry) => entry.kind === "issue")
+    .map(({ row }) => exactTaskId(row.id, `${label} export row`)).sort();
   if (new Set(inventoryIds).size !== inventoryIds.length || new Set(exportIds).size !== exportIds.length
       || canonical(inventoryIds) !== canonical(exportIds)) {
     throw new Error(`${label} export does not exactly match the independent native issue inventory`);
@@ -579,7 +604,11 @@ function captureBeads(
     "Beads source status catalog",
   );
   const exported = completeBeadsExport(runner, projectRoot, "Beads source");
-  const tasks = exported.map(({ line, row: exportRow }): BeadsTaskPackage => {
+  const memories = exported.filter((entry) => entry.kind === "memory").map(({ line, row }): BeadsMemoryPackage => ({
+    exportRow: row,
+    exportLineBase64: Buffer.from(line).toString("base64"),
+  }));
+  const tasks = exported.filter((entry) => entry.kind === "issue").map(({ line, row: exportRow }): BeadsTaskPackage => {
     const taskId = exactTaskId(exportRow.id, "Beads export row");
     const rawView = jsonCommand(runner, "bd", ["--readonly", "show", taskId, "--json", "--long", "--include-comments"], projectRoot, `bd show ${taskId}`);
     const views = Array.isArray(rawView) ? rawView : [];
@@ -611,11 +640,11 @@ function captureBeads(
     archived: tasks.filter((task) => task.classification === "archived").length,
     total: tasks.length,
   };
-  const digest = sha256(canonical({ sourceIdentity, sourceVersion, statusCatalog, tasks }));
+  const digest = sha256(canonical({ sourceIdentity, sourceVersion, statusCatalog, tasks, memories }));
   return {
     provider: "beads", projectRoot, evidence, sourceIdentity,
     sourceVersion, statusCatalog,
-    revision: `capture-sha256:${digest}`, digest, tasks, counts,
+    revision: `capture-sha256:${digest}`, digest, tasks, memories, counts,
   };
 }
 
@@ -1413,6 +1442,7 @@ function backlogSourcePackage(pkg: BeadsTaskPackage, source: BeadsSnapshot, sema
     sourceIdentity: source.sourceIdentity,
     sourceVersion: source.sourceVersion,
     statusCatalog: source.statusCatalog,
+    memories: source.memories,
     sourceTaskId: pkg.sourceTaskId,
     exportRow: pkg.exportRow,
     exportLineBase64: pkg.exportLineBase64,
@@ -2423,6 +2453,11 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     source = captureConfirmedSource(project.root, options.targetProvider, options.expectedSourceRevision, runner);
     if (source.provider === options.targetProvider) return blocked("same-provider", `the selected provider is already ${source.provider}`, "choose the other supported provider", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     if (source.revision !== options.expectedSourceRevision) return blocked("source-revision-changed", `confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`, "quiesce mutations, request a fresh inspection, and confirm that exact revision", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
+    // Capture is supported before readable native memory import is implemented.
+    // Never prepare/write a destination or retire a source by dropping memories.
+    if (source.provider === "beads" && source.memories.length > 0) {
+      return blocked("memory-import-not-implemented", "native Beads memory import as readable Backlog documents is not implemented", "preserve the authoritative Beads source; wait for native memory document/index/user-task import before confirming this migration", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
+    }
     const replayProjection = initialCodeStatus && source.provider === "beads" ? freshBacklogMigrationReplay(source, runner) : undefined;
     if (initialCodeStatus && !replayProjection) throw new Error(`source task history is not clean: ${initialCodeStatus.trim()}`);
     const verifyInitialProjection = replayProjection?.(project.root);

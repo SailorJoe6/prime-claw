@@ -321,21 +321,35 @@ runtime checks repeat beside the atomic ownership replacement and guarded
 source-deletion boundary. The existing ownership lock refuses deletion if the
 complete switched registry changes.
 
-The migration export helper reads `bd --readonly export --all` and compares its
-duplicate-free IDs with `bd --readonly list --all --limit 0 --include-infra
---include-templates --include-gates --include-ephemeral --json`. It does not
-require SQL or clear source export filters. A filter that actually omits an
-issue produces an inventory mismatch and leaves the source configuration
-unchanged. Beads source packages retain the raw CLI version and complete raw
-status-catalog response alongside issue views, unbounded issue history/events,
-and provenance. Migration-only source reads bind the native `context` and
+The migration export helper reads `bd --readonly export --all` as a native
+mixed export. Rows with `_type: "memory"` retain their original `key`, `value`
+and export line; only issues participate in the duplicate-free ID comparison
+with `bd --readonly list --all --limit 0 --include-infra --include-templates
+--include-gates --include-ephemeral --json`. Memories are not issues and are
+never sent to issue show/history/provenance commands or included in task counts.
+Malformed memory rows, unsupported record types and genuine invalid, duplicate
+or missing issues refuse inspection. The reader does not require SQL or clear
+source export filters. A filter that actually omits an issue produces an
+inventory mismatch and leaves the source configuration unchanged. Beads source
+packages retain the raw CLI version and complete raw status-catalog response
+alongside issue views, unbounded issue history/events, and provenance. Migration-only source reads bind the native `context` and
 `dolt show` store/database/connection identity. The confirmation revision is a
 `capture-sha256:` token over that identity, raw version/catalog, and complete
-issue/history packages, not a required outgoing published Dolt commit. The same
-capture is repeated from primary and active source workspaces through guarded
-retirement; task, catalog, history or identity drift refuses cutover. No source
+issue/history and memory packages, not a required outgoing published Dolt
+commit. A memory-only change also changes this revision. The same capture is
+repeated from primary and active source workspaces through guarded retirement;
+task, memory, catalog, history or identity drift refuses cutover. No source
 custom lifecycle setup, server conversion, remote, push or publication is
 required. Ordinary active Beads lifecycle/write checks remain strict.
+
+The current bounded capture increment does **not** yet import memories into
+Backlog documents. Inspection accepts valid memory rows, but confirmation with
+any memories refuses before destination preparation or writes, leaving Beads
+authoritative. The remaining PRIMECLAW-49 work must create and verify one native
+Backlog document per memory, one source/index document and exactly one USER
+curation task before this refusal can be removed. The user, not the migration
+agent, reviews and integrates useful material into project documentation or
+deletes unwanted imports. Zero-memory sources need none of these outputs.
 
 Before any Backlog destination preparation or write, the complete used-status
 inventory is checked with the existing projections. All unsupported-used statuses
@@ -386,6 +400,28 @@ resume state. The final destination-native receipt is the only durable
 migration artifact. Actual migration of a production repository remains an
 operator-authorized upgrade action; initialization and ordinary startup never
 perform it automatically.
+
+### PRIMECLAW-49 capture-slice regression
+
+The focused Docker bridge covers a public synthetic 33-issue/19-memory export,
+native typed issues and legacy untagged issues, malformed/incomplete inventories,
+and a small native memory fixture with Unicode, whitespace and frontmatter-like
+text. It checks memory-only value and raw-line digest changes, issue-only counts,
+no memory keys in issue reads, and refusal before destination writes/deletion.
+The existing populated Backlog bridge retains issue-only migration coverage.
+
+Reproduce with the verified supported Prime Agent source selector described in
+[`prime-agent-installation.md`](prime-agent-installation.md):
+
+```bash
+python3 -m pytest tests/test_task_provider_migration.py -q -m container -k "retiring_beads_source_boundary or populated_backlog_migration"
+scripts/test-tier1.sh --probe
+```
+
+The two focused selectors passed on the capture candidate (run separately after
+a concurrent disposable-builder setup failure). This is not proof of memory
+import, receipt/replay behavior for memory outputs, a live Nemo migration or
+host activation. Those remain later work under the existing operator boundaries.
 
 ## Global drift
 

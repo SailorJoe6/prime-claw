@@ -1449,6 +1449,143 @@ test("Beads export must exactly match independent native issue inventory", { tim
   assert.equal(existsSync(join(fixture.root, ".beads")), true);
 });
 
+// PRIMECLAW-49 capture slice: public data only, never the reported private store.
+function syntheticBeadsExport(rows, inventory) {
+  const calls = [];
+  return {
+    calls,
+    run(commandName, args) {
+      calls.push({ commandName, args: [...args] });
+      assert.equal(commandName, "bd");
+      if (JSON.stringify(args) === JSON.stringify(["--readonly", "export", "--all"])) {
+        return { status: 0, stdout: rows.map((row) => typeof row === "string" ? row : JSON.stringify(row)).join("\n") + "\n", stderr: "" };
+      }
+      assert.deepEqual(args, BEADS_INVENTORY);
+      return { status: 0, stdout: JSON.stringify(inventory), stderr: "" };
+    },
+  };
+}
+
+test("typed Beads export preserves 33 issues and 19 native memories with strict issue inventory", () => {
+  const issues = Array.from({ length: 33 }, (_, i) => ({ _type: "issue", id: `PUBLIC-${i + 1}`, title: `Public issue ${i + 1}`, status: "open" }));
+  const memories = Array.from({ length: 19 }, (_, i) => ({ _type: "memory", key: ` public-memory-${i} λ `,
+    value: i === 0 ? "" : `  ---\nstatus: not task metadata\n---\nPublic café 🐙 ${i}\n\ttrailing whitespace  \n` }));
+  const rows = [...issues.slice(0, 10), ...memories, ...issues.slice(10)];
+  // Native row bytes (including JSON whitespace) are evidence, not normalized text.
+  const lines = rows.map((row) => `  ${JSON.stringify(row)}  `);
+  const runner = syntheticBeadsExport(lines, issues);
+  const exported = completeBeadsExport(runner, "/public-synthetic", "public mixed fixture");
+  assert.equal(exported.length, 52);
+  assert.deepEqual(exported.filter(({ kind }) => kind === "issue").map(({ row }) => row), issues);
+  assert.deepEqual(exported.filter(({ kind }) => kind === "memory").map(({ row }) => row), memories);
+  assert.deepEqual(exported.map(({ line }) => line), lines);
+  assert.equal(runner.calls.length, 2, "helper performs only readonly export and independent inventory");
+  const issueOnly = completeBeadsExport(syntheticBeadsExport(issues, issues), "/public-synthetic", "public issue-only fixture");
+  assert.equal(issueOnly.length, 33);
+  assert.ok(issueOnly.every(({ kind }) => kind === "issue"));
+  const legacyIssues = issues.map(({ _type, ...row }) => row);
+  const legacy = completeBeadsExport(syntheticBeadsExport(legacyIssues, legacyIssues), "/public-synthetic", "legacy issue-only fixture");
+  assert.deepEqual(legacy.map(({ row }) => row), legacyIssues);
+  assert.ok(legacy.every(({ kind }) => kind === "issue"));
+});
+
+test("typed Beads export refuses malformed records and genuine issue identity omissions", () => {
+  const issue = { _type: "issue", id: "PUBLIC-1", title: "Public issue", status: "open" };
+  const memory = { _type: "memory", key: "public", value: "not an issue" };
+  for (const [name, rows, inventory, error] of [
+    ["missing issue ID", [{ _type: "issue", title: "missing" }, memory], [issue], /no exact canonical task ID/],
+    ["missing legacy issue ID", [{ title: "missing" }, memory], [issue], /no exact canonical task ID/],
+    ["malformed issue ID", [{ ...issue, id: "bad id" }, memory], [issue], /no exact canonical task ID/],
+    ["duplicate issue ID", [issue, memory, issue], [issue], /independent native issue inventory/],
+    ["missing exported issue", [memory], [issue], /independent native issue inventory/],
+    ["duplicate inventory ID", [issue, memory], [issue, issue], /independent native issue inventory/],
+    ["missing inventory ID", [issue, memory], [{}], /no exact canonical task ID/],
+    ["unknown type with valid issue ID", [{ ...issue, _type: "config" }], [issue], /unsupported.*type/],
+    ["null type", [{ ...issue, _type: null }], [issue], /unsupported.*type/],
+    ["memory missing value", [{ _type: "memory", key: "public" }], [], /malformed.*memory/],
+    ["memory nonstring value", [{ ...memory, value: { nested: true } }], [], /malformed.*memory/],
+    ["memory nonstring key", [{ ...memory, key: 7 }], [], /malformed.*memory/],
+    ["memory empty key", [{ ...memory, key: "" }], [], /malformed.*memory/],
+    ["memory with issue ID", [{ ...memory, id: issue.id }], [], /malformed.*memory/],
+    ["nonobject", [null], [], /not a JSON object/],
+  ]) {
+    assert.throws(() => completeBeadsExport(syntheticBeadsExport(rows, inventory), "/public-synthetic", name), error, name);
+  }
+});
+
+test("native Beads memory capture binds exact content and refuses confirmed import before destination writes", { timeout: 180_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "native-memory-capture");
+  const key = "public-memory-λ";
+  const value = "  ---\nstatus: not task metadata\n---\nPublic café 🐙\n\ttrailing spaces  \n";
+  bd(fixture.root, "remember", value, "--key", key);
+  bd(fixture.root, "remember", "Second public memory", "--key", "public-second-memory");
+  const sourceBefore = command(fixture.root, "bd", ["--readonly", "export", "--all"]);
+  const authorityBefore = sourceAuthorityFiles(fixture.root);
+  const codeBefore = git(fixture.root, "rev-parse", "HEAD");
+  class MemoryLineRunner extends AdmissionRunner {
+    constructor() { super(); this.padMemoryLines = false; }
+    run(commandName, args, options = {}) {
+      const result = super.run(commandName, args, options);
+      if (this.padMemoryLines && commandName === "bd" && args[0] === "--readonly" && args[1] === "export" && result.status === 0) {
+        return { ...result, stdout: result.stdout.split("\n").map((line) => line && JSON.parse(line)._type === "memory" ? `  ${line}  ` : line).join("\n") };
+      }
+      return result;
+    }
+  }
+  const runner = new MemoryLineRunner();
+  const exported = completeBeadsExport(runner, fixture.root, "native memory fixture");
+  const memories = exported.filter(({ kind }) => kind === "memory");
+  assert.deepEqual(memories.map(({ row }) => row).sort((a, b) => a.key.localeCompare(b.key)), [
+    { _type: "memory", key, value }, { _type: "memory", key: "public-second-memory", value: "Second public memory" },
+  ].sort((a, b) => a.key.localeCompare(b.key)));
+  for (const { row, line } of memories) assert.deepEqual(JSON.parse(line), row);
+  const inspect = () => inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  const first = inspect();
+  assert.equal(first.status, "ready", first.detail);
+  assert.deepEqual(first.taskCounts, { open: 3, closed: 0, archived: 0, total: 3 });
+  const issueReads = runner.reads.filter(({ args }) => ["show", "history", "provenance"].includes(args[1]));
+  assert.ok(issueReads.length > 0);
+  assert.ok(issueReads.every(({ args }) => Object.values(fixture.ids).includes(args[1] === "provenance" ? args[3] : args[2])),
+    "native memory keys must never enter task show/history/events/provenance");
+  assert.equal(inspect().sourceRevision, first.sourceRevision);
+  runner.padMemoryLines = true;
+  const rawLineChanged = inspect();
+  assert.equal(rawLineChanged.status, "ready", rawLineChanged.detail);
+  assert.notEqual(rawLineChanged.sourceDigest, first.sourceDigest, "original memory export line bytes remain snapshot digest evidence");
+  runner.padMemoryLines = false;
+  assert.equal(inspect().sourceRevision, first.sourceRevision);
+  bd(fixture.root, "remember", value + "\n", "--key", key);
+  const changed = inspect();
+  assert.equal(changed.status, "ready", changed.detail);
+  assert.notEqual(changed.sourceRevision, first.sourceRevision, "memory-only whitespace change changes exact revision");
+  assert.notEqual(changed.sourceDigest, first.sourceDigest);
+  assert.deepEqual(changed.taskCounts, first.taskCounts);
+  bd(fixture.root, "remember", value, "--key", key);
+  // Native writes may add history even after the exported value is restored.
+  // Confirm the current exact capture, never assume the old history returns.
+  const restored = inspect();
+  assert.equal(restored.status, "ready", restored.detail);
+  assert.equal(inspect().sourceRevision, restored.sourceRevision);
+  runner.calls = [];
+  let deletions = 0;
+  const result = await migrateTaskProvider({ cwd: fixture.root, targetProvider: "backlog", runner,
+    expectedSourceRevision: restored.sourceRevision, confirmedSwitch: true, actor: "public-memory-operator",
+    semanticPlacement: "Preserve every source value without curation.", deleteSource() { deletions += 1; } });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "memory-import-not-implemented");
+  assert.match(result.detail, /native Beads memor.*Backlog document.*not implemented/i);
+  assertNoAdmissionWrites(runner);
+  assert.equal(runner.calls.some(({ commandName }) => commandName === "backlog"), false,
+    "temporary slice refusal must precede even destination preparation/probes");
+  assert.equal(deletions, 0);
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+  assert.equal(existsSync(join(fixture.root, ".beads")), true);
+  assert.equal(command(fixture.root, "bd", ["--readonly", "export", "--all"]), sourceBefore);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), authorityBefore);
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), codeBefore);
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+});
+
 // PRIMECLAW-44 Slice 1g: inspection coexistence is NOT populated import permission.
 function admissionTree(path) {
   return Object.fromEntries(readdirSync(path, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
