@@ -4,7 +4,7 @@ title: Handle native Beads memory records in migration export inspection
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 18:01'
+updated_date: '2026-10-31 18:15'
 labels: []
 dependencies: []
 references:
@@ -84,7 +84,7 @@ This bug is Prime Claw work only. It does not reopen the closed PRIMECLAW-44 Epi
 - [x] #6 A confirmed migration creates one native Backlog document per Beads memory in .backlog/docs/ through the supported Backlog CLI, preserving the original memory key and value losslessly without rewriting, curating or treating it as an issue.
 - [x] #7 When at least one memory is imported, one additional Backlog document explains that the memories were migrated from Beads, identifies their source, and contains a working link to each imported memory document; it is created through the supported Backlog CLI.
 - [x] #8 When at least one memory is imported, exactly one user-facing Backlog task for the imported memory collection is created through the supported CLI and links to the index. It asks the user to integrate useful memories into the project documentation or delete unwanted imports; migration does not perform that user curation/deletion.
-- [x] #9 Memory documents, the index and the single user task are verified and published through the existing destination-native process before Beads source retirement; the original issue-ID/inventory checks remain intact and do not miscount these distinct destination outputs.
+- [ ] #9 Memory documents, the index and the single user task are verified and published through the existing destination-native process before Beads source retirement; the original issue-ID/inventory checks remain intact and do not miscount these distinct destination outputs.
 - [x] #10 A source export with zero memories produces no memory documents, no origin/index document and no memory-curation user task; supported issue-only migrations continue without empty memory outputs.
 <!-- AC:END -->
 
@@ -220,10 +220,18 @@ Actual validation, sequential Docker-only with TIER1_ENV_FILE=/var/folders/4_/tw
 - `git diff --check`: clean. Detailed helper report `/tmp/primeclaw49-confirmed-memory-integration-report.md`. Initial milestone timing727.87s was corrected to saved pytest677.17s; no rerun implied. Prior slices' intermediate failures/limits remain recorded, not erased.
 
 Remaining approved pipeline behavior now has end-to-end candidate evidence; AC3–10 checked on that basis. This is a review candidate, not a lifecycle completion/merge/activation claim. Status stays In Progress. No full-suite claim, independent broad review loop, live migration/Nemo/private access, operator curation/deletion, host/global apply/check/probe, deployment/restart, Prime Agent changes, reopening44, new framework/controller/ledger/receipt/classifier, automatic retry/repair or approval machinery. Existing single confirmation and maintenance-window authority remain required. Stop after publishing this clean candidate plus separate native evidence and notifying the owner.
+
+### Accepted integration review finding — committed memory publication proof
+
+Integration candidate 13fc90d4f40e918201cc33632183b253be40f9be is not accepted as complete. Independent review `/tmp/primeclaw49-confirmed-memory-integration-review.md` reproduced one material defect against AC9 and approved plan step4: a preserved committed destination `.gitignore` containing `docs/` allows local native memory/index readback to succeed while `git add -A` omits both document files. The candidate returned completed and retired its disposable Beads source although neither document existed in destinationDataRevision or destinationReceiptRevision. Clean Git status and matching remote HEAD proved publication of the commit, not publication of ignored output bytes. Reproduction log `/tmp/primeclaw49-confirmed-memory-publication-review-repro.log`; script `/tmp/primeclaw49-integration-review-repro/run-review.py`. Targeted Docker defect assertions passed in159.80s; this was not a suite rerun. Earlier focused2pass/probe evidence remains valid for its selected cases but did not detect this demonstrated publication defect. AC9 is reopened; prior all-AC/full-integration assertions are superseded by this finding, not completion evidence.
+
+Next pass is limited to repairing this accepted finding and its actual diff: at existing verified-commit publication/readback boundaries, prove each newly imported memory/index/USER native output path and exact bytes exists in the verified destination commit, not only local files. Reuse current native identities, existing revision/evidence and refusal boundaries. Absent/different committed blobs must block retirement/replay and preserve source/exact ownership. Native behavior first, then the smallest necessary read-only integrity check. Do not force-add files, modify ignore policy, automatically repair/retry or add a ledger/controller/classifier/receipt/protocol. Limit the proof to these newly imported outputs; no general Git-publication rewrite or reopening accepted capture/helper/path/PRIMECLAW-44 reviews.
+
+Extend one existing native fixture with the ignored-docs case and prove refusal with source intact. Retain normal published memory/replay/zero-memory behavior, lossless JSON/provenance/native links, one USER task, issue-only counts/mappings, unrelated baseline and active runtime/source/ownership protections. Run proportionate existing affected Docker selectors sequentially and mandatory tier1 --probe after source changes. Record actual failures/results and limits; publish one clean bounded repair candidate plus separate native task evidence, then stop for focused closure of this finding and actual repair diff only. No broad review gauntlet, live Nemo/private access/migration, user curation/deletion, global apply/check/restart/deploy, Prime Agent changes, lifecycle status change or merge. Status stays In Progress.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Candidate 13fc90d4f40e918201cc33632183b253be40f9be completes approved confirmed-memory integration: CLI-native memory docs/index/one USER task join existing publication/readback/path/digest/single receipt and retirement checks; exact replay reuses identities, zero memories creates no outputs, source issue mappings/counts stay separate. Focused Docker 2 passed/7 deselected in677.17s (18+9 native tests/subtests); final tier1 probe exit0. All ten AC supported by candidate evidence. In Progress pending owner review; no merge/activation/live migration or full-suite claim.
+Integration candidate 13fc90d4f40e918201cc33632183b253be40f9be requires one narrow AC9/plan-step4 repair: committed destination ignore policy can omit native memory/index files while local readback and clean published Git proofs pass. Independent disposable Docker reproduction retired source without document blobs in either verified commit. AC9 reopened; candidate not accepted complete. Next: exact committed path/byte proof for newly imported memory/index/USER outputs at existing boundaries, ignored-docs refusal regression, proportionate Docker tests/probe, one bounded repair. Existing selected 2pass/probe evidence is not proof against this defect. In Progress; no merge/activation/live migration authority.
 <!-- SECTION:FINAL_SUMMARY:END -->
