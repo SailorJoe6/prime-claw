@@ -200,10 +200,10 @@
       "source": "workflows/plan-task.md",
       "destination": ".prime-claw/workflows/plan-task.md",
       "baselineSha256": "9524ef2f0881b21a6d5cf5c93c21d3af7a386b847d0cdb48fe33f4c57ca9646f",
-      "installedSha256": "9524ef2f0881b21a6d5cf5c93c21d3af7a386b847d0cdb48fe33f4c57ca9646f",
+      "installedSha256": "2f6ce50fcbbbc7ee00aa9cc57aa87ec4d98922f311ea077a1219c30b16365a5d",
       "acceptedOverrideSha256": null,
       "availableUpstreamSha256": "9524ef2f0881b21a6d5cf5c93c21d3af7a386b847d0cdb48fe33f4c57ca9646f",
-      "state": "managed",
+      "state": "customized",
       "provenance": {
         "scope": "project",
         "exposure": "internal",
