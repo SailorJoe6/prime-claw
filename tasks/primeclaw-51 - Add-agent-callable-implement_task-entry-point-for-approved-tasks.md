@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Progress
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 20:12'
+updated_date: '2026-10-31 20:18'
 labels: []
 dependencies: []
 references:
@@ -202,4 +202,8 @@ The owning Conversation accepted retained-folder parity slice 2 as an incrementa
 Next bounded execute focus: remaining invocation cutover. Remove the five custom command registrations/adapters. Add the remaining thin globally discoverable plan, plan-spec and ordinary handoff entry skills by reusing existing tools. Align actually loaded planning/handoff/oversight guidance and relevant docs/probes/tests with skill-owned conditional authority and bounded delegated selection. Load canonical phase policy instead of copying detailed procedures into entry skills. Preserve accepted self-contained task/retained creation, stable customizable internal workflow IDs and supported fallback, all provider/identity/state/readiness/placement/ownership/resource safeguards, Prime Agent built-ins/native /skill:, and admission-versus-completion/sole-follow-up/uncertainty behavior. Do not introduce replacement approval tokens, receipts, classifiers or a broad framework.
 
 Use existing focused Docker suites and mandatory scripts/test-tier1.sh --probe after plugin-source changes. Report truthful full-task coverage and remaining gaps/baseline failures without fixing unrelated scope. Publish clean pushed code and native task progress, then stop for Conversation review. No candidate host/global apply/check/probe, merge, activation, restart, migration/retirement, cleanup or new Episode. Product scope, specification, plan, AC and In Progress status remain unchanged.
+
+Invocation-cutover slice in progress (2026-10-31)
+
+Continuing the same approved PRIMECLAW-51 Episode after incremental acceptance of retained-folder parity. Runtime changes remove the five custom command registrations and their command-only adapters/parsers, keep structured planning/implementation/handoff operations, and preserve self-contained create/resource checks. Tool-origin steer, exactly one canonical follow-up, and explicit unconfirmed-delivery/no-retry wording are retained. Remaining global entry skills and actually loaded planning/handoff/oversight policy are being aligned with conditional operator authority and bounded delegated selection. Current docs and isolated discovery probes are being updated in parallel. Code changes are not yet committed, validated, or accepted; final Docker suites and mandatory Tier-1 probe are pending. Existing plan/specification/AC/status and resource ownership remain unchanged; no activation or lifecycle action is authorized by this progress note.
 <!-- SECTION:NOTES:END -->
