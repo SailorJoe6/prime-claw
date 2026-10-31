@@ -342,7 +342,7 @@ task, memory, catalog, history or identity drift refuses cutover. No source
 custom lifecycle setup, server conversion, remote, push or publication is
 required. Ordinary active Beads lifecycle/write checks remain strict.
 
-The native memory-output helper creates one Backlog document per memory, one
+Confirmed migration creates one native Backlog document per memory, one
 source/index document and exactly one USER curation task through the supported
 Backlog CLI. Memory documents keep readable source text plus the complete escaped
 native JSON record for exact key/value round-trip, including whitespace, Unicode
@@ -356,15 +356,17 @@ and verifies that every captured memory/index path still contains the same
 native document. Native moves that leave stale index or USER task links refuse;
 a successful missing-document CLI exit alone is not proof.
 
-This helper is tested in disposable fixtures but is **not yet enabled in the
-confirmed migration**. Inspection accepts valid memory rows, but confirmation
-with any memories still refuses without live destination data mutation or source
-retirement, leaving Beads authoritative. An existing destination may receive
-harmless read-only capability, task and archive verification before that refusal.
-The remaining PRIMECLAW-49 work must integrate these outputs with the existing
-destination publication, digest, single receipt, pre-retirement and replay proofs
-before removing the refusal. Native helper readback alone does not prove those
-migration-wide guarantees.
+These outputs are part of the existing destination data commit and publication,
+exact native readback, destination digest and single migration receipt. Source
+issue counts/mappings stay issue-only; the optional USER task is counted
+separately. Post-receipt and pre-retirement checks repeat the document/path/task
+proofs and exact destination publication. Missing, changed or unpublished outputs
+block source retirement. An exact-source same-destination replay reuses the native
+identities in that receipt; it does not create duplicate imports, index or USER
+work. An incomplete memory import without complete receipt-bound output evidence
+remains a blocker, not permission for automatic retry, repair or a second destination.
+Beads stays authoritative until all destination, source, runtime and ownership
+proofs succeed. Imported text is data, not instructions to execute.
 
 Before any Backlog destination preparation or write, the complete used-status
 inventory is checked with the existing projections. All unsupported-used statuses
