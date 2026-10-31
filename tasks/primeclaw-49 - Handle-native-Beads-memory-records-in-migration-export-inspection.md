@@ -4,7 +4,7 @@ title: Handle native Beads memory records in migration export inspection
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 16:15'
+updated_date: '2026-10-31 16:29'
 labels: []
 dependencies: []
 references:
@@ -138,6 +138,14 @@ Validation (Docker-only, verified supported TypeScript dependency source selecto
 - `git diff --check`: clean. Intermediate runs exposed a concurrent disposable-builder setup failure, a native issue-tag classifier omission (fixed), and an invalid fixture assumption that restoring a memory value restores its native history/revision (corrected by reconfirming current exact source). No integrity rule was weakened.
 
 Remaining: implement approved native Backlog memory documents, source/index and exactly one USER curation task, then destination readback/publication/digest/receipt/pre-cutover/replay verification and zero-memory output assertions. Keep the early memory-import refusal until those outputs are complete. AC 1–2 checked for this capture slice; remaining criteria are not claimed. No live migration, Nemo mutation, global apply, restart, merge, source retirement or user memory curation occurred. Status remains In Progress. The implementation plan remains the full approved plan, with this note recording its bounded progress.
+
+### Accepted capture candidate and next bounded slice
+
+Owner accepted capture candidate 958b9752571f64faab3cc8871d90da5bd3ba0110 after independent read-only review found no material capture-slice defect. Continue the approved native plan with lossless CLI-native memory documents, one source/index document and exactly one USER integrate/delete task; zero memories produces none. Extend existing destination publication/readback/digest/single-receipt/pre-retirement/replay proofs, not the lifecycle. Keep memory-bearing confirmation safely refused until those outputs and proofs are complete; use bounded slices as needed.
+
+Accepted nonblocking reporting correction: the earlier statement “before any Backlog command” is too broad for an existing destination. Coexistence may perform harmless read-only capability/task/archive verification before refusal. The actual protection is no live destination data mutation or source retirement. Do not reorder guards solely to forbid those reads.
+
+Preserve honest intermediate-failure reporting and Docker-only tests/probe after source changes. Prefer native behavior and the smallest necessary integrity changes; no new frameworks, ledger/controller/receipt/retry protocol or speculative hardening. No live Nemo migration/edits, user curation/deletion, global deployment/restart, Prime Agent changes or reopening PRIMECLAW-44. Return a published bounded candidate and native task evidence; the owner retains lifecycle decisions.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
