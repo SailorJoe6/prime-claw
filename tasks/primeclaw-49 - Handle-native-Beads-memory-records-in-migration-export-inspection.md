@@ -4,7 +4,7 @@ title: Handle native Beads memory records in migration export inspection
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 17:02'
+updated_date: '2026-10-31 17:14'
 labels: []
 dependencies: []
 references:
@@ -168,10 +168,18 @@ Validation (sequential Docker-only; exact supported source selector TIER1_ENV_FI
 - Publication preparation initially tried pull/rebase with unstaged slice files; Git refused without changes. Committed the bounded slice, then pull/rebase succeeded with branch already current.
 
 Next: integrate returned outputs with existing destination publication/readback/digest/single receipt/pre-retirement/replay proofs and optional user-task count; reuse native identities on exact-source same-destination replay. Keep confirmation refused until all proofs/regressions pass. No new ledger/controller/receipt/retry protocol. No live migration/source retirement, Nemo reads/edits, curation/deletion, global deployment/restart, Prime Agent development or reopening PRIMECLAW-44. Status remains In Progress; full approved plan retained. Stop after publishing this bounded candidate.
+
+### Accepted slice 2 review finding — narrow path-verification revision
+
+Candidate 811586364ce92d46366f110bb0815db4a8a829e5 requires one in-scope repair before acceptance. Independent read-only review found that `verifyBacklogMemoryOutputs` rereads by document ID/body but ignores captured paths used by the index and USER task. In a disposable Docker reproduction, supported `backlog doc update <id> --path relocated --content=<unchanged body>` removed the original memory document path while the index still linked to it; verification incorrectly accepted. Moving the index also accepted although the USER task still pointed at its missing path. This demonstrates a material defect against approved plan step2 working links and step3 actual index path. Review report `/tmp/primeclaw49-memory-outputs-review.md`; reproduction `/tmp/primeclaw49-memory-outputs-review-repro.log` (154.71s; not a suite rerun).
+
+Next pass is limited to this accepted finding and its actual repair diff: in the existing readback, verify every captured memory/index path resolves to the same native document and body, refusing missing/moved/mismatched paths through the existing error boundary. Prefer supported native behavior, otherwise the smallest read-only integrity check. Add one focused native-move regression covering both memory document and index. No automatic link repair, ledger/controller/classifier/receipt/retry protocol, speculative hardening or broad review gauntlet.
+
+Preserve lossless content, exact native identities, zero-memory no-op, one USER task and accepted capture. Keep top-level memory-import-not-implemented refusal intact and defer publication/digest/single-receipt/pre-retirement/replay integration. Record truthful evidence; run proportionate affected Docker tests and mandatory tier1 --probe after source changes, publish one clean bounded code repair and task-only evidence, report the owner, then stop. No live migration/Nemo edits, curation/deletion, deployment/restart/global apply, Prime Agent development, reopening PRIMECLAW-44, lifecycle status change or merge. Status remains In Progress; AC1–2 only checked. Earlier slice2 green tests did not detect this demonstrated path defect; do not describe the candidate as accepted or working-link readback as complete until the repair is proven.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Bounded slices1–2 only: typed capture at 958b975 and native memory document/index/one USER task writer with exact readback at 811586364ce92d46366f110bb0815db4a8a829e5. Final slice2 Docker bridges: 2 passed, 7 deselected; mandatory tier1 probe exit0. Native helper is not enabled by confirmed migration. Memory-bearing confirmation stays safely refused while existing publication/digest/single-receipt/pre-retirement/replay integration remains pending. Full task not complete; AC1–2 only checked.
+Bounded slices1–2 only: typed capture at 958b975 and native memory document/index/one USER task writer with exact readback at 811586364ce92d46366f110bb0815db4a8a829e5. Final slice2 Docker bridges: 2 passed, 7 deselected; mandatory tier1 probe exit0. Native helper is not enabled by confirmed migration. Memory-bearing confirmation stays safely refused while existing publication/digest/single-receipt/pre-retirement/replay integration remains pending. Full task not complete; AC1–2 only checked. Known material slice2 review defect: ID/body readback ignores moved captured paths and can accept broken index/USER links. Narrow path-verification repair plus native-move regression is required next; do not advance migration integration yet.
 <!-- SECTION:FINAL_SUMMARY:END -->
