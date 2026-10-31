@@ -6,7 +6,7 @@ title: >-
 status: In Design
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 14:50'
+updated_date: '2026-10-31 17:38'
 labels: []
 dependencies: []
 references:
@@ -58,7 +58,7 @@ Installed diagnostic locations were `~/.prime/agent/extension-support/project-in
 
 ## Required outcome
 
-Capture complete valid large histories and events without a fixed per-command size ceiling, subject to available resources, without truncation or silent omission. Merely raising a fixed output-buffer cap is not sufficient. Resource failures must remain explicit and fail safely with source authority intact; this is not a promise of unlimited memory or storage. Preserve all existing tasks, history, configuration and provenance. Per-task full in-memory output capture is an implementation choice, not a universal migration requirement. Choose the smallest sound repair; this specification does not prescribe a new architecture or an implementation plan.
+Capture complete output for all native Beads source reads used by migration, including export, inventory, task views, history, events and provenance, without a fixed per-command size ceiling, subject to available resources, without truncation or silent omission. Merely raising a fixed output-buffer cap is not sufficient. Resource failures must remain explicit and fail safely with source authority intact; this is not a promise of unlimited memory or storage. Preserve all existing tasks, history, configuration and provenance. Per-task full in-memory output capture is an implementation choice, not a universal migration requirement. Choose the smallest sound repair; this specification does not prescribe a new architecture or an implementation plan.
 
 Distinguish command transport/output-limit failures from malformed or incomplete native data. Diagnostics must be bounded and actionable: identify the failed command and available error code/status/signal without dumping private task history. Empty stderr and null status must not erase ENOBUFS. Do not recommend trimming history, changing task statuses, or repairing otherwise readable source data to work around this transport bug.
 
@@ -77,7 +77,7 @@ Ticket creation authorizes no implementation, live Ralph command/retry/migration
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Complete native history and event capture has no fixed per-command size ceiling, subject to available resources, and never truncates or silently omits data; merely raising a fixed buffer cap is insufficient. A synthetic case representing the reported 1,305,475-byte, 108-record history verifies complete retention; resource failure remains explicit and safe.
+- [ ] #1 Complete output capture for all native Beads source reads used by migration (including export, inventory, task views, history, events and provenance) has no fixed per-command size ceiling, subject to available resources, and never truncates or silently omits data; merely raising a fixed buffer cap is insufficient. A synthetic case representing the reported 1,305,475-byte, 108-record history verifies complete retention; resource failure remains explicit and safe.
 - [ ] #2 Output-limit/transport failures remain distinct from invalid JSON or incomplete native data; ENOBUFS is identifiable even with empty stderr and null status, with available command/code/status/signal metadata retained.
 - [ ] #3 Failure diagnostics have a bounded size and do not dump private native task/history payloads or advise repairing readable source data for a command-capture failure; ordinary command-error diagnostics remain useful.
 - [ ] #4 When complete capture is not proven, inspection fails safely without destination writes or source mutation/retirement; existing preservation, identity, stable capture, quiescence, ownership, publication, receipt and explicit cutover/deletion safeguards remain intact.
