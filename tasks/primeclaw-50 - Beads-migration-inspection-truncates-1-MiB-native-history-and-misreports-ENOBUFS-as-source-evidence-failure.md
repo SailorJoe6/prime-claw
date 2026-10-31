@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 20:19'
+updated_date: '2026-10-31 20:43'
 labels: []
 dependencies: []
 references:
@@ -169,6 +169,16 @@ Fresh canonical main and direct remote refs/heads/main both resolved to 2e337759
 Accepted PRIMECLAW-49 native memory capture/import, exact output publication/receipt proofs, pre-retirement checks, replay guards, docs/skill text and regressions are included. This task's file-backed capture/bounded diagnostics remain present. A read-only independent preservation audit is running; it grants no new scope.
 
 Integrated-generation documented focused Docker command is running, including the complete migration suite with accepted native-memory regressions: python3 -m pytest tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_project_initialization.py::test_project_initialization_node_suite tests/test_beads_retiring_source_capture.py -q -m container. TIER1_ENV_FILE=/tmp/primeclaw50-tier1.env; log /tmp/primeclaw50-integrated-focused.log. Required tier1 --probe and full-container validation follow. Old green results do not validate this tree. Historical 83 passed/2 failed/1 skipped and exact baseline reproductions remain as recorded, not repaired. Status remains In Progress. No merge into main, foreign resource mutation, host/global activation or live migration occurred.
+
+### Integrated focused suites and mandatory probe passed; full suite running
+
+Unchanged integration commit 6742ae7c86303f905127bbe9a0fa9891998e9399, main parent 2e3377593f6a281feaed209c90bb1d53838d81ab.
+- Documented focused command: 3 passed in 1366.28s; log /tmp/primeclaw50-integrated-focused.log, evidence .test-results/20261031T201847Z-88738-fafc27f9/tier1. Complete migration TAP: 62 tests/subtests, 50 passed, 12 existing skips, 0 failures. Includes PRIMECLAW-49 typed memory export/capture/native output, ignored/unpublished memory publication refusals, changed/missing output replay refusals, pre-retirement rollback and preserved populated destinations, alongside PRIMECLAW-50 large-history/events and safe-diagnostic cases. Focused manifest confirms teardown clean/absent.
+- Required scripts/test-tier1.sh --probe: exit 0, manifest status passed with no failure codes, clean absent teardown and publication. Log /tmp/primeclaw50-integrated-probe.log, evidence .test-results/20261031T204145Z-63573-7cd9a593/tier1.
+- Full python3 -m pytest tests/ -q -m container is now running on unchanged integrated bytes; log /tmp/primeclaw50-integrated-full.log. No full-suite result or merge readiness is claimed.
+- Read-only independent integrated-preservation-audit (01a1939d-257a-7055-9add-badaf303367e) found no material in-scope integration regression against both parents. Native memory source digest, native outputs, committed blobs, receipt/replay/retirement guards and default migrationRunner path retained; both regression sets/docs intact. Static audit only, not test evidence. Observed idle/non-streaming/no queues, then removed.
+
+TIER1_ENV_FILE=/tmp/primeclaw50-tier1.env continues to select the previously verified read-only source. No host/global plugin change, live migration/data access, foreign ownership/resource mutation or lifecycle change. Historical pre-integration full-suite failures remain recorded, not repaired. Candidate publication and exact final code/task heads follow actual full-suite completion, then this Episode stops for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
