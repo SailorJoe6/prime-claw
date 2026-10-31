@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Progress
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 19:46'
+updated_date: '2026-10-31 20:06'
 labels: []
 dependencies: []
 references:
@@ -36,6 +36,14 @@ modified_files:
   - tests/test_reviewed_plan_source_loader.py
   - src/prime-agent-plugin/skills/implement-task/SKILL.md
   - tests/fixtures/backlog-admission-config.yml
+  - .prime-claw/workflows/implement-prep.md
+  - .prime-claw/workflows/implement-spec.md
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/workflows/implement-prep.md
+  - src/prime-agent-plugin/workflows/implement-spec.md
+  - tests/spec_episode_extension.test.mjs
+  - tests/test_project_initialization.py
+  - src/prime-agent-plugin/skills/implement-spec/SKILL.md
 priority: p2
 type: feature
 ordinal: 136000
@@ -168,4 +176,22 @@ The owning Conversation accepted slice 1 as an incremental candidate, not full-t
 Next bounded execute slice: retained-folder parity. Add implement_spec(location, optional stable host) tool-origin entry and discoverable global skill; make create_spec_episode self-contained without the remaining legacy invocation-proof ImplementationApproval map. Capture the current implementation-ready bundle digest at the concrete create boundary and retain the existing capture/promotion/post-copy integrity checks, grandfathered frozen-specification verification and meaningful-plan checks. Check exact active version-1 replay before requiring an obsolete future source; source-absent replay must return the same resources with no execute assignment. Preserve placement, explicit stable host/no silent fallback, ownership/resource safety, stable customizable workflow IDs and retained .ralph/skills lookup support.
 
 Do not add tokens, receipts, approval classifiers or binding frameworks. Do not migrate, retire, delete or recreate retained work. Keep command removals, other global entry skills and complete policy/docs/probe alignment pending unless this slice needs a proportionate related change. Validate changed plugin source only through Docker and the mandatory Tier-1 probe. Publish truthful native task evidence and one clean pushed code slice, then stop for Conversation review. No host/global candidate apply/check/probe, merge, activation, restart, cleanup, new Episode or second assignment. This task remains In Progress; product scope, plan and AC remain unchanged.
+
+Slice 2: retained-folder parity published for Conversation review (2026-10-31)
+
+Code HEAD: 8dfe2077a4a9e4041a927a6183371586487347e9, non-force pushed and directly verified on origin/JLanders/prime-claw-primeclaw-51-episode-c8541422. One bounded retained-folder parity slice on the same Episode; no new Episode, assignment, lifecycle publication, migration, activation, or resource cleanup. This is not completion of PRIMECLAW-51. Status remains In Progress and original specification, plan and eight unchecked acceptance criteria remain unchanged.
+
+Delivered: structured implement_spec(location, host?) routes tool-origin steer plus one canonical implementation-readiness follow-up; global inventory-managed implement-spec entry skill; self-contained create_spec_episode(location, host?) without the remaining ImplementationApproval map, skip-next-agent-end or approval-expiry hooks. Fresh creation captures the current readable meaningful-plan/frozen-spec bundle digest for existing capture/promotion/post-copy integrity checks rather than accepting a caller-supplied invocation digest. Exact active retained ownership is checked before obsolete source lookup, including source-absent replay; the same verified resources return without another execute assignment. Entry and create retain explicit stable host/no silent fallback, placement cancellation/refusal, assertConversationPromotionReady, ownership/resource and frozen-spec safeguards. Orca inventory delegates to existing strict missing-only task-placement lookup so malformed/runtime failures cannot silently select local fallback. No tokens, receipts, approval classifier or binding framework added.
+
+Loaded source and builder implement-prep/spec policies now keep semantic/conditional authority in Markdown, carry the selected stable host as factual operation data, and describe direct create/replay boundaries. Workflow IDs and builder customized states/historical baseline hashes remain; only exact changed installed/upstream hashes were updated. Supported existing .ralph/skills snapshot fallback was preserved unchanged (not expanded to retained implementation entry). Added focused Node regressions and narrow retained-entry docs in README.md, docs/prep-chain.md and docs/user-stories/E-episode-promotion.md, plus discovery/install/inventory coverage.
+
+Validation evidence (plugin/runtime behavior Docker-only; supported read-only cwd-fix-v0.9.8-r1 source identity unchanged):
+- scripts/test-tier1.sh --probe: PASS on final plugin bytes; immutable image, network isolation, checks, teardown and manifest publication verified. Evidence .test-results/20261031T195205Z-94898-4f48af54/tier1; log .test-results/primeclaw-51-slice2-probe.log.
+- python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_task_providers.py tests/test_project_initialization.py tests/test_prime_agent_plugin_install.py tests/test_global_asset_drift.py tests/test_reviewed_plan_source_loader.py -q -m container: 54 passed, 1 failed, 28 deselected. The passing bridges cover reviewed-plan/tool admission, retained fresh/replay/integrity/placement/uncertainty, task ownership/close, Backlog admission/provider resolution, real fresh-session publication, native tool discovery, initialization/global skill discovery, install/delivery, and supported source-loader. Sole failure was an obsolete Beads test-only call to the removed agent_end hook; no plugin defect. Replaced that call with an assertion that the hook is absent. Log .test-results/primeclaw-51-slice2-container-final.log.
+- python3 -m pytest tests/test_task_providers.py::test_beads_task_episode_admission_node_suite -q -m container: 1 passed on corrected final test bytes; all Beads admission cases passed. Log .test-results/primeclaw-51-slice2-beads-final.log. No plugin source changed after either passing snapshot.
+- python3 -m pytest tests/ -q: 680 passed, 12 failed, 91 skipped, 75 subtests passed. The failed-node set exactly matches the 12 recorded slice-1/baseline failures, with no candidate-only failed node. Log .test-results/primeclaw-51-slice2-tier0-last.log. Last subsequent edit was only the obsolete Node test call noted above; no host plugin runtime execution.
+- Focused host-safe delivery/policy checks: 35 passed, 3 unrelated baseline checks deselected. git diff --check passed. Full container suite was not run.
+- Initial concurrent container attempt did not execute fixture tests: source-builder image ID was absent at inspection (read-only docker image inspect confirmed No such image); receipt showed no builder allocation and identical source checkout inventory before/after. Independent source-loader passed, 54 fixture setup errors. Preserved evidence .test-results/20261031T195205Z-94724-261b599e/tier1 and .test-results/primeclaw-51-slice2-container.log. The serialized rerun above passed all but the superseded Beads fixture; no testing-harness or Prime Agent change was made. Two obsolete static wording assertions and exact current managed-hash fixtures were updated; unrelated customized assets/baseline failures were not reset.
+
+Still pending: removal of all five custom command registrations/adapters; remaining plan/plan-spec/handoff global entry skills; broader loaded planning/handoff/oversight policy and product docs/probe alignment; final acceptance and full-task cutover proof. Custom commands intentionally remain in this slice. No full acceptance criterion is marked complete. Candidate host/global apply/check/probe, merge/rebase, restart, deployment, migration/retirement, new Episode and cleanup remain outside this slice. Stop here for owning Conversation review.
 <!-- SECTION:NOTES:END -->
