@@ -4,6 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Design
 assignee: []
 created_date: '2026-10-31 17:45'
+updated_date: '2026-10-31 17:56'
 labels: []
 dependencies: []
 references:
@@ -20,35 +21,41 @@ ordinal: 136000
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 ## Context and outcome
-Design and specification can be invoked by an agent, and `plan_task` exposes the same planning workflow as `/plan TASK-ID`. Implementation has no equivalent entry point: `/implement-task TASK-ID` starts the readiness workflow, while `create_task_episode` can only finish an already-admitted chain. An operator who asks in normal conversation to implement an exact task must currently issue a slash command as well.
+Prime Claw currently mixes agent-invoked Markdown skills, agent-callable tools, and custom slash commands. Planning has an agent-callable entry point, but implementation starts through `/implement-task`, leaving the operator to supply command syntax even after giving a clear conversational instruction.
 
-Add an agent-callable `implement_task` tool so an explicit conversational implementation request can start the same task-native readiness and Episode admission workflow as `/implement-task TASK-ID`. Operator approval, not slash-command syntax, is the authorization boundary.
+Replace Prime Claw's custom slash-command workflow with Markdown skills and commands/tools exposed to the agent. Skills tell the agent how to interpret the operator's request and invoke the supported operations. The operator should be able to direct the workflow conversationally without a required custom slash-command invocation.
+
+This supersedes the original narrow proposal to add only `implement_task`. The inspected custom-command inventory is `/plan`, `/plan-spec`, `/implement-task`, `/implement-spec`, and `/handoff`. Remove Prime Claw's custom registrations, not Prime Agent's built-in commands or its native `/skill:` invocation mechanism.
 
 ## Required behavior
-The tool accepts one exact operator-selected provider-native task ID. It may be invoked only when the operator clearly authorizes implementation of that task. Missing or materially ambiguous task selection or implementation intent requires clarification before invocation; the agent must not choose a task from a queue or infer implementation approval from specification approval, planning approval, planning completion, or an automated continuation.
+Provide discoverable Markdown skill guidance and agent-callable operations for the workflow outcomes currently reached through those commands, including task-native planning and implementation, ordinary handoff, and retained folder-based compatibility where it is currently supported. Reuse existing tools where they already provide the outcome rather than adding redundant interfaces. Add the missing agent-facing implementation entry capability.
 
-The tool and slash command must have equivalent task-native behavior: resolve the repository's selected live provider and canonical task, require `In Planning`, apply the existing semantic readiness workflow, and preserve Conversation ownership and Episode admission rules. Preserve the existing placement behavior, including explicit host selection where the slash command supports it, without allowing the tool to bypass placement decisions or silently choose a different destination.
+Skills must explain how to bind the intended task or retained specification, resolve material ambiguity, invoke the corresponding operation, interpret admission versus completion, and stop or continue appropriately. Users must not need to issue a custom slash command as a prerequisite. Update installed managed guidance and relevant product documentation so they describe the same skills-and-agent-operations interface.
 
-Successful invocation admits the canonical implementation-preparation/readiness chain and its sole follow-up. It is a terminal routing action for the caller, not proof that readiness passed or an Episode was created. Episode allocation remains behind the existing readiness approval and `create_task_episode` boundary, which publishes `In Progress`, reserves ownership, and creates one isolated Episode with one fixed execute assignment. Direct calls to `create_task_episode` without matching readiness approval must remain rejected.
+Preserve task/provider identity, lifecycle-state validation, semantic readiness, placement selection, ownership, isolated Episode allocation, and the single fixed execute assignment. Do not let the interface change bypass resource-safety checks or silently broaden approved scope. Preserve supported legacy outcomes without retaining custom slash commands as a hidden required entry path. Failed or uncertain admission or partial creation must not cause automatic duplicate admission or Episode allocation.
 
-Rejected admission must report the reason without creating Episode resources or advancing lifecycle state. Failed or uncertain transport or partial creation is a blocker, not permission to retry automatically, start a second chain, or create a duplicate Episode. Preserve the existing command behavior for replays and already-owned work rather than inventing another recovery policy.
+The operator's example of conditional approval exposes an unresolved product decision: an instruction such as "plan this task, then implement it when ready" must be addressed explicitly by the new skill policy. Requiring slash-command provenance is not itself an answer to that question. Do not assume either that fresh approval is always mandatory or that conditional approval is already accepted.
 
-Expose clear agent-facing usage and authorization guidance, and update relevant user-facing workflow documentation to show that a natural-language request naming an exact task can invoke implementation without a second slash-command request.
+## Open decisions during operator interview
+- Where the boundary belongs between Markdown workflow/approval policy and native admission enforcement, including whether explicit conditional approval may cover planning followed by implementation.
+- Any further material invocation, compatibility, or cutover decisions revealed by examining the existing workflows.
+
+This is a living In Design specification, not ready for planning until the material decisions are resolved and the saved specification is reviewed.
 
 ## Scope boundaries
-This work adds task-native entry-point parity only. It does not authorize autonomous implementation after planning, remove the separate specification/plan/implementation boundaries, change readiness standards, redesign placement or Episode lifecycle, add another task provider, add an `implement_spec` tool, or extend this new tool to retained folder-based specifications. Existing retained slash-command compatibility remains unchanged.
+This work replaces the Prime Claw workflow invocation surface; it does not remove operator authority over product, scope, merge, abandonment, or destructive actions. It does not introduce an orchestrator, new task provider, or an autonomous delivery loop.
 
-Prime Agent remains an upstream dependency. Changes belong in prime-claw's plugin, managed guidance, documentation, and tests. Plugin candidate validation must remain Docker-isolated; do not apply or probe the candidate in the host/user-global installation before acceptance.
+Prime Agent remains an upstream dependency. Changes belong in prime-claw's plugin, managed guidance, documentation, and tests. Candidate plugin validation remains Docker-isolated, with no candidate host/user-global apply or probe before acceptance. Installation/cutover behavior must respect the existing full-restart and active-resource safety requirements.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 An explicit operator request to implement one exact provider-native task can invoke implement_task and start the same task-native readiness workflow as /implement-task TASK-ID, without requiring a second slash-command request.
-- [ ] #2 Agent-facing guidance requires explicit implementation approval for the exact task, asks for clarification when material intent or identity is missing, and forbids inferring implementation authority from design/specification approval, planning approval or completion, queue selection, or automated continuation.
-- [ ] #3 Tool admission preserves the slash command's selected-provider resolution, canonical task identity, In Planning requirement, readiness checks, ownership rules, and default or explicitly selected host placement; invalid task/status/provider/placement cases do not create Episode resources or advance lifecycle state.
-- [ ] #4 Successful tool invocation reports readiness-chain admission rather than implementation or Episode completion, queues only the canonical follow-up, and instructs the caller to stop the current turn after admission.
-- [ ] #5 After readiness approval, the existing create_task_episode boundary creates one Episode with one fixed execute assignment and the existing In Progress/ownership publication; calling create_task_episode without matching readiness approval remains rejected.
-- [ ] #6 Failure and uncertain-result behavior does not automatically retry admission or partial creation, send a second execute assignment, or allocate a duplicate Episode; existing slash-command replay and recovery behavior is preserved.
-- [ ] #7 Focused automated coverage proves task-native command/tool parity, authorization guidance, rejected admission, and the single-Episode boundary for the supported Backlog and Beads paths. Plugin-source changes pass the required Docker-isolated Tier-1 validation.
-- [ ] #8 Relevant workflow documentation describes natural-language implementation entry and the unchanged explicit operator-approval boundary; existing /implement-task behavior and retained folder compatibility remain intact.
+- [ ] #1 Prime Claw no longer registers its custom /plan, /plan-spec, /implement-task, /implement-spec, or /handoff commands; Prime Agent built-ins and native /skill: invocation are unaffected.
+- [ ] #2 Discoverable Markdown skills instruct the agent how to invoke the supported workflow operations, select exact task or retained-specification identity, resolve material ambiguity, and distinguish admission from completion without requiring custom slash-command syntax.
+- [ ] #3 Every supported workflow outcome formerly reached through those commands remains reachable through agent-callable operations and skill guidance, including implementation entry, task-native planning, ordinary handoff, and supported retained folder-based compatibility; existing tools are reused where sufficient.
+- [ ] #4 The resolved operator-approval policy is explicit and consistent across skills and native entry points, including the treatment of conditional instructions to plan and then implement; planning alone is not silently treated as implementation authority.
+- [ ] #5 The new invocation surface preserves provider/canonical identity, required lifecycle states, readiness checks, placement decisions, ownership, isolated Episode creation, and the one fixed execute assignment, without duplicate admission or allocation after failed or uncertain results.
+- [ ] #6 Managed installed guidance and relevant workflow/user-story documentation consistently describe skills plus agent-callable operations and no longer prescribe removed custom slash commands as required workflow entry points.
+- [ ] #7 Focused automated coverage proves removal of custom registrations, reachable replacement workflow entry points, relevant authorization guidance, and preserved admission/resource-safety outcomes for supported providers and retained compatibility; plugin-source changes pass Docker-isolated Tier-1 validation.
+- [ ] #8 Material interview decisions are resolved in the living specification before planning; the interface cutover respects existing restart and active-resource safety requirements.
 <!-- AC:END -->
