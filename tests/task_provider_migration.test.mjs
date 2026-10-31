@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { completeBeadsExport, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
+import { completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { checkBeadsCapabilities, detectExplicitTaskProvider, detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
@@ -1584,6 +1584,122 @@ test("native Beads memory capture binds exact content and refuses confirmed impo
   assert.deepEqual(sourceAuthorityFiles(fixture.root), authorityBefore);
   assert.equal(git(fixture.root, "rev-parse", "HEAD"), codeBefore);
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+});
+
+test("native Beads memory outputs preserve exact records and link one USER task", { timeout: 180_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "native-memory-outputs");
+  const key = "  public λ key\n\tends  ";
+  const value = "---\nid: not-metadata\n---\nPublic café 🐙\n```\n  leading / trailing  \n\tline\r\n";
+  bd(fixture.root, "remember", "--key", key, "--", value);
+  bd(fixture.root, "remember", "Second public value\n\x01\x1b", "--key", "public-second");
+  const entries = completeBeadsExport(RUNNER, fixture.root, "native output fixture");
+  const memories = entries.filter(({ kind }) => kind === "memory").map(({ row, line }) => ({ exportRow: row, exportLineBase64: Buffer.from(line).toString("base64") }));
+  assert.equal(memories.length, 2);
+  assert.deepEqual(memories.find(({ exportRow }) => exportRow.key === key).exportRow, { _type: "memory", key, value });
+  assert.equal(memories.find(({ exportRow }) => exportRow.key === "public-second").exportRow.value, "Second public value\n\x01\x1b");
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const source = { projectRoot: fixture.root, sourceIdentity: { repositoryRoot: fixture.root, storeDir: join(fixture.root, ".beads") },
+    revision: inspection.sourceRevision, digest: inspection.sourceDigest, memories };
+  const sourceBefore = command(fixture.root, "bd", ["--readonly", "export", "--all"]);
+  backlog(fixture.root, "init", "Memory destination", "--defaults", "--backlog-dir", ".backlog", "--config-location", "root", "--task-prefix", "MEM", "--integration-mode", "none");
+  const configPath = join(fixture.root, "backlog.config.yml");
+  writeFileSync(configPath, readFileSync(configPath, "utf8")
+    .replace(/^statuses:.*$/m, 'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]')
+    .replace(/^default_status:.*$/m, 'default_status: "In Design"')
+    .replace(/^auto_commit:.*$/m, "auto_commit: false"));
+  class OutputRunner extends CandidateRunner {
+    constructor() { super(); this.calls = []; }
+    run(commandName, args, options = {}) {
+      this.calls.push({ commandName, args: [...args] });
+      return super.run(commandName, args, options);
+    }
+  }
+  const runner = new OutputRunner();
+  const outputs = importBeadsMemoryDocuments(source, runner);
+  assert.equal(outputs.documents.length, 2);
+  assert.ok(outputs.index);
+  assert.ok(outputs.userTask);
+  assert.equal(new Set([...outputs.documents, outputs.index].map(({ docId }) => docId)).size, 3);
+  const docs = readdirSync(join(fixture.root, ".backlog", "docs"));
+  assert.equal(docs.length, 3);
+  for (const [index, document] of outputs.documents.entries()) {
+    assert.ok(document.path.startsWith(".backlog/docs/"));
+    const plain = command(fixture.root, BACKLOG, ["doc", "view", document.docId, "--plain"]);
+    assert.ok(plain.endsWith(`${document.body}\n`));
+    const complete = plain.match(/## Complete native memory record \(lossless JSON\)\n\n```json\n([^\n]+)\n```/);
+    assert.ok(complete);
+    assert.deepEqual(JSON.parse(complete[1]), memories[index].exportRow, "complete original native row, including exact key/value, round-trips");
+    const provenance = JSON.parse(plain.match(/Source provenance:\n\n```json\n([\s\S]*?)\n```/)[1]);
+    assert.deepEqual(provenance, { sourceProvider: "beads", sourceProject: fixture.root, sourceStore: join(fixture.root, ".beads"), sourceRevision: source.revision, sourceDigest: source.digest });
+    assert.match(plain, /# Imported Beads memory/);
+    assert.match(plain, /## Original key/);
+    assert.match(plain, /## Original value/);
+  }
+  const indexPlain = command(fixture.root, BACKLOG, ["doc", "view", outputs.index.docId, "--plain"]);
+  const links = [...indexPlain.matchAll(/^- \[(doc-\d+)\]\(([^)]+)\)$/gm)];
+  assert.equal(links.length, memories.length);
+  for (const [, id, link] of links) {
+    assert.ok(link.includes("%20"), "native filenames are URL-encoded");
+    const path = join(fixture.root, ".backlog", "docs", decodeURIComponent(link));
+    assert.ok(existsSync(path), "index link reaches the actual native document path");
+    assert.match(readFileSync(path, "utf8"), new RegExp(`^id: ${id}$`, "m"));
+  }
+  const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", outputs.userTask.taskId)).task;
+  assert.equal(task.status, "In Design");
+  assert.match(task.title, /^USER:/);
+  assert.match(task.description, /Integrate useful material properly into the project's documentation, or delete imported material/);
+  assert.deepEqual(task.documentation, [outputs.index.path]);
+  assert.deepEqual(task.assignees, []);
+  assert.equal(readdirSync(join(fixture.root, ".backlog", "tasks")).length, 1);
+  assert.equal(runner.calls.filter(({ args }) => args[0] === "task" && args[1] === "create").length, 1);
+  assert.equal(runner.calls.filter(({ args }) => args[0] === "doc" && args[1] === "create").length, 3);
+  assert.ok(runner.calls.filter(({ args }) => args[0] === "doc" && args[1] === "update").every(({ args }) => args[3].startsWith("--content=")));
+  assert.equal(command(fixture.root, "bd", ["--readonly", "export", "--all"]), sourceBefore);
+  verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+  // No extra outputs or commands for the existing issue-only source case.
+  runner.calls = [];
+  assert.deepEqual(importBeadsMemoryDocuments({ ...source, memories: [] }, runner), { documents: [] });
+  verifyBacklogMemoryOutputs({ documents: [] }, fixture.root, runner);
+  assert.deepEqual(runner.calls, []);
+  // Native content corruption is refused on re-read, not accepted via exit code.
+  for (const document of [...outputs.documents, outputs.index]) {
+    backlog(fixture.root, "doc", "update", document.docId, "--content=Changed public output");
+    assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /native identity\/body mismatch/);
+    backlog(fixture.root, "doc", "update", document.docId, `--content=${document.body}`);
+  }
+  backlog(fixture.root, "task", "edit", outputs.userTask.taskId, "--status", "In Progress", "--plain");
+  assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /USER task.*content\/status\/index mismatch/);
+  backlog(fixture.root, "task", "edit", outputs.userTask.taskId, "--status", "In Design", "--plain");
+  backlog(fixture.root, "task", "edit", outputs.userTask.taskId, "--doc", "", "--plain");
+  assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /USER task.*content\/status\/index mismatch/);
+  backlog(fixture.root, "task", "edit", outputs.userTask.taskId, "--doc", outputs.index.path, "--plain");
+  verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+  for (const document of [outputs.documents[0], outputs.index]) {
+    const path = join(fixture.root, document.path);
+    renameSync(path, `${path}.missing`);
+    const missing = runner.run("backlog", ["doc", "view", document.docId, "--plain"], { cwd: fixture.root });
+    assert.equal(missing.status, 0, "native missing document can exit successfully");
+    assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /native identity\/body mismatch/);
+    renameSync(`${path}.missing`, path);
+  }
+  const taskPath = join(fixture.root, task.path);
+  renameSync(taskPath, `${taskPath}.missing`);
+  assert.throws(() => verifyBacklogMemoryOutputs(outputs, fixture.root, runner), /Backlog task|backlog task view/);
+  renameSync(`${taskPath}.missing`, taskPath);
+  verifyBacklogMemoryOutputs(outputs, fixture.root, runner);
+  // NUL cannot enter bd argv. One public synthetic package proves the same
+  // native Backlog writer preserves it without passing raw NUL in argv.
+  const nulRow = { _type: "memory", key: "public\0key", value: "public\0value\n" };
+  const nulSource = { ...source, revision: "public-synthetic-nul-revision", digest: "public-synthetic-nul-digest",
+    memories: [{ exportRow: nulRow, exportLineBase64: Buffer.from(JSON.stringify(nulRow)).toString("base64") }] };
+  runner.calls = [];
+  const nulOutputs = importBeadsMemoryDocuments(nulSource, runner);
+  const nulPlain = command(fixture.root, BACKLOG, ["doc", "view", nulOutputs.documents[0].docId, "--plain"]);
+  assert.deepEqual(JSON.parse(nulPlain.match(/## Complete native memory record \(lossless JSON\)\n\n```json\n([^\n]+)\n```/)[1]), nulRow);
+  assert.ok(runner.calls.every(({ args }) => args.every((arg) => !arg.includes("\0"))));
+  assert.equal(runner.calls.filter(({ args }) => args[0] === "task" && args[1] === "create").length, 1);
+  verifyBacklogMemoryOutputs(nulOutputs, fixture.root, runner);
 });
 
 // PRIMECLAW-44 Slice 1g: inspection coexistence is NOT populated import permission.

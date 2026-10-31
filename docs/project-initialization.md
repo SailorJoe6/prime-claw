@@ -342,14 +342,27 @@ task, memory, catalog, history or identity drift refuses cutover. No source
 custom lifecycle setup, server conversion, remote, push or publication is
 required. Ordinary active Beads lifecycle/write checks remain strict.
 
-The current bounded capture increment does **not** yet import memories into
-Backlog documents. Inspection accepts valid memory rows, but confirmation with
-any memories refuses before destination preparation or writes, leaving Beads
-authoritative. The remaining PRIMECLAW-49 work must create and verify one native
-Backlog document per memory, one source/index document and exactly one USER
-curation task before this refusal can be removed. The user, not the migration
-agent, reviews and integrates useful material into project documentation or
-deletes unwanted imports. Zero-memory sources need none of these outputs.
+The native memory-output helper creates one Backlog document per memory, one
+source/index document and exactly one USER curation task through the supported
+Backlog CLI. Memory documents keep readable source text plus the complete escaped
+native JSON record for exact key/value round-trip, including whitespace, Unicode
+and control characters. The index records the source project/store and links to
+the actual native document paths. The single task is explicitly `In Design` and
+links to the index. The user, not the migration agent, reviews and integrates
+useful material into project documentation or deletes unwanted imports.
+Zero-memory input makes no native output commands and creates none of these
+outputs. Native readback checks the actual document body and task evidence;
+a successful missing-document CLI exit alone is not proof.
+
+This helper is tested in disposable fixtures but is **not yet enabled in the
+confirmed migration**. Inspection accepts valid memory rows, but confirmation
+with any memories still refuses without live destination data mutation or source
+retirement, leaving Beads authoritative. An existing destination may receive
+harmless read-only capability, task and archive verification before that refusal.
+The remaining PRIMECLAW-49 work must integrate these outputs with the existing
+destination publication, digest, single receipt, pre-retirement and replay proofs
+before removing the refusal. Native helper readback alone does not prove those
+migration-wide guarantees.
 
 Before any Backlog destination preparation or write, the complete used-status
 inventory is checked with the existing projections. All unsupported-used statuses
@@ -401,7 +414,7 @@ migration artifact. Actual migration of a production repository remains an
 operator-authorized upgrade action; initialization and ordinary startup never
 perform it automatically.
 
-### PRIMECLAW-49 capture-slice regression
+### PRIMECLAW-49 bounded-slice regressions
 
 The focused Docker bridge covers a public synthetic 33-issue/19-memory export,
 native typed issues and legacy untagged issues, malformed/incomplete inventories,
@@ -418,10 +431,20 @@ python3 -m pytest tests/test_task_provider_migration.py -q -m container -k "reti
 scripts/test-tier1.sh --probe
 ```
 
-The two focused selectors passed on the capture candidate (run separately after
-a concurrent disposable-builder setup failure). This is not proof of memory
-import, receipt/replay behavior for memory outputs, a live Nemo migration or
-host activation. Those remain later work under the existing operator boundaries.
+The native-output slice also exercises real CLI document create/update/view,
+working index links, exactly one USER task, complete record round-trip, changed
+or missing native output refusal, and zero-memory no-op. Public controls use
+supported native Beads writes; a synthetic NUL-bearing package passes through the
+same native Backlog writer because NUL cannot be passed in process argv.
+
+The final combined focused run passed both selectors (`2 passed, 7 deselected`).
+Two earlier runs failed on fixture assumptions before exercising the importer:
+a leading `---` value required the native `--` argument separator, and a fixture
+SQL update did not change exported memory content. Those were corrected without
+weakening source/refusal checks. The capture candidate's earlier intermediate
+failures remain recorded in the task. This is not proof of migration-wide memory
+publication, receipt/replay behavior, a live Nemo migration or host activation.
+Those remain later work under the existing operator boundaries.
 
 ## Global drift
 
