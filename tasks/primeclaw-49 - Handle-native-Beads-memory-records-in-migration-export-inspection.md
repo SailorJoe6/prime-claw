@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-49
 title: Handle native Beads memory records in migration export inspection
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 14:33'
+updated_date: '2026-10-31 14:45'
 labels: []
 dependencies: []
 references:
@@ -81,3 +81,31 @@ This bug is Prime Claw work only. It does not reopen the closed PRIMECLAW-44 Epi
 - [ ] #9 Memory documents, the index and the single user task are verified and published through the existing destination-native process before Beads source retirement; the original issue-ID/inventory checks remain intact and do not miscount these distinct destination outputs.
 - [ ] #10 A source export with zero memories produces no memory documents, no origin/index document and no memory-curation user task; supported issue-only migrations continue without empty memory outputs.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+## Implementation approach
+
+Keep the current Beads-to-Backlog operation and native CLI boundary. Use native record types and existing capture/publication proofs, not a new migration framework. The existing Backlog candidate already supports document content updates; no new dependency or Prime Agent changes are needed. The Nemo report is independent evidence, not a reproduction performed by this Conversation.
+
+1. **Capture the mixed native export without weakening issue checks.** In `task-provider-migration.ts`, make `completeBeadsExport` recognize native `_type: "memory"` rows separately from issues. Compare only issue IDs against the complete independent issue inventory; retain strict malformed/duplicate/missing issue refusal. Preserve every typed row and its original export line. In `captureBeads`, run task show/history/events/provenance and lifecycle/relationship validation only for issues. Retain memory keys, values and raw export evidence separately in the existing source snapshot, digest and recapture checks so a memory-only change invalidates the inspected source revision. Task counts and ownership mappings remain issue-only. Do not silently drop unsupported or malformed native content, classify records heuristically, or change the retiring Beads store/configuration.
+
+2. **Create the approved readable Backlog documents through native commands.** During confirmed `migrateBeadsToBacklog`, use `backlog doc create <title> --plain` followed by `backlog doc update <docId> --content <body>` for each memory. Use returned native identities; do not derive task IDs from memory keys or write provider files directly. Use a fixed Markdown heading/provenance wrapper, readable original content and an escaped JSON representation of the complete native memory record for exact key/value round-trip. This preserves leading/trailing whitespace, Unicode and control characters without letting a leading source YAML block become document metadata; do not summarize or normalize memories. Add one native origin/index document explaining the source Beads project/store and linking every imported memory document. Treat imported text as document data, not instructions to execute. Verify actual ID/body/provenance and link targets with `backlog doc view <docId> --plain` (raw Markdown, not JSON). Missing-document output can exit successfully, so exit status alone is not proof. Parse only native returned IDs/paths and URL-encode filenames in relative Markdown links. Use direct argv strings (`--content=<body>`) rather than shell interpolation; a native argument-size failure blocks migration without truncation or an editor/storage bypass. Do not place these imports in ordinary project `docs/`.
+
+3. **Create exactly one USER curation task, only when memories exist.** Use supported `backlog task create` with explicit `In Design`, a clear user-review title/description and `--doc <actual-index-path>`, then verify its native JSON task view. Explain that the user must integrate useful material properly into project documentation or delete unwanted imports. Do not assign that curation to an agent, perform it during migration, or create one task per memory. If there are zero memories, skip all memory documents, the index and this task.
+
+4. **Extend the current destination proofs, not the lifecycle.** Include the documents, index and user task in the existing destination data publication, exact native readback, destination digest and single receipt evidence. Adjust destination task-count verification for the one optional user task without adding documents or that task to source issue counts/mappings. Re-read these outputs at the existing post-receipt and pre-cutover checks; missing/changed/unpublished outputs must block source retirement. Preserve unrelated destination records/docs/configuration/history and the existing active-Episode identity/ownership proofs. Reuse the approved native outputs under the existing exact-source same-destination replay path so it does not duplicate the index or user task; use their source provenance and native identities, not a new receipt, ledger, controller or retry protocol. Leave uncertain/partial outcomes as the existing operation's blocker; do not automatically retry transport or create another destination.
+
+5. **Add focused regressions to the existing Docker migration suite.** Extend `tests/task_provider_migration.test.mjs` and its existing Python container bridge, without a new harness or broad matrix (extend one existing container selector to cover the focused new tests):
+   - A public synthetic 33-issue/19-memory export matching the reported native shape passes issue-inventory inspection; memory rows are never sent to issue show/history commands. Retain an issue-only case and genuine malformed/duplicate/incomplete issue refusal.
+   - A small disposable native Beads fixture with public multiline/Unicode/whitespace/frontmatter-like memory text proves lossless source capture, a memory-only digest change, and confirmed native document/index/single-user-task creation with working links and published readback. Exercise zero memories through an existing issue-only migration and assert no memory outputs.
+   - Extend existing publication/receipt refusal and same-destination replay coverage to show missing or changed memory outputs prevent source deletion and a compatible replay does not duplicate the imports/user task. Preserve the current active-Episode/source-authority assertions; use no Nemo/private memory values.
+   Run `python3 -m pytest tests/test_task_provider_migration.py -q -m container -k "retiring_beads_source_boundary or populated_backlog_migration"` with those selectors extended only as needed for the focused new cases and mandatory `scripts/test-tier1.sh --probe` after plugin-source changes. Record actual focused results and any remaining failures; do not claim unrelated historical full-suite failures are fixed.
+
+6. **Document and publish the bounded change.** Update `docs/project-initialization.md` and relevant managed initialization guidance to explain typed exports, destination memory docs/index, the USER curation task, zero-memory behavior and publication-before-retirement. Keep the normal single migration confirmation/maintenance window and source authority until all destination proofs succeed. Publish code, tests and docs through the later Episode's normal review path; no live migration, Nemo retry, global apply or coordinated restart is authorized by this plan.
+
+## Scope limit
+
+Prefer supported provider-native behavior, then concise LLM instructions for semantic judgment, then only the narrow deterministic integrity/transport changes required above. Do not add deterministic task reconciliation, plan-change machinery, another mapping framework, new persistent coordination state or speculative hardening. PRIMECLAW-44 stays closed. Planning is not implementation approval; a separate explicit `/implement-task PRIMECLAW-49` is required.
+<!-- SECTION:PLAN:END -->
