@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31 14:47'
-updated_date: '2026-10-31 19:22'
+updated_date: '2026-10-31 20:12'
 labels: []
 dependencies: []
 references:
@@ -16,6 +16,14 @@ references:
   - PRIMECLAW-46
   - PRIMECLAW-49
   - /tmp/ralph-pva-history-preflight-20261031/prime-claw-bug-handoff.md
+documentation:
+  - docs/project-initialization.md
+modified_files:
+  - docs/project-initialization.md
+  - src/prime-agent-plugin/extension-support/project-initialization.ts
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
+  - tests/project_initialization_extension.test.mjs
+  - tests/task_provider_migration.test.mjs
 priority: p1
 type: bug
 ordinal: 135000
@@ -77,11 +85,11 @@ Ticket creation authorizes no implementation, live Ralph command/retry/migration
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Complete output capture for all native Beads source reads used by migration (including export, inventory, task views, history, events and provenance) has no fixed per-command size ceiling, subject to available resources, and never truncates or silently omits data; merely raising a fixed buffer cap is insufficient. A synthetic case representing the reported 1,305,475-byte, 108-record history verifies complete retention; resource failure remains explicit and safe.
-- [ ] #2 Output-limit/transport failures remain distinct from invalid JSON or incomplete native data; ENOBUFS is identifiable even with empty stderr and null status, with available command/code/status/signal metadata retained.
-- [ ] #3 Failure diagnostics have a bounded size and display command/error metadata with an optional short bounded native stderr excerpt, but never captured stdout or native task/history payloads, including when stderr is empty. They do not advise repairing readable source data for a command-capture failure; ordinary command errors remain actionable.
-- [ ] #4 When complete capture is not proven, inspection fails safely without destination writes or source mutation/retirement; existing preservation, identity, stable capture, quiescence, ownership, publication, receipt and explicit cutover/deletion safeguards remain intact.
-- [ ] #5 Disposable synthetic Docker regression coverage exercises >1 MiB valid history/events, ENOBUFS with empty stderr/null status, ordinary command errors and genuinely malformed native JSON, without live Ralph access or global plugin changes.
+- [x] #1 Complete output capture for all native Beads source reads used by migration (including export, inventory, task views, history, events and provenance) has no fixed per-command size ceiling, subject to available resources, and never truncates or silently omits data; merely raising a fixed buffer cap is insufficient. A synthetic case representing the reported 1,305,475-byte, 108-record history verifies complete retention; resource failure remains explicit and safe.
+- [x] #2 Output-limit/transport failures remain distinct from invalid JSON or incomplete native data; ENOBUFS is identifiable even with empty stderr and null status, with available command/code/status/signal metadata retained.
+- [x] #3 Failure diagnostics have a bounded size and display command/error metadata with an optional short bounded native stderr excerpt, but never captured stdout or native task/history payloads, including when stderr is empty. They do not advise repairing readable source data for a command-capture failure; ordinary command errors remain actionable.
+- [x] #4 When complete capture is not proven, inspection fails safely without destination writes or source mutation/retirement; existing preservation, identity, stable capture, quiescence, ownership, publication, receipt and explicit cutover/deletion safeguards remain intact.
+- [x] #5 Disposable synthetic Docker regression coverage exercises >1 MiB valid history/events, ENOBUFS with empty stderr/null status, ordinary command errors and genuinely malformed native JSON, without live Ralph access or global plugin changes.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -128,4 +136,25 @@ Docker validation uses TIER1_ENV_FILE=/tmp/primeclaw50-tier1.env selecting the v
 - Final full python3 -m pytest tests/ -q -m container is currently running; log /tmp/primeclaw50-full.log. No full-suite result or candidate completion is claimed yet.
 
 Synthetic production-path evidence includes exact 108-record 1,305,475-byte history and 2,610,950-byte multibyte events retained in the existing destination-package fixture; default-route assertions for export/inventory/show/history/events/provenance/identity; ENOBUFS with empty stderr/null native status/SIGTERM; ordinary stderr cases; deterministic storage/output-read resource failures; private temporary cleanup; genuine invalid JSON without payload disclosure; and initial-capture refusal before source/ownership/destination mutation. Source review confirms FD stdio with no maxBuffer increase or capture byte cutoff. No live Ralph, global install, source retirement, status mutation or merge occurred.
+
+### Published candidate — complete capture and bounded diagnostics
+
+Code candidate: 2f89592e07c6ec69d506ba6b3e77c7f9fb9f9bac, pushed to refs/heads/JLanders/prime-claw-primeclaw-50-episode-6d94b0b3; directly published head verified and code worktree clean. Modified paths: docs/project-initialization.md, src/prime-agent-plugin/extension-support/project-initialization.ts, src/prime-agent-plugin/extension-support/task-provider-migration.ts, tests/project_initialization_extension.test.mjs, tests/task_provider_migration.test.mjs. This completes the one approved capture/diagnostic repair slice. All five AC are supported by focused synthetic tests plus existing migration-preservation regressions. The specification and full native plan remain unchanged; no follow-on slice began.
+
+Final validation on unchanged candidate bytes:
+- Focused documented three-suite command: 3 passed in 997.23s. Log /tmp/primeclaw50-focused-final.log; evidence .test-results/20261031T190350Z-29585-ff029127/tier1. Migration TAP: 54 tests/subtests, 42 passed, 12 existing skips, 0 failures. Initial focused invocation was also 3 passed but is retained only as earlier-generation evidence.
+- Mandatory scripts/test-tier1.sh --probe: exit 0; offline checks, teardown and manifest publication verified. Log /tmp/primeclaw50-probe.log; evidence .test-results/20261031T192034Z-74845-88b4e942/tier1.
+- python3 -m pytest tests/ -q -m container: 2 failed, 83 passed, 1 skipped, 690 deselected in 2777.41s. Log /tmp/primeclaw50-full.log; evidence .test-results/20261031T192218Z-80373-7b1246ea/tier1. Full suite is NOT green. Failing tests: tests/test_source_builder_real_install.py::test_two_real_source_generations_install_changed_behavior_without_replay (nested fixture isolated prep-kernel skill install failure) and tests/test_task_providers.py::test_backlog_task_episode_admission_node_suite (unchanged fixture copies missing /workspace/backlog/config.yml; 15 native subtests fail before admission setup).
+- Bounded baseline check: both exact failing tests reproduced at original code base 7380afe1526647eef3dbc7fa0b62ce8796a19641 in an ordinary disposable clone, with identical prep-kernel and missing-config errors: 2 failed in 164.62s. Log /tmp/primeclaw50-baseline-failures.log; baseline clone /var/folders/4_/twy0wz3s1mq650wnqzn1b8rr0000gq/T/primeclaw50-baseline-hw_yjo4r/repo. The implicated tests/conftest.py, tests/test_source_builder_real_install.py and tests/task_episode_admission_extension.test.mjs are byte-identical to base. No unrelated fixture repair or upstream source change was made.
+- git diff --check clean. Source review shows regular-file FD capture, full successful output reads and no fixed buffer cap or output cutoff on migration capture/recapture. Per-command temporary ownership remains private, cleanup is tested on handled success/failure, and storage/read failures return no partial stdout.
+
+Failure metadata preserves ENOBUFS with empty stderr/nativeStatus=null/SIGTERM. Diagnostic rendering is capped at 768 characters, with bounded labels/error metadata and at most 256 stderr characters; no stdout fallback or raw JSON-parser message. Ordinary required native-provider failures are intercepted before discovery can misreport capture failure as source repair. Existing negative Git probes remain compatible. Native migration packages retain exact synthetic large history/events; real Ralph/private payloads were never read.
+
+Both workers were observed idle/non-streaming and removed after completion. Task remains In Progress. This Episode did not merge, mark Ready for Merge/Done/Blocked, change ownership, migrate a live repository, activate globally, restart Prime Agent or retire any real source. Owning Conversation receives the exact separate code/task published heads and decides review/lifecycle. The two independently reproduced baseline fixture failures remain a known validation limitation, not fixed by this task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Published candidate 2f89592e07c6ec69d506ba6b3e77c7f9fb9f9bac removes the fixed migration command-output ceiling with private file-backed capture while preserving the synchronous native snapshot/package flow. It adds bounded payload-safe diagnostics with errorCode/nativeStatus/signal, separates command/resource advice from invalid JSON, and documents resource limits/cleanup. Synthetic Docker tests retain exact 108-record 1,305,475-byte history and 2,610,950-byte multibyte events, prove full default capture routing, metadata, cleanup/resource safety, malformed JSON handling and no initial-capture mutations. Focused suites: 3 passed. Required tier1 probe: passed. Full container suite: 83 passed, 2 failed, 1 skipped; both failures independently reproduced on original base (prep-kernel fixture and removed backlog/config.yml fixture). Full suite is not green. No live data/global change or lifecycle mutation. Candidate ready for Conversation review with that explicit baseline limitation.
+<!-- SECTION:FINAL_SUMMARY:END -->
