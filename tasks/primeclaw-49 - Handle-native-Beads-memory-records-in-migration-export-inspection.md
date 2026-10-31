@@ -4,7 +4,7 @@ title: Handle native Beads memory records in migration export inspection
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 15:45'
+updated_date: '2026-10-31 16:15'
 labels: []
 dependencies: []
 references:
@@ -12,6 +12,11 @@ references:
   - tests/task_provider_migration.test.mjs
 documentation:
   - docs/project-initialization.md
+modified_files:
+  - docs/project-initialization.md
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
+  - tests/task_provider_migration.test.mjs
+  - tests/test_task_provider_migration.py
 priority: p1
 type: bug
 ordinal: 134000
@@ -70,8 +75,8 @@ This bug is Prime Claw work only. It does not reopen the closed PRIMECLAW-44 Epi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Canonical switch inspection accepts the native bd 1.3.1 mixed issue/memory export shape without treating valid memory rows as missing-ID issues; the reported 33-issue/19-memory case is represented in regression evidence.
-- [ ] #2 Only actual issue records participate in issue-ID and independent issue-inventory comparison. Genuine malformed or duplicate issue IDs and incomplete issue inventories still refuse inspection without migration writes.
+- [x] #1 Canonical switch inspection accepts the native bd 1.3.1 mixed issue/memory export shape without treating valid memory rows as missing-ID issues; the reported 33-issue/19-memory case is represented in regression evidence.
+- [x] #2 Only actual issue records participate in issue-ID and independent issue-inventory comparison. Genuine malformed or duplicate issue IDs and incomplete issue inventories still refuse inspection without migration writes.
 - [ ] #3 Full typed export and native memory contents remain preserved in source capture and the existing evidence/digest/receipt path; memory records are not silently dropped, source memories are not deleted, and no credentials or private memory contents enter test fixtures.
 - [ ] #4 Focused Docker regression coverage proves mixed-export handling, memory preservation and the native memory-document/index/user-task outputs, proves that zero-memory migrations create no empty memory outputs, retains existing supported issue-only export behavior, and exercises a genuine invalid-issue refusal without adding a broad new harness or matrix.
 - [ ] #5 The repair preserves existing read-only inspection, explicit migration confirmation, publication-before-retirement and failure-safety boundaries; it does not mutate Nemo, reopen PRIMECLAW-44, or add unrelated architecture or Prime Agent changes.
@@ -109,3 +114,34 @@ Keep the current Beads-to-Backlog operation and native CLI boundary. Use native 
 
 Prefer supported provider-native behavior, then concise LLM instructions for semantic judgment, then only the narrow deterministic integrity/transport changes required above. Do not add deterministic task reconciliation, plan-change machinery, another mapping framework, new persistent coordination state or speculative hardening. PRIMECLAW-44 stays closed. Planning is not implementation approval; a separate explicit `/implement-task PRIMECLAW-49` is required.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+### Episode slice 1 — mixed-export capture (in progress)
+
+Bound this pass to Implementation approach step 1 plus focused Docker regressions and documentation. Separate native memory rows from the complete issue inventory; preserve raw memory rows/lines in snapshot/digest evidence and prove a memory-only change invalidates the inspected revision. Keep malformed/duplicate/incomplete issue refusal. Native Backlog memory docs/index/one USER curation task and their publication/replay verification remain for a later slice. Until those outputs exist, confirmation with memories must refuse before destination preparation/writes; inspection alone never authorizes dropping memories or retiring source.
+
+Exact ownership/task-store binding verified at code base 500b386002badc4af9824b8a2e85752f35c5e3f3 and task revision be072fdd01757c5b82458920153cb75b559ef43c. No live migration, Nemo mutation, global apply or restart is part of this pass.
+
+### Episode slice 1 — published capture candidate
+
+Code candidate: 958b9752571f64faab3cc8871d90da5bd3ba0110. Files: `docs/project-initialization.md, src/prime-agent-plugin/extension-support/task-provider-migration.ts, tests/task_provider_migration.test.mjs, tests/test_task_provider_migration.py`.
+
+Implemented native `_type: "issue"` / `_type: "memory"` discrimination with supported older untagged issues. Only issues enter canonical ID/inventory, history/events/provenance, lifecycle/relationship and count checks. Memory rows and original line bytes are retained separately in capture/digest and the existing source-package evidence. Native memory-only value and raw-line changes change the exact capture revision. Unknown types, malformed memories, invalid/duplicate/missing issue IDs and incomplete issue inventories still refuse. Confirmed migration with memories explicitly refuses `memory-import-not-implemented` before any Backlog command/preparation/write or source deletion. This refusal is a temporary slice boundary, not completion of the full migration contract.
+
+Validation (Docker-only, verified supported TypeScript dependency source selector via TIER1_ENV_FILE):
+- Pre-fix red: `python3 -m pytest tests/test_task_provider_migration.py -q -m container -k retiring_beads_source_boundary` reproduced the reported missing canonical task ID using public synthetic 33-issue/19-memory rows. Log `/tmp/primeclaw49-capture-red.log`; evidence `.test-results/20261031T154926Z-98321-574f86c1/tier1`. This is not a Nemo reproduction.
+- Final retiring-source boundary command above: **1 passed, 8 deselected**; 13 native Node cases/subtests including typed 33/19, malformed rows, native Unicode/whitespace/frontmatter-like memory capture, value/raw-line digest changes, issue-only reads, and fail-closed confirmation. Log `/tmp/primeclaw49-capture-green4.log`; evidence `.test-results/20261031T160849Z-60859-7046532f/tier1`.
+- Populated Backlog selector passed on identical final plugin source: 9 native Node tests; TAP `.test-results/20261031T160024Z-34258-2d43cb43/tier1/populated-backlog-migration-node.tap`. The combined command `python3 -m pytest tests/test_task_provider_migration.py -q -m container -k "retiring_beads_source_boundary or populated_backlog_migration"` was **1 failed, 1 passed** at that point due to an incorrect test assumption about restoring native history; the final boundary rerun fixed that fixture and passed. Do not describe the combined invocation as fully green.
+- Final mandatory `scripts/test-tier1.sh --probe`: **exit 0**, offline checks passed, teardown verified, manifest published. Log `/tmp/primeclaw49-capture-probe2.log`; evidence `.test-results/20261031T161252Z-72259-f88ddf14/tier1`.
+- `git diff --check`: clean. Intermediate runs exposed a concurrent disposable-builder setup failure, a native issue-tag classifier omission (fixed), and an invalid fixture assumption that restoring a memory value restores its native history/revision (corrected by reconfirming current exact source). No integrity rule was weakened.
+
+Remaining: implement approved native Backlog memory documents, source/index and exactly one USER curation task, then destination readback/publication/digest/receipt/pre-cutover/replay verification and zero-memory output assertions. Keep the early memory-import refusal until those outputs are complete. AC 1–2 checked for this capture slice; remaining criteria are not claimed. No live migration, Nemo mutation, global apply, restart, merge, source retirement or user memory curation occurred. Status remains In Progress. The implementation plan remains the full approved plan, with this note recording its bounded progress.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Slice 1 only: typed Beads issue/memory capture and strict issue inventory checks are implemented at code 958b9752571f64faab3cc8871d90da5bd3ba0110. Focused Docker boundary and populated Backlog tests plus the final tier-1 probe passed as recorded in Implementation Notes. Memory-bearing confirmation remains blocked before destination writes until native memory docs/index/one USER task and publication/replay proofs are implemented. The full task is not complete.
+<!-- SECTION:FINAL_SUMMARY:END -->
