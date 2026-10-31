@@ -4,7 +4,7 @@ title: Add agent-callable implement_task entry point for approved tasks
 status: In Design
 assignee: []
 created_date: '2026-10-31 17:45'
-updated_date: '2026-10-31 18:01'
+updated_date: '2026-10-31 18:03'
 labels: []
 dependencies: []
 references:
@@ -44,10 +44,10 @@ The operator may explicitly delegate selection of work within stated bounds. The
 
 Implementation eligibility is represented by the existing task workflow states: a task must have progressed through design and planning and be in `In Planning` before implementation admission. Selecting a "ready to implement" task therefore means selecting from that eligible lifecycle state, not merely taking the highest-priority open task or relying on dependency readiness alone. Preserve the existing semantic readiness checks; do not add a second phase-history receipt or invocation-sequence proof alongside the task's native lifecycle state.
 
-## Open decisions during operator interview
-- Whether retained folder-based workflow outcomes should remain supported through skills and tools after their custom slash commands are removed.
+## Retained folder-based compatibility
+Keep the currently supported retained folder-based planning, implementation, and continuation behavior. Replace its custom slash-command entry points with Markdown skill guidance and agent-callable operations. Removing custom commands is not authority to retire retained version-1 workflows, migrate their ownership, delete their plans, or alter their resource lifecycle.
 
-This is a living In Design specification, not ready for planning until the material decisions are resolved and the saved specification is reviewed.
+The material operator-interview decisions are resolved. This specification remains `In Design` for operator review. Specification approval permits only the separate planning workflow; it does not itself start planning or implementation.
 
 ## Scope boundaries
 This work replaces the Prime Claw workflow invocation surface; it does not remove operator authority over product, scope, merge, abandonment, or destructive actions. It does not introduce an orchestrator, new task provider, or an autonomous delivery loop.
@@ -59,10 +59,10 @@ Prime Agent remains an upstream dependency. Changes belong in prime-claw's plugi
 <!-- AC:BEGIN -->
 - [ ] #1 Prime Claw no longer registers its custom /plan, /plan-spec, /implement-task, /implement-spec, or /handoff commands; Prime Agent built-ins and native /skill: invocation are unaffected.
 - [ ] #2 Discoverable Markdown skills instruct the agent how to invoke supported workflow operations, bind exact task or retained-specification identity, resolve material ambiguity, and distinguish admission from completion without requiring custom slash commands. Explicit delegated task selection stays within the operator's bounds; implementation selection requires the existing In Planning lifecycle state after design and planning, not dependency readiness alone, and preserves semantic readiness checks without a separate phase-history proof.
-- [ ] #3 Every supported workflow outcome formerly reached through those commands remains reachable through agent-callable operations and skill guidance, including implementation entry, task-native planning, ordinary handoff, and supported retained folder-based compatibility; existing tools are reused where sufficient.
+- [ ] #3 Every supported workflow outcome formerly reached through the removed custom commands remains reachable through agent-callable operations and skill guidance, including implementation entry, task-native planning, ordinary handoff, and retained folder-based planning/implementation/continuation. Existing tools are reused where sufficient. Retained version-1 workflows, ownership, plans, and resource lifecycle are not retired or migrated by this invocation change.
 - [ ] #4 Markdown skills own phase-advancement and approval policy, honor explicit conditional approval for planning followed by implementation within approved scope, and do not infer implementation authority from planning alone. Native tools enforce concrete identity/state/readiness/placement/ownership/resource safety without requiring a particular prior workflow-entry invocation sequence.
 - [ ] #5 The new invocation surface preserves provider/canonical identity, required lifecycle states, readiness checks, placement decisions, ownership, isolated Episode creation, and the one fixed execute assignment, without duplicate admission or allocation after failed or uncertain results.
 - [ ] #6 Managed installed guidance and relevant workflow/user-story documentation consistently describe skills plus agent-callable operations and no longer prescribe removed custom slash commands as required workflow entry points.
 - [ ] #7 Focused automated coverage proves removal of custom registrations, reachable replacement workflow entry points, relevant authorization guidance, and preserved admission/resource-safety outcomes for supported providers and retained compatibility; plugin-source changes pass Docker-isolated Tier-1 validation.
-- [ ] #8 Material interview decisions are resolved in the living specification before planning; the interface cutover respects existing restart and active-resource safety requirements.
+- [ ] #8 The interface cutover respects existing restart and active-resource safety requirements; removing command registrations does not strand supported active task-native or retained version-1 workflows.
 <!-- AC:END -->
