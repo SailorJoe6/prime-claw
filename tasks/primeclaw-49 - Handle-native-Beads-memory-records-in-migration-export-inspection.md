@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-49
 title: Handle native Beads memory records in migration export inspection
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: '2026-10-30 23:43'
-updated_date: '2026-10-31 18:35'
+updated_date: '2026-10-31 18:48'
 labels: []
 dependencies: []
 references:
