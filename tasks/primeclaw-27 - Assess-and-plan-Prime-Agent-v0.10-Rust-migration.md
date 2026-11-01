@@ -1,11 +1,11 @@
 ---
 id: PRIMECLAW-27
 title: Assess and plan Prime Agent v0.10 Rust migration
-status: In Progress
+status: Blocked
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:14'
+updated_date: '2026-11-01 15:13'
 labels: []
 dependencies: []
 priority: p1
@@ -56,3 +56,17 @@ BINDING SCOPE RESOLUTION (Joe, 2026-10-10): Prime Agent downstream maintenance r
 <!-- AC:BEGIN -->
 - [ ] #1 A reviewed compatibility matrix cites exact v0.9.8 and v0.10 sources; the simplified plugin dependency inventory is complete; Orca's Prime Agent provider contract is mapped from both repos; isolated cross-version probes cover launch, create/reuse, message/queue behavior, reconnect, daemon restart, wrong-CWD/stale identity, and rollback; sequencing and cutover gates are documented; implementation work is split into dependency-ordered Backlog.md tasks without changing the installed runtime.
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Prime-Claw Conversation
+created: 2026-11-01 15:13
+---
+Blocked on upstream Prime Agent Rust / Orca compatibility, per Joe’s explicit status decision. This corrects the stale In Progress label; it does not authorize implementation or runtime changes.
+
+The recorded exit gate remains: released saved-CWD fixes, supported lifecycle/identity/finality integration, and passing Orca acceptance evidence, followed by Joe’s separate activation authorization. Prime Claw remains on the validated v0.9.8 line. Rust-line maintenance is separate from permission to install, stage for activation, restart/cut over, or use it in Orca-managed sessions.
+
+Existing tracking: Orca issue https://github.com/stablyai/orca/issues/27282 and Prime Agent discussion https://github.com/PrimeIntellect-ai/prime-agent/discussions/3484. These are the recorded blockers and gates, not a new claim about their current upstream status; no fresh upstream compatibility investigation or probe was performed for this bookkeeping update. Preserve the existing assessment, historical decisions and unchecked acceptance criterion.
+---
+<!-- COMMENTS:END -->
