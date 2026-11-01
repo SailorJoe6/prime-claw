@@ -1,15 +1,17 @@
 ---
 id: PRIMECLAW-46
 title: Allow legacy Beads export without unused Prime Claw lifecycle statuses
-status: In Planning
+status: Done
 assignee: []
 created_date: '2026-10-28 22:04'
-updated_date: '2026-10-29 22:22'
-labels: []
+updated_date: '2026-11-01 15:08'
+labels:
+  - superseded
 dependencies: []
 references:
   - src/prime-agent-plugin/extension-support/task-provider-migration.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
+  - PRIMECLAW-44
 priority: p1
 type: bug
 ordinal: 131000
@@ -133,3 +135,13 @@ Where the old recommendation/plan requires outgoing Beads server mode, a remote,
 This is scope consolidation, not a completed fix. No implementation, task completion/archive, merge, global activation, or live migration is performed here.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as superseded by PRIMECLAW-44, on Joe’s explicit instruction to correct stale bookkeeping. Joe consolidated this overlapping bug into PRIMECLAW-44 on 2026-10-29; its specification and acceptance superseded this task’s separate plan, including the older outgoing-source publication/server assumptions.
+
+PRIMECLAW-44 is Done with all 10 acceptance criteria checked. Its accepted candidate be0c662852dad5433b0017c9906dee51e9088973 is merged into published main and included in the verified all-main 7e686ad activation. PRIMECLAW-44 explicitly includes the PRIMECLAW-46 legacy-source/status-projection findings and regression requirements.
+
+This closes a superseded tracking record, not a separate PRIMECLAW-46 implementation or test run. The historical investigation, old plan, acceptance checklist and comments are retained unchanged; acceptance evidence belongs to PRIMECLAW-44. No independent Episode is needed or authorized. No archive/deletion, code changes, new validation claim, activation or live migration is performed by this bookkeeping correction.
+<!-- SECTION:FINAL_SUMMARY:END -->
