@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-33
 title: Simplify Prime Claw plugin implementation without weakening user stories
-status: In Design
+status: In Progress
 assignee: []
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-14 14:45'
+updated_date: '2026-11-01 15:26'
 labels:
   - prime-agent-plugin
   - simplification
@@ -52,3 +52,15 @@ Read-only audit baseline: about 4,150 LOC under src/prime-agent-plugin, 2,248 LO
 - [ ] #5 Exact supported-runtime tests and focused real acceptance pass.
 - [ ] #6 Main is clean and synchronized, with no candidate mutation of live plugin/sandbox/UAT resources outside separately authorized cutover work.
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Prime-Claw Conversation
+created: 2026-11-01 15:26
+---
+Bookkeeping correction approved by Joe: the parent simplification task is In Progress, not In Design. Current native dependency evidence shows 10 of its 12 subtasks Done; PRIMECLAW-33.7 (focused test cleanup) and PRIMECLAW-33.10 (final acceptance and measurements) remain In Design. PRIMECLAW-33.10 depends on PRIMECLAW-33.7.
+
+This parent status reflects partially completed work; it does not authorize starting either remaining child or creating an Episode. Their scope needs reconciliation with subsequent accepted product decisions, notably PRIMECLAW-44 replacing the old Orca template-diff workflow with non-mutating text comparison. Historical description, criteria and child records remain unchanged by this update; no new implementation, acceptance, merge, deployment or live migration is implied.
+---
+<!-- COMMENTS:END -->
