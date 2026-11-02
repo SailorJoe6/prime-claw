@@ -4,6 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Design
 assignee: []
 created_date: '2026-10-28 02:59'
+updated_date: '2026-11-02 21:32'
 labels: []
 dependencies: []
 references:
@@ -22,6 +23,18 @@ ordinal: 130000
 Backlog.md v1.55.3 is upstream’s current stable release, verified by agreement between the non-prerelease GitHub release and npm `latest` at exact upstream commit `0cf4fdbc70020327f4366a29d3f405f83d180301`. Prime-claw remains built and documented against v1.53.0, and a read-only compatibility review found that advancing the dependency without adapting prime-claw would break provider migration and make task-history evidence inaccurate.
 
 The migration must align prime-claw’s supported CLI/MCP behavior, provider-history conversion, shipped agent guidance, fixtures, distribution pins, and provenance with the v1.55.3 lifecycle. In that lifecycle, a task becomes closed by reaching the configured final status while remaining active; archive is a reversible, read-only off-board state that preserves identity, status, dependencies, and references; restore returns it to the board; delete is the explicit archived-only identity-vacating operation. Legacy `completed/` and canonical `archive/tasks/` records are both archived corpus members until `doctor --fix` migrates legacy storage.
+
+The historical reversal and migration mapping are explicit:
+
+| v1.53 source state or intent | v1.55.3 representation |
+| --- | --- |
+| Active task in a non-final status | Open active task in the same non-final status |
+| Active task in the configured final status | Closed active task in that final status |
+| Record stored under legacy `completed/` | Archived record preserving its final status and history |
+| Record stored under `archive/tasks/`, including an old cancellation or soft deletion | Archived record preserving its status and history; migration never silently deletes it |
+| Future operator intent to permanently discard a record, clean relationships, and vacate its identity | Explicit archive followed by archived-only `task delete` |
+
+Thus the old archive command’s destructive identity-cleanup meaning moves to explicit `delete` for future operations, while pre-existing archived and completed records are preserved during migration. “Closed” remains a status-derived classification, not a storage directory or a replacement native status.
 
 Current incompatibilities include the removed `backlog task complete` call in provider migration, classification of legacy completed records as closed instead of archived, and migration evidence that temporarily relocates archived files into active directories before native viewing. Public docs, installed skills, templates, and tests also teach the obsolete completion flow and old storage path, while build/runtime/submodule/provenance surfaces remain pinned to v1.53.0.
 
