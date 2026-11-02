@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-53
 title: Remove code cleanliness gates from independent Backlog authoring guidance
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-11-02 22:00'
+updated_date: '2026-11-02 22:05'
 labels: []
 dependencies: []
 references:
@@ -76,3 +77,15 @@ No initializer/runtime/symlink-policy change, no dependency or Prime Agent chang
 - [ ] #4 Any directly equivalent authoring contradiction is corrected without broad refactoring or runtime/symlink changes. Candidate validation is Docker-only and includes the mandatory Tier1 probe plus focused proportionate contract evidence; limitations are reported truthfully.
 - [ ] #5 Exact bounded source paths/commit/publication evidence and global Markdown destination/content evidence are reported. Only these approved Markdown assets are delivered globally, with unrelated runtime assets, dirty project state and running processes preserved; no broad apply or restart occurs. If safe bounded delivery is unavailable, the real blocker and pending delivery are reported, not silently bypassed.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Replace only the Backlog “Verify and publish exactly once” blocks in `src/prime-agent-plugin/skills/project-templates/design.md` and `spec-it-out.md` with the final block already approved in Description. Scope Git-index/task-path checks to the selected task store. State clean/direct-remote-equal independent store BEFORE native write, exact intended task-path change afterward, and parent code noninterference instead of code cleanliness/upstream equality. Preserve branch-local publication, Beads authoring, implementation/Episode gates and asset identities. Inspect directly equivalent authoring wording only for remaining contradictions; leave customized local assets and unrelated dirty files unchanged.
+
+2. Add only small focused contract assertions in the existing `tests/test_future_plan_skills.py` coverage (or the existing directly equivalent contract test) for both templates: consistent approved block, pre-write versus post-write timing, unrelated staged/unstaged/untracked code and divergence not blocking, no code-repair action, and unchanged branch-local/admission boundary. This is Markdown contract evidence, not proof of a real native authoring run. No runtime code, controller, generic framework, new state or symlink-policy changes.
+
+3. Validate the isolated candidate in Docker, including `scripts/test-tier1.sh --probe` after the source changes and the focused contract tests through the repository’s Docker test interface. Review the bounded diff, preserve unrelated state and publish the source/test candidate with truthful command/results evidence. Do not run candidate host/global apply/check or native host probes, and do not use live ADAPT or Nemo as fixtures. Record actual outcomes and any baseline limitations in the native task; no unrelated fixes to make a suite green.
+
+4. The owning Conversation reviews and publishes the accepted bounded source through the normal lifecycle, then handles the separately requested Markdown-only global delivery from primary main. Exact asset IDs are `project-skill-design` and `project-skill-spec-it-out`; actual destinations are `~/.prime/agent/skills/project-templates/design.md` and `~/.prime/agent/skills/project-templates/spec-it-out.md`. Deliver only those approved files through a safe existing bounded delivery method, preserving managed ownership consistency and unrelated runtime/assets/processes; never broad-apply or restart. Current `manage-prime-agent-delivery.py apply` rewrites every exact target and exposes no per-asset selector, so do not use it as a hidden broad refresh. If no supported bounded method exists, stop global delivery and report that concrete constraint, without building a delivery feature or falsely claiming activation. Report exact source commit/push, actual destination hashes and unrelated-state checks directly to Adapt-Hand Expert; distinguish source publication, Markdown delivery and runtime activation. ADAPT’s completed consumer work is reported context, not this candidate’s test evidence.
+<!-- SECTION:PLAN:END -->
