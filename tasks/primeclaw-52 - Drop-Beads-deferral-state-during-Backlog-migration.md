@@ -4,7 +4,7 @@ title: Drop Beads deferral state during Backlog migration
 status: In Planning
 assignee: []
 created_date: '2026-11-02 21:52'
-updated_date: '2026-11-03 02:28'
+updated_date: '2026-11-03 18:06'
 labels: []
 dependencies: []
 references:
@@ -57,7 +57,8 @@ Authoring this task does not approve an implementation plan, implementation, mer
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Accept native Beads `deferred` during source lifecycle inspection and consistently map it to ordinary Backlog `In Design` during conversion, destination verification, and replay. Do not project active deferral fields or scheduling; preserve ordinary content and existing raw history/provenance evidence.
-2. Add focused disposable-fixture regression coverage for past, future, and indefinite deferral, conversion/readback/replay, preserved text and history, unchanged source, and safe refusal of other unsupported statuses. Preserve existing issue-versus-memory, identity/relationship, publication, and guarded-retirement safeguards.
-3. Run the required Docker-only plugin validation, including Tier 1 with `--probe`, and report the results. Update directly affected guidance only if needed. Do not inspect or mutate live Nemo, deploy user-globally, or perform a live migration.
+1. Extend `statusFromBeads` in `src/prime-agent-plugin/extension-support/task-provider-migration.ts` with the single native `deferred` → existing Backlog `In Design` projection. Reuse the shared helper in source lifecycle preflight, destination status assignment, and destination lifecycle verification/replay, regardless of past, future or absent `defer_until`. Keep the general Beads runtime lifecycle map and issue-versus-memory handling unchanged; do not introduce date-based classification, a mapping override/framework or new migration state.
+2. Retain the existing explicit destination-field projection and `backlogSourcePackage`. Do not introduce active deferral fields, scheduling/auto-wake, special status/placement or deferral annotations. Preserve ordinary title, description, notes (including `bd defer --reason` text), comments, identity and relationships. Keep historical structured deferral values in the existing raw native/export/history/events/provenance evidence, not active destination fields. Do not normalize or otherwise mutate the retiring Beads source.
+3. Extend `tests/task_provider_migration.test.mjs` with existing disposable native Beads/Backlog fixtures for past-dated, future-dated and indefinite deferred tasks, including the reported `DEFERRED:` title and `defer_until` shape. Assert successful nonterminal inspection, ordinary `In Design` destination records in `tasks/`, no active deferral fields or extra annotations, and preserved ordinary content plus complete raw historical evidence. Exercise destination readback and exact replay through the existing guarded-retirement/refusal seams; prove the same destination identities are reused and source export/history/config and authority remain unchanged before verified cutover, with no ready/defer/undefer/status/config normalization commands. Remove only `deferred` from the unsupported-status rejection set; retain `pinned`, `hooked`, `finished`, `paused`, archive-integrity and no-write refusal assertions.
+4. Run focused deferral/status/archive tests and the full migration suite through the Docker-backed `tests/test_task_provider_migration.py` bridge; adjust its test selection only if needed to include new coverage. Keep native export, issue/memory, identity/relationship, publication, receipt/replay and guarded-retirement regressions passing. After plugin-source changes run `scripts/test-tier1.sh --probe`, report actual results and limits on this task, and update directly affected migration guidance only if it would contradict the change. No dependency upgrade, unrelated importer cleanup, reopening PRIMECLAW-44/46/49, live Nemo inspection/mutation/migration/source deletion, user-global candidate apply/check/probe, activation, restart or merge is part of candidate validation.
 <!-- SECTION:PLAN:END -->
