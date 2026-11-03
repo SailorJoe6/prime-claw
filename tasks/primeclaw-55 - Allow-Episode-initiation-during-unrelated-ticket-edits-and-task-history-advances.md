@@ -6,13 +6,31 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 21:14'
+updated_date: '2026-11-03 21:31'
 labels: []
 dependencies: []
 references:
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - .backlog/tasks/primeclaw-45 - Migrate-prime-claw-to-Backlog.md-v1.55.3.md
+documentation:
+  - docs/prep-chain.md
+modified_files:
+  - .prime-claw/workflows/implement-task-prep.md
+  - .prime-claw/workflows/implement-task.md
+  - .prime-claw/workflows/plan-task-prep.md
+  - .prime-claw/workflows/plan-task.md
+  - docs/prep-chain.md
+  - src/prime-agent-plugin/extension-support/reviewed-plan-support.ts
+  - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+  - src/prime-agent-plugin/extension-support/task-providers.ts
+  - src/prime-agent-plugin/skills/implement-task/SKILL.md
+  - src/prime-agent-plugin/workflows/implement-task-prep.md
+  - src/prime-agent-plugin/workflows/implement-task.md
+  - src/prime-agent-plugin/workflows/plan-task-prep.md
+  - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/task_history_workspace.test.mjs
+  - tests/task_providers.test.mjs
 priority: p1
 type: bug
 ordinal: 140000
@@ -140,6 +158,11 @@ After every plugin-source change run the required Docker-only tier 1. Use `scrip
 Align task-native portions of `docs/backlog.md`, `prep-chain.md`, `handoff-chain.md`, `conversation-driven-episode-oversight.md`, relevant stories/traceability and `future-specification-bundles.md` with the new policy/mechanics boundary. Keep REQUIREMENTS G2/P6/P11 consistent without importing unrelated proposed features, and leave historical evidence historical. Follow inventory/delivery rules if assets move; preserve customized-project update semantics and foreign active snapshots. Do not activate global assets.
 
 Commit/publish coherent code and native task updates promptly. Record the actual commands/results and limits on this task, with remaining accepted in-scope work in its living plan. Deliver a reviewable candidate only: no user-global activation/restart, live recovery, destructive cleanup, retained-folder redesign, dependency patch, merge or abandonment is included. This planning request does not authorize implementation.
+
+## Slice 1 checkpoint — published observational task lookup
+Code candidate `56c4a4a49c7051c30d6684e261664e0a8cf7099f` completes only the shared read-path portion of steps 1–3, plus its directly affected readiness guidance and tests. `resolveSynchronizedProviderTask` retains its historical export name but now only reads the requested workspace. No implicit primary/Episode clone preparation, synchronization or relocation occurs. `resolveProviderTask` no longer runs lifecycle-capability checks before a read. Backlog exposes its full native task-view envelope; Beads retains complete native fields/absence and unknown native statuses, with known canonical aliases unchanged.
+
+Remaining approved work on this same task: extract entry/prep-chain lifecycle eligibility and embedded policy prose; remove Backlog preparation/publication/reservation/allocation gates and automatic failure disposition/reconciliation; equivalent Beads transport/mutation/reservation/continuation extraction; handoff/oversight/block/resume and terminal/cleanup extraction; full ticket-durability asset audit; bounded same-operation PRIMECLAW-45 pre-session recovery; remaining runtime/guidance tests and aligned docs. Key next seams: `prep-chain.ts` allowedStatuses; `reviewed-plan.ts` readiness/tool policy; `spec-episode.ts` status publisher, preparation and allocation; provider history/transport helpers. Do not treat this first slice as full initiation or lifecycle completion. All acceptance criteria remain unchecked. Stop for Conversation review after publication; no next slice is started.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -147,4 +170,20 @@ Commit/publish coherent code and native task updates promptly. Record the actual
 <!-- SECTION:NOTES:BEGIN -->
 ## Slice 1 selected — observational task reads (2026-11-03)
 Implement the smallest end-to-end read-path removal in plan steps 1–3: remove implicit Backlog workspace preparation/synchronization from the default resolver and provider-capability/status eligibility refusals from the native task read for both providers. Preserve complete native task views and truthful native failures. Move explicit read/preparation and eligibility responsibility into existing planning/implementation Markdown. Cover real independent Backlog workspaces with unrelated dirty code/task state and stale/published history, and Beads with absent custom status configuration/unmapped raw statuses. Do not change allocation, lifecycle mutation, continuation, terminal policy, or live resources in this slice; those remain accepted work on this same task. Validate only in Docker, publish one code slice and exact native task notes, then stop for owner review. No acceptance criterion is fully met yet.
+
+## Slice 1 result and reproducible evidence (2026-11-03)
+Published code: `56c4a4a49c7051c30d6684e261664e0a8cf7099f` on `JLanders/prime-claw-primeclaw-55-episode-96306686`. Direct remote ref equals this HEAD; code checkout clean/upstream-equal after push and `git pull --rebase`. Task history remains separate from the code DAG. No lifecycle status was changed by this Episode.
+
+Changed behavior: native task lookup is observational at the Prime Claw boundary, not hidden workspace preparation or a lifecycle-capability/known-status admission gate. A missing Episode Backlog workspace reports lookup failure without allocating a clone; a stale local workspace returns its local task, not fabricated remote freshness. Complete Backlog nativeView and lossless Beads statuses/absent fields reach callers. Existing native failures and exact task/path reads remain. Existing planning and implementation Markdown plus managed project copies explain explicit workspace actions, eligibility interpretation and exact selected-ticket commit/publication responsibility. The customized managed plan-task content was preserved, not blanket-reset. docs/prep-chain.md explicitly distinguishes this first slice from the still-pending lifecycle extraction. Native Backlog itself can migrate old configuration on task view; this slice does not patch its CLI or claim all native reads are inherently filesystem-read-only.
+
+Validation (source selected from the independently verified annotated cwd-fix-v0.9.8-r1 checkout, a1faacd53ac4473a75de1d434afaf50945c2f647; Docker-only candidate execution):
+- `scripts/test-tier1.sh --probe`: PASS. Immutable image launch, offline apply/check/RPC probe, teardown and manifest publication verified. Evidence `.test-results/20261103T211750Z-9816-058e3aeb/tier1/manifest.json` and `/tmp/primeclaw55-slice1-probe-retry.log`.
+- `python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container`: first run 10 passed / 1 failed. History Node suite passed 80/80; admission/Beads/ownership/reviewed-plan bridges passed. Only failure was one old expected capability-probe sequence in the provider test. Updated that expectation only; no source repair. Evidence `.test-results/20261103T211556Z-1187-eb8af297/tier1/task-history-workspace-node.tap` and `/tmp/primeclaw55-slice1-focused.log`.
+- `python3 -m pytest tests/test_task_providers.py -q -m container -k test_task_providers_node_suite`: PASS after tests-only assertion correction (1 passed / 6 deselected; full 81-case provider Node suite). Evidence `.test-results/20261103T212733Z-55345-0a303852/tier1/manifest.json` and `/tmp/primeclaw55-slice1-provider-rerun.log`.
+- Host-safe selected static files with `-k "not repository_status_cutover_uses_task_native_order_without_to_do"`: 12 passed / 11 skipped / 1 deselected. Unfiltered run has one pre-existing missing-path failure: test_reviewed_plan_extension.py hardcodes `backlog/config.yml`, absent in this repository's .backlog topology. Did not repair unrelated baseline. `git diff --check`: PASS.
+- Initial disposable probe attempt failed before candidate execution: its recorded builder image SHA could not be inspected. Receipt `.test-results/20261103T211559Z-1617-65198acb/tier1/source-build.json` records builder-failed and unchanged source inventory. Subsequent independent probe run above passed. No cause beyond that exact image-unavailable evidence is asserted.
+
+Regression assertions prove dirty staged/unstaged/untracked primary code, Episode code and both independent task clones survive reads, including config bytes/index/HEAD while published history advances elsewhere. No resolver fetch, merge, clone, push or capability probe occurs. Raw Beads open/closed/custom statuses, absent design, native extensions, linked-root reads and truthful native command failures are covered. Child lifecycle-map reviewed the diff and shared/retained callers read-only: no concrete defects, static-review limit stated.
+
+No global apply/activation, restart, dependency patch, live PRIMECLAW-45 recovery, terminal mutation, ownership edit or destructive cleanup was performed. The whole task is not complete. Await owner review of this one bounded slice.
 <!-- SECTION:NOTES:END -->
