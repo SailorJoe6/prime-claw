@@ -1,24 +1,160 @@
 {
   "schemaVersion": 1,
   "owners": {
-    "01a1363a-e0f9-7628-aee4-81b03eb1e3fb": {
+    "01a18f25-aee6-7352-991b-59275f14bf96": {
       "version": 2,
       "provider": "backlog",
-      "status": "uncertain",
-      "operationId": "b0133363-514c-419e-affc-7fc4b1042d90",
+      "status": "active",
+      "operationId": "97fc9b02-6903-415a-a6f1-239fed1c6ce4",
       "engine": "orca",
-      "ownerSessionId": "01a1363a-e0f9-7628-aee4-81b03eb1e3fb",
-      "taskId": "PRIMECLAW-53",
-      "taskPath": ".backlog/tasks/primeclaw-53 - Remove-code-cleanliness-gates-from-independent-Backlog-authoring-guidance.md",
-      "providerRevision": "d3ce788ca752d649947eaa2175e5971fdd368e32",
+      "ownerSessionId": "01a18f25-aee6-7352-991b-59275f14bf96",
+      "taskId": "PRIMECLAW-48",
+      "taskPath": ".backlog/tasks/primeclaw-48 - Allow-task-Episodes-from-published-non-main-bases-for-stacked-PRs.md",
+      "providerRevision": "8c5a97fd8ec8b8804ca07ba2067c9c85523a51cc",
       "taskEvidence": {
         "schemaVersion": 1,
         "kind": "task-view",
         "task": {
-          "id": "PRIMECLAW-53",
-          "title": "Remove code cleanliness gates from independent Backlog authoring guidance",
+          "id": "PRIMECLAW-48",
+          "title": "Allow task Episodes from published non-main bases for stacked PRs",
           "status": "In Progress",
-          "type": "docs",
+          "type": "bug",
+          "priority": "p1",
+          "project": null,
+          "assignees": [],
+          "reporter": null,
+          "labels": [],
+          "milestone": null,
+          "parentTaskId": null,
+          "acceptanceCriteriaCompleted": 0,
+          "acceptanceCriteriaCount": 7,
+          "references": [
+            "src/prime-agent-plugin/extension-support/spec-episode.ts",
+            "src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md",
+            "src/prime-agent-plugin/workflows/implement-task.md"
+          ],
+          "modifiedFiles": [
+            "docs/conversation-driven-episode-oversight.md",
+            "docs/evidence/primeclaw-48-integration-target-foundation-20261103.md",
+            "src/prime-agent-plugin/extension-support/episode-ownership.ts",
+            "src/prime-agent-plugin/extension-support/task-episode-ownership.ts",
+            "tests/task_episode_ownership_extension.test.mjs"
+          ],
+          "ordinal": 133000,
+          "createdAt": "2026-10-30T23:31:00Z",
+          "updatedAt": "2026-11-03T18:48:00Z",
+          "dueDate": null,
+          "isReady": true,
+          "path": ".backlog/tasks/primeclaw-48 - Allow-task-Episodes-from-published-non-main-bases-for-stacked-PRs.md",
+          "description": "## Observed failure\n\nDirect report from Conversation Prime-Agent-Pi (`01a18414-077b-7038-85d3-6d13ece95269`), not a new reproduction: in `/Users/jlanders/code/prime-agent`, the owning primary checkout was clean and pushed on `fix/daemon-cwd-session-recovery`, at code HEAD/upstream `a1faacd53ac4473a75de1d434afaf50945c2f647`. This was the reviewed TypeScript baseline.\n\nJoe invoked `/implement-task TASK-2` for “Prevent orphaned RLM settlement after child finalization errors”. Backlog was the sole valid provider, with an ignored independent ordinary-Git `.backlog` clone, origin `https://github.com/SailorJoe6/prime-agent.git`, task ref `refs/heads/prime-claw/tasks`, and task path `.backlog/tasks/task-2 - Prevent-orphaned-RLM-settlement-after-child-finalization-errors.md`. The task was `In Planning`, with a meaningful 642-word plan, seven unchecked acceptance criteria and no blocking dependencies. Its complete specification/plan had been read and judged ready; task HEAD, FETCH_HEAD and direct published revision agreed at `61b5bfe5870e2d04ff092d6280db894f104c1997`.\n\nThe canonical readiness workflow completed preparation and called `create_task_episode` exactly once with `{\"taskId\":\"TASK-2\"}`. It returned:\n\n> Task Episode creation failed: Task-native Episode creation must run from the canonical primary main checkout\n\nAfterward, the task remained field-for-field unchanged in `In Planning`; the task clone remained clean and published at the same revision; no `.prime-claw/ownership.json` existed; and the worktree inventory contained only the original primary and existing cwd-fix/upstream-assessment trees, with no new Episode tree. Code stayed clean and unchanged. No implementation, status change, assignment/handoff, branch switch, bypass or creation retry was attempted. These are observed native/Git/filesystem facts, not proof about unseen resources.\n\nLocal main was `08ff1b2e2794ea9e8f4a08d12bc95408a66e1074` (v0.9.7), four commits behind the selected baseline (`main...HEAD` = `0/4`); origin/main was independently newer/different. Switching to main would change the approved implementation basis. No switch, merge, pull or reset workaround was authorized.\n\nJoe's feedback: '\"The tool requires the canonical primary main checkout\" bad design. it blocks stacking PRs and other such fun'\n\n## Source evidence and diagnosis\n\nPrime Claw source inspected at `24b519c3c967269dd3867bf06a9e92a2f125012d`: `src/prime-agent-plugin/extension-support/spec-episode.ts:3145-3153` rejects `git.branch(projectRoot) !== \"main\"` alongside primary-checkout identity checks. Beads admission repeats this at `2913-2921`. This confirms a literal branch-name restriction; equating primary ownership with main is the inferred design defect, not a newly reproduced runtime trace.\n\nDownstream assumptions also need coherent treatment: task blocked handling (`977-984`), handoff (`1776-1782`), cleanup (`2671-2673`), and terminal publication/ancestry checks (`2547-2605`, including Beads direct-remote `main`). Managed oversight at `src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md:41-49` hardcodes main for readiness, merge and abandonment. `src/prime-agent-plugin/workflows/implement-task.md:90` also assumes canonical main. Removing only the admission check is insufficient.\n\n## Intended outcome and boundaries\n\nUse the current checked-out branch as the Episode base and default merge target, including a clean, published feature/stack branch in the primary owning checkout. Show its name and exact base commit during readiness; bind that commit and integration branch so continuation, review, merge and cleanup use the correct target. The repository's actual primary/default branch is supported regardless of whether it is named main, master or something else; it is not a universal admission gate. Preserve task/provider/publication/owner/resource identity, isolated Episode resources, and explicit operator merge/abandonment authority.\n\nThe implement-task skill must instruct the LLM to check whether the current branch differs from the repository's actual primary/default branch. If it does, the LLM should ask the user before stacking, for example: \"Current branch is xxxx; are you sure you want to stack a branch off this?\" This is ONLY an instruction in the skill file. Add no code to require, track, validate or enforce this check-in, no approval token/receipt, and no deterministic confirmation gate or compliance test. Joe explicitly accepts that the LLM may ignore this instruction. This does not weaken the separate existing identity, isolation or publication checks.\n\nUse native Git/provider behavior and the smallest explicit binding needed. Do not introduce a branch classifier, reconciler, coordinator, new state machine or lifecycle receipts. This bug concerns task-native admission and affected downstream target assumptions, not blanket permission for arbitrary checkout admission. Preserve legacy compatibility and the distinct post-acceptance primary-main `--user-global` activation policy. No Prime Agent source changes, release/Rust/fork proposals, or changes to foreign TASK-2 are in scope. This ticket authorizes specification review only, not planning, implementation or real Episode reproduction.",
+          "dependencies": [],
+          "dependencyGraph": {
+            "root": "PRIMECLAW-48",
+            "nodes": [
+              {
+                "id": "PRIMECLAW-48",
+                "title": "Allow task Episodes from published non-main bases for stacked PRs",
+                "status": "In Progress",
+                "state": "resolved",
+                "completed": false,
+                "dependencyDepth": 0,
+                "dependentDepth": 0
+              }
+            ],
+            "edges": []
+          },
+          "readiness": {
+            "isReady": true,
+            "isBlocked": false,
+            "blockingDependencies": [],
+            "missingDependencies": []
+          },
+          "documentation": [
+            "docs/evidence/primeclaw-48-integration-target-foundation-20261103.md"
+          ],
+          "subtasks": [],
+          "acceptanceCriteria": [
+            {
+              "index": 1,
+              "text": "The current checked-out branch is the Episode base and default merge target. A clean, published non-default branch in the primary owning checkout can admit an otherwise-ready task Episode without changing that baseline; the repository default branch is supported regardless of its name.",
+              "checked": false
+            },
+            {
+              "index": 2,
+              "text": "The exact base commit and intended integration branch remain unambiguous for the same owner/task/Episode through continuation, blocked handling, review and terminal cleanup; merge and publication target that integration branch rather than a hardcoded main.",
+              "checked": false
+            },
+            {
+              "index": 3,
+              "text": "Admission never silently switches the primary checkout to main, discards stacked commits or substitutes another implementation basis. Existing unsafe-state, provider/publication, owner and resource identity rejections remain effective, with isolation preserved.",
+              "checked": false
+            },
+            {
+              "index": 4,
+              "text": "Merge and abandonment still require explicit operator authority. Task status/publication and terminal ancestry checks remain correct for the selected target; unrelated tasks and resources are not changed.",
+              "checked": false
+            },
+            {
+              "index": 5,
+              "text": "Focused disposable regression evidence covers clean published non-main acceptance with isolation/identity and invalid admission leaving task/resources unchanged. Review affected managed instructions for consistent target handling; do not require a new broad test harness or matrix.",
+              "checked": false
+            },
+            {
+              "index": 6,
+              "text": "The change stays within Prime Claw, preserves legacy compatibility and does not loosen the separate primary-main user-global activation policy or introduce unnecessary coordination/state machinery.",
+              "checked": false
+            },
+            {
+              "index": 7,
+              "text": "Content review confirms the implement-task skill tells the LLM to ask the user before stacking from a branch other than the repository’s actual primary/default branch, naming the current branch. This check-in exists only as a skill instruction: no code enforcement, confirmation tracking/receipt or compliance test is added; LLM noncompliance is explicitly acceptable.",
+              "checked": false
+            }
+          ],
+          "definitionOfDone": [],
+          "implementationPlan": "## Scope and implementation basis\n\nImplement only PRIMECLAW-48 in Prime Claw. The current checked-out branch is the code base and default integration target; show the branch and exact SHA during readiness. Keep the owning primary-root requirement, provider-native publication and unsafe-state/resource checks. This plan does not authorize implementation, real Episode reproduction, foreign TASK-2 changes or user-global activation.\n\nCurrent source at `fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8` confirms literal-main restrictions in `extension-support/spec-episode.ts` admission, task blocked handling, handoff and finalization. Existing ownership has `baseRef` and the Episode `branch`, but no integration target. Use these existing boundaries rather than adding orchestration.\n\n## Ordered work\n\n1. **Put the stacking check-in only in the skill.** Update `src/prime-agent-plugin/skills/implement-task/SKILL.md` to have the LLM inspect the current branch and the repository's actual primary/default branch using ordinary Git evidence (not a literal `main` assumption). On a non-default branch, instruct it to ask: “Current branch is xxxx; are you sure you want to stack a branch off this?” Show current branch and code SHA during readiness. Add no confirmation argument, code enforcement, approval token/receipt, tracking or compliance test. LLM failure to ask is explicitly acceptable. This must not become a second readiness/approval mechanism.\n\n2. **Bind the integration branch in existing task ownership.** Add one task-only `integrationBranch` field to the version-2 types/allowlists/parser in `extension-support/episode-ownership.ts`, and carry it through the three reservation inputs/factories in `extension-support/task-episode-ownership.ts`. Fresh admissions always record the current named branch; `baseRef` continues to identify the exact code base and `branch` continues to identify the isolated Episode branch. Use ordinary Git branch/ref validation. Include the effective target in existing `sameEpisodeBinding` immutability checks so an active owner cannot silently retarget. Old version-2 records without the field retain their previous `main` target through one narrow compatibility fallback; never infer their target from whichever branch is now checked out. Leave version-1 records and their main-only transition/activation policy unchanged. Preserve this field across provider migration and same-owner evidence/routing updates; do not migrate or rewrite live ownership. No new schema generation, state machine, target registry or receipt.\n\n3. **Admit from that branch without changing the baseline.** In Backlog `createTaskEpisode` and Beads `createBeadsTaskEpisode` in `extension-support/spec-episode.ts`, replace only the task-native literal-main gate with capture/validation of the current named branch. Retain repository-root/primary-worktree, persisted top-level owner, placement, exact task status/plan, and nonterminal ownership checks. Recheck branch and code identity at the existing serialized/publication/reservation boundaries so a switch cannot silently retarget admission. Independent Backlog and Beads keep code and provider DAGs separate and retain their clean published-code proofs against the selected branch's configured upstream. Grandfathered branch-local Backlog retains its exact task-only status commit as `baseRef` and existing prompt-push behavior. Pass the target to the reservation before any resource allocation; provision the worktree from the exact `baseRef`, never by switching the primary checkout or substituting default-branch HEAD. Preserve existing rollback/Blocked/no-retry behavior and one fixed execute assignment.\n\n4. **Use the same target for the rest of the task lifecycle.** Update task-native blocked handling, `handoffTaskEpisode`, `allocateReservedTaskEpisode` fresh/replay branch identity checks, and `finalizeTaskEpisodeCleanup`/`verifyTaskEpisodeTerminalState` in `spec-episode.ts` to use the recorded integration target instead of `main`. The owner checkout must match that branch; if it has switched, report the mismatch without switching, rebinding or allocating again. Normal target-branch advancement remains allowed under existing ancestry/publication rules; do not pin its HEAD forever to admission. Fresh review/merge evidence names the integration branch plus target and candidate heads. Check pushed terminal code and merged/abandoned Episode ancestry against that target, including Beads direct-remote checks; keep independent Backlog terminal evidence on its task ref. Preserve exact owner/task/provider/resources, idle-work checks and cleanup-only behavior. Cleanup still deletes only the Episode’s own configured upstream, never the integration branch. Keep explicit operator merge/abandonment authority; do not add retarget automation or a coordinator.\n\n5. **Align managed instructions and focused docs.** Update the task-native portions of `workflows/implement-task.md`, `skills/prime-claw-oversee-episode/SKILL.md`, relevant execute/blocked/handoff/expert guidance, and the `finalize_task_episode` tool description in `extensions/reviewed-plan.ts` so readiness, review, status publication, merge and cleanup name the recorded integration target. Update `docs/conversation-driven-episode-oversight.md` and affected promotion/finalization user stories/traceability. Review each main reference rather than globally replacing it: retained version-1 workflows, legacy bridge and accepted-primary-main `--user-global` refresh/restart/UAT rules stay unchanged. Change inert source assets, not the installed global skill/plugin; no host apply/check/probe.\n\n6. **Prove the change with existing disposable suites.** Extend `tests/task_episode_admission_extension.test.mjs` and `tests/beads_task_episode_admission_extension.test.mjs`: accept a clean published feature/stack base without losing its commits, retain the exact base/target through one isolated allocation, support a default branch named `master` or another non-main name, and replace the obsolete “primary non-main rejects” assertion while retaining linked-worktree rejection. Add focused pre-mutation detached/unsafe or branch-drift rejection assertions with unchanged task/ownership/resources. Extend existing ownership/handoff/blocked/close cases to show target retention, normal same-branch advancement, rejection of wrong-target cleanup, and correct merged/abandoned terminal ancestry/publication on the feature target. Retain old version-2 missing-target, provider-switch field preservation, forbidden active-target mutation and version-1 compatibility coverage and local/Orca identity coverage without creating a broad cross-product matrix. Review skill wording as content; add no test of whether the LLM asked or the user confirmed.\n\nRun affected Node behavior suites only through their existing Docker Tier-1 pytest bridges (`tests/test_task_providers.py`, `tests/test_reviewed_plan_extension.py`), plus relevant policy/docs checks. After every plugin-source change run the required Tier-1 validation, such as `scripts/test-tier1.sh --probe` or `python3 -m pytest tests/ -q -m container`. Record actual results and any blockers in the native task during the later implementation Episode; do not claim tests have run during planning. Keep documentation and acceptance evidence current, commit/push the reviewed implementation candidate, then return it to the owning Conversation for review. Merge, abandonment, activation/restart and cleanup remain separate lifecycle decisions, not consequences of this plan.\n\n## Execute checkpoint: slice 1 (2026-11-03)\n\nStep 2 ownership foundation is implemented and Docker-validated in code candidate 82a307079b9a5034303a8705337d3eb337791351. integrationBranch remains optional for old records/callers and the compatibility target is main. Public admission is not changed yet. Continue with steps 1, 3 and 4 as the next coherent target-aware admission/lifecycle slice; then complete step 5 managed guidance and step 6 non-main admission/terminal acceptance. Exact evidence and the unchanged static-test path limitation are in Implementation Notes and the linked evidence doc. Stop for owner review after this one slice.",
+          "implementationNotes": "## Execute slice 1: integration-target ownership foundation (2026-11-03)\n\nBound Episode: `01a1a2b3-da23-77ee-8519-83f2e4a79e73`, owning Conversation `01a18f25-aee6-7352-991b-59275f14bf96`, code base `32a02232b65dffc2a51660661e38dc05cc289f5b`.\n\nThis bounded pass implements plan step 2 only: task-only optional `integrationBranch`, explicit native Git ref validation, legacy missing-field effective target `main`, immutable effective target for a live owner, and reservation/provider-switch/evidence retention tests. Existing public callers remain compatible. Public admission is still main-only in this staged slice; enabling non-main admission and switching all downstream lifecycle checks together are the next slice. The skill-only stacking check-in and full lifecycle/docs acceptance remain pending. No acceptance criterion is claimed complete by this foundation alone. No live ownership rewrite, provider switch, foreign task mutation, installed/global refresh, merge, terminal publication or cleanup is authorized/performed.\n\nValidation and exact publication evidence will be appended after the candidate is ready.\n\n## Slice 1 completed and published (2026-11-03)\n\nCode candidate: `82a307079b9a5034303a8705337d3eb337791351` on `JLanders/prime-claw-primeclaw-48-episode-97fc9b02`, non-force pushed; direct remote head equals that SHA. Code checkout is clean and up to date with its own upstream. Only five approved code/docs/test paths changed; task history is not in the code DAG. Evidence: `docs/evidence/primeclaw-48-integration-target-foundation-20261103.md`.\n\nDelivered: task-only optional integrationBranch across all version-2 ownership shapes and all three reservation inputs/factories; native Git branch/ref validation; effectiveTaskEpisodeIntegrationBranch with omitted-field-only main fallback; live effective-target immutability, including refusal of feature-target deletion; representative provider-switch/rollback/route/evidence retention regression coverage. Existing public callers remain compatible; version-1 does not gain this task field. No live ownership rewrite occurred.\n\nActual validation:\n- scripts/test-tier1.sh --probe: exit 0, offline apply/check plus RPC probe passed, network absent, teardown verified, manifest published. Evidence .test-results/20261103T184113Z-62440-fcbcc1a5/tier1/manifest.json.\n- python3 -m pytest tests/test_task_providers.py tests/test_reviewed_plan_extension.py::test_task_episode_ownership_node_suite tests/test_reviewed_plan_extension.py::test_spec_episode_node_suite tests/test_reviewed_plan_extension.py::test_episode_close_node_suite -q -m container: 7 passed, 3 deselected in 356.25s. Evidence .test-results/20261103T184121Z-63056-69b1f777/tier1/manifest.json. Both Docker runs captured repository hash aae13124f2eb03e6044c94642ce7181d93090c2bd2b92a7e92fb7d303b0b9fad.\n- python3 -m pytest tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q: NOT GREEN; 1 failed, 11 passed, 10 skipped. Unchanged test test_repository_status_cutover_uses_task_native_order_without_to_do reads absent backlog/config.yml rather than the independent .backlog config. The test is byte-identical to the admission base and neither config path is tracked there. No separate baseline execution claimed and no unrelated fixture/topology repair made. Full output .test-results/primeclaw-48-binding-slice1/focused-static.log.\n- git diff --check: passed.\n\nThe Docker source selector points only to the documented clean read-only cwd-fix-v0.9.8-r1 source; exact tag/commit/tree/lockfile identities and immutable image IDs are in the tracked evidence note. No Prime Agent source modification, candidate host/global execution or activation occurred.\n\nAt final task-write preparation, independent history advanced from 0adba82d1caeed1d9dd62a16a17442a0f6067e93 to 0a85356dc374d6c90f2961c03296469aa0a22472 only through unrelated task changes. The complete PRIMECLAW-48 native task view remained unchanged. This update preserves those unrelated changes, the task identity, parent, status and specification; it updates only owner-authored plan checkpoint, notes, documentation and modified-file fields.\n\nSTOP after this slice for owning Conversation review/continuation. Public admission is still main-only. Next: skill-only stacking check-in, fresh current branch capture/reservation and all downstream target lifecycle checks together, then focused non-main admission/terminal evidence and managed-instruction alignment. No whole-task AC checked, no final whole-task completion claim, no merge/Ready for Merge/Done/archive/cleanup. Task remains In Progress.",
+          "comments": [],
+          "finalSummary": null
+        }
+      },
+      "baseRef": "32a02232b65dffc2a51660661e38dc05cc289f5b",
+      "createdAt": "2026-11-03T18:37:02.498Z",
+      "updatedAt": "2026-11-03T18:54:31.232Z",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-48-episode-97fc9b02",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-48-episode-97fc9b02",
+      "worktreeIdentity": "wt2:local:1e9fc8d4-098e-4263-bb37-221321429e36",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-48-episode-97fc9b02",
+      "branch": "JLanders/prime-claw-primeclaw-48-episode-97fc9b02",
+      "head": "82a307079b9a5034303a8705337d3eb337791351",
+      "launchAutomationName": "prime-claw-launch-97fc9b02-6903-415a-a6f1-239fed1c6ce4",
+      "episodeId": "01a1a2b3-da23-77ee-8519-83f2e4a79e73",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a1a2b3-da23-77ee-8519-83f2e4a79e73.jsonl",
+      "episodeActiveSessionId": "1ba91651469c",
+      "terminalHandle": "term_6aabb818-4107-43ee-a55e-c8f9b3cb4529",
+      "terminalHandles": [
+        "term_6aabb818-4107-43ee-a55e-c8f9b3cb4529",
+        "term_f03a9afd-c1b0-4737-a72b-ab0c858c8a26"
+      ]
+    },
+    "01a19f0d-54c9-71d1-b407-4016721d904e": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "89af1cc6-adf3-4d6d-958b-da1414becebe",
+      "engine": "orca",
+      "ownerSessionId": "01a19f0d-54c9-71d1-b407-4016721d904e",
+      "taskId": "PRIMECLAW-52",
+      "taskPath": ".backlog/tasks/primeclaw-52 - Drop-Beads-deferral-state-during-Backlog-migration.md",
+      "providerRevision": "0954f9ea8ad7f1f62be4c8bc654a6033bc5398b1",
+      "taskEvidence": {
+        "schemaVersion": 1,
+        "kind": "task-view",
+        "task": {
+          "id": "PRIMECLAW-52",
+          "title": "Drop Beads deferral state during Backlog migration",
+          "status": "In Progress",
+          "type": "bug",
           "priority": "p2",
           "project": null,
           "assignees": [],
@@ -27,26 +163,29 @@
           "milestone": null,
           "parentTaskId": null,
           "acceptanceCriteriaCompleted": 0,
-          "acceptanceCriteriaCount": 5,
+          "acceptanceCriteriaCount": 6,
           "references": [
-            "src/prime-agent-plugin/skills/project-templates/design.md",
-            "src/prime-agent-plugin/skills/project-templates/spec-it-out.md"
+            "PRIMECLAW-44",
+            "PRIMECLAW-46",
+            "PRIMECLAW-49",
+            "src/prime-agent-plugin/extension-support/task-provider-migration.ts",
+            "src/prime-agent-plugin/extension-support/task-providers.ts"
           ],
           "modifiedFiles": [],
-          "ordinal": 138000,
-          "createdAt": "2026-11-02T22:00:00Z",
-          "updatedAt": "2026-11-03T00:10:00Z",
+          "ordinal": 137000,
+          "createdAt": "2026-11-02T21:52:00Z",
+          "updatedAt": "2026-11-03T18:41:00Z",
           "dueDate": null,
           "isReady": true,
-          "path": ".backlog/tasks/primeclaw-53 - Remove-code-cleanliness-gates-from-independent-Backlog-authoring-guidance.md",
-          "description": "## Outcome and authority\nCorrect the canonical and globally delivered Markdown authoring templates so an independent Backlog task store can create, revise and publish tasks without requiring its parent code repository to be clean or upstream-equal. Joe explicitly authorized this bounded documentation correction and global template delivery through ADAPT / Adapt-Hand Expert. His exact instruction was: “We need to fix the skill to make it clear there's no such requirement. We need the fix to be in the global template from prime-claw as well as our local skill file. work with Prime-Claw expert to get that into the global template, fix it locally, delete the unnecessary symlink, commit the .gitignore, create the ticket.”\n\nAdapt-Hand Expert owns ADAPT local changes and reports them completed separately. This Prime-Claw task owns only the source/global Markdown fix. ADAPT-1 is not this work item. Completed PRIMECLAW-51 is not reopened and no terminal Episode may be borrowed. Joe has selected the behavior and replacement wording; no further product-definition approval is needed merely because this request is recorded as a task. The request includes bounded implementation, required safe validation and publication/global Markdown delivery, not a broad runtime refresh or restart. Normal lifecycle/resource admission gates remain in force.\n\n## Confirmed defect and scope\nBoth src/prime-agent-plugin/skills/project-templates/design.md and spec-it-out.md, in Verify and publish exactly once → Backlog, require canonical code HEAD clean and upstream-equal even for an ignored independent ordinary-Git task store. The nearby unqualified Git-index cleanliness language is also ambiguous. Correct these equivalent authoring sections only; inspect other directly equivalent authoring guidance solely to prevent contradiction, not for a broader refactor.\n\nThe following replacement is the exact final ADAPT local block, with pre-write timing confirmed by Adapt-Hand Expert and Prime-Claw51. Use the same semantics and wording in both canonical templates:\n\n### Backlog\n\nBefore mutation, record Git status in the code repository and the selected task\nstore. Require the selected existing task path and the selected task store's\nGit index to be clean; do not apply task-store cleanliness checks to a separate\nparent code repository. After creation or revision, reload the exact task\nthrough `backlog task view --json -- TASK-ID` and verify its canonical ID,\n`In Design` status, meaningful Description, native Acceptance Criteria, and\nreturned regular task path. Verify no path other than that exact returned task\npath was newly changed in the task store and do not stage unrelated pre-existing\nchanges.\n\nPreserve the selected store topology. If the selected Backlog store is a\nvalidated ignored independent ordinary-Git clone, whether built-in or custom,\nbefore the native task write require the independent clone to be clean and at\nthe directly proved `refs/heads/prime-claw/tasks` head. After the native task\nwrite, verify only the exact intended task path changed, commit only that path\ninside the clone, push `HEAD:refs/heads/prime-claw/tasks` without force, and prove\nthe direct remote head. There is no requirement for the parent code repository to be clean\nor upstream-equal for task creation, revision, or task-store publication.\nUnrelated staged, unstaged, or untracked code changes and code-branch divergence\nare not blockers. Preserve the parent code HEAD, index, and worktree as found;\nnever commit, stash, reset, clean, or otherwise repair code changes to enable a\ntask-only operation. This does not relax separate implementation or Episode\nadmission requirements.\nOnly for an actual branch-local store, keep the existing flow: commit only the\nreturned task path in the code repository, prove the commit contains no other\npath, and attempt one prompt push when a remote is available. A push failure is\ntransport evidence to report, not permission to undo the valid local\nspecification, create another task, or begin planning.\n\n## Delivery and non-goals\nPreserve managed asset identities and the existing native independent-store topology. Retain task/store/root identity checks, clean published independent store BEFORE its native write, exact intended task-path changes afterward, task-store index safety, scoped task-only commits, non-force push and direct-remote proof. Code noninterference is not code cleanliness; concurrent unrelated code changes are not proof this task operation modified them. Do not weaken branch-local authoring behavior or implementation/Episode admission requirements.\n\nValidate candidate source changes only in Docker, including mandatory Tier1 probe after changes under src/prime-agent-plugin. Use focused, proportionate docs/contract regression evidence; no new validation framework. Preserve the dirty .prime-claw/templates.json and any unrelated source/index/runtime work. Report qualified test results honestly.\n\nPublish the bounded source correction through the required normal lifecycle and deliver only the corrected global Markdown assets, using safe existing delivery surfaces if they support that scope. Prove exact destination paths and contents/hashes and absence of unrelated global/runtime changes. Do not run a broad global apply that silently refreshes other assets, do not restart, and do not invent a new delivery controller. If supported delivery cannot safely isolate these Markdown assets, report that concrete constraint rather than broadening scope or claiming global activation. Existing running processes are not claimed restarted; report actual Markdown delivery status separately from runtime activation.\n\nNo initializer/runtime/symlink-policy change, no dependency or Prime Agent changes, no live migration, no ADAPT task/source/config mutation, and no changes to completed work. The separately reported unnecessary root-symlink behavior is awareness only, outside this task.",
+          "path": ".backlog/tasks/primeclaw-52 - Drop-Beads-deferral-state-during-Backlog-migration.md",
+          "description": "## Outcome\nDuring one-way Beads→Backlog migration, import a native Beads task whose status is `deferred` as an ordinary `In Design` task. Drop active deferral state and deferral-only structured fields from the destination projection. Do not modify the retiring Beads source to achieve this.\n\n## Product instruction and context\nJoe’s instruction, relayed by NemoHermes Upgrade: “Just drop any \"deferred\" status and related fiedls as part of the migratino.” This supersedes the earlier unapproved proposal that the task must remain frozen or outside ready work. The selected behavior is the normal new/open task default, not a special destination lifecycle or scheduling feature.\n\nNemoHermes Upgrade reports canonical inspection at Nemo housekeeping commit `b8c9be358df4fc5fc67d1aec74feb7c4943572e1` stops with `Beads source lifecycle preflight failed: nemo-setup-5lt status=\"deferred\": unsupported status`. The task is titled `DEFERRED: Decide + enable web search provider`, with `defer_until=2026-08-01T00:00:00Z`. The reported native catalog defines deferred as frozen; the issue inventory is 33 issues (30 closed, one open, one blocked, one deferred), separate from the last-observed 19 memory records. These are reported consultation facts, not a new live inspection or proof of destination memory outputs.\n\nThe accepted importer currently projects fixed canonical Beads lifecycle names plus legacy open/closed and rejects deferred during source preflight. No existing runtime mapping override exists; semantic-placement prose does not change that projection. This task is the narrow destination-behavior change, not a repair of malformed source or another memory parser change.\n\n## Required behavior\n- Recognize native Beads `deferred` in inspection and destination conversion as the ordinary `In Design` projection. Use the same meaning in destination verification/replay; do not let source classification reject this selected case before projection.\n- Do not create a Deferred status, active `defer_until` or other deferral-only destination fields, snooze/auto-wake behavior, special deferral annotations, or forced Draft/Blocked/archive placement. Timed, expired and indefinite source deferral do not change this destination meaning.\n- Preserve ordinary title, description, notes, comments, native history and provenance. Native `bd defer --reason` appends ordinary notes; it is not a dedicated field to strip. Do not delete or rewrite ordinary text merely because it contains “deferred”, including the reported title.\n- Retain the canonical raw source-capture and receipt/provenance evidence already required for lossless history. Historical deferral values may remain inside that existing raw evidence; do not restore them as active destination fields, scheduling or additional deferral annotations.\n- Keep Beads unchanged and authoritative until the existing verified cutover. Never call ready/defer/undefer/status/config edits to normalize source data. Keep safe refusal for other genuinely unmapped statuses and preserve existing identity, relationship, publication, ownership, receipt/replay and guarded-retirement protections.\n\n## Scope and authority\nUse the least technology needed for this one supported projection and its focused regression coverage. Update directly affected guidance if it would otherwise contradict the behavior. No generic mapping/override framework, new controller, dependency upgrade, scheduling feature, unrelated importer cleanup, or reopening completed PRIMECLAW-44/46/49. Their accepted guarantees remain context, not unfinished work.\n\nAuthoring this task does not approve an implementation plan, implementation, merge, global activation, restart or live migration/source deletion. Candidate validation must use disposable fixtures and the repository’s Docker-only plugin workflow, including the mandatory Tier 1 probe after plugin-source changes. Do not run another live Nemo inspection to bypass the current guard or change Nemo tasks, provider or configuration. Planning and later lifecycle actions require their normal separate authority.",
           "dependencies": [],
           "dependencyGraph": {
-            "root": "PRIMECLAW-53",
+            "root": "PRIMECLAW-52",
             "nodes": [
               {
-                "id": "PRIMECLAW-53",
-                "title": "Remove code cleanliness gates from independent Backlog authoring guidance",
+                "id": "PRIMECLAW-52",
+                "title": "Drop Beads deferral state during Backlog migration",
                 "status": "In Progress",
                 "state": "resolved",
                 "completed": false,
@@ -67,182 +206,61 @@
           "acceptanceCriteria": [
             {
               "index": 1,
-              "text": "Canonical design.md and spec-it-out.md authoring guidance consistently uses the agreed Backlog block: unrelated staged, unstaged or untracked code changes and code-branch upstream divergence never block independent native task creation, revision or publication, and never cause code commit/stash/reset/cleanup/sync.",
+              "text": "Native Beads deferred tasks pass source lifecycle inspection as nonterminal ordinary work and migrate to existing Backlog In Design tasks; dated (past or future) and indefinite deferral have the same destination meaning.",
               "checked": false
             },
             {
               "index": 2,
-              "text": "Independent task-store clean/direct-remote-equal checks are explicitly PRE-WRITE. Post-write checks allow only the intended exact task path, preserving task/store/root identity, task-store index safety, scoped task-only commit, non-force push and direct-remote publication proof.",
+              "text": "Projected destination task fields contain no active deferral status, defer_until or other deferral-only fields, snooze/auto-wake behavior or additional deferral annotations; no Deferred status, forced Draft/Blocked/archive semantics or generic mapping override is introduced.",
               "checked": false
             },
             {
               "index": 3,
-              "text": "Parent code HEAD/index/worktree are preserved by task-only authoring; this is noninterference, not a cleanliness requirement. Actual branch-local publication behavior and separate implementation/Episode admission gates remain unchanged.",
+              "text": "Ordinary titles, descriptions, notes (including any reason appended by bd defer), comments and native history/provenance are preserved without keyword-based text deletion; existing canonical raw capture/receipt evidence may retain historical deferral values without making them active destination state.",
               "checked": false
             },
             {
               "index": 4,
-              "text": "Any directly equivalent authoring contradiction is corrected without broad refactoring or runtime/symlink changes. Candidate validation is Docker-only and includes the mandatory Tier1 probe plus focused proportionate contract evidence; limitations are reported truthfully.",
+              "text": "Disposable-fixture evidence proves the Beads source stays unchanged: no ready/defer/undefer/status/config mutation is used to normalize it. Existing source-authoritative publication and guarded-retirement requirements remain intact.",
               "checked": false
             },
             {
               "index": 5,
-              "text": "Exact bounded source paths/commit/publication evidence and global Markdown destination/content evidence are reported. Only these approved Markdown assets are delivered globally, with unrelated runtime assets, dirty project state and running processes preserved; no broad apply or restart occurs. If safe bounded delivery is unavailable, the real blocker and pending delivery are reported, not silently bypassed.",
-              "checked": false
-            }
-          ],
-          "definitionOfDone": [],
-          "implementationPlan": "1. Replace only the Backlog “Verify and publish exactly once” blocks in `src/prime-agent-plugin/skills/project-templates/design.md` and `spec-it-out.md` with the final block already approved in Description. Scope Git-index/task-path checks to the selected task store. State clean/direct-remote-equal independent store BEFORE native write, exact intended task-path change afterward, and parent code noninterference instead of code cleanliness/upstream equality. Preserve branch-local publication, Beads authoring, implementation/Episode gates and asset identities. Inspect directly equivalent authoring wording only for remaining contradictions; leave customized local assets and unrelated dirty files unchanged.\n\n2. Add only small focused contract assertions in the existing `tests/test_future_plan_skills.py` coverage (or the existing directly equivalent contract test) for both templates: consistent approved block, pre-write versus post-write timing, unrelated staged/unstaged/untracked code and divergence not blocking, no code-repair action, and unchanged branch-local/admission boundary. This is Markdown contract evidence, not proof of a real native authoring run. No runtime code, controller, generic framework, new state or symlink-policy changes.\n\n3. Validate the isolated candidate in Docker, including `scripts/test-tier1.sh --probe` after the source changes and the focused contract tests through the repository’s Docker test interface. Review the bounded diff, preserve unrelated state and publish the source/test candidate with truthful command/results evidence. Do not run candidate host/global apply/check or native host probes, and do not use live ADAPT or Nemo as fixtures. Record actual outcomes and any baseline limitations in the native task; no unrelated fixes to make a suite green.\n\n4. The owning Conversation reviews and publishes the accepted bounded source through the normal lifecycle, then handles the separately requested Markdown-only global delivery from primary main. Exact asset IDs are `project-skill-design` and `project-skill-spec-it-out`; actual destinations are `~/.prime/agent/skills/project-templates/design.md` and `~/.prime/agent/skills/project-templates/spec-it-out.md`. Deliver only those approved files through a safe existing bounded delivery method, preserving managed ownership consistency and unrelated runtime/assets/processes; never broad-apply or restart. Current `manage-prime-agent-delivery.py apply` rewrites every exact target and exposes no per-asset selector, so do not use it as a hidden broad refresh. If no supported bounded method exists, stop global delivery and report that concrete constraint, without building a delivery feature or falsely claiming activation. Report exact source commit/push, actual destination hashes and unrelated-state checks directly to Adapt-Hand Expert; distinguish source publication, Markdown delivery and runtime activation. ADAPT’s completed consumer work is reported context, not this candidate’s test evidence.",
-          "implementationNotes": null,
-          "comments": [],
-          "finalSummary": null
-        }
-      },
-      "baseRef": "5c1358b56732869465a1402beb5fa280635122ea",
-      "createdAt": "2026-11-03T00:10:52.009Z",
-      "updatedAt": "2026-11-03T00:15:03.442Z",
-      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
-      "worktreeName": "prime-claw-primeclaw-53-episode-b0133363",
-      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-53-episode-b0133363",
-      "worktreeIdentity": "wt2:local:8fd7953b-5d7f-49b0-83f3-18a6199751ea",
-      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-53-episode-b0133363",
-      "branch": "JLanders/prime-claw-primeclaw-53-episode-b0133363",
-      "head": "5c1358b56732869465a1402beb5fa280635122ea",
-      "launchAutomationName": "prime-claw-launch-b0133363-514c-419e-affc-7fc4b1042d90",
-      "launchAutomationId": "af1b0103-6ff2-43a1-b8a5-7db184c94057",
-      "launchRunId": "36160bc9-771b-4c42-8634-35ed490977d5",
-      "uncertaintyReason": "Timed out binding the fresh Prime Agent session and connected Orca tab at the exact Episode CWD"
-    },
-    "01a197be-7eeb-773f-98ef-7544560ced45": {
-      "version": 2,
-      "provider": "backlog",
-      "status": "uncertain",
-      "operationId": "f63a69a7-3e66-4b20-b258-2a599c4160e1",
-      "engine": "orca",
-      "ownerSessionId": "01a197be-7eeb-773f-98ef-7544560ced45",
-      "taskId": "PRIMECLAW-45",
-      "taskPath": ".backlog/tasks/primeclaw-45 - Migrate-prime-claw-to-Backlog.md-v1.55.3.md",
-      "providerRevision": "d9c42d9d91949996aa06a9902daaadc306853e4c",
-      "taskEvidence": {
-        "schemaVersion": 1,
-        "kind": "task-view",
-        "task": {
-          "id": "PRIMECLAW-45",
-          "title": "Migrate prime-claw to Backlog.md v1.55.3",
-          "status": "In Progress",
-          "type": "task",
-          "priority": "p1",
-          "project": null,
-          "assignees": [],
-          "reporter": null,
-          "labels": [],
-          "milestone": null,
-          "parentTaskId": null,
-          "acceptanceCriteriaCompleted": 0,
-          "acceptanceCriteriaCount": 9,
-          "references": [
-            "https://github.com/MrLesk/Backlog.md/releases/tag/v1.55.3",
-            "https://github.com/MrLesk/Backlog.md/compare/v1.53.0...v1.55.3"
-          ],
-          "modifiedFiles": [],
-          "ordinal": 130000,
-          "createdAt": "2026-10-28T02:59:00Z",
-          "updatedAt": "2026-11-03T18:12:00Z",
-          "dueDate": null,
-          "isReady": true,
-          "path": ".backlog/tasks/primeclaw-45 - Migrate-prime-claw-to-Backlog.md-v1.55.3.md",
-          "description": "Backlog.md v1.55.3 is upstream’s current stable release, verified by agreement between the non-prerelease GitHub release and npm `latest` at exact upstream commit `0cf4fdbc70020327f4366a29d3f405f83d180301`. Prime-claw remains built and documented against v1.53.0, and a read-only compatibility review found that advancing the dependency without adapting prime-claw would break provider migration and make task-history evidence inaccurate.\n\nThe migration must align prime-claw’s supported CLI/MCP behavior, provider-history conversion, shipped agent guidance, fixtures, distribution pins, and provenance with the v1.55.3 lifecycle. In that lifecycle, a task becomes closed by reaching the configured final status while remaining active; archive is a reversible, read-only off-board state that preserves identity, status, dependencies, and references; restore returns it to the board; delete is the explicit archived-only identity-vacating operation. Legacy `completed/` and canonical `archive/tasks/` records are both archived corpus members until `doctor --fix` migrates legacy storage.\n\nThe historical reversal and migration mapping are explicit:\n\n| v1.53 source state or intent | v1.55.3 representation |\n| --- | --- |\n| Active task in a non-final status | Open active task in the same non-final status |\n| Active task in the configured final status | Closed active task in that final status |\n| Record stored under legacy `completed/` | Archived record preserving its final status and history |\n| Record stored under `archive/tasks/`, including an old cancellation or soft deletion | Archived record preserving its status and history; migration never silently deletes it |\n| Future operator intent to permanently discard a record, clean relationships, and vacate its identity | Explicit archive followed by archived-only `task delete` |\n\nThus the old archive command’s destructive identity-cleanup meaning moves to explicit `delete` for future operations, while pre-existing archived and completed records are preserved during migration. “Closed” remains a status-derived classification, not a storage directory or a replacement native status.\n\nCurrent incompatibilities include the removed `backlog task complete` call in provider migration, classification of legacy completed records as closed instead of archived, and migration evidence that temporarily relocates archived files into active directories before native viewing. Public docs, installed skills, templates, and tests also teach the obsolete completion flow and old storage path, while build/runtime/submodule/provenance surfaces remain pinned to v1.53.0.\n\nScope includes the complete prime-claw compatibility change and the managed Backlog candidate/version advance needed to ship it. Preserve the existing single-provider, exact-history, source-authoritative migration guarantees and the Docker-only plugin validation boundary. Do not patch Prime Agent, modify upstream Backlog.md source, move the Backlog.md Expert repository’s separate `latest-stable` branch, weaken migration proof, or introduce a compatibility shim for the removed completion command. Ordering and pagination need only remain correct for prime-claw’s actual identity-set reads; interactive `cleanup` is not part of prime-claw’s workflow.",
-          "dependencies": [],
-          "dependencyGraph": {
-            "root": "PRIMECLAW-45",
-            "nodes": [
-              {
-                "id": "PRIMECLAW-45",
-                "title": "Migrate prime-claw to Backlog.md v1.55.3",
-                "status": "In Progress",
-                "state": "resolved",
-                "completed": false,
-                "dependencyDepth": 0,
-                "dependentDepth": 0
-              }
-            ],
-            "edges": []
-          },
-          "readiness": {
-            "isReady": true,
-            "isBlocked": false,
-            "blockingDependencies": [],
-            "missingDependencies": []
-          },
-          "documentation": [
-            "docs/backlog.md"
-          ],
-          "subtasks": [],
-          "acceptanceCriteria": [
-            {
-              "index": 1,
-              "text": "Every managed Backlog build, runtime image, submodule/provenance record, fixture, and version assertion consistently identifies a reviewed v1.55.3-compatible candidate whose history contains upstream tag commit `0cf4fdbc70020327f4366a29d3f405f83d180301`.",
-              "checked": false
-            },
-            {
-              "index": 2,
-              "text": "No prime-claw runtime path or shipped instruction treats `backlog task complete` or MCP `task_complete` as available; a migrated closed source task becomes an active task in the configured final status, while only an archived source record becomes archived.",
-              "checked": false
-            },
-            {
-              "index": 3,
-              "text": "Provider inspection, conversion counts, destination state, and receipts classify both legacy `completed/` records and canonical `archive/tasks/` records as archived, and classify closed only from active tasks in the configured final status.",
-              "checked": false
-            },
-            {
-              "index": 4,
-              "text": "Exact source and destination evidence for archived tasks is captured through the native archived-task read surface without moving, copying, or presenting the record as active, including coverage for both legacy and canonical archive storage.",
-              "checked": false
-            },
-            {
-              "index": 5,
-              "text": "Shipped documentation, customizable skills, canonical templates, and their installed mirrors consistently describe final-status edit followed by archive, restore-before-edit, archived-only permanent delete, and `archive/tasks/`; `completed/` appears only as legacy migration input.",
+              "text": "Destination readback and exact replay agree with the selected In Design projection and stripped active deferral fields; other genuinely unmapped source statuses still fail safely without destination/source mutation.",
               "checked": false
             },
             {
               "index": 6,
-              "text": "Migration and lifecycle tests prove identity, status, dependency, parent, documentation, and reference preservation across archive/restore and truthful identity cleanup on delete, including archived tasks whose status is and is not the configured final status.",
-              "checked": false
-            },
-            {
-              "index": 7,
-              "text": "Prime-claw’s task-list consumers remain correct under v1.55.3 default ordering and pagination semantics without depending on implicit row position, and fully specified noninteractive initialization remains successful.",
-              "checked": false
-            },
-            {
-              "index": 8,
-              "text": "The candidate passes the repository’s required migration/lifecycle suites, Tier 0 and Tier 1 Docker validation, Git certificate/private-proxy smoke coverage, and Nix task persistence/build smoke coverage.",
-              "checked": false
-            },
-            {
-              "index": 9,
-              "text": "Failure at any compatibility, provenance, build, or validation gate leaves the currently accepted v1.53.0 artifact authoritative and does not activate or publish a partial v1.55.3 upgrade.",
+              "text": "Focused regression evidence covers the reported native deferred/defer_until case and preserves existing issue-versus-memory handling, identity/relationships and receipt/publication safeguards. Required Docker-only plugin validation, including Tier 1 probe, is reported truthfully; no live Nemo migration or user-global deployment is used as candidate validation.",
               "checked": false
             }
           ],
           "definitionOfDone": [],
-          "implementationPlan": "## Approved scope and specification clarifications\n\nImplement the complete prime-claw compatibility change against Backlog.md v1.55.3, exact upstream tag commit `0cf4fdbc70020327f4366a29d3f405f83d180301`. The following operator decisions supersede the conflicting PRIMECLAW-44 policy and clarify the acceptance criteria:\n\n- Archive retains/reserves identity; only explicit archived-only delete vacates it. Both `completed/` and `archive/tasks/` are archived history, not active closed tasks.\n- Existing duplicate IDs, including archive/live collisions formerly allowed by PRIMECLAW-44, refuse before cutover. Report exact conflicts and preserve source and destination baseline unchanged. Repair, renumbering, and automatic `doctor --fix` are outside this task.\n- A successful merged Episode remains active `Done` through `finalize_task_episode`; optional archive comes afterward. AC5 does not require immediate archive or an archived-Done finalizer extension. Preserve archived non-Done abandonment plus its exact Final Summary contract.\n- Beads imports map source status normally (`closed` -> `Done`), then archive only from explicit source archive/abandonment evidence. Preserve raw source status, closure reason, and abandonment provenance; do not force archived imports to `In Progress` or infer a lost pre-close status.\n- Adopt native v1.55.3 dependency eligibility, including archived and draft targets. Retire PRIMECLAW-44's custom exclusions rather than porting its downstream patches.\n\nNo Prime Agent or Backlog source changes, removed-command shim, reverse-migration revival, interactive cleanup, new provider framework, reconciliation state machine, semantic classifier, or persistent approval/checkpoint store. Do not implement deterministic task reconciliation, iterative plan revision, or semantic compatibility decisions. Episode and Conversation LLMs own that reasoning; code enforces only concrete identity, integrity, and transport constraints. Add only narrow native read/identity/transport adaptations required below. The implementation candidate must not move the Backlog Expert's separate `latest-stable` branch or activate a host/global artifact.\n\n## Implementation slices\n\n### 1. Establish the exact release and reproducible candidate (AC1, AC9)\n\nIn the isolated implementation workspace, retrieve and verify upstream `refs/tags/v1.55.3` resolves to the exact commit above; pin `deps/backlog` to that unmodified source. Do not replay the three v1.53.0 downstream restore/dependency patches: their policy is superseded. Current local `431e95612d6167e418c507ec206d95df43c38c54` and accepted host artifact remain the fallback, not the new source.\n\nThe target object is currently absent locally and the managed fork exposes no v1.55.3 tag. Use the verified upstream repository for this unmodified release and align the submodule URL plus any Docker fetch source; do not assume the fork exposes the object or move/publish an Expert branch. Update `scripts/build-backlog.sh`, `docker/runtime.Dockerfile`, both build/runtime ARG sets in `docker/test.Dockerfile`, `tests/test_backlog_build.py`, runtime source-identity assertions, build stamps/labels, and current provenance together. Require exact HEAD and exact release-tag resolution/ancestry, frozen install, version stamping, standalone compilation, and upstream compiled-binary smoke. Replace the obsolete fixed four-commit fetch expectation with the correct exact release fetch. Use upstream's documented/CI-selected Bun `1.4.4` for the isolated Backlog build/tests, updating the Backlog builder pins and matching assertions rather than assuming existing `1.3.11` compatibility. Keep other dependency/runtime versions unchanged unless an actual compatibility defect requires review; in particular, do not upgrade Prime Agent's Node runtime. Only if changes to the corresponding tooling integration require upstream build-security/updater regressions, use isolated Node `26.12.1` or later and upstream-selected npm `12.2.1` for those tests. Do not require extra Node/npm tooling solely to consume the compiled Backlog release. These are supported-tool selections, not package `engines` requirements.\n\n### 2. Convert provider-history reads and writes to native lifecycle semantics (AC2–4, AC6)\n\nIn `extension-support/task-provider-migration.ts`:\n\n- Classify active final-status tasks as closed; classify every record from either archive directory as archived, regardless of status. Keep the existing supported canonical lifecycle ending in `Done`; do not introduce generic lifecycle configuration work.\n- Replace `archivedBacklogViews`' clone-and-relocate behavior with native `backlog task view --json -- ID`, which v1.55.3 supports for archived records. Read source/destination records at their actual committed paths. Preserve complete native views, relation context, original paths, and history; never manufacture an active view or silently migrate legacy storage.\n- Remove `task complete`, completed-directory preparation, and closed-placement expectations. Closed Beads records remain active `Done`; explicitly archived records receive the normal mapped status before native archive. Re-read the final native record in its real location and retain lossless source evidence in the existing history package/receipt.\n- Remove obsolete archived/draft dependency-target exclusions. Keep native missing/ambiguous-ID and relationship safety checks; do not build a parallel graph-policy engine. Before allocation/writes, reuse supported native checks and the existing migration inventory to detect identity conflicts across active tasks, legacy/canonical archives, and drafts. Do not build a parallel identity index, custom allocator, or duplicate corpus-discovery framework. Native ambiguity or any source/destination collision must refuse with exact diagnostics, no automatic repair, no publication/cutover, and unchanged original baseline.\n- Preserve the existing one-way Beads->Backlog transaction: source authoritative until exact destination verification and publication, same active version-2 ownership/resources, one destination-native receipt, no dual write/retry/second destination. Update classification/counts/readback/receipt assertions consistently without weakening baseline byte/history preservation or source-deletion ordering.\n\n### 3. Prove lifecycle and migration behavior with the real candidate (AC2–4, AC6–7)\n\nUpdate `tests/task_provider_migration.test.mjs` and its pytest bridge. Replace old completed-placement, forced-In-Progress archive, artificial active-read, and archive-ID-reuse expectations. Use valid nonduplicate populated baselines to prove native allocation and preservation. Add refusal cases for old archive/live duplicates and other contested IDs, proving no source deletion, baseline mutation, or cutover. Cover both `completed/` and `archive/tasks/` in forward destination-baseline migration; leave intentionally retired reverse-migration suites retired.\n\nReuse existing upstream archive/read/restore/delete tests. Add only representative integration cases at prime-claw's migration and lifecycle seams for Done and non-Done records, preserving IDs, status, dependencies (including archived/draft targets), parents, documentation, references, and original history. Do not duplicate Backlog's entire lifecycle suite or build an exhaustive cross-product of native behaviors. Prove archived records are read-only until restored, archive/restore keeps allocation reserved, and only delete vacates identity and performs native relationship cleanup. Exercise the existing `tests/spec_episode_extension.test.mjs` merged active-Done cleanup and archived non-Done abandonment contracts; assert the lifecycle instructions keep Done active until cleanup, rather than broadening the finalizer.\n\nKeep task-list consumers as complete, unwindowed JSON identity-set reads, never row-position assumptions. Add/revise representative ordering/windowing regressions only where actual consumers need them. Prove fully specified noninteractive init for supported layouts/custom native configuration; no interactive cleanup dependency.\n\n### 4. Update normative guidance and managed assets (AC5)\n\nUpdate `docs/backlog.md`, provider migration/initialization and Episode-finalization guidance, repository skills, inert canonical templates, and their managed project/test mirrors. Use final-status edit for closure, optional post-cleanup archive, native archived view, restore-before-edit, and explicit archived-only permanent delete. `archive/tasks/` is canonical storage; mention `completed/` only as preserved legacy archive input. Explain native archived/draft dependencies, reserved archived IDs, and collision refusal. Remove actionable `task complete`/`task_complete` guidance, not historical evidence of the old behavior.\n\nKeep PRIMECLAW-44's evidence historical and intact; clearly supersede its policy in current normative docs and record the new exact source/provenance. Update relevant user-story/acceptance traceability. Use supported isolated asset generation/checks; preserve unrelated customization, including the preexisting dirty `.prime-claw/templates.json`. Do not apply candidate assets to the host/user-global plugin or claim live mirrors have been activated.\n\n### 5. Validate the integrated candidate and report evidence (AC8–9)\n\nRun the existing focused native Backlog lifecycle/dependency/archived-folder and Git trust regressions plus the supported build/compiled smoke against the exact candidate; add new coverage only at changed prime-claw integration seams. Run prime-claw Tier 0 (`python3 -m pytest tests/ -q`) and Tier 1 (`python3 -m pytest tests/ -q -m container`), including the real migration and lifecycle bridges. After every plugin-source change, run the required Docker Tier-1 validation (`scripts/test-tier1.sh --probe` or the container suite); no host/global apply/check or candidate Prime Agent probe. Use `scripts/run-prime-agent-probe.sh` for isolated native probes.\n\nGit trust/private-proxy smoke: from the isolated exact upstream source, run `bun test --timeout=10000 src/test/git-certificate-trust.test.ts` with the supported upstream Bun/Git environment. Its local TLS proxy must receive exactly one request and return the expected HTTP 502/nonzero Git exit; this proves native Git trust/proxy handling, not a successful external fetch. Use the committed public test fixtures and loopback TLS only, never live credentials, TLS bypass, or host credential stores. Keep updater/build-security helper regressions conditional on changes to their corresponding tooling integration; they are not acceptance gates for unchanged upstream tooling. Do not run the mutating `update-nix` generator or rewrite its lock merely to validate.\n\nNix: use a supported isolated native builder (`x86_64-linux`, `aarch64-linux`, or `aarch64-darwin`) with flakes, network trust and normal Nix permissions. Run `nix build .#backlog-md --print-build-logs`, verify `./result/bin/backlog --version` is exactly `1.55.3`, run its help, and verify the existing native package build/persistence smoke. Retain exact derivation/build logs proving the flake's existing installCheck ran `scripts/smoke-compiled-build.ts`: it creates, reads/lists, edits and rereads a persisted temporary task and proves a failed write exits nonzero, while exercising the actual patched dependency build. Cached success alone does not prove fresh smoke execution. The development-tools check, full `nix flake check`, and development-shell CA-preservation assertion are conditional on changes to those tooling/packaging surfaces, not additional acceptance gates for consuming the unchanged upstream release. Preserve caller trust settings. Reuse native entry points, not a new Nix framework. This checkout supplies no Nix harness/builder: execution evidence is an explicit implementation prerequisite; lack of a supported runner is a blocker, not permission to waive AC8 or substitute a Docker-only Bun smoke.\n\nRecord exact source, build/toolchain and image identities, commands, pass/fail counts, and evidence paths in a bounded repository evidence note and the living task plan/notes. A skipped, unavailable, or failing required smoke is not acceptance. Stop before activation on any compatibility/provenance/build/validation failure; keep accepted v1.53.0 authoritative. Do not weaken a required gate or add unrelated fixes to call the upgrade successful.\n\n## Completion boundary\n\nDeliver a reviewable, committed/pushed prime-claw candidate with complete compatibility/provenance/validation evidence; no additional planning follow-up task. A later explicit operator decision owns merge, accepted host-artifact deployment, user-global refresh, coordinated restart/UAT, and any real data migration or repair. This planning request itself authorizes none of those actions and creates no Episode.",
+          "implementationPlan": "1. Extend `statusFromBeads` in `src/prime-agent-plugin/extension-support/task-provider-migration.ts` with the single native `deferred` → existing Backlog `In Design` projection. Its existing callers already cover source lifecycle preflight, destination status assignment, and destination lifecycle verification/replay; retain them unless a regression exposes a necessary change. Past, future or absent `defer_until` must not change the projection. Keep the general Beads runtime lifecycle map and issue-versus-memory handling unchanged; do not introduce date-based classification, a mapping override/framework or new migration state.\n2. The existing destination-field projection already excludes active `defer_until`, and `backlogSourcePackage` already retains raw history. Preserve and test those behaviors; do not add a recursive field scrubber, content-cleanup pass or new provenance format. Do not introduce active deferral fields, scheduling/auto-wake, special status/placement or deferral annotations. Preserve ordinary title, description, notes (including `bd defer --reason` text), comments, identity and relationships. Keep historical structured deferral values in the existing raw native/export/history/events/provenance evidence, not active destination fields. Do not normalize or otherwise mutate the retiring Beads source.\n3. Extend `tests/task_provider_migration.test.mjs` with existing disposable native Beads/Backlog fixtures for past-dated, future-dated and indefinite deferred tasks, including the reported `DEFERRED:` title and `defer_until` shape. Assert successful nonterminal inspection, ordinary `In Design` destination records in `tasks/`, no active deferral fields or extra annotations, and preserved ordinary content plus complete raw historical evidence. Exercise destination readback and exact replay through the existing guarded-retirement/refusal seams; prove the same destination identities are reused and source export/history/config and authority remain unchanged before verified cutover, with no ready/defer/undefer/status/config normalization commands. Remove only `deferred` from the unsupported-status rejection set; retain `pinned`, `hooked`, `finished`, `paused`, archive-integrity and no-write refusal assertions.\n4. Run focused deferral/status/archive tests and the full migration suite through the Docker-backed `tests/test_task_provider_migration.py` bridge; adjust its test selection only if needed to include new coverage. Keep native export, issue/memory, identity/relationship, publication, receipt/replay and guarded-retirement regressions passing. After plugin-source changes run `scripts/test-tier1.sh --probe`, report actual results and limits on this task, and update directly affected migration guidance only if it would contradict the change. No dependency upgrade, unrelated importer cleanup, reopening PRIMECLAW-44/46/49, live Nemo inspection/mutation/migration/source deletion, user-global candidate apply/check/probe, activation, restart or merge is part of candidate validation.",
           "implementationNotes": null,
           "comments": [],
           "finalSummary": null
         }
       },
-      "baseRef": "fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8",
-      "createdAt": "2026-11-03T18:12:35.291Z",
-      "updatedAt": "2026-11-03T18:12:45.388Z",
+      "baseRef": "d976e369d5c7ab1b4fefd8d418ca15323188a694",
+      "createdAt": "2026-11-03T18:41:46.108Z",
+      "updatedAt": "2026-11-03T18:42:31.490Z",
       "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
-      "worktreeName": "prime-claw-primeclaw-45-episode-f63a69a7",
-      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-45-episode-f63a69a7",
-      "worktreeIdentity": "wt2:local:5c7a1a6b-8698-4e72-b2f6-09bb95341fb5",
-      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-45-episode-f63a69a7",
-      "branch": "JLanders/prime-claw-primeclaw-45-episode-f63a69a7",
-      "head": "fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8",
-      "uncertaintyReason": "Independent Backlog Episode task checkout was not prepared before session start: uncommitted-task-content: the primary checkout is not a valid prepared task-history workspace: the nested clone /Users/jlanders/code/prime-claw/.backlog has uncommitted changes after preparation (native config reads may have normalized it): M \"tasks/primeclaw-48 - Allow-task-Episodes-from-published-non-main-bases-for-stacked-PRs.md\""
+      "worktreeName": "prime-claw-primeclaw-52-episode-89af1cc6",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-52-episode-89af1cc6",
+      "worktreeIdentity": "wt2:local:a975388b-ee14-4240-9049-8fe1a37a4933",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-52-episode-89af1cc6",
+      "branch": "JLanders/prime-claw-primeclaw-52-episode-89af1cc6",
+      "head": "d976e369d5c7ab1b4fefd8d418ca15323188a694",
+      "launchAutomationName": "prime-claw-launch-89af1cc6-adf3-4d6d-958b-da1414becebe",
+      "episodeId": "01a1a2b8-4622-764d-bb8c-ab66563620dc",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a1a2b8-4622-764d-bb8c-ab66563620dc.jsonl",
+      "episodeActiveSessionId": "c62dc0a14d7f",
+      "terminalHandle": "term_f215f6e8-1411-4cc4-a1af-13efcbede0d8",
+      "terminalHandles": [
+        "term_dd1692cd-8edd-4566-a852-70f33c5d0e18",
+        "term_f215f6e8-1411-4cc4-a1af-13efcbede0d8"
+      ]
     }
   }
 }

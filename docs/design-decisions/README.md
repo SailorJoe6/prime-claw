@@ -12,9 +12,11 @@ Do not add a record for ordinary implementation choices. A record must name:
 4. a regression anchor; and
 5. an objective revisit or removal condition.
 
-A record is context, not product authority. User outcomes remain canonical in
-[`docs/user-stories/`](../user-stories/), and current acceptance coverage is in
-its [traceability matrix](../user-stories/traceability.md).
+A record is context, not product authority. Product requirements are maintained
+only in [`REQUIREMENTS.md`](../../REQUIREMENTS.md). The
+[user stories](../user-stories/) and their
+[traceability matrix](../user-stories/traceability.md) are supporting workflow
+and acceptance-evidence maps, not competing requirements sources.
 
 ## Current records
 
