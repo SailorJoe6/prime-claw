@@ -371,6 +371,131 @@
       "branch": "JLanders/prime-claw-primeclaw-45-episode-f63a69a7",
       "head": "fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8",
       "uncertaintyReason": "Independent Backlog Episode task checkout was not prepared before session start: uncommitted-task-content: the primary checkout is not a valid prepared task-history workspace: the nested clone /Users/jlanders/code/prime-claw/.backlog has uncommitted changes after preparation (native config reads may have normalized it): M \"tasks/primeclaw-48 - Allow-task-Episodes-from-published-non-main-bases-for-stacked-PRs.md\""
+    },
+    "01a19f0d-54c9-71d1-b407-4016721d904e": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "89af1cc6-adf3-4d6d-958b-da1414becebe",
+      "engine": "orca",
+      "ownerSessionId": "01a19f0d-54c9-71d1-b407-4016721d904e",
+      "taskId": "PRIMECLAW-52",
+      "taskPath": ".backlog/tasks/primeclaw-52 - Drop-Beads-deferral-state-during-Backlog-migration.md",
+      "providerRevision": "0954f9ea8ad7f1f62be4c8bc654a6033bc5398b1",
+      "taskEvidence": {
+        "schemaVersion": 1,
+        "kind": "task-view",
+        "task": {
+          "id": "PRIMECLAW-52",
+          "title": "Drop Beads deferral state during Backlog migration",
+          "status": "In Progress",
+          "type": "bug",
+          "priority": "p2",
+          "project": null,
+          "assignees": [],
+          "reporter": null,
+          "labels": [],
+          "milestone": null,
+          "parentTaskId": null,
+          "acceptanceCriteriaCompleted": 0,
+          "acceptanceCriteriaCount": 6,
+          "references": [
+            "PRIMECLAW-44",
+            "PRIMECLAW-46",
+            "PRIMECLAW-49",
+            "src/prime-agent-plugin/extension-support/task-provider-migration.ts",
+            "src/prime-agent-plugin/extension-support/task-providers.ts"
+          ],
+          "modifiedFiles": [],
+          "ordinal": 137000,
+          "createdAt": "2026-11-02T21:52:00Z",
+          "updatedAt": "2026-11-03T18:41:00Z",
+          "dueDate": null,
+          "isReady": true,
+          "path": ".backlog/tasks/primeclaw-52 - Drop-Beads-deferral-state-during-Backlog-migration.md",
+          "description": "## Outcome\nDuring one-way Beads→Backlog migration, import a native Beads task whose status is `deferred` as an ordinary `In Design` task. Drop active deferral state and deferral-only structured fields from the destination projection. Do not modify the retiring Beads source to achieve this.\n\n## Product instruction and context\nJoe’s instruction, relayed by NemoHermes Upgrade: “Just drop any \"deferred\" status and related fiedls as part of the migratino.” This supersedes the earlier unapproved proposal that the task must remain frozen or outside ready work. The selected behavior is the normal new/open task default, not a special destination lifecycle or scheduling feature.\n\nNemoHermes Upgrade reports canonical inspection at Nemo housekeeping commit `b8c9be358df4fc5fc67d1aec74feb7c4943572e1` stops with `Beads source lifecycle preflight failed: nemo-setup-5lt status=\"deferred\": unsupported status`. The task is titled `DEFERRED: Decide + enable web search provider`, with `defer_until=2026-08-01T00:00:00Z`. The reported native catalog defines deferred as frozen; the issue inventory is 33 issues (30 closed, one open, one blocked, one deferred), separate from the last-observed 19 memory records. These are reported consultation facts, not a new live inspection or proof of destination memory outputs.\n\nThe accepted importer currently projects fixed canonical Beads lifecycle names plus legacy open/closed and rejects deferred during source preflight. No existing runtime mapping override exists; semantic-placement prose does not change that projection. This task is the narrow destination-behavior change, not a repair of malformed source or another memory parser change.\n\n## Required behavior\n- Recognize native Beads `deferred` in inspection and destination conversion as the ordinary `In Design` projection. Use the same meaning in destination verification/replay; do not let source classification reject this selected case before projection.\n- Do not create a Deferred status, active `defer_until` or other deferral-only destination fields, snooze/auto-wake behavior, special deferral annotations, or forced Draft/Blocked/archive placement. Timed, expired and indefinite source deferral do not change this destination meaning.\n- Preserve ordinary title, description, notes, comments, native history and provenance. Native `bd defer --reason` appends ordinary notes; it is not a dedicated field to strip. Do not delete or rewrite ordinary text merely because it contains “deferred”, including the reported title.\n- Retain the canonical raw source-capture and receipt/provenance evidence already required for lossless history. Historical deferral values may remain inside that existing raw evidence; do not restore them as active destination fields, scheduling or additional deferral annotations.\n- Keep Beads unchanged and authoritative until the existing verified cutover. Never call ready/defer/undefer/status/config edits to normalize source data. Keep safe refusal for other genuinely unmapped statuses and preserve existing identity, relationship, publication, ownership, receipt/replay and guarded-retirement protections.\n\n## Scope and authority\nUse the least technology needed for this one supported projection and its focused regression coverage. Update directly affected guidance if it would otherwise contradict the behavior. No generic mapping/override framework, new controller, dependency upgrade, scheduling feature, unrelated importer cleanup, or reopening completed PRIMECLAW-44/46/49. Their accepted guarantees remain context, not unfinished work.\n\nAuthoring this task does not approve an implementation plan, implementation, merge, global activation, restart or live migration/source deletion. Candidate validation must use disposable fixtures and the repository’s Docker-only plugin workflow, including the mandatory Tier 1 probe after plugin-source changes. Do not run another live Nemo inspection to bypass the current guard or change Nemo tasks, provider or configuration. Planning and later lifecycle actions require their normal separate authority.",
+          "dependencies": [],
+          "dependencyGraph": {
+            "root": "PRIMECLAW-52",
+            "nodes": [
+              {
+                "id": "PRIMECLAW-52",
+                "title": "Drop Beads deferral state during Backlog migration",
+                "status": "In Progress",
+                "state": "resolved",
+                "completed": false,
+                "dependencyDepth": 0,
+                "dependentDepth": 0
+              }
+            ],
+            "edges": []
+          },
+          "readiness": {
+            "isReady": true,
+            "isBlocked": false,
+            "blockingDependencies": [],
+            "missingDependencies": []
+          },
+          "documentation": [],
+          "subtasks": [],
+          "acceptanceCriteria": [
+            {
+              "index": 1,
+              "text": "Native Beads deferred tasks pass source lifecycle inspection as nonterminal ordinary work and migrate to existing Backlog In Design tasks; dated (past or future) and indefinite deferral have the same destination meaning.",
+              "checked": false
+            },
+            {
+              "index": 2,
+              "text": "Projected destination task fields contain no active deferral status, defer_until or other deferral-only fields, snooze/auto-wake behavior or additional deferral annotations; no Deferred status, forced Draft/Blocked/archive semantics or generic mapping override is introduced.",
+              "checked": false
+            },
+            {
+              "index": 3,
+              "text": "Ordinary titles, descriptions, notes (including any reason appended by bd defer), comments and native history/provenance are preserved without keyword-based text deletion; existing canonical raw capture/receipt evidence may retain historical deferral values without making them active destination state.",
+              "checked": false
+            },
+            {
+              "index": 4,
+              "text": "Disposable-fixture evidence proves the Beads source stays unchanged: no ready/defer/undefer/status/config mutation is used to normalize it. Existing source-authoritative publication and guarded-retirement requirements remain intact.",
+              "checked": false
+            },
+            {
+              "index": 5,
+              "text": "Destination readback and exact replay agree with the selected In Design projection and stripped active deferral fields; other genuinely unmapped source statuses still fail safely without destination/source mutation.",
+              "checked": false
+            },
+            {
+              "index": 6,
+              "text": "Focused regression evidence covers the reported native deferred/defer_until case and preserves existing issue-versus-memory handling, identity/relationships and receipt/publication safeguards. Required Docker-only plugin validation, including Tier 1 probe, is reported truthfully; no live Nemo migration or user-global deployment is used as candidate validation.",
+              "checked": false
+            }
+          ],
+          "definitionOfDone": [],
+          "implementationPlan": "1. Extend `statusFromBeads` in `src/prime-agent-plugin/extension-support/task-provider-migration.ts` with the single native `deferred` → existing Backlog `In Design` projection. Its existing callers already cover source lifecycle preflight, destination status assignment, and destination lifecycle verification/replay; retain them unless a regression exposes a necessary change. Past, future or absent `defer_until` must not change the projection. Keep the general Beads runtime lifecycle map and issue-versus-memory handling unchanged; do not introduce date-based classification, a mapping override/framework or new migration state.\n2. The existing destination-field projection already excludes active `defer_until`, and `backlogSourcePackage` already retains raw history. Preserve and test those behaviors; do not add a recursive field scrubber, content-cleanup pass or new provenance format. Do not introduce active deferral fields, scheduling/auto-wake, special status/placement or deferral annotations. Preserve ordinary title, description, notes (including `bd defer --reason` text), comments, identity and relationships. Keep historical structured deferral values in the existing raw native/export/history/events/provenance evidence, not active destination fields. Do not normalize or otherwise mutate the retiring Beads source.\n3. Extend `tests/task_provider_migration.test.mjs` with existing disposable native Beads/Backlog fixtures for past-dated, future-dated and indefinite deferred tasks, including the reported `DEFERRED:` title and `defer_until` shape. Assert successful nonterminal inspection, ordinary `In Design` destination records in `tasks/`, no active deferral fields or extra annotations, and preserved ordinary content plus complete raw historical evidence. Exercise destination readback and exact replay through the existing guarded-retirement/refusal seams; prove the same destination identities are reused and source export/history/config and authority remain unchanged before verified cutover, with no ready/defer/undefer/status/config normalization commands. Remove only `deferred` from the unsupported-status rejection set; retain `pinned`, `hooked`, `finished`, `paused`, archive-integrity and no-write refusal assertions.\n4. Run focused deferral/status/archive tests and the full migration suite through the Docker-backed `tests/test_task_provider_migration.py` bridge; adjust its test selection only if needed to include new coverage. Keep native export, issue/memory, identity/relationship, publication, receipt/replay and guarded-retirement regressions passing. After plugin-source changes run `scripts/test-tier1.sh --probe`, report actual results and limits on this task, and update directly affected migration guidance only if it would contradict the change. No dependency upgrade, unrelated importer cleanup, reopening PRIMECLAW-44/46/49, live Nemo inspection/mutation/migration/source deletion, user-global candidate apply/check/probe, activation, restart or merge is part of candidate validation.",
+          "implementationNotes": null,
+          "comments": [],
+          "finalSummary": null
+        }
+      },
+      "baseRef": "d976e369d5c7ab1b4fefd8d418ca15323188a694",
+      "createdAt": "2026-11-03T18:41:46.108Z",
+      "updatedAt": "2026-11-03T18:42:31.490Z",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-52-episode-89af1cc6",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-52-episode-89af1cc6",
+      "worktreeIdentity": "wt2:local:a975388b-ee14-4240-9049-8fe1a37a4933",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-52-episode-89af1cc6",
+      "branch": "JLanders/prime-claw-primeclaw-52-episode-89af1cc6",
+      "head": "d976e369d5c7ab1b4fefd8d418ca15323188a694",
+      "launchAutomationName": "prime-claw-launch-89af1cc6-adf3-4d6d-958b-da1414becebe",
+      "episodeId": "01a1a2b8-4622-764d-bb8c-ab66563620dc",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a1a2b8-4622-764d-bb8c-ab66563620dc.jsonl",
+      "episodeActiveSessionId": "c62dc0a14d7f",
+      "terminalHandle": "term_f215f6e8-1411-4cc4-a1af-13efcbede0d8",
+      "terminalHandles": [
+        "term_dd1692cd-8edd-4566-a852-70f33c5d0e18",
+        "term_f215f6e8-1411-4cc4-a1af-13efcbede0d8"
+      ]
     }
   }
 }
