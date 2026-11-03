@@ -4,7 +4,7 @@ title: Drop Beads deferral state during Backlog migration
 status: In Planning
 assignee: []
 created_date: '2026-11-02 21:52'
-updated_date: '2026-11-03 02:18'
+updated_date: '2026-11-03 02:28'
 labels: []
 dependencies: []
 references:
@@ -53,3 +53,11 @@ Authoring this task does not approve an implementation plan, implementation, mer
 - [ ] #5 Destination readback and exact replay agree with the selected In Design projection and stripped active deferral fields; other genuinely unmapped source statuses still fail safely without destination/source mutation.
 - [ ] #6 Focused regression evidence covers the reported native deferred/defer_until case and preserves existing issue-versus-memory handling, identity/relationships and receipt/publication safeguards. Required Docker-only plugin validation, including Tier 1 probe, is reported truthfully; no live Nemo migration or user-global deployment is used as candidate validation.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Accept native Beads `deferred` during source lifecycle inspection and consistently map it to ordinary Backlog `In Design` during conversion, destination verification, and replay. Do not project active deferral fields or scheduling; preserve ordinary content and existing raw history/provenance evidence.
+2. Add focused disposable-fixture regression coverage for past, future, and indefinite deferral, conversion/readback/replay, preserved text and history, unchanged source, and safe refusal of other unsupported statuses. Preserve existing issue-versus-memory, identity/relationship, publication, and guarded-retirement safeguards.
+3. Run the required Docker-only plugin validation, including Tier 1 with `--probe`, and report the results. Update directly affected guidance only if needed. Do not inspect or mutate live Nemo, deploy user-globally, or perform a live migration.
+<!-- SECTION:PLAN:END -->
