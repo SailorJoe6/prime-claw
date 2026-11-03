@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 21:11'
+updated_date: '2026-11-03 21:14'
 labels: []
 dependencies: []
 references:
@@ -141,3 +141,10 @@ Align task-native portions of `docs/backlog.md`, `prep-chain.md`, `handoff-chain
 
 Commit/publish coherent code and native task updates promptly. Record the actual commands/results and limits on this task, with remaining accepted in-scope work in its living plan. Deliver a reviewable candidate only: no user-global activation/restart, live recovery, destructive cleanup, retained-folder redesign, dependency patch, merge or abandonment is included. This planning request does not authorize implementation.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Slice 1 selected — observational task reads (2026-11-03)
+Implement the smallest end-to-end read-path removal in plan steps 1–3: remove implicit Backlog workspace preparation/synchronization from the default resolver and provider-capability/status eligibility refusals from the native task read for both providers. Preserve complete native task views and truthful native failures. Move explicit read/preparation and eligibility responsibility into existing planning/implementation Markdown. Cover real independent Backlog workspaces with unrelated dirty code/task state and stale/published history, and Beads with absent custom status configuration/unmapped raw statuses. Do not change allocation, lifecycle mutation, continuation, terminal policy, or live resources in this slice; those remain accepted work on this same task. Validate only in Docker, publish one code slice and exact native task notes, then stop for owner review. No acceptance criterion is fully met yet.
+<!-- SECTION:NOTES:END -->
