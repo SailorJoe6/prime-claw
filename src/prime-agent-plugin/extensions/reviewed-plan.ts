@@ -753,7 +753,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         "Call create_task_episode exactly once after the managed implementation readiness skill approves its exact In Planning task, whether entered through implement_task or directly through the skill.",
         "Semantic authority comes from the operator's explicit implementation request, including a conditional request or explicit bounded delegated selection among In Planning tasks; never infer authority from task status alone.",
         "Pass the exact canonical task ID and the same optional stable host carried by readiness. This tool independently resolves the current provider, task, and safe placement; no prior invocation proof or content-revision approval receipt is required.",
-        "The host validates primary-main, native task state and required plan evidence, publishes In Progress, reserves ownership before allocation, creates one Episode, and sends one fixed execute assignment; never add an initial handoff or second assignment.",
+        "The host validates the canonical primary checkout and captures its current named integration branch plus exact code base, validates native task state and required plan evidence, publishes In Progress, reserves ownership before allocation, creates one Episode, and sends one fixed execute assignment; never add an initial handoff or second assignment.",
         "Treat uncertain or partial creation as a blocker. Never retry it as a fresh Episode.",
       ],
       executionMode: "sequential",
@@ -785,7 +785,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           const placement = await resolvePlacement(task.projectRoot, params.host, ctx, dependencies);
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
           // The provider-native admission primitive re-resolves exact root/path,
-          // status and plan under its lock, proves primary-main, reserves this
+          // status and plan under its lock, binds the primary integration branch, reserves this
           // owner's identity, and revalidates placement before allocation.
           const result = await actions.create(task.taskId, toolCallId, ctx, dependencies, placement);
           return {
@@ -894,13 +894,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "finalize_task_episode",
       label: "Clean up task Episode resources",
-      description: "After an operator-authorized merge or abandonment is committed and pushed, remove the exact idle Episode resources and close ownership.",
+      description: "After an operator-authorized merge or abandonment is committed and pushed against the recorded integration target (main for old records without integrationBranch), remove only the exact idle Episode resources and close ownership.",
       promptSnippet: "Clean up the exact task Episode after its authorized pushed terminal outcome",
       promptGuidelines: [
         "Use finalize_task_episode only for one exact task-native Episode owned by this Conversation. Never use it for retained folder ownership.",
         "Perform review, request changes, merge, abandonment, and provider-native terminal publication through the Conversation instructions, ordinary Git, and the selected provider's supported CLI before cleanup.",
         "Call this tool immediately after the already operator-authorized terminal outcome is committed, pushed, and verified, with the exact pushed Episode head and truthful outcome. No second cleanup confirmation is needed. Backlog requires its pushed Done/archive terminal evidence; Beads requires current clean published native done completion or closed plus the exact abandonment reason.",
-        "Cleanup removes only the bound idle runtime and explicit descendants, exact upstream branch, provider worktree, and remaining local branch, then deletes the exact owner entry. It performs no merge, abandonment, task edit, archive, provider push, shared-store removal, or server shutdown.",
+        "Cleanup verifies terminal code against the recorded integrationBranch, with main fallback only when absent in old records. The primary checkout must match that target. It removes only the bound idle runtime and explicit descendants, the Episode branch's exact configured upstream, provider worktree, and remaining Episode local branch, then deletes the exact owner entry. It never deletes the integration branch and performs no merge, abandonment, task edit, archive, provider push, shared-store removal, or server shutdown.",
         "On error, interpret the provider evidence and re-read current ownership, Prime Agent, provider, and Git state. Re-invoke only when current evidence proves safe progress; ask the operator only when safe progress is impossible.",
       ],
       executionMode: "sequential",
@@ -909,7 +909,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         properties: {
           taskId: { type: "string", description: "Exact canonical provider-native task ID owned by this Conversation" },
           episodeHead: { type: "string", description: "Exact pushed Episode head that was merged or abandoned" },
-          outcome: { type: "string", enum: ["merged", "abandoned"], description: "Terminal outcome already committed and pushed on canonical main" },
+          outcome: { type: "string", enum: ["merged", "abandoned"], description: "Terminal outcome already committed and pushed against the recorded integration target" },
         },
         required: ["taskId", "episodeHead", "outcome"],
         additionalProperties: false,

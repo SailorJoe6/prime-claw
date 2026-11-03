@@ -6,6 +6,7 @@ import { execFileSync, spawn } from "node:child_process";
 import test from "node:test";
 
 import {
+  effectiveTaskEpisodeIntegrationBranch,
   isBacklogTaskEpisodeOwnership,
   isPublishedBacklogTaskEpisodeOwnership,
   isBeadsTaskEpisodeOwnership,
@@ -25,8 +26,10 @@ import {
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import {
   CliLegacyTaskOwnershipTransitionGit,
+  exactDirectRemoteBranchHead,
   advancePublishedBeadsTaskEpisodeEvidence,
   reservePublishedBeadsTaskEpisodeOwnership,
+  reservePublishedBacklogTaskEpisodeOwnership,
   reserveTaskEpisodeOwnership,
   transitionLegacyEpisodeOwnershipToTask,
 } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
@@ -65,6 +68,25 @@ function fixture({ extraStatusPath = false } = {}) {
   };
   return { root, relative, taskPath, selection };
 }
+
+test("direct code publication uses the integration branch's configured ordinary upstream ref", () => {
+  const f = fixture();
+  const remote = mkdtempSync(join(tmpdir(), "prime-claw-target-upstream-"));
+  execFileSync("git", ["init", "--bare", "-q", remote]);
+  git(f.root, "branch", "-M", "feature/stack");
+  git(f.root, "remote", "add", "origin", remote);
+  git(f.root, "push", "-q", "origin", "HEAD:refs/heads/published-stack");
+  git(f.root, "config", "branch.feature/stack.remote", "origin");
+  git(f.root, "config", "branch.feature/stack.merge", "refs/heads/published-stack");
+  const publishedHead = git(f.root, "rev-parse", "HEAD");
+  assert.equal(exactDirectRemoteBranchHead(f.root, "feature/stack"), publishedHead);
+  assert.equal(git(remote, "rev-parse", "refs/heads/published-stack"), publishedHead);
+  git(f.root, "config", "branch.feature/stack.merge", "refs/tags/published-stack");
+  assert.throws(() => exactDirectRemoteBranchHead(f.root, "feature/stack"), /exact ordinary upstream/);
+  git(f.root, "config", "branch.feature/stack.merge", "refs/heads/published-*");
+  assert.throws(() => exactDirectRemoteBranchHead(f.root, "feature/stack"));
+  assert.equal(git(remote, "rev-parse", "refs/heads/published-stack"), publishedHead);
+});
 
 function reserve(f, overrides = {}, dependencies = {}) {
   const { selection = {}, ...inputOverrides } = overrides;
@@ -166,7 +188,30 @@ function reservePublishedBeads(f, overrides = {}, dependencies = {}) {
   });
 }
 
-function evidenceAdvancementFixture() {
+function reservePublishedBacklog(f, overrides = {}) {
+  return reservePublishedBacklogTaskEpisodeOwnership({
+    projectRoot: f.root,
+    publication: {
+      status: "published",
+      taskId: f.selection.taskId,
+      taskPath: f.relative,
+      publishedHead: "e".repeat(40),
+      nativeAfter: JSON.stringify({ task: {
+        id: f.selection.taskId, path: f.relative, status: "In Progress",
+      } }),
+    },
+    ownerSessionId: "published-backlog-owner",
+    engine: "local",
+    baseRef: git(f.root, "rev-parse", "HEAD"),
+    operationId: "published-backlog-operation",
+    ...overrides,
+  }, {
+    taskResolver: () => f.selection,
+    now: () => "2026-10-20T16:30:00.000Z",
+  });
+}
+
+function evidenceAdvancementFixture({ integrationBranch } = {}) {
   const rawRoot = mkdtempSync(join(tmpdir(), "prime-claw-beads-evidence-main-"));
   execFileSync("git", ["init", "-q", "-b", "main", rawRoot]);
   const root = realpathSync(rawRoot);
@@ -209,6 +254,7 @@ function evidenceAdvancementFixture() {
   const owner = parseEpisodeOwnership({
     version: 2, provider: "beads", status: "active", operationId: "operation-evidence", engine: "local",
     ownerSessionId: "beads-owner", taskId, providerRevision: "a".repeat(32), taskEvidence: oldTaskEvidence,
+    ...(integrationBranch !== undefined ? { integrationBranch } : {}),
     baseRef, head: previousHead, worktree: realpathSync(episodeRoot), branch: "episode-evidence",
     episodeId: "episode-evidence-id", episodeSessionFile: sessionFile, episodeActiveSessionId: "active-evidence-id",
     createdAt: "2026-10-20T20:00:00.000Z", updatedAt: "2026-10-20T20:00:00.000Z",
@@ -810,6 +856,70 @@ test("exact status commit becomes one durable task-native provisioning reservati
 });
 
 
+test("task integration targets preserve exact native branch names across every version-2 shape", () => {
+  const legacyBacklog = taskOwnership("target-owner", "PRIMECLAW-48");
+  const shapes = [
+    legacyBacklog,
+    { ...legacyBacklog, provider: "backlog" },
+    {
+      ...legacyBacklog, provider: "backlog", providerRevision: "b".repeat(40),
+      taskEvidence: { task: { id: legacyBacklog.taskId, path: legacyBacklog.taskPath, status: "In Progress" } },
+    },
+    beadsOwnership("target-owner", "BEAD-48"),
+  ];
+  for (const shape of shapes) {
+    for (const integrationBranch of ["main", "trunk", "feature/stacked-work"]) {
+      const expected = { ...shape, integrationBranch };
+      const parsed = parseEpisodeOwnership(expected);
+      assert.deepEqual(parsed, expected);
+      assert.equal(effectiveTaskEpisodeIntegrationBranch(parsed), integrationBranch);
+      const root = mkdtempSync(join(tmpdir(), "prime-claw-target-roundtrip-"));
+      writeEpisodeOwnership(root, parsed);
+      assert.deepEqual(readEpisodeOwnership(root, parsed.ownerSessionId), expected);
+    }
+  }
+});
+
+test("missing task integration target resolves only to legacy main without rewriting ownership", () => {
+  const f = fixture();
+  git(f.root, "checkout", "-q", "-b", "caller-is-not-the-target");
+  for (const record of [taskOwnership("backlog-owner", "PRIMECLAW-48"), beadsOwnership("beads-owner", "BEAD-48")]) {
+    writeEpisodeOwnership(f.root, record);
+    const path = join(f.root, ".prime-claw", "ownership.json");
+    const before = readFileSync(path, "utf8");
+    assert.equal(effectiveTaskEpisodeIntegrationBranch(readEpisodeOwnership(f.root, record.ownerSessionId)), "main");
+    assert.equal(readFileSync(path, "utf8"), before);
+    assert.equal(Object.hasOwn(readEpisodeOwnership(f.root, record.ownerSessionId), "integrationBranch"), false);
+  }
+});
+
+test("task integration targets reject malformed explicit branches and never extend version-1 authority", () => {
+  const task = taskOwnership("target-owner", "PRIMECLAW-48");
+  for (const integrationBranch of ["", null, 48, "HEAD", "-option", "topic..bad", "topic.lock", "topic with space", "topic\nother", "@{-1}"]) {
+    assert.throws(() => parseEpisodeOwnership({ ...task, integrationBranch }), /unsupported shape/);
+  }
+  const legacy = legacyOwnership("legacy-owner", ".ralph/plans/future/legacy-target");
+  assert.strictEqual(parseEpisodeOwnership(legacy), legacy);
+  assert.throws(() => parseEpisodeOwnership({ ...legacy, integrationBranch: "main" }), /unsupported shape/);
+});
+
+test("all three task reservation factories roundtrip explicit integration targets and preserve old callers", () => {
+  for (const factory of [reserve, reservePublishedBacklog, reservePublishedBeads]) {
+    for (const integrationBranch of [undefined, "main", "feature/stacked-work"]) {
+      const f = fixture();
+      const input = integrationBranch === undefined ? {} : { integrationBranch };
+      const record = factory(f, input);
+      assert.equal(record.integrationBranch, integrationBranch);
+      assert.equal(effectiveTaskEpisodeIntegrationBranch(record), integrationBranch ?? "main");
+      assert.deepEqual(readEpisodeOwnership(f.root, record.ownerSessionId), record);
+      if (integrationBranch === undefined) assert.equal(Object.hasOwn(record, "integrationBranch"), false);
+    }
+    const f = fixture();
+    assert.throws(() => factory(f, { integrationBranch: "invalid..target" }), /unsupported shape/);
+    assert.deepEqual(readAllEpisodeOwnership(f.root), []);
+  }
+});
+
 test("legacy direct ownership is migration input and the next write preserves it in the registry", () => {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-ownership-migration-"));
   const legacy = legacyOwnership("legacy-owner", ".ralph/plans/future/legacy-source");
@@ -968,6 +1078,39 @@ test("one Conversation cannot replace a different active Episode", () => {
     /already owns a different active Episode/,
   );
   assert.deepEqual(readEpisodeOwnership(root, "same-owner"), first);
+});
+
+test("active task integration target is immutable including removal back to legacy main", () => {
+  const backlog = activeTaskOwnership("target-owner", "PRIMECLAW-48");
+  const { taskPath: _taskPath, ...resources } = backlog;
+  const beads = { ...resources, ...beadsOwnership("target-owner", "BEAD-48"), status: "active" };
+  for (const shape of [backlog, beads]) {
+    const first = parseEpisodeOwnership({ ...shape, integrationBranch: "feature/stacked-work" });
+    const root = mkdtempSync(join(tmpdir(), "prime-claw-target-immutable-"));
+    writeEpisodeOwnership(root, first);
+    const path = join(root, ".prime-claw", "ownership.json");
+    const before = readFileSync(path, "utf8");
+    for (const integrationBranch of ["feature/different-work", "main", undefined]) {
+      const changed = { ...first };
+      if (integrationBranch === undefined) delete changed.integrationBranch;
+      else changed.integrationBranch = integrationBranch;
+      assert.throws(() => writeEpisodeOwnership(root, changed), /already owns a different active Episode/);
+      assert.equal(readFileSync(path, "utf8"), before);
+    }
+  }
+});
+
+test("explicit main and missing legacy main are the same active task integration binding", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-target-legacy-main-"));
+  const legacyMain = activeTaskOwnership("target-owner", "PRIMECLAW-48");
+  writeEpisodeOwnership(root, legacyMain);
+  const explicitMain = { ...legacyMain, integrationBranch: "main" };
+  writeEpisodeOwnership(root, explicitMain);
+  assert.deepEqual(readEpisodeOwnership(root, legacyMain.ownerSessionId), explicitMain);
+  writeEpisodeOwnership(root, legacyMain);
+  assert.deepEqual(readEpisodeOwnership(root, legacyMain.ownerSessionId), legacyMain);
+  assert.throws(() => writeEpisodeOwnership(root, { ...legacyMain, integrationBranch: "feature/new-target" }), /already owns a different active Episode/);
+  assert.deepEqual(readEpisodeOwnership(root, legacyMain.ownerSessionId), legacyMain);
 });
 
 test("active task and retained-source bindings stay unique across Conversations", () => {
@@ -1198,7 +1341,7 @@ test("prepared Beads observations preserve the prior record until handoff admiss
 });
 
 test("published Beads evidence refresh synchronizes before proof/read and records current facts without binding drift", () => {
-  const f = evidenceAdvancementFixture();
+  const f = evidenceAdvancementFixture({ integrationBranch: "feature/stacked-work" });
   const provider = evidenceAdvancementProvider(f);
   const ancestry = [];
   const order = [];
@@ -1241,6 +1384,7 @@ test("published Beads evidence refresh synchronizes before proof/read and record
     JSON.stringify(result.record[key]) !== JSON.stringify(f.owner[key]));
   assert.deepEqual(changed.sort(), ["head", "providerRevision", "taskEvidence", "updatedAt"]);
   assert.equal(result.record.head, f.reviewedHead);
+  assert.equal(result.record.integrationBranch, "feature/stacked-work");
   assert.equal(result.record.providerRevision, f.publishedProviderRevision);
   assert.deepEqual(result.record.taskEvidence, f.currentTaskEvidence);
   assert.equal(result.record.updatedAt, "2026-10-20T22:00:00.000Z");
@@ -1543,6 +1687,7 @@ test("provider switch atomically preserves active Episode identity and exact rol
     version: 2,
     status: "active",
     operationId: "operation-switch",
+    integrationBranch: "feature/stacked-work",
     engine: "local",
     ownerSessionId: "owner-switch",
     taskId: "PRIMECLAW-10.38",
@@ -1585,7 +1730,7 @@ test("provider switch atomically preserves active Episode identity and exact rol
   assert.equal(current.providerRevision, "c".repeat(32));
   assert.deepEqual(current.taskEvidence, rawEvidence);
   assert.equal(current.taskPath, undefined);
-  for (const field of ["operationId", "ownerSessionId", "baseRef", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
+  for (const field of ["operationId", "ownerSessionId", "baseRef", "integrationBranch", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
     assert.deepEqual(current[field], original[field], field);
   }
   assert.deepEqual(readEpisodeOwnership(root, "owner-inactive"), inactive);
@@ -1649,7 +1794,9 @@ test("provider switch rejects colliding destination task identity before registr
 
 test("provider switch binds only the freshly verified runtime route", () => {
   const { root } = fixture();
-  const original = taskOwnership("owner-route-refresh", "PRIMECLAW-ROUTE");
+  const original = parseEpisodeOwnership({
+    ...taskOwnership("owner-route-refresh", "PRIMECLAW-ROUTE"), integrationBranch: "feature/route-retention",
+  });
   writeEpisodeOwnership(root, original);
   switchActiveTaskProviderOwnership(root, {
     sourceProvider: "backlog", targetProvider: "beads", switchedAt: "2026-10-27T12:00:00.000Z",
@@ -1658,6 +1805,7 @@ test("provider switch binds only the freshly verified runtime route", () => {
     runtimeProofs: { [original.ownerSessionId]: { expectedPreviousEpisodeActiveSessionId: original.episodeActiveSessionId, verifiedCurrentEpisodeActiveSessionId: "verified-new-route" } },
   });
   assert.equal(readEpisodeOwnership(root, original.ownerSessionId).episodeActiveSessionId, "verified-new-route");
+  assert.equal(readEpisodeOwnership(root, original.ownerSessionId).integrationBranch, "feature/route-retention");
 });
 
 test("destructive provider boundary refuses registry drift under the existing ownership lock", () => {
