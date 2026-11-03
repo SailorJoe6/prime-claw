@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 21:31'
+updated_date: '2026-11-03 21:49'
 labels: []
 dependencies: []
 references:
@@ -163,6 +163,11 @@ Commit/publish coherent code and native task updates promptly. Record the actual
 Code candidate `56c4a4a49c7051c30d6684e261664e0a8cf7099f` completes only the shared read-path portion of steps 1–3, plus its directly affected readiness guidance and tests. `resolveSynchronizedProviderTask` retains its historical export name but now only reads the requested workspace. No implicit primary/Episode clone preparation, synchronization or relocation occurs. `resolveProviderTask` no longer runs lifecycle-capability checks before a read. Backlog exposes its full native task-view envelope; Beads retains complete native fields/absence and unknown native statuses, with known canonical aliases unchanged.
 
 Remaining approved work on this same task: extract entry/prep-chain lifecycle eligibility and embedded policy prose; remove Backlog preparation/publication/reservation/allocation gates and automatic failure disposition/reconciliation; equivalent Beads transport/mutation/reservation/continuation extraction; handoff/oversight/block/resume and terminal/cleanup extraction; full ticket-durability asset audit; bounded same-operation PRIMECLAW-45 pre-session recovery; remaining runtime/guidance tests and aligned docs. Key next seams: `prep-chain.ts` allowedStatuses; `reviewed-plan.ts` readiness/tool policy; `spec-episode.ts` status publisher, preparation and allocation; provider history/transport helpers. Do not treat this first slice as full initiation or lifecycle completion. All acceptance criteria remain unchecked. Stop for Conversation review after publication; no next slice is started.
+
+## Owner-accepted continuation after slice 1
+Slice 1 (`56c4a4a49c7051c30d6684e261664e0a8cf7099f`) is accepted: observational default task reads and lossless native views are sound; owner and independent Expert reviews found no material defect. Continue the same task/Episode with one next coherent slice, prioritizing entry/prep-chain lifecycle eligibility and code-carried tool/prompt policy extraction with directly supporting paths for both Backlog and Beads. Reuse existing Markdown loaders and stage-needed native facts. Make real code-policy removals with matching editable guidance and focused tests; no instruction-only workaround, renamed gates or policy/fact-observation framework.
+
+All remaining full-lifecycle extraction, complete secondary durability audit and bounded recorded-operation recovery stay on this task. The accepted first slice is not task completion. Preserve customized copies, unrelated work, native fields/history and exact existing resources. Commit each coherent task/code update promptly using supported native history and publish it. Docker-only plugin validation follows source changes. Record truthful evidence and remaining living-plan work, then stop for next owner review. No dependency patch, new allocator/recovery framework, retained-folder redesign, global apply/activation/restart, live PRIMECLAW-45 mutation, merge/abandonment or destructive cleanup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
