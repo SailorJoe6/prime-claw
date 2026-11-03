@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-52
 title: Drop Beads deferral state during Backlog migration
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-11-02 21:52'
+updated_date: '2026-11-03 02:18'
 labels: []
 dependencies: []
 references:
