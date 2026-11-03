@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-54
 title: Enable operator choice and judgment-based implementation placement
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-11-03 02:59'
+updated_date: '2026-11-03 02:59'
 labels: []
 dependencies: []
 references:
@@ -49,3 +50,11 @@ Add proportional regression coverage for explicit direct/Episode choice, judgmen
 - [ ] #7 Focused regression coverage exercises direct, Episode, judgment defaults, ask-first, and plan-continuation paths; required Docker-only validation including Tier 1 --probe passes or reports a concrete blocker truthfully.
 - [ ] #8 PRIMECLAW-52, retained version-1 lifecycle, Prime Agent upstream, user-global activation/restart, live migrations, and unrelated ownership/resources remain outside this change.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Update injected task-implementation routing and the managed entry guidance to honor explicit placement and Joe's judgment-based planned/small-unplanned/substantial-design defaults. Keep Episode tool admission scoped to Episode requests or the planned-work default, and retain ambiguity and same-task active-Episode safeguards.
+2. Align the relevant role, task execution, planning-continuation, and project-template instructions. Add a lightweight ordinary direct-task execution path with supported native task updates and existing Git/test safety, no Episode identity or mandatory formal plan requirement, and no new runtime tool/state/protocol. Preserve existing Episode and retained version-1 behavior.
+3. Add proportional routing/guidance regression cases for both explicit modes, judgment defaults, ask-first situations, and preserved placement after planning. Run the required Docker-only plugin validation, including Tier 1 --probe; update directly affected user-facing docs and report truthful results. Do not deploy user-globally or merge.
+<!-- SECTION:PLAN:END -->
