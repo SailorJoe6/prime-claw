@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 22:50'
+updated_date: '2026-11-03 22:59'
 labels: []
 dependencies: []
 references:
@@ -240,4 +240,13 @@ No dependency patch, global apply/activation, restart, live PRIMECLAW-45 mutatio
 Continue the accepted same task/Episode with one lower preparation/publication slice for both providers. Remove the Backlog Episode preparation re-entry into mutable primary preparation, whole-checkout cleanliness/stable-head prerequisites, and the publication helper's automatic reconciliation/retry/other-task classifiers. Replace that publication loop with one exact native edit, exact-path ordinary Git commit and one non-force push, returning native/Git observations and truthful failures without absorbing unrelated staging or work. Apply the same boundary to Beads transport preparation and status publication: retain native workspace/operation targeting and factual evidence, remove lifecycle capability/clean-working-set/frozen-revision/content approval and repeated publication-proof policy, and execute only supported native operations once without automatic retry or failure-driven status choice.
 
 Keep the bounded slice in the existing preparation/publication helpers and directly required call signatures; deeper creation/reservation, exception-driven lifecycle disposition, continuation/terminal extraction, the full secondary durability audit and recorded-operation recovery remain accepted on THIS task for subsequent bounded slices. Preserve existing layouts, exact resources, unrelated work, complete native fields/absence, customized Markdown and retained-folder behavior. Matching editable guidance, focused behavior tests and Docker-only validation are part of this slice. No AC is fully met yet. Publish one coherent code candidate and native task evidence, then stop for owner review.
+
+## Slice 3 native API limitation — validation held, preservation not proved
+The lower preparation/publication and directly supporting ownership source/test/guidance edits are present but uncommitted and not candidate-validated. Selected host-safe static checks passed 46 tests / 13 deselected; `git diff --check` passed. No Docker build, candidate execution, native Beads mutation, dependency edit, global activation or resource change has occurred. A concrete shared startup/capture request was sent through the owner; no grant had been received when this limit surfaced, and the owner was asked to hold it.
+
+Exact pinned dependency source was read over HTTP, not executed or modified: https://github.com/gastownhall/beads/blob/v1.3.1/internal/storage/dolt/issue_operations_tx.go#L23-L59 . Lines 23–33 state that native DOLT_ADD stages the entire changed table after the issue-operation SQL transaction commits. Lines 55–59 state that server-mode sessions share a branch working set and another writer's DOLT_COMMIT can absorb the operation's rows. Lines 35–53 additionally state that a failed trailing native history commit may be logged but not returned as a mutation error; changed data can remain in the working set until a later commit. A native command success is therefore not selected-row isolation or proof that the exact updated task reached published history.
+
+Consequently, the current `bd ... update` path can include unrelated pending issues rows (and potentially already-staged tables) in native history. Removing Prime Claw's cleanliness checks does not establish the required unrelated-native-history preservation. Provider tests with fake runners prove request/result mechanics and preservation of unrelated Git bytes/index only; they do NOT prove native Dolt row/table/history isolation. Read-only source reviewer independently confirmed this gap and identified an unsupported source comment, which was removed. No full-task or slice readiness is claimed.
+
+Unblock condition: the owning Conversation/operator accepts a specific bounded disposition within the approved native-interface constraints, or a supported selected-task native operation is established that actually preserves unrelated pending native history. Do not patch Beads, add an extra store/branch framework, restore a renamed dirty gate, demand unrelated quiescence, or treat this finding as new authority. Preserve all current inert source/tests and exact existing Episode/resources. Await the owner's decision before claiming publishable candidate readiness; task status remains In Progress and all AC unchecked.
 <!-- SECTION:NOTES:END -->
