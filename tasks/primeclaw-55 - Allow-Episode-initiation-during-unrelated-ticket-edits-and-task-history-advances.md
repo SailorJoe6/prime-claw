@@ -3,10 +3,10 @@ id: PRIMECLAW-55
 title: >-
   Allow Episode initiation during unrelated ticket edits and task-history
   advances
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 19:24'
+updated_date: '2026-11-03 21:11'
 labels: []
 dependencies: []
 references:
