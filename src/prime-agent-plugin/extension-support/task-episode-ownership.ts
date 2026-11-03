@@ -74,6 +74,11 @@ export interface TaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /**
+   * Staged target binding. Public admission stays main-only until fresh current-branch
+   * selection and the downstream target lifecycle are wired.
+   */
+  integrationBranch?: string;
   operationId?: string;
   /** Exact verified In Progress admission commit supplied by the public admission boundary. */
   baseRef?: string;
@@ -93,6 +98,11 @@ export interface PublishedBacklogTaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /**
+   * Staged target binding. Public admission stays main-only until fresh current-branch
+   * selection and the downstream target lifecycle are wired.
+   */
+  integrationBranch?: string;
   operationId?: string;
   /** Exact clean code HEAD, separate from the published task-history revision. */
   baseRef: string;
@@ -118,6 +128,11 @@ export interface BeadsTaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /**
+   * Staged target binding. Public admission stays main-only until fresh current-branch
+   * selection and the downstream target lifecycle are wired.
+   */
+  integrationBranch?: string;
   operationId?: string;
   /** Exact clean code HEAD that this reservation binds as baseRef. */
   baseRef: string;
@@ -922,6 +937,7 @@ export function reserveTaskEpisodeOwnership(
     baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   };
@@ -1010,6 +1026,7 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
     baseRef: input.baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   }) as PublishedBacklogTaskEpisodeOwnershipRecord;
@@ -1126,6 +1143,7 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
     baseRef: input.baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   }) as BeadsTaskEpisodeOwnershipRecord;

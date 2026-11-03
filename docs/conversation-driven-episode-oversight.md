@@ -149,6 +149,26 @@ stores no review, progress, merge, or abandonment receipts. Version 2 stores no
 `cleanupHead` or cleanup-progress stage. The parser accepts and discards the old
 optional head marker without migrating or rewriting foreign owners.
 
+### Integration-target ownership foundation
+
+Task-native version-2 records may also carry `integrationBranch`, the named
+code branch intended to receive the Episode. It is separate from `baseRef`
+(the exact starting code commit) and `branch` (the isolated Episode branch).
+Explicit values must be valid native Git branch names, not checkout shorthand.
+`effectiveTaskEpisodeIntegrationBranch` returns the stored name, or `main` for
+older records that omit it. It never infers a target from the current checkout.
+An active owner cannot change that effective target by replacing or dropping
+the field. Existing provider-switch and evidence/route updates preserve it.
+Version-1 records do not accept this task-only field.
+
+This is the first PRIMECLAW-48 implementation slice, not stacked-PR admission.
+The three internal reservation factories can retain an explicitly supplied
+target, but existing public admission callers still use the prior main-only
+behavior. Non-main admission must not be enabled until the same recorded target
+is used for continuation, blocked handling, review, terminal publication and
+cleanup. This slice neither rewrites live ownership nor changes the separate
+primary-main user-global activation rule.
+
 An entry is written before its external mutation and updated at genuine external
 boundaries. Active entries retain exact bindings needed for restart recovery.
 Version-2 cleanup removes only the unchanged owner entry after all exact resources
