@@ -3,12 +3,13 @@ id: PRIMECLAW-56
 title: >-
   Prevent premature Episode allocation and resume failed creation in existing
   resources
-status: In Planning
+status: Blocked
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-03 19:21'
+updated_date: '2026-11-03 20:58'
 labels: []
-dependencies: []
+dependencies:
+  - PRIMECLAW-55
 references:
   - >-
     .backlog/tasks/primeclaw-55 -
@@ -92,3 +93,18 @@ Implement this as a Markdown-led task-native creation/recovery workflow, not a n
 5. Update the existing creation/oversight docs and acceptance evidence.
    Update the relevant sections of docs/conversation-driven-episode-oversight.md, docs/backlog.md and docs/user-stories/E-episode-promotion.md (US-13/14/16) for prerequisite ordering, targeted owner-led reconciliation and same-resource continuation; label branch/worktree deletion as an exceptional operator-authorized workaround. Update the affected assertions in tests/test_future_plan_skills.py, tests/test_oversee_episode_skill.py and tests/test_blocked_skill.py and existing story traceability rather than adding a new protocol document. Preserve DD-004 no-blind-replay policy; completing a proven-missing step is not replaying ambiguous mutation. Keep managed project guidance aligned without overwriting unrelated customizations. Record focused Docker results and representative workflow evidence in the native task. Request review of the candidate; merge, global refresh/restart, destructive actions and live recovery remain separate operator decisions.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Blocked on PRIMECLAW-55: task-native implementation admission still rejects unrelated task-history activity under the loaded runtime's over-broad workspace checks.
+
+The operator explicitly authorized implementation of PRIMECLAW-56 after approving its revised Markdown-first plan. The single implement_task(PRIMECLAW-56) attempt failed before readiness admission with:
+reviewed-plan: Backlog task-read workspace is blocked (remote-advanced): the nested clone (dd9296695b3b) is not a clean fast-forward ancestor of the remote task branch (119b56eb7f9c); inspect and reconcile the nested clone with the remote task branch through ordinary Git; never force
+
+The observed advance was unrelated PRIMECLAW-53 admission commit dd9296695b3bf2de79487fa63f12f12fb5a345c5 following PRIMECLAW-56's published plan revision 119b56eb7f9cd4120eb64e450b2bf63539d55bd1. Subsequent inspection found local and direct remote task heads already matching at dd9296695b3bf2de79487fa63f12f12fb5a345c5. PRIMECLAW-56's own task path was clean, its approved plan unchanged, and status remained In Planning. An unrelated PRIMECLAW-55 edit was also present and was preserved. No PRIMECLAW-56 Episode ownership/resources were allocated, and no admission retry was made.
+
+This is an existing admission-tool defect tracked by PRIMECLAW-55, not a legitimate requirement to quiesce unrelated work and not a defect introduced by PRIMECLAW-55. The task-history advance does not establish any specification/readiness conflict in PRIMECLAW-56. The full semantic readiness review did not run.
+
+Unblock when the PRIMECLAW-55 fix is available in the running plugin generation and exact-task admission can proceed despite unrelated edits/compatible history advances. Activation/restart, if needed, require their separate operator-authorized lifecycle; task status or source merge alone is not proof of loaded-runtime behavior. After the owning Conversation accepts that clearance, re-read current native task/ownership/resource evidence, restore and publish In Planning for this not-yet-started task, and run the canonical implementation-readiness workflow for this same task within the operator's existing approved scope. Do not create a second Episode, force Git, remove another Conversation's work, or treat resource deletion as recovery. Preserve the approved specification, seven AC and Implementation Plan.
+<!-- SECTION:NOTES:END -->
