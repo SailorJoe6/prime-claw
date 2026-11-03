@@ -940,7 +940,7 @@ function statusFromBeads(value: unknown): CanonicalLifecycleStatus {
   const status = String(value ?? "");
   const found = Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === status)?.[0];
   if (found) return found as CanonicalLifecycleStatus;
-  if (status === "open") return "In Design";
+  if (status === "open" || status === "deferred") return "In Design";
   if (status === "closed") return "Done";
   throw new Error(`Beads task has unmapped status ${JSON.stringify(status)}`);
 }
