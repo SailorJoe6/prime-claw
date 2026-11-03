@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 22:35'
+updated_date: '2026-11-03 22:47'
 labels: []
 dependencies: []
 references:
@@ -180,6 +180,11 @@ All remaining full-lifecycle extraction, complete secondary durability audit and
 Code candidate `1565c3272e12adf84238068dd1a99a4a809b182b` removes task-native entry/prep-chain status eligibility and the final task-create wrapper's status/plan/design predicate for both Backlog and Beads. The three task entry tools carry mechanical API metadata rather than duplicate policy in descriptions, parameter prose or promptGuidelines. Existing project Markdown loaders deliver editable policy plus the complete native task view to both queued prep and phase prompts. Exact identity, native failures and placement/resource mechanics are preserved; retained-folder admission/replay is unchanged.
 
 This completes only the entry/prep-chain portion of the accepted living plan. All nine acceptance criteria remain unchecked, and PRIMECLAW-55 remains In Progress. Remaining accepted work on this SAME task: lower-level creation/allocation/readiness/code-base gates, Backlog preparation/publication/reservation and automatic failure disposition/reconciliation, equivalent Beads transport/mutation/reservation/evidence-advancement, handoff/oversight/block/resume, merge/abandonment and terminal/finalization/cleanup policy extraction; complete secondary ticket-durability audit; bounded recorded-operation PRIMECLAW-45 pre-session recovery; associated tests and documentation. Likely next seams remain spec-episode.ts, task-history-workspace.ts, task-providers.ts and task-episode-ownership.ts. No complete-initiation or full-lifecycle fix is claimed by this slice. Stop for owning Conversation review before another slice.
+
+## Owner-accepted continuation after slice 2
+Accept slice 2 (`1565c3272e12adf84238068dd1a99a4a809b182b`): owner and independent Expert reviews found no material defect in the entry/prep-chain policy removal and complete native context delivery. Continue the same task/Episode with the next coherent substantive slice of the existing living plan, prioritizing lower-level task-history preparation/publication and the directly supporting creation/ownership paths across Backlog and Beads. Remove whole-checkout cleanliness, stale-head/content approval, automatic reconciliation/retry/classifier and failure-disposition policy from code as applicable to that slice; necessary decisions belong to existing editable Markdown and the LLM, not renamed safety/transport gates. Reuse supported native commands and existing stage/resource mechanics; no universal observation schema, extra state store, policy interpreter, general recovery framework or dependency patch.
+
+Keep every remaining full-lifecycle seam, the complete secondary instruction audit, and bounded recorded-operation recovery on THIS task, not a deferred follow-up. Preserve exact existing operation/resources, native fields/history, unrelated bytes/staging and customized/foreign snapshots. Deliver matching real code changes, editable guidance and focused behavior tests with required Docker-only validation; commit/publish coherent task and code edits promptly, record truthful evidence and remaining plan, then stop for review. This is not task completion. No root-main code integration, global apply/activation/restart, live PRIMECLAW-45 action, retained-folder redesign, new allocator, merge/abandonment or destructive cleanup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
