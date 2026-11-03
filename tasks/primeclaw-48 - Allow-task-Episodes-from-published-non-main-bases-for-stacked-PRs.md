@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-48
 title: Allow task Episodes from published non-main bases for stacked PRs
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-10-30 23:31'
-updated_date: '2026-11-03 18:23'
+updated_date: '2026-11-03 18:36'
 labels: []
 dependencies: []
 references:
