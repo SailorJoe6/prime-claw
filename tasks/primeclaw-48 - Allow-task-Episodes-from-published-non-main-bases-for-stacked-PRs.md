@@ -4,7 +4,7 @@ title: Allow task Episodes from published non-main bases for stacked PRs
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:31'
-updated_date: '2026-11-03 18:36'
+updated_date: '2026-11-03 18:39'
 labels: []
 dependencies: []
 references:
@@ -86,3 +86,15 @@ Current source at `fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8` confirms literal-ma
 
 Run affected Node behavior suites only through their existing Docker Tier-1 pytest bridges (`tests/test_task_providers.py`, `tests/test_reviewed_plan_extension.py`), plus relevant policy/docs checks. After every plugin-source change run the required Tier-1 validation, such as `scripts/test-tier1.sh --probe` or `python3 -m pytest tests/ -q -m container`. Record actual results and any blockers in the native task during the later implementation Episode; do not claim tests have run during planning. Keep documentation and acceptance evidence current, commit/push the reviewed implementation candidate, then return it to the owning Conversation for review. Merge, abandonment, activation/restart and cleanup remain separate lifecycle decisions, not consequences of this plan.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Execute slice 1: integration-target ownership foundation (2026-11-03)
+
+Bound Episode: `01a1a2b3-da23-77ee-8519-83f2e4a79e73`, owning Conversation `01a18f25-aee6-7352-991b-59275f14bf96`, code base `32a02232b65dffc2a51660661e38dc05cc289f5b`.
+
+This bounded pass implements plan step 2 only: task-only optional `integrationBranch`, explicit native Git ref validation, legacy missing-field effective target `main`, immutable effective target for a live owner, and reservation/provider-switch/evidence retention tests. Existing public callers remain compatible. Public admission is still main-only in this staged slice; enabling non-main admission and switching all downstream lifecycle checks together are the next slice. The skill-only stacking check-in and full lifecycle/docs acceptance remain pending. No acceptance criterion is claimed complete by this foundation alone. No live ownership rewrite, provider switch, foreign task mutation, installed/global refresh, merge, terminal publication or cleanup is authorized/performed.
+
+Validation and exact publication evidence will be appended after the candidate is ready.
+<!-- SECTION:NOTES:END -->
