@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 22:22'
+updated_date: '2026-11-03 22:35'
 labels: []
 dependencies: []
 references:
@@ -21,16 +21,23 @@ modified_files:
   - .prime-claw/workflows/plan-task-prep.md
   - .prime-claw/workflows/plan-task.md
   - docs/prep-chain.md
+  - src/prime-agent-plugin/extension-support/prep-chain.ts
   - src/prime-agent-plugin/extension-support/reviewed-plan-support.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
   - src/prime-agent-plugin/skills/implement-task/SKILL.md
+  - src/prime-agent-plugin/skills/plan/SKILL.md
   - src/prime-agent-plugin/workflows/implement-task-prep.md
   - src/prime-agent-plugin/workflows/implement-task.md
   - src/prime-agent-plugin/workflows/plan-task-prep.md
   - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/reviewed_plan_extension.test.mjs
   - tests/task_history_workspace.test.mjs
   - tests/task_providers.test.mjs
+  - tests/test_future_plan_skills.py
+  - tests/test_reviewed_plan_extension.py
+  - tests/test_task_providers.py
 priority: p1
 type: bug
 ordinal: 140000
@@ -168,6 +175,11 @@ Remaining approved work on this same task: extract entry/prep-chain lifecycle el
 Slice 1 (`56c4a4a49c7051c30d6684e261664e0a8cf7099f`) is accepted: observational default task reads and lossless native views are sound; owner and independent Expert reviews found no material defect. Continue the same task/Episode with one next coherent slice, prioritizing entry/prep-chain lifecycle eligibility and code-carried tool/prompt policy extraction with directly supporting paths for both Backlog and Beads. Reuse existing Markdown loaders and stage-needed native facts. Make real code-policy removals with matching editable guidance and focused tests; no instruction-only workaround, renamed gates or policy/fact-observation framework.
 
 All remaining full-lifecycle extraction, complete secondary durability audit and bounded recorded-operation recovery stay on this task. The accepted first slice is not task completion. Preserve customized copies, unrelated work, native fields/history and exact existing resources. Commit each coherent task/code update promptly using supported native history and publish it. Docker-only plugin validation follows source changes. Record truthful evidence and remaining living-plan work, then stop for next owner review. No dependency patch, new allocator/recovery framework, retained-folder redesign, global apply/activation/restart, live PRIMECLAW-45 mutation, merge/abandonment or destructive cleanup.
+
+## Slice 2 checkpoint — published editable task entry/prep-chain decisions
+Code candidate `1565c3272e12adf84238068dd1a99a4a809b182b` removes task-native entry/prep-chain status eligibility and the final task-create wrapper's status/plan/design predicate for both Backlog and Beads. The three task entry tools carry mechanical API metadata rather than duplicate policy in descriptions, parameter prose or promptGuidelines. Existing project Markdown loaders deliver editable policy plus the complete native task view to both queued prep and phase prompts. Exact identity, native failures and placement/resource mechanics are preserved; retained-folder admission/replay is unchanged.
+
+This completes only the entry/prep-chain portion of the accepted living plan. All nine acceptance criteria remain unchecked, and PRIMECLAW-55 remains In Progress. Remaining accepted work on this SAME task: lower-level creation/allocation/readiness/code-base gates, Backlog preparation/publication/reservation and automatic failure disposition/reconciliation, equivalent Beads transport/mutation/reservation/evidence-advancement, handoff/oversight/block/resume, merge/abandonment and terminal/finalization/cleanup policy extraction; complete secondary ticket-durability audit; bounded recorded-operation PRIMECLAW-45 pre-session recovery; associated tests and documentation. Likely next seams remain spec-episode.ts, task-history-workspace.ts, task-providers.ts and task-episode-ownership.ts. No complete-initiation or full-lifecycle fix is claimed by this slice. Stop for owning Conversation review before another slice.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -201,4 +213,21 @@ Final Docker `scripts/test-tier1.sh --probe` passed with teardown and manifest p
 Focused Docker bridges (`python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container`) finished 9 passed / 2 failed, manifest `.test-results/20261103T215446Z-79176-32730d28/tier1/manifest.json`, log `/tmp/primeclaw55-slice2-focused.log`. History Node suite passed 80/80. Provider, Beads admission, ownership, spec-Episode and close bridges passed. Backlog admission hit the 180-second bridge timeout after 8 passing cases, without a preceding assertion failure. Reviewed-plan Node suite passed 67/68; the only failure was an old compaction-test assertion expecting the intentionally removed create-wrapper status refusal. Repaired that test-only expectation to retain one exact dispatch and no handoff compaction, and increased only the existing Backlog bridge timeout to 360 seconds for all 18 cases. No source repair was indicated. The two affected bridges still require Docker rerun; no pass is claimed yet.
 
 Read-only final source/call-site review found no material defect in complete native-view delivery to both prompts, exact task identity or retained-folder behavior. Candidate remains uncommitted pending the narrow rerun. No additional source-builder startup will be launched until the sibling startup/capture window is coordinated. No lifecycle status or resources changed; full remaining accepted work stays on PRIMECLAW-55.
+
+## Slice 2 result and reproducible evidence (2026-11-03)
+Published code `1565c3272e12adf84238068dd1a99a4a809b182b` on `JLanders/prime-claw-primeclaw-55-episode-96306686`. Direct remote equals HEAD; code is clean and upstream-equal after commit, `git pull --rebase`, push and verification. Native task history remains separate. No status or ownership mutation was performed by this Episode.
+
+Production removals: TaskPrepChainWorkflow no longer carries allowedStatuses; Backlog compatibility and provider-native task prep chains no longer reject lifecycle statuses before loading Markdown; reviewed-plan entry preflights no longer repeat Beads lifecycle tests; requireLiveImplementationTask wrapper predicate is removed. plan_task, implement_task and create_task_episode tool metadata no longer carries workflow policy. Planning and implementation retain existing provider/root/path/host bindings and serialize the complete provider-native nativeView JSON into both canonical prompts. No schema, policy engine, approval receipt or facts framework was added. Native lookup, identity and operation errors remain truthful. The deeper create primitives still enforce policy pending later work; this slice does not hide or bypass those failures.
+
+Editable source entry skills, four canonical workflows and their four managed copies now own authority, lifecycle/readiness decisions, unexpected/unmapped status handling, native selected-ticket durability, uncertainty inspection and terminal routing. Source planning publication guidance no longer demands whole-index/task-store or code cleanliness. Existing customized project planning/concurrent-code guidance was preserved. docs/prep-chain.md distinguishes the bounded extraction from pending lower lifecycle gates. Read-only source/caller review found no material defect in both-prompt complete native facts, exact identity or retained folder paths; no independent full Expert review is claimed for slice 2.
+
+Docker-only candidate execution used the verified cwd-fix-v0.9.8-r1 source commit a1faacd53ac4473a75de1d434afaf50945c2f647:
+- Final `scripts/test-tier1.sh --probe`: PASS, offline apply/check/RPC probe, immutable image launch, network absence, clean teardown and manifest publication. `.test-results/20261103T215553Z-87178-8ad8c997/tier1/manifest.json`; `/tmp/primeclaw55-slice2-probe-final.log`. Earlier probe also passed at `.test-results/20261103T215240Z-69141-9d174100/tier1/manifest.json`; final run covers completed source/guidance.
+- `python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container`: initial 9 passed / 2 failed. History 80/80 and provider 81-case Node suites passed, as did Beads admission/ownership/spec-Episode/close bridges. One Backlog bridge timeout180 after 8 passing cases; no prior assertion failure. One stale reviewed-plan compaction-test assertion still expected the removed create-wrapper refusal (67/68 passed). Retained the complete failing evidence in `.test-results/20261103T215446Z-79176-32730d28/tier1/manifest.json` and `/tmp/primeclaw55-slice2-focused.log`.
+- Test-only repairs: compaction regression now expects exactly one unrelated create dispatch and no handoff compaction; Backlog's existing 18-case bridge timeout raised from180 to360. No source repair. Selected rerun `python3 -m pytest tests/test_task_providers.py::test_backlog_task_episode_admission_node_suite tests/test_reviewed_plan_extension.py::test_reviewed_plan_node_suite -q -m container`: PASS, 2 passed, both full Node suites completed; manifest `.test-results/20261103T222517Z-16462-4c73b2ae/tier1/manifest.json`, clean teardown; log `/tmp/primeclaw55-slice2-rerun.log`. This startup/capture was coordinated, immutable IID/CID receipts reported promptly, and the shared startup window returned before offline tests completed.
+- Host-safe static selection `python3 -m pytest tests/test_reviewed_plan_extension.py tests/test_future_plan_skills.py -q -m "not container" -k "not repository_status_cutover_uses_task_native_order_without_to_do and not documented_task_authoring_cli_sequence_is_atomic_and_task_only and not project_customized_authoring_skills_are_preserved_while_new_upstream_is_advertised"`: PASS, 42 passed / 9 deselected. `/tmp/primeclaw55-slice2-static-rerun.log`. Known unrelated baseline exclusions retain missing backlog/config.yml assumptions and spec-it-out customization/source equality; baseline HEAD comparison proved those source/project files unchanged. Directly affected stale wrapper/phrase pins were replaced, and existing customized plan-task behavior is now tested rather than erased. `git diff --check`: PASS.
+
+Focused new regressions prove both registered task prep tools deliver edited prep/phase policy and exact complete native JSON (including >49KB prose, unknown fields/envelope, nulls, Unicode/whitespace, custom statuses and absent Beads design/null Backlog plan) to both prompts; exact provider/root/Backlog path/host facts survive. Planning/readiness allocate nothing and send one steer plus sole followUp. Direct Backlog compatibility path, exact canonical-ID failures, native lookup errors, delivery uncertainty without retry, final wrapper dispatch without eligibility duplication, and single truthful lower-action refusal are covered. Actual lower-level create policy remains unchanged and is not claimed fixed by injected-action tests.
+
+No dependency patch, global apply/activation, restart, live PRIMECLAW-45 mutation/recovery, retained-folder redesign, new allocator/recovery framework, merge/abandonment, ownership edit or destructive cleanup occurred. All AC remain unchecked; full remaining accepted work stays on this task. Candidate is ready only for owner review of this bounded slice.
 <!-- SECTION:NOTES:END -->
