@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-53
 title: Remove code cleanliness gates from independent Backlog authoring guidance
-status: Blocked
+status: In Planning
 assignee: []
 created_date: '2026-11-02 22:00'
-updated_date: '2026-11-03 14:36'
+updated_date: '2026-11-03 19:12'
 labels: []
 dependencies: []
 references:
@@ -121,4 +121,6 @@ This task already had a published four-step Markdown plan. Joe's explicit scope 
 PRIMECLAW-53 provisioning blocked after operation b0133363-514c-419e-affc-7fc4b1042d90 allocated the retained Orca worktree/branch from 5c1358b56732869465a1402beb5fa280635122ea. Native creation timed out binding a fresh Prime Agent session to its exact Orca tab. Read-only terminal evidence: guarded launcher expects build cwd-fix-v0.9.8-r1-10-gf80340d93 / source f80340d93dc3b1c6de3459b54a82f351e136f75e; running daemon PID3601 reports cwd-fix-v0.9.8-r1 and launcher states Nothing new was started. No exact-CWD Episode session was found and no implementation is claimed. Ownership remains uncertain and the exact worktree, branch and launch evidence are retained; never retry as fresh creation, send another assignment, or delete/rebind ownership manually. Native fallback Blocked publication failed because its clean-parent-code check encountered the newly written ownership registry; this is a task-only native publication with code/ownership preserved. Unblock condition: coordinate with the runtime owner/operator to resolve the launcher-versus-daemon generation mismatch under separate runtime authority, then explicitly review recovery of THIS exact uncertain operation and existing resources before any continuation. No restart/upgrade/launcher bypass is authorized by PRIMECLAW-53. The six stale template metadata entries were separately repaired and pushed in 5c1358b; skill contents unchanged. Source template correction and global Markdown delivery remain pending.
 
 Joe authorized commit-or-rollback of this Conversation’s pending change and explicit expansion of PRIMECLAW-53 with the diagnosed lifecycle publisher correction. Committed/pushed only the existing uncertain ownership record, bytes unchanged, as fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8; rollback would discard evidence of retained allocated resources. No source implementation, resource/runtime mutation or ownership rebind occurred. Revised the already-existing native plan and specification/AC for the expanded scope; status remains Blocked, historical persisted taskEvidence remains unchanged, and no fresh planning/admission/allocation or implementation is implied.
+
+Joe confirmed TASK-2 merged/installed/active; passive status corroborated the expected f80340d93 runtime build. At Joe’s explicit direction, the failed PRIMECLAW-53 worktree for operation b0133363-514c-419e-affc-7fc4b1042d90 was removed through Orca and verified absent from disk, Git and Orca; no bound Episode session was found. Joe then explicitly directed removal of this Conversation’s stale ownership entry; only that entry was removed and committed/pushed as b66581303d477e56caaba13b59ed407f4832de87, preserving other owners. The historical failed allocation is no longer live ownership. Joe now asks to implement the expanded nine-criterion specification and revised living plan. Return this exact task to In Planning for managed implementation readiness, not directly to In Progress. No Episode/resources/assignment have been created by this status update. New readiness must use the current published task, code and selected host id:afb6537c-e643-4a5f-b284-f0f627ddcbdf, not the obsolete failed-allocation task snapshot.
 <!-- SECTION:NOTES:END -->
