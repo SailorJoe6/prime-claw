@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-53
 title: Remove code cleanliness gates from independent Backlog authoring guidance
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: '2026-11-02 22:00'
-updated_date: '2026-11-03 19:53'
+updated_date: '2026-11-03 20:05'
 labels: []
 dependencies: []
 references:
@@ -140,6 +140,8 @@ Candidate source published: d33648c17865b00a49e6046c9b93811c3ebd891a on JLanders
 Validation: scripts/test-tier1.sh --probe passed using the independently verified documented cwd-fix-v0.9.8-r1 source (a1faacd53ac4473a75de1d434afaf50945c2f647), Docker-only, offline product checks, verified teardown. Manifest .test-results/20261103T193459Z-10144-7a477a75/tier1/manifest.json. Focused bridge run initially 3 passed/1 failed; sole Episode-suite failure was new test injection matching git push instead of actual git -C <store> push. Fixed only that test seam. Corrected complete Episode suite .test-results/primeclaw-53-spec-episode.tap: 231 passed, 0 failed/skipped. Backlog admission, Beads admission and task-history bridges passed; task-history Node had 80 passed. Prior-runtime red check .test-results/primeclaw-53-regression-before.tap: both key new tests failed as expected with original clean-parent rejection, including failed Blocked publication after tracked ownership and session-binding error. Focused Markdown tests .test-results/primeclaw-53-markdown-focused.log: 4 passed. Full Markdown .test-results/primeclaw-53-markdown.log: 34 passed/3 failed; the same three failed names reproduced in a disposable git archive of b89111f (log primeclaw-53-markdown-baseline.log). No baseline fixture/local-asset repairs or all-suite-green claim.
 
 AC1-4 and AC6-9 record source-candidate evidence, not merge/deployment. AC5 remains open: exact bounded global Markdown delivery still belongs to owner after accepted source. Template source SHA-256: design.md a601f4e8cda5fe58de169bbb6940eaa906fc7fe1451d59371f48eb0fffcf8df3; spec-it-out.md 8a271b29a70ed90d9669818d9ca971bf849e8ffa86a9c02b73bcd12282ff0793. No user-global file was written; no runtime apply/check/probe/activation/restart, lifecycle change, merge, cleanup, ownership edit or ADAPT/Nemo mutation occurred. Session transport and some ownership observations are test seams; this is not live Orca/daemon UAT. Historical provisioning blockers were not retried or repaired by this source slice.
+
+Owning Conversation reviewed exact source candidate d33648c17865b00a49e6046c9b93811c3ebd891a and accepted its in-scope source evidence. Independent EXPERT openai-codex/gpt-6-astra/max found no material defect. Its focused offline Docker reproduction also proved an eligible existing independent store preserves parent HEAD/index/files/.gitignore/root configuration while dirty and divergent, with exact task-only direct publication; evidence is retained in the owner review transcript/artifacts. Mandatory Docker probe, corrected Episode 231/231, other affected bridges and focused Markdown evidence were verified; three broad Markdown failures reproduce on the clean base and are not claimed fixed. Publish Ready for Merge for the source candidate only. AC5 remains unchecked pending separately authorized accepted-source two-file global Markdown delivery; no runtime installation/activation/restart is authorized or claimed. Operator merge-tuple approval has not been requested or granted. Final merge readiness currently requires resolving the primary main checkout’s uncommitted unchanged admission ownership record and derived project-skill-prepare installed-hash observation without adopting foreign edits; do not force, stash/reset, ignore metadata or alter ownership evidence.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
