@@ -4,6 +4,7 @@ title: Allow task Episodes from published non-main bases for stacked PRs
 status: In Design
 assignee: []
 created_date: '2026-10-30 23:31'
+updated_date: '2026-11-03 18:12'
 labels: []
 dependencies: []
 references:
@@ -42,17 +43,20 @@ Downstream assumptions also need coherent treatment: task blocked handling (`977
 
 ## Intended outcome and boundaries
 
-Allow an explicitly operator-selected, clean, published feature/stack base in the primary owning checkout. Bind the exact admitted base commit and intended integration branch so continuation, review, merge and cleanup use the correct target. Main may remain the default, not a universal admission gate. Preserve task/provider/publication/owner/resource identity, isolated Episode resources, and explicit operator merge/abandonment authority.
+Use the current checked-out branch as the Episode base and default merge target, including a clean, published feature/stack branch in the primary owning checkout. Show its name and exact base commit during readiness; bind that commit and integration branch so continuation, review, merge and cleanup use the correct target. The repository's actual primary/default branch is supported regardless of whether it is named main, master or something else; it is not a universal admission gate. Preserve task/provider/publication/owner/resource identity, isolated Episode resources, and explicit operator merge/abandonment authority.
+
+The implement-task skill must instruct the LLM to check whether the current branch differs from the repository's actual primary/default branch. If it does, the LLM should ask the user before stacking, for example: "Current branch is xxxx; are you sure you want to stack a branch off this?" This is ONLY an instruction in the skill file. Add no code to require, track, validate or enforce this check-in, no approval token/receipt, and no deterministic confirmation gate or compliance test. Joe explicitly accepts that the LLM may ignore this instruction. This does not weaken the separate existing identity, isolation or publication checks.
 
 Use native Git/provider behavior and the smallest explicit binding needed. Do not introduce a branch classifier, reconciler, coordinator, new state machine or lifecycle receipts. This bug concerns task-native admission and affected downstream target assumptions, not blanket permission for arbitrary checkout admission. Preserve legacy compatibility and the distinct post-acceptance primary-main `--user-global` activation policy. No Prime Agent source changes, release/Rust/fork proposals, or changes to foreign TASK-2 are in scope. This ticket authorizes specification review only, not planning, implementation or real Episode reproduction.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 An explicitly selected clean, published non-main base in the primary owning checkout can admit an otherwise-ready task Episode without changing the selected baseline; main remains a supported default.
+- [ ] #1 The current checked-out branch is the Episode base and default merge target. A clean, published non-default branch in the primary owning checkout can admit an otherwise-ready task Episode without changing that baseline; the repository default branch is supported regardless of its name.
 - [ ] #2 The exact base commit and intended integration branch remain unambiguous for the same owner/task/Episode through continuation, blocked handling, review and terminal cleanup; merge and publication target that integration branch rather than a hardcoded main.
 - [ ] #3 Admission never silently switches the primary checkout to main, discards stacked commits or substitutes another implementation basis. Existing unsafe-state, provider/publication, owner and resource identity rejections remain effective, with isolation preserved.
 - [ ] #4 Merge and abandonment still require explicit operator authority. Task status/publication and terminal ancestry checks remain correct for the selected target; unrelated tasks and resources are not changed.
 - [ ] #5 Focused disposable regression evidence covers clean published non-main acceptance with isolation/identity and invalid admission leaving task/resources unchanged. Review affected managed instructions for consistent target handling; do not require a new broad test harness or matrix.
 - [ ] #6 The change stays within Prime Claw, preserves legacy compatibility and does not loosen the separate primary-main user-global activation policy or introduce unnecessary coordination/state machinery.
+- [ ] #7 Content review confirms the implement-task skill tells the LLM to ask the user before stacking from a branch other than the repository’s actual primary/default branch, naming the current branch. This check-in exists only as a skill instruction: no code enforcement, confirmation tracking/receipt or compliance test is added; LLM noncompliance is explicitly acceptable.
 <!-- AC:END -->
