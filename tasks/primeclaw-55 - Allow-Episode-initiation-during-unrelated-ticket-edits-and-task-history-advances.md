@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 21:52'
+updated_date: '2026-11-03 22:22'
 labels: []
 dependencies: []
 references:
@@ -194,4 +194,11 @@ No global apply/activation, restart, dependency patch, live PRIMECLAW-45 recover
 
 ## Slice 2 selected — editable task entry/prep-chain decisions
 Continue the accepted same Episode with one bounded entry/prep-chain slice for both Backlog and Beads. Remove allowed-status and plan/design eligibility checks from prep-chain/tool wrappers and remove embedded policy from the three task entry tools. Existing Markdown retains authority, status/readiness and selected-ticket durability decisions; both queued prompts receive the complete native task view as factual context through current workflow loading. Preserve exact identity, truthful native errors and existing placement/resource mechanics. Lower-level allocation, status-publication, transport, continuation and terminal policy remain accepted work on this same task, not claimed fixed in this slice. Add focused runtime tests and Docker validation, publish one coherent code slice plus native task evidence, then stop for owner review. No AC is fully met yet.
+
+## Slice 2 validation checkpoint — final probe passed; narrow rerun pending
+Final Docker `scripts/test-tier1.sh --probe` passed with teardown and manifest publication: `.test-results/20261103T215553Z-87178-8ad8c997/tier1/manifest.json`. Final selected host-safe static subset passed 42 tests (9 deselected) after updating directly affected stale assertions and preserving managed project customization. The unfiltered broader static selection retains unrelated missing `backlog/config.yml` assumptions and an existing spec-it-out source/project customization equality failure; baseline HEAD bytes prove these source/project files were unchanged by this slice. Existing managed plan-task customization predates this slice and is now tested rather than overwritten.
+
+Focused Docker bridges (`python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container`) finished 9 passed / 2 failed, manifest `.test-results/20261103T215446Z-79176-32730d28/tier1/manifest.json`, log `/tmp/primeclaw55-slice2-focused.log`. History Node suite passed 80/80. Provider, Beads admission, ownership, spec-Episode and close bridges passed. Backlog admission hit the 180-second bridge timeout after 8 passing cases, without a preceding assertion failure. Reviewed-plan Node suite passed 67/68; the only failure was an old compaction-test assertion expecting the intentionally removed create-wrapper status refusal. Repaired that test-only expectation to retain one exact dispatch and no handoff compaction, and increased only the existing Backlog bridge timeout to 360 seconds for all 18 cases. No source repair was indicated. The two affected bridges still require Docker rerun; no pass is claimed yet.
+
+Read-only final source/call-site review found no material defect in complete native-view delivery to both prompts, exact task identity or retained-folder behavior. Candidate remains uncommitted pending the narrow rerun. No additional source-builder startup will be launched until the sibling startup/capture window is coordinated. No lifecycle status or resources changed; full remaining accepted work stays on PRIMECLAW-55.
 <!-- SECTION:NOTES:END -->
