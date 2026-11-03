@@ -20,6 +20,7 @@ import {
   canonicalWorkflowPrompt,
 } from "./workflow-chain.ts";
 import {
+  effectiveTaskEpisodeIntegrationBranch,
   isBacklogTaskEpisodeOwnership,
   isPublishedBacklogTaskEpisodeOwnership,
   isBeadsTaskEpisodeOwnership,
@@ -312,7 +313,7 @@ export interface TaskEpisodeCleanupGit {
   branch(repo: string): string;
   head(repo: string): string;
   upstreamHead(repo: string): string;
-  /** Required for provider-native Beads canonical-main publication proof. */
+  /** Required for provider-native Beads integration-target publication proof. */
   directRemoteHead?(repo: string, branch: string): string;
   assertCleanWorktree(repo: string): void;
   isAncestor(repo: string, ancestor: string, descendant: string): boolean;
@@ -363,6 +364,38 @@ function runGitRaw(cwd: string, args: string[]): string {
 function runGit(cwd: string, args: string[]): string {
   return runGitRaw(cwd, args).trim();
 }
+function taskIntegrationBranch(
+  git: Pick<GitAdapter, "branch">,
+  repo: string,
+  expected?: string,
+): string {
+  const branch = git.branch(repo);
+  try {
+    execFileSync("git", ["check-ref-format", `refs/heads/${branch}`], { stdio: "ignore" });
+    if (execFileSync("git", ["check-ref-format", "--branch", branch], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+    }).trim() !== branch) throw new Error("Branch shorthand is not a literal branch");
+  } catch {
+    throw new Error("Task Episode requires a valid named integration branch");
+  }
+  if (expected !== undefined && branch !== expected) {
+    throw new Error(`Task Episode owner checkout must stay on recorded integration branch ${expected}; found ${branch}`);
+  }
+  return branch;
+}
+
+function assertTaskAdmissionCode(
+  git: Pick<TaskEpisodeAdmissionGit, "branch" | "head">,
+  projectRoot: string,
+  integrationBranch: string,
+  expectedHead?: string,
+): void {
+  taskIntegrationBranch(git, projectRoot, integrationBranch);
+  if (expectedHead !== undefined && git.head(projectRoot) !== expectedHead) {
+    throw new Error("Integration branch code HEAD changed during task Episode admission");
+  }
+}
+
 export class CliGitAdapter implements GitAdapter {
   private readonly runner: (cwd: string, args: string[]) => string;
   constructor(runner: (cwd: string, args: string[]) => string = runGit) { this.runner = runner; }
@@ -428,7 +461,7 @@ export class CliTaskEpisodeCleanupGit implements TaskEpisodeCleanupGit {
   }
   assertCleanWorktree(repo: string): void {
     if (runGitRaw(repo, ["status", "--porcelain=v1", "--untracked-files=no"]).trim()) {
-      throw new Error("Task Episode cleanup requires canonical main without staged or tracked changes");
+      throw new Error("Task Episode cleanup requires the integration checkout without staged or tracked changes");
     }
   }
   isAncestor(repo: string, ancestor: string, descendant: string): boolean {
@@ -977,11 +1010,10 @@ export function resolveBlockedWorkflowAuthority(
     throw new Error("Task-native blocked workflow must run from the repository root");
   }
   const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
-  if (!samePath(project.root, projectRoot)
-    || project.kind === "linked-worktree"
-    || git.branch(projectRoot) !== "main") {
-    throw new Error("Task-native blocked workflow must run from the canonical primary main checkout");
+  if (!samePath(project.root, projectRoot) || project.kind === "linked-worktree") {
+    throw new Error("Task-native blocked workflow must run from the canonical primary checkout");
   }
+  taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
   if (!ctx.sessionManager.getSessionFile()) {
     throw new Error("Task-native blocked workflow requires a persisted owner session");
   }
@@ -1371,6 +1403,7 @@ async function prepareOwnedEpisodeHandoff(
   promptIdentity: EpisodeHandoffPromptIdentity,
 ): Promise<PreparedEpisodeHandoff> {
   if (record.status !== "active") throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
+  if (isTaskEpisodeOwnership(record)) taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
   validateWorktreeRecord(record, git, filesystem, repo);
   if (record.engine === "orca") {
     const worktree = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
@@ -1404,6 +1437,7 @@ async function prepareOwnedEpisodeHandoff(
     handoffPrompt += observation;
     executePrompt += observation;
   }
+  if (isTaskEpisodeOwnership(record)) taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
   const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
   const state = await publisher.getState(route.activeSessionId);
   assertIdleEpisodeState(state, route.record, route.activeSessionId);
@@ -1426,6 +1460,7 @@ async function deliverOwnedEpisodeHandoff(
   const prepared = await prepareOwnedEpisodeHandoff(
     record, guidance, repo, ctx, git, filesystem, orca, publisher, store, promptIdentity,
   );
+  if (isTaskEpisodeOwnership(prepared.record)) taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(prepared.record));
   await publisher.deliverHandoff(
     prepared.activeSessionId, prepared.handoffPrompt, prepared.executePrompt, onHandoffAdmitted,
   );
@@ -1635,7 +1670,7 @@ export async function transitionSpecEpisodeToTaskOwnership(
 
 /**
  * Continue one exact active task-native Episode after the owning Conversation
- * has published the main task's resumable `In Progress` state. This internal
+ * has published the integration task's resumable `In Progress` state. This internal
  * seam is the guarded ordinary-continuation path for the public task lifecycle.
  */
 function samePublishedHandoffIdentity(
@@ -1777,8 +1812,8 @@ export async function handoffTaskEpisode(
       throw new Error("Task-native Episode handoff must run from the repository root");
     }
     const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
-    if (!samePath(project.root, repo) || project.kind === "linked-worktree" || git.branch(repo) !== "main") {
-      throw new Error("Task-native Episode handoff must run from the canonical primary main checkout");
+    if (!samePath(project.root, repo) || project.kind === "linked-worktree") {
+      throw new Error("Task-native Episode handoff must run from the canonical primary checkout");
     }
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
       throw new Error("Episode handoff is available only from a top-level project Conversation");
@@ -1787,6 +1822,7 @@ export async function handoffTaskEpisode(
     const record = store.read(repo, ownerSessionId);
     if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
     exactAllocatableTaskRecord(record, taskId, ownerSessionId);
+    taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
     if (record.status !== "active") {
       throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
     }
@@ -1906,21 +1942,21 @@ export async function handoffTaskEpisode(
     }
 
     exactOwnedTaskRecord(record, taskId, ownerSessionId);
-    const mainTask = resolveTask(repo, taskId);
-    if (!mainTask
-      || mainTask.taskId !== record.taskId
-      || !samePath(mainTask.projectRoot, repo)
-      || mainTask.taskPathRelative !== record.taskPath) {
-      throw new Error("Task-native Episode handoff does not match the exact owned Backlog task on main");
+    const integrationTask = resolveTask(repo, taskId);
+    if (!integrationTask
+      || integrationTask.taskId !== record.taskId
+      || !samePath(integrationTask.projectRoot, repo)
+      || integrationTask.taskPathRelative !== record.taskPath) {
+      throw new Error("Task-native Episode handoff does not match the exact owned Backlog task on the integration branch");
     }
     if (git.pathStatus(repo, record.taskPath) !== "") {
-      throw new Error("Task-native Episode handoff requires the exact main task path to match committed HEAD");
+      throw new Error("Task-native Episode handoff requires the exact integration task path to match committed HEAD");
     }
-    if (mainTask.status !== "In Progress") {
-      throw new Error(`Task-native Episode handoff requires main task status In Progress; found ${mainTask.status}`);
+    if (integrationTask.status !== "In Progress") {
+      throw new Error(`Task-native Episode handoff requires integration task status In Progress; found ${integrationTask.status}`);
     }
-    if (!meaningfulTaskImplementationPlan(mainTask.implementationPlan)) {
-      throw new Error("Task-native Episode handoff requires a meaningful main-task Implementation Plan");
+    if (!meaningfulTaskImplementationPlan(integrationTask.implementationPlan)) {
+      throw new Error("Task-native Episode handoff requires a meaningful integration-task Implementation Plan");
     }
     const episodeTask = resolveTask(record.worktree!, taskId);
     if (!episodeTask
@@ -2058,6 +2094,12 @@ export async function allocateReservedTaskEpisode(
     const existing = store.read(repo, ownerSessionId);
     if (!existing) throw new Error(`No durable task-native Episode reservation exists for ${rawTaskId}`);
     exactAllocatableTaskRecord(existing, rawTaskId, ownerSessionId);
+    const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
+    const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
+    if (!samePath(project.root, repo) || project.kind === "linked-worktree") {
+      throw new Error("Task-native Episode allocation must run from the canonical primary checkout");
+    }
+    taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(existing));
     if (existing.status === "active") {
       validateWorktreeRecord(existing, git, filesystem, repo);
       if (existing.engine === "orca") {
@@ -2070,17 +2112,24 @@ export async function allocateReservedTaskEpisode(
       if (!samePath(session.cwd, existing.worktree!)) {
         throw new Error("Task-native Episode session is not rooted at the owned worktree");
       }
+      taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(existing));
       const route = await reopenIfNeeded(existing, session, ctx, publisher, store, repo);
       return { ...route.record, reused: true };
     }
     if (existing.status !== "provisioning") {
       throw new EpisodeStateUncertainError(`Existing task-native Episode ownership is ${existing.status}; inspect exact resources before continuing. No assignment was replayed.`);
     }
+    if (git.head(repo) !== existing.baseRef) throw new Error("Task Episode integration code HEAD changed before allocation");
     record = existing;
     if (taskReservationHasResourceIdentity(record)) {
       throw new EpisodeStateUncertainError("Task-native provisioning already contains resource identity; inspect exact resources instead of replaying allocation");
     }
 
+    const assertReservedCode = (): void => {
+      taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record!));
+      if (git.head(repo) !== record!.baseRef) throw new Error("Task Episode integration code HEAD changed before allocation");
+    };
+    assertReservedCode();
     const taskLabel = safeTaskLabel(record.taskId);
     const worktreeName = `${basename(repo)}-${taskLabel}-episode-${record.operationId.slice(0, 8)}`;
     const executePromptAtRoot = canonicalWorkflowPrompt(repo, "execute", {
@@ -2095,11 +2144,13 @@ export async function allocateReservedTaskEpisode(
       if (filesystem.exists(worktree) || git.worktrees(repo).some((entry) => samePath(entry.path, worktree))) {
         throw new EpisodeStateUncertainError(`Task-native Episode worktree path already exists: ${worktree}`);
       }
+      assertReservedCode();
       record = updated(record, { worktreeName, worktree, branch, head: record.baseRef });
       store.write(repo, record);
       git.createWorktree(repo, branch, worktree, record.baseRef);
       git.assertCleanWorktree(worktree);
       if (git.head(worktree) !== record.baseRef) throw new EpisodeStateUncertainError("Local task-native Episode did not start at the reserved code head");
+      taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
       const preparedWorkspace = preparePublishedBacklogEpisodeWorkspace(record, repo, dependencies, store);
       record = preparedWorkspace.record;
       let executePrompt = canonicalWorkflowPrompt(worktree, "execute", {
@@ -2111,6 +2162,7 @@ export async function allocateReservedTaskEpisode(
         executePrompt += providerTaskObservationBlock(preparedWorkspace.providerTaskObservation);
       }
       const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
+      taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
       const published = await publisher.createFresh({
         worktree, sessionName: `${taskLabel}-episode`, model,
         onAllocated: (identity) => {
@@ -2124,6 +2176,7 @@ export async function allocateReservedTaskEpisode(
         episodeActiveSessionId: published.activeSessionId,
       });
       store.write(repo, record);
+      taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
       await publisher.deliverExecute(published.activeSessionId, executePrompt);
       record = updated(record, { status: "active", uncertaintyReason: undefined });
       store.write(repo, record);
@@ -2131,6 +2184,7 @@ export async function allocateReservedTaskEpisode(
     }
 
     const setup = await reservedTaskSetup(record, repo, orca);
+    assertReservedCode();
     record = updated(record, { worktreeName });
     store.write(repo, record);
     const worktree = await orca.createWorktree({ setup, name: worktreeName, baseRef: record.baseRef });
@@ -2146,6 +2200,7 @@ export async function allocateReservedTaskEpisode(
     });
     store.write(repo, record);
     git.assertCleanWorktree(worktree.path);
+    taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
     const preparedWorkspace = preparePublishedBacklogEpisodeWorkspace(record, repo, dependencies, store);
     record = preparedWorkspace.record;
     let executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
@@ -2160,6 +2215,7 @@ export async function allocateReservedTaskEpisode(
     const launchAutomationName = `prime-claw-launch-${record.operationId}`;
     record = updated(record, { launchAutomationName });
     store.write(repo, record);
+    taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
     const automationId = await orca.createLaunchAutomation({
       worktreeId: worktree.id,
       name: launchAutomationName,
@@ -2168,6 +2224,7 @@ export async function allocateReservedTaskEpisode(
     });
     record = updated(record, { launchAutomationId: automationId });
     store.write(repo, record);
+    taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
     const runId = await orca.runAutomation(automationId, setup.routingEnvironmentId);
     record = updated(record, { launchRunId: runId });
     store.write(repo, record);
@@ -2270,17 +2327,25 @@ export function commitConversationTaskStatus(options: {
   git: TaskEpisodeAdmissionGit;
   resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   expectedProvider?: "backlog" | "beads";
+  expectedIntegrationBranch?: string;
+  expectedCodeHead?: string;
   expectedSourceStatus?: "In Planning" | "In Progress";
   requireSourcePlan?: boolean;
   prepareTaskHistory?: typeof prepareTaskHistoryWorkspace;
   publishTaskHistory?: typeof publishTaskHistoryMutation;
 }): ConversationTaskStatusCommitResult {
+  const assertCode = (expectedHead = options.expectedCodeHead): void => {
+    if (options.expectedIntegrationBranch !== undefined) {
+      assertTaskAdmissionCode(options.git, options.projectRoot, options.expectedIntegrationBranch, expectedHead);
+    }
+  };
   const provider = detectTaskProvider(options.projectRoot, options.runner);
   if (options.expectedProvider
       && (provider.kind !== "selected" || provider.evidence.provider !== options.expectedProvider)) {
     throw new Error(`Task provider changed before ${options.status} publication; expected ${options.expectedProvider}`);
   }
   if (provider.kind === "selected" && provider.evidence.provider === "beads") {
+    assertCode();
     return mutateAndPublishBeadsTaskStatus({
       projectRoot: options.projectRoot,
       taskId: options.taskId,
@@ -2367,6 +2432,7 @@ export function commitConversationTaskStatus(options: {
   // Preserve the ordinary Backlog task-file path exactly: native status edit,
   // exact task re-read, one task-file-only Git commit, and cleanliness proof.
   requireExpectedBacklogSource();
+  assertCode();
   mutateProviderTaskStatus({
     projectRoot: options.projectRoot,
     taskId: options.taskId,
@@ -2383,7 +2449,9 @@ export function commitConversationTaskStatus(options: {
   if (selection.status !== options.status) {
     throw new Error(`Backlog task ${options.taskId} did not reach ${options.status}`);
   }
+  assertCode();
   const commit = options.git.commitOnlyPath(options.projectRoot, options.taskPath, options.message);
+  assertCode(commit);
   const paths = options.git.commitPaths(options.projectRoot, commit);
   if (paths.length !== 1 || paths[0] !== options.taskPath) {
     throw new Error(`Task-native Episode status commit contains paths other than ${options.taskPath}`);
@@ -2412,6 +2480,9 @@ function verifyTaskCleanupResources(
   record: TaskEpisodeOwnershipRecord,
   episodeHead: string,
 ): void {
+  if (record.branch === effectiveTaskEpisodeIntegrationBranch(record)) {
+    throw new Error("Task Episode cleanup refuses to delete the integration branch as an Episode resource");
+  }
   if (snapshot.runtime && !samePath(snapshot.runtime.cwd, record.worktree!)) {
     throw new Error("Task Episode cleanup runtime is no longer exact");
   }
@@ -2547,13 +2618,14 @@ function verifyTaskEpisodeTerminalState(
   runner: CommandRunner,
   dependencies: Pick<TaskEpisodeCleanupDependencies, "beadsTransport" | "beadsTaskReader" | "beadsRevisionIsAncestor" | "inspectPublishedTaskHistory">,
 ): TaskProviderTerminalEvidence | undefined {
-  const mainHead = git.head(projectRoot);
-  if (git.upstreamHead(projectRoot) !== mainHead) {
-    throw new Error("Task Episode cleanup requires pushed canonical main");
+  const integrationBranch = taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
+  const integrationHead = git.head(projectRoot);
+  if (git.upstreamHead(projectRoot) !== integrationHead) {
+    throw new Error("Task Episode cleanup requires pushed integration branch");
   }
   if (isBeadsTaskEpisodeOwnership(record)) {
-    if (!git.directRemoteHead || git.directRemoteHead(projectRoot, "main") !== mainHead) {
-      throw new Error("Task Episode cleanup requires exact local/upstream/direct-remote canonical main");
+    if (!git.directRemoteHead || git.directRemoteHead(projectRoot, integrationBranch) !== integrationHead) {
+      throw new Error("Task Episode cleanup requires exact local/upstream/direct-remote integration branch");
     }
     const terminal = readPublishedBeadsTerminalTask(projectRoot, record, runner, dependencies);
     if (outcome === "merged") {
@@ -2562,8 +2634,8 @@ function verifyTaskEpisodeTerminalState(
             && terminal.task.nativeView.close_reason.trim() !== "")) {
         throw new Error(`Task Episode cleanup requires ${record.taskId} to have exact native done completion without an abandonment reason`);
       }
-      if (!git.isAncestor(projectRoot, episodeHead, mainHead)) {
-        throw new Error("Task Episode cleanup requires the exact Episode candidate in canonical main history");
+      if (!git.isAncestor(projectRoot, episodeHead, integrationHead)) {
+        throw new Error("Task Episode cleanup requires the exact Episode candidate in integration branch history");
       }
       return terminal;
     }
@@ -2573,8 +2645,8 @@ function verifyTaskEpisodeTerminalState(
         || terminal.task.nativeView.closed_at.trim() === "") {
       throw new Error(`Task Episode cleanup requires ${record.taskId} to have exact native closed abandonment evidence for the pushed Episode head`);
     }
-    if (git.isAncestor(projectRoot, episodeHead, mainHead)) {
-      throw new Error("Task Episode cleanup found abandoned Episode code in canonical main history");
+    if (git.isAncestor(projectRoot, episodeHead, integrationHead)) {
+      throw new Error("Task Episode cleanup found abandoned Episode code in integration branch history");
     }
     return terminal;
   }
@@ -2594,8 +2666,8 @@ function verifyTaskEpisodeTerminalState(
           || task.taskPathRelative !== record.taskPath || task.status !== "Done") {
         throw new Error(`Task Episode cleanup requires independent Backlog task ${record.taskId} to be Done at its exact active path`);
       }
-      if (!git.isAncestor(projectRoot, episodeHead, mainHead)) {
-        throw new Error("Task Episode cleanup requires the exact Episode candidate in canonical main history");
+      if (!git.isAncestor(projectRoot, episodeHead, integrationHead)) {
+        throw new Error("Task Episode cleanup requires the exact Episode candidate in integration branch history");
       }
       taskEvidence = { task: {
         id: task.taskId, title: task.title, status: task.status, path: task.taskPathRelative,
@@ -2603,8 +2675,8 @@ function verifyTaskEpisodeTerminalState(
       } };
     } else {
       taskEvidence = archivedBacklogEvidence(first, projectRoot, record, episodeHead, runner);
-      if (git.isAncestor(projectRoot, episodeHead, mainHead)) {
-        throw new Error("Task Episode cleanup found abandoned Episode code in canonical main history");
+      if (git.isAncestor(projectRoot, episodeHead, integrationHead)) {
+        throw new Error("Task Episode cleanup found abandoned Episode code in integration branch history");
       }
     }
     const second = inspectPublished({
@@ -2619,18 +2691,18 @@ function verifyTaskEpisodeTerminalState(
   if (outcome === "merged") {
     const task = exactAdmissionTask(resolveTask(projectRoot, record.taskId), record.taskId, projectRoot, record.taskPath);
     if (task.status !== "Done") throw new Error(`Task Episode cleanup requires ${record.taskId} to be Done after merge`);
-    if (!git.isAncestor(projectRoot, episodeHead, mainHead)) {
-      throw new Error("Task Episode cleanup requires the exact Episode candidate in canonical main history");
+    if (!git.isAncestor(projectRoot, episodeHead, integrationHead)) {
+      throw new Error("Task Episode cleanup requires the exact Episode candidate in integration branch history");
     }
     return undefined;
   }
   const archivePath = expectedArchivedTaskPath(record.taskPath);
-  if (git.pathTrackedAtRef(projectRoot, mainHead, record.taskPath)
-    || !git.pathTrackedAtRef(projectRoot, mainHead, archivePath)) {
+  if (git.pathTrackedAtRef(projectRoot, integrationHead, record.taskPath)
+    || !git.pathTrackedAtRef(projectRoot, integrationHead, archivePath)) {
     throw new Error("Task Episode cleanup requires the exact task to be archived after abandonment");
   }
-  if (git.isAncestor(projectRoot, episodeHead, mainHead)) {
-    throw new Error("Task Episode cleanup found abandoned Episode code in canonical main history");
+  if (git.isAncestor(projectRoot, episodeHead, integrationHead)) {
+    throw new Error("Task Episode cleanup found abandoned Episode code in integration branch history");
   }
   return undefined;
 }
@@ -2662,17 +2734,20 @@ export async function finalizeTaskEpisodeCleanup(
   const resolveTask = dependencies.taskResolver
     ?? defaultEpisodeTaskResolver(runner);
   const projectRoot = git.repositoryRoot(ctx.cwd);
-  if (!samePath(projectRoot, ctx.cwd) || git.branch(projectRoot) !== "main") {
-    throw new Error("Task Episode cleanup must run from the canonical primary main checkout");
+  if (!samePath(projectRoot, ctx.cwd)) {
+    throw new Error("Task Episode cleanup must run from the canonical primary checkout");
   }
   const record = store.read(projectRoot, ctx.sessionManager.getSessionId());
   if (!record) throw new Error(`No durable task-native Episode ownership exists for ${taskId}`);
   exactOwnedTaskCleanupRecord(record, taskId, ctx.sessionManager.getSessionId());
+  taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
   if (record.status !== "active") {
     throw new Error(`Task Episode cleanup cannot finalize ${record.status} ownership`);
   }
   const inspect = async (): Promise<TaskEpisodeCleanupSnapshot> => {
+    taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
     const snapshot = await dependencies.cleanup.inspect(record);
+    taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
     verifyTaskCleanupResources(snapshot, record, episodeHead);
     return snapshot;
   };
@@ -2709,6 +2784,7 @@ export async function finalizeTaskEpisodeCleanup(
   }
 
   if (snapshot.runtime) {
+    taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
     await dependencies.cleanup.removeRuntime(record);
     snapshot = await inspect();
     if (snapshot.runtime) throw new Error("Task Episode cleanup runtime removal was not verified exactly");
@@ -2716,6 +2792,7 @@ export async function finalizeTaskEpisodeCleanup(
   // Orca may delete the local branch during worktree removal, so the upstream
   // must be absent before invoking that provider operation.
   if (snapshot.upstream) {
+    taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
     await dependencies.cleanup.removeUpstream(record);
     snapshot = await inspect();
     if (snapshot.runtime || snapshot.upstream) {
@@ -2723,6 +2800,7 @@ export async function finalizeTaskEpisodeCleanup(
     }
   }
   if (snapshot.worktree) {
+    taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
     await dependencies.cleanup.removeWorktree(record);
     snapshot = await inspect();
     if (snapshot.runtime || snapshot.worktree) {
@@ -2730,12 +2808,14 @@ export async function finalizeTaskEpisodeCleanup(
     }
   }
   if (snapshot.branch) {
+    taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
     await dependencies.cleanup.removeBranch(record);
     snapshot = await inspect();
   }
   if (snapshot.runtime || snapshot.worktree || snapshot.branch || snapshot.upstream) {
     throw new Error("Task Episode cleanup did not remove every exact resource");
   }
+  taskIntegrationBranch(git, projectRoot, effectiveTaskEpisodeIntegrationBranch(record));
   store.removeTask(projectRoot, record);
   return { verified: true, outcome, taskId, episodeHead, resourcesRemoved: true, ownershipRemoved: true };
 }
@@ -2787,20 +2867,19 @@ function exactBeadsAdmissionTask(
 function proveBeadsAdmissionCodeHead(
   git: TaskEpisodeAdmissionGit,
   projectRoot: string,
+  integrationBranch: string,
   expectedHead?: string,
 ): string {
+  assertTaskAdmissionCode(git, projectRoot, integrationBranch, expectedHead);
   if (git.operationInProgress(projectRoot)) {
     throw new Error("Beads task Episode creation requires no Git operation in progress");
   }
   if (git.trackedStatus(projectRoot) !== "") {
-    throw new Error("Beads task Episode creation requires canonical main without staged or tracked changes");
+    throw new Error("Beads task Episode creation requires the integration checkout without staged or tracked changes");
   }
   const head = git.head(projectRoot);
-  if (expectedHead && head !== expectedHead) {
-    throw new Error("Canonical main code HEAD changed during Beads task Episode admission");
-  }
   if (git.upstreamHead(projectRoot) !== head) {
-    throw new Error("Beads task Episode creation requires canonical main code HEAD to equal its upstream");
+    throw new Error("Beads task Episode creation requires integration code HEAD to equal its configured upstream");
   }
   return head;
 }
@@ -2896,6 +2975,7 @@ async function createBeadsTaskEpisode(
   const taskId = rawTaskId.trim();
   let projectRoot = "";
   let codeHead = "";
+  let integrationBranch = "";
   let inProgressPublication: PublishedBeadsTaskMutation | undefined;
   let reservationWriteStarted = false;
 
@@ -2908,11 +2988,10 @@ async function createBeadsTaskEpisode(
       throw new Error("Beads task Episode creation must run from the repository root");
     }
     const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
-    if (!samePath(project.root, projectRoot)
-        || project.kind === "linked-worktree"
-        || git.branch(projectRoot) !== "main") {
-      throw new Error("Beads task Episode creation must run from the canonical primary main checkout");
+    if (!samePath(project.root, projectRoot) || project.kind === "linked-worktree") {
+      throw new Error("Beads task Episode creation must run from the canonical primary checkout");
     }
+    integrationBranch = taskIntegrationBranch(git, projectRoot);
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
       throw new Error("Episode creation is available only from a top-level project Conversation");
@@ -2924,7 +3003,7 @@ async function createBeadsTaskEpisode(
       throw new Error("Task-native local admission cannot carry Orca placement identity");
     }
 
-    codeHead = proveBeadsAdmissionCodeHead(git, projectRoot);
+    codeHead = proveBeadsAdmissionCodeHead(git, projectRoot, integrationBranch);
     exactBeadsAdmissionTask(
       resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Planning", "in_planning",
     );
@@ -2935,7 +3014,7 @@ async function createBeadsTaskEpisode(
     }
 
     const admission = withEpisodeAdmissionLock(projectRoot, () => {
-      proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
+      proveBeadsAdmissionCodeHead(git, projectRoot, integrationBranch, codeHead);
       exactBeadsAdmissionTask(
         resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Planning", "in_planning",
       );
@@ -2945,6 +3024,7 @@ async function createBeadsTaskEpisode(
         throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
       }
 
+      proveBeadsAdmissionCodeHead(git, projectRoot, integrationBranch, codeHead);
       inProgressPublication = requirePublishedBeadsTaskMutation(
         commitStatus({
           taskId,
@@ -2956,10 +3036,12 @@ async function createBeadsTaskEpisode(
           git,
           resolveTask: () => null,
           expectedProvider: "beads",
+          expectedIntegrationBranch: integrationBranch,
+          expectedCodeHead: codeHead,
         }),
         "Beads In Progress admission publication", taskId, projectRoot, "In Progress", "in_progress",
       );
-      proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
+      proveBeadsAdmissionCodeHead(git, projectRoot, integrationBranch, codeHead);
       const livePublishedTask = exactBeadsAdmissionTask(
         resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
       );
@@ -2967,12 +3049,14 @@ async function createBeadsTaskEpisode(
       if (JSON.stringify(livePublishedTask.nativeView) !== JSON.stringify(publishedNativeView)) {
         throw new BeadsRawTaskViewDriftError(taskId, publishedNativeView, livePublishedTask.nativeView);
       }
+      proveBeadsAdmissionCodeHead(git, projectRoot, integrationBranch, codeHead);
       const reservation = reserve({
         projectRoot,
         publication: inProgressPublication,
         ownerSessionId,
         engine: options.engine,
         baseRef: codeHead,
+        integrationBranch,
         ...(options.projectSetupId ? { projectSetupId: options.projectSetupId } : {}),
         ...(options.routingEnvironmentId ? { routingEnvironmentId: options.routingEnvironmentId } : {}),
         ...(dependencies.reservationOperationId ? { operationId: dependencies.reservationOperationId } : {}),
@@ -2980,6 +3064,7 @@ async function createBeadsTaskEpisode(
         ownership: {
           read: (root, owner) => store.read(root, owner),
           write: (root, record) => {
+            proveBeadsAdmissionCodeHead(git, projectRoot, integrationBranch, codeHead);
             reservationWriteStarted = true;
             store.write(root, record);
           },
@@ -2987,11 +3072,13 @@ async function createBeadsTaskEpisode(
         now,
       });
       if (reservation.provider !== "beads" || reservation.taskId !== taskId
+          || reservation.integrationBranch !== integrationBranch
           || reservation.baseRef !== codeHead
           || reservation.providerRevision !== inProgressPublication.evidence.publishedRevision
           || JSON.stringify(reservation.taskEvidence) !== JSON.stringify(inProgressPublication.evidence.taskPublished.nativeView)) {
         throw new Error("Beads task Episode reservation did not bind the exact published task and clean code HEAD");
       }
+      proveBeadsAdmissionCodeHead(git, projectRoot, integrationBranch, codeHead);
       return reservation;
     });
 
@@ -3001,12 +3088,14 @@ async function createBeadsTaskEpisode(
     const active = parseEpisodeOwnership(stored, "Beads task Episode admission result");
     exactAllocatableTaskRecord(active, taskId, ownerSessionId);
     if (!isBeadsTaskEpisodeOwnership(active) || active.status !== "active"
+        || active.integrationBranch !== integrationBranch
         || active.operationId !== admission.operationId || active.baseRef !== codeHead
         || active.head !== codeHead
         || active.providerRevision !== inProgressPublication.evidence.publishedRevision
         || JSON.stringify(active.taskEvidence) !== JSON.stringify(inProgressPublication.evidence.taskPublished.nativeView)) {
       throw new Error("Beads task Episode allocation returned without the exact active reservation identity");
     }
+    taskIntegrationBranch(git, projectRoot, integrationBranch);
     exactBeadsResourceIdentity(active, result);
     exactBeadsAdmissionTask(
       resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
@@ -3034,6 +3123,7 @@ async function createBeadsTaskEpisode(
           throw new Error("durable ownership does not match the exact Beads task and code base");
         }
         blockedPublication = withEpisodeAdmissionLock(projectRoot, () => {
+          taskIntegrationBranch(git, projectRoot, integrationBranch);
           const current = store.read(projectRoot, ownerSessionId);
           if (!current || JSON.stringify(current) !== JSON.stringify(retained)) {
             throw new Error("Beads ownership changed before Blocked recovery publication");
@@ -3052,6 +3142,7 @@ async function createBeadsTaskEpisode(
               git,
               resolveTask: () => null,
               expectedProvider: "beads",
+              expectedIntegrationBranch: integrationBranch,
             }),
             "Beads Blocked admission recovery publication", taskId, projectRoot, "Blocked", "blocked",
           );
@@ -3068,6 +3159,7 @@ async function createBeadsTaskEpisode(
 
     try {
       withEpisodeAdmissionLock(projectRoot, () => {
+        taskIntegrationBranch(git, projectRoot, integrationBranch);
         const current = store.read(projectRoot, ownerSessionId);
         if (JSON.stringify(current) !== JSON.stringify(retained)) {
           throw new Error("Episode ownership changed before Beads In Planning rollback");
@@ -3086,6 +3178,7 @@ async function createBeadsTaskEpisode(
             git,
             resolveTask: () => null,
             expectedProvider: "beads",
+            expectedIntegrationBranch: integrationBranch,
           }),
           "Beads In Planning admission rollback publication", taskId, projectRoot, "In Planning", "in_planning",
         );
@@ -3127,6 +3220,7 @@ export async function createTaskEpisode(
   let projectRoot = "";
   let taskPath = "";
   let preAdmissionHead = "";
+  let integrationBranch = "";
   let statusMutationStarted = false;
   let independentTaskHistory = false;
   let admissionPushError: string | undefined;
@@ -3140,11 +3234,11 @@ export async function createTaskEpisode(
       throw new Error("Task-native Episode creation must run from the repository root");
     }
     const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
-    if (!samePath(project.root, projectRoot)
-      || project.kind === "linked-worktree"
-      || git.branch(projectRoot) !== "main") {
-      throw new Error("Task-native Episode creation must run from the canonical primary main checkout");
+    if (!samePath(project.root, projectRoot) || project.kind === "linked-worktree") {
+      throw new Error("Task-native Episode creation must run from the canonical primary checkout");
     }
+    integrationBranch = taskIntegrationBranch(git, projectRoot);
+    preAdmissionHead = git.head(projectRoot);
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
       throw new Error("Episode creation is available only from a top-level project Conversation");
@@ -3174,9 +3268,10 @@ export async function createTaskEpisode(
       const identity = isTaskEpisodeOwnership(existing) ? existing.taskId : existing.sourceLocation;
       throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
     }
-    preAdmissionHead = git.head(projectRoot);
+    assertTaskAdmissionCode(git, projectRoot, integrationBranch, preAdmissionHead);
 
     const admission = withEpisodeAdmissionLock(projectRoot, () => {
+      assertTaskAdmissionCode(git, projectRoot, integrationBranch, preAdmissionHead);
       const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
       if (lockedTask.status !== "In Planning") {
         throw new Error("Task-native Episode creation requires the exact task to remain In Planning at the serialized admission boundary");
@@ -3192,12 +3287,15 @@ export async function createTaskEpisode(
         const identity = isTaskEpisodeOwnership(lockedExisting) ? lockedExisting.taskId : lockedExisting.sourceLocation;
         throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
       }
+      assertTaskAdmissionCode(git, projectRoot, integrationBranch, preAdmissionHead);
       statusMutationStarted = true;
       const admitted = commitConversationTaskStatus({
         taskId,
         projectRoot,
         taskPath,
         status: "In Progress",
+        expectedIntegrationBranch: integrationBranch,
+        expectedCodeHead: preAdmissionHead,
         expectedSourceStatus: "In Planning",
         requireSourcePlan: true,
         message: `chore: admit ${taskId} episode`,
@@ -3208,6 +3306,10 @@ export async function createTaskEpisode(
         publishTaskHistory: dependencies.publishTaskHistory,
       }) as Extract<ConversationTaskStatusCommitResult, { selection: BacklogTaskSelection }>;
       independentTaskHistory = Boolean(admitted.taskHistory);
+      assertTaskAdmissionCode(git, projectRoot, integrationBranch, admitted.commit);
+      if (admitted.taskHistory && admitted.commit !== preAdmissionHead) {
+        throw new Error("Independent Backlog admission changed the exact code base");
+      }
       // Code admission is separate from task-only status publication. Check it
       // before reservation writes ownership, never in failure reporting.
       if (admitted.taskHistory && (git.operationInProgress(projectRoot)
@@ -3221,28 +3323,38 @@ export async function createTaskEpisode(
         ownerSessionId: ctx.sessionManager.getSessionId(),
         engine: options.engine,
         baseRef: admitted.commit,
+        integrationBranch,
         ...(options.projectSetupId ? { projectSetupId: options.projectSetupId } : {}),
         ...(options.routingEnvironmentId ? { routingEnvironmentId: options.routingEnvironmentId } : {}),
         ...(dependencies.reservationOperationId ? { operationId: dependencies.reservationOperationId } : {}),
       };
+      const reservationOwnership = {
+        read: (root: string, owner?: string) => store.read(root, owner),
+        write: (root: string, record: EpisodeOwnershipRecord) => {
+          assertTaskAdmissionCode(git, projectRoot, integrationBranch, admitted.commit);
+          store.write(root, record);
+        },
+      };
       const reservation = admitted.taskHistory
         ? reservePublishedBacklog({ ...reservationBase, publication: admitted.taskHistory }, {
-            ownership: store,
+            ownership: reservationOwnership,
             taskResolver: resolveTask,
             now: dependencies.now,
           })
         : reserve(reservationBase as TaskEpisodeReservationInput, {
             git,
-            ownership: store,
+            ownership: reservationOwnership,
             taskResolver: resolveTask,
             now: dependencies.now,
           });
-      if (reservation.baseRef !== admitted.commit) {
-        throw new Error("Task-native Episode reservation did not bind the exact code base");
+      if (reservation.baseRef !== admitted.commit || reservation.integrationBranch !== integrationBranch) {
+        throw new Error("Task-native Episode reservation did not bind the exact code base and integration branch");
       }
+      assertTaskAdmissionCode(git, projectRoot, integrationBranch, admitted.commit);
       return { admitted, reservation };
     });
     const { admitted, reservation } = admission;
+    assertTaskAdmissionCode(git, projectRoot, integrationBranch, admitted.commit);
     admissionPushError = admitted.taskHistory ? undefined : bestEffortTaskPush(git, projectRoot);
 
     const result = await allocate(taskId, ctx, dependencies);
@@ -3250,9 +3362,11 @@ export async function createTaskEpisode(
     if (!storedActive) throw new Error("Task-native Episode allocation returned without durable ownership");
     const active = parseEpisodeOwnership(storedActive, "task-native Episode admission result");
     exactOwnedTaskRecord(active, taskId, ctx.sessionManager.getSessionId());
-    if (active.status !== "active" || active.baseRef !== admitted.commit || active.operationId !== reservation.operationId) {
+    if (active.status !== "active" || active.baseRef !== admitted.commit || active.operationId !== reservation.operationId
+        || active.integrationBranch !== integrationBranch) {
       throw new Error("Task-native Episode allocation returned without the exact active reservation identity");
     }
+    taskIntegrationBranch(git, projectRoot, integrationBranch);
     const finalTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
     if (finalTask.status !== "In Progress" || git.pathStatus(projectRoot, taskPath) !== "") {
       throw new Error("Task-native Episode allocation did not preserve the exact committed In Progress task state");
@@ -3276,6 +3390,7 @@ export async function createTaskEpisode(
       ].join("\n");
       try {
         withEpisodeAdmissionLock(projectRoot, () => {
+          taskIntegrationBranch(git, projectRoot, integrationBranch);
           const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
           if (lockedTask.status !== "In Progress") {
             throw new Error(`Backlog task ${taskId} is not the In Progress admission being recovered`);
@@ -3286,6 +3401,7 @@ export async function createTaskEpisode(
             taskPath,
             status: "Blocked",
             expectedSourceStatus: "In Progress",
+            expectedIntegrationBranch: integrationBranch,
             message: `chore: block ${taskId} episode admission`,
             note,
             runner,
@@ -3323,6 +3439,7 @@ export async function createTaskEpisode(
     let rollbackCommitted = false;
     try {
       rollbackCommitted = withEpisodeAdmissionLock(projectRoot, () => {
+        taskIntegrationBranch(git, projectRoot, integrationBranch);
         const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
         const unchanged = lockedTask.status === "In Planning"
           && git.head(projectRoot) === preAdmissionHead
@@ -3337,6 +3454,7 @@ export async function createTaskEpisode(
           taskPath,
           status: "In Planning",
           expectedSourceStatus: "In Progress",
+          expectedIntegrationBranch: integrationBranch,
           message: `chore: roll back ${taskId} episode admission`,
           runner,
           git,

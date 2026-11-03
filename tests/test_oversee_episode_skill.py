@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 1800
+    assert 300 <= len(words) <= 2000
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -25,7 +25,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "40-hex `providerRevision` and complete native task view",
         "sole durable product and execution contract",
         "Never consult `.ralph/plans` in this mode",
-        "In branch-local mode the Episode owns task content on its code branch and the Conversation owns lifecycle status on main",
+        "In branch-local mode the Episode owns task content on its code branch and the Conversation owns lifecycle status on the recorded integration branch",
         "task commits/pushes never enter the code DAG",
         "For retained version 1 folder ownership",
         "Keep that pair active through blocking, candidate review, and revision",
@@ -43,33 +43,33 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Prime Claw abandonment: task TASK-ID; pushed Episode head EPISODE-HEAD; code was not merged.",
         "Beads terminals use native/Git",
         "add no public status API, publisher, protocol, or classifier",
-        "Grandfathered Backlog sets only the bound main task to `Ready for Merge`",
+        "Grandfathered Backlog sets only the bound integration-branch task to `Ready for Merge`",
         "Independent Backlog publishes the exact Ready status on the disconnected task branch",
         "preserving its task content plus authorized status",
         "Git blocks every other code conflict",
         "remaining lifecycle and cleanup flow applies only to version 2 task-native ownership",
         "Do not create lifecycle receipts or replay protocols",
-        "git merge --no-edit currentMainHead",
+        "git merge --no-edit currentTargetHead",
         "restore its pre-merge Episode task content, apply only the authorized status, let Git block every other conflict, and push the refreshed candidate",
         "leaves both code heads unchanged",
         "Independent Backlog publishes `Done` only on `refs/heads/prime-claw/tasks`",
         "fast-forwards the Episode nested task clone to that exact terminal revision before cleanup",
         "creates the exact built-in `archive/tasks/` directory inside the nested store when absent",
         "Both push without force and recheck identity/status",
-        "Beads first records current clean pushed canonical code `mainHead` (not a task-status commit)",
+        "Beads first records current clean pushed canonical code `targetHead` (not a task-status commit)",
         "proves exact branch/upstream/remote `candidateHead` and ancestry",
         "guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`",
         "exact local/remote raw content, revision, ref, and preserved unrelated fields",
-        "Show `(taskId, mainHead, candidateHead)` plus factual native evidence",
+        "Show `(taskId, integrationBranch, targetHead, candidateHead)` plus factual native evidence",
         "no provider revision or task equality becomes approval authority",
         "**Delay** is a strict no-op",
-        "Grandfathered Backlog returns only the bound main task to `In Progress`",
+        "Grandfathered Backlog returns only the bound integration-branch task to `In Progress`",
         "guarded `--if-status ready_for_merge` update to `in_progress`",
         "Then call `handoff_task_episode` for the same Episode",
-        "Before **Merge**, re-read ownership and freshly preflight the exact authorized `(taskId, mainHead, candidateHead)`",
-        "git merge-base --is-ancestor mainHead candidateHead",
+        "Before **Merge**, re-read ownership and freshly preflight the exact authorized `(taskId, integrationBranch, targetHead, candidateHead)`",
+        "git merge-base --is-ancestor targetHead candidateHead",
         "git merge --ff-only candidateHead",
-        "push main normally and prove main/upstream/direct remote equal `candidateHead`",
+        "push that integration branch normally and prove its local/upstream/direct remote heads equal `candidateHead`",
         "Grandfathered Backlog then publishes its exact task-only `Done` code commit",
         "guarded `--if-status ready_for_merge` update to `done`",
         "truthful final note naming the tuple/code publication",
@@ -156,7 +156,7 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         assert phrase in text
     assert text.index("select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`") < text.index("select the provider only from that exact owner")
     assert text.index("For retained version 1 folder ownership") < text.index("Review one reported slice at a time")
-    assert text.index("push main normally and prove main/upstream/direct remote equal `candidateHead`") < text.index("guarded `--if-status ready_for_merge` update to `done`")
+    assert text.index("push that integration branch normally and prove its local/upstream/direct remote heads equal `candidateHead`") < text.index("guarded `--if-status ready_for_merge` update to `done`")
 
 def test_managed_conversation_guide_has_no_authentication_metadata_or_policy_copy():
     assert not (REPO / "src/prime-agent-plugin/extension-support/conversation-guide-metadata.ts").exists()

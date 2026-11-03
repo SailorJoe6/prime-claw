@@ -403,8 +403,15 @@ proofs succeed. Imported text is data, not instructions to execute.
 Before any Backlog destination preparation or write, the complete used-status
 inventory is checked with the existing projections. All unsupported-used statuses
 and genuinely contradictory archive evidence are reported together with exact
-source IDs/statuses; unused catalog entries do not block. Legacy `open` maps to
-`In Design`; ordinary `closed` maps to `Done` and native `completed/` placement.
+source IDs/statuses; unused catalog entries do not block. Legacy `open` and
+native `deferred` map to ordinary `In Design` tasks. Past, future or absent
+`defer_until` does not change that projection. Migration drops active deferral
+state, not ordinary text: titles (including `DEFERRED:`), descriptions, notes
+(including reasons appended by `bd defer`) and comments are preserved. Historical
+deferral fields remain only in the existing raw source/history evidence; no
+active deferral fields, extra annotations or scheduling behavior are created,
+and migration never normalizes the retiring source. Ordinary `closed` maps to
+`Done` and native `completed/` placement.
 A nonempty `close_reason`, keyword or status category does not mean archive.
 Archive requires a coherent retained marked Backlog archive source package or
 the exact task-specific Prime Claw abandonment reason. Ambiguous exact evidence

@@ -11,7 +11,7 @@ import {
   type TaskEpisodeCleanupAdapter,
   type TaskEpisodeCleanupSnapshot,
 } from "./spec-episode.ts";
-import type { TaskEpisodeOwnershipRecord } from "./episode-ownership.ts";
+import { effectiveTaskEpisodeIntegrationBranch, type TaskEpisodeOwnershipRecord } from "./episode-ownership.ts";
 
 function samePath(a: string | undefined, b: string): boolean {
   if (typeof a !== "string") return false;
@@ -249,6 +249,9 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       || !record.episodeActiveSessionId) {
       throw new Error("Task Episode cleanup host adapter requires every exact core resource identity");
     }
+    if (record.branch === effectiveTaskEpisodeIntegrationBranch(record)) {
+      throw new Error("Task Episode cleanup cannot remove the recorded integration branch");
+    }
     const projectRoot = this.projectRoot;
     const gitWorktrees = this.git.worktrees(projectRoot);
     if (gitWorktrees.some((entry) => entry.branch === record.branch && !samePath(entry.path, record.worktree!))) {
@@ -282,6 +285,7 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     const sessionTree = await this.sessionTree(record, sessions);
     const sessionIdle = sessionTree?.idle ?? true;
     const upstream = this.configuredUpstream(record.branch, Boolean(branch));
+    this.assertNotIntegrationUpstream(record, upstream);
     const upstreamHead = this.remoteHead(upstream);
     if (upstreamHead && upstreamHead !== this.expectedHead) {
       throw new Error("Task Episode cleanup found a changed terminal upstream head");
@@ -455,18 +459,32 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     return result.stdout.trim();
   }
 
+  private branchConfig(branch: string, key: string): string | undefined {
+    const result = this.runner.run("git", ["config", "--get-all", `branch.${branch}.${key}`], {
+      cwd: this.projectRoot, allowFailure: true,
+    });
+    if (result.status === 1 && result.stdout === "") return undefined;
+    if (result.status !== 0) throw new Error(`Git upstream configuration lookup failed: ${result.stderr.trim()}`);
+    const values = result.stdout.replace(/\r?\n$/, "").split(/\r?\n/);
+    if (values.length !== 1 || !values[0]) throw new Error("Task Episode cleanup found ambiguous upstream configuration");
+    return values[0];
+  }
+
+  private assertNotIntegrationUpstream(record: TaskEpisodeOwnershipRecord, upstream: { ref: string; destination: string }): void {
+    const target = effectiveTaskEpisodeIntegrationBranch(record);
+    const remote = this.branchConfig(target, "remote"), ref = this.branchConfig(target, "merge");
+    if (!remote || ref !== upstream.ref) return;
+    const result = this.runner.run("git", ["remote", "get-url", "--all", "--", remote], {
+      cwd: this.projectRoot, allowFailure: true,
+    });
+    if (result.status !== 0) throw new Error("Task Episode cleanup cannot resolve the integration upstream destination");
+    if (result.stdout.replace(/\r?\n$/, "").split(/\r?\n/).includes(upstream.destination)) {
+      throw new Error("Task Episode cleanup cannot remove the recorded integration upstream");
+    }
+  }
+
   private configuredUpstream(branch: string, branchPresent: boolean): { remote: string; ref: string; destination: string } {
-    const config = (key: string): string | undefined => {
-      const result = this.runner.run("git", ["config", "--get-all", `branch.${branch}.${key}`], {
-        cwd: this.projectRoot, allowFailure: true,
-      });
-      if (result.status === 1 && result.stdout === "") return undefined;
-      if (result.status !== 0) throw new Error(`Git upstream configuration lookup failed: ${result.stderr.trim()}`);
-      const values = result.stdout.replace(/\r?\n$/, "").split(/\r?\n/);
-      if (values.length !== 1 || !values[0]) throw new Error("Task Episode cleanup found ambiguous upstream configuration");
-      return values[0];
-    };
-    const remote = config("remote"), ref = config("merge");
+    const remote = this.branchConfig(branch, "remote"), ref = this.branchConfig(branch, "merge");
     if (remote === undefined && ref === undefined && !branchPresent && this.resolvedUpstream?.branch === branch) {
       return this.resolvedUpstream;
     }

@@ -99,3 +99,89 @@ accepted source. This Episode did not run global apply/check/probes, install
 runtime code, restart, alter ADAPT/Nemo, change lifecycle status, or remove
 Episode resources. Source publication, Markdown delivery, and runtime activation
 must be reported separately.
+
+## Integrated accepted PRIMECLAW-48/52 revision
+
+The same Episode integrated accepted canonical main
+`213689359cdcae9fadb31a4f898e2dc5d0725f0f` into code checkpoint
+`bb9c1868ee33fffea7b9f7907fc70d702f806dd7` through ordinary Git. The initial
+pending merge against `dd693cdc` was replaced, before validation, by the actual
+accepted/pushed PRIMECLAW-52 checkpoint after the owner confirmed it. Only the
+two expected `spec-episode.ts` hunks conflicted. No whole-file ours/theirs was
+used and no uncommitted primary metadata was read or copied for integration.
+
+The resolution keeps task-only code HEAD preservation and the existing native
+publication safeguards, removes common and independent pre-call `assertCode`
+assertions from the independent publisher, and retains accepted integration-
+branch/resource safeguards. The exact independent `admitted.commit` versus
+`preAdmissionHead` check and the separate code-admission operation/clean/upstream
+checks remain **before ownership reservation**, not in failure reporting.
+Beads, branch-local and retained behavior and all accepted migration changes
+remain part of this combined candidate.
+
+The existing real-Git tests now additionally prove that independent task-only
+publication never invokes branch/operation/cleanliness/upstream admission methods
+even when integration observations are supplied, and that a concurrently moved,
+published code base is rejected before ownership/allocation without repairing
+that actor's commit.
+
+### Fresh validation and invocation limits
+
+- Mandatory `TIER1_ENV_FILE=.test-results/primeclaw-53-selector.env scripts/test-tier1.sh --probe`:
+  **passed**, exit 0. Manifest:
+  `.test-results/20261103T220935Z-46297-9829eae8/tier1/manifest.json`.
+  It proves network absent, checks/probe passed, exact driver runtime and source
+  builder teardown absent, and source checkout noninterference. The selected
+  Prime Agent source remains `a1faacd53ac4473a75de1d434afaf50945c2f647`.
+- The owning Conversation coordinated the single builder startup. Immutable
+  source-builder and runtime capture completed inside its bounded window, and
+  the startup/capture reservation was explicitly returned before offline tests
+  finished. No second builder was started.
+- Runtime image: `sha256:9fc302620bf7198bf3da16d5f4b8b3ade58c04d8b83350dc8c954c9f1a20011d`.
+  Combined Node tests use `docker run --rm --pull never --network none`, the
+  Episode mounted read-only at `/workspace`, and **`-w /tmp`**. The six absolute
+  suite paths are `/workspace/tests/` plus `spec_episode_extension.test.mjs`,
+  `task_episode_admission_extension.test.mjs`,
+  `beads_task_episode_admission_extension.test.mjs`,
+  `task_episode_ownership_extension.test.mjs`, `task_history_workspace.test.mjs`,
+  and `task_provider_migration.test.mjs`, following
+  `node --experimental-strip-types --test`.
+  Final combined result: **487 passed, 0 failed, 12 skipped, 0 cancelled**
+  (499 tests; exit 0). All 12 skips are the suite's explicitly retired reverse-
+  migration cases; the active refusal path remains covered. Total Node duration:
+  3,229,201 ms. Log:
+  `.test-results/primeclaw-53-integration-combined-isolated.tap`.
+  The corrected offline container was verified absent after `--rm`; every
+  subordinate native fixture process was confined to that container.
+- The first direct combined attempt used `-w /workspace`. Its linked-worktree
+  `.git` points at a host-only directory, so bare Git ref checks failed inside
+  Docker. A Git-only Docker diagnostic reproduced that exact error; the same
+  diagnostic passed from `/tmp`. The obsolete disposable test container was
+  stopped and removed. This was an invocation correction, not a plugin source
+  repair or product regression. Its partial log is retained as
+  `.test-results/primeclaw-53-integration-combined.tap`; it is not a test-pass
+  claim.
+- Focused Markdown command in the same immutable offline image:
+  `python3 -m pytest tests/test_future_plan_skills.py tests/test_blocked_skill.py tests/test_oversee_episode_skill.py -q -p no:cacheprovider -k 'authoring_skill_publishes or independent_backlog_authoring or task_native or integration'`:
+  **6 passed, 2 failed, 40 deselected**. Log:
+  `.test-results/primeclaw-53-integration-markdown.log`.
+  Both failed names (`test_task_native_planning_workflows_are_exposed_without_removing_folder_compatibility`
+  and `test_task_native_implementation_policies_are_publicly_activated_with_folder_compatibility`)
+  fail only at installed/source workflow-byte equality and reproduce on a
+  disposable Git archive of accepted main `213689359cdcae9fadb31a4f898e2dc5d0725f0f`.
+  Baseline log: `.test-results/primeclaw-53-integration-markdown-main-baseline.log`.
+  No local workflow refresh, global delivery or unrelated baseline repair was
+  performed. This is not an all-repository-green claim.
+
+Candidate runtime/test inputs did not change during fresh validation:
+`spec-episode.ts` SHA-256 `de14fd0e1225fce457701ea319a7db1d4dff3352d7d7b3fe3aaadf322d09bd07`;
+`spec_episode_extension.test.mjs` SHA-256 `26f3969907b16c813ff0c6059c95778aefcf8d405d72b3a739ba1854b8d76221`;
+accepted `task-provider-migration.ts` SHA-256
+`14eeb244e592007eaeaa3d53e0c37cd4280b82f6c707ca41eaaafbea97f1e6f9`.
+The final diff against accepted main remains the same seven bounded PRIMECLAW-53
+paths; all inherited PRIMECLAW-48/52 paths outside that slice are unchanged from
+that accepted checkpoint. The renewed candidate is for owning Conversation
+review, not merge acceptance or live UAT. Native task content is published
+separately on `refs/heads/prime-claw/tasks` with the exact code head and direct
+publication evidence. AC5/global Markdown delivery and all runtime activation
+remain outside this revision.

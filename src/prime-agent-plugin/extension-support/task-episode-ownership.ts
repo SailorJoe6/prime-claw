@@ -74,6 +74,11 @@ export interface TaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /**
+   * Staged target binding. Public admission stays main-only until fresh current-branch
+   * selection and the downstream target lifecycle are wired.
+   */
+  integrationBranch?: string;
   operationId?: string;
   /** Exact verified In Progress admission commit supplied by the public admission boundary. */
   baseRef?: string;
@@ -93,6 +98,11 @@ export interface PublishedBacklogTaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /**
+   * Staged target binding. Public admission stays main-only until fresh current-branch
+   * selection and the downstream target lifecycle are wired.
+   */
+  integrationBranch?: string;
   operationId?: string;
   /** Exact clean code HEAD, separate from the published task-history revision. */
   baseRef: string;
@@ -118,6 +128,11 @@ export interface BeadsTaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /**
+   * Staged target binding. Public admission stays main-only until fresh current-branch
+   * selection and the downstream target lifecycle are wired.
+   */
+  integrationBranch?: string;
   operationId?: string;
   /** Exact clean code HEAD that this reservation binds as baseRef. */
   baseRef: string;
@@ -271,9 +286,10 @@ export class CliBeadsTaskEpisodeReservationGit implements BeadsTaskEpisodeReserv
 export function exactDirectRemoteBranchHead(repo: string, branch: string, action = "Beads lifecycle"): string {
   const remote = runGit(repo, ["config", "--get", `branch.${branch}.remote`]);
   const mergeRef = runGit(repo, ["config", "--get", `branch.${branch}.merge`]);
-  if (!remote || !mergeRef || mergeRef !== `refs/heads/${branch}`) {
+  if (!remote || !mergeRef.startsWith("refs/heads/")) {
     throw new Error(`${action} requires the recorded branch's exact ordinary upstream`);
   }
+  runGit(repo, ["check-ref-format", mergeRef]);
   const urls = runGit(repo, ["remote", "get-url", "--all", remote]).split(/\r?\n/).filter(Boolean);
   if (urls.length !== 1) {
     throw new Error(`${action} requires one exact code remote transport`);
@@ -283,7 +299,7 @@ export function exactDirectRemoteBranchHead(repo: string, branch: string, action
   const match = rows.length === 1
     ? /^([0-9a-f]{40}|[0-9a-f]{64})\s+refs\/heads\/(.+)$/.exec(rows[0]!)
     : null;
-  if (!match || match[2] !== branch) {
+  if (!match || `refs/heads/${match[2]}` !== mergeRef) {
     throw new Error(`${action} could not prove the exact direct-remote code head`);
   }
   return match[1]!;
@@ -922,6 +938,7 @@ export function reserveTaskEpisodeOwnership(
     baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   };
@@ -1010,6 +1027,7 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
     baseRef: input.baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   }) as PublishedBacklogTaskEpisodeOwnershipRecord;
@@ -1126,6 +1144,7 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
     baseRef: input.baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   }) as BeadsTaskEpisodeOwnershipRecord;
