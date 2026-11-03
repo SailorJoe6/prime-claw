@@ -9,6 +9,8 @@ projects. It helps them create by becoming a **factory** for whatever their
 work produces — software, content, business, or anything else that fits its
 agentic capabilities.
 
+- [REQUIREMENTS.md](REQUIREMENTS.md) — the single maintained product requirements
+  source (first consolidated draft for review).
 - [VISION.md](VISION.md) — what prime-claw is, the agent hierarchy, the
   three-horizon context model, and why prime-agent.
 - [LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) — the long-range, manual-first build order.
