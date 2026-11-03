@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-45
 title: Migrate prime-claw to Backlog.md v1.55.3
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-03 18:04'
+updated_date: '2026-11-03 18:12'
 labels: []
 dependencies: []
 references:
