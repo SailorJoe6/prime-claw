@@ -3448,7 +3448,7 @@ export async function createTaskEpisode(
         if (lockedTask.status !== "In Progress") {
           throw new Error(`Backlog task ${taskId} is not the In Progress admission being rolled back`);
         }
-        commitConversationTaskStatus({
+        const rolledBack = commitConversationTaskStatus({
           taskId,
           projectRoot,
           taskPath,
@@ -3461,7 +3461,9 @@ export async function createTaskEpisode(
           resolveTask,
           prepareTaskHistory: dependencies.prepareTaskHistory,
           publishTaskHistory: dependencies.publishTaskHistory,
-        });
+        }) as Extract<ConversationTaskStatusCommitResult, { selection: BacklogTaskSelection }>;
+        // Admission may have thrown before returning its publication topology.
+        independentTaskHistory = Boolean(rolledBack.taskHistory);
         return true;
       });
     } catch (recoveryError) {

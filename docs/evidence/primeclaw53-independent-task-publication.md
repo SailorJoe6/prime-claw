@@ -185,3 +185,99 @@ review, not merge acceptance or live UAT. Native task content is published
 separately on `refs/heads/prime-claw/tasks` with the exact code head and direct
 publication evidence. AC5/global Markdown delivery and all runtime activation
 remain outside this revision.
+
+
+## Accepted rollback transport noninterference repair
+
+Renewed review reproduced a concrete defect in `f9e19a9` under existing AC3/6/9.
+An actor commits local code after independent `In Progress` task publication but
+before the publisher's retained HEAD check. That check correctly rejects the
+changed HEAD before the caller receives its independent-history result. The
+subsequent task-only `In Planning` rollback succeeds, but the caller discarded
+its result and used the still-false admission flag to push parent code. The
+accepted real-Git/native-Backlog/actual-push reproduction made one parent-code
+push and advanced remote code with no ownership or allocation. Its accepted-main
+comparison made zero parent-code pushes because the old clean-parent check
+prevented rollback; restoring that check is not the fix.
+
+The bounded caller correction captures the rollback's actual publication result
+and sets the existing transport topology from `rolledBack.taskHistory` before
+choosing recovery transport. No admission or native publication guard changed.
+HEAD-drift rejection, exact `preAdmissionHead`, preownership code admission,
+branch-local transport, Beads, and accepted48/52resource/migration paths remain.
+No parent-code cleanliness/upstream requirement was restored inside independent
+task-only publication. No new controller, receipt, replay state, dependency
+change, or additional scope was added.
+
+The focused caller regression lives in the existing
+`tests/spec_episode_extension.test.mjs` / `independentStatusFixture`. It uses
+real disposable code/task repositories, bare remotes, native Backlog, and actual
+Git push; only the concurrent actor commit is injected. It requires zero parent
+push attempts, unchanged remote code, a preserved local actor commit and code
+snapshot, truthful independently published `In Planning` rollback, exactly two
+task-path-only status commits, and zero allocation/ownership.
+
+### Fresh validation
+
+- Red test against unchanged `f9e19a9` runtime source: **1 failed as expected**,
+  actual parent-code push count **1**. Log:
+  `.test-results/primeclaw-53-rollback-red.tap`. Command uses the prior immutable
+  offline runtime image `sha256:9fc302620bf7198bf3da16d5f4b8b3ade58c04d8b83350dc8c954c9f1a20011d`
+  with `node --experimental-strip-types --test --test-name-pattern="rollback never pushes a concurrent" /workspace/tests/spec_episode_extension.test.mjs`.
+- Fresh mandatory `TIER1_ENV_FILE=.test-results/primeclaw-53-selector.env scripts/test-tier1.sh --probe`:
+  **passed**, exit 0. Manifest:
+  `.test-results/20261103T233312Z-31787-a86409bc/tier1/manifest.json`;
+  log `.test-results/primeclaw-53-rollback-tier1.log`. The selected unchanged
+  dependency is `a1faacd53ac4473a75de1d434afaf50945c2f647`. Network absence,
+  apply/check/probe success, source noninterference, and clean runtime/builder
+  teardown are verified. The single startup/capture was explicitly coordinated
+  for 23:32:51–23:37:51Z and its slot returned at 23:36:27Z. No second builder
+  was started. A live capture inspection arrived after successful runtime
+  teardown; the final manifest and image evidence prove the exact immutable IDs.
+- Captured source-builder image: `sha256:5086ae5a322242c6c483515c02e34abf4a7bc6307b66d8ce313b82875c6c239e`;
+  runtime image: `sha256:2a78a4451169e1c4fce560fa007c857fdb43aa6658d682119faaa581cd2eca4e`.
+- Complete affected Node run: **357 passed, 0 failed, 0 skipped, 0 cancelled**
+  (125,237 ms), exit 0. Log `.test-results/primeclaw-53-rollback-affected.tap`.
+  Command: `node --experimental-strip-types --test` followed by the four absolute
+  `/workspace/tests/` paths: `spec_episode_extension.test.mjs`,
+  `task_episode_admission_extension.test.mjs`,
+  `beads_task_episode_admission_extension.test.mjs`, and
+  `task_episode_ownership_extension.test.mjs`. The new rollback caller case
+  passed, along with dirty/divergent task-only noninterference, exact changed
+  code-base rejection before ownership, and tracked-ownership/session-binding
+  failure with truthful independent Blocked publication. Branch-local and Beads
+  admission/recovery and ownership/resource paths are covered by these suites.
+- Focused authoring Markdown: **4 passed, 33 deselected**, exit 0. Command:
+  `python3 -m pytest /workspace/tests/test_future_plan_skills.py -q -p no:cacheprovider -k 'authoring_skill_publishes or independent_backlog_authoring'`
+  with Docker `--env PYTHONPATH=/workspace`. Log
+  `.test-results/primeclaw-53-rollback-markdown-corrected.log`. The initial
+  invocation omitted `PYTHONPATH` while using `/tmp` CWD and failed during
+  conftest import with `ModuleNotFoundError: No module named 'scripts'` (exit 4,
+  `.test-results/primeclaw-53-rollback-markdown.log`). Corrected only the test
+  environment, without a source change or another builder. The earlier two
+  installed/source workflow-equality baseline failures remain historical and
+  unchanged; this focused pass is not an all-repository-green claim.
+- Full migration revalidation was not repeated: only existing caller transport
+  selection changed, and the migration helper's SHA-256 remains
+  `14eeb244e592007eaeaa3d53e0c37cd4280b82f6c707ca41eaaafbea97f1e6f9`.
+  The earlier integrated499test run is historical evidence, not a new repair
+  pass. No affected migration path or new migration evidence justified another
+  54-minute run. All direct test containers, including the failed-invocation
+  container, were verified absent after completion.
+
+Validated runtime/test hashes remained unchanged through completion:
+`spec-episode.ts` SHA-256
+`f5e61e688e2b96ab079e6e6896995f568778ebf9465ec54d42b7435e5f90e316`;
+`spec_episode_extension.test.mjs` SHA-256
+`a587427ba2dc6044257887eee202d48aa3b4fa5c21379812fc5dde4477e3f334`.
+Session transport and some ownership observations remain test seams; the focused
+case uses real native task history and actual Git pushes, but is not live
+Orca/daemon UAT.
+
+All direct Docker commands use `--rm --pull never --network none`, a read-only
+`/workspace` source mount and `-w /tmp`. Builder startup/capture must be explicitly
+coordinated before the fresh mandatory driver. This repaired source is for
+renewed owner review; publication heads are recorded in the independent task
+history and the Episode report. Task status stays `In Progress`; AC5/global Markdown
+delivery is pending owner acceptance. No runtime activation/restart/global
+install, main merge, lifecycle/ownership edit, resource replacement or cleanup.

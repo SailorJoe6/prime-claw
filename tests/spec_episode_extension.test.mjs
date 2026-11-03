@@ -2194,6 +2194,51 @@ test("independent Backlog admission refuses a different published code base befo
   assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
 });
 
+test("independent Backlog admission rollback never pushes a concurrent actor's local code commit", async (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const before = f.codeSnapshot(), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+  const publications = [];
+  let actorSnapshot, codePushes = 0, allocations = 0;
+  const realPush = f.dependencies.admissionGit.push.bind(f.dependencies.admissionGit);
+  f.dependencies.admissionGit.push = (root) => { codePushes += 1; return realPush(root); };
+  await assert.rejects(createTaskEpisode(f.taskId, "head-drift-rollback", f.ctx, {
+    ...f.dependencies,
+    publishTaskHistory(input) {
+      const publication = publishTaskHistoryMutation(input);
+      assert.equal(publication.status, "published");
+      publications.push({ status: JSON.parse(publication.nativeAfter).task.status, head: publication.publishedHead });
+      if (!actorSnapshot && input.edits.some(edit => edit.option === "--status" && edit.value === "In Progress")) {
+        // A different actor commits code after actual task publication but before
+        // the publisher's HEAD check returns the independent admission result.
+        writeFileSync(join(f.root, "code.txt"), "concurrent actor's unpublished code\n");
+        f.git(f.root, "add", "code.txt");
+        f.git(f.root, "commit", "-qm", "concurrent actor's local code commit");
+        actorSnapshot = f.codeSnapshot();
+        assert.notEqual(actorSnapshot.head, before.head);
+        assert.equal(actorSnapshot.remoteMain, before.remoteMain);
+      }
+      return publication;
+    },
+    allocateTaskEpisode: async () => { allocations += 1; throw new Error("must not allocate"); },
+  }, { engine: "local" }), /returned to In Planning.*Independent Backlog In Progress publication changed the code HEAD/);
+  assert.ok(actorSnapshot, "exercise the retained HEAD-drift rejection before admission returns");
+  assert.deepEqual(publications.map(publication => publication.status), ["In Progress", "In Planning"]);
+  assert.equal(f.view().status, "In Planning");
+  assert.equal(codePushes, 0, "independent rollback must never attempt a parent-code push");
+  assert.equal(f.remoteHead("refs/heads/main"), before.remoteMain, "the actor's code must remain unpublished");
+  assert.equal(f.git(f.root, "rev-parse", "HEAD"), actorSnapshot.head, "preserve the actor's local code commit");
+  assert.deepEqual(f.codeSnapshot(), actorSnapshot, "task rollback must not repair or publish the actor's code");
+  assert.equal(allocations, 0); assert.deepEqual(f.events, []);
+  assert.equal(f.record, null); assert.equal(f.diskRecord(), null);
+  assert.equal(f.git(f.store, "rev-list", "--count", `${taskBefore}..HEAD`), "2");
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), publications[1].head);
+  assert.equal(f.remoteHead(TASK_HISTORY_REF), publications[1].head);
+  for (const ref of ["HEAD", "HEAD^"]) {
+    assert.deepEqual(f.taskCommitPaths(ref), [f.task.path.replace(/^\.backlog\//, "")]);
+  }
+  assert.equal(f.git(f.store, "status", "--porcelain"), "");
+});
+
 test("session binding failure publishes independent Backlog Blocked despite concurrent parent code changes and retains uncertain resources", async (t) => {
   const f = independentStatusFixture(t); if (!f) return;
   const base = f.git(f.root, "rev-parse", "HEAD"), taskBefore = f.git(f.store, "rev-parse", "HEAD");
