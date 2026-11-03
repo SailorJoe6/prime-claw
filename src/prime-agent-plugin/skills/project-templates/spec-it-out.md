@@ -111,24 +111,35 @@ path, or content mirror.
 
 ### Backlog
 
-Before mutation, record Git status and require the selected existing task path
-and Git index to be clean. After creation or revision, reload the exact task
+Before mutation, record Git status in the code repository and the selected task
+store. Require the selected existing task path and the selected task store's
+Git index to be clean; do not apply task-store cleanliness checks to a separate
+parent code repository. After creation or revision, reload the exact task
 through `backlog task view --json -- TASK-ID` and verify its canonical ID,
 `In Design` status, meaningful Description, native Acceptance Criteria, and
 returned regular task path. Verify no path other than that exact returned task
-path was newly changed and do not stage unrelated pre-existing changes.
+path was newly changed in the task store and do not stage unrelated pre-existing
+changes.
 
 Preserve the selected store topology. If the selected Backlog store is a
 validated ignored independent ordinary-Git clone, whether built-in or custom,
-require canonical code HEAD clean and upstream-equal, require the nested clone
-clean at the direct remote `refs/heads/prime-claw/tasks` head, commit only the
-returned task path inside that clone, push `HEAD:refs/heads/prime-claw/tasks`
-without force, and prove the direct remote head while code HEAD stays unchanged.
+before the native task write require the independent clone to be clean and at
+the directly proved `refs/heads/prime-claw/tasks` head. After the native task
+write, verify only the exact intended task path changed, commit only that path
+inside the clone, push `HEAD:refs/heads/prime-claw/tasks` without force, and prove
+the direct remote head. There is no requirement for the parent code repository to be clean
+or upstream-equal for task creation, revision, or task-store publication.
+Unrelated staged, unstaged, or untracked code changes and code-branch divergence
+are not blockers. Preserve the parent code HEAD, index, and worktree as found;
+never commit, stash, reset, clean, or otherwise repair code changes to enable a
+task-only operation. This does not relax separate implementation or Episode
+admission requirements.
 Only for an actual branch-local store, keep the existing flow: commit only the
 returned task path in the code repository, prove the commit contains no other
-path, and attempt one prompt push when a remote is available. A push failure is transport evidence to
-report, not permission to undo the valid local specification, create another
-task, or begin planning.
+path, and attempt one prompt push when a remote is available. A push failure is
+transport evidence to report, not permission to undo the valid local
+specification, create another task, or begin planning.
+
 
 ### Beads
 

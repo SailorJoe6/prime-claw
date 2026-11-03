@@ -3,12 +3,13 @@ import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realp
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
   CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, CliTaskEpisodeCleanupGit, PrimeSessionPublisher,
   EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
-  allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
+  allocateReservedTaskEpisode, bundleContentDigest, commitConversationTaskStatus, createSpecEpisode, createTaskEpisode, handoffSpecEpisode,
   restoreBlockedSpecEpisode, transitionSpecEpisodeToTaskOwnership,
   handoffTaskEpisode, resolveBlockedWorkflowAuthority, finalizeTaskEpisodeCleanup,
   verifyActiveTaskEpisodeContinuity,
@@ -17,6 +18,9 @@ import { parseEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent
 import { CliTaskEpisodeCleanupAdapter } from "../src/prime-agent-plugin/extension-support/task-episode-cleanup.ts";
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
+import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
+import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
+import { prepareTaskHistoryWorkspace, publishTaskHistoryMutation, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 
 const LOCATION = ".ralph/plans/future/alpha";
 function diskFixture() {
@@ -1929,6 +1933,250 @@ test("retained CLI inventory permits local fallback only for a missing executabl
     assert.equal(f.record, null);
     assert.equal(f.calls.some((call) => ["local-create", "fresh", "execute"].includes(call[0])), false);
   }
+});
+
+
+// Real code/task DAGs and a disposable bare remote; only session transport is faked.
+function independentStatusFixture(t) {
+  const backlog = process.platform === "linux" && existsSync("/usr/local/bin/backlog")
+    ? "/usr/local/bin/backlog"
+    : fileURLToPath(new URL("../deps/backlog/dist/backlog", import.meta.url));
+  if (!existsSync(backlog)) { t.skip("managed backlog executable unavailable"); return null; }
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-independent-status-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const root = join(dir, "repo"), remote = join(dir, "remote.git");
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  const git = (cwd, ...args) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
+  git(root, "config", "user.name", "Prime Claw Test");
+  git(root, "config", "user.email", "prime-claw@example.invalid");
+  mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true });
+  writeFileSync(join(root, ".agents", "skills", "execute", "SKILL.md"), "---\nname: execute\n---\nImplement the exact task.\n");
+  writeFileSync(join(root, "staged.txt"), "baseline staged file\n");
+  writeFileSync(join(root, "code.txt"), "baseline code\n");
+  mkdirSync(join(root, ".prime-claw"));
+  writeFileSync(join(root, ".prime-claw", "ownership.json"), `${JSON.stringify({ schemaVersion: 1, owners: {} }, null, 2)}\n`);
+  git(root, "add", "."); git(root, "commit", "-qm", "code baseline");
+  git(root, "remote", "add", "origin", remote); git(root, "push", "-qu", "origin", "main");
+  const processRunner = new ProcessCommandRunner();
+  const runner = { run(command, args, options) { return processRunner.run(command === "backlog" ? backlog : command, args, options); } };
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner });
+  assert.equal(prepared.status, "prepared");
+  const store = prepared.storeDir;
+  git(store, "config", "user.name", "Prime Claw Test");
+  git(store, "config", "user.email", "prime-claw@example.invalid");
+  runner.run("backlog", ["task", "create", "Independent status regression", "--status", "In Planning",
+    "--description", "Publish only the selected task without changing parent code",
+    "--plan", "1. Create the bounded resource.\n2. Verify exact identity.", "--plain"], { cwd: root });
+  const taskId = JSON.parse(runner.run("backlog", ["task", "list", "--json"], { cwd: root }).stdout).tasks[0].id;
+  const view = () => JSON.parse(runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd: root }).stdout).task;
+  const task = view();
+  git(store, "add", "."); git(store, "commit", "-qm", "plan selected task");
+  git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  git(root, "add", ".gitignore"); git(root, "commit", "-qm", "ignore independent task history"); git(root, "push", "-q");
+  const records = new Map(), events = [];
+  const ownership = {
+    read(_root, owner) { return owner ? records.get(owner) ?? null : [...records.values()][0] ?? null; },
+    write(_root, value) {
+      writeEpisodeOwnership(root, value);
+      records.set(value.ownerSessionId, structuredClone(value)); events.push(["ownership", value.status]);
+    },
+    removeTask() { events.push(["cleanup"]); throw new Error("unexpected ownership cleanup"); },
+  };
+  const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+    getSessionId: () => "independent-status-owner", getSessionFile: () => join(dir, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
+  } };
+  const taskResolver = (cwd, id) => resolveBacklogTask(cwd, id, runner);
+  const admissionGit = new CliTaskEpisodeAdmissionGit();
+  const dependencies = { admissionGit, admissionRunner: runner, taskResolver, ownership,
+    reservationOperationId: "status-regression-operation", now: () => "2026-11-03T19:00:00.000Z" };
+  const statusOptions = { taskId, projectRoot: root, taskPath: task.path, status: "In Progress",
+    expectedProvider: "backlog", expectedSourceStatus: "In Planning", requireSourcePlan: true,
+    message: `admit ${taskId}`, runner, git: admissionGit, resolveTask: taskResolver };
+  const remoteHead = (ref) => git(root, "ls-remote", "--refs", "origin", ref).split(/\s+/)[0];
+  const codeSnapshot = () => ({
+    head: git(root, "rev-parse", "HEAD"), branch: git(root, "symbolic-ref", "--short", "HEAD"),
+    upstream: git(root, "rev-parse", "@{upstream}"), remoteMain: remoteHead("refs/heads/main"),
+    // Recovery may update its own tracked binding; unrelated code must remain byte-for-byte unchanged.
+    status: git(root, "status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude).prime-claw/ownership.json"),
+    index: git(root, "ls-files", "--stage"),
+    staged: git(root, "diff", "--cached", "--binary", "--", ".", ":(exclude).prime-claw/ownership.json"),
+    unstaged: git(root, "diff", "--binary", "--", ".", ":(exclude).prime-claw/ownership.json"),
+    untracked: existsSync(join(root, "scratch.txt")) ? readFileSync(join(root, "scratch.txt"), "utf8") : null,
+  });
+  const dirtyCode = () => {
+    writeFileSync(join(root, "staged.txt"), "unrelated staged code\n"); git(root, "add", "staged.txt");
+    writeFileSync(join(root, "code.txt"), "unrelated unstaged code\n");
+    writeFileSync(join(root, "scratch.txt"), "unrelated untracked code\n");
+  };
+  const divergeCode = () => {
+    const base = git(root, "rev-parse", "HEAD");
+    git(root, "commit", "--allow-empty", "-qm", "unpublished local code");
+    const remoteAdvance = git(root, "commit-tree", `${base}^{tree}`, "-p", base, "-m", "independent remote code");
+    git(root, "push", "-q", "origin", `${remoteAdvance}:refs/heads/main`); git(root, "fetch", "-q", "origin", "main");
+    assert.equal(git(root, "rev-list", "--left-right", "--count", "HEAD...@{upstream}"), "1\t1");
+  };
+  const taskCommitPaths = (ref = "HEAD") => git(store, "diff-tree", "--no-commit-id", "--name-only", "-r", ref).split(/\r?\n/);
+  const diskRecord = () => JSON.parse(readFileSync(join(root, ".prime-claw", "ownership.json"), "utf8")).owners["independent-status-owner"] ?? null;
+  return { root, dir, store, task, taskId, git, runner, view, events, ownership, ctx, dependencies, statusOptions,
+    remoteHead, codeSnapshot, dirtyCode, divergeCode, taskCommitPaths, diskRecord, get record() { return records.get("independent-status-owner") ?? null; } };
+}
+
+test("independent Backlog status publication preserves unrelated staged, unstaged, untracked and divergent parent code", (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  f.divergeCode(); f.dirtyCode();
+  const before = f.codeSnapshot(), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+  const result = commitConversationTaskStatus(f.statusOptions);
+  assert.equal(result.commit, before.head);
+  assert.equal(result.taskHistory.status, "published");
+  assert.equal(result.selection.status, "In Progress");
+  assert.equal(result.taskHistory.publishedHead, f.remoteHead(TASK_HISTORY_REF));
+  assert.notEqual(result.taskHistory.publishedHead, taskBefore);
+  assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  assert.equal(f.git(f.store, "status", "--porcelain"), "");
+  assert.deepEqual(f.codeSnapshot(), before, "publication must not stage, commit, reset, stash, clean or push parent code");
+  assert.equal(f.record, null, "status publication alone does not reserve an Episode");
+  assert.equal(f.diskRecord(), null);
+});
+
+test("independent Backlog admission still requires a suitable code base before ownership reservation", async (t) => {
+  for (const scenario of ["dirty", "divergent"]) await t.test(scenario, async (t) => {
+    const f = independentStatusFixture(t); if (!f) return;
+    if (scenario === "dirty") f.dirtyCode(); else f.divergeCode();
+    const before = f.codeSnapshot(), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+    let allocations = 0;
+    await assert.rejects(createTaskEpisode(f.taskId, "unsuitable-code", f.ctx, {
+      ...f.dependencies, allocateTaskEpisode: async () => { allocations += 1; throw new Error("must not allocate"); },
+    }, { engine: "local" }), /returned to In Planning/);
+    assert.equal(f.view().status, "In Planning");
+    assert.equal(f.record, null);
+    assert.equal(allocations, 0);
+    assert.deepEqual(f.events, []);
+    assert.deepEqual(f.codeSnapshot(), before);
+    assert.equal(f.git(f.store, "rev-list", "--count", `${taskBefore}..HEAD`), "2", "publish admission then truthful pre-reservation rollback");
+    assert.equal(f.git(f.store, "rev-parse", "HEAD"), f.remoteHead(TASK_HISTORY_REF));
+    assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  });
+});
+
+test("session binding failure publishes independent Backlog Blocked despite concurrent parent code changes and retains uncertain resources", async (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const base = f.git(f.root, "rev-parse", "HEAD"), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+  let beforeRecovery, allocatedRecord, allocatedSession, starts = 0, assignments = 0, cleanups = 0;
+  const publisher = {
+    async createFresh(options) {
+      starts += 1;
+      assert.equal(f.view().status, "In Progress");
+      assert.equal(f.record.status, "provisioning");
+      assert.equal(f.git(f.root, "ls-files", "--", ".prime-claw/ownership.json"), ".prime-claw/ownership.json");
+      assert.equal(f.git(f.root, "status", "--porcelain"), "M .prime-claw/ownership.json", "ownership writes alone dirty the tracked parent before session binding");
+      assert.deepEqual(f.diskRecord(), f.record);
+      assert.ok(existsSync(join(options.worktree, ".backlog", ".git")));
+      allocatedSession = { sessionId: "uncertain-session", sessionFile: join(f.dir, "uncertain.jsonl") };
+      writeFileSync(allocatedSession.sessionFile, "{}\n");
+      await options.onAllocated(allocatedSession);
+      allocatedRecord = structuredClone(f.record);
+      // A second actor changes main after allocation, before recovery publication.
+      const remoteAdvance = f.git(f.root, "commit-tree", `${base}^{tree}`, "-p", base, "-m", "concurrent remote advance");
+      f.git(f.root, "push", "-q", "origin", `${remoteAdvance}:refs/heads/main`); f.git(f.root, "fetch", "-q", "origin", "main");
+      f.dirtyCode(); beforeRecovery = f.codeSnapshot();
+      throw new EpisodeStateUncertainError("session binding outcome unknown");
+    },
+    async deliverExecute() { assignments += 1; },
+    async kill() { cleanups += 1; }, async deleteSaved() { cleanups += 1; },
+    close() {},
+  };
+  const dependencies = { ...f.dependencies, publisher };
+  await assert.rejects(createTaskEpisode(f.taskId, "binding-failure", f.ctx, dependencies, { engine: "local" }),
+    /is Blocked and requires exact recovery.*session binding outcome unknown/);
+  assert.equal(f.view().status, "Blocked");
+  assert.match(f.view().implementationNotes, /inspect \.prime-claw\/ownership\.json/);
+  assert.match(f.view().implementationNotes, /do not retry it as fresh creation/);
+  assert.match(f.view().implementationNotes, /session binding outcome unknown/);
+  assert.equal(f.record.status, "uncertain");
+  assert.equal(f.record.operationId, allocatedRecord.operationId);
+  assert.equal(f.record.baseRef, base);
+  for (const key of ["worktree", "branch", "head", "episodeId", "episodeSessionFile"]) assert.equal(f.record[key], allocatedRecord[key]);
+  assert.equal(f.record.providerRevision, f.remoteHead(TASK_HISTORY_REF));
+  assert.equal(f.record.taskEvidence.task.status, "Blocked");
+  assert.deepEqual(f.diskRecord(), f.record, "retain the exact uncertain binding and truthful Blocked publication on disk");
+  assert.equal(f.git(f.root, "status", "--porcelain", "--", ".prime-claw/ownership.json"), "M .prime-claw/ownership.json");
+  assert.ok(existsSync(f.record.worktree)); assert.ok(existsSync(allocatedSession.sessionFile));
+  assert.equal(f.git(f.root, "rev-parse", f.record.branch), base);
+  assert.deepEqual(f.codeSnapshot(), beforeRecovery);
+  assert.equal(f.git(f.store, "rev-list", "--count", `${taskBefore}..HEAD`), "2");
+  assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  assert.deepEqual(f.taskCommitPaths("HEAD^"), [f.task.path.replace(/^\.backlog\//, "")]);
+  const uncertain = structuredClone(f.record), taskHead = f.git(f.store, "rev-parse", "HEAD");
+  await assert.rejects(createTaskEpisode(f.taskId, "no-fresh-retry", f.ctx, dependencies, { engine: "local" }), /requires the exact task to be In Planning/);
+  await assert.rejects(allocateReservedTaskEpisode(f.taskId, f.ctx, dependencies), /ownership is uncertain/);
+  assert.deepEqual(f.record, uncertain);
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), taskHead);
+  assert.equal(starts, 1); assert.equal(assignments, 0); assert.equal(cleanups, 0);
+  assert.equal(f.events.some(([kind]) => kind === "cleanup"), false);
+});
+
+test("independent status publication retains dirty and unpublished task-store defenses", async (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const published = f.remoteHead(TASK_HISTORY_REF), before = f.codeSnapshot();
+  appendFileSync(join(f.root, f.task.path), "\nUnpublished task evidence.\n");
+  const dirty = f.git(f.store, "diff", "--binary");
+  assert.throws(() => commitConversationTaskStatus(f.statusOptions), /not prepared|did not return published/);
+  assert.equal(f.git(f.store, "diff", "--binary"), dirty);
+  f.git(f.store, "add", "."); f.git(f.store, "commit", "-qm", "unpublished task change");
+  const local = f.git(f.store, "rev-parse", "HEAD");
+  assert.throws(() => commitConversationTaskStatus(f.statusOptions), /not prepared|did not return published/);
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), local);
+  assert.equal(f.remoteHead(TASK_HISTORY_REF), published);
+  assert.equal(f.view().status, "In Planning");
+  assert.deepEqual(f.codeSnapshot(), before);
+});
+
+test("independent status publication preserves exact identity and source-state checks before native edit", (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const current = f.dependencies.taskResolver(f.root, f.taskId), published = f.remoteHead(TASK_HISTORY_REF);
+  let publications = 0;
+  for (const [patch, pattern] of [
+    [{ taskId: "FOREIGN-1" }, /could not be re-resolved exactly/],
+    [{ taskPathRelative: ".backlog/tasks/foreign.md" }, /changed project or path/],
+    [{ status: "Blocked" }, /must still be In Planning/],
+    [{ implementationPlan: "TODO" }, /meaningful Implementation Plan/],
+  ]) assert.throws(() => commitConversationTaskStatus({ ...f.statusOptions,
+    resolveTask: () => ({ ...current, ...patch }),
+    publishTaskHistory: () => { publications += 1; throw new Error("must not publish"); },
+  }), pattern);
+  assert.equal(publications, 0);
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), published);
+  assert.equal(f.view().status, "In Planning");
+});
+
+test("independent status publication reports task push failure without claiming success or discarding local evidence", (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const before = f.codeSnapshot(), published = f.remoteHead(TASK_HISTORY_REF);
+  const run = f.runner.run.bind(f.runner);
+  f.runner.run = (command, args, options) => command === "git" && args[0] === "-C" && args[1] === f.store && args[2] === "push"
+    ? { status: 1, stdout: "", stderr: "fixture task-history push rejected" } : run(command, args, options);
+  assert.throws(() => commitConversationTaskStatus(f.statusOptions), /did not return published task-history evidence.*push-failed/);
+  assert.equal(f.remoteHead(TASK_HISTORY_REF), published);
+  assert.notEqual(f.git(f.store, "rev-parse", "HEAD"), published);
+  assert.equal(f.view().status, "In Progress", "retain the unpublished local task mutation for recovery");
+  assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  assert.deepEqual(f.codeSnapshot(), before);
+  assert.equal(f.record, null);
+});
+
+test("independent status publication still rejects code HEAD mutation during task publication", (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const before = f.git(f.root, "rev-parse", "HEAD");
+  assert.throws(() => commitConversationTaskStatus({ ...f.statusOptions, publishTaskHistory(input) {
+    const publication = publishTaskHistoryMutation(input);
+    assert.equal(publication.status, "published");
+    f.git(f.root, "commit", "--allow-empty", "-qm", "concurrent code HEAD mutation");
+    return publication;
+  } }), /changed the code HEAD/);
+  assert.notEqual(f.git(f.root, "rev-parse", "HEAD"), before);
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), f.remoteHead(TASK_HISTORY_REF));
+  assert.equal(f.view().status, "In Progress", "do not hide or undo a task publication that already succeeded");
 });
 
 test("reserved task allocates a local worktree from the status commit and assigns execute once", async () => {

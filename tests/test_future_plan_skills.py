@@ -220,11 +220,11 @@ def test_authoring_skill_publishes_only_through_the_selected_provider_and_stops_
     text = " ".join(project_skill(skill_name).read_text().split())
 
     for fragment in (
-        "selected existing task path and Git index to be clean",
+        "selected existing task path and the selected task store's Git index to be clean",
         "no path other than that exact returned task path was newly changed",
         "commit only the returned task path",
         "push `HEAD:refs/heads/prime-claw/tasks` without force",
-        "code HEAD stays unchanged",
+        "Preserve the parent code HEAD, index, and worktree as found",
         "push failure is transport evidence",
         "one more supported native pull and complete raw reread",
         "bd dolt push --no-adopt",
@@ -243,6 +243,27 @@ def test_authoring_skill_publishes_only_through_the_selected_provider_and_stops_
     assert "living source of truth" in text
     assert "Do not defer updates until the end" in text
     assert "Replace stale content" in text
+
+
+@pytest.mark.parametrize("skill_name", SKILLS)
+def test_independent_backlog_authoring_preserves_code_without_a_cleanliness_gate(skill_name: str) -> None:
+    text = " ".join(project_skill(skill_name).read_text().split())
+    backlog = text.split("## Verify and publish exactly once", 1)[1].split("### Beads", 1)[0]
+
+    for fragment in (
+        "record Git status in the code repository and the selected task store",
+        "do not apply task-store cleanliness checks to a separate parent code repository",
+        "before the native task write require the independent clone to be clean",
+        "After the native task write, verify only the exact intended task path changed",
+        "There is no requirement for the parent code repository to be clean or upstream-equal",
+        "Unrelated staged, unstaged, or untracked code changes and code-branch divergence are not blockers",
+        "never commit, stash, reset, clean, or otherwise repair code changes",
+        "This does not relax separate implementation or Episode admission requirements",
+        "Only for an actual branch-local store, keep the existing flow",
+    ):
+        assert fragment in backlog
+    assert "require canonical code HEAD clean" not in backlog
+    assert backlog.index("before the native task write") < backlog.index("After the native task write")
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)

@@ -98,6 +98,27 @@ second create. Both paths preserve every unrelated native field, reject later
 states before mutation, keep a living specification, and stop for operator
 review without writing a plan or authorizing an Episode.
 
+### Independent Backlog publication and parent code
+
+Task-only authoring and lifecycle status publication use the selected independent
+clone, not the parent code index. Before a native task write, require that clone
+clean and synchronized to the directly proved `refs/heads/prime-claw/tasks` head.
+After the write, verify the exact intended task-path delta, commit only that path,
+push without force, and prove the direct remote head. Parent staged, unstaged,
+or untracked code changes and code-branch divergence do not prevent this
+publication. Preserve the parent code HEAD, index, and working files; never
+commit, stash, reset, clean, or sync code just to publish a task. Branch-local
+Backlog and Beads publication keep their existing behavior.
+
+Episode code admission is separate. Its code checks run before ownership
+reservation writes metadata. If later allocation or session binding fails,
+that ownership write must not prevent truthful task-only `Blocked` publication.
+Keep the uncertain ownership and allocated resources for exact owner recovery;
+do not retry creation, send a second execute assignment, or clean them up as a
+publication workaround. Dirty/unpublished task history, native identity or
+source-state mismatch, and publication failures remain real reported blockers.
+These source rules do not imply user-global delivery or runtime activation.
+
 The global `plan` skill and `plan_task({"taskId":"TASK-ID"})` tool resolve
 one exact task through the live native provider and admit it only in canonical
 `In Design` or `In Planning`. They preload the project-customizable

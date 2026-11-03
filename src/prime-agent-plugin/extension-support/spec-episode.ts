@@ -2326,11 +2326,8 @@ export function commitConversationTaskStatus(options: {
   }
   if (trackedTask.status === 1 && independentTaskHistory) {
     const codeHead = options.git.head(options.projectRoot);
-    if (options.git.operationInProgress(options.projectRoot)
-        || options.git.trackedStatus(options.projectRoot) !== ""
-        || options.git.upstreamHead(options.projectRoot) !== codeHead) {
-      throw new Error(`Independent Backlog ${options.status} publication requires exact clean upstream-equal code HEAD`);
-    }
+    // Task-only publication does not require a clean or upstream-equal parent.
+    // The task-history helpers operate only inside the selected task clone.
     const prepared = (options.prepareTaskHistory ?? prepareTaskHistoryWorkspace)({
       primaryRoot: options.projectRoot, runner: options.runner,
     });
@@ -2354,11 +2351,8 @@ export function commitConversationTaskStatus(options: {
     if (publication.status !== "published") {
       throw new BacklogTaskHistoryPublicationError(`Independent Backlog ${options.status} publication`, publication);
     }
-    if (options.git.head(options.projectRoot) !== codeHead
-        || options.git.operationInProgress(options.projectRoot)
-        || options.git.trackedStatus(options.projectRoot) !== ""
-        || options.git.upstreamHead(options.projectRoot) !== codeHead) {
-      throw new Error(`Independent Backlog ${options.status} publication changed or dirtied the code DAG`);
+    if (options.git.head(options.projectRoot) !== codeHead) {
+      throw new Error(`Independent Backlog ${options.status} publication changed the code HEAD`);
     }
     const selection = exactAdmissionTask(
       options.resolveTask(options.projectRoot, options.taskId),
@@ -3214,6 +3208,13 @@ export async function createTaskEpisode(
         publishTaskHistory: dependencies.publishTaskHistory,
       }) as Extract<ConversationTaskStatusCommitResult, { selection: BacklogTaskSelection }>;
       independentTaskHistory = Boolean(admitted.taskHistory);
+      // Code admission is separate from task-only status publication. Check it
+      // before reservation writes ownership, never in failure reporting.
+      if (admitted.taskHistory && (git.operationInProgress(projectRoot)
+          || git.trackedStatus(projectRoot) !== ""
+          || git.upstreamHead(projectRoot) !== admitted.commit)) {
+        throw new Error("Independent Backlog Episode creation requires exact clean upstream-equal code HEAD");
+      }
       const reservationBase = {
         projectRoot,
         taskId,
