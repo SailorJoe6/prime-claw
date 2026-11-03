@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-53
 title: Remove code cleanliness gates from independent Backlog authoring guidance
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-11-02 22:00'
-updated_date: '2026-11-03 00:10'
+updated_date: '2026-11-03 00:17'
 labels: []
 dependencies: []
 references:
@@ -89,3 +89,9 @@ No initializer/runtime/symlink-policy change, no dependency or Prime Agent chang
 
 4. The owning Conversation reviews and publishes the accepted bounded source through the normal lifecycle, then handles the separately requested Markdown-only global delivery from primary main. Exact asset IDs are `project-skill-design` and `project-skill-spec-it-out`; actual destinations are `~/.prime/agent/skills/project-templates/design.md` and `~/.prime/agent/skills/project-templates/spec-it-out.md`. Deliver only those approved files through a safe existing bounded delivery method, preserving managed ownership consistency and unrelated runtime/assets/processes; never broad-apply or restart. Current `manage-prime-agent-delivery.py apply` rewrites every exact target and exposes no per-asset selector, so do not use it as a hidden broad refresh. If no supported bounded method exists, stop global delivery and report that concrete constraint, without building a delivery feature or falsely claiming activation. Report exact source commit/push, actual destination hashes and unrelated-state checks directly to Adapt-Hand Expert; distinguish source publication, Markdown delivery and runtime activation. ADAPT’s completed consumer work is reported context, not this candidate’s test evidence.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+PRIMECLAW-53 provisioning blocked after operation b0133363-514c-419e-affc-7fc4b1042d90 allocated the retained Orca worktree/branch from 5c1358b56732869465a1402beb5fa280635122ea. Native creation timed out binding a fresh Prime Agent session to its exact Orca tab. Read-only terminal evidence: guarded launcher expects build cwd-fix-v0.9.8-r1-10-gf80340d93 / source f80340d93dc3b1c6de3459b54a82f351e136f75e; running daemon PID3601 reports cwd-fix-v0.9.8-r1 and launcher states Nothing new was started. No exact-CWD Episode session was found and no implementation is claimed. Ownership remains uncertain and the exact worktree, branch and launch evidence are retained; never retry as fresh creation, send another assignment, or delete/rebind ownership manually. Native fallback Blocked publication failed because its clean-parent-code check encountered the newly written ownership registry; this is a task-only native publication with code/ownership preserved. Unblock condition: coordinate with the runtime owner/operator to resolve the launcher-versus-daemon generation mismatch under separate runtime authority, then explicitly review recovery of THIS exact uncertain operation and existing resources before any continuation. No restart/upgrade/launcher bypass is authorized by PRIMECLAW-53. The six stale template metadata entries were separately repaired and pushed in 5c1358b; skill contents unchanged. Source template correction and global Markdown delivery remain pending.
+<!-- SECTION:NOTES:END -->
