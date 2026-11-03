@@ -4,7 +4,7 @@ title: Remove code cleanliness gates from independent Backlog authoring guidance
 status: In Progress
 assignee: []
 created_date: '2026-11-02 22:00'
-updated_date: '2026-11-03 19:35'
+updated_date: '2026-11-03 19:53'
 labels: []
 dependencies: []
 references:
@@ -12,6 +12,17 @@ references:
   - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - tests/spec_episode_extension.test.mjs
+documentation:
+  - docs/backlog.md
+  - docs/evidence/primeclaw53-independent-task-publication.md
+modified_files:
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/skills/project-templates/design.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
+  - tests/spec_episode_extension.test.mjs
+  - tests/test_future_plan_skills.py
+  - docs/backlog.md
+  - docs/evidence/primeclaw53-independent-task-publication.md
 priority: p2
 type: docs
 ordinal: 138000
@@ -85,30 +96,30 @@ No Prime Agent source/dependency change, launcher/daemon repair, initializer/sym
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Canonical design.md and spec-it-out.md authoring guidance consistently uses the agreed Backlog block: unrelated staged, unstaged or untracked code changes and code-branch upstream divergence never block independent native task creation, revision or publication, and never cause code commit/stash/reset/cleanup/sync.
-- [ ] #2 Independent task-store clean/direct-remote-equal checks are explicitly PRE-WRITE. Post-write checks allow only the intended exact task path, preserving task/store/root identity, task-store index safety, scoped task-only commit, non-force push and direct-remote publication proof.
-- [ ] #3 Parent code HEAD/index/worktree are preserved by task-only authoring; this is noninterference, not a cleanliness requirement. Actual branch-local publication behavior and separate implementation/Episode admission gates remain unchanged.
-- [ ] #4 The approved authoring and narrow independent-Backlog lifecycle corrections have proportionate existing-suite regression evidence. Candidate plugin validation is Docker-only, includes mandatory Tier1 --probe, and reports actual outcomes and baseline limits without unrelated repairs.
+- [x] #1 Canonical design.md and spec-it-out.md authoring guidance consistently uses the agreed Backlog block: unrelated staged, unstaged or untracked code changes and code-branch upstream divergence never block independent native task creation, revision or publication, and never cause code commit/stash/reset/cleanup/sync.
+- [x] #2 Independent task-store clean/direct-remote-equal checks are explicitly PRE-WRITE. Post-write checks allow only the intended exact task path, preserving task/store/root identity, task-store index safety, scoped task-only commit, non-force push and direct-remote publication proof.
+- [x] #3 Parent code HEAD/index/worktree are preserved by task-only authoring; this is noninterference, not a cleanliness requirement. Actual branch-local publication behavior and separate implementation/Episode admission gates remain unchanged.
+- [x] #4 The approved authoring and narrow independent-Backlog lifecycle corrections have proportionate existing-suite regression evidence. Candidate plugin validation is Docker-only, includes mandatory Tier1 --probe, and reports actual outcomes and baseline limits without unrelated repairs.
 - [ ] #5 Exact bounded source paths/commit/publication evidence and global Markdown destination/content evidence are reported. Only these approved Markdown assets are delivered globally, with unrelated runtime assets, dirty project state and running processes preserved; no broad apply or restart occurs. If safe bounded delivery is unavailable, the real blocker and pending delivery are reported, not silently bypassed.
-- [ ] #6 Independent Backlog lifecycle status publication accepts pre-existing staged, unstaged and untracked parent-code changes and parent-code upstream divergence while preserving parent HEAD, index and working files; task-store cleanliness/publication and exact native identity/status/path/plan checks remain enforced.
-- [ ] #7 A real disposable-Git allocation-failure regression writes tracked ownership and then fails session binding: truthful Blocked status/notes can still be published to the exact independent task, uncertain ownership/resources remain intact, and no duplicate creation, second assignment or automatic cleanup occurs.
-- [ ] #8 Dirty/unpublished/unsafe independent task history, wrong task/provider/path or expected source state, and failed publication remain honest blockers without force, evidence deletion or false success; existing branch-local Backlog and Beads behavior remains unchanged.
-- [ ] #9 Code-admission safety is distinct from task-status publication: legitimate code base/placement/cleanliness requirements are checked before ownership allocation, not imposed on task-only failure reporting afterward. No ignore/untrack/stash/reset/delete or automatic ownership-commit workaround, generic state/retry/controller machinery or new semantic approval gate is introduced.
+- [x] #6 Independent Backlog lifecycle status publication accepts pre-existing staged, unstaged and untracked parent-code changes and parent-code upstream divergence while preserving parent HEAD, index and working files; task-store cleanliness/publication and exact native identity/status/path/plan checks remain enforced.
+- [x] #7 A real disposable-Git allocation-failure regression writes tracked ownership and then fails session binding: truthful Blocked status/notes can still be published to the exact independent task, uncertain ownership/resources remain intact, and no duplicate creation, second assignment or automatic cleanup occurs.
+- [x] #8 Dirty/unpublished/unsafe independent task history, wrong task/provider/path or expected source state, and failed publication remain honest blockers without force, evidence deletion or false success; existing branch-local Backlog and Beads behavior remains unchanged.
+- [x] #9 Code-admission safety is distinct from task-status publication: legitimate code base/placement/cleanliness requirements are checked before ownership allocation, not imposed on task-only failure reporting afterward. No ignore/untrack/stash/reset/delete or automatic ownership-commit workaround, generic state/retry/controller machinery or new semantic approval gate is introduced.
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-## Current implementation plan — Episode 379643c7
+## Living implementation plan — candidate ready for owner review
 
-The owner cleared the historical allocation and authorized implementation. The active binding is operation 379643c7-e888-4881-9cdc-b19ac70459f9, Episode 01a1a2e6-5172-7694-a0ed-e867cd7e153f, code base b89111fface03f7a510dbef000a2383c217e9031. Historical blocker notes remain evidence, not current allocation authority. The owner alone controls lifecycle status.
+Active operation 379643c7-e888-4881-9cdc-b19ac70459f9; Episode 01a1a2e6-5172-7694-a0ed-e867cd7e153f. Historical failed-allocation notes remain historical evidence. The owner alone controls lifecycle status.
 
-1. Align the two canonical Backlog authoring blocks with the approved Description text. Source edits prepared; retain all Beads/branch-local guidance and separate Episode admission.
-2. Remove parent cleanliness/upstream gates only from independent Backlog task-status publication. Preserve code HEAD noninterference and existing native task-history preparation/publication. Move the existing code eligibility check into createTaskEpisode before ownership reservation; do not repeat it in failure reporting. Source edit prepared.
-3. Extend the existing suites with small Markdown checks and real disposable-Git status-publication, admission separation, and allocation/session-failure regressions. Verify dirty/divergent parent code is preserved, exact task delta is published, and uncertain ownership/resources remain without another assignment or cleanup. Retain task-store/identity/state/publication-failure coverage.
-4. Validate in Docker only: scripts/test-tier1.sh --probe with the documented verified cwd-fix-v0.9.8-r1 source selector, then focused existing test bridges. Record actual outcomes and evidence limits; do not repair unrelated failures.
-5. Review and publish one bounded source slice plus separate task-content publication. Stop and report exact code/task heads and remaining acceptance work to the owning Conversation.
-6. Global Markdown delivery is pending accepted source and owner action for only the two approved assets. No broad apply, runtime installation, restart, ADAPT/Nemo mutation, merge, lifecycle mutation, or resource cleanup in this Episode pass.
+1. Completed: both canonical Backlog authoring blocks now exactly match the approved Description text. Task-store clean/direct-remote proof is pre-write; post-write proof is exact-path-only; parent code is preserved without cleanliness/upstream requirements.
+2. Completed: independent Backlog commitConversationTaskStatus uses the existing task-history preparation/publication helpers without parent-code cleanliness/upstream gates. Code HEAD preservation and native identity/source-state/plan/path/publication checks remain. Existing operation/clean/upstream code-admission checks run in createTaskEpisode before ownership reservation, not in failure reporting. No ownership-format, Beads, branch-local, retained-plan, assignment or cleanup change.
+3. Completed: focused Markdown checks plus real disposable-Git lifecycle tests cover dirty/divergent code noninterference, admission separation, tracked ownership then session-binding failure with truthful Blocked publication, retained uncertain resources, no duplicate assignment/cleanup, and task-history/source-state/publication failure defenses.
+4. Completed candidate validation: mandatory Docker Tier1 --probe passed; corrected Episode suite 231/231 passed; Backlog admission, Beads admission and task-history bridges passed (task-history Node 80/80). Four focused Markdown tests passed. Full Markdown suite 34 passed/3 failed; all three failed names reproduced on the clean code base. Prior-runtime red check failed both key new regressions with the original clean-parent errors. Exact commands, artifacts and limits are in docs/evidence/primeclaw53-independent-task-publication.md.
+5. Source slice committed and pushed as d33648c17865b00a49e6046c9b93811c3ebd891a on JLanders/prime-claw-primeclaw-53-episode-379643c7. Task content is published separately on refs/heads/prime-claw/tasks. Stop for owning Conversation review; no second implementation slice.
+6. Pending: owner review/acceptance and only then the separately approved two-file global Markdown delivery for project-skill-design and project-skill-spec-it-out. Runtime installation/activation/restart is outside this Episode. AC5 stays unchecked because no global delivery occurred. No lifecycle mutation, merge, ADAPT/Nemo mutation or resource cleanup was performed.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -123,4 +134,20 @@ Joe confirmed TASK-2 merged/installed/active; passive status corroborated the ex
 The new managed readiness review found the expanded nine-AC task implementation-ready. Native creation published In Progress in dd9296695b3bf2de79487fa63f12f12fb5a345c5 but then failed before ownership or resource mutation because an unrelated concurrent PRIMECLAW-55 edit hit the installed whole-store task-read gate. Its automatic rollback read failed on the same unrelated edit. Fresh checks found no PRIMECLAW-53 ownership entry or Episode worktree/resources; code main remained clean at 532bc0de5d3b5dbb2ae3c55aff8967403abf1bdc. Restore only this exact task to In Planning, preserving its complete specification, nine AC and living plan. No implementation or resource recovery is claimed. Further creation attempts are paused for bounded author coordination around the known PRIMECLAW-55 tooling defect; unrelated task edits are not a product-level blocker. Existing expanded implementation authority and selected host id:afb6537c-e643-4a5f-b284-f0f627ddcbdf remain unchanged.
 
 Implementation started in the exact active 379643c7 Episode. Audit found parent-code operation/clean/upstream checks inside commitConversationTaskStatus both before and after independent task publication. Source now removes those publisher checks, keeps code HEAD preservation and native task-history helpers, and applies code admission checks in createTaskEpisode before reservation writes ownership. Both canonical authoring blocks now match the approved Description block; docs/backlog.md explains the separation. Focused regression authoring and Docker validation are in progress. No acceptance/test pass, source commit, global delivery, runtime activation or lifecycle change is claimed yet. Personal-brain lookup returned no relevant independent-Backlog record; current task and repository requirements supply this bounded contract.
+
+Candidate source published: d33648c17865b00a49e6046c9b93811c3ebd891a on JLanders/prime-claw-primeclaw-53-episode-379643c7; exact direct remote branch head proved equal, git pull --rebase found already up to date, push reported everything up-to-date, code checkout clean. Seven bounded files: both canonical templates, spec-episode.ts, existing spec-Episode/Markdown tests, docs/backlog.md and docs/evidence/primeclaw53-independent-task-publication.md. Task-only publication did not alter code HEAD/index/worktree.
+
+Validation: scripts/test-tier1.sh --probe passed using the independently verified documented cwd-fix-v0.9.8-r1 source (a1faacd53ac4473a75de1d434afaf50945c2f647), Docker-only, offline product checks, verified teardown. Manifest .test-results/20261103T193459Z-10144-7a477a75/tier1/manifest.json. Focused bridge run initially 3 passed/1 failed; sole Episode-suite failure was new test injection matching git push instead of actual git -C <store> push. Fixed only that test seam. Corrected complete Episode suite .test-results/primeclaw-53-spec-episode.tap: 231 passed, 0 failed/skipped. Backlog admission, Beads admission and task-history bridges passed; task-history Node had 80 passed. Prior-runtime red check .test-results/primeclaw-53-regression-before.tap: both key new tests failed as expected with original clean-parent rejection, including failed Blocked publication after tracked ownership and session-binding error. Focused Markdown tests .test-results/primeclaw-53-markdown-focused.log: 4 passed. Full Markdown .test-results/primeclaw-53-markdown.log: 34 passed/3 failed; the same three failed names reproduced in a disposable git archive of b89111f (log primeclaw-53-markdown-baseline.log). No baseline fixture/local-asset repairs or all-suite-green claim.
+
+AC1-4 and AC6-9 record source-candidate evidence, not merge/deployment. AC5 remains open: exact bounded global Markdown delivery still belongs to owner after accepted source. Template source SHA-256: design.md a601f4e8cda5fe58de169bbb6940eaa906fc7fe1451d59371f48eb0fffcf8df3; spec-it-out.md 8a271b29a70ed90d9669818d9ca971bf849e8ffa86a9c02b73bcd12282ff0793. No user-global file was written; no runtime apply/check/probe/activation/restart, lifecycle change, merge, cleanup, ownership edit or ADAPT/Nemo mutation occurred. Session transport and some ownership observations are test seams; this is not live Orca/daemon UAT. Historical provisioning blockers were not retried or repaired by this source slice.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented and published the bounded PRIMECLAW-53 source candidate at d33648c17865b00a49e6046c9b93811c3ebd891a. Independent Backlog authoring and lifecycle task-only publication no longer require clean/upstream-equal parent code. Exact task-history/native publication safeguards remain; code admission is checked separately before reservation. Real disposable-Git tests prove tracked ownership plus failed session binding can publish truthful Blocked evidence while preserving uncertain resources.
+
+Validation: Docker Tier1 --probe passed; corrected Episode suite 231 passed; Backlog admission, Beads admission and task-history bridges passed; focused Markdown 4 passed. Three broad Markdown fixture failures reproduced at the clean base and remain unchanged. See docs/evidence/primeclaw53-independent-task-publication.md for exact commands and limits.
+
+Owner review and accepted-source two-file global Markdown delivery remain pending. AC5 is intentionally unchecked. No global install/runtime activation, lifecycle change, merge or cleanup is claimed.
+<!-- SECTION:FINAL_SUMMARY:END -->
