@@ -4,7 +4,7 @@ title: Allow task Episodes from published non-main bases for stacked PRs
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:31'
-updated_date: '2026-11-03 18:48'
+updated_date: '2026-11-03 18:55'
 labels: []
 dependencies: []
 references:
@@ -127,4 +127,12 @@ The Docker source selector points only to the documented clean read-only cwd-fix
 At final task-write preparation, independent history advanced from 0adba82d1caeed1d9dd62a16a17442a0f6067e93 to 0a85356dc374d6c90f2961c03296469aa0a22472 only through unrelated task changes. The complete PRIMECLAW-48 native task view remained unchanged. This update preserves those unrelated changes, the task identity, parent, status and specification; it updates only owner-authored plan checkpoint, notes, documentation and modified-file fields.
 
 STOP after this slice for owning Conversation review/continuation. Public admission is still main-only. Next: skill-only stacking check-in, fresh current branch capture/reservation and all downstream target lifecycle checks together, then focused non-main admission/terminal evidence and managed-instruction alignment. No whole-task AC checked, no final whole-task completion claim, no merge/Ready for Merge/Done/archive/cleanup. Task remains In Progress.
+
+## Accepted advance and handoff focus (2026-11-03)
+
+The owning Conversation supplied the following accepted in-scope continuation guidance. It supersedes the slice-1 stop-for-review checkpoint; it does not expand the specification or authorize a terminal outcome:
+
+Foundation candidate 82a307079b9a5034303a8705337d3eb337791351 is accepted for advance after independent GPT-6 Astra review found no material defects in its scoped ownership-binding claims. Continue the same Episode with the next coherent slice already recorded in the native plan/checkpoint: skill-only stacking check-in, fresh current-branch capture/reservation, and matching task-native admission, replay, handoff, blocked and terminal integration-target handling; then focused non-main behavior and managed-guidance alignment. Preserve the existing branch/base/provider separation, version-1 and missing-field main compatibility, and separate primary-main global activation policy. The stacking question remains ONLY LLM skill prose: no code enforcement, confirmation tracking/token/receipt or compliance test. Keep required Docker validation and report the unchanged static backlog/config.yml path limitation honestly; do not add an unrelated topology repair. No merge, activation, restart or cleanup is authorized.
+
+Continue the exact existing Episode and task; do not allocate another Episode or rewrite ownership. Code remains at the accepted pushed slice-1 head. Prior published task observations are factual context; the change from the initial revision to 8c5a97fd8ec8b8804ca07ba2067c9c85523a51cc consists of the Episode's own in-scope plan/notes/evidence updates with specification, canonical identity, parent and In Progress lifecycle unchanged. This handoff adds only these accepted notes to independent task history. Existing implementation plan and evidence doc remain the durable resume sources. Canonical execute is already queued independently; handoff requests compaction once, not another execute assignment.
 <!-- SECTION:NOTES:END -->
