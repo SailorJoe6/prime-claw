@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-53
 title: Remove code cleanliness gates from independent Backlog authoring guidance
-status: Ready for Merge
+status: In Progress
 assignee: []
 created_date: '2026-11-02 22:00'
-updated_date: '2026-11-03 20:05'
+updated_date: '2026-11-03 21:52'
 labels: []
 dependencies: []
 references:
@@ -142,6 +142,8 @@ Validation: scripts/test-tier1.sh --probe passed using the independently verifie
 AC1-4 and AC6-9 record source-candidate evidence, not merge/deployment. AC5 remains open: exact bounded global Markdown delivery still belongs to owner after accepted source. Template source SHA-256: design.md a601f4e8cda5fe58de169bbb6940eaa906fc7fe1451d59371f48eb0fffcf8df3; spec-it-out.md 8a271b29a70ed90d9669818d9ca971bf849e8ffa86a9c02b73bcd12282ff0793. No user-global file was written; no runtime apply/check/probe/activation/restart, lifecycle change, merge, cleanup, ownership edit or ADAPT/Nemo mutation occurred. Session transport and some ownership observations are test seams; this is not live Orca/daemon UAT. Historical provisioning blockers were not retried or repaired by this source slice.
 
 Owning Conversation reviewed exact source candidate d33648c17865b00a49e6046c9b93811c3ebd891a and accepted its in-scope source evidence. Independent EXPERT openai-codex/gpt-6-astra/max found no material defect. Its focused offline Docker reproduction also proved an eligible existing independent store preserves parent HEAD/index/files/.gitignore/root configuration while dirty and divergent, with exact task-only direct publication; evidence is retained in the owner review transcript/artifacts. Mandatory Docker probe, corrected Episode 231/231, other affected bridges and focused Markdown evidence were verified; three broad Markdown failures reproduce on the clean base and are not claimed fixed. Publish Ready for Merge for the source candidate only. AC5 remains unchecked pending separately authorized accepted-source two-file global Markdown delivery; no runtime installation/activation/restart is authorized or claimed. Operator merge-tuple approval has not been requested or granted. Final merge readiness currently requires resolving the primary main checkout’s uncommitted unchanged admission ownership record and derived project-skill-prepare installed-hash observation without adopting foreign edits; do not force, stash/reset, ignore metadata or alter ownership evidence.
+
+Joe explicitly approved unblocking this SAME PRIMECLAW-53 Episode after coordinated48 merge. Request Changes is bounded in-scope integration, not a new task or scope. Read-only merge preview of accepted48 main716721fe with53candidatebb9c1868 found two conflict hunks in ONE file, extension-support/spec-episode.ts: independent status publication parent-code assertions versus53HEAD-only noninterference, and genuine code-admission helper ordering. Existing tests auto-merged, which is not validation. Integrate then-current accepted main in the same Episode; preserve53 independent task-only noninterference/native task-store safeguards, including removing any auto-merged assertCode cleanliness gates inside that independent publisher, while preserving48 legitimate code-admission/integration-branch/exact-base/resource checks before ownership reservation, plus Beads/branch-local/retained and52behavior. Validate combined runtime/lifecycle regressions and mandatory Docker Tier1 --probe, serialize source-builder setup against other jobs, report honest baseline limits, publish a clean candidate and stop for renewed review. Separately, Joe authorized backed-up supported removal of exact already-deleted archived descendant01a1a2e7-287a-7613-a22f-f59481ab7ecd; completed once via delete_saved_session(methodtrash), native/file absence and unchanged Episode/ownership verified. Private backup retains full transcript and RLM metadata; do not recreate or edit action history. No global Markdown delivery, runtime activation/restart, new resources, unrelated scope or cleanup in this revision. Original Description/nine ACs/six-step contract remain authoritative; AC5 remains owner-delivery pending.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
