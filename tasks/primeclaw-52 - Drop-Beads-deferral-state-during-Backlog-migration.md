@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-52
 title: Drop Beads deferral state during Backlog migration
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: '2026-11-02 21:52'
-updated_date: '2026-11-03 19:18'
+updated_date: '2026-11-03 19:28'
 labels: []
 dependencies: []
 references:
