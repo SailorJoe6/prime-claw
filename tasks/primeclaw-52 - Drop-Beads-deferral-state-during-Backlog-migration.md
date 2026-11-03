@@ -4,7 +4,7 @@ title: Drop Beads deferral state during Backlog migration
 status: In Progress
 assignee: []
 created_date: '2026-11-02 21:52'
-updated_date: '2026-11-03 18:41'
+updated_date: '2026-11-03 18:44'
 labels: []
 dependencies: []
 references:
@@ -62,3 +62,9 @@ Authoring this task does not approve an implementation plan, implementation, mer
 3. Extend `tests/task_provider_migration.test.mjs` with existing disposable native Beads/Backlog fixtures for past-dated, future-dated and indefinite deferred tasks, including the reported `DEFERRED:` title and `defer_until` shape. Assert successful nonterminal inspection, ordinary `In Design` destination records in `tasks/`, no active deferral fields or extra annotations, and preserved ordinary content plus complete raw historical evidence. Exercise destination readback and exact replay through the existing guarded-retirement/refusal seams; prove the same destination identities are reused and source export/history/config and authority remain unchanged before verified cutover, with no ready/defer/undefer/status/config normalization commands. Remove only `deferred` from the unsupported-status rejection set; retain `pinned`, `hooked`, `finished`, `paused`, archive-integrity and no-write refusal assertions.
 4. Run focused deferral/status/archive tests and the full migration suite through the Docker-backed `tests/test_task_provider_migration.py` bridge; adjust its test selection only if needed to include new coverage. Keep native export, issue/memory, identity/relationship, publication, receipt/replay and guarded-retirement regressions passing. After plugin-source changes run `scripts/test-tier1.sh --probe`, report actual results and limits on this task, and update directly affected migration guidance only if it would contradict the change. No dependency upgrade, unrelated importer cleanup, reopening PRIMECLAW-44/46/49, live Nemo inspection/mutation/migration/source deletion, user-global candidate apply/check/probe, activation, restart or merge is part of candidate validation.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03 Episode slice: verified exact owner/session/worktree, independent Backlog authority, and unchanged published task evidence. Implementing the approved migration-only deferred -> In Design projection with disposable native regression coverage. No live Nemo inspection/mutation, source normalization, lifecycle status change, or user-global activation is authorized or used.
+<!-- SECTION:NOTES:END -->
