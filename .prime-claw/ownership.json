@@ -113,6 +113,134 @@
       "launchRunId": "36160bc9-771b-4c42-8634-35ed490977d5",
       "uncertaintyReason": "Timed out binding the fresh Prime Agent session and connected Orca tab at the exact Episode CWD"
     },
+    "01a18f25-aee6-7352-991b-59275f14bf96": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "97fc9b02-6903-415a-a6f1-239fed1c6ce4",
+      "engine": "orca",
+      "ownerSessionId": "01a18f25-aee6-7352-991b-59275f14bf96",
+      "taskId": "PRIMECLAW-48",
+      "taskPath": ".backlog/tasks/primeclaw-48 - Allow-task-Episodes-from-published-non-main-bases-for-stacked-PRs.md",
+      "providerRevision": "19350de23eda36443df5c551bab5d117930f6b94",
+      "taskEvidence": {
+        "schemaVersion": 1,
+        "kind": "task-view",
+        "task": {
+          "id": "PRIMECLAW-48",
+          "title": "Allow task Episodes from published non-main bases for stacked PRs",
+          "status": "In Progress",
+          "type": "bug",
+          "priority": "p1",
+          "project": null,
+          "assignees": [],
+          "reporter": null,
+          "labels": [],
+          "milestone": null,
+          "parentTaskId": null,
+          "acceptanceCriteriaCompleted": 0,
+          "acceptanceCriteriaCount": 7,
+          "references": [
+            "src/prime-agent-plugin/extension-support/spec-episode.ts",
+            "src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md",
+            "src/prime-agent-plugin/workflows/implement-task.md"
+          ],
+          "modifiedFiles": [],
+          "ordinal": 133000,
+          "createdAt": "2026-10-30T23:31:00Z",
+          "updatedAt": "2026-11-03T18:36:00Z",
+          "dueDate": null,
+          "isReady": true,
+          "path": ".backlog/tasks/primeclaw-48 - Allow-task-Episodes-from-published-non-main-bases-for-stacked-PRs.md",
+          "description": "## Observed failure\n\nDirect report from Conversation Prime-Agent-Pi (`01a18414-077b-7038-85d3-6d13ece95269`), not a new reproduction: in `/Users/jlanders/code/prime-agent`, the owning primary checkout was clean and pushed on `fix/daemon-cwd-session-recovery`, at code HEAD/upstream `a1faacd53ac4473a75de1d434afaf50945c2f647`. This was the reviewed TypeScript baseline.\n\nJoe invoked `/implement-task TASK-2` for “Prevent orphaned RLM settlement after child finalization errors”. Backlog was the sole valid provider, with an ignored independent ordinary-Git `.backlog` clone, origin `https://github.com/SailorJoe6/prime-agent.git`, task ref `refs/heads/prime-claw/tasks`, and task path `.backlog/tasks/task-2 - Prevent-orphaned-RLM-settlement-after-child-finalization-errors.md`. The task was `In Planning`, with a meaningful 642-word plan, seven unchecked acceptance criteria and no blocking dependencies. Its complete specification/plan had been read and judged ready; task HEAD, FETCH_HEAD and direct published revision agreed at `61b5bfe5870e2d04ff092d6280db894f104c1997`.\n\nThe canonical readiness workflow completed preparation and called `create_task_episode` exactly once with `{\"taskId\":\"TASK-2\"}`. It returned:\n\n> Task Episode creation failed: Task-native Episode creation must run from the canonical primary main checkout\n\nAfterward, the task remained field-for-field unchanged in `In Planning`; the task clone remained clean and published at the same revision; no `.prime-claw/ownership.json` existed; and the worktree inventory contained only the original primary and existing cwd-fix/upstream-assessment trees, with no new Episode tree. Code stayed clean and unchanged. No implementation, status change, assignment/handoff, branch switch, bypass or creation retry was attempted. These are observed native/Git/filesystem facts, not proof about unseen resources.\n\nLocal main was `08ff1b2e2794ea9e8f4a08d12bc95408a66e1074` (v0.9.7), four commits behind the selected baseline (`main...HEAD` = `0/4`); origin/main was independently newer/different. Switching to main would change the approved implementation basis. No switch, merge, pull or reset workaround was authorized.\n\nJoe's feedback: '\"The tool requires the canonical primary main checkout\" bad design. it blocks stacking PRs and other such fun'\n\n## Source evidence and diagnosis\n\nPrime Claw source inspected at `24b519c3c967269dd3867bf06a9e92a2f125012d`: `src/prime-agent-plugin/extension-support/spec-episode.ts:3145-3153` rejects `git.branch(projectRoot) !== \"main\"` alongside primary-checkout identity checks. Beads admission repeats this at `2913-2921`. This confirms a literal branch-name restriction; equating primary ownership with main is the inferred design defect, not a newly reproduced runtime trace.\n\nDownstream assumptions also need coherent treatment: task blocked handling (`977-984`), handoff (`1776-1782`), cleanup (`2671-2673`), and terminal publication/ancestry checks (`2547-2605`, including Beads direct-remote `main`). Managed oversight at `src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md:41-49` hardcodes main for readiness, merge and abandonment. `src/prime-agent-plugin/workflows/implement-task.md:90` also assumes canonical main. Removing only the admission check is insufficient.\n\n## Intended outcome and boundaries\n\nUse the current checked-out branch as the Episode base and default merge target, including a clean, published feature/stack branch in the primary owning checkout. Show its name and exact base commit during readiness; bind that commit and integration branch so continuation, review, merge and cleanup use the correct target. The repository's actual primary/default branch is supported regardless of whether it is named main, master or something else; it is not a universal admission gate. Preserve task/provider/publication/owner/resource identity, isolated Episode resources, and explicit operator merge/abandonment authority.\n\nThe implement-task skill must instruct the LLM to check whether the current branch differs from the repository's actual primary/default branch. If it does, the LLM should ask the user before stacking, for example: \"Current branch is xxxx; are you sure you want to stack a branch off this?\" This is ONLY an instruction in the skill file. Add no code to require, track, validate or enforce this check-in, no approval token/receipt, and no deterministic confirmation gate or compliance test. Joe explicitly accepts that the LLM may ignore this instruction. This does not weaken the separate existing identity, isolation or publication checks.\n\nUse native Git/provider behavior and the smallest explicit binding needed. Do not introduce a branch classifier, reconciler, coordinator, new state machine or lifecycle receipts. This bug concerns task-native admission and affected downstream target assumptions, not blanket permission for arbitrary checkout admission. Preserve legacy compatibility and the distinct post-acceptance primary-main `--user-global` activation policy. No Prime Agent source changes, release/Rust/fork proposals, or changes to foreign TASK-2 are in scope. This ticket authorizes specification review only, not planning, implementation or real Episode reproduction.",
+          "dependencies": [],
+          "dependencyGraph": {
+            "root": "PRIMECLAW-48",
+            "nodes": [
+              {
+                "id": "PRIMECLAW-48",
+                "title": "Allow task Episodes from published non-main bases for stacked PRs",
+                "status": "In Progress",
+                "state": "resolved",
+                "completed": false,
+                "dependencyDepth": 0,
+                "dependentDepth": 0
+              }
+            ],
+            "edges": []
+          },
+          "readiness": {
+            "isReady": true,
+            "isBlocked": false,
+            "blockingDependencies": [],
+            "missingDependencies": []
+          },
+          "documentation": [],
+          "subtasks": [],
+          "acceptanceCriteria": [
+            {
+              "index": 1,
+              "text": "The current checked-out branch is the Episode base and default merge target. A clean, published non-default branch in the primary owning checkout can admit an otherwise-ready task Episode without changing that baseline; the repository default branch is supported regardless of its name.",
+              "checked": false
+            },
+            {
+              "index": 2,
+              "text": "The exact base commit and intended integration branch remain unambiguous for the same owner/task/Episode through continuation, blocked handling, review and terminal cleanup; merge and publication target that integration branch rather than a hardcoded main.",
+              "checked": false
+            },
+            {
+              "index": 3,
+              "text": "Admission never silently switches the primary checkout to main, discards stacked commits or substitutes another implementation basis. Existing unsafe-state, provider/publication, owner and resource identity rejections remain effective, with isolation preserved.",
+              "checked": false
+            },
+            {
+              "index": 4,
+              "text": "Merge and abandonment still require explicit operator authority. Task status/publication and terminal ancestry checks remain correct for the selected target; unrelated tasks and resources are not changed.",
+              "checked": false
+            },
+            {
+              "index": 5,
+              "text": "Focused disposable regression evidence covers clean published non-main acceptance with isolation/identity and invalid admission leaving task/resources unchanged. Review affected managed instructions for consistent target handling; do not require a new broad test harness or matrix.",
+              "checked": false
+            },
+            {
+              "index": 6,
+              "text": "The change stays within Prime Claw, preserves legacy compatibility and does not loosen the separate primary-main user-global activation policy or introduce unnecessary coordination/state machinery.",
+              "checked": false
+            },
+            {
+              "index": 7,
+              "text": "Content review confirms the implement-task skill tells the LLM to ask the user before stacking from a branch other than the repository’s actual primary/default branch, naming the current branch. This check-in exists only as a skill instruction: no code enforcement, confirmation tracking/receipt or compliance test is added; LLM noncompliance is explicitly acceptable.",
+              "checked": false
+            }
+          ],
+          "definitionOfDone": [],
+          "implementationPlan": "## Scope and implementation basis\n\nImplement only PRIMECLAW-48 in Prime Claw. The current checked-out branch is the code base and default integration target; show the branch and exact SHA during readiness. Keep the owning primary-root requirement, provider-native publication and unsafe-state/resource checks. This plan does not authorize implementation, real Episode reproduction, foreign TASK-2 changes or user-global activation.\n\nCurrent source at `fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8` confirms literal-main restrictions in `extension-support/spec-episode.ts` admission, task blocked handling, handoff and finalization. Existing ownership has `baseRef` and the Episode `branch`, but no integration target. Use these existing boundaries rather than adding orchestration.\n\n## Ordered work\n\n1. **Put the stacking check-in only in the skill.** Update `src/prime-agent-plugin/skills/implement-task/SKILL.md` to have the LLM inspect the current branch and the repository's actual primary/default branch using ordinary Git evidence (not a literal `main` assumption). On a non-default branch, instruct it to ask: “Current branch is xxxx; are you sure you want to stack a branch off this?” Show current branch and code SHA during readiness. Add no confirmation argument, code enforcement, approval token/receipt, tracking or compliance test. LLM failure to ask is explicitly acceptable. This must not become a second readiness/approval mechanism.\n\n2. **Bind the integration branch in existing task ownership.** Add one task-only `integrationBranch` field to the version-2 types/allowlists/parser in `extension-support/episode-ownership.ts`, and carry it through the three reservation inputs/factories in `extension-support/task-episode-ownership.ts`. Fresh admissions always record the current named branch; `baseRef` continues to identify the exact code base and `branch` continues to identify the isolated Episode branch. Use ordinary Git branch/ref validation. Include the effective target in existing `sameEpisodeBinding` immutability checks so an active owner cannot silently retarget. Old version-2 records without the field retain their previous `main` target through one narrow compatibility fallback; never infer their target from whichever branch is now checked out. Leave version-1 records and their main-only transition/activation policy unchanged. Preserve this field across provider migration and same-owner evidence/routing updates; do not migrate or rewrite live ownership. No new schema generation, state machine, target registry or receipt.\n\n3. **Admit from that branch without changing the baseline.** In Backlog `createTaskEpisode` and Beads `createBeadsTaskEpisode` in `extension-support/spec-episode.ts`, replace only the task-native literal-main gate with capture/validation of the current named branch. Retain repository-root/primary-worktree, persisted top-level owner, placement, exact task status/plan, and nonterminal ownership checks. Recheck branch and code identity at the existing serialized/publication/reservation boundaries so a switch cannot silently retarget admission. Independent Backlog and Beads keep code and provider DAGs separate and retain their clean published-code proofs against the selected branch's configured upstream. Grandfathered branch-local Backlog retains its exact task-only status commit as `baseRef` and existing prompt-push behavior. Pass the target to the reservation before any resource allocation; provision the worktree from the exact `baseRef`, never by switching the primary checkout or substituting default-branch HEAD. Preserve existing rollback/Blocked/no-retry behavior and one fixed execute assignment.\n\n4. **Use the same target for the rest of the task lifecycle.** Update task-native blocked handling, `handoffTaskEpisode`, `allocateReservedTaskEpisode` fresh/replay branch identity checks, and `finalizeTaskEpisodeCleanup`/`verifyTaskEpisodeTerminalState` in `spec-episode.ts` to use the recorded integration target instead of `main`. The owner checkout must match that branch; if it has switched, report the mismatch without switching, rebinding or allocating again. Normal target-branch advancement remains allowed under existing ancestry/publication rules; do not pin its HEAD forever to admission. Fresh review/merge evidence names the integration branch plus target and candidate heads. Check pushed terminal code and merged/abandoned Episode ancestry against that target, including Beads direct-remote checks; keep independent Backlog terminal evidence on its task ref. Preserve exact owner/task/provider/resources, idle-work checks and cleanup-only behavior. Cleanup still deletes only the Episode’s own configured upstream, never the integration branch. Keep explicit operator merge/abandonment authority; do not add retarget automation or a coordinator.\n\n5. **Align managed instructions and focused docs.** Update the task-native portions of `workflows/implement-task.md`, `skills/prime-claw-oversee-episode/SKILL.md`, relevant execute/blocked/handoff/expert guidance, and the `finalize_task_episode` tool description in `extensions/reviewed-plan.ts` so readiness, review, status publication, merge and cleanup name the recorded integration target. Update `docs/conversation-driven-episode-oversight.md` and affected promotion/finalization user stories/traceability. Review each main reference rather than globally replacing it: retained version-1 workflows, legacy bridge and accepted-primary-main `--user-global` refresh/restart/UAT rules stay unchanged. Change inert source assets, not the installed global skill/plugin; no host apply/check/probe.\n\n6. **Prove the change with existing disposable suites.** Extend `tests/task_episode_admission_extension.test.mjs` and `tests/beads_task_episode_admission_extension.test.mjs`: accept a clean published feature/stack base without losing its commits, retain the exact base/target through one isolated allocation, support a default branch named `master` or another non-main name, and replace the obsolete “primary non-main rejects” assertion while retaining linked-worktree rejection. Add focused pre-mutation detached/unsafe or branch-drift rejection assertions with unchanged task/ownership/resources. Extend existing ownership/handoff/blocked/close cases to show target retention, normal same-branch advancement, rejection of wrong-target cleanup, and correct merged/abandoned terminal ancestry/publication on the feature target. Retain old version-2 missing-target, provider-switch field preservation, forbidden active-target mutation and version-1 compatibility coverage and local/Orca identity coverage without creating a broad cross-product matrix. Review skill wording as content; add no test of whether the LLM asked or the user confirmed.\n\nRun affected Node behavior suites only through their existing Docker Tier-1 pytest bridges (`tests/test_task_providers.py`, `tests/test_reviewed_plan_extension.py`), plus relevant policy/docs checks. After every plugin-source change run the required Tier-1 validation, such as `scripts/test-tier1.sh --probe` or `python3 -m pytest tests/ -q -m container`. Record actual results and any blockers in the native task during the later implementation Episode; do not claim tests have run during planning. Keep documentation and acceptance evidence current, commit/push the reviewed implementation candidate, then return it to the owning Conversation for review. Merge, abandonment, activation/restart and cleanup remain separate lifecycle decisions, not consequences of this plan.",
+          "implementationNotes": null,
+          "comments": [],
+          "finalSummary": null
+        }
+      },
+      "baseRef": "32a02232b65dffc2a51660661e38dc05cc289f5b",
+      "createdAt": "2026-11-03T18:37:02.498Z",
+      "updatedAt": "2026-11-03T18:37:41.950Z",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-48-episode-97fc9b02",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-48-episode-97fc9b02",
+      "worktreeIdentity": "wt2:local:1e9fc8d4-098e-4263-bb37-221321429e36",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-48-episode-97fc9b02",
+      "branch": "JLanders/prime-claw-primeclaw-48-episode-97fc9b02",
+      "head": "32a02232b65dffc2a51660661e38dc05cc289f5b",
+      "launchAutomationName": "prime-claw-launch-97fc9b02-6903-415a-a6f1-239fed1c6ce4",
+      "episodeId": "01a1a2b3-da23-77ee-8519-83f2e4a79e73",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a1a2b3-da23-77ee-8519-83f2e4a79e73.jsonl",
+      "episodeActiveSessionId": "1ba91651469c",
+      "terminalHandle": "term_6aabb818-4107-43ee-a55e-c8f9b3cb4529",
+      "terminalHandles": [
+        "term_6aabb818-4107-43ee-a55e-c8f9b3cb4529",
+        "term_f03a9afd-c1b0-4737-a72b-ab0c858c8a26"
+      ]
+    },
     "01a197be-7eeb-773f-98ef-7544560ced45": {
       "version": 2,
       "provider": "backlog",
