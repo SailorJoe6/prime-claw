@@ -4,7 +4,7 @@ title: Allow task Episodes from published non-main bases for stacked PRs
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:31'
-updated_date: '2026-11-03 18:55'
+updated_date: '2026-11-03 18:58'
 labels: []
 dependencies: []
 references:
@@ -135,4 +135,10 @@ The owning Conversation supplied the following accepted in-scope continuation gu
 Foundation candidate 82a307079b9a5034303a8705337d3eb337791351 is accepted for advance after independent GPT-6 Astra review found no material defects in its scoped ownership-binding claims. Continue the same Episode with the next coherent slice already recorded in the native plan/checkpoint: skill-only stacking check-in, fresh current-branch capture/reservation, and matching task-native admission, replay, handoff, blocked and terminal integration-target handling; then focused non-main behavior and managed-guidance alignment. Preserve the existing branch/base/provider separation, version-1 and missing-field main compatibility, and separate primary-main global activation policy. The stacking question remains ONLY LLM skill prose: no code enforcement, confirmation tracking/token/receipt or compliance test. Keep required Docker validation and report the unchanged static backlog/config.yml path limitation honestly; do not add an unrelated topology repair. No merge, activation, restart or cleanup is authorized.
 
 Continue the exact existing Episode and task; do not allocate another Episode or rewrite ownership. Code remains at the accepted pushed slice-1 head. Prior published task observations are factual context; the change from the initial revision to 8c5a97fd8ec8b8804ca07ba2067c9c85523a51cc consists of the Episode's own in-scope plan/notes/evidence updates with specification, canonical identity, parent and In Progress lifecycle unchanged. This handoff adds only these accepted notes to independent task history. Existing implementation plan and evidence doc remain the durable resume sources. Canonical execute is already queued independently; handoff requests compaction once, not another execute assignment.
+
+## Execute slice 2 started (2026-11-03)
+
+Continuing the accepted foundation in the same Episode. This bounded slice wires current named primary-branch capture through task-native Backlog/Beads reservation and matching replay, handoff, blocked and terminal target checks; aligns the skill-only stacking instruction and managed guidance; and extends focused existing Docker suites. The owning Conversation accepted this advance in the preceding note. Existing branch/base/provider separation and omitted-target main compatibility remain; retained version-1 and primary-main user-global activation are unchanged.
+
+Parallel workers have disjoint runtime, admission-test, lifecycle-test, and managed-guidance files. The Episode owner integrates and runs Docker-only candidate validation. No code-level stacking question/confirmation mechanism or compliance test is permitted. Validation and exact publication results will follow. The known static backlog/config.yml path assumption is not being repaired. No status/terminal/global/ownership mutation is authorized.
 <!-- SECTION:NOTES:END -->
