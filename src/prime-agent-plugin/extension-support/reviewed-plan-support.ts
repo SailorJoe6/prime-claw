@@ -27,6 +27,7 @@ export interface BacklogTaskSelection {
   projectRoot: string;
   taskPath: string;
   taskPathRelative: string;
+  nativeView: Record<string, unknown>;
 }
 
 const SAFE_LOCATION = /^\.ralph\/plans\/future\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
@@ -53,6 +54,7 @@ function parseTaskView(stdout: string, selectedTaskId: string): {
   implementationPlan: string | null;
   references?: string[];
   taskPathRelative: string;
+  nativeView: Record<string, unknown>;
 } {
   let parsed: unknown;
   try {
@@ -91,6 +93,7 @@ function parseTaskView(stdout: string, selectedTaskId: string): {
     implementationPlan: task.implementationPlan,
     ...(task.references === undefined ? {} : { references: task.references as string[] }),
     taskPathRelative: task.path,
+    nativeView: view,
   };
 }
 

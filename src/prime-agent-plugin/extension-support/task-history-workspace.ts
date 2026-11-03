@@ -653,37 +653,16 @@ function ensureIgnored(
 }
 
 /**
- * Refresh or repair the selected independent Backlog read workspace before an
- * admission/status read. Branch-local Backlog and Beads remain provider-native
- * and unchanged; only an already-selected independent Backlog topology uses
- * the existing primary/Episode preparation seams.
+ * Read the selected provider in the requested workspace. The legacy export name
+ * is retained for callers; reading does not prepare, synchronize, or relocate a
+ * task workspace. Explicit preparation operations remain separate.
  */
 export function resolveSynchronizedProviderTask(
   cwd: string,
   rawTaskId: string,
   runner: CommandRunner = new ProcessCommandRunner(),
 ): ProviderTaskResolution | null {
-  const topRaw = gitOk(runner, cwd, ["rev-parse", "--show-toplevel"], "resolve task-read worktree");
-  const gitDirRaw = gitOk(runner, cwd, ["rev-parse", "--git-dir"], "resolve task-read git directory");
-  const commonRaw = gitOk(runner, cwd, ["rev-parse", "--git-common-dir"], "resolve task-read common directory");
-  const top = realpathSync(resolve(cwd, topRaw));
-  const gitDir = realpathSync(resolve(cwd, gitDirRaw));
-  const commonDir = realpathSync(resolve(cwd, commonRaw));
-  const primaryRoot = gitDir === commonDir ? top : realpathSync(dirname(commonDir));
-  const primaryDetection = detectTaskProvider(primaryRoot, runner);
-  if (primaryDetection.kind === "blocked") {
-    throw new Error(`task provider discovery blocked (${primaryDetection.code}): ${primaryDetection.detail}; ${primaryDetection.remediation}`);
-  }
-  if (primaryDetection.kind === "selected" && primaryDetection.evidence.provider === "backlog"
-      && primaryDetection.evidence.storeDir && existsSync(join(primaryDetection.evidence.storeDir, ".git"))) {
-    const prepared = gitDir === commonDir
-      ? prepareTaskHistoryWorkspace({ primaryRoot, runner })
-      : prepareEpisodeTaskHistoryWorkspace({ primaryRoot, targetWorktree: top, runner });
-    if (prepared.status === "blocked") {
-      throw new Error(`Backlog task-read workspace is blocked (${prepared.code}): ${prepared.detail}; ${prepared.remediation}`);
-    }
-  }
-  return resolveProviderTask(top, rawTaskId, runner);
+  return resolveProviderTask(cwd, rawTaskId, runner);
 }
 
 /**

@@ -2079,7 +2079,7 @@ export type ProviderTaskResolution =
       taskId: string;
       title: string;
       nativeStatus: string;
-      status: CanonicalLifecycleStatus;
+      status: string;
       projectRoot: string;
       nativeView: JsonRecord;
     };
@@ -2189,13 +2189,10 @@ function beadsCanonicalStatus(taskId: string, nativeStatus: string): CanonicalLi
 }
 
 /**
- * Resolve one explicit task through the repository's sole live provider.
- * Detection and the capability gate run before the native read; none, dual,
- * malformed, or unavailable provider evidence fails closed. The result is
- * discriminated by provider: the Backlog branch is the existing
- * BacklogTaskSelection, and the Beads branch carries the native issue view
- * with its status mapped to the canonical lifecycle (unmapped statuses fail
- * closed).
+ * Read one explicit task through the detected native provider. No capability,
+ * preparation, synchronization, or lifecycle-eligibility operation is implied.
+ * Beads keeps the complete raw view and native status, including statuses with
+ * no canonical alias. Existing callers retain the known canonical aliases.
  */
 export function resolveProviderTask(
   cwd: string,
@@ -2206,7 +2203,6 @@ export function resolveProviderTask(
   if (!selectedTaskId || /\s/.test(selectedTaskId) || selectedTaskId.startsWith("-")) return null;
 
   const detection = requireLiveProvider(cwd, runner);
-  checkSelectedProviderCapabilities(detection, runner);
   if (detection.evidence.provider === "backlog") {
     const selection = resolveBacklogTask(detection.projectRoot, selectedTaskId, runner);
     if (!selection) return null;
@@ -2215,7 +2211,8 @@ export function resolveProviderTask(
   const issue = readBeadsNativeTask(detection.projectRoot, selectedTaskId, runner);
   return {
     ...issue,
-    status: beadsCanonicalStatus(issue.taskId, issue.nativeStatus),
+    status: Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === issue.nativeStatus)?.[0]
+      ?? issue.nativeStatus,
   };
 }
 

@@ -561,11 +561,14 @@ test("registered linked worktree resolves the primary Beads authority and reads 
     assert.equal(resolved.status, "In Planning");
     assert.equal(resolved.projectRoot, fixture.linked);
     assert.equal(resolved.nativeView.design, "exact");
-    for (const args of [["context", "--json"], ["statuses", "--json"], ["show", "TST-1", "--json", "--long", "--include-comments"]]) {
+    for (const args of [["context", "--json"], ["show", "TST-1", "--json", "--long", "--include-comments"]]) {
       const call = runner.calls.find((item) => item.command === "bd" && JSON.stringify(item.args) === JSON.stringify(args));
       assert.ok(call, `missing native linked-worktree call: bd ${args.join(" ")}`);
       assert.equal(call.cwd, fixture.linked);
     }
+    assert.equal(runner.calls.some((item) => item.command === "bd"
+      && ["--version", "statuses"].includes(item.args[0])), false,
+    "task resolution must not capability-check the linked Beads authority");
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -1413,13 +1416,19 @@ function backlogTaskView(id = "TST-1", status = "In Planning", path = "backlog/t
   });
 }
 
-test("provider task resolution routes a Backlog repo through the native backlog read", () => {
+test("provider task resolution reads Backlog without capability probes or lifecycle configuration gates", () => {
   const root = fixtureRoot();
   writeBacklogFolderConfig(root);
   writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
+  const nativeView = JSON.parse(backlogTaskView());
+  nativeView.provider_extension = { envelope: [1, { retained: true }] };
+  nativeView.task.description = "Provider-authored description";
+  nativeView.task.acceptanceCriteria = [{ index: 1, text: "Keep native evidence", checked: false }];
+  nativeView.task.provider_extension = { task: [null, { retained: true }] };
   const runner = detectionRunner({
-    ...BACKLOG_OK,
-    ["backlog\0task\0view\0--json\0--\0TST-1"]: { stdout: backlogTaskView() + "\n", stderr: "", status: 0 },
+    ["backlog\0--version"]: { stdout: "", stderr: "version probe unavailable", status: 127 },
+    ["backlog\0config\0get\0statuses"]: { stdout: "To Do, Review\n", stderr: "", status: 0 },
+    ["backlog\0task\0view\0--json\0--\0TST-1"]: { stdout: JSON.stringify(nativeView) + "\n", stderr: "", status: 0 },
   });
   const selection = resolveProviderTask(root, "TST-1", runner);
   assert.equal(selection.provider, "backlog");
@@ -1428,6 +1437,10 @@ test("provider task resolution routes a Backlog repo through the native backlog 
   assert.equal(selection.implementationPlan, "One meaningful step");
   assert.equal(selection.taskPathRelative, "backlog/tasks/tst-1.md");
   assert.equal(selection.taskPath, realpathSync(join(root, "backlog/tasks/tst-1.md")));
+  assert.deepEqual(selection.nativeView, nativeView, "the complete native task-view envelope remains lossless");
+  assert.deepEqual(runner.calls.filter(([command]) => command === "backlog"), [
+    ["backlog", "task", "view", "--json", "--", "TST-1"],
+  ], "task resolution must not run executable or lifecycle capability checks");
 });
 
 test("provider task resolution returns the exact long Beads native view with canonical status", () => {
@@ -1446,7 +1459,8 @@ test("provider task resolution returns the exact long Beads native view with can
     provider_extension: { nested: [1, { retained: true }] },
   };
   const runner = detectionRunner({
-    ...BEADS_OK,
+    ["bd\0--version"]: { stdout: "", stderr: "version probe unavailable", status: 127 },
+    ["bd\0statuses\0--json"]: { stdout: "", stderr: "status catalog unavailable", status: 1 },
     ["bd\0show\0TST-1\0--json\0--long\0--include-comments"]: {
       stdout: JSON.stringify([nativeView]) + "\n", stderr: "", status: 0,
     },
@@ -1461,8 +1475,10 @@ test("provider task resolution returns the exact long Beads native view with can
     projectRoot: root,
     nativeView,
   });
-  assert.ok(runner.calls.some((call) => JSON.stringify(call)
-    === JSON.stringify(["bd", "show", "TST-1", "--json", "--long", "--include-comments"])));
+  assert.deepEqual(runner.calls.filter(([command]) => command === "bd"), [
+    ["bd", "config", "get", "no-db"],
+    ["bd", "show", "TST-1", "--json", "--long", "--include-comments"],
+  ], "task resolution reads native provider identity and the task, not lifecycle capabilities");
   // No provider-neutral normalization: the raw view remains Beads-only.
   assert.equal("taskPath" in selection, false);
   assert.equal("taskPathRelative" in selection, false);
@@ -1496,23 +1512,50 @@ test("raw Beads task read preserves built-in closed abandonment evidence without
     projectRoot: root,
     nativeView,
   });
-  assert.throws(() => resolveProviderTask(root, "TST-closed", detectionRunner({
-    ...BEADS_OK,
+  const selection = resolveProviderTask(root, "TST-closed", detectionRunner({
     ["bd\0show\0TST-closed\0--json\0--long\0--include-comments"]: {
       stdout: JSON.stringify([nativeView]) + "\n", stderr: "", status: 0,
     },
-  })), /unmapped status closed/);
+  }));
+  assert.deepEqual(selection, {
+    provider: "beads",
+    taskId: "TST-closed",
+    title: "Abandoned fixture",
+    nativeStatus: "closed",
+    status: "closed",
+    projectRoot: root,
+    nativeView,
+  });
 });
 
-test("provider task resolution fails closed on a Beads task with an unmapped status", () => {
-  const root = fixtureRoot();
-  writeBeadsStore(root);
-  const runner = detectionRunner({
-    ...BEADS_OK,
-    ["bd\0show\0TST-1\0--json\0--long\0--include-comments"]: { stdout: JSON.stringify([{ id: "TST-1", title: "Fixture task", status: "open" }]) + "\n", stderr: "", status: 0 },
+for (const nativeStatus of ["open", "closed", "custom_review"]) {
+  test(`provider task resolution retains unmapped Beads status ${nativeStatus} and absent design`, () => {
+    const root = fixtureRoot();
+    writeBeadsStore(root);
+    const nativeView = {
+      id: "TST-1", title: "Fixture task", status: nativeStatus,
+      provider_extension: { nested: [null, { retained: true }] },
+    };
+    const runner = detectionRunner({
+      ["bd\0show\0TST-1\0--json\0--long\0--include-comments"]: {
+        stdout: JSON.stringify([nativeView]) + "\n", stderr: "", status: 0,
+      },
+    });
+    const selection = resolveProviderTask(root, "TST-1", runner);
+    assert.deepEqual(selection, {
+      provider: "beads",
+      taskId: "TST-1",
+      title: "Fixture task",
+      nativeStatus,
+      status: nativeStatus,
+      projectRoot: root,
+      nativeView,
+    });
+    assert.equal("design" in selection.nativeView, false, "an absent native field must not be fabricated");
+    assert.equal(runner.calls.some(([command, subcommand]) => command === "bd"
+      && ["--version", "statuses"].includes(subcommand)), false);
   });
-  assert.throws(() => resolveProviderTask(root, "TST-1", runner), /unmapped status open/);
-});
+}
 
 test("provider task resolution fails closed when no live provider evidence exists", () => {
   const root = fixtureRoot();
@@ -1534,14 +1577,32 @@ test("provider task resolution fails closed on malformed evidence with remediati
   assert.throws(() => resolveProviderTask(root, "TST-1", detectionRunner()), /blocked \(malformed-evidence\)[\s\S]*bd bootstrap/);
 });
 
-test("provider task resolution fails closed when the selected provider executable is unavailable", () => {
+test("provider task resolution reports the actual Backlog native read failure without capability probes", () => {
   const root = fixtureRoot();
   writeBacklogFolderConfig(root);
   writeBacklogTaskFile(root, "backlog/tasks/tst-1.md");
   const runner = detectionRunner({
-    ["backlog\0--version"]: { stdout: "", stderr: "command not found", status: 127 },
+    ["backlog\0task\0view\0--json\0--\0TST-1"]: { stdout: "", stderr: "command not found", status: 127 },
   });
-  assert.throws(() => resolveProviderTask(root, "TST-1", runner), /executable is unavailable/);
+  assert.throws(() => resolveProviderTask(root, "TST-1", runner), /Backlog could not resolve TST-1: command not found/);
+  assert.deepEqual(runner.calls.filter(([command]) => command === "backlog"), [
+    ["backlog", "task", "view", "--json", "--", "TST-1"],
+  ]);
+});
+
+test("provider task resolution reports the actual Beads show failure without capability probes", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  const runner = detectionRunner({
+    ["bd\0show\0TST-1\0--json\0--long\0--include-comments"]: {
+      stdout: "", stderr: "native task store is unavailable", status: 1,
+    },
+  });
+  assert.throws(() => resolveProviderTask(root, "TST-1", runner), /Beads could not resolve TST-1: native task store is unavailable/);
+  assert.deepEqual(runner.calls.filter(([command]) => command === "bd"), [
+    ["bd", "config", "get", "no-db"],
+    ["bd", "show", "TST-1", "--json", "--long", "--include-comments"],
+  ]);
 });
 
 
@@ -1844,8 +1905,6 @@ test("conversation status publication preserves the ordinary Backlog mutation an
     "backlog\0config\0get\0statuses",
     "backlog\0task\0view\0--json\0--\0TST-1",
     "backlog\0task\0edit\0--status\0In Progress\0--append-notes\0admit\0--plain\0--\0TST-1",
-    "backlog\0--version",
-    "backlog\0config\0get\0statuses",
     "backlog\0task\0view\0--json\0--\0TST-1",
   ]);
   assert.equal(calls.some((call) => call.startsWith("bd\0")), false);
@@ -2042,6 +2101,7 @@ test("provider task resolution keeps the Backlog branch as the exact existing se
     projectRoot: root,
     taskPath: realpathSync(join(root, "backlog/tasks/tst-1.md")),
     taskPathRelative: "backlog/tasks/tst-1.md",
+    nativeView: JSON.parse(backlogTaskView()),
   });
 });
 

@@ -958,39 +958,81 @@ test("a clean stale Episode task clone fast-forwards only to a stable published 
   assert.equal(git(storeDir, "status", "--porcelain"), "");
 });
 
-test("first provider task read safely prepares a missing Episode Backlog clone", (t) => {
+test("provider task read reports a missing Episode workspace without preparing it", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const fixture = episodeFixture({ taskFiles: {
     [OWNER_TASK_PATH]: taskMarkdown("TASK-1", "Owner"),
   } });
+  const before = primarySnapshot(fixture.root);
+  const targetBefore = primarySnapshot(fixture.target);
+  const storeBefore = primarySnapshot(fixture.primaryStoreDir);
   assert.equal(existsSync(fixture.storeDir), false);
-  const resolved = resolveSynchronizedProviderTask(fixture.target, "TASK-1");
-  assert.equal(resolved.provider, "backlog");
-  assert.equal(resolved.status, "In Progress");
-  assert.ok(existsSync(join(fixture.storeDir, ".git")));
-  assert.equal(git(fixture.storeDir, "rev-parse", "HEAD"), fixture.primaryHead);
+  assert.throws(() => resolveSynchronizedProviderTask(fixture.target, "TASK-1"),
+    /no live task provider|Backlog could not resolve/);
+  assert.equal(existsSync(fixture.storeDir), false, "read never allocates a nested clone");
+  assert.deepEqual(primarySnapshot(fixture.root), before);
+  assert.deepEqual(primarySnapshot(fixture.target), targetBefore);
+  assert.deepEqual(primarySnapshot(fixture.primaryStoreDir), storeBefore);
 });
 
-test("provider task read refreshes a stale clean Episode clone before status admission", (t) => {
+function taskReadSnapshot(root) {
+  const paths = git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+    .split("\0").filter(Boolean);
+  return {
+    ...primarySnapshot(root),
+    head: git(root, "rev-parse", "HEAD"),
+    files: Object.fromEntries([...new Set(paths)].map((path) => [path, readFileSync(join(root, path))])),
+  };
+}
+
+function unrelatedReadDirt(root, trackedPath) {
+  writeFileSync(join(root, trackedPath), "unrelated staged edit\n");
+  git(root, "add", trackedPath);
+  writeFileSync(join(root, trackedPath), "unrelated staged plus unstaged edit\n");
+  writeFileSync(join(root, "unrelated-untracked.txt"), "unrelated untracked bytes\n");
+}
+
+test("provider task reads preserve dirty primary and Episode workspaces without fetching published descendants", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const fixture = episodeFixture({ taskFiles: {
     [OWNER_TASK_PATH]: taskMarkdown("TASK-1", "Owner"),
   } });
   assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: fixture.root, targetWorktree: fixture.target }).status, "prepared");
   const staleHead = git(fixture.storeDir, "rev-parse", "HEAD");
-  const publication = publishTaskHistoryMutation({
-    primaryRoot: fixture.root,
-    targetWorktree: fixture.root,
-    taskId: "TASK-1",
-    expectedTaskStatus: "In Progress",
-    edits: [{ option: "--status", value: "Done" }],
+  const published = publishTaskBranch(fixture.remote, {
+    [OWNER_TASK_PATH]: taskMarkdown("TASK-1", "Owner").replace("status: In Progress", "status: Done"),
   });
-  assert.equal(publication.status, "published");
-  assert.equal(git(fixture.storeDir, "rev-parse", "HEAD"), staleHead);
-  const resolved = resolveSynchronizedProviderTask(fixture.target, "TASK-1");
-  assert.equal(resolved.provider, "backlog");
-  assert.equal(resolved.status, "Done");
-  assert.equal(git(fixture.storeDir, "rev-parse", "HEAD"), publication.publishedHead);
+  assert.notEqual(published, staleHead);
+  unrelatedReadDirt(fixture.root, "code.txt");
+  unrelatedReadDirt(fixture.target, "code.txt");
+  unrelatedReadDirt(fixture.primaryStoreDir, "TASKS.md");
+  unrelatedReadDirt(fixture.storeDir, "TASKS.md");
+  const roots = [fixture.root, fixture.target, fixture.primaryStoreDir, fixture.storeDir];
+  const before = roots.map(taskReadSnapshot);
+  const calls = [];
+  const runner = {
+    run(command, args, options = {}) {
+      calls.push([command, ...args]);
+      try {
+        return { status: 0, stdout: execFileSync(command, args, {
+          cwd: options.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+        }), stderr: "" };
+      } catch (error) {
+        if (!options.allowFailure) throw error;
+        return { status: error.status ?? 1, stdout: String(error.stdout ?? ""), stderr: String(error.stderr ?? "") };
+      }
+    },
+  };
+  for (const root of [fixture.root, fixture.target]) {
+    const resolved = resolveSynchronizedProviderTask(root, "TASK-1", runner);
+    assert.equal(resolved.provider, "backlog");
+    assert.equal(resolved.status, "In Progress", "read returns current local task facts, not an implicit refresh");
+    assert.equal(resolved.nativeView.task.id, "TASK-1");
+  }
+  assert.deepEqual(roots.map(taskReadSnapshot), before, "native reads preserve HEAD, index, config and task/code bytes");
+  assert.equal(calls.some(([command, subcommand]) => command === "git"
+    && ["fetch", "pull", "merge", "clone", "push", "checkout", "switch", "add", "commit"].includes(subcommand)), false);
+  assert.equal(calls.some(([command, ...args]) => command === "backlog" && args[0] !== "task"), false);
 });
 
 test("a foreign (unregistered) target directory blocks before any write", (t) => {

@@ -23,14 +23,27 @@ to this exact canonical ID within the operator's stated bounds. Delegation
 never skips design or planning. Clarify material ambiguity or new scope; do not
 require a prior invocation or a separate phase-history receipt as authority.
 
+## Native lookup and explicit workspace actions
+
+A task lookup observes the selected workspace as it is. It does not prepare a
+missing Backlog clone, fetch or fast-forward task history, or validate lifecycle
+configuration before returning a readable task. Beads raw statuses and absent
+fields remain facts even when no canonical status alias exists. Use the native
+view below to make the stage's eligibility decision; a readable task is not
+permission to advance it.
+
+Inspect task history and publication when this stage needs them. Perform any
+needed preparation or synchronization explicitly, using the supported native
+operations on the intended workspace. Preserve unrelated staged, unstaged and
+untracked task/code work. Do not repair another Conversation's workspace or
+require it to be globally clean to read this task. Report native command failures
+truthfully; a failed read does not authorize initialization or another store.
+
 ## Reload and check planning readiness
 
 Use only the selected provider:
 
-- **Backlog:** when the selected store is an independent nested clone, first fetch
-the exact task ref and fast-forward only a clean clone to the stable direct
-published head; dirty, local-ahead, divergent, unavailable, or foreign history
-blocks. Then run `backlog task view --json -- TASK-ID` from the exact root.
+- **Backlog:** run `backlog task view --json -- TASK-ID` from the exact root.
   Require the canonical ID and returned project-relative task path to equal the
   admitted binding and status exactly `In Design` or `In Planning`. Read the
   Description, Acceptance Criteria, constraints, references, documentation,

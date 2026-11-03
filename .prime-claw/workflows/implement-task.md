@@ -39,16 +39,29 @@ content refinements remain facts for semantic readiness review, not an automatic
 reapproval gate. Do not require an earlier entry or manufacture missing receipt
 evidence when current native resolution and operator authority are sufficient.
 
+## Native lookup and explicit workspace actions
+
+A task lookup observes the selected workspace as it is. It does not prepare a
+missing Backlog clone, fetch or fast-forward task history, or validate lifecycle
+configuration before returning a readable task. Beads raw statuses and absent
+fields remain facts even when no canonical status alias exists. Use the native
+view below to make the stage's eligibility decision; a readable task is not
+permission to advance it.
+
+Inspect task history and publication when this stage needs them. Perform any
+needed preparation or synchronization explicitly, using the supported native
+operations on the intended workspace. Preserve unrelated staged, unstaged and
+untracked task/code work. Do not repair another Conversation's workspace or
+require it to be globally clean to read this task. Report native command failures
+truthfully; a failed read does not authorize initialization or another store.
+
 ## Reload and review implementation readiness
 
 Resolve the live provider directly from its native project evidence. Do not use
 a provider-selection file, infer the provider from the task ID, or mix provider
 commands or evidence. Reload the exact task through that provider:
 
-- **Backlog:** when the selected store is an independent nested clone, first
-  fetch the exact task ref and fast-forward only a clean clone to the stable
-direct published head; dirty, local-ahead, divergent, unavailable, or foreign
-history blocks. Then run `backlog task view --json -- TASK-ID`. Require the returned
+- **Backlog:** run `backlog task view --json -- TASK-ID`. Require the returned
   canonical ID to match the admitted identity, status exactly `In Planning`,
   and the exact returned task path. Require the native Implementation Plan to
   be meaningful and not blank or an obvious placeholder. Treat Description,
@@ -87,6 +100,23 @@ deficiency with exact provider-native task-field references and concrete
 revision guidance. Do not call `create_task_episode`; do not mutate task status
 or create a branch, worktree, session, or ownership record. Stop after the
 explanation.
+
+## Selected-ticket durability before creation
+
+Ensure the exact selected ticket's coherent specification and plan are committed
+and, when a remote exists, published before an Episode needs to obtain them.
+This is your responsibility under this editable workflow, not a frozen-revision
+approval or a code-level whole-checkout cleanliness check. Inspect current task
+and history facts first. If needed, commit and publish only the authorized ticket
+update through Backlog's exact-task Git history or Beads' supported native task
+history. Commit each coherent update as soon as it is ready and publish promptly;
+do not defer it until handoff or session end. Preserve unrelated bytes, staging,
+fields and history. An unrelated published descendant is not a conflict by
+itself. Use semantic judgment for actual same-task changes and report native
+publication conflicts or uncertainty without force, automatic retry or another
+allocation. Confirm that the Episode can obtain the selected committed ticket
+from its provider workspace; do not synchronize another owner's dirty checkout
+as a hidden prerequisite.
 
 ## Create the Episode
 

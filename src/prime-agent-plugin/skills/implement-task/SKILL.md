@@ -32,6 +32,23 @@ meaningful native Implementation Plan or Beads `design`; the project workflow
 still performs the full semantic readiness review. If the task or delegated
 bounds are materially unclear, ask instead of guessing.
 
+## Selected-ticket durability before creation
+
+Ensure the exact selected ticket's coherent specification and plan are committed
+and, when a remote exists, published before an Episode needs to obtain them.
+This is your responsibility under this editable workflow, not a frozen-revision
+approval or a code-level whole-checkout cleanliness check. Inspect current task
+and history facts first. If needed, commit and publish only the authorized ticket
+update through Backlog's exact-task Git history or Beads' supported native task
+history. Commit each coherent update as soon as it is ready and publish promptly;
+do not defer it until handoff or session end. Preserve unrelated bytes, staging,
+fields and history. An unrelated published descendant is not a conflict by
+itself. Use semantic judgment for actual same-task changes and report native
+publication conflicts or uncertainty without force, automatic retry or another
+allocation. Confirm that the Episode can obtain the selected committed ticket
+from its provider workspace; do not synchronize another owner's dirty checkout
+as a hidden prerequisite.
+
 ## Admit once, then stop
 
 Call `implement_task` with the exact canonical `taskId`. Supply optional `host`

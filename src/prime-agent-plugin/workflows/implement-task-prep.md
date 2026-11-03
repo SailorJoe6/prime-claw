@@ -37,6 +37,22 @@ content refinements remain facts for semantic readiness review, not an automatic
 reapproval gate. Do not require an earlier entry or manufacture missing receipt
 evidence when current native resolution and operator authority are sufficient.
 
+## Native lookup and explicit workspace actions
+
+A task lookup observes the selected workspace as it is. It does not prepare a
+missing Backlog clone, fetch or fast-forward task history, or validate lifecycle
+configuration before returning a readable task. Beads raw statuses and absent
+fields remain facts even when no canonical status alias exists. Use the native
+view below to make the stage's eligibility decision; a readable task is not
+permission to advance it.
+
+Inspect task history and publication when this stage needs them. Perform any
+needed preparation or synchronization explicitly, using the supported native
+operations on the intended workspace. Preserve unrelated staged, unstaged and
+untracked task/code work. Do not repair another Conversation's workspace or
+require it to be globally clean to read this task. Report native command failures
+truthfully; a failed read does not authorize initialization or another store.
+
 ## Light readiness sniff
 
 Resolve the live provider directly from its native project evidence. Do not use

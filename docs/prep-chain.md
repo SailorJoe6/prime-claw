@@ -132,6 +132,30 @@ entry admission reports queued work, not completed compaction, readiness, or
 creation, and the caller ends its turn.
 
 
+## Observational task lookup (PRIMECLAW-55 first slice)
+
+The default task resolver reads the selected local workspace without implicitly
+preparing a missing Backlog clone or fetching/fast-forwarding an existing one.
+It does not run provider lifecycle-capability checks before a native task read.
+Backlog returns its complete native task-view envelope alongside the existing
+selection fields. Beads retains its complete native view, native status and
+field absence. Known Beads canonical aliases remain available to existing
+callers; an unmapped status is returned as the raw status, not refused or mapped
+to Done. Native command errors remain errors.
+
+Planning and implementation workflows now explicitly own lookup interpretation,
+needed workspace preparation/synchronization and selected-ticket durability.
+Unrelated task/code dirt is not a reason to hide a readable task. A read observes
+local facts, not proof of remote freshness or implementation authority. A native
+CLI can perform its own documented migrations; this change removes Prime Claw's
+implicit preparation, not native provider behavior.
+
+This is a bounded first slice. The entry, allocation, mutation, continuation and
+terminal code described above still contains legacy policy gates pending the
+remaining PRIMECLAW-55 slices. It does not yet claim the full lifecycle policy
+extraction or the recorded same-operation recovery is complete. No live plugin
+activation or resource recovery is part of this change.
+
 ## Validation policy
 
 Plugin candidates are validated only in isolated Docker Tier 1. Never apply,
