@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 21:49'
+updated_date: '2026-11-03 21:52'
 labels: []
 dependencies: []
 references:
@@ -191,4 +191,7 @@ Validation (source selected from the independently verified annotated cwd-fix-v0
 Regression assertions prove dirty staged/unstaged/untracked primary code, Episode code and both independent task clones survive reads, including config bytes/index/HEAD while published history advances elsewhere. No resolver fetch, merge, clone, push or capability probe occurs. Raw Beads open/closed/custom statuses, absent design, native extensions, linked-root reads and truthful native command failures are covered. Child lifecycle-map reviewed the diff and shared/retained callers read-only: no concrete defects, static-review limit stated.
 
 No global apply/activation, restart, dependency patch, live PRIMECLAW-45 recovery, terminal mutation, ownership edit or destructive cleanup was performed. The whole task is not complete. Await owner review of this one bounded slice.
+
+## Slice 2 selected — editable task entry/prep-chain decisions
+Continue the accepted same Episode with one bounded entry/prep-chain slice for both Backlog and Beads. Remove allowed-status and plan/design eligibility checks from prep-chain/tool wrappers and remove embedded policy from the three task entry tools. Existing Markdown retains authority, status/readiness and selected-ticket durability decisions; both queued prompts receive the complete native task view as factual context through current workflow loading. Preserve exact identity, truthful native errors and existing placement/resource mechanics. Lower-level allocation, status-publication, transport, continuation and terminal policy remain accepted work on this same task, not claimed fixed in this slice. Add focused runtime tests and Docker validation, publish one coherent code slice plus native task evidence, then stop for owner review. No AC is fully met yet.
 <!-- SECTION:NOTES:END -->
