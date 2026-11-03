@@ -1,7 +1,13 @@
 # Prime Claw plugin user stories
 
-This directory describes the user outcomes implemented by the current Prime
-Claw plugin and its installed global and project assets. It is organized by
+Product requirements live in [REQUIREMENTS.md](../../REQUIREMENTS.md), the single
+maintained requirements source. Its first consolidation awaits operator review.
+This directory is a supporting story and implementation/evidence map, not a
+second product contract. Later operator corrections in the requirements document
+may supersede details here; a story is not proof of implementation or activation.
+
+This directory describes the user outcomes recorded for the Prime Claw plugin
+and its global and project assets. It is organized by
 lifecycle area rather than by TypeScript module, command, or test suite.
 
 The plugin itself is required. This inventory exists to separate the product

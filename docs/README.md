@@ -1,5 +1,13 @@
 # prime-claw Documentation
 
+## Product requirements
+
+- [../REQUIREMENTS.md](../REQUIREMENTS.md) is the single maintained product
+  requirements source. The first consolidation awaits operator review.
+- User stories, design records, task specifications, and historical requirement/
+  validator inventories support that document; they are not competing product
+  contracts. Existing implementation or test guards do not create requirements.
+
 ## Founding
 
 - [../VISION.md](../VISION.md) — the agent hierarchy, three-horizon context

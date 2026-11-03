@@ -23,6 +23,11 @@ Prime Agent built-ins remain available; custom workflow commands are removed.
 
 ## What this repo is
 
+Product requirements live in [REQUIREMENTS.md](REQUIREMENTS.md). Read it before
+substantive design or implementation. It is the single maintained requirements
+source; task plans, existing code/tests, and historical evidence do not create
+additional product requirements. Its first consolidation awaits operator review.
+
 This is the **builder repo** for prime-claw. Read [VISION.md](VISION.md) and
 [LONG_RANGE_PLAN.md](LONG_RANGE_PLAN.md) before substantive work. The reasoning
 behind the design (and the origin session id) is in
