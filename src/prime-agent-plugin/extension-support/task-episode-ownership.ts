@@ -286,9 +286,10 @@ export class CliBeadsTaskEpisodeReservationGit implements BeadsTaskEpisodeReserv
 export function exactDirectRemoteBranchHead(repo: string, branch: string, action = "Beads lifecycle"): string {
   const remote = runGit(repo, ["config", "--get", `branch.${branch}.remote`]);
   const mergeRef = runGit(repo, ["config", "--get", `branch.${branch}.merge`]);
-  if (!remote || !mergeRef || mergeRef !== `refs/heads/${branch}`) {
+  if (!remote || !mergeRef.startsWith("refs/heads/")) {
     throw new Error(`${action} requires the recorded branch's exact ordinary upstream`);
   }
+  runGit(repo, ["check-ref-format", mergeRef]);
   const urls = runGit(repo, ["remote", "get-url", "--all", remote]).split(/\r?\n/).filter(Boolean);
   if (urls.length !== 1) {
     throw new Error(`${action} requires one exact code remote transport`);
@@ -298,7 +299,7 @@ export function exactDirectRemoteBranchHead(repo: string, branch: string, action
   const match = rows.length === 1
     ? /^([0-9a-f]{40}|[0-9a-f]{64})\s+refs\/heads\/(.+)$/.exec(rows[0]!)
     : null;
-  if (!match || match[2] !== branch) {
+  if (!match || `refs/heads/${match[2]}` !== mergeRef) {
     throw new Error(`${action} could not prove the exact direct-remote code head`);
   }
   return match[1]!;

@@ -26,6 +26,7 @@ import {
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import {
   CliLegacyTaskOwnershipTransitionGit,
+  exactDirectRemoteBranchHead,
   advancePublishedBeadsTaskEpisodeEvidence,
   reservePublishedBeadsTaskEpisodeOwnership,
   reservePublishedBacklogTaskEpisodeOwnership,
@@ -67,6 +68,25 @@ function fixture({ extraStatusPath = false } = {}) {
   };
   return { root, relative, taskPath, selection };
 }
+
+test("direct code publication uses the integration branch's configured ordinary upstream ref", () => {
+  const f = fixture();
+  const remote = mkdtempSync(join(tmpdir(), "prime-claw-target-upstream-"));
+  execFileSync("git", ["init", "--bare", "-q", remote]);
+  git(f.root, "branch", "-M", "feature/stack");
+  git(f.root, "remote", "add", "origin", remote);
+  git(f.root, "push", "-q", "origin", "HEAD:refs/heads/published-stack");
+  git(f.root, "config", "branch.feature/stack.remote", "origin");
+  git(f.root, "config", "branch.feature/stack.merge", "refs/heads/published-stack");
+  const publishedHead = git(f.root, "rev-parse", "HEAD");
+  assert.equal(exactDirectRemoteBranchHead(f.root, "feature/stack"), publishedHead);
+  assert.equal(git(remote, "rev-parse", "refs/heads/published-stack"), publishedHead);
+  git(f.root, "config", "branch.feature/stack.merge", "refs/tags/published-stack");
+  assert.throws(() => exactDirectRemoteBranchHead(f.root, "feature/stack"), /exact ordinary upstream/);
+  git(f.root, "config", "branch.feature/stack.merge", "refs/heads/published-*");
+  assert.throws(() => exactDirectRemoteBranchHead(f.root, "feature/stack"));
+  assert.equal(git(remote, "rev-parse", "refs/heads/published-stack"), publishedHead);
+});
 
 function reserve(f, overrides = {}, dependencies = {}) {
   const { selection = {}, ...inputOverrides } = overrides;

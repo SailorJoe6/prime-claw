@@ -129,7 +129,7 @@ function commitPaths(root, ref = "HEAD") {
   return output ? output.split(/\r?\n/) : [];
 }
 
-test("independent Backlog admission keeps code and task DAGs separate and prepares task access before session start", async (t) => {
+test("independent Backlog admission isolates one Episode from the exact published feature target and keeps task history separate", async (t) => {
   if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-independent-admission-")));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -170,17 +170,32 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   git(root, "add", ".gitignore");
   git(root, "commit", "-qm", "ignore independent task store");
   git(root, "push", "-q");
+  const mainHead = git(root, "rev-parse", "main");
+  const integrationBranch = "feature/stack";
+  git(root, "checkout", "-qb", integrationBranch);
+  writeFileSync(join(root, "code.txt"), "code with accepted stacked baseline\n");
+  git(root, "add", "code.txt");
+  git(root, "commit", "-qm", "accepted stacked code baseline");
+  git(root, "push", "-qu", "origin", integrationBranch);
   const codeHead = git(root, "rev-parse", "HEAD");
+  assert.notEqual(codeHead, mainHead);
   const records = new Map();
   const ownership = {
     read(_root, owner) { return owner ? records.get(owner) ?? null : [...records.values()][0] ?? null; },
     write(_root, record) { records.set(record.ownerSessionId, record); },
   };
   let preSessionView = null;
+  let allocations = 0;
   let delivered = 0;
   let deliveredExecutePrompt = "";
   const publisher = {
     async createFresh(options) {
+      allocations += 1;
+      const reserved = records.get("independent-owner");
+      assert.equal(reserved.integrationBranch, integrationBranch);
+      assert.equal(reserved.baseRef, codeHead);
+      assert.equal(git(options.worktree, "rev-parse", "HEAD"), codeHead);
+      assert.notEqual(realpathSync(options.worktree), root);
       assert.ok(existsSync(join(options.worktree, ".backlog", ".git")), "nested task checkout exists before session allocation");
       preSessionView = view(options.worktree, taskId);
       const identity = { sessionId: "independent-episode", sessionFile: join(dir, "independent-episode.jsonl") };
@@ -225,6 +240,15 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   assert.equal(git(root, "status", "--porcelain"), "");
   assert.equal(result.baseRef, codeHead);
   assert.equal(result.head, codeHead);
+  assert.equal(result.integrationBranch, integrationBranch);
+  assert.equal(records.get("independent-owner").integrationBranch, integrationBranch);
+  assert.equal(git(root, "branch", "--show-current"), integrationBranch);
+  assert.equal(git(root, "rev-parse", "main"), mainHead);
+  assert.equal(git(root, "rev-parse", "@{upstream}"), codeHead);
+  assert.equal(allocations, 1);
+  assert.notEqual(result.branch, integrationBranch);
+  assert.equal(git(result.worktree, "branch", "--show-current"), result.branch);
+  assert.equal(readFileSync(join(result.worktree, "code.txt"), "utf8"), "code with accepted stacked baseline\n");
   assert.equal(result.providerRevision, publishedTaskHead);
   assert.equal(result.providerRevision, interleavedAdvance.publishedHead);
   assert.equal(result.taskEvidence.task.id, taskId);
@@ -291,6 +315,8 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   assert.equal(handoffs, 1);
   const advancedOwner = records.get("independent-owner");
   assert.equal(advancedOwner.providerRevision, changedTask.publishedHead);
+  assert.equal(advancedOwner.integrationBranch, integrationBranch);
+  assert.equal(advancedOwner.baseRef, codeHead);
   assert.match(advancedOwner.taskEvidence.task.implementationNotes, /accepted handoff advance/);
   activeRoute = undefined;
   const reopened = await handoffTaskEpisode(taskId, "continue after durable route refresh", ctx, handoffDependencies);
@@ -335,6 +361,8 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   );
   const blockedOwner = records.get("independent-owner-2");
   assert.equal(blockedOwner.provider, "backlog");
+  assert.equal(blockedOwner.integrationBranch, integrationBranch);
+  assert.equal(blockedOwner.baseRef, codeHead);
   assert.equal(blockedOwner.providerRevision, git(prepared.storeDir, "rev-parse", "HEAD"));
   assert.equal(blockedOwner.taskEvidence.task.status, "Blocked");
   assert.equal(view(root, secondTaskId).status, "Blocked");
@@ -381,12 +409,57 @@ test("trusted task admission commits In Progress before reservation and allocati
     paths: [f.task.path],
   });
   assert.equal(result.status, "active");
+  assert.equal(result.integrationBranch, "main");
   assert.match(result.admissionPushError, /push/i);
   assert.deepEqual(commitPaths(f.root), [f.task.path]);
   assert.equal(git(f.root, "status", "--short"), "M unrelated.txt");
   assert.deepEqual(f.events.filter(([name]) => name === "ownership-write"), [
     ["ownership-write", "provisioning"], ["ownership-write", "active"],
   ]);
+});
+
+test("grandfathered Backlog admission accepts published default master and retains its exact task-only base commit", async (t) => {
+  const f = fixture();
+  const remote = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-master-remote-")));
+  t.after(() => { rmSync(f.root, { recursive: true, force: true }); rmSync(remote, { recursive: true, force: true }); });
+  git(remote, "init", "-q", "--bare");
+  git(remote, "symbolic-ref", "HEAD", "refs/heads/master");
+  git(f.root, "branch", "-m", "master");
+  git(f.root, "remote", "add", "origin", remote);
+  git(f.root, "push", "-qu", "origin", "master");
+  const plannedHead = git(f.root, "rev-parse", "HEAD");
+  const originalTask = view(f.root);
+  let allocations = 0;
+  const result = await createTaskEpisode("PRIMECLAW-1", "master-call", f.ctx, {
+    ...f.dependencies,
+    allocateTaskEpisode: async () => {
+      allocations += 1;
+      assert.equal(f.record.integrationBranch, "master");
+      assert.equal(view(f.root).status, "In Progress");
+      assert.deepEqual(commitPaths(f.root, f.record.baseRef), [f.task.path]);
+      const active = {
+        ...f.record, status: "active", worktree: join(f.root, "episode-worktree"),
+        branch: "episode/master-task", head: f.record.baseRef,
+        episodeId: "master-episode", episodeSessionFile: join(f.root, "episode.jsonl"),
+        episodeActiveSessionId: "master-route",
+      };
+      f.ownership.write(f.root, active);
+      return { ...active, reused: false };
+    },
+  }, { engine: "local" });
+
+  assert.equal(allocations, 1);
+  assert.equal(result.integrationBranch, "master");
+  assert.equal(result.baseRef, git(f.root, "rev-parse", "HEAD"));
+  assert.equal(result.head, result.baseRef);
+  assert.notEqual(result.baseRef, plannedHead, "grandfathered status commit remains the exact Episode base");
+  assert.equal(git(f.root, "rev-parse", `${result.baseRef}^`), plannedHead);
+  assert.equal(git(f.root, "branch", "--show-current"), "master");
+  assert.equal(git(f.root, "rev-parse", "@{upstream}"), result.baseRef);
+  assert.equal(git(remote, "rev-parse", "HEAD"), result.baseRef);
+  assert.equal(view(f.root).implementationPlan, originalTask.implementationPlan);
+  assert.equal(git(f.root, "status", "--short"), "M unrelated.txt");
+  assert.equal(result.admissionPushError, undefined);
 });
 
 test("proven clean pre-reservation failure returns the exact task to In Planning", async () => {
@@ -446,7 +519,7 @@ test("post-reservation allocation failure publishes Blocked with exact recovery 
   assert.equal(git(f.root, "rev-parse", "HEAD"), head);
 });
 
-test("task admission rejects linked main and primary non-main checkouts before every mutation", async () => {
+test("task admission still rejects a linked checkout before every mutation", async () => {
   const f = fixture();
   git(f.root, "branch", "keeper");
   git(f.root, "checkout", "-q", "keeper");
@@ -473,11 +546,7 @@ test("task admission rejects linked main and primary non-main checkouts before e
   };
   await assert.rejects(
     createTaskEpisode("PRIMECLAW-1", "tool-call", { ...f.ctx, cwd: linked }, guardedDependencies, { engine: "local" }),
-    /canonical primary main checkout/,
-  );
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, guardedDependencies, { engine: "local" }),
-    /canonical primary main checkout/,
+    /canonical primary.*checkout/,
   );
 
   assert.equal(git(linked, "branch", "--show-current"), "main");
@@ -492,6 +561,56 @@ test("task admission rejects linked main and primary non-main checkouts before e
   assert.equal(reservationCalls, 0);
   assert.equal(allocatorCalls, 0);
   assert.deepEqual(f.events, []);
+});
+
+test("Backlog detached HEAD, branch drift, and code drift reject before task, ownership, or resource mutation", async (t) => {
+  for (const mode of ["detached HEAD", "branch drift", "code drift"]) {
+    await t.test(mode, async () => {
+      const f = fixture();
+      t.after(() => rmSync(f.root, { recursive: true, force: true }));
+      git(f.root, "checkout", "-qb", "feature/stack");
+      if (mode === "detached HEAD") git(f.root, "checkout", "-q", "--detach");
+      const beforeTask = readFileSync(join(f.root, f.task.path));
+      const beforeHead = git(f.root, "rev-parse", "HEAD");
+      let externalHead = beforeHead;
+      const beforeStatus = git(f.root, "status", "--short");
+      const worktrees = () => git(f.root, "worktree", "list", "--porcelain").split(/\r?\n/).filter((line) => line.startsWith("worktree "));
+      const beforeWorktrees = worktrees();
+      let resolutions = 0, reservations = 0, allocations = 0;
+      const dependencies = {
+        ...f.dependencies,
+        taskResolver(cwd, taskId) {
+          const selected = f.dependencies.taskResolver(cwd, taskId);
+          resolutions += 1;
+          if (mode === "branch drift" && resolutions === 1) git(f.root, "checkout", "-qb", "feature/other");
+          if (mode === "code drift" && resolutions === 1) {
+            git(f.root, "commit", "-q", "--allow-empty", "-m", "external code advance");
+            externalHead = git(f.root, "rev-parse", "HEAD");
+          }
+          return selected;
+        },
+        reserveTaskOwnership() { reservations += 1; throw new Error("must not reserve"); },
+        allocateTaskEpisode: async () => { allocations += 1; throw new Error("must not allocate"); },
+      };
+      await assert.rejects(
+        createTaskEpisode("PRIMECLAW-1", "unsafe-call", f.ctx, dependencies, { engine: "local" }),
+        mode === "detached HEAD" ? /named.*branch|detached|not a symbolic ref/i
+          : mode === "branch drift" ? /integration branch|branch.*changed/i : /code HEAD changed/,
+      );
+      assert.deepEqual(readFileSync(join(f.root, f.task.path)), beforeTask);
+      assert.equal(git(f.root, "rev-parse", "HEAD"), externalHead);
+      if (mode === "code drift") assert.notEqual(externalHead, beforeHead);
+      assert.equal(git(f.root, "status", "--short"), beforeStatus);
+      assert.deepEqual(worktrees(), beforeWorktrees);
+      assert.equal(view(f.root).status, "In Planning");
+      assert.equal(f.record, null);
+      assert.equal(existsSync(join(f.root, ".prime-claw", "ownership.json")), false);
+      assert.equal(f.events.some(([name]) => name === "ownership-write"), false);
+      assert.equal(reservations, 0);
+      assert.equal(allocations, 0);
+      assert.equal(git(f.root, "branch", "--show-current"), mode === "detached HEAD" ? "" : mode === "branch drift" ? "feature/other" : "feature/stack");
+    });
+  }
 });
 
 test("task admission preflight rejects unclean task and nonterminal ownership without mutation", async () => {

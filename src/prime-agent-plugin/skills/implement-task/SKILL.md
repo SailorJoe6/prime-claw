@@ -32,6 +32,20 @@ meaningful native Implementation Plan or Beads `design`; the project workflow
 still performs the full semantic readiness review. If the task or delegated
 bounds are materially unclear, ask instead of guessing.
 
+## Inspect the code base
+
+Use ordinary Git evidence to compare the current branch with the repository's
+actual primary/default branch; do not assume its name is `main`. If they differ,
+ask: “Current branch is xxxx; are you sure you want to stack a branch off this?”
+Replace `xxxx` with the current branch name. Show the current branch and exact
+code HEAD SHA during readiness. The current branch is the Episode's code base
+and default integration target; do not switch branches to change that basis.
+
+This check-in is LLM guidance only, not a second readiness or approval mechanism.
+LLM noncompliance is explicitly acceptable. Add no confirmation argument,
+tracking, token, receipt, code enforcement, or compliance test. Existing native
+identity, isolation, and publication checks remain separate and unchanged.
+
 ## Admit once, then stop
 
 Call `implement_task` with the exact canonical `taskId`. Supply optional `host`

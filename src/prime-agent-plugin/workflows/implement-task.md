@@ -88,6 +88,17 @@ revision guidance. Do not call `create_task_episode`; do not mutate task status
 or create a branch, worktree, session, or ownership record. Stop after the
 explanation.
 
+## Show the code basis
+
+Read the current named branch and exact code HEAD in the primary owning
+checkout using ordinary Git. Show both during readiness. Fresh admission records
+that branch as `integrationBranch`, the default merge/publication target, and
+allocates from the exact `baseRef`; `branch` names the isolated Episode branch.
+Grandfathered branch-local Backlog captures its task-only status commit as
+`baseRef`; independent Backlog and Beads retain the clean published code base
+separately from provider revisions. Never switch the checkout, substitute the
+repository default branch, or mix provider history into code ancestry.
+
 ## Create the Episode
 
 The full ordinary `prime-claw-oversee-episode` guidance is loaded above this
@@ -117,15 +128,16 @@ duplicate creation; never retry an uncertain dispatch as fresh work.
 
 For Backlog, the trusted capability changes only the exact task from `In
 Planning` to `In Progress` through Backlog. Grandfathered branch-local mode
-commits and verifies that exact task path on canonical main and creates the
-Episode from that recorded status-commit SHA. Independent mode first proves the
-clean pushed canonical code `baseRef`, publishes the exact task-path-only status
+commits and verifies that exact task path on the current integration branch in
+the primary checkout and creates the Episode from that recorded status-commit
+SHA. Independent mode first proves the clean pushed canonical code `baseRef`, publishes the exact task-path-only status
 commit on `refs/heads/prime-claw/tasks` without force, proves the direct task
 head and complete native reread, and leaves the code HEAD unchanged. Before any
 branch, worktree, or session, both modes persist one `provisioning` ownership
-record under this Conversation's exact registry key; independent mode also binds
-its published provider revision and complete task evidence. The Episode branch
-and worktree are then created from the recorded code base. Grandfathered prompt
+record under this Conversation's exact registry key, including the captured
+`integrationBranch`; independent mode also binds its published provider revision
+and complete task evidence. The Episode branch and worktree are then created
+from the recorded code base. Grandfathered prompt
 push is best-effort when a remote exists; independent task publication must be
 proved before resource creation.
 
@@ -147,7 +159,8 @@ publication ref, and unchanged code HEAD. Before any branch, worktree, or
 session creation, it persists one `provisioning` ownership record under this
 Conversation's exact registry key bound to provider `beads`, the canonical task
 ID, published provider revision, complete raw task evidence, exact code
-`baseRef`, and preselected placement. No task path exists or may be invented.
+`baseRef`, captured `integrationBranch`, and preselected placement. No task path
+exists or may be invented.
 The Episode branch and worktree are created from that exact code base.
 
 A creation failure proven to precede durable ownership or resource mutation
@@ -158,14 +171,16 @@ provider revision, code base, and resources, and reports the exact recovery
 condition. It must never retry, force, adopt, reset, use raw Dolt writes, or
 start a fresh Episode.
 
-Both provider paths create or return one durable worktree-isolated Episode with
-one fixed execute assignment. They do not inherit this Conversation transcript,
+Both provider paths recheck the same branch and code identity at publication and
+reservation boundaries. A changed branch blocks rather than silently retargeting.
+They create or return one durable worktree-isolated Episode with one fixed
+execute assignment. They do not inherit this Conversation transcript,
 send an initial handoff, or send a second daemon prompt.
 
 Report the selected provider, canonical task ID, project root, durable Episode
 and routing identities, lifecycle engine, exact Orca setup/worktree identity
-when applicable, actual branch and worktree, and current ownership state. For
-Backlog include the exact status commit and task path. For Beads include the raw
+when applicable, exact `baseRef`, recorded `integrationBranch`, isolated Episode
+`branch` and worktree, and current ownership state. For Backlog include the exact status commit and task path. For Beads include the raw
 pre/post/published task views, published provider revision and ref, exact code
 `baseRef`, and recovery evidence when present. State whether the capability
 created the Episode or returned existing exact active ownership. `uncertain`,

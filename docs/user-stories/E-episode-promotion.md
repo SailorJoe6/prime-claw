@@ -12,7 +12,10 @@ exact canonical task, including selection explicitly delegated within the
 operator's bounds. Implementation selection requires `In Planning` (Beads native
 `in_planning`) after design and planning, not dependency readiness alone. The
 entry resolves native task and placement before its compact-first readiness
-workflow; a failed semantic review creates no Episode.
+workflow; a failed semantic review creates no Episode. Readiness shows the
+current named branch and exact code HEAD. Fresh admission uses that branch as
+its code basis and records it as the default integration target, without
+switching to a differently named default branch.
 
 Markdown owns approval judgment. An explicit conditional instruction to plan
 then implement when ready may authorize that sequence within approved scope;
@@ -54,17 +57,22 @@ Episode, so that implementation occurs against one exact durable authority
 outside the canonical checkout.**
 
 The primary `create_task_episode(taskId=..., host=...)` transaction (with optional
-stable `id:<setup-id>` host) commits the exact
-task's `In Progress` transition, persists version-2 ownership, and creates one
-matching Episode only when that Conversation has no non-terminal ownership and
-no other owner holds the same task binding. A short cross-process lock covers
-the status edit, exact task-only commit, and reservation; push and allocation
-run after the lock is released. Public admission
-replay fails closed rather than returning or duplicating an existing Episode; an
+stable `id:<setup-id>` host) publishes the exact task's `In Progress` transition,
+persists version-2 ownership, and creates one matching Episode only when that
+Conversation has no non-terminal ownership and no other owner holds the same
+task binding. Grandfathered branch-local Backlog uses a task-only code commit;
+its short cross-process lock covers the status edit, exact commit, and
+reservation before push/allocation. Independent Backlog and Beads publish through
+their native task histories separately from the clean pushed code base. Public
+admission replay fails closed rather than returning or duplicating an existing Episode; an
 owner inspects or continues that exact Episode through its lifecycle surfaces. A
 fresh task-native Episode receives:
 
-- a feature worktree created from the exact task status commit;
+- a feature worktree created from exact code `baseRef`: the task status commit
+  for grandfathered Backlog, or the unchanged published code base for independent
+  Backlog/Beads;
+- a recorded `integrationBranch` separate from the isolated Episode `branch`;
+  only omitted fields in old version-2 records fall back to `main`;
 - no bundle copy or `.ralph/plans` promotion commit;
 - a fresh durable Prime Agent session rooted at that worktree;
 - a visible writable Orca Prime Agent tab when Orca placement is selected;
@@ -153,7 +161,7 @@ pre-mutation Orca unavailability with no explicit host request.
 Project reconciliation manages `implement-task-prep` and `implement-task` as
 customizable internal policies for the active exact-task admission path. They
 encode the `In Planning` structural and semantic readiness gates, the single
-`create_task_episode` call boundary, the main-task `In Progress` status commit,
+`create_task_episode` call boundary, provider-native `In Progress` publication,
 a durable provisioning reservation before branch/worktree/session creation,
 clean rollback to `In Planning`, and uncertain/partial `Blocked` outcome.
 
@@ -180,14 +188,15 @@ completed compaction, readiness, or Episode creation, and ends the caller's turn
 
 The ownership store now accepts either retained version-1 folder identity or
 strict version-2 task identity, never a mixture. An internal reservation seam
-re-resolves and verifies that the exact task is `In Progress`, still has a
-meaningful plan, is clean after a HEAD commit containing only its canonical
-Backlog path, and then persists version-2 `provisioning` ownership before any
-resource identity exists.
+re-resolves the exact `In Progress` task and meaningful plan, verifies the selected provider's publication, and persists
+version-2 `provisioning` ownership before any resource identity exists.
+Grandfathered Backlog verifies its exact task-only status commit; independent
+Backlog/Beads keep provider revisions and complete native evidence separate from
+code `baseRef`. Fresh reservations retain the captured integration branch.
 
 An internal task-native allocator now consumes only that exact reservation. It
 derives non-authoritative branch/worktree labels from the task ID, creates the
-local or exact reserved Orca worktree from the bound status-commit SHA, skips
+local or exact reserved Orca worktree from the exact bound code `baseRef`, skips
 all bundle copy and promotion-commit behavior, binds one durable exact-CWD
 session, and injects the exact task ID into one execute assignment. Internal
 owned-resource recovery validates the active worktree plus durable session ID,
@@ -196,18 +205,24 @@ assignment; this is not public admission replay. Partial
 `provisioning` or any failed allocation becomes `uncertain` and cannot replay
 as fresh work.
 
-The trusted-admission transaction now joins those seams. Before task
-lookup or mutation, it requires the caller to be at the repository root of the
-primary Git worktree on `main`; a linked worktree or another branch is rejected
-without changing task bytes, Git state, ownership, or allocator state. It then
-accepts only a clean exact `In Planning` task with a meaningful plan and no
-non-terminal project ownership. It changes that task to `In Progress` through
-Backlog, commits only its canonical path, treats push failure as non-gating
-transport evidence, reserves ownership against that exact commit, allocates, and verifies
-the durable active identity plus unchanged main-task state. A proven clean
-failure before ownership or resource mutation commits the exact task back to
-`In Planning`. Any durable or uncertain mutation instead commits `Blocked` plus
-the exact inspection/reconciliation condition and preserves all evidence.
+The trusted-admission transaction requires the repository root of the primary
+Git worktree on a valid named branch. A clean published feature/stack branch or
+a default branch with a name other than `main` is valid. Linked worktrees,
+detached/unsafe state, and branch drift remain blockers. Capture the current
+branch, recheck it with code identity at publication/reservation boundaries, and
+allocate from exact `baseRef`; never switch the checkout or substitute a default
+branch HEAD. Keep exact task status/plan, owner, placement, and resource checks.
+A proven clean pre-ownership/resource failure restores native `In Planning`;
+durable or uncertain mutation publishes native `Blocked` with the exact recovery
+condition and preserves all evidence. No uncertain admission is retried.
+
+Continuation, blocked handling, review, merge, and terminal cleanup retain the
+same integration branch. A switched owner checkout blocks rather than rebinding
+or allocating again; normal advancement on the same target follows existing
+ancestry/publication rules. Operator merge/abandonment authority and idle checks
+remain unchanged. Cleanup removes only the Episode branch, not its target.
+The [second-slice evidence](../evidence/primeclaw-48-target-aware-lifecycle-20261103.md)
+records candidate validation separately from live UAT and whole-task completion.
 
 The `implement-task` skill, `implement_task` entry tool, and
 `create_task_episode` expose this task-native path. Final create is
