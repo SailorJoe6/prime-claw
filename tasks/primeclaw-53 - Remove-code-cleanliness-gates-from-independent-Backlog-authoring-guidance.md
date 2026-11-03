@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-53
 title: Remove code cleanliness gates from independent Backlog authoring guidance
-status: In Progress
+status: In Planning
 assignee: []
 created_date: '2026-11-02 22:00'
-updated_date: '2026-11-03 19:23'
+updated_date: '2026-11-03 19:26'
 labels: []
 dependencies: []
 references:
@@ -123,4 +123,6 @@ PRIMECLAW-53 provisioning blocked after operation b0133363-514c-419e-affc-7fc4b1
 Joe authorized commit-or-rollback of this Conversation’s pending change and explicit expansion of PRIMECLAW-53 with the diagnosed lifecycle publisher correction. Committed/pushed only the existing uncertain ownership record, bytes unchanged, as fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8; rollback would discard evidence of retained allocated resources. No source implementation, resource/runtime mutation or ownership rebind occurred. Revised the already-existing native plan and specification/AC for the expanded scope; status remains Blocked, historical persisted taskEvidence remains unchanged, and no fresh planning/admission/allocation or implementation is implied.
 
 Joe confirmed TASK-2 merged/installed/active; passive status corroborated the expected f80340d93 runtime build. At Joe’s explicit direction, the failed PRIMECLAW-53 worktree for operation b0133363-514c-419e-affc-7fc4b1042d90 was removed through Orca and verified absent from disk, Git and Orca; no bound Episode session was found. Joe then explicitly directed removal of this Conversation’s stale ownership entry; only that entry was removed and committed/pushed as b66581303d477e56caaba13b59ed407f4832de87, preserving other owners. The historical failed allocation is no longer live ownership. Joe now asks to implement the expanded nine-criterion specification and revised living plan. Return this exact task to In Planning for managed implementation readiness, not directly to In Progress. No Episode/resources/assignment have been created by this status update. New readiness must use the current published task, code and selected host id:afb6537c-e643-4a5f-b284-f0f627ddcbdf, not the obsolete failed-allocation task snapshot.
+
+The new managed readiness review found the expanded nine-AC task implementation-ready. Native creation published In Progress in dd9296695b3bf2de79487fa63f12f12fb5a345c5 but then failed before ownership or resource mutation because an unrelated concurrent PRIMECLAW-55 edit hit the installed whole-store task-read gate. Its automatic rollback read failed on the same unrelated edit. Fresh checks found no PRIMECLAW-53 ownership entry or Episode worktree/resources; code main remained clean at 532bc0de5d3b5dbb2ae3c55aff8967403abf1bdc. Restore only this exact task to In Planning, preserving its complete specification, nine AC and living plan. No implementation or resource recovery is claimed. Further creation attempts are paused for bounded author coordination around the known PRIMECLAW-55 tooling defect; unrelated task edits are not a product-level blocker. Existing expanded implementation authority and selected host id:afb6537c-e643-4a5f-b284-f0f627ddcbdf remain unchanged.
 <!-- SECTION:NOTES:END -->
