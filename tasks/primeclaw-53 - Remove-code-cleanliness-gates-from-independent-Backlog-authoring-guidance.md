@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-53
 title: Remove code cleanliness gates from independent Backlog authoring guidance
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-02 22:00'
-updated_date: '2026-11-03 19:26'
+updated_date: '2026-11-03 19:31'
 labels: []
 dependencies: []
 references:
