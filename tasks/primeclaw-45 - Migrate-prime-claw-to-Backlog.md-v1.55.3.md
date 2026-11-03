@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-45
 title: Migrate prime-claw to Backlog.md v1.55.3
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-03 18:12'
+updated_date: '2026-11-03 18:14'
 labels: []
 dependencies: []
 references:
@@ -115,3 +115,17 @@ Record exact source, build/toolchain and image identities, commands, pass/fail c
 
 Deliver a reviewable, committed/pushed prime-claw candidate with complete compatibility/provenance/validation evidence; no additional planning follow-up task. A later explicit operator decision owns merge, accepted host-artifact deployment, user-global refresh, coordinated restart/UAT, and any real data migration or repair. This planning request itself authorizes none of those actions and creates no Episode.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Prime Claw owning Conversation 01a197be-7eeb-773f-98ef-7544560ced45
+created: 2026-11-03 18:14
+---
+Implementation admission blocked before Episode session start (2026-11-03). Operation f63a69a7-3e66-4b20-b258-2a599c4160e1 published In Progress at task revision d9c42d9d91949996aa06a9902daaadc306853e4c and allocated Orca worktree prime-claw-primeclaw-45-episode-f63a69a7 on branch JLanders/prime-claw-primeclaw-45-episode-f63a69a7 at code base fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8. It then refused task-history preparation because concurrent PRIMECLAW-48 edits made the primary nested task checkout dirty. Its automatic Blocked publication also failed when the task-history head advanced to 57243318215e0d843385a9dd7c06ec253e0eadc4.
+
+Read-only recovery inspection confirmed the same owned Orca worktree exists clean at the original code base; the ownership entry is uncertain and has no Episode session identity, the worktree has no .backlog task clone, and Orca shows only a shell terminal. The primary task checkout is now clean and published at 57243318215e0d843385a9dd7c06ec253e0eadc4; PRIMECLAW-45's native content is unchanged from the admitted In Progress observation. No fresh creation, handoff, second assignment, source edit, activation, or destructive cleanup was attempted.
+
+Unblock condition: recover this exact recorded operation and its existing resources through a supported owner-recovery path; prove the prepared Episode task workspace and exact durable session/assignment identity before continuation. Do not retry as fresh creation, manually edit ownership.json, discard resources, or replace the Episode. If no supported recovery path exists, the operator must decide the bounded recovery action. The approved specification and Implementation Plan remain unchanged.
+---
+<!-- COMMENTS:END -->
