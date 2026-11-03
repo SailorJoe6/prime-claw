@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-48
 title: Allow task Episodes from published non-main bases for stacked PRs
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-10-30 23:31'
-updated_date: '2026-11-03 19:26'
+updated_date: '2026-11-03 21:23'
 labels: []
 dependencies: []
 references:
