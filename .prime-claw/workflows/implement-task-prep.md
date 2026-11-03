@@ -37,6 +37,22 @@ content refinements remain facts for semantic readiness review, not an automatic
 reapproval gate. Do not require an earlier entry or manufacture missing receipt
 evidence when current native resolution and operator authority are sufficient.
 
+The `<operator-implementation-task-observation>` block contains the complete
+provider-native task-view JSON observed while queueing this chain. Keep its
+native envelope, field names, values, and absent fields for both Backlog and
+Beads. It is factual context, not implementation approval, a frozen revision,
+or evidence that the entry tool checked lifecycle eligibility. Reread the exact
+native task before readiness decisions or mutation; judge compatible refinements
+from the current task rather than rejecting a newer observation solely because
+it differs.
+
+This editable workflow owns status and readiness decisions. Implementation
+requires `In Planning` (Beads `in_planning`) and a meaningful native
+Implementation Plan or raw Beads `design`, not status or dependency readiness
+alone. An unexpected or unmapped native status or an inadequate plan must be
+explained without mutation or creation; do not rely on entry or prep-chain code
+to reject it. Successful queue admission is not permission to create resources.
+
 ## Native lookup and explicit workspace actions
 
 A task lookup observes the selected workspace as it is. It does not prepare a
@@ -84,9 +100,10 @@ If the sniff passes, reason from your current conversation context and compose a
 concise `focus_hint` that best prepares you to review the selected task for
 implementation admission and supervise the resulting Episode. Keep
 its exact provider, project root, task ID, observed Backlog task path when
-applicable, native readiness fields, and raw Beads view when applicable. Preserve the operator's actual instruction, approved
-scope, any conditional implementation authority, and optional stable host in
-`<operator-implementation-host>`. Planning-only authority must remain
+applicable, native readiness fields, and the complete provider-native
+observation for either provider. Preserve the operator's actual instruction,
+approved scope, any conditional implementation authority, and optional stable
+host in `<operator-implementation-host>`. Planning-only authority must remain
 planning-only. Use your judgment to decide what context will be most useful for
 that mission.
 
@@ -103,7 +120,8 @@ Interpret only the immediate result:
 - `scheduled: false` means no compaction was scheduled. Report its bounded
   reason without treating it as a workflow failure.
 - If the call raises, report that the request failed without pasting a traceback
-  or raw provider data.
+  or raw provider data. Do not automatically retry an uncertain request; inspect
+  the actual result and current state instead.
 
 In every case, the canonical `implement-task` follow-up remains independently
 queued. Do not wait for a compaction event or infer a later outcome from its

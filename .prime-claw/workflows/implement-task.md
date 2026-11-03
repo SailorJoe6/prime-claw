@@ -39,6 +39,22 @@ content refinements remain facts for semantic readiness review, not an automatic
 reapproval gate. Do not require an earlier entry or manufacture missing receipt
 evidence when current native resolution and operator authority are sufficient.
 
+The `<operator-implementation-task-observation>` block contains the complete
+provider-native task-view JSON observed while queueing this chain. Keep its
+native envelope, field names, values, and absent fields for both Backlog and
+Beads. It is factual context, not implementation approval, a frozen revision,
+or evidence that the entry tool checked lifecycle eligibility. Reread the exact
+native task before readiness decisions or mutation; judge compatible refinements
+from the current task rather than rejecting a newer observation solely because
+it differs.
+
+This editable workflow owns status and readiness decisions. Implementation
+requires `In Planning` (Beads `in_planning`) and a meaningful native
+Implementation Plan or raw Beads `design`, not status or dependency readiness
+alone. An unexpected or unmapped native status or an inadequate plan must be
+explained without mutation or creation; do not rely on entry or prep-chain code
+to reject it. Successful queue admission is not permission to create resources.
+
 ## Native lookup and explicit workspace actions
 
 A task lookup observes the selected workspace as it is. It does not prepare a
@@ -124,18 +140,22 @@ The full ordinary `prime-claw-oversee-episode` guidance is loaded above this
 workflow in the post-preparation turn. Follow it as judgment guidance. It grants
 no product, scope, merge, abandonment, cleanup, or transport authority.
 
-Only when the complete task is ready and operator authority applies, call
-`create_task_episode` exactly once with the exact canonical `taskId` and optional
+Only when the complete task is ready and operator implementation authority
+applies, call `create_task_episode` exactly once, whether readiness was reached
+through `implement_task` or directly through this guidance. Status alone never
+supplies that authority. Use the exact canonical `taskId` and optional
 stable `host` from `<operator-implementation-host>`. Pass that host unchanged as
 `id:<setup-id>`; omit it when absent. Do not supply or invent a provider, branch,
 task path, project root, worktree, session name, prompt, command, or other
 resource identity.
 
-The trusted capability independently re-resolves the live provider, exact task
-identity, provider-native status and plan/design evidence, exact project root,
-and placement before mutation. It requires no prior entry invocation, approval
-store, or turn receipt. Any invalid identity, root, native/canonical status, or
-placement rejects before creation. An explicit stable host must still be a
+The capability independently re-resolves the live provider, exact task identity,
+project root, and placement. It requires no prior entry invocation, approval
+store, or turn receipt. The lower-level create/allocation path still contains
+native status, plan/design, code-base, and publication gates pending later
+PRIMECLAW-55 work; the entry/prep-chain policy extraction does not remove them.
+Report their actual failures without bypassing them or treating code acceptance
+as the semantic readiness decision. An explicit stable host must still be a
 ready local setup and never silently falls back. Without a host, native
 placement selection chooses the sole ready local setup or presents its picker;
 ambiguity, cancellation, remote placement, or invalid inventory blocks. Direct
@@ -188,9 +208,15 @@ provider revision, code base, and resources, and reports the exact recovery
 condition. It must never retry, force, adopt, reset, use raw Dolt writes, or
 start a fresh Episode.
 
-Both provider paths create or return one durable worktree-isolated Episode with
-one fixed execute assignment. They do not inherit this Conversation transcript,
-send an initial handoff, or send a second daemon prompt.
+Both provider paths create or return one durable worktree-isolated Episode.
+Fresh creation sends one fixed initial execute assignment; an exact active
+return sends no second assignment. They do not inherit this Conversation
+transcript. Never send an initial handoff or add a second daemon prompt.
+
+The owning Conversation controls lifecycle status and disposition. The Episode
+maintains implementation, native task content, its living plan, and evidence
+within the approved scope. Do not use a generic completion/status edit from the
+Episode to bypass owner review, merge, abandonment, or cleanup decisions.
 
 Report the selected provider, canonical task ID, project root, durable Episode
 and routing identities, lifecycle engine, exact Orca setup/worktree identity
@@ -200,7 +226,10 @@ pre/post/published task views, published provider revision and ref, exact code
 `baseRef`, and recovery evidence when present. State whether the capability
 created the Episode or returned existing exact active ownership. `uncertain`,
 `provisioning`, or `Blocked` state requires inspection and must not be replayed
-as fresh creation. Do not begin implementation in the owner Conversation.
+as fresh creation. Inspect current ownership, provider, Git, runtime, and
+assignment-delivery facts before choosing any safe next step; an uncertain
+result is not evidence that nothing happened. Do not begin implementation in
+the owner Conversation.
 
 Once the tool reports success, set up one bounded heartbeat only while waiting
 for observable Episode work. Then stop without implementing or invoking

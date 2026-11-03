@@ -23,6 +23,20 @@ to this exact canonical ID within the operator's stated bounds. Delegation
 never skips design or planning. Clarify material ambiguity or new scope; do not
 require a prior invocation or a separate phase-history receipt as authority.
 
+The `<operator-plan-task-observation>` block contains the complete provider-native
+task-view JSON observed while queueing this chain. Keep its native envelope,
+field names, values, and absent fields for both Backlog and Beads. It is factual
+context, not specification approval, a frozen revision, or evidence that the
+entry tool checked lifecycle eligibility. Reread the exact native task before
+planning or mutation; judge compatible refinements from the current task rather
+than rejecting a newer observation solely because it differs.
+
+This editable workflow owns status and readiness decisions. Planning is limited
+to `In Design` or `In Planning` (Beads `in_design` or `in_planning`). An unexpected
+or unmapped native status, missing specification, or inadequate outcome/scope
+must be explained without mutation; do not rely on the entry or prep-chain code
+to reject it. Successful queue admission is not permission to advance.
+
 ## Native lookup and explicit workspace actions
 
 A task lookup observes the selected workspace as it is. It does not prepare a
@@ -83,16 +97,19 @@ concrete material defect in the approved contract.
 ### Backlog publication
 
 Before mutation, record Git status for the code checkout and selected task
-store. Require the bound task path and the task store's Git index to be clean. Use `backlog task edit` to replace that exact task's Implementation
+store. Inspect the selected task's existing edits, keep authorized same-task
+refinements, and preserve unrelated bytes and staging. Use `backlog task edit`
+to replace that exact task's Implementation
 Plan and set or retain status `In Planning` in one supported CLI operation.
 Preserve real newlines and never edit task Markdown directly. Reload through
 `backlog task view --json -- TASK-ID` and verify the exact canonical ID, bound
 path, `In Planning` status, and meaningful non-placeholder Implementation Plan.
 Verify no other task path changed and preserve the selected store topology. If
 the selected Backlog store is a validated ignored independent ordinary-Git
-clone, whether built-in or custom, require the clone clean at the direct
-published task head, commit only the bound task path inside the clone, push
-`HEAD:refs/heads/prime-claw/tasks` without force, and prove direct publication.
+clone, whether built-in or custom, commit only the bound task path inside the
+clone, push `HEAD:refs/heads/prime-claw/tasks` without force, and verify native
+publication of the selected committed task. Preserve unrelated task-store edits,
+staging, and compatible published descendants.
 Independent task publication does not require the code checkout to be clean or
 upstream-equal. Multiple Conversations may work in the same main-tracking
 checkout and drive separate Episodes concurrently; unrelated code changes,
@@ -100,12 +117,16 @@ including `.prime-claw/ownership.json`, are not a blocker. Do not write the code
 checkout's HEAD, index, or files as part of independent task publication, and
 never stash, revert, commit, or delete another Conversation's changes to satisfy
 a cleanliness check. An unrelated concurrent code change is not evidence that
-this task publication changed code. This planning policy does not bypass
-separate hard-coded lifecycle admission or status gates. Only for an actual
+this task publication changed code. Separate lower-level Episode allocation and
+publication gates remain pending later PRIMECLAW-55 work; report their actual
+failures rather than bypassing them. Only for an actual
 branch-local store, keep the existing flow: commit only the bound task path in
 the code repository, prove the commit contains no other path, and attempt one
-prompt push. A push failure is transport evidence,
-not permission to undo the valid local plan or begin implementation.
+prompt push. Commit the coherent selected-ticket plan as soon as it is ready
+and publish promptly rather than waiting for handoff or session end. A push
+failure is transport evidence, not permission to undo the valid local plan,
+retry blindly, or begin implementation. Inspect current publication facts before
+choosing a safe next step.
 
 ### Beads publication
 
@@ -131,7 +152,11 @@ working-set evidence. Require the intended meaningful raw `design`, exact
 `in_planning`/`In Planning` status, exact canonical ID, and every unrelated
 native field unchanged apart from provider-generated revision/timestamp data.
 
-Publish exactly once with `bd dolt push --no-adopt`. Then perform one native
+Commit each coherent selected-ticket update through supported native history as
+soon as it is ready; do not defer durability until handoff or session end.
+Preserve unrelated native fields, working-set changes, and history rather than
+adopting, resetting, or committing another Conversation's work. Publish promptly
+and exactly once with `bd dolt push --no-adopt`. Then perform one native
 post-publication pull/read cycle and exact publication-ref/revision proof.
 Require the published raw task to contain the verified design and
 `in_planning` status and the working set to remain clean. An unrelated-task

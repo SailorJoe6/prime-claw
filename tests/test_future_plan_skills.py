@@ -557,11 +557,28 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
     ):
         assert fragment in plan
 
-    # Both managed planning assets are reconciled exactly in this project.
-    for name in ("plan-task-prep", "plan-task"):
-        source = workflow(name)
-        tracked = ROOT / ".prime-claw" / "workflows" / f"{name}.md"
-        assert tracked.read_bytes() == source.read_bytes()
+    # Prep is uncustomized; planning keeps this project's independent-store
+    # guidance rather than requiring byte equality with the managed template.
+    tracked_prep = ROOT / ".prime-claw/workflows/plan-task-prep.md"
+    assert tracked_prep.read_bytes() == workflow("plan-task-prep").read_bytes()
+    tracked_plan = " ".join((ROOT / ".prime-claw/workflows/plan-task.md").read_text().split())
+    for policy in (plan, tracked_plan):
+        for fragment in (
+            "<operator-plan-task-observation>",
+            "complete provider-native task-view JSON",
+            "field names, values, and absent fields",
+            "This editable workflow owns status and readiness decisions",
+            "do not rely on the entry or prep-chain code to reject it",
+            "Successful queue admission is not permission to advance",
+        ):
+            assert fragment in policy
+    for customization in (
+        "record Git status for the code checkout and selected task store",
+        "Multiple Conversations may work in the same main-tracking checkout",
+        "including `.prime-claw/ownership.json`, are not a blocker",
+        "Do not write the code checkout's HEAD, index, or files",
+    ):
+        assert customization in tracked_plan
 
     extension = (
         ROOT / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.ts"
@@ -636,7 +653,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "returns the exact task to `In Planning`",
         "partial, or uncertain mutation publishes `Blocked`",
         "must never be retried as a new Episode",
-        "one fixed execute assignment",
+        "one fixed initial execute assignment",
         "Do not begin implementation in the owner Conversation",
     ):
         assert fragment in implement
@@ -650,14 +667,14 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "native status exactly `in_planning` mapped to canonical `In Planning`",
         "complete raw native view",
         "Do not invent a task path or translate it into a normalized task model",
-        "provider-native status and plan/design evidence",
+        "native status, plan/design, code-base, and publication gates pending later PRIMECLAW-55 work",
         "An explicit stable host must still be a ready local setup",
         "never retry an uncertain dispatch as fresh work",
         "published provider revision",
         "complete raw task evidence",
         "exact code `baseRef`",
         "No task path exists or may be invented",
-        "one fixed execute assignment",
+        "one fixed initial execute assignment",
         "must never retry, force, adopt, reset, use raw Dolt writes",
     ):
         assert fragment in implement
@@ -679,7 +696,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     assert 'name: "create_task_episode"' in extension
     assert "admitProviderTaskPrepChain" in extension
     assert "providerTaskResolver" in extension
-    assert "requireLiveImplementationTask" in extension
+    assert "requireLiveImplementationTask" not in extension
     assert 'name: "implement_task"' in extension
     assert 'name: "handoff_task_episode"' in extension
     assert 'name: "finalize_task_episode"' in extension

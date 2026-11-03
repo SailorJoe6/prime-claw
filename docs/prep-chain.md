@@ -26,14 +26,26 @@ Implementation requires existing `In Planning` (Beads `in_planning`) after desig
 and planning, not dependency readiness alone. No separate phase-history or prior-
 invocation proof supplements that state. Retained folder selection still requires
 an exact operator-selected location; skills do not search for or invent one.
-Both final create tools retain concrete integrity checks, not approval stores.
+Both final create tools retain exact-resource mechanics, not approval stores.
+Lower-level task lifecycle policy gates still await later PRIMECLAW-55 work;
+this entry/prep-chain slice does not claim their removal.
 
 Task planning resolves one exact task through the repository's selected native
-provider and admits only canonical `In Design` or `In Planning`. Backlog keeps
-its exact returned task path; Beads keeps its exact project root, entire
-canonical ID, native status, and complete raw view without inventing a path.
-Both planning messages carry the exact provider/root binding selected by the
-same discriminated resolver used by implementation admission. Folder-compatible
+provider without an entry-code status eligibility test. The editable `plan`
+skill and queued planning workflows decide whether the current task is
+`In Design` or `In Planning` (Beads `in_design` or `in_planning`) and has a useful
+specification. They explain unexpected or unmapped statuses and inadequate
+content without mutation. Backlog keeps its exact returned task path; Beads keeps
+its exact project root, entire canonical ID, native status, and complete raw view
+without inventing a path. Both planning messages carry the exact provider/root
+binding selected by the same discriminated resolver used by implementation
+entry, plus the complete `task.nativeView` JSON in
+`<operator-plan-task-observation>`. Both implementation messages likewise carry
+`<operator-implementation-task-observation>`, with the existing provider/root
+and Backlog-only path tags. These observations retain the full provider-native
+envelope, names, values, and absent fields. They are facts, not approval or
+frozen revision locks. Workflows reread the exact native task before acting and
+judge compatible refinements from current facts. Folder-compatible
 admission validates one exact project-relative future folder. The sole
 source-absent exception is implementation replay for the exact already-active
 version-1 owner: deterministic admission verifies its source identity, promoted
@@ -54,16 +66,21 @@ old-layout Episode can finish from its unchanged snapshot.
 | `implement_task` | wrapped `implement-task-prep`, `steer` delivery | full ordinary oversight guide followed by wrapped `implement-task` |
 
 The task-native implementation chain is registered alongside the retained folder path. Before
-it admits either message, deterministic code resolves the exact `In Planning`
-task and selects one exact ready local Orca setup. A sole setup or explicit
-stable setup ID is accepted; UI cancellation, noninteractive ambiguity, no ready
+it admits either message, code resolves the exact task and selects one exact
+ready local Orca setup. The entry skill and queued workflows, not this code,
+require current `In Planning` (Beads `in_planning`), a meaningful native plan or
+`design`, actual implementation authority, and semantic readiness. Unexpected
+statuses and inadequate plans must be explained without mutation or creation;
+a readable task and successful queue admission are not readiness. A sole setup
+or explicit stable setup ID is accepted; UI cancellation, noninteractive ambiguity, no ready
 setup, or remote placement fails without queueing a workflow. Direct local
 fallback is selected only when the production Orca command is definitively
 absent and no explicit setup was requested. Malformed or negative inventory
 responses fail closed. Placement selection performs no task, Git,
 ownership, worktree, or session mutation.
 
-For independent Backlog, implementation admission publishes `In Progress` from
+The later, lower-level create/allocation path is not extracted in this slice.
+For independent Backlog, it still publishes `In Progress` from
 the clean primary nested clone and reserves the published task revision/native
 view separately from the unchanged clean code base. Only then is the registered
 code worktree created. Its nested task clone is prepared and the exact reserved
@@ -78,7 +95,11 @@ Task-native planning updates only the selected provider-native task. Backlog
 preserves the selected topology: grandfathered stores commit only the native
 Implementation Plan task path in code history, while an independent nested store
 commits only that path on `refs/heads/prime-claw/tasks`, pushes without force,
-proves direct publication, and leaves code HEAD unchanged. Beads uses one
+verifies the selected committed task's publication, and does not write code
+HEAD, index, or files. Coherent selected-ticket edits are committed promptly and
+published before an Episode needs them. Unrelated bytes, staging, native fields,
+and compatible history descendants are preserved, not included, stashed, reset,
+or overwritten to satisfy a cleanliness check. Beads uses one
 native synchronization/read, LLM planning over the complete raw view, one
 guarded raw `design` plus `in_planning` update, one non-force publication, and
 exact native reread/publication proof; it never consults the Backlog-only queue,
@@ -113,18 +134,24 @@ A selected local fallback is reported explicitly without inventing a host ID.
 Preparation preserves the operator's actual instruction, approved scope,
 conditional implementation authority, and optional stable host through
 compaction. It cannot turn planning-only authority into implementation approval.
-The project-customizable phase policy owns semantic readiness and approval
-judgment; task lifecycle state is not supplemented by a phase-history receipt.
+The project-customizable phase policy owns lifecycle eligibility, semantic
+readiness, approval, and selected-ticket publication decisions; task status alone
+is not readiness and is not supplemented by a phase-history receipt. These rules
+live in editable entry skills and workflows, not tool prompt guidelines or
+entry/prep-chain status gates.
 
 `create_spec_episode` remains the retained folder promotion boundary or exact
 active replay return. A selected stable `id:<setup-id>` host is carried unchanged
 into final creation and revalidated, never stored privately as approval or
 silently substituted. Exact active replay must keep its recorded placement and
 resource identity. `create_task_episode(taskId, host?)` is also self-contained:
-it resolves current native provider, canonical task/root/path, `In Planning`
-state, meaningful plan, and placement without requiring any prior entry
-invocation. A carried stable host is revalidated before mutation; absent host
-uses the same safe sole-ready/picker/definitive-unavailability rules. Native
+its tool wrapper resolves current native provider, canonical task/root/path,
+and placement without requiring any prior entry invocation or repeating the
+entry-level status/plan check. The deeper create path still checks `In Planning`
+and plan evidence, alongside code-base/publication and lifecycle gates pending
+later extraction on this same task. A carried stable host is revalidated before
+mutation; absent host uses the same safe sole-ready/picker/definitive-unavailability
+rules. Native
 code retains identity, publication, ownership, reservation, session binding,
 and one fixed execute assignment checks. Invalid concrete state fails before
 lifecycle mutation; uncertainty never authorizes a duplicate admission. Successful
@@ -150,11 +177,31 @@ local facts, not proof of remote freshness or implementation authority. A native
 CLI can perform its own documented migrations; this change removes Prime Claw's
 implicit preparation, not native provider behavior.
 
-This is a bounded first slice. The entry, allocation, mutation, continuation and
-terminal code described above still contains legacy policy gates pending the
-remaining PRIMECLAW-55 slices. It does not yet claim the full lifecycle policy
-extraction or the recorded same-operation recovery is complete. No live plugin
-activation or resource recovery is part of this change.
+## Entry and prep-chain policy extraction (PRIMECLAW-55 second slice)
+
+For both Backlog and Beads, task planning and implementation entry/prep-chain
+code now supplies factual native observations rather than enforcing lifecycle
+eligibility. The duplicate implementation status/plan wrapper check is removed
+from the final task-create tool as well. Authority, bounded selection, eligible
+native statuses, meaningful specification/plan content, selected-ticket native
+commit/publication, and terminal routing guidance live in editable Markdown.
+Successful admission queues work; it is not completed compaction, readiness, or
+creation. The caller stops after admission. Uncertainty calls for inspection of
+current facts, never blind delivery retry or fresh duplicate allocation.
+
+Placement inventory resolution is unchanged. Carry the exact selected optional
+stable host through readiness and final creation; do not silently substitute it.
+Fresh Episode creation has one initial execute assignment, not an initial
+handoff or a second prompt. The owner retains lifecycle/disposition decisions;
+the Episode maintains implementation and native task content, plan, and evidence.
+
+This is a bounded second slice, not complete lifecycle extraction. Deeper
+`createTaskEpisode`, allocation, status mutation/publication, handoff, oversight,
+block/resume, merge/abandonment, and finalization/cleanup code still contains
+policy gates pending later work on the same PRIMECLAW-55 task. Their failures
+remain truthful native/code evidence, not permission to bypass them. Retained
+folder workflows and existing workflow loading are unchanged. No new protocol,
+approval receipt, live activation, or same-operation resource recovery is claimed.
 
 ## Validation policy
 

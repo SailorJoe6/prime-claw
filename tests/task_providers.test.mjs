@@ -670,7 +670,7 @@ test("linked Beads discovery blocks missing, forged, and foreign native context 
   }
 });
 
-test("real Beads 1.3.1 resolves one task, supports direct create, and rejects later native status drift", { timeout: 60_000 }, async () => {
+test("real Beads 1.3.1 resolves one task and dispatches direct create with later native status facts", { timeout: 60_000 }, async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-real-linked-beads-")));
   const primary = join(root, "primary");
   const linked = join(root, "linked");
@@ -792,8 +792,9 @@ test("real Beads 1.3.1 resolves one task, supports direct create, and rejects la
       { projectRoot: realpathSync(primary), host: undefined },
     ]);
 
-    // The creation action is mocked above; prove the real native reread, not
-    // the removed invocation-proof store, blocks a task that left In Planning.
+    // The creation action is mocked above. A real native status reread must
+    // reach that action without a duplicate wrapper eligibility policy. The
+    // deeper native creation primitive is not exercised or changed here.
     run("bd", ["update", created.id, "--status", "in_progress"]);
     const progressed = JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"]));
     assert.equal(progressed[0].status, "in_progress");
@@ -802,10 +803,11 @@ test("real Beads 1.3.1 resolves one task, supports direct create, and rejects la
     const replay = await tools.get("create_task_episode").execute(
       "real-beads-replay", { taskId: created.id }, undefined, undefined, ctx,
     );
-    assert.equal(replay.isError, true);
-    assert.match(replay.content[0].text, /implementation requires In Planning/);
-    assert.equal(creates.length, 1);
-    assert.equal(placements.length, 2);
+    assert.equal(replay.isError, undefined);
+    assert.deepEqual(creates[1], { taskId: created.id, toolCallId: "real-beads-replay", placement: { engine: "local" } });
+    assert.equal(creates.length, 2);
+    assert.equal(placements.length, 3);
+    assert.equal(sent.length, 2);
     assert.deepEqual(JSON.parse(run("bd", ["show", created.id, "--json", "--long", "--include-comments"])), progressed);
   } finally {
     try { run("bd", ["dolt", "stop"]); } catch {}

@@ -50,9 +50,6 @@ import {
   assertGrandfatheredLegacySpecificationFile,
 } from "../extension-support/legacy-specification-inventory.ts";
 import { assertLiveLegacyEpisodeFiles } from "../extension-support/legacy-workflow.ts";
-import {
-  type ProviderTaskResolution,
-} from "../extension-support/task-providers.ts";
 
 function asBacklogProviderResolver(
   resolver: (cwd: string, rawTaskId: string) => BacklogTaskSelection | null,
@@ -75,7 +72,7 @@ function taskProviderResolver(
  * Native reviewed planning and implementation-promotion boundaries.
  *
  * Skills own semantic authority and readiness in customizable Markdown.
- * Tools enforce concrete identity, state and safe canonical workflow loading. They
+ * Tools resolve task identity and load canonical workflows. They
  * expose no arbitrary command, prompt, branch, worktree, or session controls.
  */
 
@@ -94,7 +91,6 @@ const PLAN_TASK_PREP_WORKFLOW: TaskPrepChainWorkflow = {
   prepSkillName: "plan-task-prep",
   phaseSkillName: "plan-task",
   locationTag: "operator-plan-task-id",
-  allowedStatuses: ["In Design", "In Planning"],
 };
 const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
   usage: IMPLEMENT_USAGE,
@@ -102,13 +98,12 @@ const IMPLEMENT_PREP_WORKFLOW: PrepChainWorkflow = {
   phaseSkillName: "implement-spec",
   locationTag: "operator-implementation-location",
 };
-const IMPLEMENT_TASK_USAGE = "implement_task requires one exact provider-native In Planning task ID and optional stable id:<project-host-setup-id> host";
+const IMPLEMENT_TASK_USAGE = "implement_task requires one exact provider-native task ID and optional stable id:<project-host-setup-id> host";
 const IMPLEMENT_TASK_PREP_WORKFLOW: TaskPrepChainWorkflow = {
   usage: IMPLEMENT_TASK_USAGE,
   prepSkillName: "implement-task-prep",
   phaseSkillName: "implement-task",
   locationTag: "operator-implementation-task-id",
-  allowedStatuses: ["In Planning"],
 };
 
 
@@ -163,9 +158,6 @@ async function admitTaskPlanningPrepChain(
       if (task.provider === "beads" && task.taskId !== exactInput) {
         throw new Error(`Beads task ${exactInput} resolved to a different canonical ID ${task.taskId}`);
       }
-      if (task.provider === "beads" && task.nativeStatus !== "in_design" && task.nativeStatus !== "in_planning") {
-        throw new Error(`Beads task ${task.taskId} must be In Design/in_design or In Planning/in_planning for planning`);
-      }
     },
     undefined,
     "planning",
@@ -197,9 +189,6 @@ async function admitTaskImplementationPrepChain(
       if (task.provider === "beads" && task.taskId !== taskId) {
         throw new Error(`Beads task ${taskId} resolved to a different canonical ID ${task.taskId}`);
       }
-      if (task.provider === "beads" && task.nativeStatus !== "in_planning") {
-        throw new Error(`Beads task ${task.taskId} must be In Planning/in_planning for implementation admission`);
-      }
       const resolvePlacement = dependencies.placementResolver ?? resolveTaskEpisodePlacement;
       placement = await resolvePlacement(task.projectRoot, selectedHost, callCtx, dependencies.placement);
     },
@@ -214,7 +203,11 @@ ${task.provider}
 
 <operator-implementation-task-project-root>
 ${task.projectRoot}
-</operator-implementation-task-project-root>`;
+</operator-implementation-task-project-root>
+
+<operator-implementation-task-observation>
+${JSON.stringify(task.nativeView)}
+</operator-implementation-task-observation>`;
       const path = task.provider === "backlog" ? `
 
 <operator-implementation-task-path>
@@ -450,24 +443,6 @@ type TaskEpisodeCleanupParams = {
   outcome: TaskEpisodeCleanupOutcome;
 };
 
-function requireLiveImplementationTask(selection: ProviderTaskResolution): void {
-  if (selection.status !== "In Planning") {
-    throw new Error(`Task ${selection.taskId} is ${selection.status}; implementation requires In Planning`);
-  }
-  if (selection.provider === "beads") {
-    if (selection.nativeStatus !== "in_planning") {
-      throw new Error(`Beads task ${selection.taskId} must remain In Planning/in_planning`);
-    }
-    if (typeof selection.nativeView.design !== "string" || !selection.nativeView.design.trim()) {
-      throw new Error(`Beads task ${selection.taskId} has no readable provider-native design`);
-    }
-    return;
-  }
-  if (typeof selection.implementationPlan !== "string" || !selection.implementationPlan.trim()) {
-    throw new Error(`Backlog task ${selection.taskId} has no readable Implementation Plan`);
-  }
-}
-
 function placementHost(placement: TaskEpisodeAdmissionOptions): string | undefined {
   return placement.engine === "orca" ? `id:${placement.projectSetupId}` : undefined;
 }
@@ -569,21 +544,15 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "plan_task",
       label: "Plan reviewed provider-native task",
-      description: "Queue the canonical task-native planning workflow for one exact provider-native task in In Design or In Planning. Planning alone never authorizes implementation. Skills preserve any explicit conditional implementation authority.",
-      promptSnippet: "Queue canonical planning for one exact reviewed provider-native task",
-      promptGuidelines: [
-        "Use the plan skill to interpret planning authority and bind one exact provider-native task ID before calling plan_task.",
-        "The task may be operator-selected or selected within explicit bounded delegation; clarify material ambiguity before calling and never infer open-ended selection authority.",
-        "plan_task accepts only In Design or In Planning and creates no Episode resources. Planning alone does not authorize implementation; skills own conditional phase-advancement authority.",
-        "Treat plan_task as a terminal routing action: after successful admission, do not continue planning in the current turn.",
-      ],
+      description: "Queue the canonical planning workflows for one provider-native task ID.",
+      promptSnippet: "Queue task-native planning workflows",
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
           taskId: {
             type: "string",
-            description: "Exact provider-native task ID bound by the skill within operator authority",
+            description: "Provider-native task ID",
           },
         },
         required: ["taskId"],
@@ -601,7 +570,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         return {
           content: [{
             type: "text",
-            text: `Planning admitted for ${result.taskId}: canonical plan-task-prep was steered and canonical plan-task was queued as the sole follow-up. Planning has not completed. This admission adds no implementation authority; the skills retain any explicit conditional instruction.`,
+            text: `Planning admitted for ${result.taskId}: canonical plan-task-prep was steered and canonical plan-task was queued as the sole follow-up. Planning has not completed.`,
           }],
           details: { admitted: true, taskId: result.taskId },
         };
@@ -611,20 +580,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "implement_task",
       label: "Review task implementation readiness",
-      description: "Queue canonical implementation readiness for one exact provider-native In Planning task. The managed skill evaluates approval and readiness before creating an Episode; admission alone creates no resources.",
-      promptSnippet: "Queue canonical implementation readiness for one exact planned provider-native task",
-      promptGuidelines: [
-        "Use implement_task for an explicit implementation request, including a conditional request to implement only if ready.",
-        "An exact task may be operator-selected or selected within an explicit bounded delegation restricted to In Planning; never infer open-ended selection authority.",
-        "If the task or delegated boundary is materially ambiguous, ask before calling. The managed skill owns semantic approval and readiness.",
-        "Pass an optional stable id:<project-host-setup-id> host only when selected; otherwise resolve placement before delivery. Preserve the selected host through readiness and final creation.",
-        "Treat admission as terminal routing, not readiness or creation completion. On delivery uncertainty, inspect current state and never retry automatically.",
-      ],
+      description: "Queue the canonical implementation-readiness workflows for one provider-native task ID and optional placement.",
+      promptSnippet: "Queue task-native implementation-readiness workflows",
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
-          taskId: { type: "string", description: "Exact provider-native In Planning task ID selected by the operator or within explicit bounded delegation" },
+          taskId: { type: "string", description: "Provider-native task ID" },
           host: { type: "string", description: "Optional stable id:<project-host-setup-id> placement" },
         },
         required: ["taskId"],
@@ -747,21 +709,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "create_task_episode",
       label: "Create task Episode",
-      description: "Create one isolated Episode for an exact implementation-ready provider-native In Planning task. Resolve the live task and placement directly; no prior command or entry-tool invocation proof is required.",
-      promptSnippet: "Create one exact task-native Episode after implementation readiness succeeds",
-      promptGuidelines: [
-        "Call create_task_episode exactly once after the managed implementation readiness skill approves its exact In Planning task, whether entered through implement_task or directly through the skill.",
-        "Semantic authority comes from the operator's explicit implementation request, including a conditional request or explicit bounded delegated selection among In Planning tasks; never infer authority from task status alone.",
-        "Pass the exact canonical task ID and the same optional stable host carried by readiness. This tool independently resolves the current provider, task, and safe placement; no prior invocation proof or content-revision approval receipt is required.",
-        "The host validates primary-main, native task state and required plan evidence, publishes In Progress, reserves ownership before allocation, creates one Episode, and sends one fixed execute assignment; never add an initial handoff or second assignment.",
-        "Treat uncertain or partial creation as a blocker. Never retry it as a fresh Episode.",
-      ],
+      description: "Create a task-native Episode for one canonical task ID and optional placement.",
+      promptSnippet: "Create one task-native Episode",
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
-          taskId: { type: "string", description: "Exact canonical provider-native In Planning task ID approved by the managed readiness skill" },
-          host: { type: "string", description: "Optional stable id:<project-host-setup-id> selected during readiness" },
+          taskId: { type: "string", description: "Canonical provider-native task ID" },
+          host: { type: "string", description: "Optional stable id:<project-host-setup-id> placement" },
         },
         required: ["taskId"],
         additionalProperties: false,
@@ -780,13 +735,9 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           if (task.taskId !== params.taskId) {
             throw new Error(`Task ${params.taskId} resolved to a different canonical ID ${task.taskId}`);
           }
-          requireLiveImplementationTask(task);
           const resolvePlacement = dependencies?.placementResolver ?? resolveTaskEpisodePlacement;
           const placement = await resolvePlacement(task.projectRoot, params.host, ctx, dependencies);
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
-          // The provider-native admission primitive re-resolves exact root/path,
-          // status and plan under its lock, proves primary-main, reserves this
-          // owner's identity, and revalidates placement before allocation.
           const result = await actions.create(task.taskId, toolCallId, ctx, dependencies, placement);
           return {
             content: [{

@@ -26,9 +26,7 @@ export type PrepChainAdmissionResult =
   | { ok: true; location: string }
   | { ok: false; message: string; level: "warning" | "error"; deliveryUncertain?: true; stage?: "first" | "followUp" };
 
-export interface TaskPrepChainWorkflow extends PrepChainWorkflow {
-  allowedStatuses: readonly string[];
-}
+export type TaskPrepChainWorkflow = PrepChainWorkflow;
 
 export type TaskPrepChainAdmissionResult =
   | { ok: true; taskId: string; taskPath: string; projectRoot: string }
@@ -52,7 +50,11 @@ ${selection.provider}
 
 <operator-plan-task-project-root>
 ${selection.projectRoot}
-</operator-plan-task-project-root>`;
+</operator-plan-task-project-root>
+
+<operator-plan-task-observation>
+${JSON.stringify(selection.nativeView)}
+</operator-plan-task-observation>`;
   return selection.provider === "backlog"
     ? `${common}
 
@@ -198,7 +200,7 @@ export async function admitPrepChain(
   );
 }
 
-/** Admit task-native planning only for one exact Backlog task in an allowed state. */
+/** Load the planning chain and native task context for one exact Backlog task. */
 export async function admitTaskPrepChain(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
@@ -220,13 +222,6 @@ export async function admitTaskPrepChain(
     };
   }
   if (!selected) return { ok: false, message: workflow.usage, level: "warning" };
-  if (!workflow.allowedStatuses.includes(selected.status)) {
-    return {
-      ok: false,
-      message: `Task ${selected.taskId} is ${selected.status}; plan_task accepts only ${workflow.allowedStatuses.join(" or ")}.`,
-      level: "warning",
-    };
-  }
   if (preflight) {
     try {
       await preflight(ctx, selected);
@@ -247,6 +242,7 @@ export async function admitTaskPrepChain(
     source,
     undefined,
     phasePreamble,
+    planningProviderPromptContext({ provider: "backlog", ...selected }),
   );
   return result.ok ? {
     ok: true,
@@ -287,13 +283,6 @@ export async function admitProviderTaskPrepChain(
     };
   }
   if (!selected) return { ok: false, message: workflow.usage, level: "warning" };
-  if (!workflow.allowedStatuses.includes(selected.status)) {
-    return {
-      ok: false,
-      message: `Task ${selected.taskId} is ${selected.status}; ${purpose === "planning" ? "plan_task" : "implementation"} accepts only ${workflow.allowedStatuses.join(" or ")}.`,
-      level: "warning",
-    };
-  }
   if (preflight) {
     try {
       await preflight(ctx, selected);

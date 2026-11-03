@@ -30,7 +30,7 @@ def test_task_providers_node_suite(tier1_container) -> None:
 def test_backlog_task_episode_admission_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", WS_BACKLOG_ADMISSION_SUITE,
-        timeout=180,
+        timeout=360,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

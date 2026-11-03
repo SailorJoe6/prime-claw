@@ -29,8 +29,13 @@ native tasks. Select implementation work only from `In Planning` (Beads native
 `in_planning`) after design and planning, not from dependency readiness alone or
 the highest-priority open task. Selection does not skip either phase. Verify a
 meaningful native Implementation Plan or Beads `design`; the project workflow
-still performs the full semantic readiness review. If the task or delegated
-bounds are materially unclear, ask instead of guessing.
+still performs the full semantic readiness review. Apply the same rule to an
+operator-selected task. If the native status is not `In Planning`/`in_planning`,
+is unmapped, or the plan/design is missing or placeholder-only, explain the
+current native facts and stop without mutation or admission. Do not rely on code
+to refuse an ineligible task. Status, dependency readiness, and successful queue
+admission alone establish neither authority nor implementation readiness. If the
+task or delegated bounds are materially unclear, ask instead of guessing.
 
 ## Selected-ticket durability before creation
 
@@ -60,10 +65,12 @@ back to another setup or local execution.
 The tool queues preparation and one canonical readiness follow-up. Admission is
 not proof of compaction, readiness, or Episode creation. On successful admission,
 end the turn so those queued workflows can run. On failure or uncertainty,
-report the actual result; do not automatically retry, create another Episode,
-or send an initial handoff or second execute assignment. Native identity,
-lifecycle state, readiness, placement, ownership, and resource checks remain in
-force without requiring proof of a particular earlier invocation sequence.
+report the actual result and inspect current delivery, ownership, provider, and
+resource facts; do not automatically retry, create another Episode, or send an
+initial handoff or second execute assignment. Carry the exact selected host
+unchanged through readiness and final creation. The workflows own lifecycle
+eligibility and readiness decisions; native operations and resource checks do
+not replace them or require proof of a particular earlier invocation sequence.
 
 Custom slash commands are not workflow prerequisites. Retained version-1
 workflows, ownership, plans, and resources remain supported. This skill grants

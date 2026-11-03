@@ -174,6 +174,28 @@ def test_compact_first_workflows_and_normal_guide_load_are_explicit() -> None:
     assert "activation, disclosure, receipt, or readiness-confirmation step" in " ".join(implement.split())
 
 
+def test_task_entry_code_loads_native_facts_without_status_or_plan_policy() -> None:
+    extension = EXTENSION.read_text()
+    prep = (REPO / "src/prime-agent-plugin/extension-support/prep-chain.ts").read_text()
+    assert "allowedStatuses" not in extension
+    assert "allowedStatuses" not in prep
+    assert "requireLiveImplementationTask" not in extension
+    assert "accepts only" not in prep
+    assert "task.nativeStatus !==" not in extension
+    assert "<operator-plan-task-observation>" in prep
+    assert "JSON.stringify(selection.nativeView)" in prep
+    assert "<operator-implementation-task-observation>" in extension
+    assert "JSON.stringify(task.nativeView)" in extension
+
+    for name in ("plan_task", "implement_task", "create_task_episode"):
+        start = extension.index(f'name: "{name}"')
+        metadata = extension[start:extension.index("async execute", start)]
+        assert "promptGuidelines" not in metadata
+        assert "In Planning" not in metadata
+        assert "In Design" not in metadata
+        assert "implementation-ready" not in metadata
+
+
 def test_creation_policy_matches_frozen_orca_boundary() -> None:
     source = EPISODE_EXTENSION.read_text()
     for phrase in (

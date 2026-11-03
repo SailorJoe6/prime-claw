@@ -24,6 +24,20 @@ follow-up. This prep turn cannot cancel, replace, reconstruct, retry, or invoke
 that workflow. Do not run `prepare`; the queued planning turn performs the
 provider-appropriate orientation after the context boundary.
 
+The `<operator-plan-task-observation>` block contains the complete provider-native
+task-view JSON observed while queueing this chain. Keep its native envelope,
+field names, values, and absent fields for both Backlog and Beads. It is factual
+context, not specification approval, a frozen revision, or evidence that the
+entry tool checked lifecycle eligibility. Reread the exact native task before
+planning or mutation; judge compatible refinements from the current task rather
+than rejecting a newer observation solely because it differs.
+
+This editable workflow owns status and readiness decisions. Planning is limited
+to `In Design` or `In Planning` (Beads `in_design` or `in_planning`). An unexpected
+or unmapped native status, missing specification, or inadequate outcome/scope
+must be explained without mutation; do not rely on the entry or prep-chain code
+to reject it. Successful queue admission is not permission to advance.
+
 ## Native lookup and explicit workspace actions
 
 A task lookup observes the selected workspace as it is. It does not prepare a
@@ -68,9 +82,9 @@ semantic readiness decision.
 If the sniff passes, reason from your current conversation context and compose
 a concise `focus_hint` to plan the selected task. Keep the selected provider,
 project root, canonical ID, native status, relevant specification context, and
-complete raw Beads view when applicable. Provider observations are factual
-context, not semantic acceptance. Preserve the exact binding, approved scope,
-actual operator instruction, and any conditional implementation authority.
+complete provider-native observation for either provider. Provider observations
+are factual context, not semantic acceptance. Preserve the exact binding,
+approved scope, actual operator instruction, and any conditional implementation authority.
 A planning-only request must remain planning-only. Use your judgment to decide
 what context will be most useful for that mission.
 
@@ -87,7 +101,8 @@ Interpret only the immediate result:
 - `scheduled: false` means no compaction was scheduled. Report its bounded
   reason without treating it as a workflow failure.
 - If the call raises, report that the request failed without pasting a traceback
-  or raw provider data.
+  or raw provider data. Do not automatically retry an uncertain request; inspect
+  the actual result and current state instead.
 
 In every case, the canonical `plan-task` follow-up remains independently
 queued. Do not wait for a compaction event or infer a later outcome from its
