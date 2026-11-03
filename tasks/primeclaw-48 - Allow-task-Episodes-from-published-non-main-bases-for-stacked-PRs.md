@@ -4,13 +4,21 @@ title: Allow task Episodes from published non-main bases for stacked PRs
 status: In Progress
 assignee: []
 created_date: '2026-10-30 23:31'
-updated_date: '2026-11-03 18:39'
+updated_date: '2026-11-03 18:48'
 labels: []
 dependencies: []
 references:
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
   - src/prime-agent-plugin/workflows/implement-task.md
+documentation:
+  - docs/evidence/primeclaw-48-integration-target-foundation-20261103.md
+modified_files:
+  - docs/conversation-driven-episode-oversight.md
+  - docs/evidence/primeclaw-48-integration-target-foundation-20261103.md
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
+  - tests/task_episode_ownership_extension.test.mjs
 priority: p1
 type: bug
 ordinal: 133000
@@ -85,6 +93,10 @@ Current source at `fe61016a5eab4a41f7d10fe3ca3996d3bb0d3fc8` confirms literal-ma
 6. **Prove the change with existing disposable suites.** Extend `tests/task_episode_admission_extension.test.mjs` and `tests/beads_task_episode_admission_extension.test.mjs`: accept a clean published feature/stack base without losing its commits, retain the exact base/target through one isolated allocation, support a default branch named `master` or another non-main name, and replace the obsolete “primary non-main rejects” assertion while retaining linked-worktree rejection. Add focused pre-mutation detached/unsafe or branch-drift rejection assertions with unchanged task/ownership/resources. Extend existing ownership/handoff/blocked/close cases to show target retention, normal same-branch advancement, rejection of wrong-target cleanup, and correct merged/abandoned terminal ancestry/publication on the feature target. Retain old version-2 missing-target, provider-switch field preservation, forbidden active-target mutation and version-1 compatibility coverage and local/Orca identity coverage without creating a broad cross-product matrix. Review skill wording as content; add no test of whether the LLM asked or the user confirmed.
 
 Run affected Node behavior suites only through their existing Docker Tier-1 pytest bridges (`tests/test_task_providers.py`, `tests/test_reviewed_plan_extension.py`), plus relevant policy/docs checks. After every plugin-source change run the required Tier-1 validation, such as `scripts/test-tier1.sh --probe` or `python3 -m pytest tests/ -q -m container`. Record actual results and any blockers in the native task during the later implementation Episode; do not claim tests have run during planning. Keep documentation and acceptance evidence current, commit/push the reviewed implementation candidate, then return it to the owning Conversation for review. Merge, abandonment, activation/restart and cleanup remain separate lifecycle decisions, not consequences of this plan.
+
+## Execute checkpoint: slice 1 (2026-11-03)
+
+Step 2 ownership foundation is implemented and Docker-validated in code candidate 82a307079b9a5034303a8705337d3eb337791351. integrationBranch remains optional for old records/callers and the compatibility target is main. Public admission is not changed yet. Continue with steps 1, 3 and 4 as the next coherent target-aware admission/lifecycle slice; then complete step 5 managed guidance and step 6 non-main admission/terminal acceptance. Exact evidence and the unchanged static-test path limitation are in Implementation Notes and the linked evidence doc. Stop for owner review after this one slice.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -97,4 +109,22 @@ Bound Episode: `01a1a2b3-da23-77ee-8519-83f2e4a79e73`, owning Conversation `01a1
 This bounded pass implements plan step 2 only: task-only optional `integrationBranch`, explicit native Git ref validation, legacy missing-field effective target `main`, immutable effective target for a live owner, and reservation/provider-switch/evidence retention tests. Existing public callers remain compatible. Public admission is still main-only in this staged slice; enabling non-main admission and switching all downstream lifecycle checks together are the next slice. The skill-only stacking check-in and full lifecycle/docs acceptance remain pending. No acceptance criterion is claimed complete by this foundation alone. No live ownership rewrite, provider switch, foreign task mutation, installed/global refresh, merge, terminal publication or cleanup is authorized/performed.
 
 Validation and exact publication evidence will be appended after the candidate is ready.
+
+## Slice 1 completed and published (2026-11-03)
+
+Code candidate: `82a307079b9a5034303a8705337d3eb337791351` on `JLanders/prime-claw-primeclaw-48-episode-97fc9b02`, non-force pushed; direct remote head equals that SHA. Code checkout is clean and up to date with its own upstream. Only five approved code/docs/test paths changed; task history is not in the code DAG. Evidence: `docs/evidence/primeclaw-48-integration-target-foundation-20261103.md`.
+
+Delivered: task-only optional integrationBranch across all version-2 ownership shapes and all three reservation inputs/factories; native Git branch/ref validation; effectiveTaskEpisodeIntegrationBranch with omitted-field-only main fallback; live effective-target immutability, including refusal of feature-target deletion; representative provider-switch/rollback/route/evidence retention regression coverage. Existing public callers remain compatible; version-1 does not gain this task field. No live ownership rewrite occurred.
+
+Actual validation:
+- scripts/test-tier1.sh --probe: exit 0, offline apply/check plus RPC probe passed, network absent, teardown verified, manifest published. Evidence .test-results/20261103T184113Z-62440-fcbcc1a5/tier1/manifest.json.
+- python3 -m pytest tests/test_task_providers.py tests/test_reviewed_plan_extension.py::test_task_episode_ownership_node_suite tests/test_reviewed_plan_extension.py::test_spec_episode_node_suite tests/test_reviewed_plan_extension.py::test_episode_close_node_suite -q -m container: 7 passed, 3 deselected in 356.25s. Evidence .test-results/20261103T184121Z-63056-69b1f777/tier1/manifest.json. Both Docker runs captured repository hash aae13124f2eb03e6044c94642ce7181d93090c2bd2b92a7e92fb7d303b0b9fad.
+- python3 -m pytest tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q: NOT GREEN; 1 failed, 11 passed, 10 skipped. Unchanged test test_repository_status_cutover_uses_task_native_order_without_to_do reads absent backlog/config.yml rather than the independent .backlog config. The test is byte-identical to the admission base and neither config path is tracked there. No separate baseline execution claimed and no unrelated fixture/topology repair made. Full output .test-results/primeclaw-48-binding-slice1/focused-static.log.
+- git diff --check: passed.
+
+The Docker source selector points only to the documented clean read-only cwd-fix-v0.9.8-r1 source; exact tag/commit/tree/lockfile identities and immutable image IDs are in the tracked evidence note. No Prime Agent source modification, candidate host/global execution or activation occurred.
+
+At final task-write preparation, independent history advanced from 0adba82d1caeed1d9dd62a16a17442a0f6067e93 to 0a85356dc374d6c90f2961c03296469aa0a22472 only through unrelated task changes. The complete PRIMECLAW-48 native task view remained unchanged. This update preserves those unrelated changes, the task identity, parent, status and specification; it updates only owner-authored plan checkpoint, notes, documentation and modified-file fields.
+
+STOP after this slice for owning Conversation review/continuation. Public admission is still main-only. Next: skill-only stacking check-in, fresh current branch capture/reservation and all downstream target lifecycle checks together, then focused non-main admission/terminal evidence and managed-instruction alignment. No whole-task AC checked, no final whole-task completion claim, no merge/Ready for Merge/Done/archive/cleanup. Task remains In Progress.
 <!-- SECTION:NOTES:END -->
