@@ -6,7 +6,7 @@ title: >-
 status: In Planning
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 19:16'
+updated_date: '2026-11-03 19:24'
 labels: []
 dependencies: []
 references:
@@ -113,7 +113,7 @@ In `spec-episode.ts`, `prep-chain.ts`, tool entry callbacks and ownership helper
 ### 3. Apply the same extraction to every Beads path
 Remove the Beads-specific eligibility, clean-whole-working-set, exact local/remote/paired-revision, frozen task-content, status/design and code-head gates in provider reads/transport, creation/reservation, continuation/evidence advancement and terminal cleanup. Relevant seams include `checkBeadsCapabilities`, `prepareSelectedBeadsWorkspaceTransport`, `exactBeadsAdmissionTask`, `proveBeadsAdmissionCodeHead`, `reservePublishedBeadsTaskEpisodeOwnership`, `advancePublishedBeadsTaskEpisodeEvidence`, `mutateAndPublishBeadsTaskStatus` and terminal-task readers. Do not leave Beads behind after fixing Backlog.
 
-Supply complete current native long task views, native status/catalog, working-set and publication observations as facts, including unmapped/closed statuses and field absence; do not hide them behind a canonical-status refusal or fabricate a Backlog path/normalized mirror. Ensure fresh native context reaches initial execute and subsequent stage guidance without creating another store or assignment. Native CLI conditions may be executed when explicitly requested by the LLM; they are not hidden plugin transition rules.
+Obtain only the native observations needed for the current stage through existing interfaces. Do not build a universal observation layer, cached snapshot schema, or repeated whole-store publication-proof pipeline. When reading a task, preserve its complete native long view, status and field absence, including unmapped/closed statuses; do not hide them behind a canonical-status refusal or fabricate a Backlog path/normalized mirror. Ensure fresh native context reaches initial execute and subsequent stage guidance without creating another store or assignment. Native CLI conditions may be executed when explicitly requested by the LLM; they are not hidden plugin transition rules.
 
 ### 4. Make lifecycle decisions and ticket durability explicit in Markdown
 Move status-transition orchestration and failure disposition out of code. In particular, code must not choose automatic rollback to In Planning versus Blocked from an exception, decide semantic compatibility of observations, or decide terminal eligibility before exposing current facts. Existing owner guidance directs native provider/Git commands for status, blockers/resume, Ready/Request Changes, merge/abandonment and cleanup. Preserve Conversation status ownership, Episode content ownership and read-only Expert review. Explicit operator merge/abandonment authority and automatic exact cleanup after its published terminal outcome remain the same; moving the rules grants no new authority.
