@@ -1,4 +1,117 @@
 {
   "schemaVersion": 1,
-  "owners": {}
+  "owners": {
+    "01a1363a-e0f9-7628-aee4-81b03eb1e3fb": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "uncertain",
+      "operationId": "b0133363-514c-419e-affc-7fc4b1042d90",
+      "engine": "orca",
+      "ownerSessionId": "01a1363a-e0f9-7628-aee4-81b03eb1e3fb",
+      "taskId": "PRIMECLAW-53",
+      "taskPath": ".backlog/tasks/primeclaw-53 - Remove-code-cleanliness-gates-from-independent-Backlog-authoring-guidance.md",
+      "providerRevision": "d3ce788ca752d649947eaa2175e5971fdd368e32",
+      "taskEvidence": {
+        "schemaVersion": 1,
+        "kind": "task-view",
+        "task": {
+          "id": "PRIMECLAW-53",
+          "title": "Remove code cleanliness gates from independent Backlog authoring guidance",
+          "status": "In Progress",
+          "type": "docs",
+          "priority": "p2",
+          "project": null,
+          "assignees": [],
+          "reporter": null,
+          "labels": [],
+          "milestone": null,
+          "parentTaskId": null,
+          "acceptanceCriteriaCompleted": 0,
+          "acceptanceCriteriaCount": 5,
+          "references": [
+            "src/prime-agent-plugin/skills/project-templates/design.md",
+            "src/prime-agent-plugin/skills/project-templates/spec-it-out.md"
+          ],
+          "modifiedFiles": [],
+          "ordinal": 138000,
+          "createdAt": "2026-11-02T22:00:00Z",
+          "updatedAt": "2026-11-03T00:10:00Z",
+          "dueDate": null,
+          "isReady": true,
+          "path": ".backlog/tasks/primeclaw-53 - Remove-code-cleanliness-gates-from-independent-Backlog-authoring-guidance.md",
+          "description": "## Outcome and authority\nCorrect the canonical and globally delivered Markdown authoring templates so an independent Backlog task store can create, revise and publish tasks without requiring its parent code repository to be clean or upstream-equal. Joe explicitly authorized this bounded documentation correction and global template delivery through ADAPT / Adapt-Hand Expert. His exact instruction was: “We need to fix the skill to make it clear there's no such requirement. We need the fix to be in the global template from prime-claw as well as our local skill file. work with Prime-Claw expert to get that into the global template, fix it locally, delete the unnecessary symlink, commit the .gitignore, create the ticket.”\n\nAdapt-Hand Expert owns ADAPT local changes and reports them completed separately. This Prime-Claw task owns only the source/global Markdown fix. ADAPT-1 is not this work item. Completed PRIMECLAW-51 is not reopened and no terminal Episode may be borrowed. Joe has selected the behavior and replacement wording; no further product-definition approval is needed merely because this request is recorded as a task. The request includes bounded implementation, required safe validation and publication/global Markdown delivery, not a broad runtime refresh or restart. Normal lifecycle/resource admission gates remain in force.\n\n## Confirmed defect and scope\nBoth src/prime-agent-plugin/skills/project-templates/design.md and spec-it-out.md, in Verify and publish exactly once → Backlog, require canonical code HEAD clean and upstream-equal even for an ignored independent ordinary-Git task store. The nearby unqualified Git-index cleanliness language is also ambiguous. Correct these equivalent authoring sections only; inspect other directly equivalent authoring guidance solely to prevent contradiction, not for a broader refactor.\n\nThe following replacement is the exact final ADAPT local block, with pre-write timing confirmed by Adapt-Hand Expert and Prime-Claw51. Use the same semantics and wording in both canonical templates:\n\n### Backlog\n\nBefore mutation, record Git status in the code repository and the selected task\nstore. Require the selected existing task path and the selected task store's\nGit index to be clean; do not apply task-store cleanliness checks to a separate\nparent code repository. After creation or revision, reload the exact task\nthrough `backlog task view --json -- TASK-ID` and verify its canonical ID,\n`In Design` status, meaningful Description, native Acceptance Criteria, and\nreturned regular task path. Verify no path other than that exact returned task\npath was newly changed in the task store and do not stage unrelated pre-existing\nchanges.\n\nPreserve the selected store topology. If the selected Backlog store is a\nvalidated ignored independent ordinary-Git clone, whether built-in or custom,\nbefore the native task write require the independent clone to be clean and at\nthe directly proved `refs/heads/prime-claw/tasks` head. After the native task\nwrite, verify only the exact intended task path changed, commit only that path\ninside the clone, push `HEAD:refs/heads/prime-claw/tasks` without force, and prove\nthe direct remote head. There is no requirement for the parent code repository to be clean\nor upstream-equal for task creation, revision, or task-store publication.\nUnrelated staged, unstaged, or untracked code changes and code-branch divergence\nare not blockers. Preserve the parent code HEAD, index, and worktree as found;\nnever commit, stash, reset, clean, or otherwise repair code changes to enable a\ntask-only operation. This does not relax separate implementation or Episode\nadmission requirements.\nOnly for an actual branch-local store, keep the existing flow: commit only the\nreturned task path in the code repository, prove the commit contains no other\npath, and attempt one prompt push when a remote is available. A push failure is\ntransport evidence to report, not permission to undo the valid local\nspecification, create another task, or begin planning.\n\n## Delivery and non-goals\nPreserve managed asset identities and the existing native independent-store topology. Retain task/store/root identity checks, clean published independent store BEFORE its native write, exact intended task-path changes afterward, task-store index safety, scoped task-only commits, non-force push and direct-remote proof. Code noninterference is not code cleanliness; concurrent unrelated code changes are not proof this task operation modified them. Do not weaken branch-local authoring behavior or implementation/Episode admission requirements.\n\nValidate candidate source changes only in Docker, including mandatory Tier1 probe after changes under src/prime-agent-plugin. Use focused, proportionate docs/contract regression evidence; no new validation framework. Preserve the dirty .prime-claw/templates.json and any unrelated source/index/runtime work. Report qualified test results honestly.\n\nPublish the bounded source correction through the required normal lifecycle and deliver only the corrected global Markdown assets, using safe existing delivery surfaces if they support that scope. Prove exact destination paths and contents/hashes and absence of unrelated global/runtime changes. Do not run a broad global apply that silently refreshes other assets, do not restart, and do not invent a new delivery controller. If supported delivery cannot safely isolate these Markdown assets, report that concrete constraint rather than broadening scope or claiming global activation. Existing running processes are not claimed restarted; report actual Markdown delivery status separately from runtime activation.\n\nNo initializer/runtime/symlink-policy change, no dependency or Prime Agent changes, no live migration, no ADAPT task/source/config mutation, and no changes to completed work. The separately reported unnecessary root-symlink behavior is awareness only, outside this task.",
+          "dependencies": [],
+          "dependencyGraph": {
+            "root": "PRIMECLAW-53",
+            "nodes": [
+              {
+                "id": "PRIMECLAW-53",
+                "title": "Remove code cleanliness gates from independent Backlog authoring guidance",
+                "status": "In Progress",
+                "state": "resolved",
+                "completed": false,
+                "dependencyDepth": 0,
+                "dependentDepth": 0
+              }
+            ],
+            "edges": []
+          },
+          "readiness": {
+            "isReady": true,
+            "isBlocked": false,
+            "blockingDependencies": [],
+            "missingDependencies": []
+          },
+          "documentation": [],
+          "subtasks": [],
+          "acceptanceCriteria": [
+            {
+              "index": 1,
+              "text": "Canonical design.md and spec-it-out.md authoring guidance consistently uses the agreed Backlog block: unrelated staged, unstaged or untracked code changes and code-branch upstream divergence never block independent native task creation, revision or publication, and never cause code commit/stash/reset/cleanup/sync.",
+              "checked": false
+            },
+            {
+              "index": 2,
+              "text": "Independent task-store clean/direct-remote-equal checks are explicitly PRE-WRITE. Post-write checks allow only the intended exact task path, preserving task/store/root identity, task-store index safety, scoped task-only commit, non-force push and direct-remote publication proof.",
+              "checked": false
+            },
+            {
+              "index": 3,
+              "text": "Parent code HEAD/index/worktree are preserved by task-only authoring; this is noninterference, not a cleanliness requirement. Actual branch-local publication behavior and separate implementation/Episode admission gates remain unchanged.",
+              "checked": false
+            },
+            {
+              "index": 4,
+              "text": "Any directly equivalent authoring contradiction is corrected without broad refactoring or runtime/symlink changes. Candidate validation is Docker-only and includes the mandatory Tier1 probe plus focused proportionate contract evidence; limitations are reported truthfully.",
+              "checked": false
+            },
+            {
+              "index": 5,
+              "text": "Exact bounded source paths/commit/publication evidence and global Markdown destination/content evidence are reported. Only these approved Markdown assets are delivered globally, with unrelated runtime assets, dirty project state and running processes preserved; no broad apply or restart occurs. If safe bounded delivery is unavailable, the real blocker and pending delivery are reported, not silently bypassed.",
+              "checked": false
+            }
+          ],
+          "definitionOfDone": [],
+          "implementationPlan": "1. Replace only the Backlog “Verify and publish exactly once” blocks in `src/prime-agent-plugin/skills/project-templates/design.md` and `spec-it-out.md` with the final block already approved in Description. Scope Git-index/task-path checks to the selected task store. State clean/direct-remote-equal independent store BEFORE native write, exact intended task-path change afterward, and parent code noninterference instead of code cleanliness/upstream equality. Preserve branch-local publication, Beads authoring, implementation/Episode gates and asset identities. Inspect directly equivalent authoring wording only for remaining contradictions; leave customized local assets and unrelated dirty files unchanged.\n\n2. Add only small focused contract assertions in the existing `tests/test_future_plan_skills.py` coverage (or the existing directly equivalent contract test) for both templates: consistent approved block, pre-write versus post-write timing, unrelated staged/unstaged/untracked code and divergence not blocking, no code-repair action, and unchanged branch-local/admission boundary. This is Markdown contract evidence, not proof of a real native authoring run. No runtime code, controller, generic framework, new state or symlink-policy changes.\n\n3. Validate the isolated candidate in Docker, including `scripts/test-tier1.sh --probe` after the source changes and the focused contract tests through the repository’s Docker test interface. Review the bounded diff, preserve unrelated state and publish the source/test candidate with truthful command/results evidence. Do not run candidate host/global apply/check or native host probes, and do not use live ADAPT or Nemo as fixtures. Record actual outcomes and any baseline limitations in the native task; no unrelated fixes to make a suite green.\n\n4. The owning Conversation reviews and publishes the accepted bounded source through the normal lifecycle, then handles the separately requested Markdown-only global delivery from primary main. Exact asset IDs are `project-skill-design` and `project-skill-spec-it-out`; actual destinations are `~/.prime/agent/skills/project-templates/design.md` and `~/.prime/agent/skills/project-templates/spec-it-out.md`. Deliver only those approved files through a safe existing bounded delivery method, preserving managed ownership consistency and unrelated runtime/assets/processes; never broad-apply or restart. Current `manage-prime-agent-delivery.py apply` rewrites every exact target and exposes no per-asset selector, so do not use it as a hidden broad refresh. If no supported bounded method exists, stop global delivery and report that concrete constraint, without building a delivery feature or falsely claiming activation. Report exact source commit/push, actual destination hashes and unrelated-state checks directly to Adapt-Hand Expert; distinguish source publication, Markdown delivery and runtime activation. ADAPT’s completed consumer work is reported context, not this candidate’s test evidence.",
+          "implementationNotes": null,
+          "comments": [],
+          "finalSummary": null
+        }
+      },
+      "baseRef": "5c1358b56732869465a1402beb5fa280635122ea",
+      "createdAt": "2026-11-03T00:10:52.009Z",
+      "updatedAt": "2026-11-03T00:15:03.442Z",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-53-episode-b0133363",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-53-episode-b0133363",
+      "worktreeIdentity": "wt2:local:8fd7953b-5d7f-49b0-83f3-18a6199751ea",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-53-episode-b0133363",
+      "branch": "JLanders/prime-claw-primeclaw-53-episode-b0133363",
+      "head": "5c1358b56732869465a1402beb5fa280635122ea",
+      "launchAutomationName": "prime-claw-launch-b0133363-514c-419e-affc-7fc4b1042d90",
+      "launchAutomationId": "af1b0103-6ff2-43a1-b8a5-7db184c94057",
+      "launchRunId": "36160bc9-771b-4c42-8634-35ed490977d5",
+      "uncertaintyReason": "Timed out binding the fresh Prime Agent session and connected Orca tab at the exact Episode CWD"
+    }
+  }
 }
