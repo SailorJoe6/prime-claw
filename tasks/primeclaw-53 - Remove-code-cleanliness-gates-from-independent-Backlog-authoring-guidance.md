@@ -4,7 +4,7 @@ title: Remove code cleanliness gates from independent Backlog authoring guidance
 status: In Progress
 assignee: []
 created_date: '2026-11-02 22:00'
-updated_date: '2026-11-03 23:11'
+updated_date: '2026-11-03 23:20'
 labels: []
 dependencies: []
 references:
@@ -160,6 +160,8 @@ Focused Markdown6passed/2failed/40deselected; both failed names are installed/so
 Final ordinary Git landing safeguard: generic git pull --rebase attempted to flatten accepted merge ancestry and stopped at a local conflict before publication; the following push was explicitly refused because HEAD was detached, with no remote mutation. Aborted only that local rebase, recovered the exact already-reviewed merge f9e19a938668084a473c232ae08105f89c3864df, proved clean checkout and unchanged validated runtime/test hashes/tree, then non-force pushed the original merge once. Direct remote and upstream equal the exact candidate. No rebase conflict resolution, force, reset, code repair or changed candidate followed.
 
 Candidate is for renewed owner review only. Task remains In Progress, not Ready for Merge/Done. No global Markdown delivery/runtime activation/restart, direct live ownership edit, new Episode/resources or cleanup. No child/heartbeat/shell work remains; archived descendant issue is resolved and not reopened. Task-only living evidence is published separately with exact native reread and code HEAD/index/worktree preservation; owning Conversation records current observations and decides lifecycle/review next.
+
+Owner accepted one material renewed-review finding against candidate f9e19a938668084a473c232ae08105f89c3864df; keep In Progress and AC5/global delivery pending. Reproduced in immutable offline Docker with real disposable Git/task repositories: a concurrent local code commit during independent In Progress publication triggers the retained code-HEAD check before the caller records independent topology; task-only In Planning rollback succeeds but its actual publication result is discarded, so the stale success-only flag selects bestEffortTaskPush on the parent code checkout and publishes that unrelated unreviewed code. Candidate repro: one parent-code push, remote main advanced, zero allocations/ownership; committed213689 baseline made zero parent-code pushes. This violates existing AC3/6/9 noninterference and is an in-scope caller correction, not new product scope. Preserve HEAD-drift rejection and legitimate preownership admission gates. Choose rollback transport from its actual publication result/topology, with a focused real-Git regression; do not restore clean-parent gates or add controller/receipt/retry machinery. Accepted independent review evidence: /Users/jlanders/.prime/agent/session-artifacts/01a1363a-e0f9-7628-aee4-81b03eb1e3fb/sub-ad478281/primeclaw53-review/review-evidence.md and linked head-drift-rollback.test.mjs/.tap/baseline. Same owned Episode/op379643c7 only; no global delivery, runtime activation/restart, resource replacement or cleanup. Prior full499test validation remains honest historical evidence for f9e19a9, not proof of a future repair.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
