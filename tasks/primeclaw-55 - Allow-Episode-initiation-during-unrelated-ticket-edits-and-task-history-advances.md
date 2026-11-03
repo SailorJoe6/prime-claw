@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 22:59'
+updated_date: '2026-11-03 23:01'
 labels: []
 dependencies: []
 references:
@@ -249,4 +249,11 @@ Exact pinned dependency source was read over HTTP, not executed or modified: htt
 Consequently, the current `bd ... update` path can include unrelated pending issues rows (and potentially already-staged tables) in native history. Removing Prime Claw's cleanliness checks does not establish the required unrelated-native-history preservation. Provider tests with fake runners prove request/result mechanics and preservation of unrelated Git bytes/index only; they do NOT prove native Dolt row/table/history isolation. Read-only source reviewer independently confirmed this gap and identified an unsupported source comment, which was removed. No full-task or slice readiness is claimed.
 
 Unblock condition: the owning Conversation/operator accepts a specific bounded disposition within the approved native-interface constraints, or a supported selected-task native operation is established that actually preserves unrelated pending native history. Do not patch Beads, add an extra store/branch framework, restore a renamed dirty gate, demand unrelated quiescence, or treat this finding as new authority. Preserve all current inert source/tests and exact existing Episode/resources. Await the owner's decision before claiming publishable candidate readiness; task status remains In Progress and all AC unchecked.
+
+## Native limit addendum — exact helper, command flags and evidence limits
+Read-only source tracing is complete; no native provider command ran. The exact v1.3.1 path is `cmd/bd/update.go` lines 423 and 543 (`issueOpsContext`, then `runCommandUpdateMutation`/Lifecycle.Update), `internal/storage/dolt/issue_operations.go` lines 48–60 (`ExecuteUpdate` in `runIssueOperationTx`), and `internal/storage/dolt/store.go` lines 3593–3638 (`DOLT_ADD` per touched table followed by `DOLT_COMMIT('-m', ...)` over the staged set). The absorption scope is touched-table rows and already-staged changes, not necessarily every unrelated unstaged table. Sources: https://github.com/gastownhall/beads/blob/v1.3.1/cmd/bd/update.go#L423-L551 ; https://github.com/gastownhall/beads/blob/v1.3.1/internal/storage/dolt/issue_operations.go#L48-L60 ; https://github.com/gastownhall/beads/blob/v1.3.1/internal/storage/dolt/store.go#L3593-L3638 .
+
+Native flags do provide commit deferral: `cmd/bd/main.go` line 882 documents `--dolt-auto-commit=off|on|batch`, default-on help and configuration override. `cmd/bd/dolt_autocommit.go` lines 55–63/83–91 resolve that policy and use `issueops.WithDeferredVersionCommit` for off/batch; `store.go` lines 3599–3603 honor the deferral. Thus the native update is NOT unconditionally forced to commit under every supported mode. The present candidate explicitly requests on. Off/batch defer history; this tracing has not established a supported task-row-only commit/publication mechanism. Sources: https://github.com/gastownhall/beads/blob/v1.3.1/cmd/bd/main.go#L882 ; https://github.com/gastownhall/beads/blob/v1.3.1/cmd/bd/dolt_autocommit.go#L55-L91 .
+
+The independent bounded source/diff reviewer found this material native-history gap and no additional concrete material defect in the changed lower Backlog preparation/publication, supporting Beads reservation/evidence, direct spec pre-session context or strict explicit legacy/migration boundary. Review was read-only and did not execute or independently reproduce dependency behavior. The misleading source comment was removed. All children finished and were deleted; no runtime test/startup occurred. Owner withdrew/held the unstarted builder request and is independently checking documented/public native capabilities. This is blocker consultation, not new implementation authority. Preserve source and resources; await disposition. Task remains In Progress and all acceptance criteria unchecked.
 <!-- SECTION:NOTES:END -->
