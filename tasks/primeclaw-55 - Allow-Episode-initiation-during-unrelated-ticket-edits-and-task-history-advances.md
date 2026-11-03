@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 22:47'
+updated_date: '2026-11-03 22:50'
 labels: []
 dependencies: []
 references:
@@ -235,4 +235,9 @@ Docker-only candidate execution used the verified cwd-fix-v0.9.8-r1 source commi
 Focused new regressions prove both registered task prep tools deliver edited prep/phase policy and exact complete native JSON (including >49KB prose, unknown fields/envelope, nulls, Unicode/whitespace, custom statuses and absent Beads design/null Backlog plan) to both prompts; exact provider/root/Backlog path/host facts survive. Planning/readiness allocate nothing and send one steer plus sole followUp. Direct Backlog compatibility path, exact canonical-ID failures, native lookup errors, delivery uncertainty without retry, final wrapper dispatch without eligibility duplication, and single truthful lower-action refusal are covered. Actual lower-level create policy remains unchanged and is not claimed fixed by injected-action tests.
 
 No dependency patch, global apply/activation, restart, live PRIMECLAW-45 mutation/recovery, retained-folder redesign, new allocator/recovery framework, merge/abandonment, ownership edit or destructive cleanup occurred. All AC remain unchecked; full remaining accepted work stays on this task. Candidate is ready only for owner review of this bounded slice.
+
+## Slice 3 selected — native preparation and direct publication
+Continue the accepted same task/Episode with one lower preparation/publication slice for both providers. Remove the Backlog Episode preparation re-entry into mutable primary preparation, whole-checkout cleanliness/stable-head prerequisites, and the publication helper's automatic reconciliation/retry/other-task classifiers. Replace that publication loop with one exact native edit, exact-path ordinary Git commit and one non-force push, returning native/Git observations and truthful failures without absorbing unrelated staging or work. Apply the same boundary to Beads transport preparation and status publication: retain native workspace/operation targeting and factual evidence, remove lifecycle capability/clean-working-set/frozen-revision/content approval and repeated publication-proof policy, and execute only supported native operations once without automatic retry or failure-driven status choice.
+
+Keep the bounded slice in the existing preparation/publication helpers and directly required call signatures; deeper creation/reservation, exception-driven lifecycle disposition, continuation/terminal extraction, the full secondary durability audit and recorded-operation recovery remain accepted on THIS task for subsequent bounded slices. Preserve existing layouts, exact resources, unrelated work, complete native fields/absence, customized Markdown and retained-folder behavior. Matching editable guidance, focused behavior tests and Docker-only validation are part of this slice. No AC is fully met yet. Publish one coherent code candidate and native task evidence, then stop for owner review.
 <!-- SECTION:NOTES:END -->
