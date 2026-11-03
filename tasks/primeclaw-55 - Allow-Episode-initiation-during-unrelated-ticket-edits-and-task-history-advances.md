@@ -3,10 +3,10 @@ id: PRIMECLAW-55
 title: >-
   Allow Episode initiation during unrelated ticket edits and task-history
   advances
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 23:01'
+updated_date: '2026-11-03 23:10'
 labels: []
 dependencies: []
 references:
@@ -256,4 +256,11 @@ Read-only source tracing is complete; no native provider command ran. The exact 
 Native flags do provide commit deferral: `cmd/bd/main.go` line 882 documents `--dolt-auto-commit=off|on|batch`, default-on help and configuration override. `cmd/bd/dolt_autocommit.go` lines 55–63/83–91 resolve that policy and use `issueops.WithDeferredVersionCommit` for off/batch; `store.go` lines 3599–3603 honor the deferral. Thus the native update is NOT unconditionally forced to commit under every supported mode. The present candidate explicitly requests on. Off/batch defer history; this tracing has not established a supported task-row-only commit/publication mechanism. Sources: https://github.com/gastownhall/beads/blob/v1.3.1/cmd/bd/main.go#L882 ; https://github.com/gastownhall/beads/blob/v1.3.1/cmd/bd/dolt_autocommit.go#L55-L91 .
 
 The independent bounded source/diff reviewer found this material native-history gap and no additional concrete material defect in the changed lower Backlog preparation/publication, supporting Beads reservation/evidence, direct spec pre-session context or strict explicit legacy/migration boundary. Review was read-only and did not execute or independently reproduce dependency behavior. The misleading source comment was removed. All children finished and were deleted; no runtime test/startup occurred. Owner withdrew/held the unstarted builder request and is independently checking documented/public native capabilities. This is blocker consultation, not new implementation authority. Preserve source and resources; await disposition. Task remains In Progress and all acceptance criteria unchecked.
+
+## Owner-accepted blocker — native Beads history isolation
+The reviewed Beads v1.3.1 native issue-operation path stages touched tables and commits the staged set. It can include other pending rows in a touched table and already-staged unrelated tables; this is a selected-task history/publication isolation limit, not demonstrated data loss. Native off/batch modes defer history and do not establish exact-issue publication isolation. The exact source and public-interface evidence is recorded above. No supported isolating interface was found in the reviewed v1.3.1 surfaces; no runtime reproduction or exhaustive claim about raw Dolt/later versions is made.
+
+PRIMECLAW-55 is Blocked pending the operator's disposition of this conflict with the current preservation/initiation contract. Unblock when Joe explicitly approves how this native capability limitation is handled while retaining the full Backlog and Beads lifecycle-policy extraction, or verified supported native behavior meets the original guarantee. No acceptance criterion or scope exception has been approved by this status note.
+
+Preserve the same Episode, operation, branch/worktree, inert uncommitted slice-3 edits and existing accepted code. No build/live Beads operation, dependency patch, extra task store/branch framework, row-filter workaround, renamed dirty gate, product quiescence rule, activation, merge or cleanup is authorized. The unused startup reservation was returned.
 <!-- SECTION:NOTES:END -->
