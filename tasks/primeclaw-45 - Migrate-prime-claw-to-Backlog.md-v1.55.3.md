@@ -4,9 +4,10 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: Blocked
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-03 18:14'
+updated_date: '2026-11-03 18:22'
 labels: []
-dependencies: []
+dependencies:
+  - PRIMECLAW-55
 references:
   - 'https://github.com/MrLesk/Backlog.md/releases/tag/v1.55.3'
   - 'https://github.com/MrLesk/Backlog.md/compare/v1.53.0...v1.55.3'
@@ -127,5 +128,11 @@ Implementation admission blocked before Episode session start (2026-11-03). Oper
 Read-only recovery inspection confirmed the same owned Orca worktree exists clean at the original code base; the ownership entry is uncertain and has no Episode session identity, the worktree has no .backlog task clone, and Orca shows only a shell terminal. The primary task checkout is now clean and published at 57243318215e0d843385a9dd7c06ec253e0eadc4; PRIMECLAW-45's native content is unchanged from the admitted In Progress observation. No fresh creation, handoff, second assignment, source edit, activation, or destructive cleanup was attempted.
 
 Unblock condition: recover this exact recorded operation and its existing resources through a supported owner-recovery path; prove the prepared Episode task workspace and exact durable session/assignment identity before continuation. Do not retry as fresh creation, manually edit ownership.json, discard resources, or replace the Episode. If no supported recovery path exists, the operator must decide the bounded recovery action. The approved specification and Implementation Plan remain unchanged.
+---
+
+author: Prime Claw owning Conversation 01a197be-7eeb-773f-98ef-7544560ced45
+created: 2026-11-03 18:22
+---
+Blocked on PRIMECLAW-55: fix task-scoped Episode initiation during unrelated ticket edits/published task-history advances and provide bounded recovery of the existing partial PRIMECLAW-45 operation. Preserve the approved upgrade specification/plan and existing uncertain ownership/resources; do not retry fresh creation.
 ---
 <!-- COMMENTS:END -->
