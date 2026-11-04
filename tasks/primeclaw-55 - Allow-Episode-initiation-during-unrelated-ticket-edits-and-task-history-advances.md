@@ -3,10 +3,10 @@ id: PRIMECLAW-55
 title: >-
   Allow Episode initiation during unrelated ticket edits and task-history
   advances
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 19:55'
+updated_date: '2026-11-04 20:03'
 labels: []
 dependencies: []
 references:
@@ -419,4 +419,13 @@ Immutable builder receipts: IID `sha256:1f5f3c8ac82c9c0f732345bfb7eac5fa138694dc
 Inputs: captured repository clean33f18ed/407entries/framed-sha256-v2 hash8e2bc8c73ff4ab711e80bc33f8eaf59ce0332cf3c66ca19496143f73528ea468 exactly matches the published support checkout. The old407-entry probe hashcb927... remains historical and does not validate changed harness inputs. Dependency source identity stays clean a1faacd53ac4473a75de1d434afaf50945c2f647/1258entries/hashc159dd4a40619f886955c053bbe200c0874f208cb5860a4fe8970b1c3621db75. Complete checkout before/after inventories are identical34038entries/hashb10e91aaf8b350ed74187e9f94fb89a61607813ac60f7397b00df088ba72a829. Release:null. Evidence: surviving source-build.json/source-builder-image.json/source-builder.iid/source-builder.cid/source-manifest.json and manifest; full pytest log `/tmp/primeclaw55-slice3-approved-diagnostic.log`. Diagnostics reporting worked for this actual negative setup path; required focused plugin validation still did not run and is not passed.
 
 STOP for owning Conversation review now, pass/fail boundary honored. The ONE approved diagnostic attempt is consumed. No further source/build/trust fix, diagnostic/runtime attempt, retry, probe or mode/version/settings/cache substitution is authorized by this result. Any next diagnostic/build disposition needs explicit applicable owner/operator authority; underlying npm ci reason remains unknown. No environment/credential/raw-output dump, dependency patch, source selector change, Docker restart/settings change, global apply/activation, lifecycle/AC/ownership mutation, main integration, live45 action, merge/abandonment or destructive live cleanup occurred. In Progress/all9ACunchecked. Full BOTH-provider lifecycle-policy extraction, complete secondary durability audit and bounded recorded-operation recovery stay on THIS task with the approved Beads multi-issue boundary unchanged.
+
+## Owner review: accepted diagnostic support; validation remains blocked
+The owner accepts ONLY diagnostic-support delta33f18edc94df898542103ee072512a0955306e5a versus f4990696aa30f5b97873caa603e15fc32c353647 after an independent read-only openai-codex/gpt-6-astra/max review found no material defect. Existing host-safe mocked/script tests passed76tests/50subtests. The one approved diagnostic attempt proved safe propagation of npm-ci/BuildError/exited/rc1 and the outer builder-wait result; it did NOT establish the underlying npm/TLS/compile/filesystem cause, runtime/plugin correctness, or full-slice readiness. Broader product review base remains accepted1565c327; the larger slice is still unvalidated and all nine ACs remain unchecked.
+
+PRIMECLAW-55 is Blocked because required focused plugin validation cannot currently proceed and the single approved diagnostic attempt is consumed. No retry, further probe, trust/CA forwarding, mode/version/dependency change, fixture substitution or product-source repair is authorized by this review. The separately proposed shared CA-support change is not yet approved and is not assumed to be the cause or only possible remedy.
+
+Unblock when Joe explicitly approves a concrete bounded next validation-support/recovery step and any additional attempt it requires, or provides an otherwise supported ready validation path with explicit authorization for the next attempt. Record that actual decision before continuation. The existing native Beads multi-issue history exception and complete Backlog AND Beads lifecycle-policy extraction, secondary durability audit and bounded recorded-operation recovery scope remain unchanged; this is NOT reopening the previously cleared native-history decision.
+
+Preserve exact existing Episode, operation, branch/worktree, code33f18ed and all original/new failure evidence. No new Episode, source merge, global activation/restart, dependency patch, live PRIMECLAW-45 action, abandonment or live cleanup is added.
 <!-- SECTION:NOTES:END -->
