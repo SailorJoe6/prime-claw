@@ -4,7 +4,7 @@ title: Use durable Episode identity instead of ephemeral runtime routing IDs
 status: In Progress
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-04 14:26'
+updated_date: '2026-11-04 15:51'
 labels: []
 dependencies: []
 references:
@@ -13,6 +13,12 @@ references:
   - PRIMECLAW-15
   - >-
     https://github.com/SailorJoe6/prime-agent-pi/commit/f80340d93dc3b1c6de3459b54a82f351e136f75e
+documentation:
+  - docs/conversation-driven-episode-oversight.md
+modified_files:
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - tests/spec_episode_extension.test.mjs
+  - docs/conversation-driven-episode-oversight.md
 priority: p1
 type: bug
 ordinal: 142000
@@ -61,4 +67,11 @@ This request logs the bug only. It authorizes no planning, implementation, live 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 bounded slice: verified exact owner/Episode/worktree and clean independent task history at b0ff73537bc995aa06f3cf96cd915da373091d9d. The isolated Docker regression changes only the live route in the existing local cleanup fixture while ownership retains its saved route. It fails with "Task Episode cleanup found a changed Prime Agent routing identity" before removal (local artifact: .test-results/primeclaw57/red.log). Root cause: sessionTree already matches permanent ID, canonical file and CWD, then incorrectly requires its current runtime handle to equal the historical ownership observation. Implement a narrow cleanup correction and focused identity/busy regressions; audit related lookup/continuation/migration paths read-only. No live activation, ownership edit or retained TASK-2 resource use.
+
+2026-11-04 recovery handoff (same Episode; Docker restart clearance supplied by owner):
+- Owner reports Docker Desktop restarted and docker info succeeds (29.8.2); prior stalled shell/Docker PIDs are absent. This clears the former infrastructure blocker. Do not reuse dead Bash handles or count pre-restart logs/status as fresh validation.
+- Owner preserved the exact existing three-file partial diff without edits in published recovery checkpoint ee9e89ce605582b9a8ab289cbb39bdaa878f2876 on the same Episode branch. It is untested recovery state, not a completed/reviewed candidate. Current code and independent task checkouts are clean; task remains In Progress. Exact durable Episode ID/file, owner, operation, worktree and branch are unchanged; ordinary handoff reopened that same session on a refreshed runtime route.
+- Partial implementation: task-episode-cleanup.ts removes the historical-route equality rejection and no longer treats a reused old route alone as an absent-root identity collision. Durable ID/file/CWD, current-roster/state checks, pre-removal identity checks, explicit descendants, terminal publication and exact resource boundaries remain. tests/spec_episode_extension.test.mjs adds route-reuse, wrong/missing/ambiguous durable identity and busy/unknown-idle cases, and changes the end-to-end local cleanup fixture to a replacement route. docs/conversation-driven-episode-oversight.md explains the distinction. Fresh isolated tests are still required.
+- Saved read-only related-path audit (findings to judge proportionately, not new authority): normal durableSession/reopenIfNeeded/handoff in spec-episode.ts already resolves durable ID/file and refreshes route. Two same-assumption candidates remain for the approved audit step: task-episode-ownership.ts around lines 709-711 rejects an exact existing version-2 legacy-to-task bridge replay when the separately verified current route differs from the persisted route; task-provider-migration.ts around lines 2792-2797 compares post-cutover verified current route against the route observed at cutover and may roll ownership back on route-only change. Existing tests cover initial replacement, not subsequent route changes. Inspect current code and native fixtures before deciding minimal in-scope corrections. Do not broaden old-route-still-live ambiguity guards without concrete evidence.
+- Next execute: run prepare, reread exact ownership and this native task, inspect ee9e89c, then start fresh focused Docker regressions and required scripts/test-tier1.sh --probe nonblocking with explicit bounded timeouts. Inspect completed outputs, repair concrete in-scope failures, complete approved native plan/audit proportionately, publish task evidence separately from code, and report tested bounded candidate to owner. No live plugin apply/check/activation, Prime Agent source patch, replacement Episode/assignment, retained TASK-2 fixture use, merge or cleanup. Requirements and acceptance remain unchanged; no green validation or task completion is claimed.
 <!-- SECTION:NOTES:END -->
