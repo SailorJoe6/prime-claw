@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 19:30'
+updated_date: '2026-11-04 19:46'
 labels: []
 dependencies: []
 references:
@@ -24,6 +24,8 @@ modified_files:
   - REQUIREMENTS.md
   - docs/backlog.md
   - docs/prep-chain.md
+  - scripts/testing/source_builder.py
+  - scripts/testing/source_builder_payload.py
   - src/prime-agent-plugin/extension-support/prep-chain.ts
   - src/prime-agent-plugin/extension-support/reviewed-plan-support.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
@@ -39,6 +41,7 @@ modified_files:
   - src/prime-agent-plugin/workflows/plan-task-prep.md
   - src/prime-agent-plugin/workflows/plan-task.md
   - tests/beads_task_episode_admission_extension.test.mjs
+  - tests/conftest.py
   - tests/reviewed_plan_extension.test.mjs
   - tests/task_episode_admission_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
@@ -47,7 +50,9 @@ modified_files:
   - tests/test_future_plan_skills.py
   - tests/test_oversee_episode_skill.py
   - tests/test_reviewed_plan_extension.py
+  - tests/test_source_builder.py
   - tests/test_task_providers.py
+  - tests/test_tier1_fixture.py
 priority: p1
 type: bug
 ordinal: 140000
@@ -235,6 +240,11 @@ When those supporting changes/tests are ready, obtain actual startup/capture cap
 Do NOT implement CA/trust forwarding, TLS bypass, dependency patch/version/mode switch, Docker settings, cached/peer runtime substitution or a presumed underlying build fix. Peer57's Node HEAD trust result establishes only that bounded request gap, not fresh55cause or repair authority. Do not infer shared cause from the earlier custom raw-linked-worktree mount or D/VirtioFS waits either. Preserve native fields/history/foreign work and exact Episode resources.
 
 Record the support scope, actual results and limits here/on native Notes, publish coherent code and exact-task evidence promptly, then STOP for owner review after the bounded attempt. Full BOTH-provider lifecycle-policy extraction, complete secondary durability audit and bounded recorded-operation recovery remain on THIS task with the approved Beads multi-issue boundary unchanged. All9AC remain unchecked. No new Episode/allocator, main integration, global apply/activation/restart, live45mutation, retained-folder redesign, merge/abandonment or destructive live cleanup. This handoff itself makes no source change or runtime attempt.
+
+## Diagnostic-support checkpoint — one approved attempt remains
+Approved minimal diagnostic-support implementation is published at `33f18edc94df898542103ee072512a0955306e5a`; plugin/managed source remains f499 bytes. Existing host-safe mocked/script suites passed76tests/50subtests after the concrete module-shadowing repair; actual failed and passing logs and privacy/coverage limits are in native Notes. Existing diagnostics now carry controlled operation/category/outcome/return-code facts through payload, host and pytest wrapper, without raw command output, new receipt schema/store or build/trust repair.
+
+Next obtain current startup/capture capacity, then make exactly ONE normal-driver diagnostic attempt with the already recorded focused `-m container -x` selection. No reservation/startup exists yet; no extra probe or retry. Changed whole-repository support inputs are NOT covered by a blanket old probe hash match. Publish actual outcomes/receipts/limits promptly, return the slot at capture, then STOP for owner review even on success. Do not repair a newly exposed cause and silently rerun. Full remaining BOTH-provider lifecycle/audit/recorded-operation scope and Beads exception remain on this SAME task/slice/Episode; review cumulatively from1565c327. All9AC remain unchecked.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -378,4 +388,15 @@ Keep the change minimal and bounded: preserve useful privacy-safe failed-operati
 This approval does NOT authorize CA/trust forwarding, TLS verification bypass, Docker setting changes, dependency patch/version/mode selection changes, cached/peer runtime substitution, or a retry beyond the single approved attempt. Any distinct trust-input fix needs its own explicit decision and evidence. No global activation, merge/abandonment, live PRIMECLAW-45 action or live cleanup is added.
 
 The original full Backlog AND Beads lifecycle-policy extraction, complete secondary durability audit, bounded recorded-operation recovery, and previously approved native Beads multi-issue history boundary all remain unchanged on this SAME task/Episode. All nine ACs remain unchecked. Source checkpoint f499069 is still unvalidated, last accepted review base1565c327. Record the actual supporting changes/evidence in the living plan, keep old failures historical, publish coherently and stop for owner review after the bounded attempt.
+
+## Approved diagnostic support — published, one runtime attempt still pending
+Published code `33f18edc94df898542103ee072512a0955306e5a` adds only the approved validation-support diagnostics to the SAME selected slice3/Episode. Exact remote code ref equals HEAD; code is clean/upstream-equal after commit, `git pull --rebase`, push and direct verification. Five paths changed from f499: scripts/testing/source_builder.py, source_builder_payload.py, tests/conftest.py, tests/test_source_builder.py and tests/test_tier1_fixture.py. Plugin source and managed skills/workflows are byte-unchanged from f499. Review the cumulative slice against last accepted1565c327, not just this support commit or the two preserved WIP commits.
+
+The existing payload stderr now reports fixed operation names (including npm-ci, npm-build and release-pack), error category, native outcome and numeric return code. Native build stdout/stderr remain suppressed; no environment, argv, exception text, credential material or arbitrary raw output is emitted. The existing host helper captures its attempted operation and native failure outcome. Only after a failed payload, it makes one bounded15-second exact-CID `docker logs --tail 8` read before the existing teardown, retaining only strictly allow-listed metadata. Details use the existing source-build.json failure_codes and existing pytest failure message, not a new receipt schema/store/fixture or reporting framework. Missing/invalid diagnostics do not mask the original wrapper failure. Build/install commands, time bounds, isolation, source-copy behavior, release validation and exact teardown behavior otherwise remain unchanged. This reports command-level facts, not an underlying compile/TLS/filesystem root cause; raw command diagnostics remain intentionally unavailable.
+
+Host-safe mocked/script command: `python3 -m pytest tests/test_source_builder.py tests/test_tier1_fixture.py -q -m "not container"`. Final PASS:76passed/50subtests in28.66seconds, `/tmp/primeclaw55-diagnostic-support-host-safe-rerun.log`. The first run was3failed/73passed/50subtests in33.77seconds (`/tmp/primeclaw55-diagnostic-support-host-safe.log`): an existing local payload-bytes variable shadowed the newly imported helper module on failure paths. Renamed that local variable only; final rerun covers the repaired support bytes. Focused new coverage proves private output/argv/env/exception text are excluded; command exit/signal/timeout/launch metadata survives; only bounded controlled codes pass; exact-CID logs are read once before cleanup; missing receipts keep the original native outcome. Existing clean/uncertain teardown, source inventory, signal and publication behavior also passed. No host candidate-plugin execution or live Docker actor was used by these mocked/script suites. `git diff --check`:PASS. A delegation bootstrap failed before work; no independent child review is claimed and the child was deleted without task replay.
+
+Current whole-repository input is clean33f18ed,407entries/framed-sha256-v2 hash8e2bc8c73ff4ab711e80bc33f8eaf59ce0332cf3c66ca19496143f73528ea468. It differs from the prior probe's407-entry hashcb927b8077e9e0aa706da54e1a54c7b98d2716240808d1ab7a75c8cb8e9acc0a because validation support changed. Do not claim the old probe validates this changed harness. Its historical unchanged-plugin evidence is separate. Public source selection remains the clean a1faacd53ac4473a75de1d434afaf50945c2f647/cwd-fix-v0.9.8-r1 checkout, package-lock SHA2563e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74, no TIER1_ENV_FILE override. No dependency or selector change occurred.
+
+The ONE approved coordinated normal-driver -x diagnostic attempt has NOT started. No Docker action, startup/capture reservation, extra probe/fixture launch, live provider mutation, trust/TLS/build repair, mode/version/cache substitution, signal/kill/restart, global activation or resource cleanup occurred in this support implementation. Original old failed evidence remains historical and preserved. Next request actual capacity and run exactly the recorded fail-fast selection once; report actual receipts/results/limits and STOP for owner review whether it passes or fails. Any further attempt or distinct fix requires disposition. Full BOTH-provider lifecycle extraction, secondary durability audit and bounded recorded-operation recovery remain on this task; approved native Beads boundary is unchanged. In Progress/all9ACunchecked; no readiness or task completion is claimed.
 <!-- SECTION:NOTES:END -->
