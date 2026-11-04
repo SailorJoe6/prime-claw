@@ -4,7 +4,7 @@ title: Use durable Episode identity instead of ephemeral runtime routing IDs
 status: In Progress
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-04 16:16'
+updated_date: '2026-11-04 16:20'
 labels: []
 dependencies: []
 references:
@@ -16,9 +16,13 @@ references:
 documentation:
   - docs/conversation-driven-episode-oversight.md
 modified_files:
-  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
-  - tests/spec_episode_extension.test.mjs
   - docs/conversation-driven-episode-oversight.md
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
+  - tests/spec_episode_extension.test.mjs
+  - tests/task_episode_ownership_extension.test.mjs
+  - tests/task_provider_migration.test.mjs
 priority: p1
 type: bug
 ordinal: 142000
@@ -100,6 +104,13 @@ This request logs the bug only. It authorizes no planning, implementation, live 
 - Narrow bridge correction now treats expectedPreviousEpisodeActiveSessionId as stored-record drift evidence for both initial transition and replay, accepts a separately verified current route, and routes replay rebinding through existing paired provider/Git/unchanged-record/write-readback protections. Unchanged-route replay remains no-write. No authority/resource recreation or assignment.
 - Full ownership suite green: 75/75, zero failures/skips, exited 0 (green-bridge.log and green-bridge.status.json). New coverage proves subsequent current-route replay and idempotence, stale previous-record observation refusal, and preservation of a concurrent ownership write. The two source-native provider shapes retain their existing checks.
 - Related post-switch migration reproduction/guard fixtures are running in a separate fresh bounded network-none Docker snapshot against original migration source. Source correction waits for actual red evidence. These are disposable fixtures, not a live provider migration. Prior cleanup acceptance is preserved; whole-task readiness and tier1 TLS clearance are not claimed. Requirements/plan/unchecked acceptance and status remain unchanged.
+
+2026-11-04 related-route validation checkpoint:
+- Post-cutover route-only replacement reproduced in supported disposable Beads-to-Backlog fixture: red-migration.log exited 1, positive case blocked with active runtime route changed after ownership switch; both native source-preservation guard subtests passed. Only the third runtime proof varied its verified current route; permanent Episode/session file/owner/worktree/task/resource identity and destination publication were retained.
+- Minimal task-provider-migration.ts correction removes the redundant post-proof current-route-equals-historical-route loop. Existing proveActiveRuntimeContinuity still requires exact owner coverage, nonempty verified current address and expectedPrevious matching the stored observation; unchanged withCurrentTaskProviderOwnershipSwitch still refuses persisted-registry drift and preserves native source/destination/publication/resource checks.
+- Fresh focused migration GREEN passes 4/4, exited 0, zero skipped, ~116s in immutable network-none Docker (.test-results/primeclaw57-routes-20261104T161450Z/migration.log and migration.status.json). Runtime-unavailable proof restores unchanged source ownership without source deletion. Persisted-record drift refuses rollback/overwrite and source deletion. Positive route-only replacement completes with source retired only after destination publication and exact continuity proof. Synthetic local fixtures only; no live migration/UAT claimed.
+- The first broader run passed 355/356; its sole failure was the new Beads bridge test expecting its original transition head after an existing first-handoff fixture had advanced the stored head. Source behavior correctly preserved the current head. Corrected only that expected-record assertion to compare against the current stored record. A fresh full three-suite rerun is now active from candidate-final (episodes-final.log/status). Source code and migration fixture bytes unchanged between snapshots; hashes/commands captured. No broader test pass claimed until that rerun finishes.
+- Child source/test sanity review found no material bridge defect; this is review evidence, not live cutover or merge authority. Shared mutable-tag tier1 startup is deferred to the owner's capacity coordination: PRIMECLAW-55 actual startup/CAPTURE 16:17:13Z–16:22:13Z, return on IID/CID capture, not offline completion. This Episode holds no competing startup reservation and has not launched tier1. TLS limit remains unresolved. Private source authoring and already-captured immutable-image tests continued without touching foreign resources. Status/requirements/plan/unchecked acceptance unchanged.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
