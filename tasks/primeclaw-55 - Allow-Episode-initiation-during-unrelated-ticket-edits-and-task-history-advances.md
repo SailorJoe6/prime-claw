@@ -3,10 +3,10 @@ id: PRIMECLAW-55
 title: >-
   Allow Episode initiation during unrelated ticket edits and task-history
   advances
-status: Blocked
+status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-03 23:10'
+updated_date: '2026-11-04 13:05'
 labels: []
 dependencies: []
 references:
@@ -263,4 +263,13 @@ The reviewed Beads v1.3.1 native issue-operation path stages touched tables and 
 PRIMECLAW-55 is Blocked pending the operator's disposition of this conflict with the current preservation/initiation contract. Unblock when Joe explicitly approves how this native capability limitation is handled while retaining the full Backlog and Beads lifecycle-policy extraction, or verified supported native behavior meets the original guarantee. No acceptance criterion or scope exception has been approved by this status note.
 
 Preserve the same Episode, operation, branch/worktree, inert uncommitted slice-3 edits and existing accepted code. No build/live Beads operation, dependency patch, extra task store/branch framework, row-filter workaround, renamed dirty gate, product quiescence rule, activation, merge or cleanup is authorized. The unused startup reservation was returned.
+
+## Operator approval and native-history blocker clearance
+Joe explicitly approved the recommended narrow Beads native-history exception, and after reboot explicitly requested continuation. The full Backlog AND Beads task-native lifecycle-policy extraction remains in scope, including the complete secondary durability audit and bounded recorded-operation recovery support.
+
+For Beads v1.3.1, accept the native table/staged-set, multi-issue commit semantics rather than promise exact-issue history isolation. Editable guidance must expose relevant native facts, disclose and review commit/publication consequences, and consult before publishing unauthorized or unclear pending work. Pending or concurrent native Beads database changes can prevent a safe operation. Do not reintroduce a code dirty-state gate, extra task store/branch, row-filter framework, dependency patch, or synthetic isolation/approval mechanism. Backlog selected-file guarantees, unrelated Git-dirt handling and compatible published-history advances remain unchanged.
+
+This explicit operator decision clears the native-capability blocker recorded above. Resume the SAME task, Episode, operation and resources; this is not task completion or merge/activation authority. The Episode must incorporate only this accepted clarification into its owned native contract, requirements, guidance, code and tests as applicable before claiming preservation or completion. All remaining full-lifecycle work remains on this task; all nine ACs remain unchecked.
+
+Code checkpoint 002a779de01f08fe0dfe772260e180613e12ff86 preserves the exact prior 18 owned WIP files and is runtime UNVALIDATED, not an accepted candidate. Last accepted slice code remains 1565c3272e12adf84238068dd1a99a4a809b182b. No new Episode, runtime activation, live PRIMECLAW-45 recovery, dependency work, merge/abandonment or destructive cleanup is authorized by this clearance.
 <!-- SECTION:NOTES:END -->
