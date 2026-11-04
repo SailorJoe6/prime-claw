@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 16:03'
+updated_date: '2026-11-04 16:08'
 labels: []
 dependencies: []
 references:
@@ -21,6 +21,7 @@ modified_files:
   - .prime-claw/workflows/implement-task.md
   - .prime-claw/workflows/plan-task-prep.md
   - .prime-claw/workflows/plan-task.md
+  - REQUIREMENTS.md
   - docs/backlog.md
   - docs/prep-chain.md
   - src/prime-agent-plugin/extension-support/prep-chain.ts
@@ -37,12 +38,14 @@ modified_files:
   - src/prime-agent-plugin/workflows/implement-task.md
   - src/prime-agent-plugin/workflows/plan-task-prep.md
   - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/beads_task_episode_admission_extension.test.mjs
   - tests/reviewed_plan_extension.test.mjs
   - tests/task_episode_admission_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
   - tests/task_history_workspace.test.mjs
   - tests/task_providers.test.mjs
   - tests/test_future_plan_skills.py
+  - tests/test_oversee_episode_skill.py
   - tests/test_reviewed_plan_extension.py
   - tests/test_task_providers.py
 priority: p1
@@ -208,6 +211,17 @@ Apply only the accepted narrow Beads native-history exception. Beads v1.3.1 uses
 At the queued execute pass, run prepare fresh, reload the exact task and owner clearance, and incorporate this accepted clarification into the Episode-owned native Description/affected acceptance wording/living plan, applicable REQUIREMENTS and editable guidance/code/tests before claiming preservation or acceptance completion. Do not erase historical blocker evidence or broaden the exception. Finish the existing coherent lower preparation/publication/supporting-path slice rather than start another slice. Obtain a concrete source-builder startup/capture window only when source/tests are ready, run required isolated Docker validation, preserve actual failures and limits, publish coherent code and exact-task evidence promptly, then stop for owner review.
 
 Full BOTH-provider task-native lifecycle-policy extraction, the complete secondary durability audit and bounded recorded-operation recovery remain on THIS task; all nine acceptance criteria remain unchecked. Preserve unrelated work, staging, fields/history, customized copies, and exact existing resources. No main source integration, dependency patch, retained-folder redesign, global apply/activation/restart, live PRIMECLAW-45 action, new allocator, merge/abandonment or destructive cleanup. This handoff performs no new implementation or validation.
+
+## Infrastructure recovery — continue the existing slice 3 validation
+The owner-published recovery note records Joe's manual Docker Desktop restart and request to continue. The exact old pytest/shell, failed-run runtime and builder are now absent as later recovery facts. Preserve the original FAILED manifest, logs, share and repository snapshot; do not rewrite that failed run as clean or green.
+
+Current published code `f4990696aa30f5b97873caa603e15fc32c353647` preserves the unchanged 18 continuation files atop `002a779de01f08fe0dfe772260e180613e12ff86`. The approved Beads exception has already been incorporated into the native contract and applicable requirements/guidance/code/tests. Both checkpoints remain UNVALIDATED/INFRA-FAILED WIP, not accepted candidates. Continue THIS selected lower preparation/publication/supporting-path slice; review all subsequent WIP cumulatively against last accepted `1565c3272e12adf84238068dd1a99a4a809b182b`.
+
+Next canonical execute: prepare fresh, reload the exact owner/task/recovery note, and run fresh required focused Docker validation with existing pytest `-x` fail-fast: `python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container -x`. Reuse the prior successful probe only when it covers unchanged source; otherwise run the required probe. Coordinate a concrete fresh startup/capture slot when ready and there is actual competing capacity; no old slot or capture grants a new startup. Use the documented isolated driver and its existing repository snapshot.
+
+No product-source cause was established by the old native D/VirtioFS metadata waits. Diagnose a genuine in-scope assertion defect before repair. Do not make speculative source repairs, blanket timeout increases, fixture-placement/Docker-setting changes, host candidate tests, or native-history isolation workarounds. Peer57's custom direct raw-linked-worktree mount had an unavailable host .git pointer; our normal driver snapshots inputs before mounting. These are NOT proven the same cause; do not copy the peer workaround by analogy.
+
+Preserve actual new results and evidence limits, publish coherent code and exact native-task evidence promptly, then stop for owner review. Full BOTH-provider lifecycle-policy extraction, complete secondary durability audit and bounded recorded-operation recovery remain on THIS task. Keep the approved native Beads multi-issue boundary and unchanged Backlog selected-file guarantees. All9AC remain unchecked. No new framework/gate/store/branch/filter, dependency patch, retained-folder redesign, global apply/activation/restart, live PRIMECLAW-45 mutation, main integration, merge/abandonment or destructive live cleanup. This handoff performs no implementation or runtime validation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
