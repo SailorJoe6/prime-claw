@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-57
 title: Use durable Episode identity instead of ephemeral runtime routing IDs
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-04 16:24'
+updated_date: '2026-11-04 16:37'
 labels: []
 dependencies: []
 references:
@@ -120,6 +120,19 @@ This request logs the bug only. It authorizes no planning, implementation, live 
 - Required scripts/test-tier1.sh --probe attempted ONCE after owner returned PRIMECLAW-55 startup capacity. Actual bounded normal-driver startup 16:22:18Z; no competing startup during 55 window and no foreign resource inspection/removal. Fresh run .test-results/primeclaw57-routes-20261104T161450Z/20261104T162219Z-88219-f15c7a86/tier1 records exited 1, builder-failed, before runtime image/container/plugin install. Builder IID sha256:c0f3140c75d19faffff3eb4ff36f0d4d6e9b800b2b6c0e37d272d07fa5dfa81c; exact CID 794f8ee5d1cb5d05c36eb71c0f1bdfd1edcda664df21e22b2c46edc687549d1c is recorded clean/absent and independently inspected absent. Runtime image/installed version null; upstream source at a1faacd53ac4473a75de1d434afaf50945c2f647 and before/after checkout inventory identical. Startup slot returned including unused remainder, no retry/reservation held. The new sanitized receipt does not expose the command-level cause, so it is NOT fresh proof of a specific TLS error. The prior separate same-source diagnostic SELF_SIGNED_CERT_IN_CHAIN remains unresolved and not cleared; no TLS bypass, Keychain/credential access, dependency/upstream/selected-runtime change or host apply/check was used. Unblock condition remains an approved isolated native source-build environment with valid trust/dependencies that completes required tier1 install/load/probe; do not disable TLS.
 - Docs now explain same-resource bridge replay routing and post-cutover current addressing. Child read-only source/test sanity found no material bridge defect; not independent whole-candidate Expert review or UAT. Same owner/operation/Episode/session/worktree/branch retained. Requirements, implementation plan, parent, status In Progress and all unchecked AC unchanged. This completes only the approved coherent next slice. No merge, activation/restart, lifecycle publication, replacement Episode/assignment, retained TASK-2 live fixture, destructive cleanup or ownership edits. Report separately published task/code heads and STOP for owner review.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Prime Claw owning Conversation 01a1a6e7-da13-750e-ae8b-f6a6888c3b42
+created: 2026-11-04 16:37
+---
+Owner review accepted routing code 36de6686eba6711af4a6fef97b7e677907bec663: both independent material reviews found no defect; saved isolated results show356/356 related tests and4/4 focused migration tests. This is not whole-task Ready for Merge or merge/activation approval.
+Blocked on required isolated tier1 installation/load/probe: the fresh normal driver failed in its native source builder before plugin installation. The sanitized fresh receipt does not establish command-level cause; source checkout and selected runtime remain unchanged.
+Separate bounded HTTPS diagnostic in the exact immutable builder image showed default trust fails SELF_SIGNED_CERT_IN_CHAIN, while supplying the already-configured public CA bundle with TLS verification enabled returns HTTP200. Evidence: .test-results/primeclaw57-trust-check-20261104T163522Z/summary.json and default.log/provided-ca.log. Both exact diagnostic containers are verified absent; temporary CA copy removed. This proves the trust-input gap for that HTTPS request, not a successful npm install, source build or probe.
+Unblock condition: an explicitly approved isolated native build/trust environment completes the existing required tier1 probe, without disabling TLS or patching Prime Agent/dependencies. No test-harness CA-forwarding change has been implemented. Keep this same Episode, code/resources and existing task specification/plan/evidence. No merge, activation, replacement or live retained TASK-2 action.
+---
+<!-- COMMENTS:END -->
 
 ## Final Summary
 
