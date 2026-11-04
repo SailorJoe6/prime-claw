@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 13:05'
+updated_date: '2026-11-04 13:10'
 labels: []
 dependencies: []
 references:
@@ -15,24 +15,31 @@ references:
   - .backlog/tasks/primeclaw-45 - Migrate-prime-claw-to-Backlog.md-v1.55.3.md
 documentation:
   - docs/prep-chain.md
+  - docs/backlog.md
 modified_files:
   - .prime-claw/workflows/implement-task-prep.md
   - .prime-claw/workflows/implement-task.md
   - .prime-claw/workflows/plan-task-prep.md
   - .prime-claw/workflows/plan-task.md
+  - docs/backlog.md
   - docs/prep-chain.md
   - src/prime-agent-plugin/extension-support/prep-chain.ts
   - src/prime-agent-plugin/extension-support/reviewed-plan-support.ts
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
   - src/prime-agent-plugin/skills/implement-task/SKILL.md
   - src/prime-agent-plugin/skills/plan/SKILL.md
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
   - src/prime-agent-plugin/workflows/implement-task-prep.md
   - src/prime-agent-plugin/workflows/implement-task.md
   - src/prime-agent-plugin/workflows/plan-task-prep.md
   - src/prime-agent-plugin/workflows/plan-task.md
   - tests/reviewed_plan_extension.test.mjs
+  - tests/task_episode_admission_extension.test.mjs
+  - tests/task_episode_ownership_extension.test.mjs
   - tests/task_history_workspace.test.mjs
   - tests/task_providers.test.mjs
   - tests/test_future_plan_skills.py
@@ -185,6 +192,15 @@ This completes only the entry/prep-chain portion of the accepted living plan. Al
 Accept slice 2 (`1565c3272e12adf84238068dd1a99a4a809b182b`): owner and independent Expert reviews found no material defect in the entry/prep-chain policy removal and complete native context delivery. Continue the same task/Episode with the next coherent substantive slice of the existing living plan, prioritizing lower-level task-history preparation/publication and the directly supporting creation/ownership paths across Backlog and Beads. Remove whole-checkout cleanliness, stale-head/content approval, automatic reconciliation/retry/classifier and failure-disposition policy from code as applicable to that slice; necessary decisions belong to existing editable Markdown and the LLM, not renamed safety/transport gates. Reuse supported native commands and existing stage/resource mechanics; no universal observation schema, extra state store, policy interpreter, general recovery framework or dependency patch.
 
 Keep every remaining full-lifecycle seam, the complete secondary instruction audit, and bounded recorded-operation recovery on THIS task, not a deferred follow-up. Preserve exact existing operation/resources, native fields/history, unrelated bytes/staging and customized/foreign snapshots. Deliver matching real code changes, editable guidance and focused behavior tests with required Docker-only validation; commit/publish coherent task and code edits promptly, record truthful evidence and remaining plan, then stop for review. This is not task completion. No root-main code integration, global apply/activation/restart, live PRIMECLAW-45 action, retained-folder redesign, new allocator, merge/abandonment or destructive cleanup.
+
+## Resumed slice 3 — accepted native-history clarification and preserved WIP
+Joe's explicit approval and post-reboot continuation, recorded in the owner-authored "Operator approval and native-history blocker clearance" note, clear the native capability blocker. Continue the SAME task, Episode, operation and resources from code checkpoint `002a779de01f08fe0dfe772260e180613e12ff86`. That checkpoint preserves the prior 18 WIP files and is runtime UNVALIDATED, not an accepted/tested candidate. The review base remains accepted slice 2, `1565c3272e12adf84238068dd1a99a4a809b182b`.
+
+Apply only the accepted narrow Beads native-history exception. Beads v1.3.1 uses native touched-table/staged-set multi-issue commit semantics; do not promise per-issue history isolation. Editable guidance must expose native facts, disclose/review commit and publication consequences, and consult before publishing unauthorized or unclear pending work. Pending or concurrent native Beads database changes can prevent a safe operation. Do not replace the removed policy with a code dirty-state gate, extra store/branch, row-filter, dependency patch or policy/facts framework. Backlog selected-file guarantees, unrelated Git-dirt handling and compatible published-history advances remain unchanged. Keep historical source/API-limit evidence and mocked-test limits truthful.
+
+At the queued execute pass, run prepare fresh, reload the exact task and owner clearance, and incorporate this accepted clarification into the Episode-owned native Description/affected acceptance wording/living plan, applicable REQUIREMENTS and editable guidance/code/tests before claiming preservation or acceptance completion. Do not erase historical blocker evidence or broaden the exception. Finish the existing coherent lower preparation/publication/supporting-path slice rather than start another slice. Obtain a concrete source-builder startup/capture window only when source/tests are ready, run required isolated Docker validation, preserve actual failures and limits, publish coherent code and exact-task evidence promptly, then stop for owner review.
+
+Full BOTH-provider task-native lifecycle-policy extraction, the complete secondary durability audit and bounded recorded-operation recovery remain on THIS task; all nine acceptance criteria remain unchecked. Preserve unrelated work, staging, fields/history, customized copies, and exact existing resources. No main source integration, dependency patch, retained-folder redesign, global apply/activation/restart, live PRIMECLAW-45 action, new allocator, merge/abandonment or destructive cleanup. This handoff performs no new implementation or validation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
