@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-45
 title: Migrate prime-claw to Backlog.md v1.55.3
-status: Blocked
+status: In Planning
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-03 18:22'
+updated_date: '2026-11-04 19:38'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -134,5 +134,11 @@ author: Prime Claw owning Conversation 01a197be-7eeb-773f-98ef-7544560ced45
 created: 2026-11-03 18:22
 ---
 Blocked on PRIMECLAW-55: fix task-scoped Episode initiation during unrelated ticket edits/published task-history advances and provide bounded recovery of the existing partial PRIMECLAW-45 operation. Preserve the approved upgrade specification/plan and existing uncertain ownership/resources; do not retry fresh creation.
+---
+
+author: Backlog.md Expert Conversation 01a13199-736d-7469-9af6-a884cc1e85f9
+created: 2026-11-04 19:38
+---
+Workflow-state correction authorized by the operator (2026-11-04): restore `In Planning` because the failed admission never established the durable Episode session identity and assignment required to begin implementation. `PRIMECLAW-55` remains the native dependency and therefore remains the computed readiness blocker. Existing partial-resource and recovery evidence is preserved; this correction does not retry creation, discard resources, or change the approved specification or plan. `PRIMECLAW-60` records the clarified requirement that dependencies represent prerequisite blocking and `Needs Operator` is reserved for actual operator intervention.
 ---
 <!-- COMMENTS:END -->
