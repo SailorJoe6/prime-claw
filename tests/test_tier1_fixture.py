@@ -347,6 +347,22 @@ class TestSourceBuilderFailureReporting(unittest.TestCase):
 
 
 class TestSourceBuilderShareOwnership(unittest.TestCase):
+    def test_optional_public_ca_identity_is_strict_and_preserves_exact_teardown(self):
+        receipt = source_builder_receipt(state="absent", clean=True)
+        identity = {"content_sha256": "a" * 64, "size": 123}
+        receipt["public_ca_bundle"] = identity
+        self.assertEqual(conftest.provenance.source_builder_share_teardown(receipt),
+                         receipt["builder_teardown"])
+        for invalid in (None, [], {}, {**identity, "path": "private-input"},
+                        {**identity, "content_sha256": "invalid"},
+                        {**identity, "content_sha256": []},
+                        {**identity, "size": True}, {**identity, "size": 0},
+                        {**identity, "size": 1024 * 1024 + 1}, {**identity, "size": "123"}):
+            with self.subTest(identity=invalid):
+                receipt["public_ca_bundle"] = invalid
+                with self.assertRaises(conftest.provenance.ProvenanceError):
+                    conftest.provenance.source_builder_share_teardown(receipt)
+
     def _run_failed_builder(self, scenario):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name).resolve()

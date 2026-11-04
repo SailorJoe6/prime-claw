@@ -106,6 +106,18 @@ only. Do not apply, check, or probe a candidate against the host user-global
     read-only `/stage`; installation verifies and reads only `/stage`. No source
     checkout, host home, socket, credentials, or live state is exposed. The
     source path is never written to evidence or echoed.
+    When `NODE_EXTRA_CA_CERTS` already selects a public PEM certificate bundle,
+    the canonical source builder reads that bounded regular file, rejects keys
+    and non-certificate content, and stages a run-owned copy outside the image
+    context and release share. Only that file is mounted read-only at
+    `/input/public-ca.pem`; npm/node receive that container-local extra-root path
+    with TLS verification still on. No other host trust or environment settings
+    are forwarded. The existing `source-build.json` records only the bundle's
+    SHA-256 and size, never its contents or host path. The copy is removed after
+    clean exact-builder absence; uncertain teardown preserves it. Unset means
+    the original three-mount/default-trust path. The helper's
+    `--public-ca-bundle` can explicitly select the same kind of public input.
+    This support does not change host/Docker trust or the offline runtime.
   - `PRIME_AGENT_PINNED=<version>` and its vendor-installer path remain legacy
     fixture surfaces only. They are not supported for candidate construction:
     today's public installer can select a Rust/native artifact that shares the

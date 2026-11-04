@@ -260,7 +260,8 @@ def _collect_outputs(release: Path, output: Path,
     return records, dict(mains[0])
 
 
-def build(source: Path, manifest_path: Path, output: Path, work: Path) -> dict[str, Any]:
+def build(source: Path, manifest_path: Path, output: Path, work: Path,
+          public_ca_bundle: Path | None = None) -> dict[str, Any]:
     manifest = _validate_manifest(json.loads(manifest_path.read_text(encoding="utf-8")))
     work.mkdir(parents=True, exist_ok=True)
     local = work / "source"
@@ -277,6 +278,8 @@ def build(source: Path, manifest_path: Path, output: Path, work: Path) -> dict[s
         "HUSKY": "0", "CI": "1", "npm_config_update_notifier": "false",
         "npm_config_audit": "false", "npm_config_fund": "false",
     }
+    if public_ca_bundle is not None:
+        env["NODE_EXTRA_CA_CERTS"] = str(public_ca_bundle)
     Path(env["HOME"]).mkdir(mode=0o700, exist_ok=True)
     _run(["npm", "ci"], local, env, operation="npm-ci")
     for relative in DIST_DIRS:
@@ -308,6 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", default="/input/source-manifest.json")
     parser.add_argument("--output", default="/output")
     parser.add_argument("--work", default="/work")
+    parser.add_argument("--public-ca-bundle", type=Path)
     args = parser.parse_args(argv)
     stage = "initialization"
     try:
@@ -318,7 +322,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             output.mkdir(mode=0o700)
         stage = "build-and-pack"
-        result = build(Path(args.source), Path(args.manifest), output, Path(args.work))
+        result = build(Path(args.source), Path(args.manifest), output, Path(args.work),
+                       public_ca_bundle=args.public_ca_bundle)
         stage = "publication"
         target = output / "builder-output.json"
         temporary = output / ".builder-output.tmp"
