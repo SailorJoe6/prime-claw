@@ -3,10 +3,10 @@ id: PRIMECLAW-55
 title: >-
   Allow Episode initiation during unrelated ticket edits and task-history
   advances
-status: Blocked
+status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 20:03'
+updated_date: '2026-11-04 23:36'
 labels: []
 dependencies: []
 references:
@@ -428,4 +428,13 @@ PRIMECLAW-55 is Blocked because required focused plugin validation cannot curren
 Unblock when Joe explicitly approves a concrete bounded next validation-support/recovery step and any additional attempt it requires, or provides an otherwise supported ready validation path with explicit authorization for the next attempt. Record that actual decision before continuation. The existing native Beads multi-issue history exception and complete Backlog AND Beads lifecycle-policy extraction, secondary durability audit and bounded recorded-operation recovery scope remain unchanged; this is NOT reopening the previously cleared native-history decision.
 
 Preserve exact existing Episode, operation, branch/worktree, code33f18ed and all original/new failure evidence. No new Episode, source merge, global activation/restart, dependency patch, live PRIMECLAW-45 action, abandonment or live cleanup is added.
+
+## Operator approval, single implementation lead, and validation-blocker clearance
+Joe explicitly approved ("fine") ONE SHARED test-harness change coordinated with Task57: carry the already-configured PUBLIC CA bundle read-only into the isolated source builder, retain TLS verification, add focused regression coverage, and perform ONE NEW Task55 validation attempt. Joe's subsequent coordination direction was that Task57 wait for Task55 to finish the test-harness work. Task57 withdrew its earlier implementation offer before any edit/lifecycle action. Task55's SAME existing Episode is therefore the SINGLE implementation lead; no duplicate Task57 implementation or further operator approval is needed for this exact bounded work.
+
+Keep support in one separate isolated shared-harness commit usable without pulling Task55's wider unvalidated product slice or Task57 routing code. Preserve the accepted diagnostic-only support33f18ed. Use only the already-configured PUBLIC CA input read-only and do not expose CA contents, credentials/private keys or unrelated environment data. TLS verification stays ON. No dependency version/selector/mode change, host/Docker trust change, credential change, product/plugin behavior change, broad mount, retry framework, fixture substitution, activation or extra attempt is included. Default/no-CA behavior and existing identity/provenance/cleanup protections must remain intact except the minimum explicit public-CA input handling.
+
+This new approval clears the owner-decision portion of the validation blocker and authorizes active implementation through canonical continuation. Restore In Progress on the SAME Task55/Episode/resources. Exactly ONE NEW55validation attempt is approved and UNUSED; the earlier diagnostic attempt remains consumed. Task57 obtains no new attempt from this allowance. A peer's controlled Node HTTPS request proves a trust-input gap, not that the shared change fixes npm/build/plugin tests; record actual results and stop for owner review after the single attempt, pass or fail.
+
+The complete original Backlog AND Beads lifecycle-policy extraction, secondary durability audit, bounded recorded-operation recovery and approved native Beads multi-issue history boundary remain unchanged. All9AC remain unchecked. Source33f18ed contains accepted diagnostic support only; broader slice runtime validation is still unavailable and last accepted product review base is1565c327. No main/source merge, dependency patch, global apply/activation/restart, live PRIMECLAW-45 action, abandonment or live cleanup is authorized. Preserve historical failed manifests/logs/snapshots rather than rebaselining them.
 <!-- SECTION:NOTES:END -->
