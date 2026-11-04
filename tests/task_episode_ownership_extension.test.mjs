@@ -505,6 +505,13 @@ test("guarded transition records published independent Backlog authority without
   const replay = transition(f, {}, { transitionTargetResolver: () => providerTarget });
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.record, result.record);
+
+  const refreshed = transition(f, {
+    verifiedCurrentEpisodeActiveSessionId: "later-independent-backlog-route",
+  }, { transitionTargetResolver: () => providerTarget });
+  assert.equal(refreshed.reused, true);
+  assert.deepEqual(refreshed.record, { ...result.record, episodeActiveSessionId: "later-independent-backlog-route" });
+  assert.deepEqual(readEpisodeOwnership(f.root), refreshed.record);
 });
 
 test("guarded transition records published Beads authority and its first normal handoff remains usable", () => {
@@ -564,6 +571,18 @@ test("guarded transition records published Beads authority and its first normal 
   };
   const preparedHandoff = prepareEvidence(firstHandoff);
   assert.equal(preparedHandoff.commit().head, f.episodeHead);
+
+  const beforeRefresh = readEpisodeOwnership(f.root);
+  const refreshed = transition(f, {
+    verifiedCurrentEpisodeActiveSessionId: "later-beads-route",
+  }, { transitionTargetResolver: () => providerTarget });
+  assert.equal(refreshed.reused, true);
+  assert.deepEqual(refreshed.record, {
+    ...beforeRefresh,
+    episodeActiveSessionId: "later-beads-route",
+    updatedAt: "2026-10-14T09:00:00.000Z",
+  });
+  assert.deepEqual(readEpisodeOwnership(f.root), refreshed.record);
 });
 
 test("guarded Beads transition rejects a historical head that its first handoff and cleanup cannot continue", () => {
@@ -683,9 +702,57 @@ test("guarded transition atomically replaces an obsolete runtime route with the 
   ]) assert.deepEqual(result.record[preserved], f.legacy[preserved]);
   assert.deepEqual(readEpisodeOwnership(f.root), result.record);
 
-  const replay = transition(f, { verifiedCurrentEpisodeActiveSessionId: currentRoute });
+  const replay = transition(f, {
+    expectedPreviousEpisodeActiveSessionId: currentRoute,
+    verifiedCurrentEpisodeActiveSessionId: currentRoute,
+  });
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.record, result.record);
+});
+
+test("guarded transition replay refreshes a later verified runtime route without changing durable ownership", () => {
+  const f = transitionFixture();
+  const firstRoute = "first-current-route";
+  const completed = transition(f, { verifiedCurrentEpisodeActiveSessionId: firstRoute });
+  const nextRoute = "later-current-route";
+  const replay = transition(f, {
+    expectedPreviousEpisodeActiveSessionId: firstRoute,
+    verifiedCurrentEpisodeActiveSessionId: nextRoute,
+  });
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.record, { ...completed.record, episodeActiveSessionId: nextRoute });
+  assert.deepEqual(readEpisodeOwnership(f.root), replay.record);
+
+  assert.throws(() => transition(f, {
+    expectedPreviousEpisodeActiveSessionId: firstRoute,
+    verifiedCurrentEpisodeActiveSessionId: "third-current-route",
+  }), /previous runtime route drifted/);
+  assert.deepEqual(readEpisodeOwnership(f.root), replay.record);
+
+  const repeated = transition(f, {
+    expectedPreviousEpisodeActiveSessionId: nextRoute,
+    verifiedCurrentEpisodeActiveSessionId: nextRoute,
+  });
+  assert.equal(repeated.reused, true);
+  assert.deepEqual(repeated.record, replay.record);
+});
+
+test("guarded transition route-refresh replay preserves concurrent owner record changes", () => {
+  const f = transitionFixture();
+  const completed = transition(f);
+  let calls = 0;
+  const changed = { ...completed.record, uncertaintyReason: "concurrent owner observation" };
+  assert.throws(() => transition(f, {
+    verifiedCurrentEpisodeActiveSessionId: "later-current-route",
+  }, {
+    transitionTargetResolver: () => {
+      calls += 1;
+      if (calls === 2) writeEpisodeOwnership(f.root, changed);
+      return { provider: "backlog", history: "branch-local", task: f.selection };
+    },
+  }), /ownership changed during transition validation/);
+  assert.equal(calls, 2);
+  assert.deepEqual(readEpisodeOwnership(f.root), changed);
 });
 
 test("guarded transition requires explicit readiness, exact owner, and exact bindings", () => {
