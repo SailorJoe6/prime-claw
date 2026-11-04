@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 14:02'
+updated_date: '2026-11-04 14:22'
 labels: []
 dependencies: []
 references:
@@ -309,4 +309,15 @@ Docker source fixture was verified clean at a1faacd53ac4473a75de1d434afaf50945c2
 The required focused command `python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container` is still running in the one already-captured fixture, `.test-results/20261104T133753Z-27442-5979e0d9/tier1`. Current output has two failures; history bridge reached its900-second bound and emitted only `TAP version 13`. Read-only diagnostics found its orphaned Git `rev-parse HEAD` process in Linux state D / `request_wait_answer` for over20minutes, and a subsequent provider Node process also in state D / metadata-syscall wait. Snapshot/share mounts use VirtioFS. This establishes native filesystem-wait symptoms, NOT a proven product-code cause or an assertion-based repair. No full focused pass or clean terminal teardown is claimed while the run is incomplete. Log `/tmp/primeclaw55-slice3-resumed-focused.log`; bounded diagnostics `/tmp/primeclaw55-slice3-focused-diagnostics.log`.
 
 No code/source edit, process kill, Docker restart, retry or third startup was performed in response. Preserve remaining output and terminal manifest, then assess actual failures before any necessary repair/new coordinated validation. Current continuation source is uncommitted; code HEAD remains the published WIP002a779. Status stays In Progress, all9 AC unchecked, full remaining lifecycle/audit/recovery scope stays on this task. No main integration/global activation/live provider recovery/merge/cleanup authority is claimed.
+
+## Resumed slice 3 terminal validation result — focused failure and preserved runtime
+The focused run is terminal, not still running: original handle exited1 after2542.2seconds. Pytest result is11failed /14deselected /1teardownerror in0:42:21. Final manifest `.test-results/20261104T133753Z-27442-5979e0d9/tier1/manifest.json` records failed at2026-11-04T14:20:14Z with `tests-failed`, `teardown-command-failed`, `teardown-not-absent`. The earlier isolated probe PASS and selected static55pass remain separate evidence, not a focused pass.
+
+History returned124 with only the TAP header. Later Node bridges returned137 without useful assertion output; both RPC controls failed at even the native `command -v prime-agent` lookup timeout. Read-only diagnostics observed native filesystem metadata waits and uninterruptible processes. No product-code root cause has been established; do not infer a code repair or increase timeouts from these results. The owner's ONE SIGINT is now explicitly visible as `_FixtureInterrupted(signal2)` in the reviewed-plan case, after which pytest continued collecting/running later cases. It was not whole-run cancellation. This Episode sent no interruption/retry/kill/restart.
+
+Standard fixture teardown attempted only its captured runtime and FAILED: exact `docker rm -f` returned1 and native inspect proved present. At14:21:25Z runtime `3bdce23a7523f5000f5872fe5271307beaf801e51870d800ce44ab9b3717fb6a` remained running. The standard finalizer preserved its writable share and repository snapshot; do not manually delete either or claim absence. Builder `e7350f2cf1292d4f85cde7d0f4f0f6a2a6ea1bc06d214088294f61b9fdc2e7e7` has clean/absent receipt and a fresh native NoSuch inspection. Host pytest27442 is gone and the original handle is terminal. Network absence was proved at13:39:24Z, independently of test/teardown failure.
+
+Full log `/tmp/primeclaw55-slice3-resumed-focused.log`, diagnostics `/tmp/primeclaw55-slice3-focused-diagnostics.log`, manifest and existing receipts remain preserved. Startup slot was already returned; there is no third-startup grant. Runtime recovery is awaiting Joe's decision through the owner; this result authorizes no Docker service restart, ad hoc cleanup, new fixture, speculative repair or source change. After explicitly authorized recovery and current exact fixture-state inspection, a separately coordinated fresh candidate validation is still required before a tested slice3 candidate can be claimed.
+
+Continuation source remains uncommitted; code HEAD remains published WIP002a779, not accepted/tested. Review base remains accepted1565c327. Task status is unchanged and all9AC remain unchecked. Full remaining both-provider lifecycle extraction, secondary durability audit and bounded recovery scope remain on this same task. The completed test monitor has been removed; wait for the pending operator-recovery decision.
 <!-- SECTION:NOTES:END -->
