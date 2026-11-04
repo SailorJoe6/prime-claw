@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-57
 title: Use durable Episode identity instead of ephemeral runtime routing IDs
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-11-04 14:05'
+updated_date: '2026-11-04 14:20'
 labels: []
 dependencies: []
 references:
@@ -46,3 +47,12 @@ This request logs the bug only. It authorizes no planning, implementation, live 
 - [ ] #4 Focused deterministic isolated regression coverage reproduces the observed same-permanent-ID/different-runtime-handle cleanup failure and proves the correction while preserving relevant wrong-identity and busy-resource behavior.
 - [ ] #5 Related Prime Claw Episode identity/routing uses are checked for the same assumption and corrected where affected, through supported Prime Agent interfaces rather than Prime Agent source patches.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Reproduce the cleanup failure in the existing isolated session/Git fixtures in tests/spec_episode_extension.test.mjs: retain the permanent Episode ID, canonical session file and owned worktree/branch, but give the live idle session a different runtime handle from the ownership record.
+2. Correct task-episode-cleanup.ts so durable identity selects the owned session and cleanup addresses its verified current runtime handle. Keep current roster/state and pre-removal checks, explicit descendant handling, exact resource checks, terminal publication requirements, and busy/unknown-idle refusal. Do not hand-edit ownership or reopen, replace, or reassign an Episode to make cleanup work.
+3. Check the related Episode lookup, continuation/reopen and migration-continuity uses in spec-episode.ts and relevant ownership/cleanup callers for the same historical-handle-as-identity mistake. Correct only affected uses. Add focused regressions proving changed-handle cleanup succeeds while stale/reused handles cannot select a foreign session, missing/ambiguous/changed durable identity is refused, and busy or unprovably idle resources stay intact. Reuse existing coverage where it already proves these outcomes.
+4. Run the focused regressions and related Episode suites inside the existing isolated Docker test environment, plus the required scripts/test-tier1.sh --probe after plugin-source changes. Record the actual results and related-path audit in the native task notes, add only explanatory comments/docs needed for changed behavior, and commit/push the bounded candidate for review. No live activation/restart, Prime Agent source change, or use/removal of retained TASK-2 resources is included.
+<!-- SECTION:PLAN:END -->
