@@ -4,7 +4,7 @@ title: Use durable Episode identity instead of ephemeral runtime routing IDs
 status: In Progress
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-04 16:11'
+updated_date: '2026-11-04 16:16'
 labels: []
 dependencies: []
 references:
@@ -94,6 +94,12 @@ This request logs the bug only. It authorizes no planning, implementation, live 
 - Use fresh bounded isolated Docker tests from a disposable archive/snapshot, NOT a raw linked-worktree .git bind. Use existing native driver safety, supported Docker startup reservations and captured immutable identities. PRIMECLAW-55 is independently continuing; coordinate shared mutable-tag startup through this owner if a separate slot is needed. Do not inspect/remove its resources or freeze private authoring.
 - TLS source-builder SELF_SIGNED_CERT_IN_CHAIN remains an external validation limit; it has NOT been cleared. Do not disable TLS validation, access Keychain/credentials, patch dependencies or upstream Prime Agent, silently change selected runtime, or claim tier1 probe green. Record fresh attempts and limits truthfully.
 - Same task ID, owner/operation, durable Episode/session file, worktree and branch remain bound. Task stays In Progress; specification, implementation plan and unchecked criteria are unchanged. Keep native content/evidence current, publish this next coherent slice with separate task/code heads, report tested results and any genuine blocker, then stop for owner review. No merge, activation, restart, replacement Episode/duplicate initial assignment, retained TASK-2 live fixture use or destructive cleanup.
+
+2026-11-04 approved related-route slice in progress (same Episode):
+- Existing archive-snapshot fixture reproduced exact already-converted bridge replay failure with only a later verified current runtime route: red-bridge.log reports Existing task-native ownership does not match the completed transition binding, exited 1. Bounded offline Docker command/status captured under .test-results/primeclaw57-routes-20261104T161450Z; no raw linked .git mount.
+- Narrow bridge correction now treats expectedPreviousEpisodeActiveSessionId as stored-record drift evidence for both initial transition and replay, accepts a separately verified current route, and routes replay rebinding through existing paired provider/Git/unchanged-record/write-readback protections. Unchanged-route replay remains no-write. No authority/resource recreation or assignment.
+- Full ownership suite green: 75/75, zero failures/skips, exited 0 (green-bridge.log and green-bridge.status.json). New coverage proves subsequent current-route replay and idempotence, stale previous-record observation refusal, and preservation of a concurrent ownership write. The two source-native provider shapes retain their existing checks.
+- Related post-switch migration reproduction/guard fixtures are running in a separate fresh bounded network-none Docker snapshot against original migration source. Source correction waits for actual red evidence. These are disposable fixtures, not a live provider migration. Prior cleanup acceptance is preserved; whole-task readiness and tier1 TLS clearance are not claimed. Requirements/plan/unchecked acceptance and status remain unchanged.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
