@@ -4,7 +4,7 @@ title: Use durable Episode identity instead of ephemeral runtime routing IDs
 status: In Progress
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-04 14:23'
+updated_date: '2026-11-04 14:26'
 labels: []
 dependencies: []
 references:
@@ -56,3 +56,9 @@ This request logs the bug only. It authorizes no planning, implementation, live 
 3. Check the related Episode lookup, continuation/reopen and migration-continuity uses in spec-episode.ts and relevant ownership/cleanup callers for the same historical-handle-as-identity mistake. Correct only affected uses. Add focused regressions proving changed-handle cleanup succeeds while stale/reused handles cannot select a foreign session, missing/ambiguous/changed durable identity is refused, and busy or unprovably idle resources stay intact. Reuse existing coverage where it already proves these outcomes.
 4. Run the focused regressions and related Episode suites inside the existing isolated Docker test environment, plus the required scripts/test-tier1.sh --probe after plugin-source changes. Record the actual results and related-path audit in the native task notes, add only explanatory comments/docs needed for changed behavior, and commit/push the bounded candidate for review. No live activation/restart, Prime Agent source change, or use/removal of retained TASK-2 resources is included.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 bounded slice: verified exact owner/Episode/worktree and clean independent task history at b0ff73537bc995aa06f3cf96cd915da373091d9d. The isolated Docker regression changes only the live route in the existing local cleanup fixture while ownership retains its saved route. It fails with "Task Episode cleanup found a changed Prime Agent routing identity" before removal (local artifact: .test-results/primeclaw57/red.log). Root cause: sessionTree already matches permanent ID, canonical file and CWD, then incorrectly requires its current runtime handle to equal the historical ownership observation. Implement a narrow cleanup correction and focused identity/busy regressions; audit related lookup/continuation/migration paths read-only. No live activation, ownership edit or retained TASK-2 resource use.
+<!-- SECTION:NOTES:END -->
