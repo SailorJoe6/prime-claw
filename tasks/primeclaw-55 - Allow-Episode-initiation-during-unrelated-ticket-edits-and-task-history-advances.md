@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 23:36'
+updated_date: '2026-11-04 23:40'
 labels: []
 dependencies: []
 references:
@@ -250,6 +250,17 @@ Next obtain current startup/capture capacity, then make exactly ONE normal-drive
 The approved support code33f18ed is published. Existing host-safe mocked/script checks passed76tests/50subtests. Exactly ONE coordinated normal-driver -x diagnostic attempt ran at19:51:14UTC in run20261104T195118Z-2065-daa16099. It ended in pre-runtime setup failure: npm-ci / BuildError / exited / rc1 now propagates through the saved receipt and pytest wrapper. No underlying npm/TLS/compile/filesystem cause is proved, no runtime/plugin test ran, and no product correctness or AC completion is claimed. Full command/input/immutable-receipt/teardown evidence and limits are in native Notes.
 
 Builder clean absence was recorded and freshly verified; the startup slot returned19:53:30UTC before deadline. Old failed evidence remains historical/preserved. No retry, additional probe/startup or underlying build repair occurred. This consumes the ONE approved diagnostic attempt: STOP here for owner review even though runtime validation remains unavailable. Do not silently fix an expected cause or rerun. Preserve code33f18ed and same Episode/resources; review cumulative WIP from accepted1565c327. Full BOTH-provider lifecycle extraction, secondary durability audit and bounded recorded-operation recovery remain on this task, all9ACunchecked and native Beads exception unchanged. A further diagnostic/build attempt or distinct fix requires the applicable explicit disposition; this checkpoint does not create new authority.
+
+## Approved shared public-CA validation support — Task55 is the single lead
+Joe's explicit approval and owner-published "Operator approval, single implementation lead, and validation-blocker clearance" note authorize this bounded next support change and ONE NEW Task55 validation attempt. The owner has restored this SAME task/Episode to In Progress. This supersedes the prior human wait and prior prohibition on CA forwarding only for the exact approved PUBLIC-CA input handling below. The earlier diagnostic attempt remains consumed; this new allowance is UNUSED until actual launch. Task57 withdrew before editing and is waiting for Task55; do not wait for Task57 implementation or create a parallel workstream.
+
+At queued canonical execute, prepare fresh and reload the exact owner/current native approval, then implement the smallest existing-harness support for the already-configured PUBLIC CA bundle read-only in the ISOLATED SOURCE BUILDER, with TLS verification ON. Preserve accepted diagnostics33f18ed, source/dependency selection, default/no-CA behavior, current identity/provenance/cleanup protections, host/Docker trust, credentials and product/plugin behavior. Use only run-owned bounded public input handling; never commit the operator's actual bundle/contents or credential/private-key material. No broad host/environment forwarding, TLS bypass, alternate version/mode, cached/peer fixture replacement, dependency patch or new framework.
+
+Keep the shared support in ONE separate isolated commit usable without the wider unvalidated Task55 product slice or Task57 routing code. Add focused existing host-safe mocked/script regression coverage, including privacy and relevant input/mount/cleanup behavior. No host candidate-plugin execution or uncounted live Docker actor. Publish coherent code and native task evidence promptly.
+
+When support/tests are ready, request actual current startup/capture capacity for precisely ONE NEW normal-driver fail-fast validation of OUR candidate: `python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container -x`. There is no current reservation. No extra probe, retry or diagnostic actor beyond approved coverage. Report actual immutable builder/runtime receipts and return the slot on capture or earlier terminal setup failure; request any extension before expiry, never infer one or blind-kill. Record actual outcomes/limits and STOP after the one attempt for owner review whether it passes or fails. The known peer Node HTTPS experiment establishes only a trust-input gap, not npm/build/plugin success.
+
+Full BOTH-provider task-native lifecycle extraction, secondary all-asset durability audit and bounded recorded-operation recovery remain on THIS task with the approved Beads multi-issue history boundary unchanged; all9AC remain unchecked. Last accepted product review base1565c327 remains distinct from accepted diagnostic-only delta33f18ed. No speculative product repair, main integration, global apply/activation/restart, live45mutation, retained-folder redesign, allocator/store/row-filter/policy framework, merge/abandonment or destructive live cleanup. Preserve historical failures/evidence. This handoff makes no source change, CA read/copy, test or Docker/resource action.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
