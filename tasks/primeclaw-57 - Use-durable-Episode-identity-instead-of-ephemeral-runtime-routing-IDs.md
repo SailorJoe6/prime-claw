@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-57
 title: Use durable Episode identity instead of ephemeral runtime routing IDs
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-04 14:20'
+updated_date: '2026-11-04 14:23'
 labels: []
 dependencies: []
 references:
