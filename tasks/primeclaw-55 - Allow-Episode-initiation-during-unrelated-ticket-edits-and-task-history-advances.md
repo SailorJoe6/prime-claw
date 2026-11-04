@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 16:21'
+updated_date: '2026-11-04 19:25'
 labels: []
 dependencies: []
 references:
@@ -356,4 +356,13 @@ Actual source-builder IID `sha256:2f05c76683875f3be93102bc27175467b9a7575c5a033f
 The surviving diagnostics provide only the helper's generic failure code, not the underlying failing native operation. Read-only inspection of the existing helper/fixture confirmed generic error handling; no cause or product-code repair is established. This is NOT evidence that the earlier D/VirtioFS waits recurred or that peer57's custom direct raw-linked-worktree mount had the same cause. No source/dependency/fixture-placement/Docker-setting change, host candidate test, signal/kill, second startup or retry was performed. The remaining slot was returned immediately after inspecting terminal failure evidence, before its deadline.
 
 Current blocker: required fresh focused validation has not reached plugin execution. Preserve clean published UNVALIDATED/INFRA-FAILED WIP f499 atop002a and review all cumulative changes against accepted1565c327. Await the owning Conversation's bounded disposition for any additional diagnostic/runtime attempt; an old slot or this failure does not authorize another startup, speculative repair or settings change. Candidate readiness still requires actual focused test evidence. Full BOTH-provider lifecycle extraction, complete secondary durability audit and bounded recorded-operation recovery remain on THIS task with the approved native Beads exception unchanged. No status/ownership/AC mutation, main integration/global activation/restart/live45/merge/abandonment or destructive live cleanup is authorized.
+
+## Operator-approved narrow diagnostic validation-support work
+Joe explicitly approved the proposed small diagnostic-only improvement to prime-claw's existing source-builder/test-fixture error reporting, focused regression coverage, and ONE coordinated diagnostic attempt. The current generic builder-failed/rc1 loses useful failed-stage/error/result context, so this supporting change is needed to diagnose validation; it is not a product-source fix or proof of the underlying cause.
+
+Keep the change minimal and bounded: preserve useful privacy-safe failed-operation/error-category/native-result details in existing diagnostics and surface them through the existing pytest wrapper. Do not dump environment contents, credentials or arbitrary unsafe command output. Use existing reporting/test interfaces; no new state store, reporting protocol, policy/classifier/retry framework or replacement fixture. Add focused regression coverage including privacy/error-propagation behavior, then one coordinated fresh diagnostic attempt; preserve actual outcomes without claiming setup failure is a product defect.
+
+This approval does NOT authorize CA/trust forwarding, TLS verification bypass, Docker setting changes, dependency patch/version/mode selection changes, cached/peer runtime substitution, or a retry beyond the single approved attempt. Any distinct trust-input fix needs its own explicit decision and evidence. No global activation, merge/abandonment, live PRIMECLAW-45 action or live cleanup is added.
+
+The original full Backlog AND Beads lifecycle-policy extraction, complete secondary durability audit, bounded recorded-operation recovery, and previously approved native Beads multi-issue history boundary all remain unchanged on this SAME task/Episode. All nine ACs remain unchecked. Source checkpoint f499069 is still unvalidated, last accepted review base1565c327. Record the actual supporting changes/evidence in the living plan, keep old failures historical, publish coherently and stop for owner review after the bounded attempt.
 <!-- SECTION:NOTES:END -->
