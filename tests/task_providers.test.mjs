@@ -371,8 +371,8 @@ function beadsMutationRunner(root, scenario = {}) {
         const noteIndex = args.indexOf("--append-notes");
         if (noteIndex >= 0 && !scenario.ignoreNote) notes = `${notes}\n${args[noteIndex + 1]}`;
         mutationCompleted = true;
-        if (!scenario.noNewRevision) revision = scenario.postUpdateDescendant ? "e".repeat(32) : "d".repeat(32);
-        return { stdout: JSON.stringify([{ id: "TST-1", status }]) + "\n", stderr: "native update warning\n", status: 0 };
+        if (!scenario.noNewRevision && !scenario.historyCommitFailure) revision = scenario.postUpdateDescendant ? "e".repeat(32) : "d".repeat(32);
+        return { stdout: JSON.stringify([{ id: "TST-1", status }]) + "\n", stderr: scenario.historyCommitFailure ? "simulated trailing history commit failure\n" : "native update warning\n", status: 0 };
       }
       if (command === "bd" && args[0] === "dolt" && args[1] === "push") {
         if (scenario.pushFailure) return { stdout: "native push output\n", stderr: "non-fast-forward\n", status: 1 };
@@ -1145,7 +1145,7 @@ test("explicit retained-folder and migration transport keeps its separate pre-ex
   const runner = recordedDetectionRunner(beadsWorkspaceResponses(root));
   const result = prepareExplicitBeadsWorkspaceTransport(root, runner);
   assert.equal(result.status, "ready");
-  assert.equal(result.evidence.publishedRevision, DOLT_REVISION);
+  assert.equal(result.evidence.submittedRevision, DOLT_REVISION);
   assert.equal(result.evidence.publicationHead, DOLT_DATA_HEAD);
   assert.equal(runner.calls.filter(([command, subcommand]) => command === "dolt" && subcommand === "clone").length, 1);
   assert.equal(runner.calls.filter((call) => call.at(-1) === DOLT_IDENTITY_QUERY).length, 2);
@@ -1195,7 +1195,7 @@ test("Beads transport retains absent fields and unavailable publication evidence
   assert.equal(result.evidence.serverHost, undefined);
   assert.equal(result.evidence.serverPort, undefined);
   assert.equal(result.evidence.publicationHead, undefined);
-  assert.equal(result.evidence.publishedRevision, undefined);
+  assert.equal(result.evidence.submittedRevision, undefined);
   assert.deepEqual(result.evidence.server, { database: "fixture_db", embedded: true, native_extra: null });
   assert.equal(result.evidence.publication.command.status, 2);
   assert.equal(result.evidence.publication.command.stderr, "no remote ref\n");
@@ -1476,24 +1476,49 @@ test("Beads mutation performs one requested native update and one pull/push with
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
   const runner = beadsMutationRunner(root);
   const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
-  assert.equal(result.status, "published");
+  assert.equal(result.status, "pushed");
   assert.equal(result.evidence.preparedRevision, DOLT_REVISION);
-  assert.equal(result.evidence.committedRevision, "d".repeat(32));
-  assert.equal(result.evidence.publishedRevision, "d".repeat(32), "submitted HEAD is retained on native push success");
+  assert.equal(result.evidence.postMutationRevision, "d".repeat(32));
+  assert.equal(result.evidence.submittedRevision, "d".repeat(32), "submitted HEAD is retained on native push success");
   assert.equal(result.evidence.publicationHead, "e".repeat(40));
   assert.equal(result.evidence.remotePublishedTask, undefined, "no remote task snapshot is fabricated");
-  assert.equal(result.evidence.taskPublished.nativeStatus, "in_progress");
+  assert.equal(result.evidence.taskAfterPush.nativeStatus, "in_progress");
   assert.deepEqual(result.evidence.mutation.args, ["--dolt-auto-commit=on", "update", "TST-1", "--status", "in_progress", "--json"]);
   assert.equal(result.evidence.mutation.stderr, "native update warning\n");
   assert.equal(result.evidence.push.stderr, "native push warning\n");
   assert.equal(result.evidence.taskReads.length, 4);
-  assert.deepEqual(JSON.parse(result.evidence.taskReads.at(-1).command.stdout)[0], result.evidence.taskPublished.nativeView);
+  assert.deepEqual(JSON.parse(result.evidence.taskReads.at(-1).command.stdout)[0], result.evidence.taskAfterPush.nativeView);
   assert.equal(result.evidence.commands.includes(result.evidence.pull), true);
   assert.equal(result.evidence.commands.includes(result.evidence.mutation), true);
   assert.equal(result.evidence.commands.includes(result.evidence.push), true);
   assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
   assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
   assert.equal(runner.calls.some((call) => call.includes("--if-status") || call.includes("--force") || call.includes("clone")), false);
+});
+
+// Adapter-only failure simulation, not a reproduction of native Dolt commits
+// or proof of per-issue isolation. Beads may leave an update in its working set
+// despite returning success; a push result must not label that task published.
+test("Beads push success preserves a logged history-commit failure as unproved local task evidence", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const runner = beadsMutationRunner(root, { historyCommitFailure: true, dirtyAfterMutation: true });
+  const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
+  assert.equal(result.status, "pushed", "only the requested native push is reported successful");
+  assert.equal(result.evidence.mutation.status, 0);
+  assert.equal(result.evidence.mutation.stderr, "simulated trailing history commit failure\n");
+  assert.equal(result.evidence.push.status, 0);
+  assert.equal(result.evidence.submittedRevision, DOLT_REVISION, "HEAD did not advance with the working-set update");
+  assert.equal(result.evidence.postMutationObservation.clean, false);
+  assert.equal(result.evidence.postPushObservation.clean, false);
+  assert.equal(result.evidence.taskAfterPush.nativeStatus, "in_progress", "this is a local working-set read only");
+  for (const key of ["publishedRevision", "taskPublished", "postMutationProof", "localPublishedProof", "remotePublishedTask"]) {
+    assert.equal(key in result.evidence, false, `${key} must not invent committed/published task proof`);
+  }
+  for (const operation of ["pull", "update", "push"]) {
+    assert.equal(runner.calls.filter((call) => call.includes(operation)).length, 1);
+  }
+  assert.equal(runner.calls.some((call) => call.includes("clone") || call.includes("--force")), false);
 });
 
 test("Beads status and note requests are native operations, not transition eligibility rules", () => {
@@ -1507,10 +1532,10 @@ test("Beads status and note requests are native operations, not transition eligi
     const runner = beadsMutationRunner(root, { initialStatus: from });
     const note = `Owner requested ${to}`;
     const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: to, note, runner });
-    assert.equal(result.status, "published");
+    assert.equal(result.status, "pushed");
     assert.equal(result.evidence.taskBefore.nativeStatus, from);
-    assert.equal(result.evidence.taskPublished.nativeStatus, BEADS_STATUS_MAP[to].name);
-    assert.deepEqual(result.evidence.taskPublished.nativeView.native_tail, result.evidence.taskBefore.nativeView.native_tail);
+    assert.equal(result.evidence.taskAfterPush.nativeStatus, BEADS_STATUS_MAP[to].name);
+    assert.deepEqual(result.evidence.taskAfterPush.nativeView.native_tail, result.evidence.taskBefore.nativeView.native_tail);
     assert.deepEqual(result.evidence.mutation.args, ["--dolt-auto-commit=on", "update", "TST-1", "--status", BEADS_STATUS_MAP[to].name, "--append-notes", note, "--json"]);
     if (from === "custom_native_status" || from === "closed") assert.equal("canonicalStatus" in result.evidence.taskBefore, false);
   }
@@ -1521,7 +1546,7 @@ test("Beads forwards native --if-status only when explicitly requested and repor
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
   const runner = beadsMutationRunner(root, { initialStatus: "custom_native_status" });
   const accepted = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "Blocked", ifStatus: "custom_native_status", runner });
-  assert.equal(accepted.status, "published");
+  assert.equal(accepted.status, "pushed");
   assert.deepEqual(accepted.evidence.mutation.args, ["--dolt-auto-commit=on", "update", "TST-1", "--status", "blocked", "--if-status", "custom_native_status", "--json"]);
   const rejectedRunner = beadsMutationRunner(root, { initialStatus: "ready_for_merge" });
   const rejected = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "Blocked", ifStatus: "in_progress", runner: rejectedRunner });
@@ -1538,15 +1563,15 @@ test("Beads preserves missing native fields, unknown statuses, nulls, and raw pr
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
   const runner = beadsMutationRunner(root, { absentFields: true, absentRevisionFields: true, nativeView: { provider_extra: { unknown: null } } });
   const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
-  assert.equal(result.status, "published");
-  for (const task of [result.evidence.taskBefore, result.evidence.taskPublished]) {
+  assert.equal(result.status, "pushed");
+  for (const task of [result.evidence.taskBefore, result.evidence.taskAfterPush]) {
     for (const field of ["title", "nativeStatus", "canonicalStatus"]) assert.equal(field in task, false);
     for (const field of ["title", "status", "design", "notes", "comments"]) assert.equal(field in task.nativeView, false);
     assert.deepEqual(task.nativeView.provider_extra, { unknown: null });
   }
-  assert.equal(result.evidence.postMutationProof.clean, undefined);
-  assert.equal(result.evidence.postMutationProof.parentRevision, undefined);
-  assert.deepEqual(result.evidence.postMutationProof.nativeView.native_extra, { retained: true });
+  assert.equal(result.evidence.postMutationObservation.clean, undefined);
+  assert.equal(result.evidence.postMutationObservation.parentRevision, undefined);
+  assert.deepEqual(result.evidence.postMutationObservation.nativeView.native_extra, { retained: true });
 });
 
 test("Beads does not approve per-field note/status content before native publication", () => {
@@ -1554,9 +1579,9 @@ test("Beads does not approve per-field note/status content before native publica
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
   const runner = beadsMutationRunner(root, { initialStatus: "in_progress", ignoreStatus: true, ignoreNote: true });
   const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "Blocked", note: "requested note", runner });
-  assert.equal(result.status, "published", "native successful operations are evidence, not code-level semantic acceptance");
-  assert.equal(result.evidence.taskPublished.nativeStatus, "in_progress");
-  assert.equal(result.evidence.taskPublished.nativeView.notes, "existing native notes");
+  assert.equal(result.status, "pushed", "native successful operations are evidence, not code-level semantic acceptance");
+  assert.equal(result.evidence.taskAfterPush.nativeStatus, "in_progress");
+  assert.equal(result.evidence.taskAfterPush.nativeView.notes, "existing native notes");
   assert.ok(result.evidence.mutation.args.includes("requested note"));
   assert.equal(result.evidence.push.status, 0);
 });
@@ -1577,15 +1602,15 @@ for (const [name, scenario] of [
     const index = execFileSync("git", ["diff", "--cached", "--binary"], { cwd: root });
     const runner = beadsMutationRunner(root, scenario);
     const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
-    assert.equal(result.status, "published");
+    assert.equal(result.status, "pushed");
     assert.equal(runner.calls.filter((call) => call.includes("pull")).length, 1);
     assert.equal(runner.calls.filter((call) => call.includes("update")).length, 1);
     assert.equal(runner.calls.filter((call) => call.includes("push")).length, 1);
     assert.deepEqual(readFileSync(join(root, "unrelated.txt")), bytes);
     assert.deepEqual(execFileSync("git", ["diff", "--cached", "--binary"], { cwd: root }), index);
     if (scenario.concurrentPull) assert.equal(JSON.parse(result.evidence.commands.find((command) => command.args.at(-1) === DOLT_MUTATION_REVISION_QUERY).stdout)[0].revision, "c".repeat(32));
-    if (scenario.dirtyAfterMutation) assert.equal(result.evidence.postMutationProof.clean, false);
-    if (scenario.noNewRevision) assert.equal(result.evidence.committedRevision, DOLT_REVISION);
+    if (scenario.dirtyAfterMutation) assert.equal(result.evidence.postMutationObservation.clean, false);
+    if (scenario.noNewRevision) assert.equal(result.evidence.postMutationRevision, DOLT_REVISION);
   });
 }
 
@@ -1594,12 +1619,12 @@ test("Beads post-push advances are separate native observations, not a frozen eq
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
   const runner = beadsMutationRunner(root, { postPushLocalAdvance: true, postPushStatus: "native_later_status", refFailure: true });
   const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
-  assert.equal(result.status, "published");
-  assert.equal(result.evidence.committedRevision, "d".repeat(32));
-  assert.equal(result.evidence.publishedRevision, "d".repeat(32), "the post-push local HEAD is not mislabeled as pushed");
-  assert.equal(result.evidence.localPublishedProof.revision, "f".repeat(32));
-  assert.equal(result.evidence.taskPublished.nativeStatus, "native_later_status");
-  assert.equal("canonicalStatus" in result.evidence.taskPublished, false);
+  assert.equal(result.status, "pushed");
+  assert.equal(result.evidence.postMutationRevision, "d".repeat(32));
+  assert.equal(result.evidence.submittedRevision, "d".repeat(32), "the post-push local HEAD is not mislabeled as pushed");
+  assert.equal(result.evidence.postPushObservation.revision, "f".repeat(32));
+  assert.equal(result.evidence.taskAfterPush.nativeStatus, "native_later_status");
+  assert.equal("canonicalStatus" in result.evidence.taskAfterPush, false);
   assert.equal(result.evidence.publicationHead, undefined);
   assert.equal(result.evidence.publication.command.stderr, "remote read unavailable\n");
   assert.equal(result.evidence.remotePublishedTask, undefined);
@@ -1769,15 +1794,15 @@ test("conversation status publication returns the exact published Beads evidence
     resolveTask() { throw new Error("Beads publication must not resolve a Backlog task path"); },
   });
 
-  assert.equal(result.status, "published");
+  assert.equal(result.status, "pushed");
   assert.equal(result.evidence.provider, "beads");
   assert.equal(result.evidence.preparedRevision, DOLT_REVISION);
-  assert.equal(result.evidence.publishedRevision, "d".repeat(32));
+  assert.equal(result.evidence.submittedRevision, "d".repeat(32));
   assert.equal(result.evidence.publicationHead, "e".repeat(40));
   assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "update"), false);
   assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on").length, 1);
   assert.ok(runner.calls.some((call) => call.includes("--append-notes") && call.includes("native lifecycle evidence")));
-  assert.match(result.evidence.taskPublished.nativeView.notes, /native lifecycle evidence/);
+  assert.match(result.evidence.taskAfterPush.nativeView.notes, /native lifecycle evidence/);
 });
 
 test("conversation status publication propagates raw Beads native failure without classification", () => {

@@ -20,24 +20,9 @@ For retained version 1 folder ownership, require its readable non-empty active s
 
 Use the exceptional `transition_spec_episode_to_task` cutover surface after marker, review, merge, activation, restart, UAT, readiness, and exact heads. Preserve resources; Beads requires historical-head ancestry/clean code. An exact same-binding replay is the only idempotent replay; plan deletion remains a separate reviewed step.
 
-Preparation, publication, reservation and observation advancement supply native
-facts; they do not repeat your lifecycle or compatibility decision. Before
-requesting a mutation, inspect the exact task and current history and ensure the
-intended ticket update is authorized. Preserve unrelated code/task bytes and
-staging. Dirty state is not permission to include another owner's work, and a
-new revision alone is not a conflict. Backlog publication uses an exact-path
-commit and one non-force push, with no hidden merge/classifier/retry. Beads uses
-supported native history and one requested push. Its submitted candidate
-revision, post-push local task/revision and publication-ref observation are
-separate facts, not a frozen remote-content proof. Read those facts and judge a
-real semantic conflict or compatible in-scope change under the current editable
-guidance. Do not ask reservation or evidence code to enforce status/design,
-whole-checkout cleanliness or content/revision approval on your behalf. Exact
-owner/task/database/worktree/session and resource targeting remain unchanged.
-Commit each coherent authorized native ticket update promptly and publish when
-a remote exists; do not defer accepted review or blocker evidence until handoff.
+Follow `.prime-claw/workflows/implement-task.md` for preparation/publication; code supplies facts, not policy. Backlog keeps exact-file commits. Beads v1.3.1 uses touched-table/staged-set multi-issue history, not per-issue isolation. Before auto-committing mutation/push, review consequences and consult about unauthorized/unclear pending work. Native pending/concurrent changes can prevent a safe operation; native success does not prove task inclusion. Commit coherent authorized edits promptly and publish.
 
-Review one reported slice at a time: check ownership/code/tests/docs/authority. Independent Backlog: compare persisted/current complete native task evidence/revision/publication. For Beads, compare the persisted raw task and revision with the synchronized current raw task, publication ref, candidate code base/head. An unrelated-task revision descendant alone is compatible. For a same-task change, surface the exact persisted and current fields. Judge whether it is a compatible in-scope clarification or living-plan update; escalate a genuine semantic conflict, authority change, scope expansion, or product decision. Never replace this judgment with a classifier or equality gate. Apply before handoff, blockers, terminals, and cleanup; mutate only as authorized.
+Review one reported slice at a time: check ownership/code/tests/docs and persisted/current native task/history observations. An unrelated-task descendant alone is compatible. Judge same-task changes as in-scope clarification or genuine semantic conflict, authority change, scope expansion, or product decision. Apply before handoff, blockers, terminals and cleanup; no equality gate or classifier replaces judgment.
 
 A report, findings, and Review conclusions are evidence, not approval. Choose:
 
@@ -53,7 +38,7 @@ The remaining lifecycle and cleanup flow applies only to version 2 task-native o
 
 Before merge readiness, verify provider-reported idle completion of the Episode and explicitly proven descendants through Prime Agent list/state responses. Only recursive explicit parent session ID or canonical parent session-file edges prove descendants; require agreement when both exist. CWD/RLM metadata grants no ownership. Active or unprovable-idle sessions block readiness and merge; cleanup independently rechecks before mutation.
 
-For Beads, `handoff_task_episode` targets the exact owner/resources and performs one native pull before reading current task/revision observations. The evidence-advancement helper does not pair stable publication proofs or require a frozen previous revision/content observation. After first-message admission, its callback records only `providerRevision`, raw `taskEvidence`, code `head`, and `updatedAt`. Prior may be `blocked`; require current `in_progress` and meaningful design. Integrity failure stops without retry.
+For Beads, `handoff_task_episode` targets exact resources and supplies previous/current native observations after one pull, without frozen content/revision approval. After message admission, record only provider/task/code observations and `updatedAt`. Prior may be `blocked`; current requires `in_progress` and meaningful design. Native failure stops without retry.
 
 Only the exact owning top-level canonical-primary Conversation publishes accepted blockers. Grandfathered Backlog uses exact-path code-DAG status commit/push. Independent Backlog uses the primary nested clone: freshly fast-forward only, edit the exact task with the supported CLI, commit only its path, push `HEAD:refs/heads/prime-claw/tasks` without force, and prove the direct remote head while the code HEAD stays unchanged. Restore `In Progress` through the same selected mode before handoff; the host prepares both clones and records facts only after admission.
 
@@ -73,6 +58,8 @@ Apply **Abandon** only after explicit operator confirmation of task and pushed E
 
 On error/interruption, the Conversation interprets provider evidence; re-read current ownership, Prime Agent, provider, and Git state. Exact absence counts as cleaned. Re-invoke only when current evidence proves safe progress; changed, busy, dirty, foreign, unpublished, or wrong-head state blocks. Consult the operator only when safe progress is impossible. No retry/classifier/coordinator/receipt/replay result.
 
-Use `prime-claw-expert-review` when needed. Speculative hardening, alternative architecture, and reviewer-invented invariants are non-blocking. If review invents requirements, stop that review loop. Do not request or implement another repair merely to satisfy adversarial review.
+Use `prime-claw-expert-review` when needed; speculative hardening, alternative architecture, and reviewer-invented invariants are non-blocking. Stop invented-requirement review loops.
 
-Maintain a bounded goal. Use one exact heartbeat while waiting for Episode/Expert work. The operator alone decides scope, product, merge, and abandonment.
+Maintain a bounded goal, or one exact heartbeat while waiting for Episode/Expert work.
+
+The operator alone decides scope, product, merge, abandonment.

@@ -2722,7 +2722,7 @@ export async function finalizeTaskEpisodeCleanup(
 }
 
 type BeadsProviderTaskResolution = Extract<ProviderTaskResolution, { provider: "beads" }>;
-type PublishedBeadsTaskMutation = Extract<BeadsTaskMutationPublication, { status: "published" }>;
+type PublishedBeadsTaskMutation = Extract<BeadsTaskMutationPublication, { status: "pushed" }>;
 
 class BeadsPublicationEvidenceError extends Error {
   readonly publication: BeadsTaskMutationPublication;
@@ -2794,12 +2794,12 @@ function requirePublishedBeadsTaskMutation(
   canonicalStatus: "In Planning" | "In Progress" | "Blocked",
   nativeStatus: "in_planning" | "in_progress" | "blocked",
 ): PublishedBeadsTaskMutation {
-  if (!("status" in result) || result.status !== "published") {
+  if (!("status" in result) || result.status !== "pushed") {
     if ("status" in result) throw new BeadsPublicationEvidenceError(action, result);
     throw new Error(`${action} returned Backlog status-commit evidence in a Beads repository`);
   }
   const evidence = result.evidence;
-  const task = evidence.taskPublished;
+  const task = evidence.taskAfterPush;
   const raw = task.nativeView;
   if (evidence.provider !== "beads" || evidence.taskId !== taskId
       || !samePath(evidence.projectRoot, projectRoot)
@@ -2847,8 +2847,8 @@ function advanceBlockedBeadsOwnership(
   const evidence = publication.evidence;
   const advanced = parseEpisodeOwnership({
     ...retained,
-    providerRevision: evidence.publishedRevision,
-    taskEvidence: evidence.taskPublished.nativeView,
+    providerRevision: evidence.submittedRevision,
+    taskEvidence: evidence.taskAfterPush.nativeView,
     updatedAt: now(),
   }) as BeadsTaskEpisodeOwnershipRecord;
   store.write(projectRoot, advanced);
@@ -2944,7 +2944,7 @@ async function createBeadsTaskEpisode(
       const livePublishedTask = exactBeadsAdmissionTask(
         resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
       );
-      const publishedNativeView = inProgressPublication.evidence.taskPublished.nativeView;
+      const publishedNativeView = inProgressPublication.evidence.taskAfterPush.nativeView;
       if (JSON.stringify(livePublishedTask.nativeView) !== JSON.stringify(publishedNativeView)) {
         throw new BeadsRawTaskViewDriftError(taskId, publishedNativeView, livePublishedTask.nativeView);
       }
@@ -2969,8 +2969,8 @@ async function createBeadsTaskEpisode(
       });
       if (reservation.provider !== "beads" || reservation.taskId !== taskId
           || reservation.baseRef !== codeHead
-          || reservation.providerRevision !== inProgressPublication.evidence.publishedRevision
-          || JSON.stringify(reservation.taskEvidence) !== JSON.stringify(inProgressPublication.evidence.taskPublished.nativeView)) {
+          || reservation.providerRevision !== inProgressPublication.evidence.submittedRevision
+          || JSON.stringify(reservation.taskEvidence) !== JSON.stringify(inProgressPublication.evidence.taskAfterPush.nativeView)) {
         throw new Error("Beads task Episode reservation did not bind the exact published task and clean code HEAD");
       }
       return reservation;
@@ -2984,8 +2984,8 @@ async function createBeadsTaskEpisode(
     if (!isBeadsTaskEpisodeOwnership(active) || active.status !== "active"
         || active.operationId !== admission.operationId || active.baseRef !== codeHead
         || active.head !== codeHead
-        || active.providerRevision !== inProgressPublication.evidence.publishedRevision
-        || JSON.stringify(active.taskEvidence) !== JSON.stringify(inProgressPublication.evidence.taskPublished.nativeView)) {
+        || active.providerRevision !== inProgressPublication.evidence.submittedRevision
+        || JSON.stringify(active.taskEvidence) !== JSON.stringify(inProgressPublication.evidence.taskAfterPush.nativeView)) {
       throw new Error("Beads task Episode allocation returned without the exact active reservation identity");
     }
     exactBeadsResourceIdentity(active, result);

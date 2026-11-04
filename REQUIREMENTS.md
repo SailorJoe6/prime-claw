@@ -108,8 +108,17 @@ Sources: [PRIMECLAW-22][T22], [10.34][T10_34], [33.11][T33_11]. The accessible
 ### G5. Preserve unrelated work and report facts honestly
 
 Do not commit, stash, reset, overwrite, delete, or adopt another conversation's
-work to satisfy a workflow. Unrelated changes and compatible history advances
-are normal concurrent work, not permission to freeze the whole repository.
+work to satisfy a workflow. Backlog commits remain selected-file-only. The only
+commit-isolation exception is Beads v1.3.1 native touched-table/staged-set commits,
+which may include multiple issues; it does not extend to code or other Git files
+and does not promise per-issue history isolation. Before consequential native
+mutation, commit, or push, disclose and review its consequences and consult if
+pending work is unauthorized or unclear. With auto-commit on, a native update may commit
+touched-table/pre-staged pending work before any push.
+Unrelated Git changes and compatible history advances are normal concurrent work,
+not permission to freeze the whole repository. Pending or concurrent native Beads
+database changes can prevent a safe operation; judge the actual facts, not a
+replacement code-level dirty gate or blanket quiescence rule.
 Distinguish requested, queued, completed, reviewed, published, and activated.
 An uncertain consequential operation requires inspection, not a blind replay,
 false success, or fresh duplicate allocation.
@@ -174,14 +183,21 @@ In Progress, Blocked, Ready for Merge, and Done, using native provider mappings.
 
 Sources: [PRIMECLAW-35][T35], [43][T43], [44][T44]; US-28.
 
-### P6. Save coherent ticket edits promptly and without unrelated commits
+### P6. Save coherent ticket edits promptly through native history
 
 Use the selected provider's native authoring and publication workflow. Commit a
 coherent ticket update as soon as it is ready and publish promptly when a remote
 exists. Do not defer task durability until handoff or session end. Publish the
 selected committed ticket before an Episode needs to read it. Preserve unrelated
 task/code content, staging, and history; never manufacture a clean checkout by
-including someone else's edits.
+including someone else's edits. Backlog's exact selected-file commits exclude
+unrelated changes. For Beads v1.3.1, inspect native pending/staged changes and
+review its touched-table/staged-set multi-issue commit/publication consequences
+under G5; do not promise per-issue isolation or add row filtering, another store or
+branch, dependency patches, or a policy/facts framework to provide it. Native
+command success alone does not prove the changed task reached history: a
+trailing native commit may fail or only log its failure. Inspect actual task
+history, revision, and publication facts before claiming durability.
 
 For independent task history, unrelated parent-code changes or divergence must
 not block task-only authoring, status updates, or failure reporting. Publication
@@ -252,8 +268,11 @@ task/specification and meaningful plan, scope, code basis, placement, and any
 real conflict before allocation. Episode selection requires planned work, not
 `--ready` alone. The invoking LLM applies the editable policy. Code must not
 repeat the decision as hidden admission gates or frozen revision approval.
-Unrelated staged, unstaged, or untracked task/code changes and compatible
-published task-history descendants must not block initiation.
+Unrelated staged, unstaged, or untracked Git task/code changes and compatible
+published task-history descendants must not block initiation. Beads native
+pending or concurrent database changes can prevent a safe operation under G5/P6;
+expose and judge those facts without a replacement code-level dirty gate or
+blanket quiescence requirement.
 
 Sources: [PRIMECLAW-51][T51]; **requested correction:** [55][T55] supersedes
 older whole-checkout cleanliness and snapshot-equality requirements.

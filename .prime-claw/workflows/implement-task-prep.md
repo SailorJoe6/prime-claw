@@ -75,7 +75,19 @@ workspace/database/branch/remote identities, and consequential failure evidence
 in the readiness focus. A newer remote head alone does not reject the selected
 task. The readiness Agent must inspect intended exact-task changes, preserve
 unrelated bytes and staging, and decide any real conflict before requesting an
-operation. Do not ask preparation code to synchronize another owner's dirty
+operation. Beads v1.3.1 native touched-table/staged-set commits may include
+multiple issues; do not promise per-issue history isolation. Keep pending/staged
+native changes and commit/publication consequences in the readiness focus.
+Before consequential native mutation, commit, or push, the readiness Agent must
+disclose and review those consequences and consult if pending work is
+unauthorized or unclear. With auto-commit on, a native update may commit
+touched-table/pre-staged pending work before any push. Pending or concurrent
+native database changes can prevent a safe operation, without a replacement
+code-level dirty gate or blanket quiescence rule. Native command success is not
+proof the changed task reached history; a trailing commit may fail or only log
+failure. Preserve actual history/revision/publication facts for review. Do not
+add row filtering, another store/branch, dependency patches, or a policy/facts
+framework. Do not ask preparation code to synchronize another owner's dirty
 primary checkout, reconcile a rejected push, or retry uncertain delivery.
 
 ## Light readiness sniff

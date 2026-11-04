@@ -43,19 +43,31 @@ Ensure the exact selected ticket's coherent specification and plan are committed
 and, when a remote exists, published before an Episode needs to obtain them.
 This is your responsibility under this editable workflow, not a frozen-revision
 approval or a code-level whole-checkout cleanliness check. Inspect current task
-and history facts first. If needed, commit and publish only the authorized ticket
-update through Backlog's exact-task Git history or Beads' supported native task
-history. Commit each coherent update as soon as it is ready and publish promptly;
-do not defer it until handoff or session end. Preserve unrelated bytes, staging,
-fields and history. An unrelated published descendant is not a conflict by
-itself. Use semantic judgment for actual same-task changes and report native
-publication conflicts or uncertainty without force, automatic retry or another
+and history facts first. If needed, commit and publish the authorized ticket
+update through the provider's native history. Backlog commits only the selected
+task path and excludes unrelated staged changes. Beads v1.3.1 uses native
+touched-table/staged-set commits that may include multiple issues; it does not
+promise per-issue history isolation. Before consequential native mutation,
+commit, or push, inspect pending/staged native changes, disclose and review the
+consequences, and consult if pending work is unauthorized or unclear. With
+auto-commit on, a native update may commit touched-table/pre-staged pending work
+before any push. Pending or concurrent native Beads database changes can prevent
+a safe operation; judge those facts without a
+replacement code-level dirty gate or blanket quiescence requirement. Commit each
+coherent update as soon as it is ready and publish promptly; do not defer it
+until handoff or session end. Preserve unrelated bytes, staging, fields and
+history. An unrelated published descendant is not a conflict by itself. Use
+semantic judgment for actual same-task changes and report native publication
+conflicts or uncertainty without force, automatic retry or another
 allocation. Confirm that the Episode can obtain the selected committed ticket
 from its provider workspace; do not synchronize another owner's dirty checkout
 as a hidden prerequisite. Follow the canonical readiness workflow's native
-preparation/publication procedure. Command success and local/remote observations
-are facts, not a duplicate readiness decision; preserve failures for judgment
-instead of asking code to reconcile or retry them.
+preparation/publication procedure. Native command success alone does not prove
+the changed task reached history: a trailing commit may fail or only log failure.
+Inspect actual history, revisions and publication facts. These are not a duplicate
+readiness decision; preserve failures for judgment instead of asking code to
+reconcile or retry them. Do not add row filtering, another store/branch, dependency
+patches, or a policy/facts framework to imitate per-issue Beads history.
 
 ## Admit once, then stop
 

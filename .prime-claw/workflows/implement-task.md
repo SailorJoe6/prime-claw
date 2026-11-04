@@ -123,13 +123,22 @@ Ensure the exact selected ticket's coherent specification and plan are committed
 and, when a remote exists, published before an Episode needs to obtain them.
 This is your responsibility under this editable workflow, not a frozen-revision
 approval or a code-level whole-checkout cleanliness check. Inspect current task
-and history facts first. If needed, commit and publish only the authorized ticket
-update through Backlog's exact-task Git history or Beads' supported native task
-history. Commit each coherent update as soon as it is ready and publish promptly;
-do not defer it until handoff or session end. Preserve unrelated bytes, staging,
-fields and history. An unrelated published descendant is not a conflict by
-itself. Use semantic judgment for actual same-task changes and report native
-publication conflicts or uncertainty without force, automatic retry or another
+and history facts first. If needed, commit and publish the authorized ticket
+update through the provider's native history. Backlog commits only the selected
+task path and excludes unrelated staged changes. Beads v1.3.1 uses native
+touched-table/staged-set commits that may include multiple issues; it does not
+promise per-issue history isolation. Before consequential native mutation,
+commit, or push, inspect pending/staged native changes, disclose and review the
+consequences, and consult if pending work is unauthorized or unclear. With
+auto-commit on, a native update may commit touched-table/pre-staged pending work
+before any push. Pending or concurrent native Beads database changes can prevent
+a safe operation; judge those facts without a
+replacement code-level dirty gate or blanket quiescence requirement. Commit each
+coherent update as soon as it is ready and publish promptly; do not defer it
+until handoff or session end. Preserve unrelated bytes, staging, fields and
+history. An unrelated published descendant is not a conflict by itself. Use
+semantic judgment for actual same-task changes and report native publication
+conflicts or uncertainty without force, automatic retry or another
 allocation. Confirm that the Episode can obtain the selected committed ticket
 from its provider workspace; do not synchronize another owner's dirty checkout
 as a hidden prerequisite.
@@ -162,12 +171,15 @@ newer remote observation is history evidence, not automatic semantic rejection.
 For Beads, inspect native workspace/database/branch/remote facts and the complete
 raw task. Use supported `bd dolt pull`, `bd update`, native task-history commit
 when needed, and `bd dolt push --no-adopt` on the intended workspace. Preserve
-native fields and absence; do not invent a Markdown task path. A dirty native
-working set is an observation to understand, not permission to commit another
-owner's tables or task edits. Do not ask transport code to prove a frozen local,
-parent, remote or task-content revision. Do not infer publication of the exact
-intended task merely from a successful command; inspect the returned raw views,
-command results, revisions and publication facts.
+native fields and absence; do not invent a Markdown task path. Apply the native
+multi-issue commit-scope review above; do not add row filtering, another
+store/branch, dependency patches, or a policy/facts framework to imitate
+per-issue history.
+Do not ask transport code to prove a frozen local, parent, remote or task-content
+revision. Native command success does not prove the intended task reached
+history: a trailing commit may fail or only log failure. Inspect the returned raw
+views, actual history, command results, revisions and publication facts before
+claiming durability or publication.
 
 For either provider, a rejected or uncertain native operation requires current
 state inspection and an LLM decision. Preserve the local task/commit, unrelated

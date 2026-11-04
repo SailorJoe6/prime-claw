@@ -132,19 +132,19 @@ function publishedBeadsStatus(f, overrides = {}) {
     remoteName: "origin",
     publicationRef: "refs/dolt/data",
     preparedRevision: "c".repeat(32),
-    committedRevision: revision,
-    publishedRevision: revision,
+    postMutationRevision: revision,
+    submittedRevision: revision,
     publicationHead: "e".repeat(40),
     taskBefore: { taskId, title: rawTask.title, nativeStatus: "in_design", canonicalStatus: "In Design", nativeView: { ...rawTask, status: "in_design" } },
-    taskPublished: { taskId, title: rawTask.title, nativeStatus: rawTask.status, canonicalStatus: "In Progress", nativeView: rawTask },
-    postMutationProof: { revision, parentRevision: "c".repeat(32), clean: true, command },
-    localPublishedProof: { revision, parentRevision: "c".repeat(32), clean: true, command },
+    taskAfterPush: { taskId, title: rawTask.title, nativeStatus: rawTask.status, canonicalStatus: "In Progress", nativeView: rawTask },
+    postMutationObservation: { revision, parentRevision: "c".repeat(32), clean: true, command },
+    postPushObservation: { revision, parentRevision: "c".repeat(32), clean: true, command },
     pull: command,
     mutation: command,
     push: command,
     ...overrides,
   };
-  return { status: "published", evidence };
+  return { status: "pushed", evidence };
 }
 
 function reservePublishedBeads(f, overrides = {}, dependencies = {}) {
@@ -1140,9 +1140,9 @@ test("Beads reservation keeps raw native facts and preserves dirty code and hist
     comments: [{ body: "current native observation" }], opaque_native_field: { keep: [1, 2] },
   };
   const publication = publishedBeadsStatus(f, {
-    committedRevision: "a".repeat(32),
-    localPublishedProof: { revision: "b".repeat(32), clean: false },
-    taskPublished: {
+    postMutationRevision: "a".repeat(32),
+    postPushObservation: { revision: "b".repeat(32), clean: false },
+    taskAfterPush: {
       taskId: f.selection.taskId, title: "Earlier title", canonicalStatus: "In Planning",
       nativeStatus: "in_planning", nativeView: rawTask,
     },
@@ -1156,7 +1156,7 @@ test("Beads reservation keeps raw native facts and preserves dirty code and hist
     },
   });
   assert.equal(record.baseRef, baseRef);
-  assert.equal(record.providerRevision, publication.evidence.publishedRevision);
+  assert.equal(record.providerRevision, publication.evidence.submittedRevision);
   assert.deepEqual(record.taskEvidence, rawTask);
   assert.deepEqual(readEpisodeOwnership(f.root, unrelated.ownerSessionId), unrelated);
   assert.equal(git(f.root, "rev-parse", "HEAD"), headBefore);
@@ -1169,10 +1169,10 @@ test("Beads reservation keeps raw native facts and preserves dirty code and hist
 test("Beads reservation retains exact task, revision and root targeting", () => {
   const f = fixture();
   const mismatched = publishedBeadsStatus(f);
-  mismatched.evidence.taskPublished.nativeView.id = "OTHER-1";
+  mismatched.evidence.taskAfterPush.nativeView.id = "OTHER-1";
   assert.throws(() => reservePublishedBeads(f, { publication: mismatched }), /raw native evidence for the exact task/);
   assert.throws(() => reservePublishedBeads(f, {
-    publication: publishedBeadsStatus(f, { publishedRevision: "invalid" }),
+    publication: publishedBeadsStatus(f, { submittedRevision: "invalid" }),
   }), /exact observed candidate provider revision/);
   assert.throws(() => reservePublishedBeads(f, {
     publication: publishedBeadsStatus(f, { projectRoot: mkdtempSync(join(tmpdir(), "foreign-beads-reservation-")) }),

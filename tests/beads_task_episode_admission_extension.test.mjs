@@ -55,13 +55,13 @@ function published(root, taskId, canonicalStatus, design) {
     comments: [{ id: 7, text: `${canonicalStatus} raw evidence` }],
   };
   return {
-    status: "published",
+    status: "pushed",
     evidence: {
       provider: "beads",
       projectRoot: root,
       taskId,
-      publishedRevision: revision[canonicalStatus],
-      taskPublished: {
+      submittedRevision: revision[canonicalStatus],
+      taskAfterPush: {
         taskId,
         title: nativeView.title,
         nativeStatus: status,
@@ -165,8 +165,8 @@ function fixture() {
       engine: input.engine,
       ownerSessionId: input.ownerSessionId,
       taskId,
-      providerRevision: input.publication.evidence.publishedRevision,
-      taskEvidence: input.publication.evidence.taskPublished.nativeView,
+      providerRevision: input.publication.evidence.submittedRevision,
+      taskEvidence: input.publication.evidence.taskAfterPush.nativeView,
       baseRef: input.baseRef,
       createdAt: now,
       updatedAt: now,

@@ -561,6 +561,20 @@ the real repository cutover remain PRIMECLAW-43.1.
 
 ### Beads workspace and transport observations
 
+Beads v1.3.1 native touched-table/staged-set commits may include multiple issues;
+no per-issue history isolation is promised. Before consequential native mutation,
+commit, or push, inspect native pending/staged changes, disclose and review the
+consequences, and consult if pending work is unauthorized or unclear. With
+auto-commit on, a native update may commit touched-table/pre-staged pending work
+before any push. Pending or concurrent native
+database changes can prevent a safe operation. Judge actual facts without a
+replacement code-level dirty gate or blanket quiescence rule. Do not add row
+filtering, another store/branch, dependency patches, or a policy/facts framework
+to imitate per-issue history. Backlog selected-file guarantees, unrelated Git
+dirt, and compatible published descendants are unchanged. This native exception
+does not complete the remaining both-provider lifecycle-policy extraction,
+secondary durability audit, or bounded recovery work on PRIMECLAW-55.
+
 `prepareBeadsWorkspaceTransport` reads the selected native context, server,
 database, branch, revision, working set, configured remote and publication-ref
 facts. These support exact workspace/operation targeting. The task-native path
@@ -583,9 +597,12 @@ as a hidden transition rule. Current working-set, parent, status and revision
 facts are not repeated code-level eligibility or content-approval tests.
 
 Returned raw views, revisions, command outputs and publication observations let
-the Agent inspect what happened. A successful push reports the submitted local
-revision and the native command result, not an isolated remote-Dolt proof or a
-frozen task-content approval. Rejected or uncertain operations retain factual
+the Agent inspect what happened. Native command success alone does not prove
+the changed task reached history: a trailing native commit may fail or only log
+failure. Inspect actual task history, revision and publication facts before
+claiming durability. A successful push reports the submitted local revision and
+the native command result, not an isolated remote-Dolt proof or a frozen
+task-content approval. Rejected or uncertain operations retain factual
 evidence and do not trigger automatic second pull, retry, rollback or replacement
 allocation. Editable guidance owns selected-task durability, semantic decisions
 and failure disposition. Deeper creation/reservation and later lifecycle policy

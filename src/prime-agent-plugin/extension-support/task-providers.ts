@@ -1829,21 +1829,22 @@ export interface BeadsMutationRevisionEvidence {
   error?: string;
 }
 
-export interface BeadsTaskMutationPublishedEvidence {
+export interface BeadsTaskMutationPushEvidence {
   provider: "beads";
   projectRoot: string;
   taskId: string;
   remoteName: string;
   publicationRef: typeof BEADS_DOLT_DATA_REF;
   preparedRevision: string;
-  committedRevision: string;
-  /** Submitted local HEAD for the successful native push, not isolated remote proof. */
-  publishedRevision: string;
+  postMutationRevision: string;
+  /** Local HEAD observed before the successful native push; task inclusion is not proved. */
+  submittedRevision: string;
   publicationHead?: string;
   taskBefore: BeadsNativeTaskSnapshot;
-  taskPublished: BeadsNativeTaskSnapshot;
-  postMutationProof: BeadsMutationRevisionEvidence;
-  localPublishedProof: BeadsMutationRevisionEvidence;
+  /** Local working-set task read after push, not a committed or remote task snapshot. */
+  taskAfterPush: BeadsNativeTaskSnapshot;
+  postMutationObservation: BeadsMutationRevisionEvidence;
+  postPushObservation: BeadsMutationRevisionEvidence;
   remotePublishedTask?: BeadsRemoteTaskSnapshotEvidence;
   pull: BeadsRawCommandEvidence;
   mutation: BeadsRawCommandEvidence;
@@ -1872,11 +1873,12 @@ export interface BeadsTaskMutationReviewEvidence {
 }
 
 export type BeadsTaskMutationPublication =
-  | { status: "published"; evidence: BeadsTaskMutationPublishedEvidence }
+  // Successful native push only; local task reads do not prove task publication.
+  | { status: "pushed"; evidence: BeadsTaskMutationPushEvidence }
   | {
       status: "review-required";
-      code: "synchronization-failed" | "mutation-failed" | "push-rejected" | "publication-proof-failed";
-      phase: "synchronization" | "mutation" | "push" | "publication-proof";
+      code: "synchronization-failed" | "mutation-failed" | "push-rejected" | "post-push-read-failed";
+      phase: "synchronization" | "mutation" | "push" | "post-push-read";
       detail: string;
       evidence: BeadsTaskMutationReviewEvidence;
     }
@@ -2068,28 +2070,28 @@ export function mutateAndPublishBeadsTaskStatus(options: {
       evidence: { ...evidence, observedRevision: committed.revision, revisionProof: committed, taskBefore: afterPull, taskObserved: afterMutation, operation: push },
     };
   }
-  const publishedTask = readTask();
-  const published = readRevision();
+  const taskAfterPush = readTask();
+  const postPush = readRevision();
   const publication = readBeadsPublicationRef(prepared.projectRoot, prepared.remoteName, runner);
   commands.push(publication.command);
-  if (!published.revision || !publishedTask.task) {
+  if (!postPush.revision || !taskAfterPush.task) {
     return {
-      status: "review-required", code: "publication-proof-failed", phase: "publication-proof",
-      detail: published.error ?? publishedTask.error ?? "native readback after the successful push is unavailable",
-      evidence: { ...evidence, observedRevision: published.revision, revisionProof: published, taskBefore: afterPull, taskObserved: publishedTask, operation: push, publicationRef: publication },
+      status: "review-required", code: "post-push-read-failed", phase: "post-push-read",
+      detail: postPush.error ?? taskAfterPush.error ?? "native readback after the successful push is unavailable",
+      evidence: { ...evidence, observedRevision: postPush.revision, revisionProof: postPush, taskBefore: afterPull, taskObserved: taskAfterPush, operation: push, publicationRef: publication },
     };
   }
   return {
-    status: "published",
+    status: "pushed",
     evidence: {
       provider: "beads", projectRoot: prepared.projectRoot, taskId, remoteName: prepared.remoteName,
       publicationRef: BEADS_DOLT_DATA_REF, preparedRevision: prepared.revision,
       // The submitted local HEAD for the successful native push. This is
-      // not an isolated remote revision or a content-approval proof.
-      committedRevision: committed.revision, publishedRevision: committed.revision,
+      // not evidence that the update reached committed/published history.
+      postMutationRevision: committed.revision, submittedRevision: committed.revision,
       publicationHead: publication.head,
-      taskBefore: before.task, taskPublished: publishedTask.task,
-      postMutationProof: committed, localPublishedProof: published,
+      taskBefore: before.task, taskAfterPush: taskAfterPush.task,
+      postMutationObservation: committed, postPushObservation: postPush,
       pull, mutation, push, commands, taskReads, publication,
     },
   };

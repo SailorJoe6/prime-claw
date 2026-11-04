@@ -1000,6 +1000,16 @@ def test_native_preparation_publication_guidance_keeps_decisions_in_markdown() -
             "not choose a lifecycle\nrollback or Blocked disposition",
         ):
             assert phrase in section
+        # Guidance owns the native commit-scope decision. This does not prove
+        # native Dolt isolation; the provider adapter tests use fake runners.
+        guidance = " ".join(text.split())
+        for phrase in (
+            "touched-table/staged-set",
+            "multi-issue",
+            "consult if pending work is unauthorized or unclear",
+            "Backlog commits only the selected task path",
+        ):
+            assert phrase in guidance
     for path in (workflow("implement-task-prep"), ROOT / ".prime-claw/workflows/implement-task-prep.md"):
         text = path.read_text()
         assert "not a cleanliness or frozen-revision approval" in text

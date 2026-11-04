@@ -1040,7 +1040,7 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
   input: BeadsTaskEpisodeReservationInput,
   dependencies: BeadsTaskEpisodeReservationDependencies = {},
 ): BeadsTaskEpisodeOwnershipRecord {
-  if (input.publication.status !== "published") {
+  if (input.publication.status !== "pushed") {
     throw new Error("Beads Episode reservation requires an already-published native status result");
   }
   const evidence = input.publication.evidence;
@@ -1061,11 +1061,11 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
   if (!evidence.taskId || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(evidence.taskId)) {
     throw new Error("Beads Episode reservation requires the exact canonical published task ID");
   }
-  if (!BEADS_RESERVATION_REVISION.test(evidence.publishedRevision)) {
+  if (!BEADS_RESERVATION_REVISION.test(evidence.submittedRevision)) {
     throw new Error("Beads Episode reservation requires an exact observed candidate provider revision");
   }
 
-  const publishedTask = evidence.taskPublished;
+  const publishedTask = evidence.taskAfterPush;
   const rawTask = publishedTask.nativeView;
   if (publishedTask.taskId !== evidence.taskId
       || !rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
@@ -1103,7 +1103,7 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
     engine: input.engine,
     ownerSessionId: input.ownerSessionId,
     taskId: evidence.taskId,
-    providerRevision: evidence.publishedRevision,
+    providerRevision: evidence.submittedRevision,
     taskEvidence: rawTask,
     baseRef: input.baseRef,
     createdAt: now,

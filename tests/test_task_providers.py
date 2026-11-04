@@ -129,7 +129,8 @@ def test_version_two_ownership_keeps_one_discriminated_provider_native_shape() -
     assert "reservePublishedBacklogTaskEpisodeOwnership" in writer
     assert "reservePublishedBacklogTaskEpisodeOwnership" in episode
     assert writer.count("reservePublishedBeadsTaskEpisodeOwnership") == 1
-    assert 'input.publication.status !== "published"' in writer
+    assert 'input.publication.status !== "published"' in writer  # Backlog Git publication
+    assert 'input.publication.status !== "pushed"' in writer  # Beads native push only
     assert 'provider: "beads"' in writer
     assert "reservePublishedBeadsTaskEpisodeOwnership" in episode
     assert "reserveBeadsTaskOwnership ?? reservePublishedBeadsTaskEpisodeOwnership" in episode

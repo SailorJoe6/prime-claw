@@ -100,10 +100,12 @@ Implementation Plan task path in code history, while an independent nested store
 commits only that path on `refs/heads/prime-claw/tasks`, pushes without force,
 verifies the selected committed task's publication, and does not write code
 HEAD, index, or files. Coherent selected-ticket edits are committed promptly and
-published before an Episode needs them. Unrelated bytes, staging, native fields,
-and compatible history descendants are preserved, not included, stashed, reset,
-or overwritten to satisfy a cleanliness check. Beads uses one
-native synchronization/read, LLM planning over the complete raw view, one
+published before an Episode needs them. Backlog preserves and excludes unrelated
+bytes/staging from its selected-file commits. Both providers preserve native
+fields and compatible history descendants without stashing, resetting, or
+overwriting them to satisfy a cleanliness check. Beads has the accepted native
+multi-issue commit scope described below, not Backlog's selected-file isolation.
+Beads uses one native synchronization/read, LLM planning over the complete raw view, one
 guarded raw `design` plus `in_planning` update, one non-force publication, and
 exact native reread/publication proof; it never consults the Backlog-only queue,
 creates a task path, or mirrors content. Compatible same-task refinements are
@@ -230,16 +232,32 @@ uses supported operations once, returning complete raw task views and operation
 results instead of a paired stable-revision, parent or content approval. It does
 not fabricate a Backlog path or use repeated isolated whole-store clones as an
 approval pipeline. A rejected native command remains a failure; success is not
-semantic acceptance.
+semantic acceptance or proof the changed task reached history. A trailing native
+commit may fail or only log failure; inspect actual history/revision/publication
+facts before claiming durability.
+
+Beads v1.3.1 native touched-table/staged-set commits may include multiple issues;
+no per-issue history isolation is promised. Before consequential native mutation,
+commit, or push, the Agent inspects pending/staged native changes, discloses and
+reviews the consequences, and consults if pending work is unauthorized or unclear.
+With auto-commit on, a native update may commit touched-table/pre-staged pending
+work before any push. Pending or
+concurrent native database changes can prevent a safe operation; judge actual
+facts without a replacement code-level dirty gate or blanket quiescence rule.
+Do not add row filtering, another store/branch, dependency patches, or a
+policy/facts framework to imitate per-issue history. Backlog's selected-file
+guarantees, unrelated Git dirt and compatible descendants are unchanged.
 
 The editable implementation workflow tells the invoking Agent to inspect the
 selected task/diff and current history, ensure authorized ticket durability,
 interpret native conflicts, and preserve unrelated work. Neither dirty state
-nor successful transport grants permission to absorb another owner's edits.
+nor successful transport grants authority to commit or publish unauthorized work.
 Reconciliation and failure disposition are LLM decisions from current facts,
 not automatic retry, rollback or a replacement allocation. Deeper creation,
 ownership and lifecycle callers may still apply policy awaiting later slices;
-this bounded helper extraction is not full initiation or task completion.
+this bounded helper extraction is not full initiation or task completion. Full
+both-provider lifecycle-policy extraction, the secondary durability audit, and
+bounded recovery remain in scope on PRIMECLAW-55.
 
 ## Validation policy
 
