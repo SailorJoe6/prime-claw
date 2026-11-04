@@ -464,8 +464,8 @@ ID/file. Terminal cleanup likewise resolves the current route from the exact
 permanent ID, canonical session file, and worktree. A different route after
 restart/reopen does not change ownership. Cleanup checks the current roster and
 idle state again before removal; the saved historical route cannot select an
-unrelated session that later reuses it. Orca terminal handles are also refreshable. Durable session and
-worktree identities remain authoritative across restarts. Expert review follows
+unrelated session that later reuses it. Orca terminal handles are also refreshable.
+Durable session and worktree identities remain authoritative across restarts. Expert review follows
 the same disjoint authority selection. Backlog uses the exact bound task fields
 at its candidate commit. Beads uses exact persisted/current raw task,
 revision/ref, code base/head, and Episode identity evidence without normalizing

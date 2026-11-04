@@ -2858,6 +2858,8 @@ test("cleanup resolves a changed route only for the exact durable idle Episode",
   const adapter = new CliTaskEpisodeCleanupAdapter(f.root, f.head, { sessions });
   for (const [label, invalidRows] of [
     ["missing root", [foreignRow]],
+    ["missing root with explicit child ID", [{ ...foreignRow, parentSessionId: f.record.episodeId }]],
+    ["missing root with explicit child file", [{ ...foreignRow, parentSessionPath: sessionFile }]],
     ["changed permanent ID", [{ ...rootRow, sessionId: "foreign" }]],
     ["changed session file", [{ ...rootRow, sessionFile: foreignFile }]],
     ["changed worktree", [{ ...rootRow, cwd: f.root }]],
@@ -2865,7 +2867,7 @@ test("cleanup resolves a changed route only for the exact durable idle Episode",
     ["duplicate current route", [rootRow, { ...foreignRow, activeSessionId: "current-route" }]],
   ]) await t.test(label, async () => {
     rows = invalidRows;
-    await assert.rejects(adapter.removeRuntime(f.record), /Prime Agent session identity|untracked saved-session file/);
+    await assert.rejects(adapter.removeRuntime(f.record), /Prime Agent session identity|untracked saved-session file|explicit descendant without its recorded root/);
   });
   await t.test("current route resolves to foreign state", async () => {
     rows = [rootRow, foreignRow]; stateOverride = { ...foreignRow, activeSessionId: "current-route" };
