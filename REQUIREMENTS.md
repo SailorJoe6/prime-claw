@@ -375,7 +375,9 @@ machine/agent work, and neither while waiting only on the user or after terminal
 completion. Restore concise work-control and applicable role guidance after
 context transitions. Use native control facilities; reminders are advisory,
 not another scheduler or policy enforcement engine. Report material changes,
-not unchanged ticks.
+not unchanged ticks. Install `goals-and-heartbeats` globally for Prime Agent only,
+at `~/.prime/agent/skills/goals-and-heartbeats/`. Do not install another copy in
+project-local skill directories or the shared cross-agent `~/.agents/skills/`.
 
 Sources: [PRIMECLAW-10.28][T10_28], [26][T26], [30][T30], [33.5][T33_5]; US-25–26.
 

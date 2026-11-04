@@ -38,7 +38,7 @@
     {"id":"plugin-extensions-project-initialization-ts","source":"extensions/project-initialization.ts","targets":[{"class":"plugin-root-exact","destination":"extensions/project-initialization.ts"}]},
     {"id":"plugin-extensions-reviewed-plan-ts","source":"extensions/reviewed-plan.ts","targets":[{"class":"plugin-root-exact","destination":"extensions/reviewed-plan.ts"}]},
     {"id":"global-goal-continuation","source":"skills/goals-and-heartbeats/CONTINUATION.md","targets":[{"class":"plugin-root-managed","destination":"skills/goals-and-heartbeats/CONTINUATION.md"}]},
-    {"id":"global-goals-and-heartbeats","source":"skills/goals-and-heartbeats/SKILL.md","targets":[{"class":"plugin-root-managed","destination":"skills/goals-and-heartbeats/SKILL.md"},{"class":"user-skill-exact","destination":"skills/goals-and-heartbeats/SKILL.md"}]},
+    {"id":"global-goals-and-heartbeats","source":"skills/goals-and-heartbeats/SKILL.md","targets":[{"class":"plugin-root-managed","destination":"skills/goals-and-heartbeats/SKILL.md"}]},
     {"id":"global-expert-review","source":"skills/prime-claw-expert-review/SKILL.md","targets":[{"class":"plugin-root-managed","destination":"skills/prime-claw-expert-review/SKILL.md"}]},
     {"id":"global-initialize-prime-claw","source":"skills/initialize-prime-claw/SKILL.md","targets":[{"class":"plugin-root-managed","destination":"skills/initialize-prime-claw/SKILL.md"}]},
     {"id":"global-plan","source":"skills/plan/SKILL.md","targets":[{"class":"plugin-root-managed","destination":"skills/plan/SKILL.md"}]},
