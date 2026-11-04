@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 19:25'
+updated_date: '2026-11-04 19:30'
 labels: []
 dependencies: []
 references:
@@ -222,6 +222,19 @@ Next canonical execute: prepare fresh, reload the exact owner/task/recovery note
 No product-source cause was established by the old native D/VirtioFS metadata waits. Diagnose a genuine in-scope assertion defect before repair. Do not make speculative source repairs, blanket timeout increases, fixture-placement/Docker-setting changes, host candidate tests, or native-history isolation workarounds. Peer57's custom direct raw-linked-worktree mount had an unavailable host .git pointer; our normal driver snapshots inputs before mounting. These are NOT proven the same cause; do not copy the peer workaround by analogy.
 
 Preserve actual new results and evidence limits, publish coherent code and exact native-task evidence promptly, then stop for owner review. Full BOTH-provider lifecycle-policy extraction, complete secondary durability audit and bounded recorded-operation recovery remain on THIS task. Keep the approved native Beads multi-issue boundary and unchanged Backlog selected-file guarantees. All9AC remain unchecked. No new framework/gate/store/branch/filter, dependency patch, retained-folder redesign, global apply/activation/restart, live PRIMECLAW-45 mutation, main integration, merge/abandonment or destructive live cleanup. This handoff performs no implementation or runtime validation.
+
+## Approved diagnostic-only support — resume the same slice 3
+Joe explicitly approved the narrow validation-support work recorded in the owner-published "Operator-approved narrow diagnostic validation-support work" note. This supersedes the prior wait for Joe only for that bounded proposal. Continue the SAME Task55/Episode/selected slice3; it is not another slice, accepted candidate, presumed build repair or full-task completion. Preserve clean published WIP f499 atop002a and review all cumulative WIP against last accepted1565c327.
+
+The fresh normal-driver fail-fast run20261104T161749Z-78886-ec8f7664 failed in source-builder setup before runtime/plugin execution. Exact evidence is in native checkpoint c330eb088ae55ade908946840e6e14f6b3fdc2da and existing manifest/source-build.json/log. The saved artifacts contain generic builder-failed/rc1 without the underlying failing operation. Builder teardown is clean/absent; this does not validate product code. Original older failed manifests/logs/share/snapshot stay historical and preserved.
+
+Next canonical execute must prepare fresh, reload the exact owner/task/approved note, then FIRST make only the minimal diagnostic improvement in the existing source-builder/helper and pytest wrapper: retain useful bounded private-data-safe failing-operation/error-category/native-outcome detail in existing diagnostics and surface it through the wrapper. Do not dump environment/credentials or arbitrary unsafe raw output. Use current reporting/test interfaces, not a new diagnostic/state/schema/protocol/classifier/retry framework. Add focused regression coverage for privacy and error propagation through existing host-safe mocked/script suites where appropriate. No host candidate-plugin execution or uncounted live Docker test.
+
+When those supporting changes/tests are ready, obtain actual startup/capture capacity and perform exactly ONE coordinated normal-driver diagnostic attempt using the existing fail-fast selection: `python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container -x`. No reservation currently exists. Report actual immutable receipts promptly and return the slot after capture, not offline completion. No additional probe/fixture start, blind retry or implicit extension beyond approved coverage; report actual facts and request disposition if another attempt is needed.
+
+Do NOT implement CA/trust forwarding, TLS bypass, dependency patch/version/mode switch, Docker settings, cached/peer runtime substitution or a presumed underlying build fix. Peer57's Node HEAD trust result establishes only that bounded request gap, not fresh55cause or repair authority. Do not infer shared cause from the earlier custom raw-linked-worktree mount or D/VirtioFS waits either. Preserve native fields/history/foreign work and exact Episode resources.
+
+Record the support scope, actual results and limits here/on native Notes, publish coherent code and exact-task evidence promptly, then STOP for owner review after the bounded attempt. Full BOTH-provider lifecycle-policy extraction, complete secondary durability audit and bounded recorded-operation recovery remain on THIS task with the approved Beads multi-issue boundary unchanged. All9AC remain unchecked. No new Episode/allocator, main integration, global apply/activation/restart, live45mutation, retained-folder redesign, merge/abandonment or destructive live cleanup. This handoff itself makes no source change or runtime attempt.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
