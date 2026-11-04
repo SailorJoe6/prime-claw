@@ -2802,7 +2802,6 @@ test("cleanup without its root still rejects live CWD and exact saved-identity c
   const unrelated = { sessionId: "unrelated", sessionFile: path, cwd: f.record.worktree, isSessionActive: false };
   for (const collision of [
     { ...unrelated, activeSessionId: "foreign-route" },
-    { ...unrelated, activeSessionId: f.record.episodeActiveSessionId, cwd: f.root },
     { ...unrelated, sessionId: f.record.episodeId, cwd: f.root },
     { ...unrelated, sessionFile: f.record.episodeSessionFile, cwd: f.root },
   ]) {
@@ -2813,6 +2812,85 @@ test("cleanup without its root still rejects live CWD and exact saved-identity c
     assert.equal(f.localPresent(), true);
     assert.equal(f.remoteHead(), f.head);
   }
+});
+
+test("cleanup preserves an unrelated session reusing the historical route", async (t) => {
+  const f = cleanupTransportFixture(t);
+  const foreignFile = join(f.root, "foreign.jsonl"); writeFileSync(foreignFile, "preserve\n");
+  const foreign = { sessionId: "foreign", sessionFile: foreignFile, cwd: f.root,
+    activeSessionId: f.record.episodeActiveSessionId, isSessionActive: true };
+  const sessions = { async list() { return [structuredClone(foreign)]; } };
+  const adapter = new CliTaskEpisodeCleanupAdapter(f.root, f.head, { sessions });
+  assert.equal((await adapter.inspect(f.record)).runtime, undefined);
+  await adapter.removeUpstream(f.record);
+  await adapter.removeBranch(f.record);
+  assert.deepEqual(await adapter.inspect(f.record), {});
+  assert.equal(readFileSync(foreignFile, "utf8"), "preserve\n");
+});
+
+test("cleanup resolves a changed route only for the exact durable idle Episode", async (t) => {
+  const f = cleanupTransportFixture(t);
+  const sessionFile = f.record.episodeSessionFile; writeFileSync(sessionFile, "episode\n");
+  const foreignFile = join(f.root, "foreign.jsonl"); writeFileSync(foreignFile, "preserve\n");
+  const idle = { isSessionActive: false, isStreaming: false, isCompacting: false,
+    sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } };
+  const rootRow = { ...idle, sessionId: f.record.episodeId, sessionFile, cwd: f.record.worktree,
+    activeSessionId: "current-route" };
+  const foreignRow = { ...idle, sessionId: "foreign", sessionFile: foreignFile, cwd: f.root,
+    activeSessionId: f.record.episodeActiveSessionId };
+  let rows = []; let stateOverride;
+  const stateCalls = []; const mutations = [];
+  const sessions = {
+    async list() { return structuredClone(rows); },
+    async getState(id) {
+      stateCalls.push(id);
+      return structuredClone(stateOverride ?? rows.find((row) => row.activeSessionId === id));
+    },
+    async kill(id) {
+      mutations.push(["kill", id]);
+      rows = rows.map((row) => row.activeSessionId === id ? { ...row, activeSessionId: undefined } : row);
+    },
+    async deleteSaved(path) {
+      mutations.push(["delete", path]); unlinkSync(path);
+      rows = rows.filter((row) => row.sessionFile !== path);
+    },
+  };
+  const adapter = new CliTaskEpisodeCleanupAdapter(f.root, f.head, { sessions });
+  for (const [label, invalidRows] of [
+    ["missing root", [foreignRow]],
+    ["changed permanent ID", [{ ...rootRow, sessionId: "foreign" }]],
+    ["changed session file", [{ ...rootRow, sessionFile: foreignFile }]],
+    ["changed worktree", [{ ...rootRow, cwd: f.root }]],
+    ["duplicate permanent identity", [rootRow, { ...rootRow, activeSessionId: "duplicate-route" }]],
+    ["duplicate current route", [rootRow, { ...foreignRow, activeSessionId: "current-route" }]],
+  ]) await t.test(label, async () => {
+    rows = invalidRows;
+    await assert.rejects(adapter.removeRuntime(f.record), /Prime Agent session identity|untracked saved-session file/);
+  });
+  await t.test("current route resolves to foreign state", async () => {
+    rows = [rootRow, foreignRow]; stateOverride = { ...foreignRow, activeSessionId: "current-route" };
+    await assert.rejects(adapter.removeRuntime(f.record), /changed Prime Agent session identity/);
+    stateOverride = undefined;
+  });
+  for (const [field, value] of [["isSessionActive", true], ["isStreaming", true],
+    ["isCompacting", true], ["isSessionActive", undefined], ["sessionActions", undefined]]) {
+    await t.test(`changed route retains idle proof: ${field}=${value}`, async () => {
+      rows = [{ ...rootRow, [field]: value }, foreignRow];
+      assert.equal((await adapter.inspect(f.record)).runtime.idle, false);
+      await assert.rejects(adapter.removeRuntime(f.record), /exact idle runtime/);
+    });
+  }
+  assert.deepEqual(mutations, []);
+  assert.equal(readFileSync(sessionFile, "utf8"), "episode\n");
+  rows = [rootRow, foreignRow]; stateCalls.length = 0;
+  assert.equal((await adapter.inspect(f.record)).runtime.idle, true);
+  await adapter.removeRuntime(f.record);
+  assert.deepEqual(new Set(stateCalls), new Set(["current-route"]));
+  assert.deepEqual(mutations, [["kill", "current-route"], ["delete", sessionFile]]);
+  assert.deepEqual(rows, [foreignRow]);
+  assert.equal(readFileSync(foreignFile, "utf8"), "preserve\n");
+  assert.equal(f.record.episodeActiveSessionId, "route");
+  assert.equal((await adapter.inspect(f.record)).runtime, undefined);
 });
 
 test("production local cleanup adapter proves exact idle runtime, worktree, and unmerged branch removal", async () => {
@@ -2832,7 +2910,7 @@ test("production local cleanup adapter proves exact idle runtime, worktree, and 
   const terminalHead = execFileSync("git", ["-C", worktree, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   configureCleanupUpstream(root, "episode-cleanup");
   const sessionFile = join(root, "episode.jsonl"); writeFileSync(sessionFile, "{}\n");
-  let rows = [{ activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } }];
+  let rows = [{ activeSessionId: "current-route", sessionId: "episode", sessionFile, cwd: worktree, isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } }];
   const calls = []; let deleteAttempts = 0; let stateCwd = worktree;
   const sessions = {
     async list() { return rows.map((row) => ({ ...row })); },
@@ -2871,7 +2949,8 @@ test("production local cleanup adapter proves exact idle runtime, worktree, and 
   await adapter.removeBranch(record);
   snapshot = await adapter.inspect(record);
   assert.deepEqual(snapshot, {});
-  assert.deepEqual(calls, [["kill", "route"], ["delete", sessionFile], ["delete", sessionFile]]);
+  assert.deepEqual(calls, [["kill", "current-route"], ["delete", sessionFile], ["delete", sessionFile]]);
+  assert.equal(record.episodeActiveSessionId, "route", "cleanup does not rewrite historical ownership routing");
 });
 
 test("cleanup retains ownership when an explicit child survives its missing root", async (t) => {
