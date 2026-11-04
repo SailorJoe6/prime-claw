@@ -4,6 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Design
 assignee: []
 created_date: '2026-11-04 18:32'
+updated_date: '2026-11-04 19:16'
 labels: []
 dependencies: []
 references:
@@ -34,6 +35,13 @@ Private reproducible evidence is at `/Users/jlanders/gitlab_local/ralph-pva/repo
 
 ## Authority and non-goals
 Joe explicitly asked to log this bug and continue the current bounded recovery attempt without waiting for a fix. This ticket is NOT a dependency or approval gate for that attempt. Ticket creation does not authorize implementation, global installation/restart, or another live migration. Preserve source authority and exact cutover confirmation boundaries. Do not modify Prime Agent source as the solution.
+
+## Operator-aborted recovery attempt and additional defects
+Joe reports that he had to run `prime-agent shutdown --force` to stop the recovery migration because ordinary interruption did not stop it. The migration had run over half an hour. The native command returned `append Backlog provenance to TASK-52: backlog command: command/capture failed (status=1, nativeStatus=null, signal=SIGTERM)`. For this attempt, the SIGTERM is consistent with the operator's deliberate force shutdown; do not misreport it as a spontaneous data failure. The earlier attempt's interruption cause remains unproven.
+
+After shutdown, read-only inspection finds 59 task files, 1671 encoded provenance-comment chunks, and 39,760,679 bytes of task Markdown. Beads is still present. Joe has interrupted this operation; do not restart it automatically.
+
+The unreadable data is not required task content or a user-supplied binary attachment. `backlogSourcePackage` serializes export rows, native views, history, events, provenance, and repeated source catalog/memory context into JSON; `chunkComment` base64-encodes it into 24,000-character pieces; each piece is appended by a separate native `backlog task edit --comment` invocation. This creates both unreadable task Markdown and thousands of CLI edits. It is a directly observed runtime contributor, not proof of the entire interruption cause. Lossless preservation does not by itself justify encoding an archive into normal task comments. Readability, practical runtime, and ordinary cancellation are defects to address, not instructions to trim source history.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -43,4 +51,7 @@ Joe explicitly asked to log this bug and continue the current bounded recovery a
 - [ ] #3 Long-running large-history imports expose actionable progress and interruption evidence; failure does not masquerade as damaged source history, and the worker-interruption cause is investigated without assuming the old ENOBUFS defect.
 - [ ] #4 Disposable regression fixtures cover interruption during provenance chunking, same-destination recovery, original Backlog coexistence, and preservation through complete verification/publication before source retirement.
 - [ ] #5 Document which layout artifacts are native Backlog requirements versus Prime Claw conventions and give bounded rollback/retry instructions that preserve Beads and unrelated user data.
+- [ ] #6 An operator can cancel a long migration through ordinary supported interruption without force-shutting down the entire Prime Agent runtime; cancellation stops provider writes and leaves source authoritative with an explicit resumable or safely recoverable result.
+- [ ] #7 Imported task Markdown remains human-readable; preserving full source history/provenance does not flood ordinary task comments with base64 archive chunks. Any retained archival representation has an explicit reviewed placement that does not obscure native task fields.
+- [ ] #8 Large-history migration performance is measured with representative data and avoids thousands of sequential per-chunk CLI rewrites; progress and elapsed-time evidence make excessive runtime visible.
 <!-- AC:END -->
