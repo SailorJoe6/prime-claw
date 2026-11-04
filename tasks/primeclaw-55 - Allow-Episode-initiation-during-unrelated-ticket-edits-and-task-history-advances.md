@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 13:15'
+updated_date: '2026-11-04 14:02'
 labels: []
 dependencies: []
 references:
@@ -298,4 +298,15 @@ Code checkpoint 002a779de01f08fe0dfe772260e180613e12ff86 preserves the exact pri
 
 ## Accepted clarification incorporated — resumed slice 3
 The owner-published approval and post-reboot continuation are now incorporated into the native Description, affected AC5/AC8 wording and living plan. This is the approved narrow native Beads history exception, not a reduction of the full BOTH-provider lifecycle extraction, complete secondary durability audit or bounded recorded-operation recovery. Historical blocker/API-limit notes remain unchanged. Status remains In Progress and all nine AC are unchecked. Continue the existing lower preparation/publication/supporting-path slice from runtime-UNVALIDATED checkpoint 002a779; review against accepted 1565c327. No preservation, test pass or candidate completion is claimed by this content update.
+
+## Resumed slice 3 validation checkpoint — probe passed; focused run incomplete
+Accepted Beads exception is now in the applicable requirements/implementation guidance and native task contract. Beads adapter success/result fields distinguish a successful native push from committed/published task proof: `pushed`, `submittedRevision`, local `taskAfterPush`, and post-mutation/post-push observations. The new logged-history-commit-failure regression is adapter-only, not native Dolt isolation proof. Direct consumers/fixtures changed mechanically; no new policy gate, retry, isolation framework or native operation was added. Oversight guidance was condensed without changing retained-folder/terminal procedures, and directly affected obsolete static pins were updated.
+
+Selected host-safe static checks: 55 passed / 13 deselected, `/tmp/primeclaw55-slice3-static-combined.log`. The three earlier unrelated baseline exclusions remain unchanged. Independent read-only cumulative review against accepted `1565c3272e12adf84238068dd1a99a4a809b182b` found no material defect, with no runtime/native-isolation claim. Preserved WIP `002a779de01f08fe0dfe772260e180613e12ff86` is not the accepted review base.
+
+Docker source fixture was verified clean at a1faacd53ac4473a75de1d434afaf50945c2f647 (cwd-fix-v0.9.8-r1; unchanged recorded tree/tag/package-lock identity). Exactly two serialized startup pairs ran in the explicitly coordinated 13:34:37–13:42:37 UTC slot; the slot was returned after second actual immutable capture at13:39, before offline completion. `scripts/test-tier1.sh --probe`: PASS, `.test-results/20261104T133511Z-19918-abaaa6d2/tier1/manifest.json`; actual network absence and clean builder/runtime teardown recorded. Log `/tmp/primeclaw55-slice3-resumed-probe.log`.
+
+The required focused command `python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py -q -m container` is still running in the one already-captured fixture, `.test-results/20261104T133753Z-27442-5979e0d9/tier1`. Current output has two failures; history bridge reached its900-second bound and emitted only `TAP version 13`. Read-only diagnostics found its orphaned Git `rev-parse HEAD` process in Linux state D / `request_wait_answer` for over20minutes, and a subsequent provider Node process also in state D / metadata-syscall wait. Snapshot/share mounts use VirtioFS. This establishes native filesystem-wait symptoms, NOT a proven product-code cause or an assertion-based repair. No full focused pass or clean terminal teardown is claimed while the run is incomplete. Log `/tmp/primeclaw55-slice3-resumed-focused.log`; bounded diagnostics `/tmp/primeclaw55-slice3-focused-diagnostics.log`.
+
+No code/source edit, process kill, Docker restart, retry or third startup was performed in response. Preserve remaining output and terminal manifest, then assess actual failures before any necessary repair/new coordinated validation. Current continuation source is uncommitted; code HEAD remains the published WIP002a779. Status stays In Progress, all9 AC unchecked, full remaining lifecycle/audit/recovery scope stays on this task. No main integration/global activation/live provider recovery/merge/cleanup authority is claimed.
 <!-- SECTION:NOTES:END -->
