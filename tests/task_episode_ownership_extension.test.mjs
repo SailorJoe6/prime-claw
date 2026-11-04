@@ -139,10 +139,6 @@ function publishedBeadsStatus(f, overrides = {}) {
     taskPublished: { taskId, title: rawTask.title, nativeStatus: rawTask.status, canonicalStatus: "In Progress", nativeView: rawTask },
     postMutationProof: { revision, parentRevision: "c".repeat(32), clean: true, command },
     localPublishedProof: { revision, parentRevision: "c".repeat(32), clean: true, command },
-    remotePublishedTask: {
-      publicationHead: "e".repeat(40), revision, taskRow: { id: taskId, title: rawTask.title, status: rawTask.status },
-      comments: [], refBefore: { command },
-    },
     pull: command,
     mutation: command,
     push: command,
@@ -242,16 +238,9 @@ function evidenceAdvancementProvider(f, overrides = {}) {
       status: "ready",
       evidence: {
         provider: "beads", projectRoot: f.root,
+        database: "evidence", branch: "main",
         revision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
-        publishedRevision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
-      },
-    }),
-    pairTransport: () => ({
-      status: "ready",
-      evidence: {
-        provider: "beads", projectRoot: f.root,
-        revision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
-        publishedRevision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
+        workingSet: [{ table_name: "unrelated_task", status: "modified" }],
       },
     }),
     resolveTask: () => ({
@@ -259,7 +248,6 @@ function evidenceAdvancementProvider(f, overrides = {}) {
       nativeStatus: currentTaskEvidence.status, status: overrides.canonicalStatus ?? "In Progress",
       projectRoot: overrides.taskProjectRoot ?? f.episodeRoot, nativeView: currentTaskEvidence,
     }),
-    providerRevisionIsAncestor: overrides.providerRevisionIsAncestor ?? (() => true),
     now: () => "2026-10-20T22:00:00.000Z",
     ...overrides.dependencies,
   };
@@ -1118,7 +1106,7 @@ test("published Beads evidence reserves one exact provider-native owner and pres
   assert.equal(taskEpisodeProvider(readEpisodeOwnership(f.root, "unrelated-owner")), "backlog");
 });
 
-test("Beads reservation rejects anything other than the proven published result before ownership write", () => {
+test("Beads reservation reports an unsuccessful native result before ownership write", () => {
   const f = fixture();
   assert.throws(() => reservePublishedBeads(f, {
     publication: {
@@ -1129,13 +1117,66 @@ test("Beads reservation rejects anything other than the proven published result 
       evidence: { provider: "beads", projectRoot: f.root, taskId: f.selection.taskId },
     },
   }), /already-published native status result/);
-  assert.throws(() => reservePublishedBeads(f, {}, {
+  assert.equal(readEpisodeOwnership(f.root, "beads-owner"), null);
+});
+
+test("Beads reservation keeps raw native facts and preserves dirty code and history without frozen publication approval", () => {
+  const f = fixture();
+  const unrelated = taskOwnership("unrelated-owner", "PRIMECLAW-99");
+  writeEpisodeOwnership(f.root, unrelated);
+  const baseRef = git(f.root, "rev-parse", "HEAD");
+  writeFileSync(join(f.root, "unrelated.txt"), "published concurrent code\n");
+  git(f.root, "add", "unrelated.txt");
+  git(f.root, "commit", "-q", "-m", "unrelated code descendant");
+  writeFileSync(join(f.root, "unrelated.txt"), "staged work\n");
+  git(f.root, "add", "unrelated.txt");
+  writeFileSync(join(f.root, "unrelated.txt"), "unstaged work\n");
+  writeFileSync(join(f.root, "untracked.txt"), "untouched native absence\n");
+  const headBefore = git(f.root, "rev-parse", "HEAD");
+  const statusBefore = git(f.root, "status", "--porcelain=v1", "--untracked-files=all");
+  const indexBefore = readFileSync(join(f.root, ".git", "index"));
+  const rawTask = {
+    id: f.selection.taskId, title: "Raw current title", status: "blocked", design: "",
+    comments: [{ body: "current native observation" }], opaque_native_field: { keep: [1, 2] },
+  };
+  const publication = publishedBeadsStatus(f, {
+    committedRevision: "a".repeat(32),
+    localPublishedProof: { revision: "b".repeat(32), clean: false },
+    taskPublished: {
+      taskId: f.selection.taskId, title: "Earlier title", canonicalStatus: "In Planning",
+      nativeStatus: "in_planning", nativeView: rawTask,
+    },
+  });
+  assert.equal(publication.evidence.remotePublishedTask, undefined);
+  const record = reservePublishedBeads(f, { baseRef, publication }, {
     git: {
       repositoryRoot: () => f.root,
-      head: () => git(f.root, "rev-parse", "HEAD"),
-      status: () => " M src/changed.ts",
+      head: () => assert.fail("reservation does not approve a frozen code HEAD"),
+      status: () => assert.fail("reservation does not approve whole-code cleanliness"),
     },
-  }), /exact clean Git code HEAD\/baseRef/);
+  });
+  assert.equal(record.baseRef, baseRef);
+  assert.equal(record.providerRevision, publication.evidence.publishedRevision);
+  assert.deepEqual(record.taskEvidence, rawTask);
+  assert.deepEqual(readEpisodeOwnership(f.root, unrelated.ownerSessionId), unrelated);
+  assert.equal(git(f.root, "rev-parse", "HEAD"), headBefore);
+  assert.equal(git(f.root, "status", "--porcelain=v1", "--untracked-files=all"), statusBefore);
+  assert.deepEqual(readFileSync(join(f.root, ".git", "index")), indexBefore);
+  assert.equal(readFileSync(join(f.root, "unrelated.txt"), "utf8"), "unstaged work\n");
+  assert.equal(readFileSync(join(f.root, "untracked.txt"), "utf8"), "untouched native absence\n");
+});
+
+test("Beads reservation retains exact task, revision and root targeting", () => {
+  const f = fixture();
+  const mismatched = publishedBeadsStatus(f);
+  mismatched.evidence.taskPublished.nativeView.id = "OTHER-1";
+  assert.throws(() => reservePublishedBeads(f, { publication: mismatched }), /raw native evidence for the exact task/);
+  assert.throws(() => reservePublishedBeads(f, {
+    publication: publishedBeadsStatus(f, { publishedRevision: "invalid" }),
+  }), /exact observed candidate provider revision/);
+  assert.throws(() => reservePublishedBeads(f, {
+    publication: publishedBeadsStatus(f, { projectRoot: mkdtempSync(join(tmpdir(), "foreign-beads-reservation-")) }),
+  }), /different project/);
   assert.equal(readEpisodeOwnership(f.root, "beads-owner"), null);
 });
 
@@ -1197,10 +1238,9 @@ test("prepared Beads observations preserve the prior record until handoff admiss
   assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), prepared.record);
 });
 
-test("published Beads evidence refresh synchronizes before proof/read and records current facts without binding drift", () => {
+test("Beads evidence refresh observes the native revision and raw task once without paired publication approval", () => {
   const f = evidenceAdvancementFixture();
   const provider = evidenceAdvancementProvider(f);
-  const ancestry = [];
   const order = [];
   const result = advanceEvidence(f, {}, {
     ...provider,
@@ -1209,34 +1249,23 @@ test("published Beads evidence refresh synchronizes before proof/read and record
       return provider.synchronize(...args);
     },
     prepareTransport: (...args) => {
-      order.push("prepare");
-      return provider.prepareTransport(...args);
+      order.push("observe");
+      const preparation = provider.prepareTransport(...args);
+      assert.equal(preparation.evidence.publishedRevision, undefined);
+      assert.deepEqual(preparation.evidence.workingSet, [{ table_name: "unrelated_task", status: "modified" }]);
+      return preparation;
     },
     resolveTask: (...args) => {
       order.push("read");
       return provider.resolveTask(...args);
     },
-    pairTransport: (...args) => {
-      order.push("pair");
-      return provider.pairTransport(...args);
-    },
-    providerRevisionIsAncestor: (cwd, ancestor, descendant) => {
-      order.push("ancestry");
-      ancestry.push({ cwd, ancestor, descendant });
-      return true;
-    },
   });
 
-  assert.deepEqual(order, ["pull", "prepare", "read", "pair", "ancestry"]);
+  assert.deepEqual(order, ["pull", "observe", "read"]);
   assert.equal(result.previousProviderRevision, f.owner.providerRevision);
   assert.equal(result.publishedProviderRevision, f.publishedProviderRevision);
   assert.deepEqual(result.previousTaskEvidence, f.owner.taskEvidence);
   assert.deepEqual(result.currentTaskEvidence, f.currentTaskEvidence);
-  assert.deepEqual(ancestry, [{
-    cwd: f.episodeRoot,
-    ancestor: f.owner.providerRevision,
-    descendant: f.publishedProviderRevision,
-  }]);
   const changed = Object.keys(result.record).filter((key) =>
     JSON.stringify(result.record[key]) !== JSON.stringify(f.owner[key]));
   assert.deepEqual(changed.sort(), ["head", "providerRevision", "taskEvidence", "updatedAt"]);
@@ -1291,37 +1320,58 @@ test("owner-authored and compatible outside same-task Beads changes both advance
   assert.deepEqual(outsideResult.record.taskEvidence, outsideEvidence);
 });
 
-test("paired publication failure and lifecycle drift fail without ownership writes", () => {
+test("native observation failure is reported without ownership writes", () => {
   const f = evidenceAdvancementFixture();
-  const provider = evidenceAdvancementProvider(f);
   let ownerWrites = 0;
   assert.throws(() => advanceEvidence(f, {}, {
-    ...provider,
-    pairTransport: () => ({
+    prepareTransport: () => ({
       status: "blocked",
       code: "revision",
-      detail: "the selected Dolt working set has 1 uncommitted table change(s)",
-      remediation: "Review the exact native writer before continuing",
-      observedRevision: "d".repeat(32),
+      detail: "native SQL read failed",
+      remediation: "Inspect the reported native failure",
     }),
     ownership: {
       read: (root, ownerSessionId) => readEpisodeOwnership(root, ownerSessionId),
       mutate: () => {
         ownerWrites += 1;
-        throw new Error("ownership mutation must not run for unpaired evidence");
+        throw new Error("ownership mutation must not run after native failure");
       },
     },
-  }), /paired publication proof is blocked/);
+  }), /native observation is blocked.*native SQL read failed/);
   assert.equal(ownerWrites, 0);
   assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
+});
 
-  const lifecycle = evidenceAdvancementFixture();
-  const blockedEvidence = { ...lifecycle.currentTaskEvidence, status: "blocked" };
-  assert.throws(() => advanceEvidence(lifecycle, {}, evidenceAdvancementProvider(lifecycle, {
-    currentTaskEvidence: blockedEvidence,
-    canonicalStatus: "Blocked",
-  })), /current native In Progress task/);
-  assert.deepEqual(readEpisodeOwnership(lifecycle.root, lifecycle.owner.ownerSessionId), lifecycle.owner);
+test("Beads evidence refresh passes changed lifecycle, design, history and prior observations to the LLM as facts", () => {
+  const f = evidenceAdvancementFixture();
+  const priorRevision = "b".repeat(32);
+  const priorTask = { ...f.owner.taskEvidence, notes: "Earlier caller observation" };
+  const currentTaskEvidence = {
+    ...f.currentTaskEvidence, status: "blocked", design: "TBD",
+    comments: [{ body: "Native raw facts, not lifecycle approval" }],
+  };
+  const result = advanceEvidence(f, {
+    previousProviderRevision: priorRevision, previousTaskEvidence: priorTask,
+  }, evidenceAdvancementProvider(f, {
+    currentTaskEvidence, canonicalStatus: "Blocked",
+    dependencies: {
+      prepareTransport: () => ({
+        status: "ready",
+        evidence: {
+          provider: "beads", projectRoot: f.root, database: "evidence", branch: "main",
+          revision: "d".repeat(32), publishedRevision: "a".repeat(32),
+          workingSet: [{ table_name: "issues", status: "modified" }],
+        },
+      }),
+    },
+  }));
+  assert.equal(result.previousProviderRevision, priorRevision);
+  assert.deepEqual(result.previousTaskEvidence, priorTask);
+  assert.equal(result.record.providerRevision, "d".repeat(32));
+  assert.equal(result.publishedProviderRevision, "d".repeat(32));
+  assert.deepEqual(result.currentTaskEvidence, currentTaskEvidence);
+  assert.deepEqual(result.record.taskEvidence, currentTaskEvidence);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
 });
 
 test("foreign linked provider context is rejected before the sole native pull", () => {
@@ -1366,9 +1416,6 @@ test("native synchronization failure is not retried and changes no evidence", ()
 test("Beads evidence advancement rejects foreign, drifted, colliding, uncertain, or unpushed identity without retry", () => {
   const f = evidenceAdvancementFixture();
   assert.throws(() => advanceEvidence(f, { ownerSessionId: "foreign-owner" }), /no ownership for the exact requesting owner/);
-  assert.throws(() => advanceEvidence(f, {}, {
-    providerRevisionIsAncestor: () => false,
-  }), /not an ancestor/);
 
   const cleanGit = {
     repositoryRoot: () => f.episodeRoot,

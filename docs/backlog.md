@@ -427,41 +427,20 @@ fields, no lifecycle wiring, no per-task mutation loop.
 
 ### `prepareEpisodeTaskHistoryWorkspace({ primaryRoot, targetWorktree })`
 
-- **Identity/containment (Git only):** the target must be a REGISTERED linked
-  worktree of the SAME Git common repository as the canonical primary —
-  proven by `git rev-parse --git-common-dir` equality plus
-  `git worktree list --porcelain`. The primary itself, an arbitrary directory,
-  or a foreign repository blocks (`not-linked-worktree` /
-  `common-repo-mismatch`). No ownership fields or lifecycle wiring.
-- **Derived from the prepared primary:** the selected remote name, exact
-  transport URL, published `refs/heads/prime-claw/tasks` authority, and exact
-  exact safe relative store location come from
-  `prepareTaskHistoryWorkspace(primaryRoot)`. A prepared `backlog/`, `.backlog/`,
-  or retained custom primary maps only to the same relative target path.
-- **Pre-existing effective ignore required:** the store path must be directly
-  contained and non-symlinked, and native `git check-ignore` must prove it is
-  already ignored BEFORE anything is created. The target code worktree is
-  never edited or staged to establish ignore; an unsafe ignore blocks
-  (`not-ignored`). The ignore lives on the target branch's own committed
-  `.gitignore` (a worktree-creation/operator responsibility, not this seam's).
-- **Exact target-native authority:** before the clone write, target provider
-  discovery may be absent or may select only the exact derived Backlog store;
-  another provider or store blocks. A target root configuration is accepted
-  only when it is the exact reviewed relative symlink into the derived custom
-  nested clone; regular, absolute, dangling, and alternate targets block.
-  After creation or reuse, discovery must select that exact store before native
-  lifecycle/default/autoCommit reads are trusted.
-- **Independent nested clone:** an ordinary-Git clone uses both the selected
-  remote name (`--origin <selected>`) and exact URL on `prime-claw/tasks` at
-  the exact remote head — never a nested linked worktree, submodule,
-  alternate index, same-root custom work tree, local-filesystem authority
-  clone, or force update. Fresh and reused clones must have a real,
-  non-symlink `.git` directory; canonical top level equal to the store; and
-  Git/common directories equal to the contained `<store>/.git`. Reuse also
-  verifies the exact sole remote name+URL, branch/head, native
-  lifecycle/default/autoCommit, and no unpublished commits or files. Its
-  result-checked clean-status proofs include ordinary and ignored untracked
-  entries, so an ignored local sentinel is still unpublished content.
+This operation targets the exact registered linked Episode worktree and derives
+the native store location and selected remote from primary metadata, without
+preparing or synchronizing the primary task clone. A missing target store is
+cloned from that remote. An existing target retains its own unrelated work;
+explicit native fetch/fast-forward results are returned without requiring a
+clean whole checkout, a stable paired remote head, or lifecycle/default-status
+configuration approval.
+
+The ordinary nested clone, configured store, exact remote/ref and containment
+checks address the requested resource. Preparation does not overwrite a foreign
+store or another provider. Native failures are returned as facts; the invoking
+Agent decides publication readiness and any real conflict through editable
+implementation guidance. Initialization and the separate cleanup seam below are
+not changed by this extraction.
 
 ### `cleanupEpisodeTaskHistoryStore({ primaryRoot, targetWorktree })`
 
@@ -491,53 +470,30 @@ routing, migration/cutover, PRIMECLAW-43.1, and changes to the accepted
 non-empty-folder-store ordering.
 
 
-## Backlog sub-slice 2C: exact task mutation and publication
+## Exact Backlog task mutation and direct publication
 
 `publishTaskHistoryMutation({ primaryRoot, targetWorktree, taskId, edits,
-commitMessage? })` is the shared Backlog-specific write seam for either the
-prepared primary nested clone or one prepared Episode clone.
-`publishEpisodeTaskHistoryMutation` remains a compatibility alias. `edits` contains native `backlog task edit`
-option/value pairs; the seam supplies the sole positional task ID itself.
-It does not expose a normalized task model or implement lifecycle routing.
+commitMessage? })` performs a native exact-task read/edit/reread in the intended
+independent primary or Episode clone. `publishEpisodeTaskHistoryMutation` remains
+an alias. Native task ID/path and requested clone/ref are exact operation targets,
+not a status, meaningful-plan, clean-checkout or frozen-content approval.
 
-Before the native read and write, the seam re-proves the linked-worktree,
-folder-native authority, independent clone, one exact remote name/URL, task
-branch, ignored store, and strict clean/no-unpublished state. It directly reads
-and ordinarily fetches `refs/heads/prime-claw/tasks`; a clean stale clone moves
-only by `git merge --ff-only`, followed by another direct-head and cleanliness
-proof. Before native task discovery, every tracked `tasks/` entry must have a
-real regular-file Git mode and a real non-symlink parent chain contained in the
-exact independent store. Native Backlog must then resolve the exact requested
-canonical ID and the same tracked real regular non-symlink path before and
-after the edit, with effective `autoCommit` exactly `false`. Unsafe task-file
-identity blocks without returning a possibly external native view. Only that
-exact task path may change. The seam then makes one ordinary Git commit and
-pushes `HEAD:refs/heads/prime-claw/tasks` without a force option or force
-refspec. A successful result is returned only after a fresh `git ls-remote`
-proves the direct remote head equals the published commit. It includes
-base/published heads, exact ID/path, unmodified safe native JSON views, and the
-exact task-path Git diff.
+The operation uses an exact-path ordinary Git commit and one non-force
+`HEAD:refs/heads/prime-claw/tasks` push. Unrelated staged entries, unstaged files
+and untracked files are not included or reset. It returns complete native task
+views, the exact task diff, observed heads and native Git results. It does not
+fetch/merge/retry on rejection, classify same-task versus other-task remote
+changes, or wait for matching whole-branch observations. A successful push and a
+newer remote observation are both reported without treating inequality as a
+semantic veto. Failed native commands preserve available local work/evidence.
 
-A non-force rejection triggers fresh direct-read/fetch evidence. Automatic
-retry requires a complete status-aware ordinary-Git remote path set containing
-only added or modified files. In one disposable clone, native Backlog indexes
-safe task identities at both the prior integrated remote head and the candidate
-remote head. Every modified path must resolve to the same exact canonical ID
-and native path at both heads, and that identity must differ from the owner.
-Every added path must be absent at the prior head and resolve to exactly one
-safe different-task identity at the candidate head. This rejects an in-place
-canonical-ID rewrite even when its file path is unchanged. Shared
-configuration/authority, non-task, malformed, deleted/renamed/type-changed,
-same-task, non-descendant, unreadable, or otherwise ambiguous advances block
-with exact prior/new remote heads, safe native identity views, the retained
-local task diff, and the full remote Git diff for managed judgment. A proven
-other-task-file-only A/M advance is preserved by an ordinary merge. Before
-another non-force push, the seam re-proves target authority, independent-clone
-identity, native capabilities, effective `autoCommit=false`, strict
-cleanliness, and the same exact canonical ID plus safe task path. The seam
-never decides semantic compatibility or forces/rewrites remote history. Native
-mutation, commit, fetch, merge, push, or direct-proof failure leaves
-recoverable local work in the nested clone and never calls it published.
+The Agent following editable implementation guidance inspects authorized task
+changes and history before requesting mutation. It ensures the selected coherent
+ticket is committed and published before an Episode needs it, commits promptly,
+and decides a real conflict or compatible in-scope reconciliation. Command
+success alone does not grant lifecycle authority or permission to absorb another
+Conversation's work. No automatic retry, force, reset or replacement allocation
+is supplied by this helper.
 
 ## Independent Backlog production lifecycle connection
 
@@ -603,101 +559,37 @@ or parent-worktree removal. Only the exact clean fully published nested clone is
 removed; primary task history and unrelated ownership survive. Migration and
 the real repository cutover remain PRIMECLAW-43.1.
 
-### Beads workspace and transport foundation (slice 2D)
+### Beads workspace and transport observations
 
-`prepareBeadsWorkspaceTransport` is the direct Beads-specific readiness seam.
-It prepares no shadow state and performs no task mutation or publication. It
-uses supported native reads in one fail-closed sequence:
+`prepareBeadsWorkspaceTransport` reads the selected native context, server,
+database, branch, revision, working set, configured remote and publication-ref
+facts. These support exact workspace/operation targeting. The task-native path
+no longer checks lifecycle capabilities, demands a clean working set, compares
+live/remote revisions as approval, or repeatedly clones remote databases to
+prove a stable snapshot. Raw observations and native failures reach the Agent;
+unknown statuses and absent optional fields remain native facts.
 
-- before any native Beads capability, server, or remote proof, filesystem
-  identity checks require the selected `.beads` path to be a real non-symlink
-  directory at the canonical project root and require `metadata.json` plus
-  `config.yaml` to be readable real regular non-symlink files at their exact
-  canonical paths inside that store. Unsafe, external, unreadable, incomplete,
-  or ambiguous authority blocks without reading external content or making a
-  native Beads/Dolt call;
-- provider discovery and the existing `bd` capability/status gate select the
-  sole live Beads authority;
-- `bd context --json` must bind the exact repository, `.beads` store, installed
-  `bd` version, Dolt database, and native `server` mode;
-- `bd config get dolt.auto-start --json`, `bd dolt show --json`, and
-  `bd dolt status --json` distinguish a running bd-managed per-project server
-  from an explicitly operator-managed external server. A bd-managed server's
-  reported data directory must be the selected store's exact real `.beads/dolt`
-  directory; foreign, symlinked, unreadable, or ambiguous path identity blocks.
-  Embedded, proxied, machine-global shared, unreachable, or ambiguous server
-  evidence also blocks;
-- read-only SQL through `bd` proves the exact database, active branch, 32-character
-  Dolt revision, installed/server Dolt version parity, and an empty
-  `dolt_status` working set. A dirty working set has no complete revision
-  authority and blocks with native commit remediation;
-- `bd config get sync.remote --json` and `bd dolt remote list --json` must select
-  one healthy Git-backed Dolt remote matching one repository Git remote.
-  Before exact comparison, supported ordinary HTTPS, SSH, and file URLs plus
-  safe absolute filesystem paths normalize to the same `git+...` transport
-  identity emitted by native Beads; normalization does not relax either native
-  or repository-remote cardinality. Direct `git ls-remote --refs` must expose
-  exactly one `refs/dolt/data` ref;
-  then a disposable isolated `dolt clone --ref refs/dolt/data` must report the
-  same native branch and revision as the live server. After that isolated proof,
-  the live native database, branch, revision, Dolt version, and clean
-  `dolt_status` working set are read again and must exactly match the initial
-  evidence. A final direct ref read must equal the initial Git object ID so
-  neither a concurrent live advance nor a concurrent publication can be called
-  ready. The Git object ID for the ref and the Dolt revision are retained as
-  different evidence; neither is mistaken for the other.
+The existing explicit preparation path for migration/retained ownership
+transition preserves its separate compatibility behavior. It is not a task-native
+eligibility substitute. Neither path creates a new task authority or mirror,
+uses live raw Dolt writes, or grants migration/activation authority.
 
-The only direct `dolt` operations are executable version discovery and
-read-only inspection of the disposable remote clone. They never point at the
-live `.beads` data directory or race the server. `.beads/issues.jsonl` never
-participates. Missing capabilities, lifecycle evidence, clean revision,
-remote, credentials, ref, or exact published revision returns bounded native
-remediation; no force push, daemon, sidecar, mirror, registry, lock, protocol,
-or persistent Prime Claw state is introduced.
+### Beads native status publication
 
-Still out of scope for the workspace foundation: Beads per-task mutation,
-Episode admission/finalization/cleanup wiring, ownership/receipt fields,
-provider-neutral UX, managed semantic decisions, legacy transition,
-migration/cutover, PRIMECLAW-43.1, and any coordinator, lock, checkpoint,
-framework, or persistent state.
+`mutateAndPublishBeadsTaskStatus` reads the exact raw task, performs one supported
+native pull, requests the intended native update, and makes one non-force native
+push. Native `--if-status` is used only when explicitly requested, not generated
+as a hidden transition rule. Current working-set, parent, status and revision
+facts are not repeated code-level eligibility or content-approval tests.
 
-### Beads native status publication (first bounded mutation slice)
-
-`mutateAndPublishBeadsTaskStatus` adds one deliberately small provider-native
-write seam on top of the workspace foundation. It prepares the exact clean
-workspace, reads the exact task through `bd show --json --long
---include-comments`, and performs one `bd dolt pull --remote <name>`. If that
-pull advances the native revision, the seam stops before mutation and returns
-the raw supported `bd --readonly diff <from> <to> --json`, both exact task
-views, and revision facts for managed LLM review. TypeScript does not classify
-the change as same-task or unrelated.
-
-With no concurrent advance, the seam asks Beads to own the guarded atomic
-write and commit through `bd --dolt-auto-commit=on update <exact-id> --status
-<native-status> --if-status <prior-native-status> --json`. One supported
-read-only native query then captures the exact `HEAD`, `HEAD~1`, and
-`dolt_status` row count together. The update is eligible to publish only when
-`HEAD~1` is the prepared revision and the working set is empty. A different
-first parent returns raw `bd --readonly diff <prepared> <observed> --json` plus
-exact before/after long-and-comments task views for managed review; deterministic
-code does not classify the descendant.
-
-The seam then makes one `bd dolt push --remote <name> --no-adopt`, never
-force-pushes, and re-proves the same exact clean local revision before success.
-One disposable read-only clone bracketed by stable direct ref reads retains the
-raw remote revision, exact issue row, and comments. Success requires that remote
-revision to equal the proved committed/live revision and the remote row to carry
-the exact requested status; a remote descendant is review evidence, not exact
-success. A guarded mutation failure or rejected push is preserved and returned
-with raw command output, exact local and remote task/revision/ref facts, and raw
-native diff evidence. There is no automatic second pull, retry, rollback, table
-enumeration, normalized diff, or deterministic semantic compatibility decision.
-A managed Episode or Conversation reviews the native evidence and may
-deliberately continue on a later pass.
-
-The focused publication contract uses five representative cases only: ordinary
-clean direct-parent success, one post-update descendant, one dirty-state
-refusal, one concurrent pull advance, and one rejected non-force push.
+Returned raw views, revisions, command outputs and publication observations let
+the Agent inspect what happened. A successful push reports the submitted local
+revision and the native command result, not an isolated remote-Dolt proof or a
+frozen task-content approval. Rejected or uncertain operations retain factual
+evidence and do not trigger automatic second pull, retry, rollback or replacement
+allocation. Editable guidance owns selected-task durability, semantic decisions
+and failure disposition. Deeper creation/reservation and later lifecycle policy
+extraction remain on PRIMECLAW-55; this helper slice does not claim completion.
 
 ### Conversation status-publication integration boundary
 
@@ -856,55 +748,28 @@ provider-aware allocation, and migration remain deferred.
 
 ### Internal same-owner Beads factual observation advancement
 
-One internal provider-specific primitive refreshes factual published Beads
-observations on an existing active version-2 owner. It has no independent public
-tool, semantic acceptance, status transition, or lifecycle authority; the
-direct active-Beads handoff branch below is its sole managed caller. The exact
-requesting Conversation owner is selected before provider or task
-interpretation; provider-absent/Backlog and version-1 records reject unchanged.
+The existing internal primitive refreshes native observations on one exact
+active version-2 owner. It selects the requesting Conversation before task
+interpretation and retains exact provider/task/worktree/session/database and
+foreign-owner targeting. It creates no resource and grants no lifecycle authority.
 
-The input binds the exact owner/task, prior persisted complete raw native task
-view and Dolt revision, and the current pushed Episode code head. The prior
-values must equal the selected ownership record. From the recorded linked
-Episode worktree the boundary runs one supported `bd dolt pull` without force or
-retry. A conflict or transport failure stops with no ownership write. Existing
-native transport preparation then proves the selected Beads database, clean
-published revision, remote publication ref, and supported provider authority.
-Exact native `bd show --json --long --include-comments` reads the complete raw
-target. A second fresh transport proof immediately after that read must match
-the same database, branch, transport, clean published revision, and publication
-ref. Movement, dirt, or proof drift during this pairing window is a real
-transport-integrity failure and writes nothing.
+Previous revision/raw-task observations are context, not frozen acceptance. One
+supported native pull runs from the recorded Episode worktree, followed by native
+transport facts and the complete raw task. The helper no longer pairs repeated
+stable publication proofs, compares previous content as approval, enforces
+status/design eligibility, or tests provider-history ancestry. Current native
+revision and complete raw task reach the responsible LLM, which judges semantic
+compatibility under editable owner guidance. Unknown fields and absence remain
+native facts.
 
-The current target must retain the exact task ID, native `in_progress` and
-canonical `In Progress` status, and meaningful raw `design`. One read-only
-native Dolt merge-base query proves the prior recorded revision is an ancestor
-of the current published revision. Raw inequality with the prior task
-observation is not an approval boundary. Owner-authored living-plan changes,
-compatible outside same-task edits, and unrelated-task descendants all become
-current factual evidence; exact previous/current native objects and revisions
-are returned for the existing Episode LLM.
-
-The recorded Episode worktree must remain the exact repository root and branch,
-with no Git operation, no tracked or untracked changes, and local, upstream, and
-direct-remote heads all equal to the supplied head. Ordinary Git ancestry must
-prove `baseRef` → prior recorded head → supplied head. The existing Episode
-session transcript must remain a readable non-empty regular file.
-
-After the first canonical handoff message is admitted, its admission callback
-runs the atomic Conversation-keyed ownership mutation before the execute
-follow-up is queued. A rejected or uncertain first send therefore preserves the
-prior observation; a rejected follow-up retains the current observation because
-the responsible LLM already received exact before/current context. The mutation
-checks the exact retained owner and foreign active binding collisions beside its
-sole write. Only factual `providerRevision`, current raw `taskEvidence`, code
-`head`, and `updatedAt` change. Every operation, provider/task, base, engine/placement,
-worktree/branch, Episode/session, creation, cleanup, and unrelated-owner field
-is preserved. The primitive re-reads the exact persisted record. Owner drift,
-collisions, unsafe/unpushed code, non-descendant provider history, publication
-or identity failure, and uncertain writes fail closed without reservation,
-recreation, retry, force, or provider/task mutation. The live project registry
-is not used during development tests.
+The existing atomic callback still runs only after first-message admission and
+updates only provider revision, raw task evidence, code head and timestamp on
+the exact owner. Operation, placement, branch/worktree/session and other-owner
+resources remain unchanged. Native failures, identity/collision failures and
+uncertain writes are reported without retry or fresh allocation. The separate
+code-head/publication and later handoff/terminal policy paths remain pending
+extraction on this task; this supporting helper change is not full continuation
+or lifecycle completion.
 
 ### Direct active-Beads task handoff continuation
 

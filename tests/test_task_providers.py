@@ -89,7 +89,7 @@ def test_task_providers_module_keeps_the_narrow_deterministic_boundary() -> None
         "issues.jsonl",
     ):
         assert sentinel in source
-    resolver_read = source[source.index("function readBeadsIssue("):source.index("/** Canonical lifecycle status", source.index("function readBeadsIssue("))]
+    resolver_read = source[source.index("function readBeadsIssue("):source.index("/**\n * Read one explicit task through", source.index("function readBeadsIssue("))]
     assert '["show", selectedTaskId, "--json", "--long", "--include-comments"]' in resolver_read
     assert "nativeView: issue.nativeView" in source
     # No shadow authority, no provider framework, no semantic machinery.

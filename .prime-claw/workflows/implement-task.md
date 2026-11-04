@@ -134,6 +134,53 @@ allocation. Confirm that the Episode can obtain the selected committed ticket
 from its provider workspace; do not synchronize another owner's dirty checkout
 as a hidden prerequisite.
 
+## Preparation and publication are native operations
+
+Before requesting a task mutation, inspect the complete current native task and
+its history. Decide whether the selected update is authorized, whether current
+content is compatible, and whether the selected ticket is committed and
+published. These decisions belong here, not to cleanliness, status, plan, or
+revision predicates in preparation/publication code. A new whole-branch head or
+unrelated dirty task/code work is not a conflict by itself.
+
+For independent Backlog, obtain the Episode's task clone from the selected
+remote and configured store location without preparing or synchronizing another
+Conversation's primary clone. Reuse only the intended target workspace. An
+existing target may have unrelated work; do not overwrite it to make preparation
+succeed. Use ordinary fetch/fast-forward only when needed for the intended
+operation. Interpret any native Git conflict from the returned facts.
+
+A Backlog mutation uses the supported native exact-task edit and reread, an
+exact-path Git commit, and one non-force push. Use path-limited commit mechanics
+such as `git commit --only -m "..." -- <task-path>` so unrelated index entries
+remain staged and excluded. Never commit other paths, require the whole index
+to be clean, or absorb unreviewed selected-ticket edits. Inspect the task diff
+before committing. The publication helper does not classify remote changes,
+merge/rebase them, or retry a rejected push. A successful push followed by a
+newer remote observation is history evidence, not automatic semantic rejection.
+
+For Beads, inspect native workspace/database/branch/remote facts and the complete
+raw task. Use supported `bd dolt pull`, `bd update`, native task-history commit
+when needed, and `bd dolt push --no-adopt` on the intended workspace. Preserve
+native fields and absence; do not invent a Markdown task path. A dirty native
+working set is an observation to understand, not permission to commit another
+owner's tables or task edits. Do not ask transport code to prove a frozen local,
+parent, remote or task-content revision. Do not infer publication of the exact
+intended task merely from a successful command; inspect the returned raw views,
+command results, revisions and publication facts.
+
+For either provider, a rejected or uncertain native operation requires current
+state inspection and an LLM decision. Preserve the local task/commit, unrelated
+bytes and staging, and exact existing operation/resources. Do not automatically
+pull again, reconcile, retry, force, reset, or allocate a replacement. Decide a
+compatible in-scope reconciliation from actual before/current content, or ask
+for a real semantic conflict, authority change or scope decision. Record each
+coherent authorized ticket edit promptly and publish it through its native
+history. Code reports the operation result; it does not choose a lifecycle
+rollback or Blocked disposition on the Agent's behalf. The remaining deeper
+create/reservation/failure-disposition paths are still pending extraction on
+PRIMECLAW-55; report their actual behavior without claiming it is this policy.
+
 ## Create the Episode
 
 The full ordinary `prime-claw-oversee-episode` guidance is loaded above this

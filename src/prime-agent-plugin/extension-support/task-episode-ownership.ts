@@ -30,6 +30,7 @@ import {
 import {
   detectTaskProvider,
   prepareBeadsWorkspaceTransport,
+  prepareExplicitBeadsWorkspaceTransport,
   requireBacklogTaskSelection,
   type BeadsTaskMutationPublication,
   type BeadsWorkspaceTransportPreparation,
@@ -119,7 +120,7 @@ export interface BeadsTaskEpisodeReservationInput {
   projectSetupId?: string;
   routingEnvironmentId?: string;
   operationId?: string;
-  /** Exact clean code HEAD that this reservation binds as baseRef. */
+  /** Requested code-base identifier, independent of current checkout state. */
   baseRef: string;
 }
 
@@ -163,17 +164,14 @@ export interface BeadsTaskEvidenceAdvancementDependencies {
   detectProvider?: typeof detectTaskProvider;
   synchronize?: (cwd: string, runner: CommandRunner) => { stdout: string; stderr: string; status: number };
   prepareTransport?: (cwd: string, runner: CommandRunner) => BeadsWorkspaceTransportPreparation;
-  pairTransport?: (cwd: string, runner: CommandRunner) => BeadsWorkspaceTransportPreparation;
   resolveTask?: (cwd: string, taskId: string, runner: CommandRunner) => ProviderTaskResolution | null;
-  providerRevisionIsAncestor?: (
-    cwd: string, ancestor: string, descendant: string, runner: CommandRunner,
-  ) => boolean;
   now?: () => string;
 }
 
 export interface BeadsTaskEvidenceAdvancementResult {
   record: BeadsTaskEpisodeOwnershipRecord;
   previousProviderRevision: string;
+  /** Historical field name; this is the current native observation, not publication approval. */
   publishedProviderRevision: string;
   previousTaskEvidence: Record<string, unknown>;
   currentTaskEvidence: Record<string, unknown>;
@@ -538,12 +536,13 @@ export function resolveLegacyTaskOwnershipTransitionTarget(
     };
   }
 
-  const prepare = (): BeadsWorkspaceTransportPreparation => prepareBeadsWorkspaceTransport(projectRoot, runner);
+  const prepare = (): BeadsWorkspaceTransportPreparation => prepareExplicitBeadsWorkspaceTransport(projectRoot, runner);
   const primary = prepare();
   if (primary.status !== "ready") {
     throw new Error(`Ownership transition cannot prove published Beads history: ${primary.code}: ${primary.detail}`);
   }
-  if (primary.evidence.revision !== primary.evidence.publishedRevision) {
+  const publishedRevision = primary.evidence.publishedRevision;
+  if (!publishedRevision || primary.evidence.revision !== publishedRevision) {
     throw new Error("Ownership transition Beads working revision is not the exact published provider revision");
   }
   const episodeDetection = detectTaskProvider(episodeRoot, runner);
@@ -570,7 +569,7 @@ export function resolveLegacyTaskOwnershipTransitionTarget(
   }
   return {
     provider: "beads", task: mainTask,
-    providerRevision: primary.evidence.publishedRevision,
+    providerRevision: publishedRevision,
     taskEvidence: mainTask.nativeView,
   };
 }
@@ -1031,12 +1030,11 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
 
 
 const BEADS_RESERVATION_REVISION = /^[0-9a-v]{32}$/;
-const BEADS_IN_PROGRESS_STATUS = "in_progress";
 
 /**
- * Persist one Beads task-native provisioning reservation from the already
- * published provider-native status result. The public admission path calls
- * this only after exact serialized provider publication proof.
+ * Persist one Beads task-native provisioning reservation from a successful
+ * native mutation result. The revision and raw task are observations, not a
+ * second status, content, publication, or code-base approval gate.
  */
 export function reservePublishedBeadsTaskEpisodeOwnership(
   input: BeadsTaskEpisodeReservationInput,
@@ -1063,29 +1061,16 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
   if (!evidence.taskId || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(evidence.taskId)) {
     throw new Error("Beads Episode reservation requires the exact canonical published task ID");
   }
-  if (!BEADS_RESERVATION_REVISION.test(evidence.publishedRevision)
-      || evidence.committedRevision !== evidence.publishedRevision
-      || evidence.localPublishedProof.revision !== evidence.publishedRevision
-      || evidence.localPublishedProof.clean !== true
-      || evidence.remotePublishedTask.revision !== evidence.publishedRevision) {
-    throw new Error("Beads Episode reservation requires one exact clean published provider revision");
+  if (!BEADS_RESERVATION_REVISION.test(evidence.publishedRevision)) {
+    throw new Error("Beads Episode reservation requires an exact observed candidate provider revision");
   }
 
   const publishedTask = evidence.taskPublished;
   const rawTask = publishedTask.nativeView;
-  const remoteTask = evidence.remotePublishedTask.taskRow;
   if (publishedTask.taskId !== evidence.taskId
-      || publishedTask.canonicalStatus !== "In Progress"
-      || publishedTask.nativeStatus !== BEADS_IN_PROGRESS_STATUS
       || !rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
-      || rawTask.id !== evidence.taskId
-      || rawTask.title !== publishedTask.title
-      || rawTask.status !== publishedTask.nativeStatus
-      || !remoteTask || typeof remoteTask !== "object" || Array.isArray(remoteTask)
-      || remoteTask.id !== rawTask.id
-      || remoteTask.title !== rawTask.title
-      || remoteTask.status !== rawTask.status) {
-    throw new Error("Beads Episode reservation requires matching raw published In Progress task evidence");
+      || rawTask.id !== evidence.taskId) {
+    throw new Error("Beads Episode reservation requires raw native evidence for the exact task");
   }
 
   if (!input.ownerSessionId) throw new Error("Beads Episode reservation requires an exact owner session");
@@ -1096,10 +1081,7 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
     throw new Error("Beads local reservation cannot carry Orca placement identity");
   }
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(input.baseRef)) {
-    throw new Error("Beads Episode reservation requires an exact Git code HEAD");
-  }
-  if (git.head(projectRoot) !== input.baseRef || git.status(projectRoot) !== "") {
-    throw new Error("Beads Episode reservation requires the exact clean Git code HEAD/baseRef");
+    throw new Error("Beads Episode reservation requires an exact Git code-base identifier");
   }
 
   const ownership = dependencies.ownership ?? defaultOwnership;
@@ -1130,9 +1112,6 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   }) as BeadsTaskEpisodeOwnershipRecord;
 
-  if (git.head(projectRoot) !== input.baseRef || git.status(projectRoot) !== "") {
-    throw new Error("Git state changed during Beads Episode reservation validation");
-  }
   const beforeWrite = ownership.read(projectRoot, input.ownerSessionId);
   if ((initial === null) !== (beforeWrite === null)
       || (initial !== null && beforeWrite !== null && JSON.stringify(initial) !== JSON.stringify(beforeWrite))) {
@@ -1253,18 +1232,9 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
   assertRegularNonemptyFile(selected.episodeSessionFile, "Owned Beads Episode session transcript");
   const episodeRoot = realpathSync(selected.worktree);
 
-  // Validate the persisted observation without inventing a second task model.
-  parseEpisodeOwnership({
-    ...selected,
-    providerRevision: input.previousProviderRevision,
-    taskEvidence: input.previousTaskEvidence,
-    head: input.episodeHead,
-  }, "previous Beads evidence advancement input");
-  if (input.previousProviderRevision !== selected.providerRevision
-      || JSON.stringify(input.previousTaskEvidence) !== JSON.stringify(selected.taskEvidence)) {
-    throw new Error("Beads evidence advancement input does not match the exact persisted provider observation");
-  }
-  if (input.previousTaskEvidence.id !== input.taskId) {
+  // Previous observations are context for the LLM, not frozen approval evidence.
+  if (!input.previousTaskEvidence || typeof input.previousTaskEvidence !== "object"
+      || Array.isArray(input.previousTaskEvidence) || input.previousTaskEvidence.id !== input.taskId) {
     throw new Error("Beads evidence advancement requires exact previous raw task identity");
   }
 
@@ -1294,14 +1264,13 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
   }
   const preparation = (dependencies.prepareTransport ?? prepareBeadsWorkspaceTransport)(ownershipRoot, runner);
   if (preparation.status !== "ready") {
-    throw new Error(`Beads evidence advancement native publication proof is blocked (${preparation.code}): ${preparation.detail}`);
+    throw new Error(`Beads evidence advancement native observation is blocked (${preparation.code}): ${preparation.detail}`);
   }
   const prepared = preparation.evidence;
   if (realpathSync(prepared.projectRoot) !== ownershipRoot
       || prepared.provider !== "beads"
-      || prepared.publishedRevision !== prepared.revision
-      || !BEADS_RESERVATION_REVISION.test(prepared.publishedRevision)) {
-    throw new Error("Beads evidence advancement publication proof does not match the exact recorded Episode project");
+      || !BEADS_RESERVATION_REVISION.test(prepared.revision)) {
+    throw new Error("Beads evidence advancement native observation does not match the exact recorded Episode project");
   }
   const currentTask = (dependencies.resolveTask ?? resolveSynchronizedProviderTask)(episodeRoot, input.taskId, runner);
   if (!currentTask || currentTask.provider !== "beads" || currentTask.taskId !== input.taskId
@@ -1309,42 +1278,10 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
     throw new Error("Beads evidence advancement could not prove the exact native task identity and project");
   }
 
-  // Pair the long raw task read with a second fresh native publication proof.
-  // Provider movement or a dirty/unpublished store during that read is a real
-  // transport-integrity failure, not a semantic approval state.
-  const pairedPreparation = (dependencies.pairTransport ?? prepareBeadsWorkspaceTransport)(ownershipRoot, runner);
-  if (pairedPreparation.status !== "ready") {
-    throw new Error(`Beads evidence advancement paired publication proof is blocked (${pairedPreparation.code}): ${pairedPreparation.detail}`);
-  }
-  const paired = pairedPreparation.evidence;
-  const pairedIdentityMatches = realpathSync(paired.projectRoot) === ownershipRoot
-    && paired.provider === "beads"
-    && paired.publishedRevision === paired.revision
-    && BEADS_RESERVATION_REVISION.test(paired.publishedRevision)
-    && paired.database === prepared.database
-    && paired.branch === prepared.branch
-    && paired.remoteName === prepared.remoteName
-    && paired.remoteUrl === prepared.remoteUrl
-    && paired.publicationRef === prepared.publicationRef
-    && paired.publishedRevision === prepared.publishedRevision;
-  if (!pairedIdentityMatches) {
-    throw new Error("Beads evidence advancement publication identity changed during the paired native read");
-  }
-  if (currentTask.nativeStatus !== BEADS_IN_PROGRESS_STATUS || currentTask.status !== "In Progress"
-      || !meaningfulTaskImplementationPlan(
-        typeof currentTask.nativeView.design === "string" ? currentTask.nativeView.design : null,
-      )) {
-    throw new Error("Beads evidence advancement requires the exact current native In Progress task with a meaningful design before ownership mutation");
-  }
-  const revisionIsAncestor = dependencies.providerRevisionIsAncestor ?? exactBeadsProviderRevisionAncestor;
-  if (!revisionIsAncestor(episodeRoot, input.previousProviderRevision, paired.publishedRevision, runner)) {
-    throw new Error("Beads evidence advancement previous provider revision is not an ancestor of the current published revision");
-  }
-
   const git = dependencies.git ?? new CliBeadsTaskEvidenceAdvancementGit();
   const target = parseEpisodeOwnership({
     ...selected,
-    providerRevision: paired.publishedRevision,
+    providerRevision: prepared.revision,
     taskEvidence: currentTask.nativeView,
     head: input.episodeHead,
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
@@ -1385,7 +1322,7 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
   return {
     record: target,
     previousProviderRevision: input.previousProviderRevision,
-    publishedProviderRevision: paired.publishedRevision,
+    publishedProviderRevision: prepared.revision,
     previousTaskEvidence: input.previousTaskEvidence,
     currentTaskEvidence: currentTask.nativeView,
     commit,

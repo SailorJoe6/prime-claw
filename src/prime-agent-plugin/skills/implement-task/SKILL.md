@@ -52,7 +52,10 @@ itself. Use semantic judgment for actual same-task changes and report native
 publication conflicts or uncertainty without force, automatic retry or another
 allocation. Confirm that the Episode can obtain the selected committed ticket
 from its provider workspace; do not synchronize another owner's dirty checkout
-as a hidden prerequisite.
+as a hidden prerequisite. Follow the canonical readiness workflow's native
+preparation/publication procedure. Command success and local/remote observations
+are facts, not a duplicate readiness decision; preserve failures for judgment
+instead of asking code to reconcile or retry them.
 
 ## Admit once, then stop
 

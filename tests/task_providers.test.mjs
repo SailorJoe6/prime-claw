@@ -20,6 +20,7 @@ import {
   mutateAndPublishBeadsTaskStatus,
   mutateProviderTaskStatus,
   prepareBeadsWorkspaceTransport,
+  prepareExplicitBeadsWorkspaceTransport,
   readBeadsNativeTask,
   requireBacklogTaskSelection,
   resolveProviderTask,
@@ -176,7 +177,7 @@ const DOLT_REMOTE_URL = "git+https://example.invalid/org/repo.git";
 const DOLT_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, dolt_version() AS dolt_version";
 const DOLT_DIRTY_QUERY = "SELECT table_name, staged, status FROM dolt_status ORDER BY table_name";
 const DOLT_REMOTE_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision";
-const DOLT_MUTATION_REVISION_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, dolt_hashof('HEAD~1') AS parent_revision, (SELECT COUNT(*) FROM dolt_status) AS status_count";
+const DOLT_MUTATION_REVISION_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, (SELECT COUNT(*) FROM dolt_status) AS status_count";
 
 function beadsWorkspaceResponses(root, { operatorManaged = false, bdVersion = "1.1.2", doltVersion = "2.2.3" } = {}) {
   const storeDir = join(root, ".beads");
@@ -330,76 +331,67 @@ test("legacy transition target proves paired published Beads revision and comple
 });
 
 function beadsMutationRunner(root, scenario = {}) {
-  const delegate = beadsTransportRunner(beadsWorkspaceResponses(root));
+  const responses = beadsWorkspaceResponses(root);
+  if (scenario.dirtyBeforeMutation) responses[["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")] = {
+    stdout: JSON.stringify([{ table_name: "unrelated_table", staged: true, status: "modified" }]) + "\n", stderr: "", status: 0,
+  };
+  const delegate = beadsTransportRunner(responses);
   const calls = [];
   let revision = DOLT_REVISION;
-  let parentRevision = "9".repeat(32);
-  let remoteRevision = DOLT_REVISION;
   let head = DOLT_DATA_HEAD;
   let status = scenario.initialStatus ?? "in_design";
   let notes = "existing native notes";
-  const design = "preserve the owner-authored native design";
-  const nativeTail = { opaque: ["alpha", { omega: true }] };
   let mutationCompleted = false;
-  let remoteStatus = status;
-  let remoteNotes = notes;
   let pushCompleted = false;
-  let postPushRefReads = 0;
   return {
     calls,
     run(command, args, options = {}) {
       calls.push([command, ...args]);
       if (command === "bd" && args[0] === "show" && args.includes("--long")) {
-        return { stdout: JSON.stringify([{ id: "TST-1", title: "Native task", status, design, notes, native_tail: nativeTail, comments: [] }]) + "\n", stderr: "", status: 0 };
+        if (scenario.showFailure && mutationCompleted) return { stdout: "", stderr: "native read unavailable\n", status: 7 };
+        const native = {
+          id: scenario.foreignTask ? "TST-other" : "TST-1", title: "Native task", status,
+          design: "preserve the owner-authored native design", notes,
+          native_tail: { opaque: ["alpha", { omega: true }] }, comments: [],
+          ...(scenario.nativeView ?? {}),
+        };
+        if (scenario.absentFields) for (const key of ["title", "status", "design", "notes", "comments"]) delete native[key];
+        return { stdout: JSON.stringify([native]) + "\n", stderr: "", status: 0 };
       }
       if (command === "bd" && args[0] === "dolt" && args[1] === "pull") {
+        if (scenario.pullFailure) return { stdout: "native partial pull\n", stderr: "pull conflict\n", status: 2 };
         if (scenario.concurrentPull) revision = "c".repeat(32);
         return { stdout: "pulled\n", stderr: "", status: 0 };
       }
       if (command === "bd" && args[0] === "--dolt-auto-commit=on") {
-        if (scenario.mutationFailure) return { stdout: "", stderr: "guard rejected\n", status: 1 };
-        status = args[args.indexOf("--status") + 1];
+        if (scenario.mutationFailure || (args.includes("--if-status") && args[args.indexOf("--if-status") + 1] !== status)) {
+          return { stdout: "native update result\n", stderr: "native conditional update rejected\n", status: 1 };
+        }
+        status = scenario.ignoreStatus ? status : args[args.indexOf("--status") + 1];
         const noteIndex = args.indexOf("--append-notes");
         if (noteIndex >= 0 && !scenario.ignoreNote) notes = `${notes}\n${args[noteIndex + 1]}`;
         mutationCompleted = true;
-        revision = scenario.postUpdateDescendant ? "e".repeat(32) : "d".repeat(32);
-        parentRevision = scenario.postUpdateDescendant ? "d".repeat(32) : DOLT_REVISION;
-        return { stdout: JSON.stringify([{ id: "TST-1", status }]) + "\n", stderr: "", status: 0 };
+        if (!scenario.noNewRevision) revision = scenario.postUpdateDescendant ? "e".repeat(32) : "d".repeat(32);
+        return { stdout: JSON.stringify([{ id: "TST-1", status }]) + "\n", stderr: "native update warning\n", status: 0 };
       }
       if (command === "bd" && args[0] === "dolt" && args[1] === "push") {
-        if (scenario.pushFailure) return { stdout: "", stderr: "non-fast-forward\n", status: 1 };
+        if (scenario.pushFailure) return { stdout: "native push output\n", stderr: "non-fast-forward\n", status: 1 };
         head = "e".repeat(40);
-        remoteRevision = revision;
-        remoteStatus = status;
-        remoteNotes = notes;
         pushCompleted = true;
-        return { stdout: "pushed\n", stderr: "", status: 0 };
-      }
-      if (command === "dolt" && args[0] === "sql" && args.at(-1) === DOLT_REMOTE_IDENTITY_QUERY) {
-        return { stdout: JSON.stringify({ rows: [{ database_name: "fixture_db", branch: "main", revision: remoteRevision }] }) + "\n", stderr: "", status: 0 };
-      }
-      if (command === "dolt" && args[0] === "sql" && args.at(-1).startsWith("SELECT * FROM issues WHERE id =")) {
-        return { stdout: JSON.stringify({ rows: [{ id: "TST-1", title: "Native task", status: remoteStatus, design, notes: remoteNotes, native_tail: nativeTail }] }) + "\n", stderr: "", status: 0 };
-      }
-      if (command === "dolt" && args[0] === "sql" && args.at(-1).startsWith("SELECT * FROM comments WHERE issue_id =")) {
-        return { stdout: JSON.stringify({ rows: [] }) + "\n", stderr: "", status: 0 };
+        if (scenario.postPushLocalAdvance) revision = "f".repeat(32);
+        if (scenario.postPushStatus) status = scenario.postPushStatus;
+        return { stdout: "pushed\n", stderr: "native push warning\n", status: 0 };
       }
       if (command === "bd" && args.at(-1) === DOLT_MUTATION_REVISION_QUERY) {
         return { stdout: JSON.stringify([{
-          database_name: "fixture_db", branch: "main", revision, parent_revision: parentRevision,
-          status_count: mutationCompleted && scenario.dirtyAfterMutation ? 1 : 0,
+          database_name: scenario.foreignDatabase && mutationCompleted ? "foreign_db" : "fixture_db",
+          branch: "main", revision,
+          ...(scenario.absentRevisionFields ? {} : { status_count: mutationCompleted && scenario.dirtyAfterMutation ? 1 : 0 }),
+          native_extra: { retained: true },
         }]) + "\n", stderr: "", status: 0 };
       }
-      if (command === "bd" && args[0] === "--readonly" && args[1] === "diff") {
-        return { stdout: JSON.stringify({ from: args[2], to: args[3], changes: [{ raw: true }] }) + "\n", stderr: "", status: 0 };
-      }
       if (command === "git" && args[0] === "ls-remote") {
-        if (pushCompleted) postPushRefReads += 1;
-        if (scenario.remotePostPushAdvance && postPushRefReads === 1) {
-          remoteRevision = "f".repeat(32);
-          remoteStatus = "blocked";
-          head = "f".repeat(40);
-        }
+        if (pushCompleted && scenario.refFailure) return { stdout: "", stderr: "remote read unavailable\n", status: 128 };
         return { stdout: `${head}\t${BEADS_DOLT_DATA_REF}\n`, stderr: "", status: 0 };
       }
       return delegate.run(command, args, options);
@@ -1093,308 +1085,179 @@ test("Beads workspace transport rejects symlinked store authority before native 
   }
 });
 
-test("Beads workspace transport proves bd-managed server, native revision, remote, and refs/dolt/data", () => {
+test("Beads workspace transport exposes one set of native observations without publication approval", () => {
   const root = fixtureRoot();
   const storeDir = writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const runner = recordedDetectionRunner(beadsWorkspaceResponses(root));
+  const responses = beadsWorkspaceResponses(root);
+  const runner = recordedDetectionRunner(responses);
   const result = prepareBeadsWorkspaceTransport(root, runner);
-  assert.deepEqual(result, {
-    status: "ready",
-    evidence: {
-      provider: "beads",
-      projectRoot: root,
-      storeDir,
-      bdVersion: "1.1.2",
-      doltVersion: "2.2.3",
-      serverAuthority: "bd-auto-start",
-      serverHost: "127.0.0.1",
-      serverPort: 3307,
-      database: "fixture_db",
-      branch: "main",
-      revision: DOLT_REVISION,
-      remoteName: "origin",
-      remoteUrl: DOLT_REMOTE_URL,
-      publicationRef: BEADS_DOLT_DATA_REF,
-      publicationHead: DOLT_DATA_HEAD,
-      publishedRevision: DOLT_REVISION,
-    },
-  });
-  const doltCalls = runner.calls.filter(([command]) => command === "dolt");
-  assert.deepEqual(doltCalls.map(([, subcommand]) => subcommand), ["version", "clone", "sql"]);
-  assert.ok(doltCalls[1].includes(BEADS_DOLT_DATA_REF), "the only raw clone targets isolated refs/dolt/data proof");
-  assert.match(doltCalls[1].at(-1), /prime-claw-beads-remote-proof-/, "the raw clone target is disposable, not the live store");
-  assert.notEqual(doltCalls[1].at(-1), storeDir);
-  assert.equal(runner.calls.some((call) => call.join(" ").includes("issues.jsonl")), false, "JSONL is never authority");
-  assert.equal(runner.calls.filter((call) => call.join("\0") === ["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")).length, 2);
-  assert.equal(runner.calls.filter((call) => call.join("\0") === ["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")).length, 2);
-  assert.equal(runner.calls.filter(([command, subcommand]) => command === "git" && subcommand === "ls-remote").length, 2);
+  assert.equal(result.status, "ready");
+  const facts = result.evidence;
+  assert.equal(facts.projectRoot, root);
+  assert.equal(facts.storeDir, storeDir);
+  assert.equal(facts.database, "fixture_db");
+  assert.equal(facts.branch, "main");
+  assert.equal(facts.revision, DOLT_REVISION);
+  assert.equal(facts.remoteName, "origin");
+  assert.equal(facts.remoteUrl, DOLT_REMOTE_URL);
+  assert.equal(facts.publicationHead, DOLT_DATA_HEAD);
+  assert.equal("publishedRevision" in facts, false, "local HEAD is not a remote Dolt observation");
+  assert.deepEqual(facts.context, JSON.parse(responses["bd\0context\0--json"].stdout));
+  assert.deepEqual(facts.workingSet, []);
+  assert.equal(facts.commands.every((command) => typeof command.stdout === "string" && typeof command.stderr === "string"), true);
+  assert.equal(runner.calls.filter((call) => call.at(-1) === DOLT_IDENTITY_QUERY).length, 1);
+  assert.equal(runner.calls.filter((call) => call.at(-1) === DOLT_DIRTY_QUERY).length, 1);
+  assert.equal(runner.calls.filter(([command, subcommand]) => command === "git" && subcommand === "ls-remote").length, 1);
+  assert.deepEqual(runner.calls.filter(([command]) => command === "dolt"), []);
+  assert.equal(runner.calls.some((call) => call.includes("statuses")), false);
 });
 
-test("Beads 1.3.1 transport normalizes equivalent configured, native, and repository Git remote forms", () => {
+test("Beads native transport needs no direct Dolt executable or separate version capability gate", () => {
   const root = fixtureRoot();
-  const localRemote = join(root, "published.git");
-  const fileUrl = `file://${localRemote}`;
-  const gitFileUrl = `git+${fileUrl}`;
-  const cases = [
-    {
-      label: "https",
-      configured: "https://example.invalid/org/repo.git",
-      listed: "git+https://example.invalid/org/repo.git",
-      repository: "https://example.invalid/org/repo.git",
-      normalized: "git+https://example.invalid/org/repo.git",
-    },
-    {
-      label: "ssh",
-      configured: "git+ssh://git@example.invalid/org/repo.git",
-      listed: "ssh://git@example.invalid/org/repo.git",
-      repository: "git@example.invalid:org/repo.git",
-      normalized: "git+ssh://git@example.invalid/org/repo.git",
-    },
-    {
-      label: "file URL",
-      configured: fileUrl,
-      listed: gitFileUrl,
-      repository: localRemote,
-      normalized: gitFileUrl,
-    },
-    {
-      label: "absolute path",
-      configured: localRemote,
-      listed: gitFileUrl,
-      repository: fileUrl,
-      normalized: gitFileUrl,
-    },
-  ];
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const responses = beadsWorkspaceResponses(root);
+  responses["bd\0--version"] = { stdout: "unusual native build", stderr: "", status: 0 };
+  responses["dolt\0version"] = { stdout: "", stderr: "dolt executable not found", status: 127 };
+  const context = JSON.parse(responses["bd\0context\0--json"].stdout);
+  context.bd_version = "native-development-build";
+  responses["bd\0context\0--json"].stdout = JSON.stringify(context);
+  const runner = recordedDetectionRunner(responses);
+  const result = prepareBeadsWorkspaceTransport(root, runner);
+  assert.equal(result.status, "ready");
+  assert.equal(result.evidence.bdVersion, "native-development-build");
+  assert.equal(result.evidence.doltVersion, "2.2.3", "the native server reports its own version");
+  assert.equal(runner.calls.some((call) => call[0] === "dolt" || call.includes("--version")), false);
 
-  for (const remote of cases) {
-    writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  delete context.bd_version;
+  responses["bd\0context\0--json"].stdout = JSON.stringify(context);
+  responses[["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")].stdout = JSON.stringify([{
+    database_name: "fixture_db", branch: "main", revision: DOLT_REVISION,
+  }]);
+  const absent = prepareBeadsWorkspaceTransport(root, recordedDetectionRunner(responses));
+  assert.equal(absent.status, "ready");
+  assert.equal(absent.evidence.bdVersion, undefined);
+  assert.equal(absent.evidence.doltVersion, undefined);
+});
+
+test("explicit retained-folder and migration transport keeps its separate pre-existing remote proof", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const runner = recordedDetectionRunner(beadsWorkspaceResponses(root));
+  const result = prepareExplicitBeadsWorkspaceTransport(root, runner);
+  assert.equal(result.status, "ready");
+  assert.equal(result.evidence.publishedRevision, DOLT_REVISION);
+  assert.equal(result.evidence.publicationHead, DOLT_DATA_HEAD);
+  assert.equal(runner.calls.filter(([command, subcommand]) => command === "dolt" && subcommand === "clone").length, 1);
+  assert.equal(runner.calls.filter((call) => call.at(-1) === DOLT_IDENTITY_QUERY).length, 2);
+  assert.equal(runner.calls.filter(([command, subcommand]) => command === "git" && subcommand === "ls-remote").length, 2);
+  const unpublished = prepareExplicitBeadsWorkspaceTransport(root, recordedDetectionRunner(beadsWorkspaceResponses(root), { publishedRevision: "c".repeat(32) }));
+  assert.equal(unpublished.status, "blocked", "the separate retained proof was not silently weakened");
+});
+
+test("Beads transport preserves dirty working sets, native version differences, and unrelated Git bytes/index/history", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  writeFileSync(join(root, "unrelated.txt"), "staged bytes\n");
+  execFileSync("git", ["add", "unrelated.txt"], { cwd: root });
+  writeFileSync(join(root, "unrelated.txt"), "unstaged bytes\n");
+  writeFileSync(join(root, "untracked.txt"), "untracked bytes\n");
+  const before = [readFileSync(join(root, "unrelated.txt")), readFileSync(join(root, "untracked.txt")), execFileSync("git", ["diff", "--cached", "--binary"], { cwd: root })];
+  const responses = beadsWorkspaceResponses(root);
+  const context = JSON.parse(responses["bd\0context\0--json"].stdout);
+  context.bd_version = "a newer native context version";
+  responses["bd\0context\0--json"].stdout = JSON.stringify(context);
+  const dirty = [{ table_name: "other_ticket", staged: true, status: "modified", native_extra: true }];
+  responses[["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")].stdout = JSON.stringify(dirty);
+  responses[["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")].stdout = JSON.stringify([{
+    database_name: "fixture_db", branch: "main", revision: "c".repeat(32), dolt_version: "native-server-version",
+  }]);
+  const runner = recordedDetectionRunner(responses, { publishedRevision: "9".repeat(32) });
+  const result = prepareBeadsWorkspaceTransport(root, runner);
+  assert.equal(result.status, "ready");
+  assert.deepEqual(result.evidence.workingSet, dirty);
+  assert.equal(result.evidence.revision, "c".repeat(32));
+  assert.equal(result.evidence.identity.dolt_version, "native-server-version");
+  assert.deepEqual([readFileSync(join(root, "unrelated.txt")), readFileSync(join(root, "untracked.txt")), execFileSync("git", ["diff", "--cached", "--binary"], { cwd: root })], before);
+  assert.equal(runner.calls.some((call) => ["commit", "stash", "reset", "clone", "push", "pull"].some((operation) => call.includes(operation))), false);
+});
+
+test("Beads transport retains absent fields and unavailable publication evidence without inventing them", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root);
+  const responses = beadsWorkspaceResponses(root, { operatorManaged: true });
+  responses["bd\0dolt\0show\0--json"].stdout = JSON.stringify({ database: "fixture_db", embedded: true, native_extra: null });
+  responses["bd\0dolt\0status\0--json"].stdout = JSON.stringify({ mode: "native-other-mode", running: false });
+  responses["bd\0config\0get\0dolt.auto-start\0--json"].stdout = JSON.stringify({ key: "dolt.auto-start" });
+  responses[`git\0ls-remote\0--exit-code\0--refs\0origin\0${BEADS_DOLT_DATA_REF}`] = { stdout: "", stderr: "no remote ref\n", status: 2 };
+  const result = prepareBeadsWorkspaceTransport(root, recordedDetectionRunner(responses));
+  assert.equal(result.status, "ready");
+  assert.equal(result.evidence.serverAuthority, undefined);
+  assert.equal(result.evidence.serverHost, undefined);
+  assert.equal(result.evidence.serverPort, undefined);
+  assert.equal(result.evidence.publicationHead, undefined);
+  assert.equal(result.evidence.publishedRevision, undefined);
+  assert.deepEqual(result.evidence.server, { database: "fixture_db", embedded: true, native_extra: null });
+  assert.equal(result.evidence.publication.command.status, 2);
+  assert.equal(result.evidence.publication.command.stderr, "no remote ref\n");
+});
+
+test("Beads transport normalizes equivalent native and repository remote forms without cloning", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const cases = [
+    ["https://example.invalid/org/repo.git", "git+https://example.invalid/org/repo.git", "https://example.invalid/org/repo.git"],
+    ["git+ssh://git@example.invalid/org/repo.git", "ssh://git@example.invalid/org/repo.git", "git@example.invalid:org/repo.git"],
+    [join(root, "published.git"), `git+file://${root}/published.git`, `file://${root}/published.git`],
+  ];
+  for (const [configured, native, repository] of cases) {
     const responses = beadsWorkspaceResponses(root, { bdVersion: "1.3.1", doltVersion: "2.5.0" });
-    const configured = JSON.parse(responses["bd\0config\0get\0sync.remote\0--json"].stdout);
-    configured.value = remote.configured;
-    responses["bd\0config\0get\0sync.remote\0--json"] = {
-      stdout: JSON.stringify(configured) + "\n", stderr: "", status: 0,
-    };
-    responses["bd\0dolt\0remote\0list\0--json"] = {
-      stdout: JSON.stringify([{ name: "origin", url: remote.listed, sql_url: remote.listed, status: "ok" }]) + "\n",
-      stderr: "", status: 0,
-    };
-    responses["git\0remote\0get-url\0--all\0origin"] = { stdout: `${remote.repository}\n`, stderr: "", status: 0 };
+    responses["bd\0config\0get\0sync.remote\0--json"].stdout = JSON.stringify({ value: configured });
+    responses["bd\0dolt\0remote\0list\0--json"].stdout = JSON.stringify([{ name: "origin", url: native, sql_url: native, status: "native-status" }]);
+    responses["git\0remote\0get-url\0--all\0origin"].stdout = repository + "\n";
     const runner = recordedDetectionRunner(responses);
     const result = prepareBeadsWorkspaceTransport(root, runner);
-    assert.equal(result.status, "ready", remote.label);
-    assert.equal(result.evidence.remoteUrl, remote.normalized, remote.label);
-    const clone = runner.calls.find(([command, subcommand]) => command === "dolt" && subcommand === "clone");
-    assert.ok(clone, remote.label);
-    assert.equal(clone.at(-2), remote.normalized, remote.label);
+    assert.equal(result.status, "ready");
+    assert.equal(result.evidence.remoteName, "origin");
+    assert.equal(result.evidence.remoteUrl.startsWith("git+"), true);
+    assert.equal(runner.calls.some((call) => call.includes("clone")), false);
   }
 });
 
-test("Beads remote normalization preserves exact native and repository remote cardinality", () => {
-  const root = fixtureRoot();
-  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const responses = beadsWorkspaceResponses(root, { bdVersion: "1.3.1", doltVersion: "2.5.0" });
-  const configured = JSON.parse(responses["bd\0config\0get\0sync.remote\0--json"].stdout);
-  configured.value = "https://example.invalid/org/repo.git";
-  responses["bd\0config\0get\0sync.remote\0--json"] = {
-    stdout: JSON.stringify(configured) + "\n", stderr: "", status: 0,
-  };
-  responses["bd\0dolt\0remote\0list\0--json"] = {
-    stdout: JSON.stringify([
-      { name: "origin", url: "git+https://example.invalid/org/repo.git", sql_url: "git+https://example.invalid/org/repo.git", status: "ok" },
-      { name: "mirror", url: "https://example.invalid/org/repo.git", sql_url: "https://example.invalid/org/repo.git", status: "ok" },
-    ]) + "\n",
-    stderr: "", status: 0,
-  };
-  const duplicate = prepareBeadsWorkspaceTransport(root, recordedDetectionRunner(responses));
-  assert.equal(duplicate.status, "blocked");
-  assert.equal(duplicate.code, "remote-transport");
-  assert.match(duplicate.detail, /exactly one healthy native Dolt remote/);
-
-  configured.value = "../relative/repo.git";
-  responses["bd\0config\0get\0sync.remote\0--json"] = {
-    stdout: JSON.stringify(configured) + "\n", stderr: "", status: 0,
-  };
-  const relative = prepareBeadsWorkspaceTransport(root, recordedDetectionRunner(responses));
-  assert.equal(relative.status, "blocked");
-  assert.equal(relative.code, "remote-transport");
-  assert.match(relative.detail, /supported config.yaml-backed Git remote URL or absolute path/);
-});
-
-test("Beads workspace transport rejects foreign, symlinked, and ambiguous bd-managed data directories", () => {
-  for (const kind of ["foreign", "symlink", "ambiguous"]) {
-    const root = fixtureRoot();
-    const storeDir = writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-    const responses = beadsWorkspaceResponses(root);
-    const status = JSON.parse(responses["bd\0dolt\0status\0--json"].stdout);
-    if (kind === "foreign") {
-      status.data_dir = "/tmp/foreign-shared-dolt-data";
-    } else if (kind === "symlink") {
-      const alias = join(root, "dolt-data-alias");
-      symlinkSync(join(storeDir, "dolt"), alias, "dir");
-      status.data_dir = alias;
-    } else {
-      status.data_dir = `${join(storeDir, "dolt")}/.`;
-    }
-    responses["bd\0dolt\0status\0--json"] = { stdout: JSON.stringify(status) + "\n", stderr: "", status: 0 };
-    const result = prepareBeadsWorkspaceTransport(root, beadsTransportRunner(responses));
-    assert.equal(result.status, "blocked", kind);
-    assert.equal(result.code, "server-unavailable", kind);
-    assert.match(result.detail, /data-directory identity is unavailable|not the selected store's exact real per-project directory/, kind);
-    assert.match(result.remediation, /foreign|symlinked/, kind);
-  }
-});
-
-test("Beads workspace transport distinguishes an explicitly operator-managed server", () => {
-  const root = fixtureRoot();
-  writeBeadsStore(root, {
-    metadataOverrides: { dolt_mode: "server", dolt_server_host: "127.0.0.1", dolt_server_port: 3307 },
-    configText: "dolt.auto-start: false\n",
-  });
-  const result = prepareBeadsWorkspaceTransport(root, beadsTransportRunner(beadsWorkspaceResponses(root, { operatorManaged: true })));
-  assert.equal(result.status, "ready");
-  assert.equal(result.evidence.serverAuthority, "operator-managed");
-  assert.equal(result.evidence.database, "fixture_db");
-});
-
-test("Beads workspace transport fails closed with exact capability, server, revision, remote, and publication remediation", () => {
+test("Beads transport refuses wrong or ambiguous operation targets with raw native observations", () => {
   const cases = [
-    {
-      code: "capability",
-      change(responses) { responses["bd\0--version"] = { stdout: "", stderr: "bd unavailable", status: 127 }; },
-      remediation: /pinned supported `bd` executable/,
-    },
-    {
-      code: "server-mode",
-      change(responses) {
-        const view = JSON.parse(responses["bd\0context\0--json"].stdout);
-        view.dolt_mode = "embedded";
-        responses["bd\0context\0--json"] = { stdout: JSON.stringify(view), stderr: "", status: 0 };
-      },
-      remediation: /bd init --server/,
-    },
-    {
-      code: "server-unavailable",
-      change(responses) {
-        responses["bd\0dolt\0status\0--json"] = { stdout: JSON.stringify({ schema_version: 1, running: false, pid: 0 }), stderr: "", status: 0 };
-      },
-      remediation: /bd dolt start/,
-    },
-    {
-      code: "revision",
-      change(responses) {
-        responses[["bd", "--readonly", "sql", "--json", DOLT_IDENTITY_QUERY].join("\0")] = { stdout: JSON.stringify([{
-          database_name: "fixture_db", branch: "main", revision: "ambiguous", dolt_version: "2.2.3",
-        }]), stderr: "", status: 0 };
-      },
-      remediation: /read-only `bd sql` identity query/,
-    },
-    {
-      code: "revision",
-      change(responses) {
-        responses[["bd", "--readonly", "sql", "--json", DOLT_DIRTY_QUERY].join("\0")] = { stdout: JSON.stringify([{
-          table_name: "config", staged: 0, status: "modified",
-        }]), stderr: "", status: 0 };
-      },
-      remediation: /bd dolt commit.*upgrade or repair Beads/,
-    },
-    {
-      code: "remote-transport",
-      change(responses) {
-        responses["bd\0config\0get\0sync.remote\0--json"] = { stdout: "", stderr: "not configured", status: 1 };
-      },
-      remediation: /bd dolt remote add origin/,
-    },
-    {
-      code: "publication-authority",
-      change(responses) {
-        responses[`git\0ls-remote\0--exit-code\0--refs\0origin\0${BEADS_DOLT_DATA_REF}`] = { stdout: "", stderr: "", status: 2 };
-      },
-      remediation: /bd dolt push --remote origin/,
-    },
-    {
-      code: "publication-authority",
-      change() {},
-      runnerOptions: { publishedRevision: "c".repeat(32) },
-      remediation: /bd dolt pull --remote origin/,
-    },
+    ["provider-authority", (responses) => { const view = JSON.parse(responses["bd\0context\0--json"].stdout); view.database = "foreign"; responses["bd\0context\0--json"].stdout = JSON.stringify(view); }],
+    ["provider-authority", (responses) => { const view = JSON.parse(responses["bd\0dolt\0show\0--json"].stdout); view.database = "foreign"; responses["bd\0dolt\0show\0--json"].stdout = JSON.stringify(view); }],
+    ["remote-transport", (responses) => { const rows = JSON.parse(responses["bd\0dolt\0remote\0list\0--json"].stdout); rows.push({ ...rows[0], name: "mirror" }); responses["bd\0dolt\0remote\0list\0--json"].stdout = JSON.stringify(rows); }],
+    ["publication-authority", (responses) => { responses["git\0remote\0get-url\0--all\0origin"].stdout = "https://example.invalid/foreign.git\n"; }],
   ];
-  for (const scenario of cases) {
+  for (const [code, change] of cases) {
     const root = fixtureRoot();
     writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
     const responses = beadsWorkspaceResponses(root);
-    scenario.change(responses);
-    const result = prepareBeadsWorkspaceTransport(root, beadsTransportRunner(responses, scenario.runnerOptions));
-    assert.equal(result.status, "blocked", scenario.code);
-    assert.equal(result.code, scenario.code);
-    assert.match(result.remediation, scenario.remediation);
+    change(responses);
+    const runner = recordedDetectionRunner(responses);
+    const result = prepareBeadsWorkspaceTransport(root, runner);
+    assert.equal(result.status, "blocked");
+    assert.equal(result.code, code);
+    assert.ok(result.commands.length > 0);
+    assert.equal(runner.calls.some((call) => ["update", "push", "pull", "clone", "start"].some((operation) => call.includes(operation))), false);
   }
 });
 
-test("Beads workspace transport refuses a refs/dolt/data race during isolated proof", () => {
+test("Beads transport reports a native failure without repair or retry", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const delegate = beadsTransportRunner(beadsWorkspaceResponses(root));
-  let publicationReads = 0;
-  const runner = {
-    run(command, args, options = {}) {
-      if (command === "git" && args[0] === "ls-remote") {
-        publicationReads += 1;
-        if (publicationReads === 2) {
-          return { stdout: `${"c".repeat(40)}\t${BEADS_DOLT_DATA_REF}\n`, stderr: "", status: 0 };
-        }
-      }
-      return delegate.run(command, args, options);
-    },
-  };
+  const responses = beadsWorkspaceResponses(root);
+  responses["bd\0dolt\0show\0--json"] = { stdout: "partial native evidence\n", stderr: "connection failed\n", status: 3 };
+  const runner = recordedDetectionRunner(responses);
   const result = prepareBeadsWorkspaceTransport(root, runner);
   assert.equal(result.status, "blocked");
-  assert.equal(result.code, "publication-authority");
-  assert.match(result.detail, new RegExp(`${DOLT_DATA_HEAD}.*${"c".repeat(40)}`));
-  assert.match(result.remediation, /bd dolt pull --remote origin/);
-  assert.equal(publicationReads, 2);
+  assert.equal(result.code, "server-unavailable");
+  assert.match(result.detail, /connection failed/);
+  assert.deepEqual(result.commands.at(-1), { command: "bd", args: ["dolt", "show", "--json"], stdout: "partial native evidence\n", stderr: "connection failed\n", status: 3 });
+  assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "show").length, 1);
+  assert.equal(runner.calls.some((call) => call.includes("start")), false);
 });
-
-test("Beads workspace transport refuses a live revision race during isolated proof", () => {
-  const root = fixtureRoot();
-  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const delegate = beadsTransportRunner(beadsWorkspaceResponses(root));
-  let remoteProofCompleted = false;
-  let identityReads = 0;
-  let workingSetReads = 0;
-  const runner = {
-    run(command, args, options = {}) {
-      if (command === "dolt" && args[0] === "sql" && args.at(-1) === DOLT_REMOTE_IDENTITY_QUERY) {
-        const result = delegate.run(command, args, options);
-        remoteProofCompleted = true;
-        return result;
-      }
-      if (command === "bd" && args.at(-1) === DOLT_IDENTITY_QUERY) {
-        identityReads += 1;
-        if (identityReads === 2) {
-          assert.equal(remoteProofCompleted, true, "the live identity recheck must follow isolated remote identity proof");
-          return { stdout: JSON.stringify([{
-            database_name: "fixture_db", branch: "main", revision: "c".repeat(32), dolt_version: "2.2.3",
-          }]) + "\n", stderr: "", status: 0 };
-        }
-      }
-      if (command === "bd" && args.at(-1) === DOLT_DIRTY_QUERY) {
-        workingSetReads += 1;
-        if (workingSetReads === 2) {
-          assert.equal(remoteProofCompleted, true, "the live working-set recheck must follow isolated remote identity proof");
-        }
-      }
-      return delegate.run(command, args, options);
-    },
-  };
-  const result = prepareBeadsWorkspaceTransport(root, runner);
-  assert.equal(result.status, "blocked");
-  assert.equal(result.code, "revision");
-  assert.match(result.detail, new RegExp(`${DOLT_REVISION}.*${"c".repeat(32)}`));
-  assert.match(result.remediation, /stable clean revision/);
-  assert.equal(identityReads, 2);
-  assert.equal(workingSetReads, 2);
-});
-
 
 test("the beads status map covers every canonical lifecycle state exactly once", () => {
   assert.deepEqual(Object.keys(BEADS_STATUS_MAP), CANONICAL);
@@ -1608,232 +1471,176 @@ test("provider task resolution reports the actual Beads show failure without cap
 });
 
 
-test("Beads mutation publishes one guarded provider-native update without retry or force", () => {
+test("Beads mutation performs one requested native update and one pull/push with raw evidence", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
   const runner = beadsMutationRunner(root);
   const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
-
   assert.equal(result.status, "published");
   assert.equal(result.evidence.preparedRevision, DOLT_REVISION);
   assert.equal(result.evidence.committedRevision, "d".repeat(32));
-  assert.equal(result.evidence.publishedRevision, "d".repeat(32));
+  assert.equal(result.evidence.publishedRevision, "d".repeat(32), "submitted HEAD is retained on native push success");
   assert.equal(result.evidence.publicationHead, "e".repeat(40));
+  assert.equal(result.evidence.remotePublishedTask, undefined, "no remote task snapshot is fabricated");
   assert.equal(result.evidence.taskPublished.nativeStatus, "in_progress");
-  assert.equal(result.evidence.postMutationProof.parentRevision, DOLT_REVISION);
-  assert.equal(result.evidence.postMutationProof.clean, true);
-  assert.equal(result.evidence.localPublishedProof.revision, "d".repeat(32));
-  assert.equal(result.evidence.localPublishedProof.parentRevision, DOLT_REVISION);
-  assert.equal(result.evidence.localPublishedProof.clean, true);
-  assert.equal(result.evidence.remotePublishedTask.revision, "d".repeat(32));
-  assert.equal(result.evidence.remotePublishedTask.taskRow.status, "in_progress");
+  assert.deepEqual(result.evidence.mutation.args, ["--dolt-auto-commit=on", "update", "TST-1", "--status", "in_progress", "--json"]);
+  assert.equal(result.evidence.mutation.stderr, "native update warning\n");
+  assert.equal(result.evidence.push.stderr, "native push warning\n");
+  assert.equal(result.evidence.taskReads.length, 4);
+  assert.deepEqual(JSON.parse(result.evidence.taskReads.at(-1).command.stdout)[0], result.evidence.taskPublished.nativeView);
+  assert.equal(result.evidence.commands.includes(result.evidence.pull), true);
+  assert.equal(result.evidence.commands.includes(result.evidence.mutation), true);
+  assert.equal(result.evidence.commands.includes(result.evidence.push), true);
   assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
   assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
-  assert.ok(runner.calls.some((call) => call.join(" ").includes("--dolt-auto-commit=on update TST-1 --status in_progress --if-status in_design --json")));
-  assert.equal(runner.calls.some((call) => call.includes("--force")), false);
+  assert.equal(runner.calls.some((call) => call.includes("--if-status") || call.includes("--force") || call.includes("clone")), false);
 });
 
-test("Beads merge lifecycle publishes only guarded readiness, revision, and done transitions", () => {
+test("Beads status and note requests are native operations, not transition eligibility rules", () => {
   const transitions = [
-    { from: "in_progress", expected: "In Progress", to: "Ready for Merge", native: "ready_for_merge", note: "Accepted complete pushed candidate for exact review tuple." },
-    { from: "ready_for_merge", expected: "Ready for Merge", to: "In Progress", native: "in_progress", note: "Request Changes accepted: repair the exact in-scope finding." },
-    { from: "ready_for_merge", expected: "Ready for Merge", to: "Done", native: "done", note: "Merged exact authorized tuple and proved canonical code publication." },
+    ["in_design", "Done"], ["ready_for_merge", "Blocked"], ["blocked", "In Progress"],
+    ["in_progress", "Ready for Merge"], ["closed", "In Planning"], ["custom_native_status", "In Progress"],
   ];
-  for (const transition of transitions) {
+  for (const [from, to] of transitions) {
     const root = fixtureRoot();
     writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-    const runner = beadsMutationRunner(root, { initialStatus: transition.from });
-    const result = mutateAndPublishBeadsTaskStatus({
-      projectRoot: root, taskId: "TST-1", status: transition.to,
-      expectedCurrentStatus: transition.expected, note: transition.note, runner,
-    });
+    const runner = beadsMutationRunner(root, { initialStatus: from });
+    const note = `Owner requested ${to}`;
+    const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: to, note, runner });
     assert.equal(result.status, "published");
-    assert.equal(result.evidence.taskBefore.nativeStatus, transition.from);
-    assert.equal(result.evidence.taskPublished.nativeStatus, transition.native);
-    assert.equal(result.evidence.taskPublished.nativeView.design, result.evidence.taskBefore.nativeView.design);
+    assert.equal(result.evidence.taskBefore.nativeStatus, from);
+    assert.equal(result.evidence.taskPublished.nativeStatus, BEADS_STATUS_MAP[to].name);
     assert.deepEqual(result.evidence.taskPublished.nativeView.native_tail, result.evidence.taskBefore.nativeView.native_tail);
-    assert.equal(result.evidence.taskPublished.nativeView.notes.includes(transition.note), true);
-    assert.equal(result.evidence.remotePublishedTask.taskRow.status, transition.native);
-    assert.equal(result.evidence.remotePublishedTask.taskRow.notes.includes(transition.note), true);
-    assert.equal(result.evidence.publishedRevision, "d".repeat(32));
-    assert.equal(result.evidence.publicationHead, "e".repeat(40));
-    const update = runner.calls.find((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on");
-    assert.deepEqual(update.slice(2), [
-      "update", "TST-1", "--status", transition.native, "--if-status", transition.from,
-      "--append-notes", transition.note, "--json",
-    ]);
-    assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
-    assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
-    assert.equal(runner.calls.some((call) => call.includes("--force")), false);
+    assert.deepEqual(result.evidence.mutation.args, ["--dolt-auto-commit=on", "update", "TST-1", "--status", BEADS_STATUS_MAP[to].name, "--append-notes", note, "--json"]);
+    if (from === "custom_native_status" || from === "closed") assert.equal("canonicalStatus" in result.evidence.taskBefore, false);
   }
-
-  const root = fixtureRoot();
-  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const drifted = beadsMutationRunner(root, { initialStatus: "blocked" });
-  const refused = mutateAndPublishBeadsTaskStatus({
-    projectRoot: root, taskId: "TST-1", status: "Ready for Merge",
-    expectedCurrentStatus: "In Progress", note: "must remain unwritten", runner: drifted,
-  });
-  assert.equal(refused.status, "blocked");
-  assert.equal(refused.code, "status-transition");
-  assert.equal(refused.evidence.taskObserved.task.nativeStatus, "blocked");
-  assert.equal(drifted.calls.some((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on"), false);
-  assert.equal(drifted.calls.some((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push"), false);
 });
 
-test("Beads blocker publication and resume append truthful notes in one guarded native update", () => {
+test("Beads forwards native --if-status only when explicitly requested and reports native rejection", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const blockerNote = "Blocked: exact dependency is unavailable. Unblock when revision dep-42 is published.";
-  const blockedRunner = beadsMutationRunner(root, { initialStatus: "in_progress" });
-  const blocked = mutateAndPublishBeadsTaskStatus({
-    projectRoot: root, taskId: "TST-1", status: "Blocked",
-    expectedCurrentStatus: "In Progress", note: blockerNote, runner: blockedRunner,
-  });
-  assert.equal(blocked.status, "published");
-  assert.equal(blocked.evidence.taskBefore.nativeStatus, "in_progress");
-  assert.equal(blocked.evidence.taskPublished.nativeStatus, "blocked");
-  assert.equal(blocked.evidence.taskPublished.nativeView.design, blocked.evidence.taskBefore.nativeView.design);
-  assert.deepEqual(blocked.evidence.taskPublished.nativeView.native_tail, blocked.evidence.taskBefore.nativeView.native_tail);
-  assert.equal(blocked.evidence.taskPublished.nativeView.notes.includes(blockerNote), true);
-  assert.equal(blocked.evidence.remotePublishedTask.taskRow.status, "blocked");
-  assert.match(blocked.evidence.remotePublishedTask.taskRow.notes, /dep-42/);
-  const blockedUpdate = blockedRunner.calls.find((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on");
-  assert.deepEqual(blockedUpdate.slice(2), [
-    "update", "TST-1", "--status", "blocked", "--if-status", "in_progress",
-    "--append-notes", blockerNote, "--json",
-  ]);
-  assert.equal(blockedRunner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
-  assert.equal(blockedRunner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
-
-  const clearedNote = "Cleared: revision dep-42 is published and verified.";
-  const resumedRunner = beadsMutationRunner(root, { initialStatus: "blocked" });
-  const resumed = mutateAndPublishBeadsTaskStatus({
-    projectRoot: root, taskId: "TST-1", status: "In Progress",
-    expectedCurrentStatus: "Blocked", note: clearedNote, runner: resumedRunner,
-  });
-  assert.equal(resumed.status, "published");
-  assert.equal(resumed.evidence.taskBefore.nativeStatus, "blocked");
-  assert.equal(resumed.evidence.taskPublished.nativeStatus, "in_progress");
-  assert.match(resumed.evidence.taskPublished.nativeView.notes, /revision dep-42 is published/);
-  assert.equal(resumedRunner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
-  assert.equal(resumedRunner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
-  assert.equal(resumedRunner.calls.some((call) => call.includes("--force")), false);
+  const runner = beadsMutationRunner(root, { initialStatus: "custom_native_status" });
+  const accepted = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "Blocked", ifStatus: "custom_native_status", runner });
+  assert.equal(accepted.status, "published");
+  assert.deepEqual(accepted.evidence.mutation.args, ["--dolt-auto-commit=on", "update", "TST-1", "--status", "blocked", "--if-status", "custom_native_status", "--json"]);
+  const rejectedRunner = beadsMutationRunner(root, { initialStatus: "ready_for_merge" });
+  const rejected = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "Blocked", ifStatus: "in_progress", runner: rejectedRunner });
+  assert.equal(rejected.status, "review-required");
+  assert.equal(rejected.code, "mutation-failed");
+  assert.equal(rejected.evidence.operation.status, 1);
+  assert.equal(rejected.evidence.operation.stderr, "native conditional update rejected\n");
+  assert.equal(rejectedRunner.calls.filter((call) => call.includes("update")).length, 1, "the LLM's native condition is not a local eligibility precheck");
+  assert.equal(rejectedRunner.calls.some((call) => call.includes("push")), false);
 });
 
-test("Beads blocker publication refuses to push when the appended note is not proven", () => {
+test("Beads preserves missing native fields, unknown statuses, nulls, and raw provider data", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const runner = beadsMutationRunner(root, { initialStatus: "in_progress", ignoreNote: true });
-  const result = mutateAndPublishBeadsTaskStatus({
-    projectRoot: root, taskId: "TST-1", status: "Blocked",
-    expectedCurrentStatus: "In Progress", note: "required blocker evidence", runner,
-  });
-  assert.equal(result.status, "review-required");
-  assert.equal(result.code, "guarded-mutation-failed");
-  assert.match(result.detail, /status and appended note/);
-  assert.equal(result.evidence.taskObserved.task.nativeStatus, "blocked");
-  assert.equal(result.evidence.taskObserved.task.nativeView.notes, "existing native notes");
-  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push"), false);
-});
-
-test("Beads blocked workflow publication refuses a later current state before update or push", () => {
-  const root = fixtureRoot();
-  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const runner = beadsMutationRunner(root, { initialStatus: "ready_for_merge" });
-  const result = mutateAndPublishBeadsTaskStatus({
-    projectRoot: root, taskId: "TST-1", status: "Blocked",
-    expectedCurrentStatus: "In Progress", note: "must not write", runner,
-  });
-  assert.equal(result.status, "blocked");
-  assert.equal(result.code, "status-transition");
-  assert.match(result.detail, /currently Ready for Merge\/ready_for_merge, not required In Progress\/in_progress/);
-  assert.equal(result.evidence.taskObserved.task.nativeStatus, "ready_for_merge");
-  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on"), false);
-  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push"), false);
-  assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
-});
-
-test("Beads mutation returns raw evidence when a descendant appears after the guarded update", () => {
-  const root = fixtureRoot();
-  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const runner = beadsMutationRunner(root, { postUpdateDescendant: true });
+  const runner = beadsMutationRunner(root, { absentFields: true, absentRevisionFields: true, nativeView: { provider_extra: { unknown: null } } });
   const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
+  assert.equal(result.status, "published");
+  for (const task of [result.evidence.taskBefore, result.evidence.taskPublished]) {
+    for (const field of ["title", "nativeStatus", "canonicalStatus"]) assert.equal(field in task, false);
+    for (const field of ["title", "status", "design", "notes", "comments"]) assert.equal(field in task.nativeView, false);
+    assert.deepEqual(task.nativeView.provider_extra, { unknown: null });
+  }
+  assert.equal(result.evidence.postMutationProof.clean, undefined);
+  assert.equal(result.evidence.postMutationProof.parentRevision, undefined);
+  assert.deepEqual(result.evidence.postMutationProof.nativeView.native_extra, { retained: true });
+});
 
-  assert.equal(result.status, "review-required");
-  assert.equal(result.code, "concurrent-advance");
-  assert.equal(result.phase, "mutation");
-  assert.equal(result.evidence.observedRevision, "e".repeat(32));
-  assert.equal(result.evidence.revisionProof.parentRevision, "d".repeat(32));
-  assert.equal(result.evidence.revisionProof.clean, true);
-  assert.equal(result.evidence.taskBefore.task.nativeStatus, "in_design");
-  assert.equal(result.evidence.taskObserved.task.nativeStatus, "in_progress");
-  assert.deepEqual(result.evidence.taskBefore.command.args, ["show", "TST-1", "--json", "--long", "--include-comments"]);
-  assert.deepEqual(result.evidence.taskObserved.command.args, ["show", "TST-1", "--json", "--long", "--include-comments"]);
-  assert.deepEqual(JSON.parse(result.evidence.diff.stdout), {
-    from: DOLT_REVISION, to: "e".repeat(32), changes: [{ raw: true }],
+test("Beads does not approve per-field note/status content before native publication", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const runner = beadsMutationRunner(root, { initialStatus: "in_progress", ignoreStatus: true, ignoreNote: true });
+  const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "Blocked", note: "requested note", runner });
+  assert.equal(result.status, "published", "native successful operations are evidence, not code-level semantic acceptance");
+  assert.equal(result.evidence.taskPublished.nativeStatus, "in_progress");
+  assert.equal(result.evidence.taskPublished.nativeView.notes, "existing native notes");
+  assert.ok(result.evidence.mutation.args.includes("requested note"));
+  assert.equal(result.evidence.push.status, 0);
+});
+
+for (const [name, scenario] of [
+  ["a dirty working set", { dirtyBeforeMutation: true, dirtyAfterMutation: true }],
+  ["an unrelated pull advance", { concurrentPull: true }],
+  ["a later descendant after update", { postUpdateDescendant: true }],
+  ["an idempotent native update", { noNewRevision: true }],
+]) {
+  test(`Beads native publication is not suppressed by ${name}`, () => {
+    const root = fixtureRoot();
+    writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+    writeFileSync(join(root, "unrelated.txt"), "staged bytes\n");
+    execFileSync("git", ["add", "unrelated.txt"], { cwd: root });
+    writeFileSync(join(root, "unrelated.txt"), "unstaged bytes\n");
+    const bytes = readFileSync(join(root, "unrelated.txt"));
+    const index = execFileSync("git", ["diff", "--cached", "--binary"], { cwd: root });
+    const runner = beadsMutationRunner(root, scenario);
+    const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
+    assert.equal(result.status, "published");
+    assert.equal(runner.calls.filter((call) => call.includes("pull")).length, 1);
+    assert.equal(runner.calls.filter((call) => call.includes("update")).length, 1);
+    assert.equal(runner.calls.filter((call) => call.includes("push")).length, 1);
+    assert.deepEqual(readFileSync(join(root, "unrelated.txt")), bytes);
+    assert.deepEqual(execFileSync("git", ["diff", "--cached", "--binary"], { cwd: root }), index);
+    if (scenario.concurrentPull) assert.equal(JSON.parse(result.evidence.commands.find((command) => command.args.at(-1) === DOLT_MUTATION_REVISION_QUERY).stdout)[0].revision, "c".repeat(32));
+    if (scenario.dirtyAfterMutation) assert.equal(result.evidence.postMutationProof.clean, false);
+    if (scenario.noNewRevision) assert.equal(result.evidence.committedRevision, DOLT_REVISION);
   });
-  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push"), false);
-});
+}
 
-test("Beads mutation refuses a dirty native working set before push", () => {
+test("Beads post-push advances are separate native observations, not a frozen equality gate", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const runner = beadsMutationRunner(root, { dirtyAfterMutation: true });
+  const runner = beadsMutationRunner(root, { postPushLocalAdvance: true, postPushStatus: "native_later_status", refFailure: true });
   const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
-
-  assert.equal(result.status, "review-required");
-  assert.equal(result.code, "guarded-mutation-failed");
-  assert.equal(result.phase, "mutation");
-  assert.equal(result.evidence.observedRevision, "d".repeat(32));
-  assert.equal(result.evidence.revisionProof.parentRevision, DOLT_REVISION);
-  assert.equal(result.evidence.revisionProof.clean, false);
-  assert.match(result.detail, /dolt_status.*not empty/);
-  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push"), false);
+  assert.equal(result.status, "published");
+  assert.equal(result.evidence.committedRevision, "d".repeat(32));
+  assert.equal(result.evidence.publishedRevision, "d".repeat(32), "the post-push local HEAD is not mislabeled as pushed");
+  assert.equal(result.evidence.localPublishedProof.revision, "f".repeat(32));
+  assert.equal(result.evidence.taskPublished.nativeStatus, "native_later_status");
+  assert.equal("canonicalStatus" in result.evidence.taskPublished, false);
+  assert.equal(result.evidence.publicationHead, undefined);
+  assert.equal(result.evidence.publication.command.stderr, "remote read unavailable\n");
+  assert.equal(result.evidence.remotePublishedTask, undefined);
 });
 
+for (const [name, scenario, code, failedOperation, stderr] of [
+  ["pull", { pullFailure: true }, "synchronization-failed", "pull", "pull conflict\n"],
+  ["update", { mutationFailure: true }, "mutation-failed", "update", "native conditional update rejected\n"],
+  ["push", { pushFailure: true }, "push-rejected", "push", "non-fast-forward\n"],
+]) {
+  test(`Beads reports a truthful native ${name} failure without retry or repair`, () => {
+    const root = fixtureRoot();
+    writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+    const runner = beadsMutationRunner(root, scenario);
+    const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
+    assert.equal(result.status, "review-required");
+    assert.equal(result.code, code);
+    assert.equal(result.evidence.operation.stderr, stderr);
+    assert.equal(result.evidence.operation.status === 0, false);
+    assert.equal(result.evidence.commands.includes(result.evidence.operation), true);
+    assert.equal(runner.calls.filter((call) => call.includes(failedOperation)).length, 1);
+    assert.equal(runner.calls.filter((call) => call.includes("pull")).length, 1);
+    assert.equal(runner.calls.filter((call) => call.includes("push")).length, name === "push" ? 1 : 0);
+    assert.equal(runner.calls.some((call) => ["--force", "reset", "commit", "clone", "start"].some((operation) => call.includes(operation))), false);
+  });
+}
 
-test("Beads mutation returns raw native evidence for a concurrent pull and does not mutate", () => {
+test("Beads refuses a different exact task or database target without substitution", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const runner = beadsMutationRunner(root, { concurrentPull: true });
-  const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
-
-  assert.equal(result.status, "review-required");
-  assert.equal(result.code, "concurrent-advance");
-  assert.equal(result.evidence.preparedRevision, DOLT_REVISION);
-  assert.equal(result.evidence.observedRevision, "c".repeat(32));
-  assert.equal(JSON.parse(result.evidence.diff.stdout).changes[0].raw, true);
-  assert.equal(result.evidence.taskObserved.task.nativeView.id, "TST-1");
-  assert.equal(runner.calls.some((call) => call.includes("update")), false);
-  assert.equal(runner.calls.some((call) => call.includes("push")), false);
-
-  const remoteRunner = beadsMutationRunner(root, { remotePostPushAdvance: true });
-  const remoteResult = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner: remoteRunner });
-  assert.equal(remoteResult.status, "review-required");
-  assert.equal(remoteResult.code, "publication-proof-failed");
-  assert.equal(remoteResult.evidence.remoteTask.revision, "f".repeat(32));
-  assert.equal(remoteResult.evidence.remoteTask.taskRow.status, "blocked");
-  assert.equal(remoteRunner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
-});
-
-test("Beads mutation preserves a rejected non-force push with raw evidence and no retry", () => {
-  const root = fixtureRoot();
-  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const runner = beadsMutationRunner(root, { pushFailure: true });
-  const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
-
-  assert.equal(result.status, "review-required");
-  assert.equal(result.code, "push-rejected");
-  assert.equal(result.evidence.operation.stderr, "non-fast-forward\n");
-  assert.equal(result.evidence.observedRevision, "d".repeat(32));
-  assert.equal(result.evidence.taskObserved.task.nativeStatus, "in_progress");
-  assert.equal(result.evidence.remoteTask.revision, DOLT_REVISION);
-  assert.equal(result.evidence.remoteTask.taskRow.status, "in_design");
-  assert.equal(JSON.parse(result.evidence.diff.stdout).changes[0].raw, true);
-  assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "push").length, 1);
-  assert.equal(runner.calls.filter((call) => call[0] === "bd" && call[1] === "dolt" && call[2] === "pull").length, 1);
-  assert.equal(runner.calls.some((call) => call.includes("--force")), false);
+  const wrongTask = beadsMutationRunner(root, { foreignTask: true });
+  const taskResult = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner: wrongTask });
+  assert.equal(taskResult.status, "blocked");
+  assert.equal(taskResult.code, "task-identity");
+  assert.equal(wrongTask.calls.some((call) => call.includes("pull") || call.includes("update") || call.includes("push")), false);
+  const wrongDatabase = beadsMutationRunner(root, { foreignDatabase: true });
+  const databaseResult = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner: wrongDatabase });
+  assert.equal(databaseResult.status, "review-required");
+  assert.equal(databaseResult.code, "mutation-failed");
+  assert.match(databaseResult.evidence.revisionProof.error, /selected database/);
+  assert.equal(wrongDatabase.calls.some((call) => call.includes("push")), false);
 });
 
 function conversationStatusGit(overrides = {}) {
@@ -1973,26 +1780,23 @@ test("conversation status publication returns the exact published Beads evidence
   assert.match(result.evidence.taskPublished.nativeView.notes, /native lifecycle evidence/);
 });
 
-test("conversation status publication propagates raw Beads review evidence without classification", () => {
+test("conversation status publication propagates raw Beads native failure without classification", () => {
   const root = fixtureRoot();
   writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
-  const runner = beadsMutationRunner(root, { concurrentPull: true });
+  const runner = beadsMutationRunner(root, { pushFailure: true });
   const result = commitConversationTaskStatus({
     taskId: "TST-1", projectRoot: root, taskPath: "backlog/tasks/unused.md", status: "In Progress",
     message: "unused for Beads", runner, git: failIfConversationFilePathIsUsed(),
-    resolveTask() { throw new Error("Beads review evidence must not resolve a Backlog task path"); },
+    resolveTask() { throw new Error("Beads raw failure must not resolve a Backlog task path"); },
   });
-
   assert.equal(result.status, "review-required");
-  assert.equal(result.code, "concurrent-advance");
-  assert.equal(result.phase, "synchronization");
+  assert.equal(result.code, "push-rejected");
+  assert.equal(result.phase, "push");
   assert.equal(result.evidence.preparedRevision, DOLT_REVISION);
-  assert.equal(result.evidence.observedRevision, "c".repeat(32));
-  assert.deepEqual(JSON.parse(result.evidence.diff.stdout), {
-    from: DOLT_REVISION, to: "c".repeat(32), changes: [{ raw: true }],
-  });
-  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "update"), false);
-  assert.equal(runner.calls.some((call) => call[0] === "bd" && call[1] === "--dolt-auto-commit=on"), false);
+  assert.equal(result.evidence.observedRevision, "d".repeat(32));
+  assert.equal(result.evidence.operation.stderr, "non-fast-forward\n");
+  assert.equal(runner.calls.filter((call) => call.includes("push")).length, 1);
+  assert.equal(runner.calls.filter((call) => call.includes("pull")).length, 1);
 });
 
 test("provider status mutation edits the Backlog task natively and proves the new status", () => {

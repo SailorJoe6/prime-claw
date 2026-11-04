@@ -79,12 +79,15 @@ absent and no explicit setup was requested. Malformed or negative inventory
 responses fail closed. Placement selection performs no task, Git,
 ownership, worktree, or session mutation.
 
-The later, lower-level create/allocation path is not extracted in this slice.
-For independent Backlog, it still publishes `In Progress` from
-the clean primary nested clone and reserves the published task revision/native
-view separately from the unchanged clean code base. Only then is the registered
-code worktree created. Its nested task clone is prepared and the exact reserved
-task is reread before any session, automation, or execute delivery.
+The deeper create/allocation path still contains policy pending extraction.
+For independent Backlog it requests `In Progress` publication and reserves task
+revision/native view separately from code. The lower publication operation now
+uses one exact-task native edit, path-only commit and non-force push, without a
+whole-clone cleanliness test or automatic reconciliation. Episode task workspace
+preparation obtains the intended native clone without preparing the primary
+clone again. Deeper reservation, code-base and reserved-task predicates still
+exist; native preparation success does not claim their removal. The registered
+code worktree and exact task are still addressed before session/execute delivery.
 
 The prep workflow may request focused compaction. It does not wait for a compact
 event, recreate the phase prompt, or control the already queued follow-up. The
@@ -195,13 +198,48 @@ Fresh Episode creation has one initial execute assignment, not an initial
 handoff or a second prompt. The owner retains lifecycle/disposition decisions;
 the Episode maintains implementation and native task content, plan, and evidence.
 
-This is a bounded second slice, not complete lifecycle extraction. Deeper
-`createTaskEpisode`, allocation, status mutation/publication, handoff, oversight,
-block/resume, merge/abandonment, and finalization/cleanup code still contains
-policy gates pending later work on the same PRIMECLAW-55 task. Their failures
+This entry/prep-chain change is not complete lifecycle extraction. The lower
+preparation/publication operations described below are a separate third slice.
+Deeper `createTaskEpisode`, allocation/reservation, automatic failure disposition,
+handoff, oversight, block/resume, merge/abandonment, and finalization/cleanup still
+contain policy gates pending later work on the same PRIMECLAW-55 task. Their failures
 remain truthful native/code evidence, not permission to bypass them. Retained
 folder workflows and existing workflow loading are unchanged. No new protocol,
 approval receipt, live activation, or same-operation resource recovery is claimed.
+
+## Native preparation and direct publication (PRIMECLAW-55 third slice)
+
+The lower Backlog Episode preparation path no longer prepares the primary clone
+again or treats unrelated task/code work as a global-cleanliness prerequisite.
+It targets the existing native store layout and selected remote. Explicit native
+clone/fetch/fast-forward operations report their own failures; they do not wait
+for a stable whole-branch revision or decide semantic compatibility.
+
+The Backlog publication helper performs one native exact-task read/edit/reread,
+a path-limited ordinary Git commit and one non-force push. It preserves unrelated
+index entries and working files. It does not fetch/merge/retry a rejected push,
+classify other-task changes, require a meaningful plan/status, or count the
+whole checkout's changed paths. It returns before/after native views and factual
+Git results/heads for the Agent. A later remote head is an observation, not a
+frozen-revision approval failure.
+
+Beads transport preparation supplies native workspace/database/branch/remote and
+revision facts without requiring lifecycle capability, a clean whole working
+set or equality between live and remote revisions. Native status publication
+uses supported operations once, returning complete raw task views and operation
+results instead of a paired stable-revision, parent or content approval. It does
+not fabricate a Backlog path or use repeated isolated whole-store clones as an
+approval pipeline. A rejected native command remains a failure; success is not
+semantic acceptance.
+
+The editable implementation workflow tells the invoking Agent to inspect the
+selected task/diff and current history, ensure authorized ticket durability,
+interpret native conflicts, and preserve unrelated work. Neither dirty state
+nor successful transport grants permission to absorb another owner's edits.
+Reconciliation and failure disposition are LLM decisions from current facts,
+not automatic retry, rollback or a replacement allocation. Deeper creation,
+ownership and lifecycle callers may still apply policy awaiting later slices;
+this bounded helper extraction is not full initiation or task completion.
 
 ## Validation policy
 

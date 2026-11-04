@@ -981,3 +981,27 @@ def test_changed_loaded_policy_keeps_phase_ids_fallback_and_builder_customizatio
     handoff = " ".join(workflow("handoff").read_text().split())
     assert "`ralph_handoff` operation or owning Conversation" in handoff
     assert "native `/handoff` command" not in handoff
+
+
+def test_native_preparation_publication_guidance_keeps_decisions_in_markdown() -> None:
+    source = workflow("implement-task").read_text()
+    managed = (ROOT / ".prime-claw/workflows/implement-task.md").read_text()
+    for text in (source, managed):
+        section = text.split("## Preparation and publication are native operations", 1)[1].split("## Create the Episode", 1)[0]
+        for phrase in (
+            "without preparing or synchronizing another",
+            "git commit --only",
+            "remain staged and excluded",
+            "does not classify remote changes",
+            "merge/rebase them, or retry a rejected push",
+            "bd dolt push --no-adopt",
+            "native fields and absence",
+            "current\nstate inspection and an LLM decision",
+            "not choose a lifecycle\nrollback or Blocked disposition",
+        ):
+            assert phrase in section
+    for path in (workflow("implement-task-prep"), ROOT / ".prime-claw/workflows/implement-task-prep.md"):
+        text = path.read_text()
+        assert "not a cleanliness or frozen-revision approval" in text
+        assert "reconcile a rejected push" in text
+        assert "retry uncertain delivery" in text

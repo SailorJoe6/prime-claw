@@ -236,7 +236,7 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   assert.equal(result.taskId, taskId);
   assert.equal(result.episodeId, "independent-episode");
   assert.equal(result.episodeActiveSessionId, "independent-route");
-  assert.equal(preparationCalls, 2);
+  assert.equal(preparationCalls, 1, "pre-session task context uses one preparation, not a paired stable-head approval");
   assert.match(deliveredExecutePrompt, /<provider-task-observation>/);
   assert.ok(deliveredExecutePrompt.includes(JSON.stringify(reservedTaskEvidence)));
   assert.ok(deliveredExecutePrompt.includes(JSON.stringify(result.taskEvidence)));

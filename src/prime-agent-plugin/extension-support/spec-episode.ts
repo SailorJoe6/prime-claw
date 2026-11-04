@@ -1973,14 +1973,6 @@ function preparePublishedBacklogEpisodeWorkspace(
   if (prepared.status !== "prepared") {
     throw new EpisodeStateUncertainError(`Independent Backlog Episode task checkout was not prepared before session start: ${prepared.code}: ${prepared.detail}`);
   }
-  if (prepared.head !== record.providerRevision) {
-    const ancestry = runner.run("git", ["merge-base", "--is-ancestor", record.providerRevision, prepared.head], {
-      cwd: prepared.storeDir, allowFailure: true,
-    });
-    if (ancestry.status !== 0) {
-      throw new EpisodeStateUncertainError("Independent Backlog task history changed non-descendant before Episode session start");
-    }
-  }
   const current = runner.run("backlog", ["task", "view", "--json", "--", record.taskId], {
     cwd: record.worktree!, allowFailure: true,
   });
@@ -1995,24 +1987,11 @@ function preparePublishedBacklogEpisodeWorkspace(
   const rawTask = evidence.task;
   if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
       || (rawTask as Record<string, unknown>).id !== record.taskId
-      || (rawTask as Record<string, unknown>).path !== record.taskPath
-      || (rawTask as Record<string, unknown>).status !== "In Progress"
-      || !meaningfulTaskImplementationPlan(
-        typeof (rawTask as Record<string, unknown>).implementationPlan === "string"
-          ? (rawTask as Record<string, unknown>).implementationPlan as string
-          : null,
-      )) {
-    throw new EpisodeStateUncertainError("Independent Backlog Episode task checkout does not expose the exact reserved In Progress task");
+      || (rawTask as Record<string, unknown>).path !== record.taskPath) {
+    throw new EpisodeStateUncertainError("Independent Backlog Episode task checkout resolved a different reserved task identity");
   }
-  const paired = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
-    primaryRoot: repo,
-    targetWorktree: record.worktree!,
-    runner,
-  });
-  if (paired.status !== "prepared" || paired.head !== prepared.head) {
-    throw new EpisodeStateUncertainError("Independent Backlog task history changed during pre-session publication proof");
-  }
-  if (prepared.head === record.providerRevision) return { record };
+  // Current native views/revisions are observations for the Episode LLM. Do
+  // not freeze history around the task read or repeat status/plan eligibility.
   const providerTaskObservation = JSON.stringify({
     previousProviderRevision: record.providerRevision,
     publishedProviderRevision: prepared.head,
@@ -2342,8 +2321,6 @@ export function commitConversationTaskStatus(options: {
       primaryRoot: options.projectRoot,
       targetWorktree: options.projectRoot,
       taskId: options.taskId,
-      ...(options.expectedSourceStatus ? { expectedTaskStatus: options.expectedSourceStatus } : {}),
-      ...(options.requireSourcePlan ? { requireMeaningfulPlan: true } : {}),
       edits: [
         { option: "--status", value: options.status },
         ...(options.note ? [{ option: "--append-notes", value: options.note }] : []),
@@ -2468,8 +2445,6 @@ function readPublishedBeadsTerminalTask(
       || !samePath(paired.projectRoot, projectRoot)
       || !samePath(task.projectRoot, projectRoot)
       || first.provider !== "beads" || paired.provider !== "beads"
-      || first.revision !== first.publishedRevision
-      || paired.revision !== paired.publishedRevision
       || first.database !== paired.database
       || first.branch !== paired.branch
       || first.remoteName !== paired.remoteName

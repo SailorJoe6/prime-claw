@@ -954,19 +954,29 @@ export interface BeadsWorkspaceTransportEvidence {
   provider: "beads";
   projectRoot: string;
   storeDir: string;
-  bdVersion: string;
-  doltVersion: string;
-  serverAuthority: BeadsServerAuthority;
-  serverHost: string;
-  serverPort: number;
+  bdVersion?: string;
+  doltVersion?: string;
+  serverAuthority?: BeadsServerAuthority;
+  serverHost?: string;
+  serverPort?: number;
   database: string;
   branch: string;
+  /** Local native HEAD at this observation, not an approval revision. */
   revision: string;
   remoteName: string;
   remoteUrl: string;
   publicationRef: typeof BEADS_DOLT_DATA_REF;
-  publicationHead: string;
-  publishedRevision: string;
+  publicationHead?: string;
+  /** Present only when an actual remote Dolt revision has been observed. */
+  publishedRevision?: string;
+  commands: BeadsRawCommandEvidence[];
+  context: JsonRecord;
+  server: JsonRecord;
+  serverStatus: JsonRecord;
+  identity: JsonRecord;
+  workingSet: unknown;
+  remotes: unknown[];
+  publication: BeadsPublicationRefEvidence;
 }
 
 export type BeadsWorkspaceTransportPreparation =
@@ -976,8 +986,20 @@ export type BeadsWorkspaceTransportPreparation =
       code: "provider-authority" | "capability" | "server-mode" | "server-unavailable" | "revision" | "remote-transport" | "publication-authority";
       detail: string;
       remediation: string;
-      /** Exact native revision observed before a later proof step failed. */
       observedRevision?: string;
+      commands?: BeadsRawCommandEvidence[];
+    };
+
+/** Existing explicit migration/retained-folder proof retains its exact result. */
+export type BeadsExplicitWorkspaceTransportPreparation =
+  | Extract<BeadsWorkspaceTransportPreparation, { status: "blocked" }>
+  | {
+      status: "ready";
+      evidence: BeadsWorkspaceTransportEvidence & {
+        bdVersion: string; doltVersion: string;
+        serverAuthority: BeadsServerAuthority; serverHost: string; serverPort: number;
+        publishedRevision: string; publicationHead: string;
+      };
     };
 
 type JsonRecord = Record<string, unknown>;
@@ -1009,11 +1031,10 @@ export function normalizedDoltGitRemote(url: string): string | null {
 }
 
 /**
- * Prove the selected Beads workspace, per-project server, native revision,
- * configured Git-backed Dolt transport, and its published refs/dolt/data
- * authority. Native bd reads may exercise bd's supported per-project
- * auto-start. Direct Dolt reads are limited to version discovery and a
- * disposable remote clone; none targets the live store. JSONL is never authority.
+ * Observe the selected Beads workspace and its native transport targets.
+ * Native reads may exercise bd's supported auto-start. Working-set, history,
+ * versions, and publication observations are facts, not lifecycle approval.
+ * This path performs no remote clone or repeated stable-publication proof.
  */
 export function prepareBeadsWorkspaceTransport(
   cwd: string,
@@ -1053,7 +1074,7 @@ export function prepareBeadsWorkspaceTransport(
 export function prepareExplicitBeadsWorkspaceTransport(
   cwd: string,
   runner: CommandRunner = new ProcessCommandRunner(),
-): BeadsWorkspaceTransportPreparation {
+): BeadsExplicitWorkspaceTransportPreparation {
   const project = resolveNearestProjectRoot(cwd, process.env.HOME ?? "", runner);
   const scanned = project.kind === "linked-worktree"
     ? scanLinkedWorktreeBeads(project.root, runner)
@@ -1082,14 +1103,28 @@ export function prepareExplicitBeadsWorkspaceTransport(
       remediation: "repair the canonical .beads authority before retrying",
     };
   }
-  return prepareSelectedBeadsWorkspaceTransport(project.root, scanned.evidence, runner);
+  return prepareExplicitSelectedBeadsWorkspaceTransport(project.root, scanned.evidence, runner);
 }
 
-function prepareSelectedBeadsWorkspaceTransport(
+/**
+ * Retained-folder transition and provider-migration verification only. This is
+ * the pre-existing strict publication proof for those separate operations.
+ * Task-native lifecycle callers use prepareBeadsWorkspaceTransport instead;
+ * this helper must not become their admission or status-publication gate.
+ */
+function prepareExplicitSelectedBeadsWorkspaceTransport(
   projectRoot: string,
   selected: BeadsProviderEvidence,
-  runner: CommandRunner,
-): BeadsWorkspaceTransportPreparation {
+  nativeRunner: CommandRunner,
+): BeadsExplicitWorkspaceTransportPreparation {
+  const commands: BeadsRawCommandEvidence[] = [];
+  const runner: CommandRunner = {
+    run(command, args, options) {
+      const result = nativeRunner.run(command, args, options);
+      commands.push(rawCommand(command, args, result));
+      return result;
+    },
+  };
   let capabilities: ProviderCapabilities;
   try {
     capabilities = checkBeadsCapabilities(projectRoot, runner);
@@ -1592,6 +1627,153 @@ function prepareSelectedBeadsWorkspaceTransport(
       publicationRef: BEADS_DOLT_DATA_REF,
       publicationHead,
       publishedRevision: revision,
+      commands, context, server: show, serverStatus, identity,
+      workingSet: dirtyRows, remotes,
+      publication: { command: rawCommand("git", ["ls-remote", "--exit-code", "--refs", remoteName, BEADS_DOLT_DATA_REF], publicationRecheck), head: publicationHead },
+    },
+  };
+}
+
+function prepareSelectedBeadsWorkspaceTransport(
+  projectRoot: string,
+  selected: BeadsProviderEvidence,
+  runner: CommandRunner,
+): BeadsWorkspaceTransportPreparation {
+  const commands: BeadsRawCommandEvidence[] = [];
+  const run = (command: string, args: string[]) => {
+    const result = runner.run(command, args, { cwd: projectRoot, allowFailure: true });
+    commands.push(rawCommand(command, args, result));
+    return result;
+  };
+  const blocked = (
+    code: Extract<BeadsWorkspaceTransportPreparation, { status: "blocked" }>["code"],
+    detail: string,
+    observedRevision?: string,
+  ): BeadsWorkspaceTransportPreparation => ({
+    status: "blocked", code, detail,
+    remediation: "Inspect the returned native observations and resolve the reported transport or targeting failure before another operation",
+    observedRevision, commands,
+  });
+
+  const contextResult = parseJSONRecordCommand("bd context --json", run("bd", ["context", "--json"]));
+  if ("error" in contextResult) return blocked("provider-authority", contextResult.error);
+  const context = contextResult.value;
+  const bdVersion = typeof context.bd_version === "string" ? context.bd_version : undefined;
+  if (context.backend !== "dolt" || context.database !== selected.doltDatabase
+      || typeof context.repo_root !== "string" || resolve(context.repo_root) !== dirname(selected.storeDir)
+      || typeof context.cwd_repo_root !== "string" || resolve(context.cwd_repo_root) !== projectRoot
+      || typeof context.beads_dir !== "string" || resolve(context.beads_dir) !== selected.storeDir) {
+    return blocked("provider-authority", "`bd context --json` does not target the selected repository, .beads store, and Dolt database");
+  }
+
+  const autoStartResult = parseJSONRecordCommand(
+    "bd config get dolt.auto-start --json", run("bd", ["config", "get", "dolt.auto-start", "--json"]),
+  );
+  if ("error" in autoStartResult) return blocked("server-mode", autoStartResult.error);
+  const autoStart = typeof autoStartResult.value.value === "string"
+    ? autoStartResult.value.value.trim().toLowerCase() : undefined;
+  const serverAuthority = autoStart !== undefined && ["false", "0", "off"].includes(autoStart)
+    ? "operator-managed" as const
+    : autoStart !== undefined && ["", "true", "1", "on"].includes(autoStart)
+      ? "bd-auto-start" as const : undefined;
+
+  const showResult = parseJSONRecordCommand("bd dolt show --json", run("bd", ["dolt", "show", "--json"]));
+  if ("error" in showResult) return blocked("server-unavailable", showResult.error);
+  const show = showResult.value;
+  if (show.database !== selected.doltDatabase) {
+    return blocked("provider-authority", "`bd dolt show --json` targets a different Dolt database");
+  }
+  const serverHost = typeof show.host === "string" ? show.host : undefined;
+  const serverPort = typeof show.port === "number" ? show.port : undefined;
+  const statusResult = parseJSONRecordCommand("bd dolt status --json", run("bd", ["dolt", "status", "--json"]));
+  if ("error" in statusResult) return blocked("server-unavailable", statusResult.error);
+  const serverStatus = statusResult.value;
+  // If native status names a server target, it must be the one just observed.
+  if ((serverStatus.database !== undefined && serverStatus.database !== selected.doltDatabase)
+      || (serverStatus.host !== undefined && serverStatus.host !== serverHost)
+      || (serverStatus.port !== undefined && serverStatus.port !== serverPort)) {
+    return blocked("provider-authority", "`bd dolt status --json` names a different server or database");
+  }
+  if (serverAuthority === "bd-auto-start" && typeof serverStatus.data_dir === "string") {
+    const expectedDataDir = join(selected.storeDir, "dolt");
+    try {
+      if (realpathSync(serverStatus.data_dir) !== realpathSync(expectedDataDir)) {
+        return blocked("provider-authority", "the native server data directory is not the selected store's directory");
+      }
+    } catch (error) {
+      return blocked("provider-authority", `native server data-directory identity is unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  const identityQuery = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, dolt_version() AS dolt_version";
+  const identityCommand = run("bd", ["--readonly", "sql", "--json", identityQuery]);
+  if (identityCommand.status !== 0) return blocked("revision", commandFailure("bd --readonly sql identity", identityCommand));
+  let identityRows: unknown;
+  try {
+    identityRows = JSON.parse(identityCommand.stdout);
+  } catch (error) {
+    return blocked("revision", `native identity returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const identity = Array.isArray(identityRows) && identityRows.length === 1 ? identityRows[0] as JsonRecord : null;
+  if (!identity || identity.database_name !== selected.doltDatabase
+      || typeof identity.branch !== "string" || !identity.branch.trim()
+      || typeof identity.revision !== "string" || !/^[0-9a-v]{32}$/.test(identity.revision)) {
+    return blocked("revision", "native identity did not identify the selected database, branch, and HEAD");
+  }
+  const doltVersion = typeof identity.dolt_version === "string" ? identity.dolt_version : undefined;
+  const branch = identity.branch;
+  const revision = identity.revision;
+  const workingSetCommand = run("bd", ["--readonly", "sql", "--json", "SELECT table_name, staged, status FROM dolt_status ORDER BY table_name"]);
+  if (workingSetCommand.status !== 0) return blocked("revision", commandFailure("bd --readonly sql dolt_status", workingSetCommand), revision);
+  // Preserve the complete native working-set observation without a cleanliness
+  // predicate. Native update/commit isolation is not established by this read.
+  let workingSet: unknown;
+  try {
+    workingSet = JSON.parse(workingSetCommand.stdout);
+  } catch (error) {
+    return blocked("revision", `native working set returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`, revision);
+  }
+
+  const configuredResult = parseJSONRecordCommand(
+    "bd config get sync.remote --json", run("bd", ["config", "get", "sync.remote", "--json"]),
+  );
+  if ("error" in configuredResult) return blocked("remote-transport", configuredResult.error, revision);
+  const configuredRemote = typeof configuredResult.value.value === "string"
+    ? normalizedDoltGitRemote(configuredResult.value.value.trim()) : null;
+  if (!configuredRemote) return blocked("remote-transport", "native sync.remote does not name a supported Git remote URL or absolute path", revision);
+  const remotesCommand = run("bd", ["dolt", "remote", "list", "--json"]);
+  if (remotesCommand.status !== 0) return blocked("remote-transport", commandFailure("bd dolt remote list --json", remotesCommand), revision);
+  let remotes: unknown;
+  try {
+    remotes = JSON.parse(remotesCommand.stdout);
+  } catch (error) {
+    return blocked("remote-transport", `native remote list returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`, revision);
+  }
+  if (!Array.isArray(remotes)) return blocked("remote-transport", "native remote list is not an array", revision);
+  const matches = remotes.filter((row): row is JsonRecord => row !== null && typeof row === "object"
+    && typeof row.name === "string" && row.name.trim().length > 0
+    && typeof row.url === "string" && normalizedDoltGitRemote(row.url) === configuredRemote
+    && (row.sql_url === undefined || (typeof row.sql_url === "string" && normalizedDoltGitRemote(row.sql_url) === configuredRemote)));
+  if (matches.length !== 1) return blocked("remote-transport", "native sync.remote does not select exactly one native Dolt remote", revision);
+  const remoteName = matches[0].name as string;
+  const gitRemoteCommand = run("git", ["remote", "get-url", "--all", remoteName]);
+  const gitUrls = gitRemoteCommand.stdout.split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
+  if (gitRemoteCommand.status !== 0 || gitUrls.length !== 1 || normalizedDoltGitRemote(gitUrls[0]) !== configuredRemote) {
+    return blocked("publication-authority", "the named Git remote does not identify the selected native Dolt transport", revision);
+  }
+  const publication = readBeadsPublicationRef(projectRoot, remoteName, runner);
+  commands.push(publication.command);
+  // A missing or unavailable publication ref is an observation, not a hidden
+  // prerequisite for a native pull/push. No remote Dolt revision is invented.
+  return {
+    status: "ready",
+    evidence: {
+      provider: "beads", projectRoot, storeDir: selected.storeDir,
+      bdVersion, doltVersion, serverAuthority, serverHost, serverPort,
+      database: selected.doltDatabase, branch, revision, remoteName,
+      remoteUrl: configuredRemote, publicationRef: BEADS_DOLT_DATA_REF,
+      publicationHead: publication.head, commands, context, server: show,
+      serverStatus, identity, workingSet, remotes, publication,
     },
   };
 }
@@ -1606,9 +1788,9 @@ export interface BeadsRawCommandEvidence {
 
 export interface BeadsNativeTaskSnapshot {
   taskId: string;
-  title: string;
-  nativeStatus: string;
-  canonicalStatus: CanonicalLifecycleStatus;
+  title?: string;
+  nativeStatus?: string;
+  canonicalStatus?: CanonicalLifecycleStatus;
   nativeView: JsonRecord;
 }
 
@@ -1643,6 +1825,7 @@ export interface BeadsMutationRevisionEvidence {
   parentRevision?: string;
   clean?: boolean;
   command: BeadsRawCommandEvidence;
+  nativeView?: JsonRecord;
   error?: string;
 }
 
@@ -1654,22 +1837,28 @@ export interface BeadsTaskMutationPublishedEvidence {
   publicationRef: typeof BEADS_DOLT_DATA_REF;
   preparedRevision: string;
   committedRevision: string;
+  /** Submitted local HEAD for the successful native push, not isolated remote proof. */
   publishedRevision: string;
-  publicationHead: string;
+  publicationHead?: string;
   taskBefore: BeadsNativeTaskSnapshot;
   taskPublished: BeadsNativeTaskSnapshot;
   postMutationProof: BeadsMutationRevisionEvidence;
   localPublishedProof: BeadsMutationRevisionEvidence;
-  remotePublishedTask: BeadsRemoteTaskSnapshotEvidence;
+  remotePublishedTask?: BeadsRemoteTaskSnapshotEvidence;
   pull: BeadsRawCommandEvidence;
   mutation: BeadsRawCommandEvidence;
   push: BeadsRawCommandEvidence;
+  commands: BeadsRawCommandEvidence[];
+  taskReads: BeadsNativeTaskReadEvidence[];
+  publication: BeadsPublicationRefEvidence;
 }
 
 export interface BeadsTaskMutationReviewEvidence {
   provider: "beads";
   projectRoot: string;
   taskId: string;
+  commands?: BeadsRawCommandEvidence[];
+  preparation?: BeadsWorkspaceTransportPreparation;
   prepared?: BeadsWorkspaceTransportEvidence;
   preparedRevision?: string;
   observedRevision?: string;
@@ -1686,20 +1875,19 @@ export type BeadsTaskMutationPublication =
   | { status: "published"; evidence: BeadsTaskMutationPublishedEvidence }
   | {
       status: "review-required";
-      code: "concurrent-advance" | "synchronization-failed" | "guarded-mutation-failed" | "push-rejected" | "publication-proof-failed";
+      code: "synchronization-failed" | "mutation-failed" | "push-rejected" | "publication-proof-failed";
       phase: "synchronization" | "mutation" | "push" | "publication-proof";
       detail: string;
       evidence: BeadsTaskMutationReviewEvidence;
     }
   | {
       status: "blocked";
-      code: "preparation" | "task-identity" | "status-transition";
+      code: "preparation" | "task-identity";
       detail: string;
       evidence: BeadsTaskMutationReviewEvidence;
     };
 
-const BEADS_REMOTE_IDENTITY_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision";
-const BEADS_MUTATION_REVISION_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, dolt_hashof('HEAD~1') AS parent_revision, (SELECT COUNT(*) FROM dolt_status) AS status_count";
+const BEADS_MUTATION_REVISION_QUERY = "SELECT database() AS database_name, active_branch() AS branch, dolt_hashof('HEAD') AS revision, (SELECT COUNT(*) FROM dolt_status) AS status_count";
 
 function rawCommand(
   command: string,
@@ -1718,34 +1906,27 @@ function readExactBeadsTaskEvidence(
   const result = runner.run("bd", args, { cwd: projectRoot, allowFailure: true });
   const command = rawCommand("bd", args, result);
   if (result.status !== 0) return { command, error: commandFailure(`bd show ${taskId}`, result) };
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(result.stdout);
-  } catch (error) {
-    return { command, error: `bd show ${taskId} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}` };
-  }
-  if (!Array.isArray(parsed) || parsed.length !== 1 || !parsed[0] || typeof parsed[0] !== "object" || Array.isArray(parsed[0])) {
-    return { command, error: `bd show ${taskId} returned an unsupported exact task-view schema` };
-  }
-  const nativeView = parsed[0] as JsonRecord;
-  if (typeof nativeView.id !== "string" || !nativeView.id.trim()
-      || typeof nativeView.title !== "string" || !nativeView.title.trim()
-      || typeof nativeView.status !== "string" || !nativeView.status.trim()) {
-    return { command, error: `bd show ${taskId} returned an incomplete exact task view` };
-  }
-  try {
+    const parsed: unknown = JSON.parse(result.stdout);
+    if (!Array.isArray(parsed) || parsed.length !== 1 || !parsed[0]
+        || typeof parsed[0] !== "object" || Array.isArray(parsed[0])) {
+      return { command, error: `bd show ${taskId} did not return one native task object` };
+    }
+    const nativeView = parsed[0] as JsonRecord;
+    if (nativeView.id !== taskId) return { command, error: `bd show ${taskId} resolved a different or absent canonical task ID` };
+    const nativeStatus = typeof nativeView.status === "string" ? nativeView.status : undefined;
+    const canonicalStatus = Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === nativeStatus)?.[0] as CanonicalLifecycleStatus | undefined;
     return {
       command,
       task: {
-        taskId: nativeView.id,
-        title: nativeView.title,
-        nativeStatus: nativeView.status,
-        canonicalStatus: beadsCanonicalStatus(nativeView.id, nativeView.status),
-        nativeView,
+        taskId, nativeView,
+        ...(typeof nativeView.title === "string" ? { title: nativeView.title } : {}),
+        ...(nativeStatus !== undefined ? { nativeStatus } : {}),
+        ...(canonicalStatus !== undefined ? { canonicalStatus } : {}),
       },
     };
   } catch (error) {
-    return { command, error: error instanceof Error ? error.message : String(error) };
+    return { command, error: `bd show ${taskId} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
@@ -1763,30 +1944,17 @@ function readBeadsMutationRevision(
     const row = Array.isArray(parsed) && parsed.length === 1 && parsed[0]
       && typeof parsed[0] === "object" && !Array.isArray(parsed[0]) ? parsed[0] as JsonRecord : null;
     if (!row || row.database_name !== expected.database || row.branch !== expected.branch
-        || typeof row.revision !== "string" || !/^[0-9a-v]{32}$/.test(row.revision)
-        || (row.parent_revision !== null && (typeof row.parent_revision !== "string" || !/^[0-9a-v]{32}$/.test(row.parent_revision)))
-        || typeof row.status_count !== "number" || !Number.isInteger(row.status_count) || row.status_count < 0) {
-      return { command, error: "native revision proof did not preserve the exact database, branch, HEAD, first parent, and working-set count" };
+        || typeof row.revision !== "string" || !/^[0-9a-v]{32}$/.test(row.revision)) {
+      return { command, error: "native revision observation did not identify the selected database, branch, and HEAD" };
     }
     return {
-      command,
-      revision: row.revision,
-      parentRevision: typeof row.parent_revision === "string" ? row.parent_revision : undefined,
-      clean: row.status_count === 0,
+      command, nativeView: row, revision: row.revision,
+      ...(typeof row.parent_revision === "string" ? { parentRevision: row.parent_revision } : {}),
+      ...(typeof row.status_count === "number" ? { clean: row.status_count === 0 } : {}),
     };
   } catch (error) {
-    return { command, error: `native revision proof returned invalid JSON: ${error instanceof Error ? error.message : String(error)}` };
+    return { command, error: `native revision returned invalid JSON: ${error instanceof Error ? error.message : String(error)}` };
   }
-}
-
-function readBeadsRawDiff(
-  projectRoot: string,
-  fromRevision: string,
-  toRevision: string,
-  runner: CommandRunner,
-): BeadsRawCommandEvidence {
-  const args = ["--readonly", "diff", fromRevision, toRevision, "--json"];
-  return rawCommand("bd", args, runner.run("bd", args, { cwd: projectRoot, allowFailure: true }));
 }
 
 function readBeadsPublicationRef(
@@ -1805,262 +1973,124 @@ function readBeadsPublicationRef(
   return { command, head: match[1] };
 }
 
-function readIsolatedBeadsRemoteTask(
-  prepared: BeadsWorkspaceTransportEvidence,
-  taskId: string,
-  runner: CommandRunner,
-): BeadsRemoteTaskSnapshotEvidence {
-  const refBefore = readBeadsPublicationRef(prepared.projectRoot, prepared.remoteName, runner);
-  const evidence: BeadsRemoteTaskSnapshotEvidence = { refBefore };
-  if (!refBefore.head) return { ...evidence, error: refBefore.error ?? "remote publication ref is unavailable" };
-
-  const proofRoot = mkdtempSync(join(tmpdir(), "prime-claw-beads-task-proof-"));
-  const proofDatabase = join(proofRoot, prepared.database);
-  try {
-    const cloneArgs = [
-      "clone", "--branch", prepared.branch, "--single-branch", "--ref", BEADS_DOLT_DATA_REF,
-      prepared.remoteUrl, proofDatabase,
-    ];
-    const cloneResult = runner.run("dolt", cloneArgs, { cwd: proofRoot, allowFailure: true });
-    evidence.clone = rawCommand("dolt", cloneArgs, cloneResult);
-    if (cloneResult.status !== 0) return { ...evidence, error: commandFailure("dolt clone", cloneResult) };
-
-    const identityArgs = ["sql", "-r", "json", "-q", BEADS_REMOTE_IDENTITY_QUERY];
-    const identityResult = runner.run("dolt", identityArgs, { cwd: proofDatabase, allowFailure: true });
-    evidence.identity = rawCommand("dolt", identityArgs, identityResult);
-    const quotedTaskId = taskId.replaceAll("'", "''");
-    const taskArgs = ["sql", "-r", "json", "-q", `SELECT * FROM issues WHERE id = '${quotedTaskId}'`];
-    const taskResult = runner.run("dolt", taskArgs, { cwd: proofDatabase, allowFailure: true });
-    evidence.task = rawCommand("dolt", taskArgs, taskResult);
-    const commentArgs = ["sql", "-r", "json", "-q", `SELECT * FROM comments WHERE issue_id = '${quotedTaskId}' ORDER BY created_at, id`];
-    const commentResult = runner.run("dolt", commentArgs, { cwd: proofDatabase, allowFailure: true });
-    evidence.commentRead = rawCommand("dolt", commentArgs, commentResult);
-
-    let identityRows: unknown;
-    let taskRows: unknown;
-    let comments: unknown;
-    try {
-      identityRows = (JSON.parse(identityResult.stdout) as JsonRecord).rows;
-      taskRows = (JSON.parse(taskResult.stdout) as JsonRecord).rows;
-      const commentOutput = JSON.parse(commentResult.stdout) as JsonRecord;
-      comments = "rows" in commentOutput ? commentOutput.rows : [];
-    } catch (error) {
-      return { ...evidence, error: `isolated remote task snapshot returned invalid JSON: ${error instanceof Error ? error.message : String(error)}` };
-    }
-    const identity = identityResult.status === 0 && Array.isArray(identityRows) && identityRows.length === 1
-      && identityRows[0] && typeof identityRows[0] === "object" ? identityRows[0] as JsonRecord : null;
-    const taskRow = taskResult.status === 0 && Array.isArray(taskRows) && taskRows.length === 1
-      && taskRows[0] && typeof taskRows[0] === "object" ? taskRows[0] as JsonRecord : null;
-    if (!identity || identity.database_name !== prepared.database || identity.branch !== prepared.branch
-        || typeof identity.revision !== "string" || !/^[0-9a-v]{32}$/.test(identity.revision)
-        || !taskRow || taskRow.id !== taskId || typeof taskRow.status !== "string"
-        || commentResult.status !== 0 || !Array.isArray(comments)
-        || comments.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
-      return { ...evidence, error: "isolated remote revision or exact task snapshot is unavailable" };
-    }
-    evidence.revision = identity.revision;
-    evidence.taskRow = taskRow;
-    evidence.comments = comments as JsonRecord[];
-
-    const refAfter = readBeadsPublicationRef(prepared.projectRoot, prepared.remoteName, runner);
-    evidence.refAfter = refAfter;
-    if (!refAfter.head || refAfter.head !== refBefore.head) {
-      return { ...evidence, error: "remote publication ref changed during isolated task proof" };
-    }
-    evidence.publicationHead = refAfter.head;
-    return evidence;
-  } finally {
-    rmSync(proofRoot, { recursive: true, force: true });
-  }
-}
-
 /**
- * Publish one exact Beads status and optional appended-note mutation with the
- * smallest provider-native transport flow. Deterministic code proves only the
- * exact task/status/note and revision/ref identities. Any concurrent advance or rejected operation is
- * preserved and returned as raw provider evidence for managed review; this
- * function never classifies task semantics, pulls twice, retries, or forces.
+ * Run the requested native update and one pull/push. Raw observations describe
+ * what happened; they do not approve status, content, history, or cleanliness.
+ * Only an explicitly supplied native ifStatus requests a conditional update.
+ * A native failure is returned without repair, retry, force, or another clone.
  */
 export function mutateAndPublishBeadsTaskStatus(options: {
   projectRoot: string;
   taskId: string;
   status: CanonicalLifecycleStatus;
-  expectedCurrentStatus?: CanonicalLifecycleStatus;
+  ifStatus?: string;
   note?: string;
   runner?: CommandRunner;
 }): BeadsTaskMutationPublication {
   const runner = options.runner ?? new ProcessCommandRunner();
   const taskId = options.taskId.trim();
+  const commands: BeadsRawCommandEvidence[] = [];
   const baseEvidence: BeadsTaskMutationReviewEvidence = {
-    provider: "beads", projectRoot: resolve(options.projectRoot), taskId,
+    provider: "beads", projectRoot: resolve(options.projectRoot), taskId, commands,
   };
   if (!taskId || taskId !== options.taskId || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(taskId)) {
     return { status: "blocked", code: "task-identity", detail: "the requested Beads task ID is not one exact canonical ID", evidence: baseEvidence };
   }
-
   const preparation = prepareBeadsWorkspaceTransport(options.projectRoot, runner);
   if (preparation.status !== "ready") {
+    commands.push(...preparation.commands ?? []);
     return {
-      status: "blocked", code: "preparation",
-      detail: `Beads transport preparation is blocked (${preparation.code}): ${preparation.detail}`,
-      evidence: baseEvidence,
+      status: "blocked", code: "preparation", detail: preparation.detail,
+      evidence: { ...baseEvidence, preparation },
     };
   }
   const prepared = preparation.evidence;
+  commands.push(...prepared.commands);
   const evidence = { ...baseEvidence, projectRoot: prepared.projectRoot, prepared, preparedRevision: prepared.revision };
-  const before = readExactBeadsTaskEvidence(prepared.projectRoot, taskId, runner);
-  if (!before.task || before.task.taskId !== taskId) {
-    return {
-      status: "blocked", code: "task-identity",
-      detail: before.error ?? `requested ${taskId} but Beads resolved ${before.task?.taskId ?? "no canonical ID"}`,
-      evidence: { ...evidence, taskBefore: before },
-    };
+  const taskReads: BeadsNativeTaskReadEvidence[] = [];
+  const readTask = () => {
+    const read = readExactBeadsTaskEvidence(prepared.projectRoot, taskId, runner);
+    commands.push(read.command);
+    taskReads.push(read);
+    return read;
+  };
+  const readRevision = () => {
+    const read = readBeadsMutationRevision(prepared.projectRoot, prepared, runner);
+    commands.push(read.command);
+    return read;
+  };
+  const run = (args: string[]) => {
+    const result = runner.run("bd", args, { cwd: prepared.projectRoot, allowFailure: true });
+    const raw = rawCommand("bd", args, result);
+    commands.push(raw);
+    return raw;
+  };
+  const before = readTask();
+  if (!before.task) {
+    return { status: "blocked", code: "task-identity", detail: before.error ?? "exact native task is unavailable", evidence: { ...evidence, taskBefore: before } };
   }
-
-  const pullArgs = ["dolt", "pull", "--remote", prepared.remoteName];
-  const pullResult = runner.run("bd", pullArgs, { cwd: prepared.projectRoot, allowFailure: true });
-  const pull = rawCommand("bd", pullArgs, pullResult);
-  if (pullResult.status !== 0) {
+  const pull = run(["dolt", "pull", "--remote", prepared.remoteName]);
+  if (pull.status !== 0) {
     return {
       status: "review-required", code: "synchronization-failed", phase: "synchronization",
-      detail: "the single provider-native pull failed; no mutation was attempted",
+      detail: "the single native pull failed; no mutation was attempted",
       evidence: { ...evidence, taskBefore: before, operation: pull },
     };
   }
-
-  const synchronized = readBeadsMutationRevision(prepared.projectRoot, prepared, runner);
-  const afterPull = readExactBeadsTaskEvidence(prepared.projectRoot, taskId, runner);
-  if (!synchronized.revision || !afterPull.task || afterPull.task.taskId !== taskId) {
+  const synchronized = readRevision();
+  const afterPull = readTask();
+  if (!synchronized.revision || !afterPull.task) {
     return {
       status: "review-required", code: "synchronization-failed", phase: "synchronization",
-      detail: synchronized.error ?? afterPull.error ?? "the exact task identity changed during synchronization",
-      evidence: { ...evidence, taskBefore: before, taskObserved: afterPull, operation: pull },
-    };
-  }
-  if (synchronized.revision !== prepared.revision) {
-    return {
-      status: "review-required", code: "concurrent-advance", phase: "synchronization",
-      detail: "the single native pull observed a concurrent revision advance; managed review must classify it before mutation",
-      evidence: {
-        ...evidence, observedRevision: synchronized.revision, taskBefore: before, taskObserved: afterPull,
-        operation: pull, diff: readBeadsRawDiff(prepared.projectRoot, prepared.revision, synchronized.revision, runner),
-      },
-    };
-  }
-
-  if (options.expectedCurrentStatus && afterPull.task.canonicalStatus !== options.expectedCurrentStatus) {
-    return {
-      status: "blocked", code: "status-transition",
-      detail: `Beads task ${taskId} is currently ${afterPull.task.canonicalStatus}/${afterPull.task.nativeStatus}, not required ${options.expectedCurrentStatus}/${BEADS_STATUS_MAP[options.expectedCurrentStatus].name}; no mutation was attempted`,
+      detail: synchronized.error ?? afterPull.error ?? "native synchronization readback is unavailable",
       evidence: { ...evidence, observedRevision: synchronized.revision, revisionProof: synchronized, taskBefore: before, taskObserved: afterPull, operation: pull },
     };
   }
-
-  const expectedNotes = options.note
-    ? `${typeof afterPull.task.nativeView.notes === "string" && afterPull.task.nativeView.notes
-      ? `${afterPull.task.nativeView.notes}\n` : ""}${options.note}`
-    : undefined;
-  const nativeStatus = BEADS_STATUS_MAP[options.status].name;
-  const mutationArgs = [
-    "--dolt-auto-commit=on", "update", taskId, "--status", nativeStatus,
-    "--if-status", afterPull.task.nativeStatus,
-  ];
-  if (options.note) mutationArgs.push("--append-notes", options.note);
+  const mutationArgs = ["--dolt-auto-commit=on", "update", taskId, "--status", BEADS_STATUS_MAP[options.status].name];
+  if (options.ifStatus !== undefined) mutationArgs.push("--if-status", options.ifStatus);
+  if (options.note !== undefined) mutationArgs.push("--append-notes", options.note);
   mutationArgs.push("--json");
-  const mutationResult = runner.run("bd", mutationArgs, { cwd: prepared.projectRoot, allowFailure: true });
-  const mutation = rawCommand("bd", mutationArgs, mutationResult);
-  const committed = readBeadsMutationRevision(prepared.projectRoot, prepared, runner);
-  const afterMutation = readExactBeadsTaskEvidence(prepared.projectRoot, taskId, runner);
-  if (mutationResult.status !== 0 || !committed.revision || committed.revision === prepared.revision || !afterMutation.task
-      || afterMutation.task.taskId !== taskId || afterMutation.task.nativeStatus !== nativeStatus
-      || afterMutation.task.canonicalStatus !== options.status
-      || (expectedNotes !== undefined && afterMutation.task.nativeView.notes !== expectedNotes)) {
+  const mutation = run(mutationArgs);
+  const committed = readRevision();
+  const afterMutation = readTask();
+  if (mutation.status !== 0 || !committed.revision || !afterMutation.task) {
     return {
-      status: "review-required", code: "guarded-mutation-failed", phase: "mutation",
-      detail: mutationResult.status !== 0
-        ? "the guarded provider-native mutation failed"
-        : committed.error ?? afterMutation.error ?? "the guarded mutation did not prove the exact requested task status and appended note",
-      evidence: {
-        ...evidence, observedRevision: committed.revision, revisionProof: committed,
-        taskBefore: afterPull, taskObserved: afterMutation, operation: mutation,
-        diff: committed.revision && committed.revision !== prepared.revision
-          ? readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner) : undefined,
-      },
+      status: "review-required", code: "mutation-failed", phase: "mutation",
+      detail: mutation.status !== 0 ? "the native requested update failed" : committed.error ?? afterMutation.error ?? "native update readback is unavailable",
+      evidence: { ...evidence, observedRevision: committed.revision, revisionProof: committed, taskBefore: afterPull, taskObserved: afterMutation, operation: mutation },
     };
   }
-  if (committed.parentRevision !== prepared.revision) {
-    return {
-      status: "review-required", code: "concurrent-advance", phase: "mutation",
-      detail: "the post-update HEAD is not a direct child of the prepared revision; managed review must classify the concurrent descendant",
-      evidence: {
-        ...evidence, observedRevision: committed.revision, revisionProof: committed,
-        taskBefore: afterPull, taskObserved: afterMutation, operation: mutation,
-        diff: readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner),
-      },
-    };
-  }
-  if (committed.clean !== true) {
-    return {
-      status: "review-required", code: "guarded-mutation-failed", phase: "mutation",
-      detail: "native dolt_status was not empty after the guarded mutation; the dirty working set was not pushed",
-      evidence: {
-        ...evidence, observedRevision: committed.revision, revisionProof: committed,
-        taskBefore: afterPull, taskObserved: afterMutation, operation: mutation,
-        diff: readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner),
-      },
-    };
-  }
-
-  const pushArgs = ["dolt", "push", "--remote", prepared.remoteName, "--no-adopt"];
-  const pushResult = runner.run("bd", pushArgs, { cwd: prepared.projectRoot, allowFailure: true });
-  const push = rawCommand("bd", pushArgs, pushResult);
-  if (pushResult.status !== 0) {
-    const remoteTask = readIsolatedBeadsRemoteTask(prepared, taskId, runner);
+  const push = run(["dolt", "push", "--remote", prepared.remoteName, "--no-adopt"]);
+  if (push.status !== 0) {
     return {
       status: "review-required", code: "push-rejected", phase: "push",
-      detail: "the single non-force provider-native push was rejected; no pull, retry, reset, or force was attempted",
-      evidence: {
-        ...evidence, observedRevision: committed.revision, revisionProof: committed,
-        taskBefore: afterPull, taskObserved: afterMutation, operation: push,
-        diff: readBeadsRawDiff(prepared.projectRoot, prepared.revision, committed.revision, runner),
-        publicationRef: remoteTask.refAfter ?? remoteTask.refBefore, remoteTask,
-      },
+      detail: "the single native push failed; no retry, repair, reset, or force was attempted",
+      evidence: { ...evidence, observedRevision: committed.revision, revisionProof: committed, taskBefore: afterPull, taskObserved: afterMutation, operation: push },
     };
   }
-
-  const remoteTask = readIsolatedBeadsRemoteTask(prepared, taskId, runner);
-  const publishedTask = readExactBeadsTaskEvidence(prepared.projectRoot, taskId, runner);
-  const published = readBeadsMutationRevision(prepared.projectRoot, prepared, runner);
-  if (published.revision !== committed.revision || published.parentRevision !== prepared.revision || published.clean !== true
-      || !publishedTask.task || publishedTask.task.taskId !== taskId || publishedTask.task.nativeStatus !== nativeStatus
-      || publishedTask.task.canonicalStatus !== options.status
-      || (expectedNotes !== undefined && publishedTask.task.nativeView.notes !== expectedNotes)
-      || remoteTask.revision !== committed.revision || remoteTask.taskRow?.status !== nativeStatus
-      || (expectedNotes !== undefined && remoteTask.taskRow?.notes !== expectedNotes)
-      || !remoteTask.publicationHead || remoteTask.publicationHead === prepared.publicationHead) {
+  const publishedTask = readTask();
+  const published = readRevision();
+  const publication = readBeadsPublicationRef(prepared.projectRoot, prepared.remoteName, runner);
+  commands.push(publication.command);
+  if (!published.revision || !publishedTask.task) {
     return {
       status: "review-required", code: "publication-proof-failed", phase: "publication-proof",
-      detail: published.error ?? publishedTask.error ?? remoteTask.error
-        ?? "isolated publication proof did not preserve the exact committed revision, requested task status, and appended note",
-      evidence: {
-        ...evidence, observedRevision: remoteTask.revision ?? published.revision, revisionProof: published,
-        taskBefore: afterPull, taskObserved: publishedTask, operation: push,
-        diff: published.revision && published.revision !== committed.revision
-          ? readBeadsRawDiff(prepared.projectRoot, committed.revision, published.revision, runner) : undefined,
-        publicationRef: remoteTask.refAfter ?? remoteTask.refBefore, remoteTask,
-      },
+      detail: published.error ?? publishedTask.error ?? "native readback after the successful push is unavailable",
+      evidence: { ...evidence, observedRevision: published.revision, revisionProof: published, taskBefore: afterPull, taskObserved: publishedTask, operation: push, publicationRef: publication },
     };
   }
-
   return {
     status: "published",
     evidence: {
       provider: "beads", projectRoot: prepared.projectRoot, taskId, remoteName: prepared.remoteName,
       publicationRef: BEADS_DOLT_DATA_REF, preparedRevision: prepared.revision,
-      committedRevision: committed.revision, publishedRevision: published.revision,
-      publicationHead: remoteTask.publicationHead, taskBefore: before.task, taskPublished: publishedTask.task,
+      // The submitted local HEAD for the successful native push. This is
+      // not an isolated remote revision or a content-approval proof.
+      committedRevision: committed.revision, publishedRevision: committed.revision,
+      publicationHead: publication.head,
+      taskBefore: before.task, taskPublished: publishedTask.task,
       postMutationProof: committed, localPublishedProof: published,
-      remotePublishedTask: remoteTask, pull, mutation, push,
+      pull, mutation, push, commands, taskReads, publication,
     },
   };
 }
@@ -2177,15 +2207,6 @@ export function readBeadsNativeTask(
     projectRoot,
     nativeView: issue.nativeView,
   };
-}
-
-/** Canonical lifecycle status for a Beads issue, at the exact use boundary. */
-function beadsCanonicalStatus(taskId: string, nativeStatus: string): CanonicalLifecycleStatus {
-  const canonical = Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === nativeStatus)?.[0];
-  if (!canonical) {
-    throw new Error(`Beads task ${taskId} carries unmapped status ${nativeStatus}`);
-  }
-  return canonical as CanonicalLifecycleStatus;
 }
 
 /**

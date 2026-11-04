@@ -69,6 +69,15 @@ untracked task/code work. Do not repair another Conversation's workspace or
 require it to be globally clean to read this task. Report native command failures
 truthfully; a failed read does not authorize initialization or another store.
 
+Preparation and publication return native observations and operation results,
+not a cleanliness or frozen-revision approval. Keep native task fields, history,
+workspace/database/branch/remote identities, and consequential failure evidence
+in the readiness focus. A newer remote head alone does not reject the selected
+task. The readiness Agent must inspect intended exact-task changes, preserve
+unrelated bytes and staging, and decide any real conflict before requesting an
+operation. Do not ask preparation code to synchronize another owner's dirty
+primary checkout, reconcile a rejected push, or retry uncertain delivery.
+
 ## Light readiness sniff
 
 Resolve the live provider directly from its native project evidence. Do not use

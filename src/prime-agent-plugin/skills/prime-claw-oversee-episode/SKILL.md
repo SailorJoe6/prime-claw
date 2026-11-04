@@ -20,6 +20,23 @@ For retained version 1 folder ownership, require its readable non-empty active s
 
 Use the exceptional `transition_spec_episode_to_task` cutover surface after marker, review, merge, activation, restart, UAT, readiness, and exact heads. Preserve resources; Beads requires historical-head ancestry/clean code. An exact same-binding replay is the only idempotent replay; plan deletion remains a separate reviewed step.
 
+Preparation, publication, reservation and observation advancement supply native
+facts; they do not repeat your lifecycle or compatibility decision. Before
+requesting a mutation, inspect the exact task and current history and ensure the
+intended ticket update is authorized. Preserve unrelated code/task bytes and
+staging. Dirty state is not permission to include another owner's work, and a
+new revision alone is not a conflict. Backlog publication uses an exact-path
+commit and one non-force push, with no hidden merge/classifier/retry. Beads uses
+supported native history and one requested push. Its submitted candidate
+revision, post-push local task/revision and publication-ref observation are
+separate facts, not a frozen remote-content proof. Read those facts and judge a
+real semantic conflict or compatible in-scope change under the current editable
+guidance. Do not ask reservation or evidence code to enforce status/design,
+whole-checkout cleanliness or content/revision approval on your behalf. Exact
+owner/task/database/worktree/session and resource targeting remain unchanged.
+Commit each coherent authorized native ticket update promptly and publish when
+a remote exists; do not defer accepted review or blocker evidence until handoff.
+
 Review one reported slice at a time: check ownership/code/tests/docs/authority. Independent Backlog: compare persisted/current complete native task evidence/revision/publication. For Beads, compare the persisted raw task and revision with the synchronized current raw task, publication ref, candidate code base/head. An unrelated-task revision descendant alone is compatible. For a same-task change, surface the exact persisted and current fields. Judge whether it is a compatible in-scope clarification or living-plan update; escalate a genuine semantic conflict, authority change, scope expansion, or product decision. Never replace this judgment with a classifier or equality gate. Apply before handoff, blockers, terminals, and cleanup; mutate only as authorized.
 
 A report, findings, and Review conclusions are evidence, not approval. Choose:
@@ -36,7 +53,7 @@ The remaining lifecycle and cleanup flow applies only to version 2 task-native o
 
 Before merge readiness, verify provider-reported idle completion of the Episode and explicitly proven descendants through Prime Agent list/state responses. Only recursive explicit parent session ID or canonical parent session-file edges prove descendants; require agreement when both exist. CWD/RLM metadata grants no ownership. Active or unprovable-idle sessions block readiness and merge; cleanup independently rechecks before mutation.
 
-For Beads, `handoff_task_episode` proves owner/resources, pushed code, one pull, and paired publication evidence.  After first-message admission, its callback records only `providerRevision`, raw `taskEvidence`, code `head`, and `updatedAt`. Prior may be `blocked`; require current `in_progress` and meaningful design. Integrity failure stops without retry.
+For Beads, `handoff_task_episode` targets the exact owner/resources and performs one native pull before reading current task/revision observations. The evidence-advancement helper does not pair stable publication proofs or require a frozen previous revision/content observation. After first-message admission, its callback records only `providerRevision`, raw `taskEvidence`, code `head`, and `updatedAt`. Prior may be `blocked`; require current `in_progress` and meaningful design. Integrity failure stops without retry.
 
 Only the exact owning top-level canonical-primary Conversation publishes accepted blockers. Grandfathered Backlog uses exact-path code-DAG status commit/push. Independent Backlog uses the primary nested clone: freshly fast-forward only, edit the exact task with the supported CLI, commit only its path, push `HEAD:refs/heads/prime-claw/tasks` without force, and prove the direct remote head while the code HEAD stays unchanged. Restore `In Progress` through the same selected mode before handoff; the host prepares both clones and records facts only after admission.
 
