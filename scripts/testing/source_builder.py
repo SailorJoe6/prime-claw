@@ -16,6 +16,7 @@ from typing import Any
 
 from scripts.testing import bounded
 from scripts.testing import provenance
+from scripts.testing import source_builder_payload as payload
 
 SHA256 = re.compile(r"[0-9a-f]{64}")
 IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
@@ -24,7 +25,24 @@ SEMVER = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
 
 
 class BuilderError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, outcome: str = "error",
+                 returncode: int | None = None):
+        super().__init__(message)
+        self.outcome = outcome
+        self.returncode = returncode
+
+
+def failure_diagnostics(codes: Any) -> list[str]:
+    """Render only fixed failure codes or controlled builder metadata."""
+    if not isinstance(codes, list):
+        return []
+    fixed = {"builder-failed", "interrupted", "teardown-failed",
+             "source-inventory-changed", "source-inventory-unknown",
+             "output-validation-failed", "publication-failed",
+             "publication-invalidation-failed", "handler-restoration-failed"}
+    return [code for code in codes[:16] if isinstance(code, str)
+            and len(code) <= 256
+            and (code in fixed or payload.FAILURE_DIAGNOSTIC.fullmatch(code))]
 
 
 class BuilderInterrupted(BaseException):
@@ -52,7 +70,8 @@ def _run(argv: list[str], *, timeout: float, policy: str = "capture"):
 
 def _require_success(result, stage: str) -> None:
     if result.outcome != "exited" or result.returncode != 0:
-        raise BuilderError(f"{stage} failed")
+        raise BuilderError(f"{stage} failed", outcome=result.outcome,
+                           returncode=result.returncode)
 
 
 def _read_regular(path: Path, *, maximum: int = 1024 * 1024) -> bytes:
@@ -336,6 +355,7 @@ def execute(args: argparse.Namespace) -> int:
     source_manifest = None
     release = None
     failure_codes: list[str] = []
+    operation = "source-inventory"
     started = provenance.utc_now()
     pending_signal = None
     finalizing = False
@@ -372,9 +392,11 @@ def execute(args: argparse.Namespace) -> int:
     share_cap = provenance.open_owned_directory(share, args.share_binding)
     try:
         before = provenance.checkout_inventory(source)
+        operation = "source-manifest"
         source_manifest = provenance.repository_source_manifest(source)
         provenance.write_sanitized_json(
             tier, "source-manifest.json", source_manifest)
+        operation = "builder-context"
         context_cap = provenance._create_owned_directory_child(
             tier, "source-builder-context", mode=0o700)
         output_cap = provenance._create_owned_directory_child(
@@ -383,8 +405,8 @@ def execute(args: argparse.Namespace) -> int:
             ("docker/test-prime-agent-builder.Dockerfile", "Dockerfile"),
             ("scripts/testing/source_builder_payload.py", "source_builder_payload.py"),
         ):
-            payload = _read_regular(workspace / relative, maximum=2 * 1024 * 1024)
-            provenance._publish_owned_bytes(context_cap, target, payload)
+            payload_bytes = _read_regular(workspace / relative, maximum=2 * 1024 * 1024)
+            provenance._publish_owned_bytes(context_cap, target, payload_bytes)
         context = tier_dir / "source-builder-context"
         output = share / "source-release"
         iidfile = tier_dir / "source-builder.iid"
@@ -393,18 +415,21 @@ def execute(args: argparse.Namespace) -> int:
             context, ["Dockerfile", "source_builder_payload.py"])
         tag = f"prime-claw-test-prime-agent-builder:{input_hash[:12]}"
         image_started = provenance.utc_now()
+        operation = "builder-image-build"
         built = _run([
             "docker", "build", "--iidfile", str(iidfile), "-f",
             str(context / "Dockerfile"), "-t", tag, str(context),
         ], timeout=args.image_timeout)
         _require_success(built, "builder image build")
         image_finished = provenance.utc_now()
+        operation = "builder-image-inspection"
         image = _image_identity(
             tier, tier_dir, context, iidfile, image_started, image_finished)
         mount_manifest = tier_dir / "source-manifest.json"
         for raw in (str(mount_manifest), str(output)):
             if any(ch in raw for ch in (",", "\n", "\r", "\0")):
                 raise BuilderError("run-owned mount path is unsafe")
+        operation = "builder-container-launch"
         container_attempted = True
         launched = _run([
             "docker", "run", "-d", "--cidfile", str(cidfile),
@@ -424,7 +449,9 @@ def execute(args: argparse.Namespace) -> int:
             raise BuilderError("builder cidfile identity is invalid")
         container_id = raw_cid
         _require_success(launched, "builder container launch")
+        operation = "builder-mount-inspection"
         _attest_builder_mounts(container_id)
+        operation = "builder-container-wait"
         waited = _run(["docker", "wait", container_id], timeout=args.build_timeout)
         _require_success(waited, "builder container wait")
         try:
@@ -432,12 +459,32 @@ def execute(args: argparse.Namespace) -> int:
         except ValueError as exc:
             raise BuilderError("builder wait result is invalid") from exc
         if exit_code != 0:
-            raise BuilderError("isolated source build failed")
+            # The payload suppresses raw command output. Read only its bounded
+            # tail and retain strictly allow-listed metadata, never raw logs.
+            try:
+                logs = _run(["docker", "logs", "--tail", "8", container_id], timeout=15)
+                if logs.outcome == "exited" and logs.returncode == 0:
+                    for stream in (logs.stdout, logs.stderr):
+                        if isinstance(stream, str):
+                            failure_codes.extend(failure_diagnostics(
+                                stream[:8192].splitlines()[-8:]))
+                else:
+                    failure_codes.append(payload.failure_diagnostic(
+                        "builder-log-read", "BuilderError", logs.outcome, logs.returncode))
+            except OSError:
+                failure_codes.append(payload.failure_diagnostic("builder-log-read", "OSError"))
+            raise BuilderError("isolated source build failed", outcome="exited",
+                               returncode=exit_code)
     except BuilderInterrupted as exc:
         pending_signal = exc.signum
         failure_codes.append("interrupted")
-    except (BuilderError, provenance.ProvenanceError, OSError, ValueError):
-        failure_codes.append("builder-failed")
+    except (BuilderError, provenance.ProvenanceError, OSError, ValueError) as exc:
+        category = ("BuilderError" if isinstance(exc, BuilderError) else
+                    "ProvenanceError" if isinstance(exc, provenance.ProvenanceError) else
+                    "OSError" if isinstance(exc, OSError) else "ValueError")
+        failure_codes.extend(["builder-failed", payload.failure_diagnostic(
+            operation, category, getattr(exc, "outcome", "error"),
+            getattr(exc, "returncode", None))])
     finally:
         finalizing = True
         terminal_sigmask(signal.SIG_BLOCK, watched)

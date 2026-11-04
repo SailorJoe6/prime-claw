@@ -309,6 +309,43 @@ class TestSessionTeardown(unittest.TestCase):
         self.assertEqual(result.outcome,"interrupted")
         self.assertEqual(conftest._DEFERRED_SIGNAL,signal.SIGTERM)
 
+class TestSourceBuilderFailureReporting(unittest.TestCase):
+    def test_wrapper_surfaces_safe_receipt_detail_not_raw_helper_streams(self):
+        detail = conftest.source_builder.payload.failure_diagnostic(
+            "npm-ci", "BuildError", "exited", 1)
+        secret = "synthetic-private-value"
+        receipt = {"failure_codes": ["builder-failed", detail, secret]}
+        with mock.patch.object(conftest, "_host_command", return_value=cp(
+                [], rc=1, out=secret, err=secret)) as command, \
+                mock.patch.object(conftest.provenance, "read_sanitized_json",
+                                  return_value=receipt):
+            with self.assertRaises(RuntimeError) as error:
+                conftest._build_source_release(
+                    "/selected", object(), Path("/tier"), "binding",
+                    Path("/share"), "binding", Path("/snapshot"))
+        self.assertIn(detail, str(error.exception))
+        self.assertNotIn(secret, str(error.exception))
+        self.assertEqual(command.call_count, 1)
+
+    def test_unavailable_receipt_does_not_mask_native_failure_or_leak_exception(self):
+        for error in (OSError("private-path"),
+                      conftest.provenance.ProvenanceError("private-path"),
+                      ValueError("private-path")):
+            with self.subTest(error=type(error).__name__), \
+                    mock.patch.object(conftest, "_host_command", return_value=cp(
+                        [], rc=124, outcome="timed_out", err="private-stream")), \
+                    mock.patch.object(conftest.provenance, "read_sanitized_json",
+                                      side_effect=error):
+                with self.assertRaises(RuntimeError) as caught:
+                    conftest._build_source_release(
+                        "/selected", object(), Path("/tier"), "binding",
+                        Path("/share"), "binding", Path("/snapshot"))
+                message = str(caught.exception)
+                self.assertIn("outcome=timed_out, rc=124", message)
+                self.assertIn("diagnostics unavailable", message)
+                self.assertNotIn("private-", message)
+
+
 class TestSourceBuilderShareOwnership(unittest.TestCase):
     def _run_failed_builder(self, scenario):
         temporary = tempfile.TemporaryDirectory()

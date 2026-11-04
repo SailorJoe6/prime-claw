@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
+from contextlib import redirect_stderr
 import json
 import os
 from pathlib import Path
@@ -145,7 +147,7 @@ class TestBuilderPayload(unittest.TestCase):
             repo = _source_repo(base)
             before = provenance.checkout_inventory(repo)
 
-            def fake_run(argv, cwd, env):
+            def fake_run(argv, cwd, env, *, operation):
                 if any(item.endswith("pack-prime-agent-release.mjs") for item in argv):
                     out = cwd / "packages/coding-agent/release/tier1/artifacts"
                     out.mkdir(parents=True)
@@ -195,7 +197,7 @@ class TestBuilderPayload(unittest.TestCase):
             before = provenance.checkout_inventory(repo)
             for index, failing_command in enumerate(("build", "pack")):
                 output = base / f"output-{index}"; output.mkdir()
-                def fail(argv, cwd, env, target=failing_command):
+                def fail(argv, cwd, env, *, operation, target=failing_command):
                     if (target == "build" and argv[:3] == ["npm", "run", "build"]) \
                             or (target == "pack" and any(item.endswith("pack-prime-agent-release.mjs") for item in argv)):
                         raise payload.BuildError("injected")
@@ -206,8 +208,51 @@ class TestBuilderPayload(unittest.TestCase):
                 self.assertEqual(before, provenance.checkout_inventory(repo))
 
 
+class TestBuilderFailureDiagnostics(unittest.TestCase):
+    def test_payload_command_metadata_excludes_output_argv_env_and_exception_text(self):
+        secret = "Authorization: Bearer synthetic-private-value"
+        for native, outcome, rc in (
+                (SimpleNamespace(returncode=17), "exited", 17),
+                (SimpleNamespace(returncode=-9), "signaled", -9),
+                (OSError(secret), "launch_error", None),
+                (subprocess.TimeoutExpired(secret, 540, output=secret,
+                                           stderr=secret), "timed_out", None)):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as td:
+                root = Path(td).resolve()
+                options = ({"side_effect": native} if isinstance(native, Exception)
+                           else {"return_value": native})
+                with mock.patch.object(payload.subprocess, "run", **options) as run:
+                    with self.assertRaises(payload.BuildError) as error:
+                        payload._run([secret], root, {"PRIVATE": secret},
+                                     operation="npm-ci")
+                self.assertIs(run.call_args.kwargs["stdout"], subprocess.DEVNULL)
+                self.assertIs(run.call_args.kwargs["stderr"], subprocess.DEVNULL)
+                captured = io.StringIO()
+                with mock.patch.object(payload, "build", side_effect=error.exception), \
+                        redirect_stderr(captured):
+                    result = payload.main(["--output", str(root / "output")])
+                expected = payload.failure_diagnostic("npm-ci", "BuildError", outcome, rc)
+                self.assertEqual(result, 1)
+                self.assertEqual(captured.getvalue(), expected + "\n")
+                self.assertNotIn(secret, captured.getvalue())
+
+    def test_untrusted_diagnostic_fields_and_raw_codes_are_not_rendered(self):
+        secret = "synthetic-private-value"
+        safe = payload.failure_diagnostic("release-pack", "BuildError", "exited", 2)
+        for fields in ((secret, "BuildError", "exited", 1),
+                       ("npm-ci", secret, "exited", 1),
+                       ("npm-ci", "BuildError", secret, 1),
+                       ("npm-ci", "BuildError", "exited", secret)):
+            self.assertEqual(payload.failure_diagnostic(*fields), "builder-failed")
+        codes = [safe, secret, safe + " " + secret, "builder-failed", None, {},
+                 "x" * 10000]
+        self.assertEqual(source_builder.failure_diagnostics(codes), [safe, "builder-failed"])
+        self.assertEqual(source_builder.failure_diagnostics(secret), [])
+
+
 class TestHostBuilderLifecycle(unittest.TestCase):
-    def _run(self, *, builder_exit: int = 0,
+    def _run(self, *, builder_exit: int = 0, builder_logs: str = "",
+             wait_outcome: str = "exited", wait_rc: int = 0,
              inspect_outcome: str = "exited", inspect_rc: int = 1,
              inspect_stdout: str | bytes = "",
              inspect_stderr: str | bytes = f"Error: No such object: {CID}",
@@ -258,8 +303,11 @@ class TestHostBuilderLifecycle(unittest.TestCase):
                 if builder_exit == 0:
                     manifest = json.loads((tier / "source-manifest.json").read_text())
                     _write_release(share / "source-release", manifest["identity"])
-                return SimpleNamespace(outcome="exited", returncode=0,
+                return SimpleNamespace(outcome=wait_outcome, returncode=wait_rc,
                                        stdout=str(builder_exit) + "\n", stderr="")
+            if argv[1] == "logs":
+                return SimpleNamespace(outcome="exited", returncode=0,
+                                       stdout=builder_logs, stderr="")
             if argv[1:3] == ["rm", "-f"]:
                 return SimpleNamespace(outcome=remove_outcome,
                                        returncode=remove_rc,
@@ -405,6 +453,38 @@ class TestHostBuilderLifecycle(unittest.TestCase):
                              receipt["checkout_inventory_after"])
             self.assertIn(["docker", "rm", "-f", CID], calls)
             self.assertIn(["docker", "inspect", CID], calls)
+
+    def test_failed_builder_preserves_safe_payload_metadata_before_exact_cleanup(self):
+        detail = payload.failure_diagnostic("npm-build", "BuildError", "exited", 17)
+        secret = "Authorization: Bearer synthetic-private-value"
+        logs = secret + "\n" + detail + "\n" + detail + " " + secret + "\n"
+        temporary, _repo, tier, calls, receipt, rc = self._run(
+            builder_exit=1, builder_logs=logs)
+        with temporary:
+            self.assertEqual(rc, 1)
+            self.assertIn(detail, receipt["failure_codes"])
+            self.assertIn(payload.failure_diagnostic(
+                "builder-container-wait", "BuilderError", "exited", 1),
+                receipt["failure_codes"])
+            self.assertNotIn(secret, (tier / "source-build.json").read_text())
+            log_read = ["docker", "logs", "--tail", "8", CID]
+            self.assertEqual(calls.count(log_read), 1)
+            self.assertLess(calls.index(log_read), calls.index(["docker", "rm", "-f", CID]))
+            self.assertIsNone(receipt["release"])
+            self.assertTrue(receipt["builder_teardown"]["clean"])
+            provenance.source_builder_share_teardown(receipt)
+
+    def test_native_wait_failure_retains_operation_and_outcome_without_retry(self):
+        temporary, _repo, _tier, calls, receipt, rc = self._run(
+            builder_exit=1, wait_outcome="timed_out", wait_rc=124)
+        with temporary:
+            self.assertEqual(rc, 1)
+            self.assertIn(payload.failure_diagnostic(
+                "builder-container-wait", "BuilderError", "timed_out", 124),
+                receipt["failure_codes"])
+            self.assertEqual(calls.count(["docker", "wait", CID]), 1)
+            self.assertFalse(any(call[1] == "logs" for call in calls))
+            self.assertTrue(receipt["builder_teardown"]["clean"])
 
     def test_signal_during_validation_publishes_failed_interrupted_receipt(self):
         temporary, _repo, _tier, calls, receipt, rc = self._run(

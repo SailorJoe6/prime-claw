@@ -32,6 +32,7 @@ import time
 import pytest
 
 from scripts.testing import provenance
+from scripts.testing import source_builder
 from scripts.testing import bounded as bounded_command
 
 
@@ -221,9 +222,17 @@ def _build_source_release(source: str, tier_cap: provenance.OwnedDirectory,
         timeout=600, kill_grace=120, capture_output=True, text=True,
     )
     if result.outcome != "exited" or result.returncode != 0:
+        details = []
+        try:
+            failed = provenance.read_sanitized_json(tier_cap, "source-build.json")
+            if isinstance(failed, dict):
+                details = source_builder.failure_diagnostics(failed.get("failure_codes"))
+        except (provenance.ProvenanceError, OSError, ValueError):
+            pass  # Missing diagnostics must not mask the original native failure.
         raise RuntimeError(
             "tier-1 fixture: disposable source builder failed "
-            f"(outcome={result.outcome}, rc={result.returncode})")
+            f"(outcome={result.outcome}, rc={result.returncode}); "
+            + ("; ".join(details) if details else "diagnostics unavailable"))
     receipt = provenance.read_sanitized_json(tier_cap, "source-build.json")
     try:
         teardown = provenance.source_builder_share_teardown(receipt)
