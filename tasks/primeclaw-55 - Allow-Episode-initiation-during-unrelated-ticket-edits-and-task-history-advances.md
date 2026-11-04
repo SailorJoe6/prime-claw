@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-04 14:22'
+updated_date: '2026-11-04 16:03'
 labels: []
 dependencies: []
 references:
@@ -320,4 +320,13 @@ Standard fixture teardown attempted only its captured runtime and FAILED: exact 
 Full log `/tmp/primeclaw55-slice3-resumed-focused.log`, diagnostics `/tmp/primeclaw55-slice3-focused-diagnostics.log`, manifest and existing receipts remain preserved. Startup slot was already returned; there is no third-startup grant. Runtime recovery is awaiting Joe's decision through the owner; this result authorizes no Docker service restart, ad hoc cleanup, new fixture, speculative repair or source change. After explicitly authorized recovery and current exact fixture-state inspection, a separately coordinated fresh candidate validation is still required before a tested slice3 candidate can be claimed.
 
 Continuation source remains uncommitted; code HEAD remains published WIP002a779, not accepted/tested. Review base remains accepted1565c327. Task status is unchanged and all9AC remain unchecked. Full remaining both-provider lifecycle extraction, secondary durability audit and bounded recovery scope remain on this same task. The completed test monitor has been removed; wait for the pending operator-recovery decision.
+
+## Owner-recorded infrastructure recovery and continuation
+Joe manually restarted Docker Desktop and requested continuation. The Docker API is responsive. Host pytest27442 and its original shell are gone. The exact failed-run runtime was stopped after the restart; owner verified its captured image/run identity, removed only that exited disposable test container without force, and a fresh native inspect returned NoSuchObject. The recorded builder is also absent. No unrelated container, volume, source, fixture setting, live Episode resource or global plugin was changed by this cleanup.
+
+The original focused run20261104T133753Z-27442-5979e0d9 remains FAILED with its original manifest, one-SIGINT case-continuation evidence, logs, readonly snapshot and share preserved. That manifest is not rewritten as successful teardown; the current absence is later recovery evidence. No assertion-based product-source cause was established from the native metadata waits/timeouts. The probe PASS remains separate, not a full validation result.
+
+Code checkpoint f4990696aa30f5b97873caa603e15fc32c353647 mechanically preserves the exact unchanged18owned files atop002a779. They match the failed captured repository snapshot byte-for-byte. This is UNVALIDATED/INFRA-FAILED WIP, not an accepted candidate, AC completion or scope approval. Last accepted review base remains1565c327, and the full current slice must be reviewed from that base.
+
+Continue the SAME Episode and selected slice via canonical handoff. Fresh focused validation may use the existing pytest -x fail-fast option so an infrastructure failure does not consume the rest of the collection. Do not make a speculative product repair, blanket timeout increase, Docker setting change or native-history isolation workaround from the old timeout evidence. Reuse prior probe evidence only if it covers unchanged source; otherwise run required Docker validation for changed source. Any real in-scope assertion defect must be diagnosed before repair. The approved narrow Beads history boundary and the complete both-provider lifecycle/audit/recovery scope remain unchanged. No global activation, dependency patch, live PRIMECLAW-45 action, merge/abandonment or live resource cleanup is authorized.
 <!-- SECTION:NOTES:END -->
