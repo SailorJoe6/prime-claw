@@ -1102,6 +1102,32 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
   );
 });
 
+test("task-native blocked selection preserves exact bindings without branch-label or depth policy", () => {
+  for (const provider of ["backlog", "beads"]) {
+    const f = harness();
+    const record = provider === "beads" ? activeBeadsTaskRecord(f) : activeTaskRecord(f);
+    f.ownership.write(f.root, record);
+    const before = JSON.stringify(f.record);
+    const calls = structuredClone(f.calls);
+    execFileSync("git", ["switch", "-q", "-c", "selected-review-base"], { cwd: f.root });
+    f.git.branch = () => { assert.fail("blocked selection must not approve a branch label"); };
+    f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 3 });
+    const result = resolveBlockedWorkflowAuthority(record.taskId, f.ctx, f.deps);
+    assert.equal(result.provider, provider);
+    assert.equal(result.taskId, record.taskId);
+    assert.equal(result.projectRoot, f.root);
+    if (provider === "beads") assert.deepEqual(result.taskEvidence, record.taskEvidence);
+    else assert.equal(result.taskPath, record.taskPath);
+    assert.equal(JSON.stringify(f.record), before);
+    assert.deepEqual(f.calls, calls);
+    assert.throws(() => resolveBlockedWorkflowAuthority("OTHER-1", f.ctx, f.deps), /exact owned provider task/);
+    assert.throws(() => resolveBlockedWorkflowAuthority(record.taskId, {
+      ...f.ctx, sessionManager: { ...f.ctx.sessionManager, getSessionId: () => "unbound-owner" },
+    }, f.deps), /requires active version-2 Episode ownership/);
+    assert.equal(JSON.stringify(f.record), before);
+  }
+});
+
 test("cleanup Git adapter resolves the current root without a primary-cleanliness policy", () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-cleanup-main-")));
   try {
@@ -2021,6 +2047,7 @@ test("retained CLI inventory permits local fallback only for a missing executabl
 
 test("reserved task allocates a local worktree from the status commit and assigns execute once", async () => {
   const f = harness({ record: taskReservation() });
+  f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 3 });
   f.filesystem.exists = () => false;
   f.git.head = () => TASK_BASE;
   const createWorktree = f.git.createWorktree.bind(f.git);
@@ -2050,6 +2077,7 @@ test("reserved task allocates a local worktree from the status commit and assign
 
 test("reserved task allocates through exact Orca placement without bundle promotion", async () => {
   const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });
+  f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 3 });
   bindTaskOrcaHead(f);
   f.orca.listTerminals = async () => [
     { handle: "fallback", connected: true, writable: true, agentIdentity: "shell", worktreeId: f.wt.id, worktreePath: f.wt.path, visible: true },

@@ -210,6 +210,14 @@ The full ordinary `prime-claw-oversee-episode` guidance is loaded above this
 workflow in the post-preparation turn. Follow it as judgment guidance. It grants
 no product, scope, merge, abandonment, cleanup, or transport authority.
 
+Apply Conversation, Episode and Expert responsibilities here as editable policy.
+Only the invoking Conversation with implementation authority requests creation;
+an Episode or Expert does not acquire its owner's lifecycle authority. RLM depth
+or a branch label does not establish a role or grant authority. Inspect the actual
+owner/session and placement facts; never substitute another owner's identity.
+Code preserves the exact requested owner, task, root and resource bindings rather
+than treating runtime depth as a second role-approval rule.
+
 Only when the complete task is ready and operator implementation authority
 applies, call `create_task_episode` exactly once, whether readiness was reached
 through `implement_task` or directly through this guidance. Status alone never

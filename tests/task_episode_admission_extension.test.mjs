@@ -736,6 +736,8 @@ try {
 
 test("registered Backlog create reports actual default status and reservation failure without selecting another lifecycle action", async () => {
   const f = fixture(), tools = new Map();
+  // Role judgment belongs to the edited workflow, not RLM metadata.
+  f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 3 });
   const beforeIndex = git(f.root, "diff", "--cached", "--binary");
   let allocations = 0;
   createReviewedPlanExtension({

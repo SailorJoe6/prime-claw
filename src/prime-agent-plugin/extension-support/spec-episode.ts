@@ -953,15 +953,11 @@ export function resolveBlockedWorkflowAuthority(
   }
   const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
   if (!samePath(project.root, projectRoot)
-    || project.kind === "linked-worktree"
-    || git.branch(projectRoot) !== "main") {
-    throw new Error("Task-native blocked workflow must run from the canonical primary main checkout");
+    || project.kind === "linked-worktree") {
+    throw new Error("Task-native blocked workflow must run from the canonical primary checkout");
   }
   if (!ctx.sessionManager.getSessionFile()) {
     throw new Error("Task-native blocked workflow requires a persisted owner session");
-  }
-  if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
-    throw new Error("Task-native blocked workflow is available only from a top-level project Conversation");
   }
   exactAllocatableTaskRecord(record, record.taskId, ctx.sessionManager.getSessionId());
   if (isBeadsTaskEpisodeOwnership(record)) {
@@ -1992,7 +1988,6 @@ export async function allocateReservedTaskEpisode(
     repo = git.repositoryRoot(ctx.cwd);
     if (resolve(repo) !== resolve(realpathSync(ctx.cwd))) throw new Error("Task-native Episode allocation must run from the repository root");
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode allocation requires a persisted owner session");
-    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) throw new Error("Episode allocation is available only from a top-level project Conversation");
     const ownerSessionId = ctx.sessionManager.getSessionId();
     publisher ??= new PrimeSessionPublisher(undefined, runtimeSessionManagerClass(ctx.sessionManager));
 
@@ -2597,9 +2592,6 @@ async function createBeadsTaskEpisode(
       throw new Error("Beads task Episode creation resolved a different project root");
     }
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
-    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
-      throw new Error("Episode creation is available only from a top-level project Conversation");
-    }
     if (options.engine === "orca" && !options.projectSetupId) {
       throw new Error("Task-native Orca admission requires an exact project setup");
     }
@@ -2725,9 +2717,6 @@ export async function createTaskEpisode(
       throw new Error("Task-native Episode creation resolved a different project root");
     }
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
-    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
-      throw new Error("Episode creation is available only from a top-level project Conversation");
-    }
     if (options.engine === "orca" && !options.projectSetupId) {
       throw new Error("Task-native Orca admission requires an exact project setup");
     }

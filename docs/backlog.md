@@ -27,8 +27,17 @@ Conversation inspects current task/history/resource/session/assignment facts and
 chooses any supported status/note publication through editable guidance. Backlog
 remains selected-file-only; Beads retains approved multi-issue commit consequences
 and actual push/local-versus-task-publication limits. The one initial execute and
-both continuation observation channels remain unchanged. This is not a claim
-that the remaining terminal lifecycle or whole Task55 is complete.
+both continuation observation channels remain unchanged.
+
+Task-native creation, allocation and blocked-workflow selection do not approve
+Conversation responsibility from RLM depth. Blocked selection does not approve
+a literal `main` branch label either. The existing editable implementation and
+blocked guidance decides role, code basis and lifecycle authority. Exact
+persisted owner/session/task/provider/root and requested resource bindings still
+apply; neither a child nor an Expert acquires another owner's authority. This
+changes no retained version-1 role, transition, or cleanup behavior. Bounded
+same-operation recovery remains separate unfinished Task55 work; no live
+recovery or whole-task completion is claimed here.
 
 ## Current bounded release
 

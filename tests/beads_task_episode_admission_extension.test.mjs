@@ -336,6 +336,8 @@ test("registered Beads implement-task path delegates once without invocation-pro
 
 test("registered create_task_episode admits Beads directly without prior command or entry tool", async () => {
   const f = fixture(), tools = new Map(), sent = [];
+  // Role judgment belongs to the edited workflow, not RLM metadata.
+  f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 3 });
   const pi = {
     registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
     sendUserMessage(message) { sent.push(message); }, async sendMessage() {},
