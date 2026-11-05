@@ -7,6 +7,7 @@ import test from "node:test";
 
 import {
   CliTaskEpisodeAdmissionGit,
+  allocateReservedTaskEpisode,
   createTaskEpisode,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
@@ -61,6 +62,19 @@ function published(root, taskId, canonicalStatus, design) {
       projectRoot: root,
       taskId,
       submittedRevision: revision[canonicalStatus],
+      postMutationObservation: {
+        revision: revision[canonicalStatus], clean: false,
+        command: { command: "bd", args: ["sql", "--json"], status: 0, stdout: "raw local mutation revision", stderr: "" },
+        nativeView: { status_count: 2, opaque: ["issues", "comments"] },
+      },
+      postPushObservation: {
+        revision: revision[canonicalStatus], clean: false,
+        command: { command: "bd", args: ["sql", "--json"], status: 0, stdout: "raw local post-push revision", stderr: "post-push observation warning" },
+      },
+      mutation: { command: "bd", args: ["update", taskId, "--status", status], status: 0, stdout: "native update succeeded", stderr: "auto-commit warning: issues remain pending" },
+      push: { command: "bd", args: ["dolt", "push"], status: 0, stdout: "Everything up-to-date", stderr: "native push warning" },
+      commands: [{ command: "bd", args: ["dolt", "status", "--json"], status: 0, stdout: "raw touched-table/staged-set facts", stderr: "" }],
+      publication: { remoteName: "origin", ref: "refs/dolt/data", raw: "no exact remote task observation" },
       taskAfterPush: {
         taskId,
         title: nativeView.title,
@@ -292,6 +306,14 @@ test("registered Beads implement-task path delegates once without invocation-pro
   assert.equal(result.details.provider, "beads");
   assert.equal(result.details.providerRevision, revision["In Progress"]);
   assert.equal(result.details.taskEvidence.design, f.design);
+  const mutation = published(f.root, f.taskId, "In Progress", f.design);
+  assert.deepEqual(result.details.beadsTaskMutation, mutation);
+  assert.ok(result.content[0].text.includes(JSON.stringify(mutation)));
+  assert.equal(Object.hasOwn(result.details.beadsTaskMutation.evidence, "remotePublishedTask"), false);
+  assert.equal(Object.hasOwn(result.details.beadsTaskMutation.evidence, "publicationHead"), false);
+  assert.equal(Object.hasOwn(result.details.beadsTaskMutation.evidence, "publishedRevision"), false);
+  assert.match(result.content[0].text, /auto-commit warning: issues remain pending/);
+  assert.match(result.content[0].text, /post-push observation warning/);
   assert.match(result.content[0].text, /One fixed execute assignment/);
   assert.match(result.content[0].text, /Exact provider-native result/);
   assert.deepEqual(f.statusCalls, ["In Progress"]);
@@ -519,4 +541,104 @@ test("Beads Blocked recovery preserves ownership and raw review evidence when pu
   assert.equal(retained.providerRevision, revision["In Progress"]);
   assert.equal(retained.taskEvidence.status, "in_progress");
   assert.equal(retained.status, "provisioning");
+});
+
+test("registered Beads creation carries native mutation qualifications and fresh local reads to its one initial execute", async () => {
+  const f = fixture();
+  const calls = [];
+  const writeExecute = (cwd) => {
+    mkdirSync(join(cwd, ".agents", "skills", "execute"), { recursive: true });
+    writeFileSync(join(cwd, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE NATIVE POLICY\n");
+  };
+  writeExecute(f.root);
+  git(f.root, "add", "--", ".agents/skills/execute/SKILL.md");
+  git(f.root, "commit", "-q", "-m", "install fixture execute workflow");
+  const baseRef = git(f.root, "rev-parse", "HEAD");
+  f.upstreamHead = baseRef;
+  const preparation = {
+    status: "ready",
+    evidence: {
+      provider: "beads", projectRoot: f.root, revision: "d".repeat(32),
+      workingSet: [{ table_name: "issues", staged: true }, { table_name: "comments", status: "modified" }],
+      publication: { remoteName: "origin", ref: "refs/dolt/data", raw: "native remote ref not observed" },
+      commands: [{ command: "bd", args: ["dolt", "status", "--json"], status: 0, stdout: "raw pre-session working set", stderr: "pre-session native warning" }],
+    },
+  };
+  const localTask = {
+    provider: "beads", taskId: f.taskId, title: "Changed local task", nativeStatus: "blocked",
+    nativeView: { id: f.taskId, title: "Changed local task", status: "blocked", design: "", opaque: { absent_remote_proof: true } },
+  };
+  let worktree;
+  const identity = { sessionId: "initial-session", sessionFile: join(f.root, "initial.jsonl"), activeSessionId: "initial-route" };
+  const dependencies = {
+    ...f.dependencies,
+    allocateTaskEpisode: allocateReservedTaskEpisode,
+    filesystem: { exists: () => false },
+    git: {
+      repositoryRoot: () => f.root, head: () => baseRef, worktrees: () => [],
+      assertCleanWorktree() {},
+      createWorktree(_repo, branch, path, head) {
+        calls.push(["worktree", branch, path, head]); worktree = path; writeExecute(path);
+      },
+    },
+    beadsTransport(cwd) { calls.push(["transport", cwd]); return preparation; },
+    beadsTaskReader(cwd, taskId) {
+      calls.push(["read", cwd, taskId]);
+      return { ...localTask, projectRoot: cwd };
+    },
+    publisher: {
+      async createFresh(options) {
+        calls.push(["fresh", options.worktree]);
+        assert.deepEqual(calls.map(([name]) => name), ["worktree", "transport", "read", "fresh"]);
+        await options.onAllocated({ sessionId: identity.sessionId, sessionFile: identity.sessionFile });
+        const allocated = f.ownership.read(f.root, "owner-session");
+        assert.equal(allocated.episodeId, identity.sessionId);
+        assert.equal(allocated.status, "provisioning");
+        return identity;
+      },
+      async deliverExecute(route, prompt) {
+        calls.push(["execute", route, prompt]);
+        const allocated = f.ownership.read(f.root, "owner-session");
+        assert.equal(allocated.episodeActiveSessionId, route);
+        assert.equal(allocated.status, "provisioning");
+      },
+      close() {},
+    },
+    async placementResolver() { return { engine: "local" }; },
+  };
+  const tools = new Map();
+  createReviewedPlanExtension(dependencies)({
+    registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
+    sendUserMessage() { assert.fail("creation must not add another assignment"); }, async sendMessage() {},
+  });
+  const result = await tools.get("create_task_episode").execute("initial-native", { taskId: f.taskId }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined, JSON.stringify(result));
+  const mutation = published(f.root, f.taskId, "In Progress", f.design);
+  assert.deepEqual(result.details.beadsTaskMutation, mutation);
+  assert.ok(result.content[0].text.includes(JSON.stringify(mutation)));
+  assert.deepEqual(calls.map(([name]) => name), ["worktree", "transport", "read", "fresh", "execute"]);
+  assert.deepEqual(calls[1], ["transport", worktree]);
+  assert.deepEqual(calls[2], ["read", worktree, f.taskId]);
+  const prompt = calls.find(([name]) => name === "execute")[2];
+  assert.match(prompt, /EXECUTE NATIVE POLICY/);
+  const observation = JSON.parse(prompt.match(/<provider-task-observation>\n([\s\S]*?)\n<\/provider-task-observation>/)[1]);
+  assert.deepEqual(observation.beadsTaskMutation, mutation);
+  assert.deepEqual(observation.preparation, preparation);
+  assert.deepEqual(observation.currentTask, { ...localTask, projectRoot: worktree });
+  assert.deepEqual(observation.currentTaskEvidence, localTask.nativeView);
+  assert.deepEqual(observation.previousTaskEvidence, mutation.evidence.taskAfterPush.nativeView);
+  assert.equal(observation.currentProviderRevision, preparation.evidence.revision);
+  assert.equal(Object.hasOwn(observation, "publishedProviderRevision"), false);
+  assert.equal(Object.hasOwn(observation.preparation.evidence, "publishedRevision"), false);
+  assert.equal(Object.hasOwn(observation.beadsTaskMutation.evidence, "remotePublishedTask"), false);
+  const stored = f.ownership.read(f.root, "owner-session");
+  assert.equal(stored.status, "active");
+  assert.equal(stored.operationId, "beads-operation");
+  assert.equal(stored.episodeId, identity.sessionId);
+  assert.equal(stored.episodeActiveSessionId, identity.activeSessionId);
+  assert.equal(stored.worktree, worktree);
+  assert.equal(Object.hasOwn(stored, "beadsTaskMutation"), false);
+  assert.equal(Object.hasOwn(stored, "preparation"), false);
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(f.reservationCalls.length, 1);
 });

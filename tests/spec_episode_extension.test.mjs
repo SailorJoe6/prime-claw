@@ -747,7 +747,7 @@ test("registered active Beads handoff delivers owner-authored published design a
     return {
       record: advanced,
       previousProviderRevision: input.previousProviderRevision,
-      publishedProviderRevision: publishedRevision,
+      currentProviderRevision: publishedRevision,
       previousTaskEvidence: input.previousTaskEvidence,
       currentTaskEvidence: currentEvidence,
       commit() { f.ownership.write(f.root, advanced); return advanced; },
@@ -815,7 +815,7 @@ test("registered active Beads handoff delivers compatible outside same-task nati
   f.ownership.write(f.root, initial);
   f.calls.length = 0;
   const currentHead = "b".repeat(40);
-  const publishedProviderRevision = "b".repeat(32);
+  const currentProviderRevision = "b".repeat(32);
   const current = {
     ...previous,
     notes: "Compatible outside same-task note for the existing approved scope.",
@@ -829,7 +829,7 @@ test("registered active Beads handoff delivers compatible outside same-task nati
     f.calls.push(["advance", input]);
     const advanced = parseEpisodeOwnership({
       ...f.record,
-      providerRevision: publishedProviderRevision,
+      providerRevision: currentProviderRevision,
       taskEvidence: current,
       head: input.episodeHead,
       updatedAt: "2026-10-20T09:00:00.000Z",
@@ -837,7 +837,7 @@ test("registered active Beads handoff delivers compatible outside same-task nati
     return {
       record: advanced,
       previousProviderRevision: input.previousProviderRevision,
-      publishedProviderRevision,
+      currentProviderRevision,
       previousTaskEvidence: input.previousTaskEvidence,
       currentTaskEvidence: current,
       commit() { f.ownership.write(f.root, advanced); return advanced; },
@@ -868,7 +868,7 @@ test("registered active Beads handoff delivers compatible outside same-task nati
     assert.ok(prompt.includes(JSON.stringify(current)));
     assert.match(prompt, new RegExp(longTailMarker));
     assert.match(prompt, new RegExp(BEADS_REVISION));
-    assert.match(prompt, new RegExp(publishedProviderRevision));
+    assert.match(prompt, new RegExp(currentProviderRevision));
   }
   assert.equal(f.calls.some((call) => ["execute", "reopen"].includes(call[0])), false);
 });
@@ -883,7 +883,7 @@ test("active Beads handoff resumes from a factual blocked observation when curre
   const initial = activeBeadsTaskRecord(f, { taskEvidence: previous });
   f.ownership.write(f.root, initial);
   f.calls.length = 0;
-  const publishedProviderRevision = "b".repeat(32);
+  const currentProviderRevision = "b".repeat(32);
   const current = {
     ...previous,
     status: "in_progress",
@@ -895,7 +895,7 @@ Cleared: exact native dependency is published.`,
     assert.equal(input.previousTaskEvidence.status, "blocked");
     const advanced = parseEpisodeOwnership({
       ...f.record,
-      providerRevision: publishedProviderRevision,
+      providerRevision: currentProviderRevision,
       taskEvidence: current,
       head: input.episodeHead,
       updatedAt: "2026-10-20T09:00:00.000Z",
@@ -903,7 +903,7 @@ Cleared: exact native dependency is published.`,
     return {
       record: advanced,
       previousProviderRevision: input.previousProviderRevision,
-      publishedProviderRevision,
+      currentProviderRevision,
       previousTaskEvidence: input.previousTaskEvidence,
       currentTaskEvidence: current,
       commit() { f.ownership.write(f.root, advanced); return advanced; },
@@ -914,7 +914,7 @@ Cleared: exact native dependency is published.`,
     BEADS_TASK_ID, "resume after accepted unblock", f.ctx, { ...f.deps, advanceBeadsEvidence },
   );
   assert.equal(result.admitted, true);
-  assert.equal(f.record.providerRevision, publishedProviderRevision);
+  assert.equal(f.record.providerRevision, currentProviderRevision);
   assert.equal(f.record.taskEvidence.status, "in_progress");
   assert.equal(f.record.worktree, initial.worktree);
   assert.equal(f.record.episodeId, initial.episodeId);
@@ -928,13 +928,13 @@ test("active Beads handoff commits factual observations only after the first can
     f.ownership.write(f.root, initial);
     f.calls.length = 0;
     const currentHead = "b".repeat(40);
-    const publishedProviderRevision = "b".repeat(32);
+    const currentProviderRevision = "b".repeat(32);
     const current = { ...BEADS_TASK_EVIDENCE, notes: "outside factual change marker admission-sequence" };
     f.git.head = (path) => path === f.worktree ? currentHead : "main-head";
     const advanceBeadsEvidence = (input) => {
       const advanced = parseEpisodeOwnership({
         ...f.record,
-        providerRevision: publishedProviderRevision,
+        providerRevision: currentProviderRevision,
         taskEvidence: current,
         head: input.episodeHead,
         updatedAt: "2026-10-20T09:00:00.000Z",
@@ -942,7 +942,7 @@ test("active Beads handoff commits factual observations only after the first can
       return {
         record: advanced,
         previousProviderRevision: input.previousProviderRevision,
-        publishedProviderRevision,
+        currentProviderRevision,
         previousTaskEvidence: input.previousTaskEvidence,
         currentTaskEvidence: current,
         commit() { f.ownership.write(f.root, advanced); return advanced; },

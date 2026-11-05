@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -173,12 +173,17 @@ function commandFailureMetadata(result: CommandResult): string {
 export class ProcessCommandRunner implements CommandRunner {
   run(command: string, args: string[], options: { cwd?: string; allowFailure?: boolean } = {}): CommandResult {
     try {
-      const stdout = execFileSync(command, args, {
+      const native = spawnSync(command, args, {
         cwd: options.cwd,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
       });
-      return { stdout, stderr: "", status: 0 };
+      if (native.error || native.status !== 0) {
+        throw Object.assign(native.error ?? new Error(`Command failed: ${command} ${args.join(" ")}`), {
+          status: native.status, signal: native.signal, stdout: native.stdout, stderr: native.stderr,
+        });
+      }
+      return { stdout: native.stdout, stderr: native.stderr, status: 0 };
     } catch (error: any) {
       const result = {
         ...failedCommandResult(error),

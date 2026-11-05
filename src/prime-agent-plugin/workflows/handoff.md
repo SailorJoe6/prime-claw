@@ -94,18 +94,20 @@ view-equality, paired stable-head, or code-upstream approval gate.
 
 For Beads task-native handoff, use only the exact active owner's persisted
 `providerRevision` and complete raw `taskEvidence`. Before delivery, the public
-handoff boundary performs one supported native pull, proves a clean published
-provider state, reads the exact current raw task, and pairs that read with a
-second publication proof. Require the current raw task to remain exact
-`in_progress` with a meaningful `design`. The host appends the exact
-previous/current native views and revisions to both canonical prompts as factual
-context, not semantic acceptance or a new authority. Only after the first
-handoff message is admitted does its callback record the current
-provider/task/code observations before queuing execute. Incorporate compatible in-scope owner-authored or outside changes;
-escalate a genuine semantic conflict, authority change, or scope expansion. Do
-not use Backlog, translate the task, or mutate Beads during handoff. If task
-content needs an in-scope update, leave it for the execute workflow's guarded
-native pull/read/update/push cycle. Guidance never reconstructs provider facts.
+boundary performs one supported native pull, reads native transport/working-set
+facts and the exact current raw task. Both prompts receive previous/current raw
+views, local revisions, the pull result and transport observations, including
+warnings and publication-ref results. A local `currentProviderRevision`, a
+successful command, or a local task read is not exact-task publication proof.
+Judge status, meaningful design, publication and compatibility here using those
+facts; require `in_progress` with meaningful `design` for ordinary continuation,
+not a duplicate code status/plan/cleanliness gate or stable-proof pipeline.
+Only after first-message admission does its callback record current
+provider/task/code observations before queuing execute. Incorporate compatible
+in-scope changes; escalate genuine semantic conflict, authority change or scope
+expansion. Do not use Backlog, translate or mutate Beads during handoff. Leave
+content updates to execute's native cycle, reviewing touched-table/staged-set
+multi-issue consequences first. Guidance never reconstructs provider facts.
 
 In either task-native branch, guidance is bounded compaction focus only. It
 never accepts task content or supplies provider revision or raw evidence. Never pass `--status`, complete or archive the task, select replacement work,

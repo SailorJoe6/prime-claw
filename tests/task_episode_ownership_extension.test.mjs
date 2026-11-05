@@ -23,6 +23,7 @@ import {
   removeTaskEpisodeOwnership,
   writeEpisodeOwnership,
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
+import { handoffTaskEpisode } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import {
   CliLegacyTaskOwnershipTransitionGit,
   advancePublishedBeadsTaskEpisodeEvidence,
@@ -214,7 +215,7 @@ function evidenceAdvancementFixture() {
   writeEpisodeOwnership(root, unrelated);
   return {
     root, episodeRoot: realpathSync(episodeRoot), taskId, owner, unrelated, reviewedHead,
-    publishedProviderRevision: "c".repeat(32), currentTaskEvidence,
+    currentProviderRevision: "c".repeat(32), currentTaskEvidence,
   };
 }
 
@@ -233,14 +234,16 @@ function evidenceAdvancementProvider(f, overrides = {}) {
         doltDatabase: "evidence",
       },
     }),
-    synchronize: () => ({ status: 0, stdout: "synchronized", stderr: "" }),
+    synchronize: () => ({ status: 0, stdout: "synchronized", stderr: "native pull qualification" }),
     prepareTransport: () => ({
       status: "ready",
       evidence: {
         provider: "beads", projectRoot: f.root,
         database: "evidence", branch: "main",
-        revision: overrides.publishedProviderRevision ?? f.publishedProviderRevision,
+        revision: overrides.currentProviderRevision ?? f.currentProviderRevision,
         workingSet: [{ table_name: "unrelated_task", status: "modified" }],
+        publication: { remoteName: "origin", ref: "refs/dolt/data", raw: "remote task publication not observed" },
+        commands: [{ command: "bd", args: ["dolt", "status", "--json"], status: 0, stdout: "raw current working-set facts", stderr: "native observation warning" }],
       },
     }),
     resolveTask: () => ({
@@ -501,7 +504,7 @@ test("guarded transition records published Beads authority and its first normal 
   const firstHandoff = {
     root: f.root, episodeRoot: f.episodeRoot, taskId: f.selection.taskId,
     owner: result.record, reviewedHead: f.episodeHead,
-    publishedProviderRevision: providerTarget.providerRevision,
+    currentProviderRevision: providerTarget.providerRevision,
     currentTaskEvidence: taskEvidence,
   };
   const preparedHandoff = prepareEvidence(firstHandoff);
@@ -1242,35 +1245,43 @@ test("Beads evidence refresh observes the native revision and raw task once with
   const f = evidenceAdvancementFixture();
   const provider = evidenceAdvancementProvider(f);
   const order = [];
+  let synchronization, preparation, currentTask;
   const result = advanceEvidence(f, {}, {
     ...provider,
     synchronize: (...args) => {
       order.push("pull");
-      return provider.synchronize(...args);
+      synchronization = provider.synchronize(...args);
+      return synchronization;
     },
     prepareTransport: (...args) => {
       order.push("observe");
-      const preparation = provider.prepareTransport(...args);
+      preparation = provider.prepareTransport(...args);
       assert.equal(preparation.evidence.publishedRevision, undefined);
       assert.deepEqual(preparation.evidence.workingSet, [{ table_name: "unrelated_task", status: "modified" }]);
       return preparation;
     },
     resolveTask: (...args) => {
       order.push("read");
-      return provider.resolveTask(...args);
+      currentTask = provider.resolveTask(...args);
+      return currentTask;
     },
   });
 
   assert.deepEqual(order, ["pull", "observe", "read"]);
   assert.equal(result.previousProviderRevision, f.owner.providerRevision);
-  assert.equal(result.publishedProviderRevision, f.publishedProviderRevision);
+  assert.equal(result.currentProviderRevision, f.currentProviderRevision);
   assert.deepEqual(result.previousTaskEvidence, f.owner.taskEvidence);
   assert.deepEqual(result.currentTaskEvidence, f.currentTaskEvidence);
+  assert.equal(result.synchronization, synchronization);
+  assert.equal(result.preparation, preparation);
+  assert.equal(result.currentTask, currentTask);
+  assert.equal(Object.hasOwn(result, "publishedProviderRevision"), false);
+  assert.equal(Object.hasOwn(result.preparation.evidence, "publishedRevision"), false);
   const changed = Object.keys(result.record).filter((key) =>
     JSON.stringify(result.record[key]) !== JSON.stringify(f.owner[key]));
   assert.deepEqual(changed.sort(), ["head", "providerRevision", "taskEvidence", "updatedAt"]);
   assert.equal(result.record.head, f.reviewedHead);
-  assert.equal(result.record.providerRevision, f.publishedProviderRevision);
+  assert.equal(result.record.providerRevision, f.currentProviderRevision);
   assert.deepEqual(result.record.taskEvidence, f.currentTaskEvidence);
   assert.equal(result.record.updatedAt, "2026-10-20T22:00:00.000Z");
   assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), result.record);
@@ -1368,7 +1379,7 @@ test("Beads evidence refresh passes changed lifecycle, design, history and prior
   assert.equal(result.previousProviderRevision, priorRevision);
   assert.deepEqual(result.previousTaskEvidence, priorTask);
   assert.equal(result.record.providerRevision, "d".repeat(32));
-  assert.equal(result.publishedProviderRevision, "d".repeat(32));
+  assert.equal(result.currentProviderRevision, "d".repeat(32));
   assert.deepEqual(result.currentTaskEvidence, currentTaskEvidence);
   assert.deepEqual(result.record.taskEvidence, currentTaskEvidence);
   assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
@@ -1759,4 +1770,80 @@ test("atomic task removal handles provider-native Beads evidence without a Backl
   assert.equal(expected.taskPath, undefined);
   removeTaskEpisodeOwnership(root, expected);
   assert.equal(readEpisodeOwnership(root, "owner"), null);
+});
+
+test("real Beads advancement carries full local transport qualifications to both continuation prompts before its admission callback persists", async () => {
+  const f = evidenceAdvancementFixture();
+  mkdirSync(join(f.episodeRoot, ".agents", "skills", "execute"), { recursive: true });
+  mkdirSync(join(f.episodeRoot, ".prime-claw", "workflows"), { recursive: true });
+  writeFileSync(join(f.episodeRoot, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE RAW NATIVE FACTS\n");
+  writeFileSync(join(f.episodeRoot, ".prime-claw", "workflows", "handoff.md"), "HANDOFF RAW NATIVE FACTS\n");
+  // The managed handoff directory is already Git-ignored by this fixture.
+  // Keep it readable there; only the tracked execute workflow needs a commit.
+  git(f.episodeRoot, "add", "--", ".agents/skills/execute/SKILL.md");
+  git(f.episodeRoot, "commit", "-q", "-m", "install fixture continuation workflows");
+  f.reviewedHead = git(f.episodeRoot, "rev-parse", "HEAD");
+  git(f.episodeRoot, "push", "-q");
+  const provider = evidenceAdvancementProvider(f);
+  const session = {
+    activeSessionId: f.owner.episodeActiveSessionId, sessionId: f.owner.episodeId,
+    sessionFile: f.owner.episodeSessionFile, cwd: f.episodeRoot,
+    isSessionActive: false, isStreaming: false, isCompacting: false, isBashRunning: false,
+    isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0,
+    sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null },
+  };
+  let deliveries = 0;
+  let advancement;
+  const ctx = {
+    cwd: f.root,
+    sessionManager: {
+      getSessionId: () => f.owner.ownerSessionId,
+      getSessionFile: () => join(f.root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
+    },
+  };
+  const result = await handoffTaskEpisode(f.taskId, "accepted bounded revision", ctx, {
+    advanceBeadsEvidence(input) {
+      advancement = advancePublishedBeadsTaskEpisodeEvidence(input, provider);
+      return advancement;
+    },
+    publisher: {
+      async list() { return [session]; },
+      async getState() { return session; },
+      async deliverHandoff(route, handoff, execute, onHandoffAdmitted) {
+        deliveries += 1;
+        assert.equal(route, f.owner.episodeActiveSessionId);
+        assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
+        for (const prompt of [handoff, execute]) {
+          const facts = JSON.parse(prompt.match(/<provider-task-observation>\n([\s\S]*?)\n<\/provider-task-observation>/)[1]);
+          assert.equal(facts.currentProviderRevision, f.currentProviderRevision);
+          assert.equal(Object.hasOwn(facts, "publishedProviderRevision"), false);
+          assert.deepEqual(facts.previousTaskEvidence, f.owner.taskEvidence);
+          assert.deepEqual(facts.currentTaskEvidence, f.currentTaskEvidence);
+          assert.deepEqual(facts.synchronization, advancement.synchronization);
+          assert.deepEqual(facts.preparation, advancement.preparation);
+          assert.deepEqual(facts.currentTask, advancement.currentTask);
+          assert.equal(Object.hasOwn(facts.preparation.evidence, "publishedRevision"), false);
+          assert.match(prompt, /native pull qualification/);
+          assert.match(prompt, /native observation warning/);
+          assert.match(prompt, /remote task publication not observed/);
+        }
+        assert.match(handoff, /accepted bounded revision/);
+        assert.doesNotMatch(execute, /accepted bounded revision/);
+        await onHandoffAdmitted();
+        assert.equal(readEpisodeOwnership(f.root, f.owner.ownerSessionId).providerRevision, f.currentProviderRevision);
+      },
+      async createFresh() { assert.fail("continuation must not create a session"); },
+      async deliverExecute() { assert.fail("continuation must not send a second initial assignment"); },
+      async reopen() { assert.fail("same live session must remain bound"); },
+      close() {},
+    },
+  });
+  assert.equal(deliveries, 1);
+  assert.equal(result.episodeId, f.owner.episodeId);
+  assert.equal(result.episodeActiveSessionId, f.owner.episodeActiveSessionId);
+  const stored = readEpisodeOwnership(f.root, f.owner.ownerSessionId);
+  const changed = Object.keys(stored).filter((key) => JSON.stringify(stored[key]) !== JSON.stringify(f.owner[key]));
+  assert.deepEqual(changed.sort(), ["head", "providerRevision", "taskEvidence", "updatedAt"]);
+  assert.equal(Object.hasOwn(stored, "preparation"), false);
+  assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
 });

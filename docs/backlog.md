@@ -774,10 +774,17 @@ Previous revision/raw-task observations are context, not frozen acceptance. One
 supported native pull runs from the recorded Episode worktree, followed by native
 transport facts and the complete raw task. The helper no longer pairs repeated
 stable publication proofs, compares previous content as approval, enforces
-status/design eligibility, or tests provider-history ancestry. Current native
-revision and complete raw task reach the responsible LLM, which judges semantic
-compatibility under editable owner guidance. Unknown fields and absence remain
-native facts.
+status/design eligibility, or tests provider-history ancestry. Current
+local revision and complete raw task reach the responsible LLM along with the
+native pull result and transport observations (warnings, working set and
+publication-ref result). Both continuation prompts retain those facts;
+`currentProviderRevision` is local HEAD, not exact-task publication proof. The
+LLM judges compatibility under editable owner guidance. Unknown fields and
+absence remain native facts. Initial creation returns its existing native
+mutation/push result to the invoking tool and includes it with fresh local
+observations in the one initial execute assignment; no persistent mirror or
+second assignment is added. The production process runner preserves stderr on
+exit zero, including native trailing-history-commit warnings.
 
 The existing atomic callback still runs only after first-message admission and
 updates only provider revision, raw task evidence, code head and timestamp on
@@ -802,8 +809,10 @@ the exact operation, code base, worktree, branch, Episode/session, and Orca
 resource binding. It requires prior raw evidence with a meaningful `design`, a
 clean owned worktree, an exact durable-session CWD,
 and the existing complete idle/quiescent transport proof before factual
-evidence refresh. The refresh performs the native pull/read/publication pairing and proves the
-current code head clean and equal to ordinary upstream/direct remote. The
+evidence refresh. The refresh returns native pull/read/transport observations,
+not a paired publication proof. The surrounding wrapper still proves the current
+code head clean and equal to ordinary upstream/direct remote; that remaining
+code-policy extraction is separate work on this same task. The
 current raw task/revision/code observation is committed only by the first
 handoff message's admission callback, before its execute follow-up.
 

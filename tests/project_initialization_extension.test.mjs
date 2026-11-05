@@ -93,7 +93,7 @@ class Runner {
 function captureResources(t, overrides = {}) {
   const original = {
     mkdtempSync: fs.mkdtempSync, openSync: fs.openSync, readFileSync: fs.readFileSync,
-    execFileSync: childProcess.execFileSync,
+    execFileSync: childProcess.execFileSync, spawnSync: childProcess.spawnSync,
   };
   const resources = { directories: [], descriptors: [], opened: [], executions: 0 };
   t.mock.method(fs, "mkdtempSync", (...args) => {
@@ -118,6 +118,11 @@ function captureResources(t, overrides = {}) {
     resources.executions++;
     if (overrides.execFileSync) return overrides.execFileSync(...args);
     return original.execFileSync(...args);
+  });
+  t.mock.method(childProcess, "spawnSync", (...args) => {
+    resources.executions++;
+    if (overrides.spawnSync) return overrides.spawnSync(...args);
+    return original.spawnSync(...args);
   });
   syncBuiltinESMExports();
   t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
@@ -183,9 +188,10 @@ test("file-backed runner retains ENOBUFS, null status and signal without error p
 
 test("synchronous pipe runner retains native failure metadata for existing callers", (t) => {
   captureResources(t, {
-    execFileSync: () => { throw Object.assign(new Error("spawnSync bd ENOBUFS"), {
-      code: "ENOBUFS", status: null, signal: "SIGTERM", stdout: "partial", stderr: "",
-    }); },
+    spawnSync: () => ({
+      error: Object.assign(new Error("spawnSync bd ENOBUFS"), { code: "ENOBUFS" }),
+      status: null, signal: "SIGTERM", stdout: "partial", stderr: "",
+    }),
   });
   const result = new ProcessCommandRunner().run("bd", [], { allowFailure: true });
   assert.deepEqual(result, {

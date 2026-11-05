@@ -1521,6 +1521,64 @@ test("Beads push success preserves a logged history-commit failure as unproved l
   assert.equal(runner.calls.some((call) => call.includes("clone") || call.includes("--force")), false);
 });
 
+// These exercise the actual production runner with real subprocesses. They
+// do not run live Beads or establish native Dolt history/task publication.
+test("production process runner preserves successful stderr and existing failure results", () => {
+  const runner = new ProcessCommandRunner();
+  const success = runner.run(process.execPath, ["-e", 'process.stdout.write("native result\\n"); process.stderr.write("trailing history commit failure — warning\\n");']);
+  assert.deepEqual(success, {
+    stdout: "native result\n", stderr: "trailing history commit failure — warning\n", status: 0,
+  });
+  const failureArgs = ["-e", 'process.stdout.write("partial native result\\n"); process.stderr.write("native failure\\n"); process.exit(7);'];
+  const failure = runner.run(process.execPath, failureArgs, { allowFailure: true });
+  assert.equal(failure.stdout, "partial native result\n");
+  assert.equal(failure.stderr, "native failure\n");
+  assert.equal(failure.status, 7);
+  assert.equal(failure.nativeStatus, 7);
+  assert.equal(failure.signal, null);
+  assert.throws(() => runner.run(process.execPath, failureArgs), /failed: native failure/);
+  const missing = runner.run(join(tmpdir(), "prime-claw-absent-executable", "missing"), [], { allowFailure: true });
+  assert.equal(missing.status, 1);
+  assert.equal(missing.errorCode, "ENOENT");
+  assert.equal(missing.nativeStatus, null);
+  assert.equal(missing.signal, null);
+});
+
+test("real production process streams reach Beads mutation and push observations", () => {
+  const root = fixtureRoot();
+  writeBeadsStore(root, { metadataOverrides: { dolt_mode: "server" } });
+  const fixture = beadsMutationRunner(root, { historyCommitFailure: true, dirtyAfterMutation: true });
+  const processRunner = new ProcessCommandRunner();
+  const runner = {
+    run(command, args, options) {
+      const result = fixture.run(command, args, options);
+      if (command !== "bd" || !(args[0] === "--dolt-auto-commit=on" || (args[0] === "dolt" && args[1] === "push"))) return result;
+      // A disposable command emits the fixture's native response through real
+      // OS pipes, then the default production runner supplies the caller result.
+      return processRunner.run(process.execPath, ["-e",
+        "process.stdout.write(process.argv[1]); process.stderr.write(process.argv[2]); process.exit(Number(process.argv[3]));",
+        result.stdout, result.stderr, String(result.status),
+      ], options);
+    },
+  };
+  try {
+    const result = mutateAndPublishBeadsTaskStatus({ projectRoot: root, taskId: "TST-1", status: "In Progress", runner });
+    assert.equal(result.status, "pushed");
+    assert.equal(result.evidence.mutation.status, 0);
+    assert.equal(result.evidence.mutation.stderr, "simulated trailing history commit failure\n");
+    assert.deepEqual(JSON.parse(result.evidence.mutation.stdout), [{ id: "TST-1", status: "in_progress" }]);
+    assert.equal(result.evidence.push.status, 0);
+    assert.equal(result.evidence.push.stderr, "native push warning\n");
+    assert.equal(result.evidence.push.stdout, "pushed\n");
+    assert.equal(result.evidence.postMutationObservation.clean, false);
+    assert.equal(result.evidence.postPushObservation.clean, false);
+    assert.equal(result.evidence.submittedRevision, DOLT_REVISION);
+    assert.equal(result.evidence.remotePublishedTask, undefined);
+    assert.equal(fixture.calls.filter((call) => call.includes("update")).length, 1);
+    assert.equal(fixture.calls.filter((call) => call.includes("push")).length, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("Beads status and note requests are native operations, not transition eligibility rules", () => {
   const transitions = [
     ["in_design", "Done"], ["ready_for_merge", "Blocked"], ["blocked", "In Progress"],

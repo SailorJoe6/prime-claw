@@ -171,10 +171,13 @@ export interface BeadsTaskEvidenceAdvancementDependencies {
 export interface BeadsTaskEvidenceAdvancementResult {
   record: BeadsTaskEpisodeOwnershipRecord;
   previousProviderRevision: string;
-  /** Historical field name; this is the current native observation, not publication approval. */
-  publishedProviderRevision: string;
+  /** Current local native HEAD observation, not exact-task publication proof. */
+  currentProviderRevision: string;
   previousTaskEvidence: Record<string, unknown>;
   currentTaskEvidence: Record<string, unknown>;
+  synchronization: { stdout: string; stderr: string; status: number };
+  preparation: Extract<BeadsWorkspaceTransportPreparation, { status: "ready" }>;
+  currentTask: Extract<ProviderTaskResolution, { provider: "beads" }>;
   commit: () => BeadsTaskEpisodeOwnershipRecord;
 }
 
@@ -1322,9 +1325,12 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
   return {
     record: target,
     previousProviderRevision: input.previousProviderRevision,
-    publishedProviderRevision: prepared.revision,
+    currentProviderRevision: prepared.revision,
     previousTaskEvidence: input.previousTaskEvidence,
     currentTaskEvidence: currentTask.nativeView,
+    synchronization,
+    preparation,
+    currentTask,
     commit,
   };
 }

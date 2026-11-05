@@ -285,12 +285,16 @@ export interface TaskEpisodeAdmissionOptions {
 
 export type TaskEpisodeCreationResult = TaskEpisodeResult & {
   admissionPushError?: string;
+  /** Native mutation/push results; a successful push is not exact-task publication proof. */
+  beadsTaskMutation?: PublishedBeadsTaskMutation;
 };
 
 export interface TaskEpisodeAllocationDependencies extends EpisodeDependencies {
   admissionRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   prepareEpisodeTaskHistory?: typeof prepareEpisodeTaskHistoryWorkspace;
+  beadsTransport?: typeof prepareBeadsWorkspaceTransport;
+  beadsTaskReader?: typeof readBeadsNativeTask;
   now?: () => string;
 }
 
@@ -1791,16 +1795,12 @@ export async function handoffTaskEpisode(
         throw new Error("Beads evidence advancement changed retained Episode resource identity");
       }
       if (advancement.record.head !== currentEpisodeHead
-          || advancement.record.providerRevision !== advancement.publishedProviderRevision
+          || advancement.record.providerRevision !== advancement.currentProviderRevision
           || JSON.stringify(advancement.record.taskEvidence) !== JSON.stringify(advancement.currentTaskEvidence)) {
         throw new Error("Beads evidence advancement returned unexpected factual observations");
       }
-      const providerTaskObservation = JSON.stringify({
-        previousProviderRevision: advancement.previousProviderRevision,
-        publishedProviderRevision: advancement.publishedProviderRevision,
-        previousTaskEvidence: advancement.previousTaskEvidence,
-        currentTaskEvidence: advancement.currentTaskEvidence,
-      });
+      const { record: _advancedRecord, commit: _commit, ...observations } = advancement;
+      const providerTaskObservation = JSON.stringify(observations);
       let committedRecord: BeadsTaskEpisodeOwnershipRecord | undefined;
       const activeSessionId = await deliverOwnedEpisodeHandoff(
         preparedRecord, guidance, repo, ctx, git, filesystem, orca, publisher, store,
@@ -1920,16 +1920,37 @@ export async function handoffTaskEpisode(
 
 
 /**
- * Allocate resources only after the selected provider reservation has durably
- * bound one exact task and Git code base. Backlog binds its status-commit SHA;
- * Beads binds its published native revision plus the unchanged clean code HEAD.
+ * Prepare the provider workspace before starting the reserved Episode session.
+ * Keep Beads admission results and fresh native reads in the prompt only; its
+ * local HEAD and working-set observations do not prove exact-task publication.
  */
-function preparePublishedBacklogEpisodeWorkspace(
+function prepareTaskEpisodeWorkspace(
   record: TaskEpisodeOwnershipRecord,
   repo: string,
   dependencies: TaskEpisodeAllocationDependencies,
   store: EpisodeOwnershipStore,
+  beadsTaskMutation?: PublishedBeadsTaskMutation,
 ): { record: TaskEpisodeOwnershipRecord; providerTaskObservation?: string } {
+  if (isBeadsTaskEpisodeOwnership(record)) {
+    const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
+    const preparation = (dependencies.beadsTransport ?? prepareBeadsWorkspaceTransport)(record.worktree!, runner);
+    if (preparation.status !== "ready") {
+      throw new EpisodeStateUncertainError(`Beads Episode native transport was unavailable before session start (${preparation.code}): ${preparation.detail}`);
+    }
+    const currentTask = (dependencies.beadsTaskReader ?? readBeadsNativeTask)(record.worktree!, record.taskId, runner);
+    return {
+      record,
+      providerTaskObservation: JSON.stringify({
+        previousProviderRevision: record.providerRevision,
+        previousTaskEvidence: record.taskEvidence,
+        ...(beadsTaskMutation ? { beadsTaskMutation } : {}),
+        currentProviderRevision: preparation.evidence.revision,
+        preparation,
+        currentTaskEvidence: currentTask.nativeView,
+        currentTask,
+      }),
+    };
+  }
   if (!isPublishedBacklogTaskEpisodeOwnership(record)) return { record };
   const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
   const prepared = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
@@ -1982,6 +2003,8 @@ export async function allocateReservedTaskEpisode(
   rawTaskId: string,
   ctx: ExtensionContext,
   dependencies: TaskEpisodeAllocationDependencies = {},
+  /** Ephemeral native admission result for the one initial execute prompt. */
+  beadsTaskMutation?: PublishedBeadsTaskMutation,
 ): Promise<TaskEpisodeResult> {
   const git = dependencies?.git ?? new CliGitAdapter();
   const filesystem = dependencies?.filesystem ?? new NodeFilesystemAdapter();
@@ -2046,7 +2069,7 @@ export async function allocateReservedTaskEpisode(
       git.createWorktree(repo, branch, worktree, record.baseRef);
       git.assertCleanWorktree(worktree);
       if (git.head(worktree) !== record.baseRef) throw new EpisodeStateUncertainError("Local task-native Episode did not start at the reserved code head");
-      const preparedWorkspace = preparePublishedBacklogEpisodeWorkspace(record, repo, dependencies, store);
+      const preparedWorkspace = prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
       record = preparedWorkspace.record;
       let executePrompt = canonicalWorkflowPrompt(worktree, "execute", {
         location: { tag: "operator-episode-task", value: record.taskId },
@@ -2092,7 +2115,7 @@ export async function allocateReservedTaskEpisode(
     });
     store.write(repo, record);
     git.assertCleanWorktree(worktree.path);
-    const preparedWorkspace = preparePublishedBacklogEpisodeWorkspace(record, repo, dependencies, store);
+    const preparedWorkspace = prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
     record = preparedWorkspace.record;
     let executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
       location: { tag: "operator-episode-task", value: record.taskId },
@@ -2943,7 +2966,7 @@ async function createBeadsTaskEpisode(
       return reservation;
     });
 
-    const result = await allocate(taskId, ctx, dependencies);
+    const result = await allocate(taskId, ctx, dependencies, inProgressPublication);
     const stored = store.read(projectRoot, ownerSessionId);
     if (!stored) throw new Error("Beads task Episode allocation returned without durable ownership");
     const active = parseEpisodeOwnership(stored, "Beads task Episode admission result");
@@ -2959,7 +2982,7 @@ async function createBeadsTaskEpisode(
     exactBeadsAdmissionTask(
       resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
     );
-    return { ...active, reused: result.reused };
+    return { ...active, reused: result.reused, beadsTaskMutation: inProgressPublication };
   } catch (error) {
     if (error instanceof BeadsPublicationEvidenceError || !inProgressPublication || !projectRoot) throw error;
     const cause = error instanceof BeadsRawTaskViewDriftError ? error.message : taskAdmissionError(error);
