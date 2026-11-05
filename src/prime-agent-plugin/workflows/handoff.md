@@ -63,17 +63,23 @@ backlog task view --json -- TASK-ID
 
 Require the returned canonical ID and task path to match the binding, and
 require status to remain exactly `In Progress`. The task is the sole durable
-handoff authority in this branch. Ensure its Implementation Plan,
+handoff authority in this branch. Coherent ticket edits must already have been
+committed ASAP and published promptly; handoff is not their first durability
+checkpoint. Follow execute's selected-file/native-history procedure. Ensure its Implementation Plan,
 Implementation Notes, acceptance evidence, references, documentation, modified
 files, and Final Summary contain the current resumable context. If an in-scope
 update is needed, use supported `backlog task edit` operations only in this
 Episode worktree, reload and verify identity/path/parent/status, then commit and
 push the single-purpose checkpoint before compacting. Grandfathered mode commits
-the task on the Episode code branch. Independent mode commits only the task path
+only the literal selected task path on the Episode code branch, separately from
+code, preserving unrelated index entries. Independent mode commits only the task path
 in the ignored nested clone, pushes `HEAD:refs/heads/prime-claw/tasks` without
 force, proves direct publication and unchanged code HEAD, and leaves ownership
 revision/evidence advancement to `handoff_task_episode` after message admission.
-A dirty, unpublished, divergent, or foreign nested clone blocks. The host
+Inspect the selected ticket and history/publication facts. Unrelated dirty work
+or compatible descendants are not blockers; foreign identity, an actual native
+conflict or unavailable selected-ticket publication needs factual recovery.
+Never reset or absorb another writer's work to make the clone clean. The host
 supplies the persisted and freshly synchronized complete native task views and
 revisions as factual context. An unrelated-task descendant alone is compatible.
 For an outside same-task change, use bounded semantic judgment: incorporate a
@@ -108,6 +114,18 @@ in-scope changes; escalate genuine semantic conflict, authority change or scope
 expansion. Do not use Backlog, translate or mutate Beads during handoff. Leave
 content updates to execute's native cycle, reviewing touched-table/staged-set
 multi-issue consequences first. Guidance never reconstructs provider facts.
+
+The `<provider-task-observation>` JSON is factual before/current context, not
+semantic acceptance or new authority. Grandfathered Backlog includes complete
+primary/Episode native views; independent Backlog and Beads include prior/current
+native views and code observations. `<episode-session-observation>` carries the
+native list/state flags. Check idle completion, children/queues and publication
+facts before ordinary continuation; these are LLM decisions under this policy,
+not duplicate status/design/code-dirt/upstream/ancestry or role-depth predicates.
+Never use ordinary handoff for Blocked, merge, abandonment, cleanup, consultation,
+pause or scope expansion. Inspect uncertain native delivery; do not replay it or
+claim execute/compaction completion from admission. Code retains exact existing
+owner/task/worktree/branch/session/route targeting and the native send result.
 
 In either task-native branch, guidance is bounded compaction focus only. It
 never accepts task content or supplies provider revision or raw evidence. Never pass `--status`, complete or archive the task, select replacement work,

@@ -63,10 +63,12 @@ backlog task view --json -- TASK-ID
 Require the returned canonical ID and project-relative task path to match the
 ownership record, and require status to be exactly `Blocked` in the selected
 Backlog store. The task is the sole lifecycle authority in this branch.
-Grandfathered Backlog reads canonical main. Independent Backlog first
-fast-forwards the clean primary nested clone to the directly published
-`refs/heads/prime-claw/tasks`; dirty, local-ahead, divergent, unavailable, or
-foreign history blocks without migration or force. Compare the persisted complete
+Grandfathered Backlog reads the bound primary task. Independent Backlog inspects
+and synchronizes only this owning Conversation's intended task workspace when
+needed. Preserve unrelated bytes/staging and compatible history descendants;
+inspect actual native conflicts or unavailable selected-task publication, not
+whole-clone cleanliness or code-upstream equality. Never reset, absorb or force
+another writer's work. Compare the persisted complete
 native `taskEvidence` with the freshly synchronized exact task view. An
 unrelated-task descendant alone is compatible. For an outside same-task change,
 use bounded semantic judgment: preserve a compatible in-scope clarification or
@@ -76,9 +78,10 @@ an approval gate; never add an equality gate or deterministic classifier. Work
 with the user to satisfy the recorded unblock condition. After the user or accepted
 evidence clears it, only that exact owning Conversation may publish the same
 task as `In Progress`. Grandfathered Backlog preserves the existing one exact-
-task-only main commit: unrelated main dirt is allowed, the task path must match
-committed `HEAD`, and push is prompt best-effort evidence after authoritative
-local commit success. Independent Backlog uses the supported CLI in the primary
+task-only main commit: unrelated main dirt is allowed. Inspect the selected diff
+and commit with literal `git add`/`git commit --only` pathspecs, excluding other
+index entries. Commit each coherent authorized blocker/clearance note ASAP and
+publish promptly; do not wait for handoff or session end. Independent Backlog uses the supported CLI in the primary
 nested clone, commits only the exact task path, pushes
 `HEAD:refs/heads/prime-claw/tasks` without force, proves the direct remote head,
 and proves canonical code HEAD unchanged. Then continue the same ownership, branch, worktree, and session through
@@ -88,12 +91,24 @@ For Beads task mode, current synchronized native state—not the older ownership
 observation—governs. From the canonical-primary Conversation and the exact
 recorded project context, use `bd context --json`, exactly one supported
 `bd dolt pull`, and `bd show TASK-ID --json --long --include-comments`, together
-with the existing native revision, publication-ref, and clean-working-set proof.
+with native revision, publication-ref, history and working-set observations.
 Require the exact canonical ID and complete raw task. Compare the persisted and
 current raw views with LLM judgment: preserve compatible owner-authored or
 outside changes, and stop for a genuine semantic conflict, authority change, or
 scope decision. Raw inequality and an unrelated-task revision advance alone are
 not blockers. Never use a deterministic classifier or equality gate.
+
+Before either blocker or resume mutation, native commit or push, inspect
+pending/staged changes and review Beads v1.3.1 touched-table/staged-set multi-issue
+consequences. Auto-update can commit pending touched rows/already-staged work
+BEFORE push. Disclose and consult about unauthorized/unclear work; no per-issue
+isolation, blanket clean/quiescence gate or store/branch/row-filter workaround.
+Commit coherent authorized blocker/clearance notes through native history ASAP
+and publish promptly, not only when continuation is about to run. Inspect
+`bd --readonly history TASK-ID --json --limit 0` (CommitHash/Issue snapshots) and
+actual publication evidence for intended status/note inclusion. Native update
+exit-zero may only log commit failure; successful push/local HEAD/task read alone
+are not exact-task proof. Report actual warnings and working-set qualifications.
 
 An accepted pushed blocker may move only current `in_progress` to `blocked`.
 Use one supported guarded native update:
@@ -101,7 +116,8 @@ Use one supported guarded native update:
 in_progress --append-notes "<truthful blocker, evidence, and exact unblock
 condition>" --json`. Then make one `bd dolt push
 --no-adopt`, never force or retry, and prove the exact resulting raw task,
-published revision, `refs/dolt/data`, and clean working set. If current state is
+committed task-history inclusion, published revision, `refs/dolt/data`, and actual
+working-set observations. If current state is
 already `blocked`, do not publish again; use the accepted recorded blocker. If
 it is any later or different state, stop without mutation. A failed or uncertain
 pull, update, push, or proof is raw evidence and never permission to retry,
@@ -114,7 +130,8 @@ context/pull/raw-read/proof cycle, use
 `bd --dolt-auto-commit=on update TASK-ID --status in_progress --if-status
 blocked --append-notes "<truthful clearance evidence>" --json`, publish once
 without force, and
-prove the exact raw task/revision/ref/clean result. Then call
+verify actual task-history inclusion, raw task/revision/publication ref and
+working-set result under the same consequence-review procedure. Then call
 `handoff_task_episode`; its existing admitted callback records only factual
 current `providerRevision`, raw `taskEvidence`, code head, and timestamp before
 the sole execute follow-up. Never write `ownership.json` directly.

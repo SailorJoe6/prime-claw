@@ -41,8 +41,7 @@ ${value}
 
 <operator-episode-owner-session>
 ${options.ownerSessionId}
-</operator-episode-owner-session>
-The value above is the exact owning Conversation registry key for this managed Episode. It intentionally differs from the Episode session ID; use it to select the persisted ownership entry and never substitute the current session ID.`;
+</operator-episode-owner-session>`;
   }
   if (options.guidance) {
     prompt += `

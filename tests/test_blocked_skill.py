@@ -36,7 +36,7 @@ def test_blocked_skill_supports_disjoint_task_and_retained_folder_authority() ->
         "one exact- task-only main commit",
         "pushes `HEAD:refs/heads/prime-claw/tasks` without force",
         "unrelated main dirt is allowed",
-        "push is prompt best-effort evidence after authoritative local commit success",
+        "Commit each coherent authorized blocker/clearance note ASAP and publish promptly",
         "same task, ownership, branch, worktree, and durable Episode session",
         "Never create a new task, admission, Episode resource, status-sync message",
         "current synchronized native state—not the older ownership observation—governs",

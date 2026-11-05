@@ -92,8 +92,9 @@ test("registers no custom commands and one narrow tool without lifecycle listene
   assert.deepEqual(Object.keys(tool.parameters.properties), ["guidance"]);
   assert.equal(tool.parameters.required, undefined);
   assert.equal(tool.parameters.additionalProperties, false);
-  assert.match(tool.promptGuidelines.join(" "), /handoff skill.*bind the current implementation pass/);
-  assert.match(tool.promptGuidelines.join(" "), /never retry uncertain delivery automatically/);
+  assert.equal(tool.promptGuidelines, undefined);
+  assert.equal(tool.parameters.properties.guidance.description, "Compaction focus text");
+  assert.doesNotMatch(tool.description, /operator|approved|scope|only/);
   assert.deepEqual([...f.events.keys()], []);
 });
 

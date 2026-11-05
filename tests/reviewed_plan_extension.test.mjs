@@ -719,10 +719,9 @@ test("tool guidance preserves operator authority and fixed fresh assignment", ()
   assert.match(handoff.promptGuidelines.join(" "), /product decisions/); assert.match(handoff.promptGuidelines.join(" "), /operator accepted the exact recorded unblock/); assert.match(handoff.promptGuidelines.join(" "), /restored active version-1 plan identity was revalidated/); assert.match(finalize.promptGuidelines.join(" "), /operator/);
   assert.match(finalize.promptGuidelines.join(" "), /active legacy plan pair/); assert.match(finalize.promptGuidelines.join(" "), /separate explicit post-terminal legacy authority/);
   const taskHandoff = f.tools.get("handoff_task_episode"); const taskFinalize = f.tools.get("finalize_task_episode");
-  assert.match(taskHandoff.promptGuidelines.join(" "), /Never use ordinary handoff for Blocked, merge/);
-  assert.match(taskHandoff.promptGuidelines.join(" "), /Guidance never supplies provider revision or raw task authority/);
-  assert.match(taskHandoff.promptGuidelines.join(" "), /factual LLM context, not a semantic approval gate/);
-  assert.match(taskHandoff.promptGuidelines.join(" "), /compatible same-task changes and unrelated descendants continue normally/);
+  assert.equal(taskHandoff.promptGuidelines, undefined);
+  assert.equal(taskHandoff.parameters.properties.taskId.description, "Canonical task ID");
+  assert.equal(taskHandoff.parameters.properties.guidance.description, "Compaction focus text");
   assert.match(taskFinalize.promptGuidelines.join(" "), /already operator-authorized terminal outcome/);
   assert.match(taskFinalize.promptGuidelines.join(" "), /exact pushed Episode head/);
   assert.match(taskFinalize.promptGuidelines.join(" "), /removes only the bound idle runtime/);

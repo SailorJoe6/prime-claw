@@ -73,5 +73,12 @@ tracker-specific memory command.
 - Do not create Markdown TODO files as a parallel source of truth.
 - Prefer `--json` when parsing CLI output programmatically.
 - Do not change or complete tasks unless the work and authority support it.
-- Backlog.md does not own Git transport; follow repository instructions for
-  commits, pulls, and pushes.
+- Commit each coherent authorized ticket edit ASAP and publish promptly, not at
+  handoff, compaction, session end or Episode admission. Use the actual selected
+  topology: exact task path in the independent clone (non-force
+  `HEAD:refs/heads/prime-claw/tasks`) or a task-only code-branch commit for an
+  existing branch-local store. Use literal pathspecs for `git add` and
+  `git commit --only`; inspect the selected diff, commit and native publication.
+  Preserve unrelated bytes/index/history and commit code separately. Native
+  conflicts and uncertain pushes need inspection, not force, reset or replay.
+- Follow repository transport instructions within those task-only boundaries.

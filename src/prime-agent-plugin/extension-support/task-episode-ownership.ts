@@ -144,12 +144,6 @@ export interface BeadsTaskEvidenceAdvancementInput {
 export interface BeadsTaskEvidenceAdvancementGit {
   repositoryRoot(cwd: string): string;
   branch(repo: string): string;
-  head(repo: string): string;
-  upstreamHead(repo: string): string;
-  directRemoteHead(repo: string, branch: string): string;
-  status(repo: string): string;
-  operationInProgress(repo: string): boolean;
-  isAncestor(repo: string, ancestor: string, descendant: string): boolean;
 }
 
 export interface BeadsTaskEvidenceAdvancementStore {
@@ -293,25 +287,6 @@ export function exactDirectRemoteBranchHead(repo: string, branch: string, action
 export class CliBeadsTaskEvidenceAdvancementGit implements BeadsTaskEvidenceAdvancementGit {
   repositoryRoot(cwd: string): string { return realpathSync(runGit(cwd, ["rev-parse", "--show-toplevel"])); }
   branch(repo: string): string { return runGit(repo, ["symbolic-ref", "--short", "HEAD"]); }
-  head(repo: string): string { return runGit(repo, ["rev-parse", "HEAD"]); }
-  upstreamHead(repo: string): string { return runGit(repo, ["rev-parse", "@{upstream}"]); }
-  directRemoteHead(repo: string, branch: string): string {
-    return exactDirectRemoteBranchHead(repo, branch, "Beads evidence advancement");
-  }
-  status(repo: string): string { return runGit(repo, ["status", "--porcelain=v1", "--untracked-files=all"]); }
-  operationInProgress(repo: string): boolean {
-    return ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer"]
-      .some((marker) => existsSync(resolve(repo, runGit(repo, ["rev-parse", "--git-path", marker]))));
-  }
-  isAncestor(repo: string, ancestor: string, descendant: string): boolean {
-    try {
-      execFileSync("git", ["-C", repo, "merge-base", "--is-ancestor", ancestor, descendant], { stdio: "ignore" });
-      return true;
-    } catch (error) {
-      if (typeof error === "object" && error !== null && "status" in error && error.status === 1) return false;
-      throw error;
-    }
-  }
 }
 
 export class CliLegacyTaskOwnershipTransitionGit implements LegacyTaskOwnershipTransitionGit {
@@ -1141,35 +1116,6 @@ export function exactBeadsProviderRevisionAncestor(
   return row.merge_base === ancestor;
 }
 
-function proveBeadsEpisodeCodeHead(
-  record: BeadsTaskEpisodeOwnershipRecord,
-  episodeHead: string,
-  git: BeadsTaskEvidenceAdvancementGit,
-): void {
-  const episodeRoot = realpathSync(record.worktree!);
-  if (git.repositoryRoot(episodeRoot) !== episodeRoot) {
-    throw new Error("Beads evidence advancement requires the exact recorded Episode repository root");
-  }
-  if (git.operationInProgress(episodeRoot) || git.status(episodeRoot) !== "") {
-    throw new Error("Beads evidence advancement requires a clean Episode worktree with no Git operation in progress");
-  }
-  if (git.branch(episodeRoot) !== record.branch) {
-    throw new Error("Beads evidence advancement recorded Episode branch drifted");
-  }
-  const localHead = git.head(episodeRoot);
-  const upstreamHead = git.upstreamHead(episodeRoot);
-  const directRemoteHead = git.directRemoteHead(episodeRoot, record.branch!);
-  if (localHead !== episodeHead || upstreamHead !== episodeHead || directRemoteHead !== episodeHead) {
-    throw new Error("Beads evidence advancement requires the exact pushed local/upstream/direct-remote Episode head");
-  }
-  if (!record.head || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(record.head)
-      || !git.isAncestor(episodeRoot, record.baseRef, record.head)
-      || !git.isAncestor(episodeRoot, record.head, episodeHead)
-      || !git.isAncestor(episodeRoot, record.baseRef, episodeHead)) {
-    throw new Error("Beads evidence advancement found unsafe Episode base/head ancestry");
-  }
-}
-
 function activeForeignBeadsEvidenceCollision(
   retained: BeadsTaskEpisodeOwnershipRecord,
   allRecords: readonly EpisodeOwnershipRecord[],
@@ -1226,6 +1172,10 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
     throw new Error("Beads evidence advancement requires exact previous raw task identity");
   }
 
+  const git = dependencies.git ?? new CliBeadsTaskEvidenceAdvancementGit();
+  if (git.repositoryRoot(episodeRoot) !== episodeRoot || git.branch(episodeRoot) !== selected.branch) {
+    throw new Error("Beads evidence advancement does not address the exact recorded Episode repository and branch");
+  }
   const runner = dependencies.runner ?? new ProcessCommandRunner();
   const detectProvider = dependencies.detectProvider ?? detectTaskProvider;
   const primaryProvider = detectProvider(ownershipRoot, runner);
@@ -1266,7 +1216,6 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
     throw new Error("Beads evidence advancement could not prove the exact native task identity and project");
   }
 
-  const git = dependencies.git ?? new CliBeadsTaskEvidenceAdvancementGit();
   const target = parseEpisodeOwnership({
     ...selected,
     providerRevision: prepared.revision,
@@ -1285,8 +1234,6 @@ export function advancePublishedBeadsTaskEpisodeEvidence(
         if (activeForeignBeadsEvidenceCollision(selected, allRecords)) {
           throw new Error("Beads evidence advancement found a foreign active owner collision");
         }
-        // Put the pushed-head proof immediately beside the sole ownership write.
-        proveBeadsEpisodeCodeHead(selected, input.episodeHead, git);
         return target;
       });
     } catch (error) {

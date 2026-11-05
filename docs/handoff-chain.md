@@ -67,11 +67,49 @@ prompt and queues canonical execute as the sole follow-up. Admission can be
 immediate or queued but is not completion. An uncertain transport result is
 preserved and never retried automatically.
 
-The public `handoff_task_episode(taskId, guidance?)` tool seam stages the equivalent continuation for version-2 task ownership. It selects the exact Conversation-keyed owner before interpreting provider or task state. Both canonical prompts carry the same `<operator-episode-task>` and `<operator-episode-owner-session>` bindings, so handoff and execute cannot fall back to folder authority or infer an owner from placement. The durable session must be rooted at the exact owned worktree and fully quiescent before any message is sent.
+The public `handoff_task_episode(taskId, guidance?)` sends the canonical handoff
+and sole execute follow-up to the existing version-2 Episode. It selects the
+exact owner, task, recorded worktree/branch, durable session and runtime route.
+Editable handoff/oversight guidance owns status, meaningful plan/design, code
+publication, idle completion/children/queues, scope and semantic compatibility.
+Code does not repeat those decisions as literal-main, role-depth, task-byte,
+whole-code-cleanliness, upstream equality, ancestry or old-design approval.
+Native prompt delivery still uses `queueIfBusy: false` for the first message;
+its refusal or uncertainty is reported once, without retry or a duplicate
+assignment. Retained version-1 identity, frozen plans and quiescence behavior
+are unchanged.
 
-The Backlog branch retains canonical primary `main` and exact owner/task/path targeting. Provider-absent or explicit Backlog without revision/evidence stays grandfathered branch-local; its existing committed-task/status/plan checks remain pending the complete task-native policy extraction. Explicit independent Backlog handoff transport prepares only the Episode nested task checkout and reads the exact native task there. It does not re-enter mutable primary preparation, compare primary/Episode task views, repeat status/plan predicates, freeze a paired task head, or require an equal code upstream as an admission rule. The invoking Conversation uses the editable oversight/handoff guidance to judge current lifecycle, plan, task/code publication and history compatibility. Both prompts receive complete previous/current native task views and revisions plus current Episode code-head/upstream results; a native upstream lookup failure remains a fact rather than a hidden eligibility refusal. A primary author's stale or unrelated dirty task bytes/index stay untouched. Episode content and Conversation lifecycle edits still use exact task-path commits and non-force `HEAD:refs/heads/prime-claw/tasks` publication; code heads remain separate. After the first handoff message is admitted, ownership records only current task revision/native evidence, code head, and time. No task mirror or automatic reconciliation is introduced. The surrounding task-native wrapper/other-provider/terminal policy extraction remains pending PRIMECLAW-55; this directly supporting transport repair is not full lifecycle completion.
+Grandfathered Backlog carries complete current primary and Episode native task
+views to both prompts and the caller. Independent Backlog prepares only the
+Episode task clone once, without synchronizing another writer's mutable primary
+bytes/index or freezing paired heads. Both prompts retain exact previous/current
+native views/revisions and Episode code-head/upstream/status results. Unrelated
+Git bytes, staging and compatible history descendants survive. Publication and
+same-task refinements are LLM judgments, not a classifier or frozen approval.
+Backlog authoring remains literal selected-file-only, separately from code in
+both topologies; each coherent ticket edit is committed ASAP and published
+promptly, not saved for handoff or session end.
 
-The active-Beads branch has no task path and does not use Backlog. It preserves the exact operation, base, worktree/branch, Episode/session, and optional Orca resources. After initial idle/quiescent inspection, handoff performs one supported native pull and reads current transport facts and the complete raw task. Both canonical prompts receive previous/current raw views and local revisions, the native pull result and complete transport observations, including actual warnings, working-set state and publication-ref command results. `currentProviderRevision` identifies observed local native HEAD, not a proved published task revision. No repeated remote proof, content equality or status/design/cleanliness gate is added. The owning LLM applies editable guidance to lifecycle, meaningful design, publication and compatibility. The first message's admission callback records only provider/task/code observations while preserving resource identity; execute remains its one follow-up. Compatible changes continue and genuine conflicts escalate. Initial create also returns the existing full native mutation/push result to the initiating Conversation and carries it, plus fresh Episode-local observations, in its single initial execute assignment. Successful commands and local task reads are not exact-task publication proof, including exit-zero trailing history-commit warnings. The production runner retains both streams. No persistent evidence mirror or second assignment is introduced; the remaining lifecycle/terminal policy extraction stays on PRIMECLAW-55.
+Beads performs one supported pull and reads current native transport and raw
+task facts. Both prompts and the caller receive previous/current raw views,
+local revisions, native results/warnings/working-set/ref qualifications and code
+observations. The old persisted design is not a readiness lock. No clean/pushed
+code or ancestry predicate can reject the observation callback after admission.
+Exact fixed ownership/resource targeting and readback remain. Native session
+list/get_state flags also reach both prompts; they are facts for editable policy.
+`currentProviderRevision` is local HEAD, not exact-task publication proof.
+The first message's callback records only existing task/provider/code observations;
+execute is its sole follow-up. R1 preserves successful stderr; R2 preserves full
+create mutation results through one initial execute. No new mirror or assignment.
+
+Beads authoring uses its accepted touched-table/staged-set multi-issue semantics:
+review pending/staged consequences BEFORE mutation/commit/push, consult unclear
+or unauthorized work, and inspect actual task history and publication inclusion.
+Exit-zero update can merely log history-commit failure; local read/HEAD or push
+success is insufficient. See the editable execute/implementation and owner
+guidance for the provider-native procedure. Full terminal/finalization/cleanup
+policy extraction and bounded recorded-operation recovery remain on Task55;
+this continuation slice does not claim their completion or live activation.
 
 Candidate review, Delay, Request Changes, Merge, and abandonment are not handoff. Grandfathered Backlog retains its exact main-task-only `Ready for Merge` or `In Progress` commits and ordinary same-Episode main integration. Independent Backlog publishes those statuses, Done, or archive only on the disconnected task branch, keeps `mainHead` as code history, and fast-forwards nested task clones without mixing task bytes into the candidate. Both retain the exact displayed tuple, ff-only code Merge, and explicit abandonment authority. Beads instead treats `mainHead` as the current pushed canonical code head, integrates it into the idle Episode when needed, and proves pushed `candidateHead` ancestry before one guarded `in_progress`→`ready_for_merge` native status-plus-note publication. Delay is a no-op. Explicit Request Changes makes one guarded `ready_for_merge`→`in_progress` publication with truthful finding evidence, then resumes the same Episode through ordinary handoff. Explicit Merge authority still binds the exact displayed `(taskId, mainHead, candidateHead)`; a fresh preflight proves Git identity/ancestry plus current native `ready_for_merge`, then canonical main uses ordinary `git merge --ff-only` and normal push before one guarded native `ready_for_merge`→`done` publication with truthful tuple/code evidence. Beads abandonment is also outside handoff: separate exact task/head authority permits one supported native `closed` plus exact reason publication, distinct from completed custom `done`, and abandoned code never enters main. No branch adds a Ready receipt, progress object, content digest, custom publisher/merge recovery, provider-revision approval lock, or replay protocol.
 

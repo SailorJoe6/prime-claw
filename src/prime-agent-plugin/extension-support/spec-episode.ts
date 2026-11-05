@@ -167,6 +167,7 @@ export interface BlockedLegacyRestoreResult {
 export type TaskEpisodeHandoffResult = {
   admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
   handoffDelivery: "prompt"; executeDelivery: "followUp";
+  providerTaskObservation?: Record<string, unknown>;
 };
 export interface PublishedSession { activeSessionId: string; sessionId: string; sessionFile: string }
 
@@ -1020,9 +1021,12 @@ function sessionIsBusy(session: SessionSummary): boolean {
 function sessionRuntimeRoute(session: SessionSummary): string | undefined {
   return session.activeSessionId ?? session.id;
 }
-function assertIdleEpisodeState(state: EpisodeSessionState, identity: EpisodeOwnershipRecord, activeSessionId: string): void {
+function assertEpisodeStateIdentity(state: EpisodeSessionState, identity: EpisodeOwnershipRecord, activeSessionId: string): void {
   const matches = state.activeSessionId === activeSessionId && state.sessionId === identity.episodeId && samePath(state.sessionFile, identity.episodeSessionFile);
   if (!matches) throw new Error("Episode state does not match the durable owned identity");
+}
+function assertIdleEpisodeState(state: EpisodeSessionState, identity: EpisodeOwnershipRecord, activeSessionId: string): void {
+  assertEpisodeStateIdentity(state, identity, activeSessionId);
   const actions = state.sessionActions;
   const idle = state.isSessionActive === false && state.isStreaming === false && state.isCompacting === false
     && state.isBashRunning === false && state.isRunningTools === false && state.hasRunningRlmChildren === false
@@ -1358,7 +1362,7 @@ function providerTaskObservationBlock(observation: string): string {
 <provider-task-observation>
 ${observation}
 </provider-task-observation>
-The JSON above is exact factual provider-native before/current context for this continuation. It records observations, not semantic acceptance or a new authority.`;
+`;
 }
 
 async function prepareOwnedEpisodeHandoff(
@@ -1385,7 +1389,7 @@ async function prepareOwnedEpisodeHandoff(
   if (promptIdentity.requireExactCwd && (!session.cwd || !samePath(session.cwd, record.worktree!))) {
     throw new Error("Episode durable session is not rooted at the owned worktree");
   }
-  if (sessionIsBusy(session)) throw new Error("Owned Episode is busy; handoff requires an idle Episode with an empty queue");
+  if (!promptIdentity.taskId && sessionIsBusy(session)) throw new Error("Owned Episode is busy; handoff requires an idle Episode with an empty queue");
   const location = promptIdentity.taskId
     ? { tag: "operator-episode-task", value: promptIdentity.taskId }
     : undefined;
@@ -1409,7 +1413,18 @@ async function prepareOwnedEpisodeHandoff(
   }
   const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
   const state = await publisher.getState(route.activeSessionId);
-  assertIdleEpisodeState(state, route.record, route.activeSessionId);
+  if (promptIdentity.taskId) {
+    assertEpisodeStateIdentity(state, route.record, route.activeSessionId);
+    const observation = `
+
+<episode-session-observation>
+${JSON.stringify({ session, state })}
+</episode-session-observation>`;
+    handoffPrompt += observation;
+    executePrompt += observation;
+  } else {
+    assertIdleEpisodeState(state, route.record, route.activeSessionId);
+  }
   return { record: route.record, activeSessionId: route.activeSessionId, handoffPrompt, executePrompt };
 }
 
@@ -1636,11 +1651,7 @@ export async function transitionSpecEpisodeToTaskOwnership(
   } finally { try { publisher?.close(); } catch { /* do not mask transition result */ } }
 }
 
-/**
- * Continue one exact active task-native Episode after the owning Conversation
- * has published the main task's resumable `In Progress` state. This internal
- * seam is the guarded ordinary-continuation path for the public task lifecycle.
- */
+/** Compare fixed Episode resource bindings independently of native observations. */
 function samePublishedHandoffIdentity(
   before: BeadsTaskEpisodeOwnershipRecord | PublishedBacklogTaskEpisodeOwnershipRecord,
   after: BeadsTaskEpisodeOwnershipRecord | PublishedBacklogTaskEpisodeOwnershipRecord,
@@ -1747,11 +1758,8 @@ export async function handoffTaskEpisode(
       throw new Error("Task-native Episode handoff must run from the repository root");
     }
     const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
-    if (!samePath(project.root, repo) || project.kind === "linked-worktree" || git.branch(repo) !== "main") {
-      throw new Error("Task-native Episode handoff must run from the canonical primary main checkout");
-    }
-    if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
-      throw new Error("Episode handoff is available only from a top-level project Conversation");
+    if (!samePath(project.root, repo) || project.kind === "linked-worktree") {
+      throw new Error("Task-native Episode handoff must address the canonical primary checkout");
     }
     const ownerSessionId = ctx.sessionManager.getSessionId();
     const record = store.read(repo, ownerSessionId);
@@ -1761,14 +1769,14 @@ export async function handoffTaskEpisode(
       throw new Error(`Episode ownership is ${record.status}; inspect it before handoff`);
     }
     validateWorktreeRecord(record, git, filesystem, repo);
-    git.assertCleanWorktree(record.worktree!);
+    const episodeCode = {
+      head: git.head(record.worktree!),
+      branch: git.branch(record.worktree!),
+      status: runner.run("git", ["status", "--porcelain=v1", "--untracked-files=all"], { cwd: record.worktree!, allowFailure: true }),
+      upstream: runner.run("git", ["rev-parse", "--verify", "@{upstream}"], { cwd: record.worktree!, allowFailure: true }),
+    };
 
     if (isBeadsTaskEpisodeOwnership(record)) {
-      if (!meaningfulTaskImplementationPlan(
-        typeof record.taskEvidence.design === "string" ? record.taskEvidence.design : null,
-      )) {
-        throw new Error("Beads task-native Episode handoff requires persisted raw evidence with a meaningful design");
-      }
       publisher ??= new PrimeSessionPublisher();
       const preflight = await prepareOwnedEpisodeHandoff(
         record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
@@ -1781,7 +1789,7 @@ export async function handoffTaskEpisode(
         throw new Error("Beads task-native Episode ownership changed during idle handoff preflight");
       }
       const preparedRecord = preflight.record;
-      const currentEpisodeHead = git.head(preparedRecord.worktree!);
+      const currentEpisodeHead = episodeCode.head;
       const advancement = (dependencies.advanceBeadsEvidence ?? advancePublishedBeadsTaskEpisodeEvidence)({
         projectRoot: repo,
         ownerSessionId,
@@ -1799,7 +1807,7 @@ export async function handoffTaskEpisode(
         throw new Error("Beads evidence advancement returned unexpected factual observations");
       }
       const { record: _advancedRecord, commit: _commit, ...observations } = advancement;
-      const providerTaskObservation = JSON.stringify(observations);
+      const providerTaskObservation = JSON.stringify({ ...observations, episodeCode });
       let committedRecord: BeadsTaskEpisodeOwnershipRecord | undefined;
       const activeSessionId = await deliverOwnedEpisodeHandoff(
         preparedRecord, guidance, repo, ctx, git, filesystem, orca, publisher, store,
@@ -1824,6 +1832,7 @@ export async function handoffTaskEpisode(
         episodeActiveSessionId: activeSessionId,
         handoffDelivery: "prompt",
         executeDelivery: "followUp",
+        providerTaskObservation: JSON.parse(providerTaskObservation),
       };
     }
 
@@ -1843,10 +1852,11 @@ export async function handoffTaskEpisode(
       const prepared = preparePublishedBacklogHandoffEvidence(
         preparedRecord, repo, runner, dependencies, git.head(preparedRecord.worktree!),
       );
+      const providerTaskObservation = JSON.stringify({ ...JSON.parse(prepared.observation), episodeCode });
       let committed = false;
       const activeSessionId = await deliverOwnedEpisodeHandoff(
         preparedRecord, guidance, repo, ctx, git, filesystem, orca, publisher, store,
-        { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation: prepared.observation },
+        { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation },
         () => {
           const current = store.read(repo, ownerSessionId);
           if (!current || JSON.stringify(current) !== JSON.stringify(preparedRecord)) {
@@ -1868,6 +1878,7 @@ export async function handoffTaskEpisode(
         episodeActiveSessionId: activeSessionId,
         handoffDelivery: "prompt",
         executeDelivery: "followUp",
+        providerTaskObservation: JSON.parse(providerTaskObservation),
       };
     }
 
@@ -1879,15 +1890,6 @@ export async function handoffTaskEpisode(
       || mainTask.taskPathRelative !== record.taskPath) {
       throw new Error("Task-native Episode handoff does not match the exact owned Backlog task on main");
     }
-    if (git.pathStatus(repo, record.taskPath) !== "") {
-      throw new Error("Task-native Episode handoff requires the exact main task path to match committed HEAD");
-    }
-    if (mainTask.status !== "In Progress") {
-      throw new Error(`Task-native Episode handoff requires main task status In Progress; found ${mainTask.status}`);
-    }
-    if (!meaningfulTaskImplementationPlan(mainTask.implementationPlan)) {
-      throw new Error("Task-native Episode handoff requires a meaningful main-task Implementation Plan");
-    }
     const episodeTask = resolveTask(record.worktree!, taskId);
     if (!episodeTask
       || episodeTask.taskId !== record.taskId
@@ -1895,16 +1897,15 @@ export async function handoffTaskEpisode(
       || episodeTask.taskPathRelative !== record.taskPath) {
       throw new Error("Task-native Episode handoff does not match the exact owned Backlog task in the Episode worktree");
     }
-    if (episodeTask.status !== "In Progress") {
-      throw new Error(`Task-native Episode handoff requires Episode task status In Progress; found ${episodeTask.status}`);
-    }
-    if (!meaningfulTaskImplementationPlan(episodeTask.implementationPlan)) {
-      throw new Error("Task-native Episode handoff requires a meaningful Episode Implementation Plan");
-    }
+    const providerTaskObservation = {
+      mainTaskEvidence: mainTask.nativeView,
+      currentTaskEvidence: episodeTask.nativeView,
+      episodeCode,
+    };
     publisher ??= new PrimeSessionPublisher();
     const activeSessionId = await deliverOwnedEpisodeHandoff(
       record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
-      { taskId: record.taskId, requireExactCwd: true },
+      { taskId: record.taskId, requireExactCwd: true, providerTaskObservation: JSON.stringify(providerTaskObservation) },
     );
     return {
       admitted: true,
@@ -1913,6 +1914,7 @@ export async function handoffTaskEpisode(
       episodeActiveSessionId: activeSessionId,
       handoffDelivery: "prompt",
       executeDelivery: "followUp",
+      providerTaskObservation,
     };
   } finally { try { publisher?.close(); } catch { /* do not mask lifecycle result */ } }
 }

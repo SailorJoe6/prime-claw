@@ -78,10 +78,12 @@ two branches.
 First retain the ownership-selected Backlog topology. Provider-absent and
 explicit Backlog without revision/evidence remain branch-local. Explicit Backlog
 with revision/evidence uses the ignored independent nested clone at the derived
-store path. In independent mode require that clone to be a clean ordinary Git
-clone on `prime-claw/tasks`, at the exact published remote head descended from
-the owned revision; never stage it as a gitlink or place task files in the code
-DAG. A missing, dirty, unpublished, divergent, or foreign nested clone blocks.
+store path as an ordinary Git clone on `prime-claw/tasks`; never stage it as a
+gitlink or put task files in the code DAG. Inspect the selected committed ticket,
+current history and publication facts. Unrelated bytes/staging and compatible
+descendants do not block execution. A missing or foreign workspace, real native
+conflict or unavailable selected-ticket history needs factual recovery; never
+reset or absorb another writer's work to make it clean.
 
 Use the exact task ID and path selected above. Do not use `.ralph/plans` as
 authority in this mode. Reload the exact task through the supported structured
@@ -122,24 +124,31 @@ mark the task `Done`, publish `Blocked` or `Ready for Merge`, or write task
 content in another checkout. Ordinary execution performs no cross-checkout
 copy, mirroring, or dual write.
 
-For independent Backlog, the host first fetches the exact task ref and
-fast-forwards only clean primary/Episode nested clones. Compare the persisted
-complete native `taskEvidence` with the freshly synchronized `backlog task view`
-field for field. A descendant caused only by unrelated tasks is compatible. For
-an outside change to this same task, use bounded semantic judgment: incorporate
-a compatible in-scope clarification or living-plan update as the current basis,
-and stop without mutation for a genuine semantic conflict, authority change,
-scope expansion, or product decision. Raw inequality is evidence, not an
-approval gate. Never add an equality gate or deterministic semantic classifier.
-Immediately before an owner-authorized task-content write, synchronize and
-reread once more; after it, prove the exact intended fields, preserved unrelated
-fields, clean clone, non-force publication, and exact native reread.
+For independent Backlog, prepare and read only this Episode's intended task
+workspace when needed, not another writer's mutable primary clone. Inspect the
+persisted and current complete native task views/history. Incorporate compatible
+in-scope clarifications; stop for a real semantic conflict, authority change,
+scope expansion or product decision, not raw inequality or unrelated history.
+Immediately before an authorized content write, synchronize and reread this
+workspace once more. Preserve unrelated edits/index/history and inspect actual
+native conflicts rather than imposing whole-clone cleanliness.
+
+Commit each coherent ticket edit ASAP and publish promptly, during execution,
+not only at candidate, blocker, handoff, compaction, session end or admission.
+In BOTH Backlog topologies use a task-path-only commit, with literal pathspecs
+for `git add` and `git commit --only`; inspect the selected diff, commit and
+unrelated index entries. In independent mode publish non-force to
+`HEAD:refs/heads/prime-claw/tasks`, prove direct publication/native reread, and
+make no code HEAD/index/file write. In branch-local mode publish the exact task
+commit normally. Commit code separately. Verify intended fields and preserve
+ID/path/parent/status and all unrelated task fields. A rejected or uncertain
+operation requires inspection, never a blind retry, force or automatic merge.
 
 If blocked after a bounded attempt, append the exact blocker, attempted actions,
 evidence, and unblock condition to this task's Implementation Notes on the
 Episode task authority. Verify the task identity and unchanged status. In
-grandfathered mode create one single-purpose code-branch commit containing that
-task update plus only safe in-scope resumable changes. In independent mode make
+grandfathered mode create a task-path-only code-branch commit and publish it
+promptly; commit safe resumable code separately. In independent mode make
 one task-path-only commit in the nested clone and push
 `HEAD:refs/heads/prime-claw/tasks` without force; commit/push code separately only
 when code changed. Report both exact heads and push
@@ -149,8 +158,8 @@ publish `Blocked` on main.
 
 When the candidate is complete, ensure the task holds the current plan, notes,
 acceptance evidence, references, documentation, modified files, and a useful
-Final Summary. Leave its status unchanged. Grandfathered mode may commit the
-task with implemented code/docs in one bounded code slice. Independent mode
+Final Summary. Leave its status unchanged. Grandfathered mode commits the
+task path only, separately from implemented code/docs. Independent mode
 commits and non-force-pushes task content only in the nested task clone, then
 commits/pushes the code candidate separately. Report both exact published heads
 and evidence to the owning Conversation. Do not
@@ -175,11 +184,11 @@ bd show TASK-ID --json --long --include-comments
 Require one raw task whose exact canonical ID equals the bound task ID, whose
 native status is exactly `in_progress` and maps to canonical `In Progress`, and
 whose raw `design` is meaningful rather than blank or placeholder text. Also
-require native evidence for the exact current Dolt database, branch, revision,
-publication ref, and a clean working set. If synchronization or any identity,
-status, design, revision, ref, worktree, or session proof fails, do not mutate
-anything. Report the exact provider evidence to the owning Conversation and
-stop.
+inspect native evidence for the exact current Dolt database, branch, revision,
+publication ref and working set. Apply these execution rules using actual facts,
+not a duplicate code-level status/design/cleanliness or publication gate. If the
+exact task/resource identity or actual authority cannot be established, report
+the evidence and stop without replacement work.
 
 Treat the complete raw Beads view as the durable work contract: description,
 design, acceptance criteria, notes, comments, labels, dependencies, and every
@@ -198,14 +207,22 @@ The Episode may change only owner-authored task content through supported
 `bd update TASK-ID` content fields: description, design, acceptance criteria,
 and notes. It must not change status, title, type, priority, assignee, parent,
 dependencies, labels, comments, metadata, task identity, or lifecycle fields.
+Before every native content mutation, history commit or push, inspect native
+pending/staged work. Beads v1.3.1 commits touched-table rows and the staged set,
+including other pending issues/already-staged work during auto-commit BEFORE
+push. Disclose consequences and consult about unauthorized or unclear work.
+This approved multi-issue exception is not per-issue isolation; pending native
+work can prevent a safe operation, but no blanket clean/quiescence gate or
+store/branch/row-filter/dependency workaround replaces judgment.
 Immediately before any write, synchronize once more, reread the complete raw
 task, and repeat the same-task comparison. Apply at most the intended in-scope
 content update without `--status`, `--force`, raw Dolt SQL writes, or retry.
 Immediately after the write, reread the complete raw task and native revision,
 branch, ref, and working-set state. Require the exact intended owner-authored
 field changes, only the exact provider-generated revision/timestamp changes
-caused by that write, every other raw task field unchanged, and a clean working
-set.
+caused by that write, every other raw task field unchanged, and actual remaining
+working-set facts. Commit each coherent authorized ticket update through native
+history ASAP and publish promptly; do not defer it to the end of the code slice.
 
 Publish the verified native task update exactly once and without force:
 
@@ -213,16 +230,15 @@ Publish the verified native task update exactly once and without force:
 bd dolt push --no-adopt
 ```
 
-After publication, perform one native post-publication pull/read cycle and
-capture the exact raw task plus revision/ref evidence again. Require the remote
-publication to contain the intended published revision, the published task to
-equal the verified post-write view, and the local working set to remain clean.
-An unrelated-task descendant may advance the final revision; report both exact
-revisions and require the same target-task view. Route any outside same-task
-change through the reconciliation rule above. A rejected or uncertain
-synchronization, update, or push is evidence, not permission to pull again,
-retry, reset, force, adopt, or overwrite. Preserve and report the exact raw
-state instead.
+Inspect `bd --readonly history TASK-ID --json --limit 0` (native CommitHash and
+Issue snapshots) to verify the intended task changes actually reached committed
+history. Native update exit-zero may only log a trailing history-commit failure;
+a local task read, local revision and successful push are not exact-task proof.
+After publication, read current raw task/revision/ref/history evidence and report
+actual inclusion and warnings/remaining working-set qualifications. Incorporate
+compatible descendants/refinements with LLM judgment, not frozen-view equality.
+A rejected or uncertain synchronization, update, commit or push is evidence,
+not permission to pull again, retry, reset, force, adopt or overwrite.
 
 On a candidate or blocker, keep the Beads design/notes and Episode code evidence
 current through the same guarded native flow. Commit and push only the approved
@@ -281,8 +297,9 @@ authority.
 Assuming work remains in either mode, choose one small elephant-carpaccio slice:
 the smallest end-to-end change that produces observable value or decisive
 evidence. It must fit within the current context window, including
-implementation, tests, documentation, durable task or plan updates, and one
-clean single-purpose commit pushed for review. Size the slice to finish without
+implementation, tests, documentation, prompt native task publication, and one
+single-purpose code commit pushed for review. Task-only commits remain separate
+and happen whenever each coherent ticket update is ready. Size the slice to finish without
 relying on auto-compaction. If it cannot reasonably finish within that boundary,
 split it before starting. After pushing the slice, stop and report; do not begin
 another slice. You may use as many subagents as useful within that one slice.

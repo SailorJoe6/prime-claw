@@ -796,7 +796,8 @@ test("registered active Beads handoff delivers owner-authored published design a
     assert.match(prompt, /<provider-task-observation>/);
     assert.ok(prompt.includes(JSON.stringify(BEADS_TASK_EVIDENCE)));
     assert.ok(prompt.includes(JSON.stringify(currentEvidence)));
-    assert.match(prompt, /records observations, not semantic acceptance or a new authority/);
+    assert.match(prompt, /<episode-session-observation>/);
+    assert.doesNotMatch(prompt, /records observations, not semantic acceptance or a new authority/);
   }
   assert.equal(f.calls.some((call) => ["fresh", "execute", "orca-create"].includes(call[0])), false);
 });
@@ -977,7 +978,7 @@ test("active Beads handoff commits factual observations only after the first can
   });
 });
 
-test("active Beads task handoff rejects foreign, busy, and dirty native evidence before delivery", async (t) => {
+test("active Beads handoff preserves foreign targeting and actual native failure without policy preflight", async (t) => {
   await t.test("foreign owner", async () => {
     const f = harness({ list: (_count, session) => [session] });
     f.ownership.write(f.root, activeBeadsTaskRecord(f));
@@ -989,17 +990,27 @@ test("active Beads task handoff rejects foreign, busy, and dirty native evidence
     assert.equal(advances, 0);
     assert.equal(f.calls.some((call) => call[0] === "handoff"), false);
   });
-  await t.test("busy Episode", async () => {
-    const f = harness({ list: (_count, session) => [{ ...session, isSessionActive: true }] });
-    f.ownership.write(f.root, activeBeadsTaskRecord(f));
-    let advances = 0;
+  await t.test("native first-message refusal is reported once without observation commit", async () => {
+    const f = harness({
+      list: (_count, session) => [{ ...session, isSessionActive: true }],
+      handoffBeforeAdmissionError: new Error("native handoff delivery rejected: busy"),
+    });
+    const initial = activeBeadsTaskRecord(f, { taskEvidence: { ...BEADS_TASK_EVIDENCE, design: "TBD" } });
+    f.ownership.write(f.root, initial);
+    f.git.head = () => initial.head;
+    let commits = 0;
     await assert.rejects(handoffTaskEpisode(BEADS_TASK_ID, "continue", f.ctx, {
-      ...f.deps, advanceBeadsEvidence() { advances += 1; throw new Error("must not run"); },
-    }), /Owned Episode is busy/);
-    assert.equal(advances, 0);
-    assert.equal(f.calls.some((call) => call[0] === "handoff"), false);
+      ...f.deps, advanceBeadsEvidence(input) { return {
+        record: initial, previousProviderRevision: input.previousProviderRevision,
+        currentProviderRevision: initial.providerRevision,
+        previousTaskEvidence: initial.taskEvidence, currentTaskEvidence: initial.taskEvidence,
+        commit() { commits += 1; return initial; },
+      }; },
+    }), /native handoff delivery rejected: busy/);
+    assert.equal(commits, 0);
+    assert.deepEqual(f.record, initial);
   });
-  await t.test("dirty native evidence", async () => {
+  await t.test("actual native observation failure", async () => {
     const f = harness({ list: (_count, session) => [session] });
     f.ownership.write(f.root, activeBeadsTaskRecord(f));
     let advances = 0;
@@ -1007,9 +1018,9 @@ test("active Beads task handoff rejects foreign, busy, and dirty native evidence
       ...f.deps,
       advanceBeadsEvidence() {
         advances += 1;
-        throw new Error("native publication proof is blocked: selected Dolt working set has uncommitted changes");
+        throw new Error("native task read failed: database unavailable");
       },
-    }), /Dolt working set has uncommitted changes/);
+    }), /native task read failed: database unavailable/);
     assert.equal(advances, 1);
     assert.equal(f.calls.some((call) => call[0] === "handoff"), false);
   });
@@ -1624,26 +1635,40 @@ test("cleanup-only task finalization refuses unsafe identity or terminal evidenc
   });
 });
 
-test("task-native handoff rejects dirty main task bytes before routing even when they claim In Progress", async () => {
+test("branch-local handoff delivers current raw task and code facts without task-byte approval", async () => {
   const f = harness({ list: (_count, session) => [session] });
   const { relative, taskPath } = commitMainTask(f, "Blocked");
   writeFileSync(taskPath, "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\n");
-  assert.match(readFileSync(taskPath, "utf8"), /status: In Progress/);
-  assert.match(execFileSync("git", ["-C", f.root, "show", `HEAD:${relative}`], { encoding: "utf8" }), /status: Blocked/);
-  const cliGit = new CliGitAdapter();
-  f.git.pathStatus = (repo, path) => cliGit.pathStatus(repo, path);
+  const bytes = readFileSync(taskPath, "utf8");
+  const head = execFileSync("git", ["-C", f.root, "rev-parse", "HEAD"], { encoding: "utf8" });
+  const index = execFileSync("git", ["-C", f.root, "ls-files", "--stage"], { encoding: "utf8" });
+  f.git.pathStatus = () => { throw new Error("selected-path cleanliness must not approve continuation"); };
+  f.git.assertCleanWorktree = () => { throw new Error("code cleanliness must not approve continuation"); };
   f.ownership.write(f.root, activeTaskRecord(f));
-  f.calls.length = 0;
-  let resolverCalls = 0;
-  await assert.rejects(
-    handoffTaskEpisode(
-      "PRIMECLAW-10.38", "continue", f.ctx,
-      { ...f.deps, taskResolver: (cwd) => { resolverCalls += 1; return taskSelection(f, { projectRoot: cwd }); } },
-    ),
-    /exact main task path to match committed HEAD/,
-  );
-  assert.equal(resolverCalls, 1);
-  assert.equal(f.calls.some((value) => ["reopen", "ownership", "handoff", "execute"].includes(value[0])), false);
+  const mainView = { task: { id: "PRIMECLAW-10.38", status: "custom-review", implementationPlan: null, path: relative, opaque: [null, "原文"] } };
+  const episodeView = { task: { ...mainView.task, status: "Blocked", implementationPlan: "TBD", notes: "current native Episode view" } };
+  writeFileSync(join(f.worktree, ".prime-claw/workflows/handoff.md"), "EDITED CONTINUATION POLICY\n");
+  writeFileSync(join(f.worktree, ".agents/skills/execute/SKILL.md"), "EDITED EXECUTION POLICY\n");
+  const result = await handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, {
+    ...f.deps,
+    taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd, nativeView: cwd === f.root ? mainView : episodeView }),
+  });
+  assert.equal(result.admitted, true);
+  const deliveries = f.calls.filter(([kind]) => kind === "handoff");
+  assert.equal(deliveries.length, 1);
+  assert.match(deliveries[0][1], /EDITED CONTINUATION POLICY/);
+  assert.match(deliveries[0][2], /EDITED EXECUTION POLICY/);
+  for (const prompt of deliveries[0].slice(1)) {
+    assert.ok(prompt.includes(JSON.stringify(mainView)));
+    assert.ok(prompt.includes(JSON.stringify(episodeView)));
+    assert.match(prompt, /episodeCode/);
+  }
+  assert.deepEqual(result.providerTaskObservation.mainTaskEvidence, mainView);
+  assert.deepEqual(result.providerTaskObservation.currentTaskEvidence, episodeView);
+  assert.equal(readFileSync(taskPath, "utf8"), bytes);
+  assert.equal(execFileSync("git", ["-C", f.root, "rev-parse", "HEAD"], { encoding: "utf8" }), head);
+  assert.equal(execFileSync("git", ["-C", f.root, "ls-files", "--stage"], { encoding: "utf8" }), index);
+  assert.equal(f.calls.some(([kind]) => ["fresh", "execute", "local-create", "orca-create"].includes(kind)), false);
 });
 
 test("task-native handoff allows unrelated dirty main paths", async () => {
@@ -1682,7 +1707,7 @@ test("task-native handoff preserves exact Orca identity without allocating resou
   assert.equal(f.calls.some((value) => ["orca-create", "auto-create", "fresh"].includes(value[0])), false);
 });
 
-test("task-native handoff rejects non-active ownership and a dirty Episode checkout before task routing", async (t) => {
+test("task-native handoff retains active resource identity without branch, role or dirt approval", async (t) => {
   await t.test("non-active ownership", async () => {
     const f = harness({ record: taskReservation() });
     await assert.rejects(
@@ -1694,91 +1719,46 @@ test("task-native handoff rejects non-active ownership and a dirty Episode check
     );
     assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
   });
-  await t.test("primary checkout is not on main", async () => {
-    const f = harness();
+  await t.test("primary branch, role depth and dirty code are facts, not eligibility", async () => {
+    const f = harness({ list: (_count, session) => [session] });
     f.ownership.write(f.root, activeTaskRecord(f));
-    f.git.branch = () => "feature";
-    await assert.rejects(
-      handoffTaskEpisode(
-        "PRIMECLAW-10.38", "continue", f.ctx,
-        { ...f.deps, taskResolver: boundTaskResolver(f) },
-      ),
-      /canonical primary main checkout/,
-    );
-    assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
-  });
-  await t.test("dirty Episode checkout", async () => {
-    const f = harness();
-    f.ownership.write(f.root, activeTaskRecord(f));
-    f.git.assertCleanWorktree = () => { throw new Error("Episode worktree is dirty"); };
-    await assert.rejects(
-      handoffTaskEpisode(
-        "PRIMECLAW-10.38", "continue", f.ctx,
-        { ...f.deps, taskResolver: boundTaskResolver(f) },
-      ),
-      /Episode worktree is dirty/,
-    );
-    assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
+    f.git.branch = (cwd) => cwd === f.root ? "selected-integration" : f.wt.branch;
+    f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 2 });
+    f.git.assertCleanWorktree = () => { throw new Error("must not run"); };
+    const result = await handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, {
+      ...f.deps, taskResolver: boundTaskResolver(f),
+    });
+    assert.equal(result.admitted, true);
+    assert.equal(f.calls.filter(([kind]) => kind === "handoff").length, 1);
+    assert.equal(f.calls.some(([kind]) => kind === "clean"), false);
   });
 });
 
-test("task-native handoff rejects changed task state and foreign durable session before delivery", async (t) => {
+test("task-native handoff delivers status/plan changes but rejects foreign task/session identity", async (t) => {
   for (const scenario of [
-    {
-      name: "main status is still Blocked",
-      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? "Blocked" : "In Progress" }),
-      list: undefined,
-      pattern: /requires main task status In Progress; found Blocked/,
-    },
-    {
-      name: "main status is already Ready for Merge",
-      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? "Ready for Merge" : "In Progress" }),
-      list: undefined,
-      pattern: /requires main task status In Progress; found Ready for Merge/,
-    },
-    {
-      name: "main plan is placeholder-only",
-      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, implementationPlan: cwd === f.root ? "TODO" : "Implement the task." }),
-      list: undefined,
-      pattern: /meaningful main-task Implementation Plan/,
-    },
-    {
-      name: "task path no longer matches ownership",
-      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, taskPathRelative: "backlog/tasks/other.md" }),
-      list: undefined,
-      pattern: /does not match the exact owned Backlog task on main/,
-    },
-    {
-      name: "Episode task status drifted",
-      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, status: cwd === f.root ? "In Progress" : "Blocked" }),
-      list: undefined,
-      pattern: /requires Episode task status In Progress; found Blocked/,
-    },
-    {
-      name: "Episode plan is placeholder-only",
-      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd, implementationPlan: cwd === f.root ? "Implement the task." : "TBD" }),
-      list: undefined,
-      pattern: /meaningful Episode Implementation Plan/,
-    },
-    {
-      name: "durable session is rooted in another checkout",
-      selection: (f, cwd) => taskSelection(f, { projectRoot: cwd }),
-      list: (_count, session) => [{ ...session, cwd: "/foreign" }],
-      pattern: /durable session is not rooted at the owned worktree/,
-    },
-  ]) await t.test(scenario.name, async () => {
-    const f = harness({ ...(scenario.list ? { list: scenario.list } : {}) });
+    { status: "Blocked", implementationPlan: "TBD" },
+    { status: "Ready for Merge", implementationPlan: null },
+    { status: "native-custom-state", implementationPlan: "" },
+  ]) await t.test(scenario.status, async () => {
+    const f = harness({ list: (_count, session) => [session] });
     f.ownership.write(f.root, activeTaskRecord(f));
-    await assert.rejects(
-      handoffTaskEpisode(
-        "PRIMECLAW-10.38",
-        "continue",
-        f.ctx,
-        { ...f.deps, taskResolver: (cwd) => scenario.selection(f, cwd) },
-      ),
-      scenario.pattern,
-    );
-    assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
+    const result = await handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, {
+      ...f.deps, taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd, ...scenario,
+        nativeView: { task: { id: "PRIMECLAW-10.38", ...scenario } } }),
+    });
+    assert.equal(result.admitted, true);
+    for (const prompt of f.calls.find(([kind]) => kind === "handoff").slice(1)) {
+      assert.ok(prompt.includes(JSON.stringify({ task: { id: "PRIMECLAW-10.38", ...scenario } })));
+    }
+  });
+  for (const foreign of ["path", "session"]) await t.test(foreign, async () => {
+    const f = harness({ list: (_count, session) => [{ ...session, ...(foreign === "session" ? { cwd: "/foreign" } : {}) }] });
+    f.ownership.write(f.root, activeTaskRecord(f));
+    await assert.rejects(handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, {
+      ...f.deps, taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd,
+        ...(foreign === "path" ? { taskPathRelative: "backlog/tasks/other.md" } : {}) }),
+    }), foreign === "path" ? /does not match the exact owned Backlog task/ : /not rooted at the owned worktree/);
+    assert.equal(f.calls.some(([kind]) => kind === "handoff"), false);
   });
 });
 
@@ -1935,6 +1915,11 @@ test("reserved task allocates a local worktree from the status commit and assign
   const f = harness({ record: taskReservation() });
   f.filesystem.exists = () => false;
   f.git.head = () => TASK_BASE;
+  const createWorktree = f.git.createWorktree.bind(f.git);
+  f.git.createWorktree = (repo, branch, path, base) => {
+    createWorktree(repo, branch, path, base);
+    writeFileSync(join(path, ".agents/skills/execute/SKILL.md"), "EDITED OWNER SELECTION POLICY\n");
+  };
   const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
   assert.equal(result.version, 2);
   assert.equal(result.status, "active");
@@ -1951,8 +1936,8 @@ test("reserved task allocates a local worktree from the status commit and assign
   const execute = f.calls.find((call) => call[0] === "execute");
   assert.match(execute[1], /<operator-episode-task>\s*PRIMECLAW-10\.38\s*<\/operator-episode-task>/);
   assert.match(execute[1], /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
-  assert.match(execute[1], /exact owning Conversation registry key/);
-  assert.match(execute[1], /never substitute the current session ID/);
+  assert.match(execute[1], /EDITED OWNER SELECTION POLICY/);
+  assert.doesNotMatch(execute[1], /exact owning Conversation registry key|never substitute the current session ID/);
 });
 
 test("reserved task allocates through exact Orca placement without bundle promotion", async () => {

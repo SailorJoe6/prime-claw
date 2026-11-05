@@ -36,11 +36,23 @@ the same grandfathered digest before either file moves; recovery remains
 provider-independent and works when the original future source is absent. Missing files never switch modes. It
 may refresh a stale route but never replays an uncertain transport.
 
-`handoff_task_episode(taskId, guidance?)` exposes the same continuation for strict version-2 ownership. It selects the exact requesting owner before provider/task interpretation and keeps the public signature unchanged. The grandfathered branch-local Backlog branch still requires canonical primary `main`, exact owner/task/path, a committed main task path, `In Progress` on main and in the Episode, meaningful plans, a clean owned worktree, exact durable-session CWD, and a quiescent queue.
+`handoff_task_episode(taskId, guidance?)` keeps exact owner/task/resource/session
+targeting and native delivery. Editable Markdown decides lifecycle eligibility,
+meaningful plan/design, code publication, idle completion and compatible changes.
+No duplicate literal-main/role-depth/code-dirt/upstream/ancestry/old-design gate
+selects continuation. Both canonical prompts receive current native task and
+code facts plus session list/state observations; native first-message refusal
+is truthful and never retried.
 
-Independent Backlog instead proves the exact code base/resources plus both clean nested task clones, a directly published descendant task revision, native `In Progress`, and a meaningful plan. Handoff fast-forwards only the task clones, gives both prompts exact previous/current native evidence, and records current factual revision/evidence after admission. Ready, Request Changes, Done, and archive publish only on the disconnected task branch, never the code DAG; code integration stays ordinary Git. The terminal workflow fast-forwards the Episode clone before cleanup.
-
-The direct Beads branch instead requires that same canonical Conversation and exact active provider-specific owner, operation, base, worktree/branch, Episode/session, and optional Orca resources. It preflights idle/quiescent transport, performs one supported native pull, proves clean published state, reads the exact current raw task, pairs the read with a second stable publication proof, and proves the current Episode code head clean and pushed. Exact previous/current raw views and revisions reach both canonical prompts, and the first handoff message's admission callback records the current provider/task/code facts without treating the prior `taskEvidence` observation as an approval snapshot, so the existing Episode LLM incorporates compatible owner-authored or outside same-task changes and escalates genuine semantic, authority, or scope conflicts. Unrelated published descendants remain nonblocking. A valid continuation rechecks quiescence and binds one canonical handoff plus the sole execute follow-up to the same task and resources. Guidance is bounded focus only; it cannot supply revision/raw authority.
+Grandfathered Backlog carries both complete current task views. Independent
+Backlog prepares only the Episode clone and retains prior/current native facts,
+without primary synchronization or paired equality. Beads preserves complete
+raw shape/absence, local revision and actual pull/transport/warning/working-set
+qualifications, not fabricated exact-task publication proof. Its post-admission
+callback updates only existing observations, never second resources/assignment.
+Unrelated bytes/index/history remain intact. See [handoff mechanics](../handoff-chain.md)
+and the editable handoff/execute/oversight policy for current rules and native
+publication procedures. Retained folder behavior remains separate and unchanged.
 
 Blocked and resumed status are Conversation-owned prompt steps. Backlog preserves its supported exact task-path status edit, verification, commit, and push. Beads binds the exact persisted provider/task/owner/worktree/session with no task path and uses current synchronized native status rather than stale observed status. After accepting a pushed blocker report, one guarded status-plus-note update may move only `in_progress` to `blocked`, truthfully record the blocker and unblock condition, and publish once without force with exact raw revision/ref/clean proof. Only after the operator or accepted evidence clears that actual condition may one fresh guarded update return current `blocked` to `in_progress`, append clearance evidence, and publish once before ordinary task handoff. The same Episode/resources continue; its handoff callback advances factual current provider/task/code observations. Later states, foreign ownership, and uncertain operations stop without retry. No custom block/resume action, public parameter, progress receipt, alternate state machine, or replacement work is required.
 

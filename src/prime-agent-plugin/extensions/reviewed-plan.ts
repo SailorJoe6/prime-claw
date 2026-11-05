@@ -882,21 +882,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "handoff_task_episode",
       label: "Hand off task Episode",
-      description: "Continue one exact owned idle task-native Episode within its approved scope.",
-      promptSnippet: "Hand off the exact task-native Episode and queue its next execute pass",
-      promptGuidelines: [
-        "Call handoff_task_episode only when this exact owner selects continuation while the task remains In Progress.",
-        "Pass only the exact canonical task ID and optional bounded focus. Guidance never supplies provider revision or raw task authority.",
-        "For active Beads ownership, exact previous/current native task observations are factual LLM context, not a semantic approval gate; compatible same-task changes and unrelated descendants continue normally.",
-        "Never use ordinary handoff for Blocked, merge, abandonment, cleanup, consultation, pause, or scope expansion.",
-        "Treat handoff as terminal routing. Never retry uncertain transport or claim compaction or execute completion from admission alone.",
-      ],
+      description: "Send canonical handoff and queue execute for the task's existing Episode.",
+      promptSnippet: "Deliver the task Episode handoff and execute workflow chain",
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
-          taskId: { type: "string", description: "Exact canonical provider-native task ID bound to the owned Episode" },
-          guidance: { type: "string", description: "Optional bounded compaction focus inside the accepted scope" },
+          taskId: { type: "string", description: "Canonical task ID" },
+          guidance: { type: "string", description: "Compaction focus text" },
         },
         required: ["taskId"],
         additionalProperties: false,
@@ -907,7 +900,9 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
           const conversationCompaction = await runConversationAfterHandoff(pi, ctx, dependencies);
           return {
-            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.${conversationCompactionWarning(conversationCompaction)}` }],
+            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.${conversationCompactionWarning(conversationCompaction)}${result.providerTaskObservation ? `
+
+${JSON.stringify(result.providerTaskObservation)}` : ""}` }],
             details: { ...result, conversationCompaction },
           };
         } catch (error) {

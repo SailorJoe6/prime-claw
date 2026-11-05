@@ -62,9 +62,10 @@ the native design status rather than relying on a configured default:
   `--status "In Design"`, then bind the exact created task ID from its output.
   This repository now defaults to `In Design`, but the explicit status keeps
   the authoring command self-contained and auditable.
-- **Beads:** first run one supported `bd dolt pull` and capture
-  `bd context --json`, native revision/publication evidence, and clean
-  working-set state. Use one supported `bd --dolt-auto-commit=on create`
+- **Beads:** before the auto-committing create, follow the Beads consequence
+  review below, then run one supported `bd dolt pull` and capture
+  `bd context --json`, native revision/publication and working-set facts.
+  Use one supported `bd --dolt-auto-commit=on create`
   command with the title, `--type task`, `--status in_design`, `--description`,
   `--acceptance`, and `--json`. Bind only the exact canonical ID returned by
   that one creation.
@@ -117,51 +118,66 @@ path, or content mirror.
 
 ### Backlog
 
-Before mutation, record Git status and require the selected existing task path
-and Git index to be clean. After creation or revision, reload the exact task
-through `backlog task view --json -- TASK-ID` and verify its canonical ID,
-`In Design` status, meaningful Description, native Acceptance Criteria, and
-returned regular task path. Verify no path other than that exact returned task
-path was newly changed and do not stage unrelated pre-existing changes.
+Immediately before mutation, synchronize and reread the intended task workspace
+through the supported CLI. Inspect the selected task diff and any pre-existing
+edits; incorporate compatible authorized changes, and consult on a real conflict
+or unclear ownership. Unrelated staged, unstaged, or untracked task/code changes
+and compatible history descendants are not cleanliness prerequisites. Never
+absorb, stash, revert, or delete them to make publication succeed.
 
-Preserve the selected store topology. If the selected Backlog store is a
-validated ignored independent ordinary-Git clone, whether built-in or custom,
-require canonical code HEAD clean and upstream-equal, require the nested clone
-clean at the direct remote `refs/heads/prime-claw/tasks` head, commit only the
-returned task path inside that clone, push `HEAD:refs/heads/prime-claw/tasks`
-without force, and prove the direct remote head while code HEAD stays unchanged.
-Only for an actual branch-local store, keep the existing flow: commit only the
-returned task path in the code repository, prove the commit contains no other
-path, and attempt one prompt push when a remote is available. A push failure is transport evidence to
-report, not permission to undo the valid local specification, create another
-task, or begin planning.
+After creation or revision, reload `backlog task view --json -- TASK-ID` and
+verify canonical ID, returned regular path, parent, `In Design` status,
+Description, Acceptance Criteria and the intended field changes. Preserve all
+unrelated fields. Commit each coherent ticket update as soon as it is ready,
+and publish promptly, not at handoff, compaction, session end or admission.
+Inspect the selected diff; use literal pathspecs for both `git add -- PATH` and
+`git commit --only -- PATH` (`git --literal-pathspecs ...`). Verify that the
+commit contains only that task path and excludes unrelated index entries.
+
+Preserve the selected store topology. In an ignored independent ordinary Git
+clone, commit inside that clone and push `HEAD:refs/heads/prime-claw/tasks`
+without force. Verify direct publication and the native reread. Task-only work
+must not write the code checkout's HEAD, index or files; unrelated concurrent
+code changes do not prove this operation changed code. In branch-local mode,
+make the same exact-task-only commit in the code repository and publish normally
+when a remote exists; commit code separately. A native conflict or rejected or
+uncertain push is evidence to inspect, not permission to retry, force, create
+another task, or begin planning. Workflow rules belong here and in the invoking
+LLM's judgment, not a second code-level admission or publication policy.
 
 ### Beads
 
-For an existing task, immediately before the single guarded update perform one
-more supported native pull and complete raw reread. Compare it field for field
-with the synchronized view. Incorporate a compatible in-scope clarification as
-the current living specification. Stop without a write for a genuine semantic
-conflict, authority change, or scope expansion. Do not replace this judgment
-with a byte-equality approval gate or semantic classifier.
+Before every create, update, native history commit or push, inspect native
+pending/staged changes and review publication consequences. Beads v1.3.1 stages
+touched tables and commits the staged set: other pending rows in those tables
+and already-staged changes can enter history during an auto-committing mutation,
+BEFORE push. This is the approved multi-issue history exception, not per-issue
+isolation. Disclose relevant consequences and consult before committing or
+publishing unauthorized or unclear pending work. Pending/concurrent native work
+can prevent a safe operation; judge the facts, not a blanket cleanliness or
+quiescence rule. Never add a store, branch, row filter or dependency workaround.
 
-After the one create or update, reread with
-`bd show TASK-ID --json --long --include-comments` and capture native
-revision, publication-ref, and clean working-set evidence. Require exact
-canonical identity, native `in_design` status, and the intended meaningful
-`description` and acceptance criteria. A create establishes that complete raw
-view as the exact baseline. An update must leave every unrelated raw field
-unchanged apart from provider-generated revision/timestamp data caused by the
-write.
+Immediately before an existing-task update, perform the supported pull and
+complete raw reread. Incorporate compatible in-scope refinements; stop for a
+genuine semantic conflict, authority change or scope expansion. Inequality is
+not an approval gate or a deterministic classifier. After the one create or
+update, reread `bd show TASK-ID --json --long --include-comments`, revision,
+publication-ref and working-set facts. Verify exact ID, native `in_design`,
+the intended Description/acceptance changes and preservation of every unrelated
+raw field apart from provider-generated revision/timestamps.
 
-Publish exactly once with `bd dolt push --no-adopt`. Then perform one native
-post-publication pull/read cycle and exact revision/ref proof. Require the final
-published raw task to equal the verified post-write view and the working set to
-remain clean. An unrelated-task descendant revision is compatible only when the
-exact target-task view is unchanged. Any failed or uncertain pull, create,
-update, push, or proof is evidence to report, not permission to retry, force,
-adopt, reset, overwrite, or create another task. Beads authoring performs no
-Backlog command or Git task-file commit.
+Commit each coherent authorized ticket update through supported native history
+as soon as ready and publish promptly with `bd dolt push --no-adopt`. Inspect
+`bd --readonly history TASK-ID --json --limit 0` (native CommitHash and Issue
+snapshots) and revision inclusion before claiming a commit, and native
+publication-ref/history evidence before claiming the exact task is published.
+An exit-zero update may only log a trailing history-commit failure; successful
+push, local HEAD and a local task read alone are not that proof. Report command
+results/warnings and remaining working-set qualifications honestly. Use the
+native post-publication read to inspect current facts; compatible descendants
+and same-task refinements remain LLM judgment, not frozen-view equality. A failed
+or uncertain result is not permission to retry, force, adopt, reset, overwrite
+or create again. No Backlog command or fabricated Git task-file commit is used.
 
 ## Keep the specification alive
 

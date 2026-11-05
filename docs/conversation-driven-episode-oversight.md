@@ -1,5 +1,32 @@
 # Conversation-driven Episode oversight
 
+## Task55 continuation and ticket-durability boundary
+
+Ordinary task-native continuation now follows editable handoff/execute/oversight
+policy rather than duplicated code status/design/branch/role-depth/dirt/upstream/
+ancestry checks. Exact owner/task/worktree/branch/session/route addressing stays
+mechanical. Current raw task/code and native session observations reach both
+prompts and the caller; the first native prompt uses queueIfBusy:false and actual
+failure/uncertainty never causes automatic replay. Independent Backlog prepares
+only the Episode task workspace, not the mutable primary. Beads old design and
+successful native commands are not approval or exact-task publication proof.
+
+The complete46file durability correction uses the existing asset inventory,
+not another policy registry. Coherent ticket updates are committed ASAP and
+published promptly through native history. Backlog uses literal selected-file
+commits in both topologies, excluding unrelated staging; code commits separately.
+Beads v1.3.1 requires pending/staged touched-table/staged-set consequence review
+BEFORE mutation/commit/push and actual task-history/publication inclusion checks,
+not per-issue isolation or a replacement clean-working-set gate. Customized
+project guidance is preserved. Candidate source is not global activation.
+
+Older implementation detail below about creation clean-code/status checks and
+exception-selected rollback is superseded by the accepted Task55 creation slice;
+see [current task creation](backlog.md). Terminal/cleanup and recorded-operation
+recovery still require their remaining Task55 work; retained version-1 behavior
+is unchanged. This section is not whole-task acceptance or live cleanup authority.
+
+
 Prime Claw uses the hierarchy **Universal → Project → Conversation → Episode**.
 The Conversation supervises one implementation Episode. The Episode implements
 an approved specification in its own worktree. Roles are responsibilities
@@ -159,9 +186,10 @@ directory and transcript oversight markers are retired.
 For grandfathered branch-local Backlog version-2 ownership, a short inter-process
 admission lock serializes only the exact Backlog status edit, task-only commit,
 and durable reservation.
-The reservation seam re-resolves the exact task, verifies the caller-supplied
-admission commit and a clean task, then writes `provisioning` before releasing
-the lock or starting push, branch, worktree, session, or assignment work. Its
+The reservation seam targets the exact task/path/owner and requested code base,
+then writes `provisioning` before resource allocation. Status/plan, task/code dirt
+and code publication judgments belong to editable readiness policy, not this
+resource operation. Its
 allocator consumes only that reservation, creates the selected local or Orca
 worktree from `baseRef`, skips bundle promotion, binds one durable exact-CWD
 session, and sends one execute assignment carrying both the task ID and exact
@@ -178,18 +206,14 @@ reopening without reassigning. For version 2 this is an internal recovery seam:
 public `implement_task` and `create_task_episode` admission reject existing
 non-terminal ownership, and the owner continues through the existing Episode's
 lifecycle surfaces. Partial provisioning or allocation failure becomes
-`uncertain` and cannot replay fresh. The trusted task-admission
-transaction first proves it is at the repository root of the primary Git
-worktree on `main`; linked worktrees and other branches fail before any task,
-Git, ownership, or allocator mutation. Grandfathered Backlog commits the exact clean `In Planning` task as `In Progress`
-and reserves from that exact SHA under the short lock. Independent Backlog
-publishes that status on its disconnected task branch, binding its revision
-and native view separately from the clean code base. Beads publishes one
-guarded native `in_progress` transition and binds its published raw task and
-revision. Allocation follows reservation and verifies durable active identity.
-Proven-clean pre-ownership failure restores native `In Planning`; durable or
-uncertain mutation publishes native `Blocked` with its exact recovery condition
-while retaining evidence. No path retries admission. Folder admission and close operations explicitly reject version 2;
+`uncertain` and cannot replay fresh. The task creation operation reports current native facts, performs one requested
+In Progress mutation and exact resource reservation/allocation, and sends one
+initial execute. Editable Markdown owns readiness, code basis and failure
+disposition. It does not impose literal-main/whole-checkout-clean/upstream or
+frozen-view approval, implicitly initialize during ordinary status publication,
+or choose In Planning/Blocked from an exception. Backlog task-only commits and
+Beads raw native qualifications retain their distinct history contracts.
+Folder admission and close operations explicitly reject version 2;
 task-native creation, handoff, lifecycle, and cleanup use their separate public
 surfaces.
 
@@ -377,9 +401,9 @@ work.
 Only after the operator or accepted evidence clears that recorded condition may
 one fresh proof cycle guard `blocked` to `in_progress`, append truthful clearance
 evidence, and publish once without force. `handoff_task_episode` then selects the
-same owner/resources, preflights the same idle Episode, performs its supported
-native pull and paired raw publication proof, and proves the current code head
-clean and pushed. It supplies exact previous/current raw views and revisions to
+same owner/resources and reads current native raw/transport/code/session facts;
+it does not impose clean/pushed-code or paired publication-proof eligibility.
+It supplies exact previous/current raw views and revisions to
 both canonical prompts, then records only factual provider/task/code observations
 after the first handoff message is admitted. The previous persisted observation
 may truthfully be `blocked`; the current task must be exact `in_progress` with a

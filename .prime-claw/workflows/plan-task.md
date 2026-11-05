@@ -106,8 +106,8 @@ Preserve real newlines and never edit task Markdown directly. Reload through
 path, `In Planning` status, and meaningful non-placeholder Implementation Plan.
 Verify no other task path changed and preserve the selected store topology. If
 the selected Backlog store is a validated ignored independent ordinary-Git
-clone, whether built-in or custom, commit only the bound task path inside the
-clone, push `HEAD:refs/heads/prime-claw/tasks` without force, and verify native
+clone, whether built-in or custom, commit only the bound task path with literal
+pathspecs for both `git add` and `git commit --only` inside the clone, push `HEAD:refs/heads/prime-claw/tasks` without force, and verify native
 publication of the selected committed task. Preserve unrelated task-store edits,
 staging, and compatible published descendants.
 Independent task publication does not require the code checkout to be clean or
@@ -117,9 +117,8 @@ including `.prime-claw/ownership.json`, are not a blocker. Do not write the code
 checkout's HEAD, index, or files as part of independent task publication, and
 never stash, revert, commit, or delete another Conversation's changes to satisfy
 a cleanliness check. An unrelated concurrent code change is not evidence that
-this task publication changed code. Separate lower-level Episode allocation and
-publication gates remain pending later PRIMECLAW-55 work; report their actual
-failures rather than bypassing them. Only for an actual
+this task publication changed code. Workflow decisions belong to editable guidance and the LLM; code performs the
+requested native operations and reports their actual results. Only for an actual
 branch-local store, keep the existing flow: commit only the bound task path in
 the code repository, prove the commit contains no other path, and attempt one
 prompt push. Commit the coherent selected-ticket plan as soon as it is ready
@@ -130,13 +129,16 @@ choosing a safe next step.
 
 ### Beads publication
 
-Immediately before mutation, reread `bd context --json`, the complete exact task
-view, native revision/publication evidence, and clean working-set state. Compare
-that raw view with the synchronized view field for field. A normal compatible
-owner-authored refinement or outside same-task planning change becomes the
-current planning basis; revise the proposed design to incorporate it. Escalate
-only a genuine semantic conflict, authority change, or scope expansion. Do not
-replace this judgment with byte equality, a classifier, or a new approval gate.
+Before native mutation, commit or push, inspect pending/staged changes and
+review Beads v1.3.1 touched-table/staged-set multi-issue consequences, including
+other pending rows and already-staged changes committed by auto-update BEFORE
+push. Disclose consequences and consult before unauthorized/unclear work enters
+history. Pending native work may prevent a safe operation; no per-issue isolation,
+blanket clean/quiescence gate, store/branch, row filter or dependency workaround.
+Immediately before mutation reread `bd context --json`, the complete exact raw
+task and native revision/publication/working-set facts. Incorporate compatible
+refinements; escalate a genuine semantic conflict, authority change or scope
+expansion. Raw inequality is not a classifier or approval gate.
 
 Apply the exact plan and lifecycle transition together through one guarded
 supported native command equivalent to:
@@ -147,24 +149,25 @@ bd --dolt-auto-commit=on update TASK-ID --design "$PLAN" --status in_planning --
 
 Do not change any other owner or lifecycle field. Do not force, retry, adopt,
 reset, use raw Dolt writes, or create a task path, sidecar, snapshot, digest, or
-receipt. Reread the complete raw task plus native revision and clean
+receipt. Reread the complete raw task plus native revision and actual
 working-set evidence. Require the intended meaningful raw `design`, exact
 `in_planning`/`In Planning` status, exact canonical ID, and every unrelated
 native field unchanged apart from provider-generated revision/timestamp data.
 
-Commit each coherent selected-ticket update through supported native history as
-soon as it is ready; do not defer durability until handoff or session end.
-Preserve unrelated native fields, working-set changes, and history rather than
-adopting, resetting, or committing another Conversation's work. Publish promptly
-and exactly once with `bd dolt push --no-adopt`. Then perform one native
-post-publication pull/read cycle and exact publication-ref/revision proof.
-Require the published raw task to contain the verified design and
-`in_planning` status and the working set to remain clean. An unrelated-task
-revision descendant is compatible when the exact target-task view is unchanged.
-If the target task changed outside the planning write, use the exact raw values
-to judge whether it is compatible; report a genuine semantic/scope/authority
-conflict without another mutation. Any failed or uncertain sync, update, push,
-or proof is evidence to report, not permission to retry or overwrite.
+Commit each coherent authorized ticket update through supported native history
+ASAP and publish promptly, not at handoff, compaction, session end or admission.
+Preserve unrelated fields and history; only the explicitly reviewed native
+multi-issue exception permits including other pending issue changes. Never reset,
+adopt or commit unauthorized/unclear work. Inspect
+`bd --readonly history TASK-ID --json --limit 0` (CommitHash/Issue snapshots) and
+revision inclusion to verify the intended task changes reached history. A native
+exit-zero update can merely log a trailing commit failure; local view/HEAD and
+push success are not exact-task durability proof. Publish once with
+`bd dolt push --no-adopt`, inspect native publication ref/history/current raw
+view, and report actual inclusion, warnings and remaining working-set facts.
+Compatible task/history changes remain LLM judgment, not frozen equality.
+Failed or uncertain sync/update/commit/push is evidence, never permission to
+retry, force or overwrite.
 
 Beads planning performs no Backlog command, Git task-file commit, content
 mirror, ownership write, branch/worktree/session creation, or implementation

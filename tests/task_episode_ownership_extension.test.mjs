@@ -23,7 +23,7 @@ import {
   removeTaskEpisodeOwnership,
   writeEpisodeOwnership,
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
-import { handoffTaskEpisode } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
+import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import {
   CliLegacyTaskOwnershipTransitionGit,
   advancePublishedBeadsTaskEpisodeEvidence,
@@ -1424,7 +1424,7 @@ test("native synchronization failure is not retried and changes no evidence", ()
   assert.deepEqual(readEpisodeOwnership(f.root, f.unrelated.ownerSessionId), f.unrelated);
 });
 
-test("Beads evidence advancement rejects foreign, drifted, colliding, uncertain, or unpushed identity without retry", () => {
+test("Beads advancement preserves exact owner/store mutation without pushed-head approval", () => {
   const f = evidenceAdvancementFixture();
   assert.throws(() => advanceEvidence(f, { ownerSessionId: "foreign-owner" }), /no ownership for the exact requesting owner/);
 
@@ -1438,7 +1438,13 @@ test("Beads evidence advancement rejects foreign, drifted, colliding, uncertain,
     operationInProgress: () => false,
     isAncestor: () => true,
   };
-  assert.throws(() => advanceEvidence(f, {}, { git: cleanGit }), /local\/upstream\/direct-remote Episode head/);
+  cleanGit.status = () => { throw new Error("no code cleanliness approval"); };
+  cleanGit.upstreamHead = () => { throw new Error("no upstream approval"); };
+  cleanGit.directRemoteHead = () => { throw new Error("no direct-remote approval"); };
+  cleanGit.isAncestor = () => { throw new Error("no ancestry approval"); };
+  assert.equal(prepareEvidence(f, {}, { git: cleanGit }).commit().head, f.reviewedHead);
+  writeEpisodeOwnership(f.root, f.owner);
+  assert.throws(() => prepareEvidence(f, {}, { git: { ...cleanGit, branch: () => "foreign" } }), /exact recorded Episode repository and branch/);
 
   const drifted = { ...f.owner, updatedAt: "2026-10-20T21:59:00.000Z" };
   const driftStore = {
@@ -1788,8 +1794,12 @@ test("atomic task removal handles provider-native Beads evidence without a Backl
   assert.equal(readEpisodeOwnership(root, "owner"), null);
 });
 
-test("real Beads advancement carries full local transport qualifications to both continuation prompts before its admission callback persists", async () => {
+test("registered Beads continuation delivers current raw/code/session facts without old design or code-publication approval", async () => {
   const f = evidenceAdvancementFixture();
+  f.owner = parseEpisodeOwnership({ ...f.owner, taskEvidence: { ...f.owner.taskEvidence, design: null } });
+  writeEpisodeOwnership(f.root, f.owner);
+  f.currentTaskEvidence = { ...f.currentTaskEvidence, status: "native-unknown", notes: "current raw refinement" };
+  delete f.currentTaskEvidence.design;
   mkdirSync(join(f.episodeRoot, ".agents", "skills", "execute"), { recursive: true });
   mkdirSync(join(f.episodeRoot, ".prime-claw", "workflows"), { recursive: true });
   writeFileSync(join(f.episodeRoot, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE RAW NATIVE FACTS\n");
@@ -1799,13 +1809,19 @@ test("real Beads advancement carries full local transport qualifications to both
   git(f.episodeRoot, "add", "--", ".agents/skills/execute/SKILL.md");
   git(f.episodeRoot, "commit", "-q", "-m", "install fixture continuation workflows");
   f.reviewedHead = git(f.episodeRoot, "rev-parse", "HEAD");
-  git(f.episodeRoot, "push", "-q");
+  // Leave the new fixture commit unpublished and unrelated index/bytes dirty.
+  writeFileSync(join(f.episodeRoot, "candidate.txt"), "staged unrelated code\n");
+  git(f.episodeRoot, "add", "candidate.txt");
+  writeFileSync(join(f.episodeRoot, "candidate.txt"), "unstaged unrelated code\n");
+  writeFileSync(join(f.episodeRoot, "untracked.txt"), "untracked unrelated code\n");
+  const before = [git(f.episodeRoot, "rev-parse", "HEAD"), git(f.episodeRoot, "ls-files", "--stage"),
+    readFileSync(join(f.episodeRoot, "candidate.txt"), "utf8"), readFileSync(join(f.episodeRoot, "untracked.txt"), "utf8")];
   const provider = evidenceAdvancementProvider(f);
   const session = {
     activeSessionId: f.owner.episodeActiveSessionId, sessionId: f.owner.episodeId,
     sessionFile: f.owner.episodeSessionFile, cwd: f.episodeRoot,
     isSessionActive: false, isStreaming: false, isCompacting: false, isBashRunning: false,
-    isRunningTools: false, hasRunningRlmChildren: false, unfinishedActionCount: 0,
+    isRunningTools: true, hasRunningRlmChildren: true, unfinishedActionCount: 3,
     sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null },
   };
   let deliveries = 0;
@@ -1817,7 +1833,8 @@ test("real Beads advancement carries full local transport qualifications to both
       getSessionFile: () => join(f.root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
     },
   };
-  const result = await handoffTaskEpisode(f.taskId, "accepted bounded revision", ctx, {
+  const tools = new Map();
+  createReviewedPlanExtension({
     advanceBeadsEvidence(input) {
       advancement = advancePublishedBeadsTaskEpisodeEvidence(input, provider);
       return advancement;
@@ -1830,7 +1847,7 @@ test("real Beads advancement carries full local transport qualifications to both
         assert.equal(route, f.owner.episodeActiveSessionId);
         assert.deepEqual(readEpisodeOwnership(f.root, f.owner.ownerSessionId), f.owner);
         for (const prompt of [handoff, execute]) {
-          const facts = JSON.parse(prompt.match(/<provider-task-observation>\n([\s\S]*?)\n<\/provider-task-observation>/)[1]);
+          const facts = JSON.parse(prompt.match(/(?:^|\n)<provider-task-observation>\r?\n([\s\S]*?)\r?\n<\/provider-task-observation>/)[1]);
           assert.equal(facts.currentProviderRevision, f.currentProviderRevision);
           assert.equal(Object.hasOwn(facts, "publishedProviderRevision"), false);
           assert.deepEqual(facts.previousTaskEvidence, f.owner.taskEvidence);
@@ -1842,6 +1859,11 @@ test("real Beads advancement carries full local transport qualifications to both
           assert.match(prompt, /native pull qualification/);
           assert.match(prompt, /native observation warning/);
           assert.match(prompt, /remote task publication not observed/);
+          assert.match(facts.episodeCode.status.stdout, /candidate.txt/);
+          assert.notEqual(facts.episodeCode.head, facts.episodeCode.upstream.stdout.trim());
+          const sessionFacts = JSON.parse(prompt.match(/(?:^|\n)<episode-session-observation>\r?\n([\s\S]*?)\r?\n<\/episode-session-observation>/)[1]);
+          assert.equal(sessionFacts.state.hasRunningRlmChildren, true);
+          assert.equal(Object.hasOwn(facts.currentTaskEvidence, "design"), false);
         }
         assert.match(handoff, /accepted bounded revision/);
         assert.doesNotMatch(execute, /accepted bounded revision/);
@@ -1853,7 +1875,19 @@ test("real Beads advancement carries full local transport qualifications to both
       async reopen() { assert.fail("same live session must remain bound"); },
       close() {},
     },
+  })({
+    registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
+    sendUserMessage() {}, async sendMessage() {},
   });
+  const toolResult = await tools.get("handoff_task_episode").execute("continue", {
+    taskId: f.taskId, guidance: "accepted bounded revision",
+  }, undefined, undefined, ctx);
+  assert.equal(toolResult.isError, undefined, toolResult.content[0].text);
+  const result = toolResult.details;
+  assert.equal(result.providerTaskObservation.currentTaskEvidence.status, "native-unknown");
+  assert.ok(toolResult.content[0].text.includes(JSON.stringify(result.providerTaskObservation)), "the invoking LLM gets facts in tool text, not only UI details");
+  assert.deepEqual([git(f.episodeRoot, "rev-parse", "HEAD"), git(f.episodeRoot, "ls-files", "--stage"),
+    readFileSync(join(f.episodeRoot, "candidate.txt"), "utf8"), readFileSync(join(f.episodeRoot, "untracked.txt"), "utf8")], before);
   assert.equal(deliveries, 1);
   assert.equal(result.episodeId, f.owner.episodeId);
   assert.equal(result.episodeActiveSessionId, f.owner.episodeActiveSessionId);

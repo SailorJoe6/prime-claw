@@ -61,20 +61,15 @@ export default function handoffChain(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "ralph_handoff",
     label: "Ralph handoff",
-    description: "Admit the canonical Ralph handoff workflow and queue one canonical execute follow-up. Optional guidance affects handoff compaction focus only.",
-    promptSnippet: "Hand off the current Ralph implementation slice and queue its next execute pass",
-    promptGuidelines: [
-      "Call ralph_handoff when the operator clearly asks to hand off the current Ralph implementation pass.",
-      "Use the handoff skill to interpret the request and bind the current implementation pass; pass only operator-supplied optional guidance and clarify a materially ambiguous objective.",
-      "Treat ralph_handoff as a terminal routing action: after successful admission, do not continue the implementation task in the current turn. Admission is not compaction or execute completion; never retry uncertain delivery automatically.",
-    ],
+    description: "Send canonical handoff and queue one execute follow-up.",
+    promptSnippet: "Deliver the Ralph handoff and execute workflow chain",
     executionMode: "sequential",
     parameters: {
       type: "object",
       properties: {
         guidance: {
           type: "string",
-          description: "Optional operator-supplied compaction guidance for the handoff workflow",
+          description: "Compaction focus text",
         },
       },
       additionalProperties: false,

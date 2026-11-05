@@ -220,17 +220,17 @@ def test_authoring_skill_publishes_only_through_the_selected_provider_and_stops_
     text = " ".join(project_skill(skill_name).read_text().split())
 
     for fragment in (
-        "selected existing task path and Git index to be clean",
-        "no path other than that exact returned task path was newly changed",
-        "commit only the returned task path",
+        "Unrelated staged, unstaged, or untracked task/code changes and compatible history descendants are not cleanliness prerequisites",
+        "commit contains only that task path and excludes unrelated index entries",
+        "git commit --only -- PATH",
         "push `HEAD:refs/heads/prime-claw/tasks` without force",
-        "code HEAD stays unchanged",
-        "push failure is transport evidence",
-        "one more supported native pull and complete raw reread",
+        "Task-only work must not write the code checkout's HEAD, index or files",
+        "A native conflict or rejected or uncertain push is evidence to inspect",
+        "perform the supported pull and complete raw reread",
         "bd dolt push --no-adopt",
-        "one native post-publication pull/read cycle",
-        "every unrelated raw field unchanged",
-        "Beads authoring performs no Backlog command or Git task-file commit",
+        "native post-publication read",
+        "preservation of every unrelated raw field",
+        "No Backlog command or fabricated Git task-file commit is used",
         "report the selected provider, canonical task ID, exact project root",
         "explicitly ask the operator to review the saved specification",
         "stop without planning, writing an implementation plan",
@@ -332,7 +332,19 @@ def test_project_customized_authoring_skills_are_preserved_while_new_upstream_is
         installed_fragment = source_fragment + """  This repository now defaults to `In Design`, but the explicit status keeps
   the authoring command self-contained and auditable.
 """
-        assert exposed.read_text() == source.replace(source_fragment, installed_fragment)
+        expected = source.replace(source_fragment, installed_fragment)
+        if skill_name == "spec-it-out":
+            # Preserve this project's additional concurrent-code customization,
+            # not a source-equality assumption that predates that customization.
+            custom = """Independent task publication does not require the code checkout to be clean or
+upstream-equal. Multiple Conversations may work in the same main-tracking checkout and drive
+separate Episodes concurrently. Unrelated code changes, including
+`.prime-claw/ownership.json`, are not a blocker. Never stash, revert, commit or
+delete another Conversation's changes to satisfy a cleanliness check.
+
+"""
+            expected = expected.replace("### Beads\n", custom + "### Beads\n")
+        assert exposed.read_text() == expected
         assert entry["state"] == "customized"
         assert entry["installedSha256"] == installed
         assert entry["availableUpstreamSha256"] == upstream
@@ -551,7 +563,7 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
         "push failure is transport evidence",
         '--design "$PLAN" --status in_planning --if-status CURRENT_NATIVE_STATUS',
         "bd dolt push --no-adopt",
-        "compatible owner-authored refinement or outside same-task planning change",
+        "Incorporate compatible refinements",
         "does not authorize implementation",
         "invoke `implement_task` for this exact ID",
     ):
@@ -957,11 +969,11 @@ def test_changed_loaded_policy_keeps_phase_ids_fallback_and_builder_customizatio
     for path in (ROOT / ".prime-claw/workflows/plan-task.md", ROOT / ".agents/skills/spec-it-out/SKILL.md"):
         text = path.read_text()
         assert "Independent task publication does not require the code" in text
-        assert "never stash, revert, commit, or delete another Conversation's" in text
+        assert "stash, revert, commit" in " ".join(text.split()) and "Conversation's" in text
     oversee = " ".join((source / "skills/prime-claw-oversee-episode/SKILL.md").read_text().split())
-    assert "Explicit conditional plan-then-implement authority" in oversee
-    assert "planning alone never authorizes implementation" in oversee
-    assert "not dependency readiness alone or a separate phase-history receipt" in oversee
+    assert "Explicit conditional authority" in oversee
+    assert "Planning alone grants no implementation authority" in oversee
+    assert "not dependency readiness or a phase-history receipt" in oversee
     handoff = " ".join(workflow("handoff").read_text().split())
     assert "`ralph_handoff` operation or owning Conversation" in handoff
     assert "native `/handoff` command" not in handoff

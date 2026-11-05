@@ -262,7 +262,7 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   assert.ok(deliveredExecutePrompt.includes(JSON.stringify(result.taskEvidence)));
   assert.match(deliveredExecutePrompt, new RegExp(reservedProviderRevision));
   assert.match(deliveredExecutePrompt, new RegExp(interleavedAdvance.publishedHead));
-  assert.match(deliveredExecutePrompt, /records observations, not semantic acceptance or a new authority/);
+  assert.doesNotMatch(deliveredExecutePrompt, /records observations, not semantic acceptance or a new authority/);
   assert.equal(git(result.worktree, "rev-parse", "HEAD"), codeHead);
   assert.equal(git(join(result.worktree, ".backlog"), "rev-parse", "HEAD"), publishedTaskHead);
   assert.notEqual(realpathSync(join(root, ".backlog", ".git")), realpathSync(join(result.worktree, ".backlog", ".git")));
@@ -319,7 +319,15 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
     readFileSync(join(root, task.path)),
   ];
   assert.notEqual(primaryBeforeHandoff[0], changedTask.publishedHead, "primary task checkout is intentionally stale");
+  writeFileSync(join(result.worktree, "unrelated-code.txt"), "staged Episode code\n");
+  git(result.worktree, "add", "unrelated-code.txt");
+  writeFileSync(join(result.worktree, "unrelated-code.txt"), "unstaged Episode code\n");
+  writeFileSync(join(result.worktree, "untracked-code.txt"), "untracked Episode code\n");
+  const codeBeforeHandoff = [git(result.worktree, "diff", "--cached", "--binary"),
+    readFileSync(join(result.worktree, "unrelated-code.txt")), readFileSync(join(result.worktree, "untracked-code.txt"))];
   const continued = await handoffTaskEpisode(taskId, "continue accepted work", ctx, handoffDependencies);
+  assert.deepEqual([git(result.worktree, "diff", "--cached", "--binary"),
+    readFileSync(join(result.worktree, "unrelated-code.txt")), readFileSync(join(result.worktree, "untracked-code.txt"))], codeBeforeHandoff);
   assert.deepEqual([
     git(prepared.storeDir, "rev-parse", "HEAD"),
     git(prepared.storeDir, "diff", "--cached", "--binary"),
@@ -336,8 +344,9 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   for (const prompt of [deliveredHandoff, deliveredContinuation]) {
     assert.ok(prompt.includes(JSON.stringify(beforeHandoff.taskEvidence)));
     assert.ok(prompt.includes(JSON.stringify(advancedOwner.taskEvidence)));
-    const observation = JSON.parse(prompt.match(/<provider-task-observation>\s*([\s\S]*?)\s*<\/provider-task-observation>/)[1]);
+    const observation = JSON.parse(prompt.match(/(?:^|\n)<provider-task-observation>\r?\n([\s\S]*?)\r?\n<\/provider-task-observation>/)[1]);
     assert.equal(observation.episodeCodeHead, codeHead);
+    assert.match(observation.episodeCode.status.stdout, /unrelated-code.txt/);
     assert.notEqual(observation.episodeUpstream.status, 0, "missing upstream is an observation, not coded eligibility");
   }
   git(result.worktree, "push", "-qu", "origin", result.branch);

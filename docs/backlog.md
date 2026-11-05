@@ -4,6 +4,16 @@ Prime Claw vendors its long-lived Backlog.md fork as the Git submodule at
 `deps/backlog`. The fork is `SailorJoe6/Backlog.md`; its `upstream` lineage is
 `MrLesk/Backlog.md`.
 
+Ordinary continuation likewise uses editable handoff/execute/oversight policy,
+not status/design/code-clean/upstream/ancestry approval in code. Both prompts
+receive complete native task/code/session facts. Coherent ticket edits commit
+ASAP and publish promptly: literal selected-file Backlog commits in both
+supported topologies, code separately; Beads consequence review BEFORE native
+mutation/commit/push and actual task-history/publication inclusion checks.
+See [handoff mechanics](handoff-chain.md) for the current slice and remaining
+terminal/cleanup/recovery scope. Old task-native capability/cleanliness/rollback
+details below are historical, not instructions to restore removed code policy.
+
 ## Requested creation and failure decisions
 
 Task-native create performs the caller-requested In Progress native operation,
@@ -18,7 +28,7 @@ chooses any supported status/note publication through editable guidance. Backlog
 remains selected-file-only; Beads retains approved multi-issue commit consequences
 and actual push/local-versus-task-publication limits. The one initial execute and
 both continuation observation channels remain unchanged. This is not a claim
-that the remaining terminal lifecycle or full guidance audit is complete.
+that the remaining terminal lifecycle or whole Task55 is complete.
 
 ## Current bounded release
 
@@ -145,19 +155,16 @@ in the managed `implement-task` workflow. Backlog runs ordinary `prepare`;
 Beads performs the same repository-orientation reads while skipping the
 Backlog-only queue inventory so preparation cannot select or mix providers.
 
-`create_task_episode` re-resolves the live provider, task identity, root,
-provider-native status and plan/design, and current placement at its self-contained
-creation boundary. Carried stable placement is revalidated, never silently
-substituted. No approval store or prior-entry receipt is required. Actual
-provider, identity, state, publication, placement, ownership, and resource
-failures still refuse creation. Backlog retains its
-existing exact task-only status commit and rollback transaction. Beads delegates
-once to the accepted provider-native admission: one non-force native
-`in_progress` publication, exact raw task/revision/ref proof, clean code
-`baseRef`, provisioning ownership before resources, and one fixed execute
-assignment. Clean pre-reservation failure publishes one native `in_planning`
-rollback; durable or uncertain mutation publishes `blocked` with exact recovery
-evidence. Neither path retries fresh admission.
+`create_task_episode` performs the caller-requested native In Progress mutation,
+then reserves and allocates exact selected resources. Existing editable readiness
+guidance owns lifecycle, plan/design, selected-ticket publication and code-basis
+judgments; code does not repeat them. Backlog uses literal selected-file commits;
+Beads returns actual native mutation/push/working-set facts, not fabricated task
+publication proof. One fixed execute assignment carries the complete existing
+native observations. Errors retain actual completed-operation and ownership facts;
+no exception-selected In Planning rollback, Blocked publication, recovery commit,
+push or evidence advancement occurs. The owner decides disposition. Explicit
+initialization/migration and retained-folder behavior remain separate.
 
 The resulting Episode uses the exact task as its sole durable authority, skips
 bundle copy and promotion, and leaves every later lifecycle status transition

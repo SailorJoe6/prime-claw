@@ -10,10 +10,10 @@ import {
   assertConversationPromotionReady,
   registerConversationOversight,
 } from "../src/prime-agent-plugin/extension-support/conversation-oversight.ts";
-import { writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
+import { readEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
-function fixture({ status = "active", owner = "owner", taskNative = false, legacyFiles = true, mainLegacyFiles = false } = {}) {
+function fixture({ status = "active", owner = "owner", taskNative = false, provider = "backlog", legacyFiles = true, mainLegacyFiles = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-oversight-"));
   execFileSync("git", ["init", "-q", root]);
   const guideRoot = join(root, "plugin");
@@ -25,7 +25,10 @@ function fixture({ status = "active", owner = "owner", taskNative = false, legac
   if (mainLegacyFiles) { const plans=join(root,".ralph/plans");mkdirSync(plans,{recursive:true});writeFileSync(join(plans,"SPECIFICATION.md"),"old in-place spec\n");writeFileSync(join(plans,"IMPLEMENTATION_PLAN.md"),"old in-place plan\n"); }
   if (status) writeEpisodeOwnership(root, {
     ...(taskNative
-      ? { version: 2, taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/task.md" }
+      ? (provider === "beads"
+          ? { version: 2, provider, taskId: "PRIMECLAW-10.38", providerRevision: "a".repeat(32),
+              taskEvidence: { id: "PRIMECLAW-10.38", title: "native fixture", status: "in_progress" } }
+          : { version: 2, taskId: "PRIMECLAW-10.38", taskPath: "backlog/tasks/task.md" })
       : { version: 1, sourceLocation: ".ralph/plans/future/alpha", slug: "alpha", bundleDigest: "0".repeat(64) }),
     status, operationId: "op", engine: "local", ownerSessionId: owner, baseRef: taskNative ? "a".repeat(40) : "base",
     createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
@@ -152,6 +155,22 @@ test("task-native ownership survives compaction without pretending to be a folde
   assert.throws(() => assertConversationPromotionReady(f.ctx, ".ralph/plans/future/alpha"), /PRIMECLAW-10.38/);
 });
 
+
+for (const provider of ["backlog", "beads"]) test(`oversight reloads edited Markdown for ${provider} without native status/design eligibility`, async () => {
+  const f = fixture({ taskNative: true, provider });
+  const original = readEpisodeOwnership(f.root, "owner");
+  const { taskPath, ...common } = original;
+  const record = provider === "beads"
+    ? { ...common, provider, providerRevision: "b".repeat(32), taskEvidence: { id: original.taskId, title: "native", status: "custom-native", opaque: [null, "原文"] } }
+    : { ...original, provider, providerRevision: "c".repeat(40), taskEvidence: { task: { id: original.taskId, path: taskPath, status: "Blocked", implementationPlan: null } } };
+  writeEpisodeOwnership(f.root, record);
+  writeFileSync(join(f.root, "plugin/skills/prime-claw-oversee-episode/SKILL.md"), "EDITED OVERSIGHT POLICY\n");
+  await f.events.get("session_compact")({}, f.ctx);
+  assert.equal(f.sent.length, 1);
+  assert.equal(f.sent[0].message.content, "EDITED OVERSIGHT POLICY\n");
+  assert.deepEqual(f.sent[0].message.details, { taskId: original.taskId, episodeId: original.episodeId });
+  assert.deepEqual(readEpisodeOwnership(f.root, "owner"), record);
+});
 
 test("compaction is inert outside a Git project", async () => {
   const root = mkdtempSync(join(tmpdir(), "prime-claw-ordinary-"));
