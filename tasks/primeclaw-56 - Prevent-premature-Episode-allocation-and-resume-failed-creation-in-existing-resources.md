@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-05 16:30'
+updated_date: '2026-11-05 16:41'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -22,14 +22,22 @@ documentation:
   - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/traceability.md
 modified_files:
+  - .agents/skills/blocked/SKILL.md
+  - .prime-claw/templates.json
+  - .prime-claw/workflows/implement-task-prep.md
   - .prime-claw/workflows/implement-task.md
   - docs/backlog.md
   - docs/conversation-driven-episode-oversight.md
   - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/traceability.md
   - src/prime-agent-plugin/skills/implement-task/SKILL.md
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/workflows/implement-task-prep.md
   - src/prime-agent-plugin/workflows/implement-task.md
+  - tests/test_blocked_skill.py
   - tests/test_future_plan_skills.py
+  - tests/test_oversee_episode_skill.py
 priority: p1
 type: bug
 ordinal: 141000
@@ -157,4 +165,25 @@ The owning Conversation accepted code b2657d09df7dfb59af816ee0dd813b88c0cb258a a
 Continue in this same Episode with a bounded Markdown-only recovery-guidance slice: route the exact existing owner before fresh admission checks; document owner-led targeted reconciliation with the current registry lock, selected-entry compare-before-edit and verification reread; route prep/blocked/oversight for incomplete creation before active-session/report requirements; align docs and narrow tests. Reuse PRIMECLAW-55/58's existing operationId/sessionId native seam. No remaining hard-coded obstacle has yet required TypeScript changes in this slice. Broader partial shapes and representative recovery exercises remain unfinished until their actual evidence is recorded; unsupported exact native operations must be reported as constraints rather than assumed to work.
 
 Preserve the reviewed specification, Implementation Plan, all seven unchecked AC and In Progress status. No live ownership/status mutation, new Episode/initial assignment, PRIMECLAW-45 recovery, merge, activation/restart, dependency patch or destructive action is performed by this Episode. Main's compatible ad96ebf ownership-only advance is not a required code merge or scope conflict.
+
+## Slice 2 published: owner-led creation recovery and early routing
+
+Published code candidate: 9795e575ad5737bf19ede021b30d8893c84a90bf on JLanders/prime-claw-primeclaw-56-episode-b31eee86, directly verified at origin. This is the next bounded partial-task candidate for owner review, not full-task completion. Original base f5287c3647245a6a5e6d3baad64d9cecf1dab81b and integration target main are unchanged; main's compatible ownership-only advance was not merged into this Episode.
+
+The canonical/project implement-task workflow selects exact existing ownership before fresh provider/status/readiness rules. Owner-led creation recovery now documents evidence-led targeted reconciliation with the existing ownership.json.lock directory lock, an immediate selected-entry compare-before-edit, preservation of latest other-owner raw entries and all original bindings, short same-directory atomic replacement and verification reread. It qualifies blanket no-direct-edit wording only for the exact owning Conversation's approved incomplete-creation recovery; Episode/Expert roles gain no edit authority. No session/launch identity is cleared to bypass guards, and active requires both exact session and initial-assignment proof. Current native Blocked is retained until accepted clearance; In Progress is restored/published only when needed before execution. Failed status publication reports actual local and published state rather than assumed rollback or automatic retry.
+
+Prep, blocked and oversight now route exact-owner version-2 provisioning/uncertain incomplete creation before fresh In Planning sniff, active-session identity or Episode completion/report requirements. They return to the same procedure without another readiness admission, ordinary handoff or initial assignment. Missing recorded session is not proof of non-delivery. Existing independent-Backlog/Orca operationId/sessionId continuation is reused; the instructions state its limited supported shapes and require a concrete interface-constraint report rather than pretending it supports every late failure. Unsupported shapes and truly ambiguous delivery remain unresolved until exact native evidence supports a safe action. Aligned docs preserve the no-blind-replay rule and label branch/worktree deletion as an exceptional separately authorized workaround. Only the three changed managed project-copy hashes were refreshed; historical baselines, accepted overrides and unrelated customizations were preserved. This is no user-global plugin application or activation.
+
+No TypeScript was changed. PRIMECLAW-55/58 already provide the native mechanics used by this slice; Markdown and existing filesystem/Git/provider interfaces suffice for these added decisions and targeted edit instructions. No recovery API/framework, ownership schema/state, persistent checkpoint, approval/receipt, semantic reconciler or retry planner was added.
+
+Validation:
+- `python3 -m pytest tests/test_future_plan_skills.py -q -k "task_native_implementation_policies or task_implementation_entry or creation_recovery_is"`: 3 passed, 42 deselected.
+- `python3 -m pytest tests/test_oversee_episode_skill.py tests/test_blocked_skill.py -q`: 14 passed.
+- `scripts/test-tier1.sh --probe`: passed in isolated source-mode Docker. Manifest: .test-results/20261105T163515Z-96491-28c24b90/tier1/manifest.json; SHA-256 bf390b99f061e1669c3ebd78c75629a56e7a2f6e487d9c055cd676c35d7fe634. No failure codes; teardown verified.
+- `python3 -m pytest tests/test_future_plan_skills.py::test_documented_creation_recovery_native_publication_and_registry tests/test_future_plan_skills.py::test_documented_creation_preflight_native_failure tests/test_reviewed_plan_extension.py::test_spec_episode_node_suite -q -m container`: 3 passed in 131.39s, with clean fixture teardown. Manifest: .test-results/20261105T163705Z-948-dabe5e02/tier1/manifest.json; SHA-256 8fb5a273500a5b5b64343ae3b156266a511b4623a04ec52bf288229886e15dbd.
+- Native exercise: .test-results/20261105T163705Z-948-dabe5e02/tier1/creation-recovery-native-exercise.json; SHA-256 fbe70330ddf3a359b6dcae020e467115f8b1686d5a28ca79e6c94d9513388b1d. An isolated remote rejects the one selected clearance commit. Native evidence shows local In Progress versus published Blocked and unchanged uncertain ownership. After inspection and removal of only the fixture's known rejecting hook, the same commit is published without repeating the status edit. A native Python short locked compare-before-edit then updates only the selected ownership fields to provisioning/current observations. Original owner/operation/task/provider/base/host/branch/worktree identities, latest other-owner value, code HEAD/worktree inventory and unrelated code/task staged diff plus file bytes are preserved. No session, launch or assignment is requested by this exercise. The existing full spec_episode Node suite also passed, including the prior same-worktree continuation, existing-session no-send binding and identity/launch-uncertainty regressions.
+
+Evidence limits and failed attempts: the exercise is native publication/registry smoke, not LLM compliance, real Orca/session recovery, complete creation or activation proof. The route writer's bounded Markdown contradiction check found no material mismatch; it ran no extra runtime tests and is not an independent full-candidate review. The first simultaneous focused Docker fixture failed before test bodies during builder-image inspection; its recorded image ID was subsequently absent and no test builder container remained. The independent probe passed. After inspecting those facts, the focused run was restarted alone and passed; no source-builder/provenance bypass was added. Failed setup evidence remains at .test-results/20261105T163515Z-96256-ec63b156/tier1. A broad host-safe policy selection also reached one unchanged old authoring fixture that assumes missing backlog/config.yml and failed before its native command (56 other tests passed); the relevant selected policy/routing suites above are green. That legacy fixture was not rewritten as unrelated work.
+
+Remaining approved work: representative Markdown-led allocated-worktree/pre-session and existing-session/assignment recovery exercises through actual supported native operations, including ambiguity-stop evidence; inspect any remaining concrete unsupported partial shapes and make only justified narrow enabling changes if needed. Existing adapter regressions and this native smoke do not close those outcomes. Keep the complete task unfinished, all seven AC unchecked, and status In Progress. This Episode made no live ownership/lifecycle change, new Episode/initial assignment, PRIMECLAW-45 recovery, dependency patch, merge, activation/restart, abandonment or destructive action. Await owner review of this bounded candidate before another execute slice.
 <!-- SECTION:NOTES:END -->
