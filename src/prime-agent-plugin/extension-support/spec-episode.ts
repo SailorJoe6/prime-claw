@@ -1663,7 +1663,6 @@ function preparePublishedBacklogHandoffEvidence(
   record: PublishedBacklogTaskEpisodeOwnershipRecord,
   repo: string,
   runner: CommandRunner,
-  resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null,
   dependencies: TaskEpisodeHandoffDependencies,
   episodeHead: string,
 ): { record: PublishedBacklogTaskEpisodeOwnershipRecord; observation: string } {
@@ -1675,67 +1674,33 @@ function preparePublishedBacklogHandoffEvidence(
   if (prepared.status !== "prepared") {
     throw new Error(`Independent Backlog handoff could not prepare exact task history: ${prepared.code}: ${prepared.detail}`);
   }
-  const ancestry = runner.run("git", ["merge-base", "--is-ancestor", record.providerRevision, prepared.head], {
-    cwd: prepared.storeDir,
-    allowFailure: true,
+  const current = runner.run("backlog", ["task", "view", "--json", "--", record.taskId], {
+    cwd: record.worktree!, allowFailure: true,
   });
-  if (ancestry.status !== 0) {
-    throw new Error("Independent Backlog handoff task history is not descended from the owned published revision");
-  }
-  const readNative = (cwd: string): Record<string, unknown> => {
-    const result = runner.run("backlog", ["task", "view", "--json", "--", record.taskId], { cwd, allowFailure: true });
-    try {
-      const parsed = JSON.parse(result.stdout) as unknown;
-      if (result.status !== 0 || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error(result.stderr.trim() || `exit ${result.status}`);
-      }
-      return parsed as Record<string, unknown>;
-    } catch (error) {
-      throw new Error(`Independent Backlog handoff could not read exact native task evidence: ${error instanceof Error ? error.message : String(error)}`);
+  let evidence: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(current.stdout) as unknown;
+    if (current.status !== 0 || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error(current.stderr.trim() || `exit ${current.status}`);
     }
-  };
-  const primaryEvidence = readNative(repo);
-  const episodeEvidence = readNative(record.worktree!);
-  if (JSON.stringify(primaryEvidence) !== JSON.stringify(episodeEvidence)) {
-    throw new Error("Independent Backlog handoff primary and Episode task evidence differ at one published revision");
+    evidence = parsed as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(`Independent Backlog handoff could not read exact native task evidence: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const rawTask = primaryEvidence.task;
+  const rawTask = evidence.task;
   if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
       || (rawTask as Record<string, unknown>).id !== record.taskId
-      || (rawTask as Record<string, unknown>).path !== record.taskPath
-      || (rawTask as Record<string, unknown>).status !== "In Progress") {
-    throw new Error("Independent Backlog handoff requires the exact published In Progress task identity");
-  }
-  for (const [label, cwd] of [["primary", repo], ["Episode", record.worktree!]] as const) {
-    const selected = resolveTask(cwd, record.taskId);
-    if (!selected || selected.taskId !== record.taskId || !samePath(selected.projectRoot, cwd)
-        || selected.taskPathRelative !== record.taskPath || selected.status !== "In Progress"
-        || !meaningfulTaskImplementationPlan(selected.implementationPlan)) {
-      throw new Error(`Independent Backlog handoff requires the exact meaningful In Progress task in the ${label} workspace`);
-    }
-  }
-  const paired = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
-    primaryRoot: repo,
-    targetWorktree: record.worktree!,
-    runner,
-  });
-  if (paired.status !== "prepared" || paired.head !== prepared.head) {
-    throw new Error("Independent Backlog task history changed during paired handoff publication proof");
-  }
-  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(episodeHead)) {
-    throw new Error("Independent Backlog handoff could not prove the current Episode code head");
+      || (rawTask as Record<string, unknown>).path !== record.taskPath) {
+    throw new Error("Independent Backlog handoff resolved a different owned task identity");
   }
   const upstream = runner.run("git", ["rev-parse", "--verify", "@{upstream}"], {
     cwd: record.worktree!,
     allowFailure: true,
   });
-  if (upstream.status !== 0 || upstream.stdout.trim() !== episodeHead) {
-    throw new Error("Independent Backlog handoff requires the exact Episode code head to be pushed");
-  }
   const advanced = parseEpisodeOwnership({
     ...record,
     providerRevision: prepared.head,
-    taskEvidence: primaryEvidence,
+    taskEvidence: evidence,
     head: episodeHead,
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
   }) as PublishedBacklogTaskEpisodeOwnershipRecord;
@@ -1748,7 +1713,9 @@ function preparePublishedBacklogHandoffEvidence(
       previousProviderRevision: record.providerRevision,
       publishedProviderRevision: prepared.head,
       previousTaskEvidence: record.taskEvidence,
-      currentTaskEvidence: primaryEvidence,
+      currentTaskEvidence: evidence,
+      episodeCodeHead: episodeHead,
+      episodeUpstream: upstream,
     }),
   };
 }
@@ -1875,7 +1842,7 @@ export async function handoffTaskEpisode(
       }
       const preparedRecord = preflight.record;
       const prepared = preparePublishedBacklogHandoffEvidence(
-        preparedRecord, repo, runner, resolveTask, dependencies, git.head(preparedRecord.worktree!),
+        preparedRecord, repo, runner, dependencies, git.head(preparedRecord.worktree!),
       );
       let committed = false;
       const activeSessionId = await deliverOwnedEpisodeHandoff(

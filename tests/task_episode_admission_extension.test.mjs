@@ -273,31 +273,63 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
     ...session(), isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
     unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null },
   });
-  publisher.deliverHandoff = async (_route, _handoff, _execute, onHandoffAdmitted) => { handoffs += 1; await onHandoffAdmitted?.(); };
+  let deliveredHandoff = "";
+  let deliveredContinuation = "";
+  publisher.deliverHandoff = async (_route, handoff, execute, onHandoffAdmitted) => {
+    handoffs += 1;
+    deliveredHandoff = handoff;
+    deliveredContinuation = execute;
+    await onHandoffAdmitted?.();
+  };
   const handoffDependencies = {
     admissionRunner: runner, taskRunner: runner, taskResolver, ownership, publisher,
+    prepareEpisodeTaskHistory,
     now: () => "2026-10-26T20:01:00.000Z",
   };
-  const beforeUnpushedHandoff = structuredClone(records.get("independent-owner"));
-  await assert.rejects(
-    handoffTaskEpisode(taskId, "continue accepted work", ctx, handoffDependencies),
-    /exact Episode code head to be pushed/,
-  );
-  assert.equal(handoffs, 0);
-  assert.deepEqual(records.get("independent-owner"), beforeUnpushedHandoff);
-  git(result.worktree, "push", "-qu", "origin", result.branch);
+  const beforeHandoff = structuredClone(records.get("independent-owner"));
+  writeFileSync(join(prepared.storeDir, "unrelated-primary.txt"), "staged primary task bytes\n");
+  git(prepared.storeDir, "add", "unrelated-primary.txt");
+  writeFileSync(join(prepared.storeDir, "unrelated-primary.txt"), "unstaged primary task bytes\n");
+  writeFileSync(join(prepared.storeDir, "untracked-primary.txt"), "untracked primary task bytes\n");
+  const primaryBeforeHandoff = [
+    git(prepared.storeDir, "rev-parse", "HEAD"),
+    git(prepared.storeDir, "diff", "--cached", "--binary"),
+    readFileSync(join(prepared.storeDir, "unrelated-primary.txt")),
+    readFileSync(join(prepared.storeDir, "untracked-primary.txt")),
+    readFileSync(join(root, task.path)),
+  ];
+  assert.notEqual(primaryBeforeHandoff[0], changedTask.publishedHead, "primary task checkout is intentionally stale");
   const continued = await handoffTaskEpisode(taskId, "continue accepted work", ctx, handoffDependencies);
+  assert.deepEqual([
+    git(prepared.storeDir, "rev-parse", "HEAD"),
+    git(prepared.storeDir, "diff", "--cached", "--binary"),
+    readFileSync(join(prepared.storeDir, "unrelated-primary.txt")),
+    readFileSync(join(prepared.storeDir, "untracked-primary.txt")),
+    readFileSync(join(root, task.path)),
+  ], primaryBeforeHandoff, "handoff does not synchronize or absorb the mutable primary task checkout");
   assert.equal(continued.admitted, true);
   assert.equal(handoffs, 1);
+  assert.equal(preparationCalls, 2, "handoff adds one preparation, not paired stability proofs");
   const advancedOwner = records.get("independent-owner");
   assert.equal(advancedOwner.providerRevision, changedTask.publishedHead);
   assert.match(advancedOwner.taskEvidence.task.implementationNotes, /accepted handoff advance/);
+  for (const prompt of [deliveredHandoff, deliveredContinuation]) {
+    assert.ok(prompt.includes(JSON.stringify(beforeHandoff.taskEvidence)));
+    assert.ok(prompt.includes(JSON.stringify(advancedOwner.taskEvidence)));
+    const observation = JSON.parse(prompt.match(/<provider-task-observation>\s*([\s\S]*?)\s*<\/provider-task-observation>/)[1]);
+    assert.equal(observation.episodeCodeHead, codeHead);
+    assert.notEqual(observation.episodeUpstream.status, 0, "missing upstream is an observation, not coded eligibility");
+  }
+  git(result.worktree, "push", "-qu", "origin", result.branch);
   activeRoute = undefined;
   const reopened = await handoffTaskEpisode(taskId, "continue after durable route refresh", ctx, handoffDependencies);
   assert.equal(reopened.admitted, true);
   assert.equal(reopened.episodeActiveSessionId, "independent-reopened-route");
   assert.equal(handoffs, 2);
   assert.equal(records.get("independent-owner").episodeActiveSessionId, "independent-reopened-route");
+  // The primary author explicitly synchronizes its own checkout before its next edit.
+  git(prepared.storeDir, "fetch", "-q", "origin", TASK_HISTORY_REF);
+  git(prepared.storeDir, "merge", "--ff-only", "FETCH_HEAD");
   const primaryAdvance = publishTaskHistoryMutation({
     primaryRoot: root, targetWorktree: root, taskId,
     edits: [{ option: "--append-notes", value: "ordinary primary advance" }], runner,

@@ -343,7 +343,8 @@ test("direct Beads admission publishes, reserves, allocates, and proves one exac
   assert.deepEqual(f.statusCalls, ["In Progress"]);
   assert.equal(f.reservationCalls.length, 1);
   assert.equal(f.reservationCalls[0].baseRef, codeHead);
-  assert.equal(f.reservationCalls[0].publication.status, "published");
+  // Native push success is not proof that this task reached published history.
+  assert.equal(f.reservationCalls[0].publication.status, "pushed");
   assert.equal(f.allocatorCalls, 1);
   assert.equal(f.status, "In Progress");
   assert.equal(git(f.root, "rev-parse", "HEAD"), codeHead);

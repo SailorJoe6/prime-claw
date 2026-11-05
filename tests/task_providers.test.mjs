@@ -1145,7 +1145,7 @@ test("explicit retained-folder and migration transport keeps its separate pre-ex
   const runner = recordedDetectionRunner(beadsWorkspaceResponses(root));
   const result = prepareExplicitBeadsWorkspaceTransport(root, runner);
   assert.equal(result.status, "ready");
-  assert.equal(result.evidence.submittedRevision, DOLT_REVISION);
+  assert.equal(result.evidence.publishedRevision, DOLT_REVISION);
   assert.equal(result.evidence.publicationHead, DOLT_DATA_HEAD);
   assert.equal(runner.calls.filter(([command, subcommand]) => command === "dolt" && subcommand === "clone").length, 1);
   assert.equal(runner.calls.filter((call) => call.at(-1) === DOLT_IDENTITY_QUERY).length, 2);

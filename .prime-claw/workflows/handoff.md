@@ -82,6 +82,16 @@ semantic conflict, authority change, scope expansion, or product decision. Raw
 inequality is not an approval gate; never add an equality gate or deterministic
 classifier.
 
+For independent Backlog continuation, the transport prepares and reads the
+Episode's task checkout, not the mutable primary task checkout. The invoking
+Conversation synchronizes its own task workspace when needed for its authorized
+status publication; handoff must not synchronize or absorb another writer's
+primary bytes or index. Inspect the supplied previous/current native task views,
+Episode code head, and native upstream result before deciding continuation.
+Apply the status, meaningful-plan, selected-ticket publication, code publication,
+and history-compatibility rules here as LLM judgment, not a primary/Episode
+view-equality, paired stable-head, or code-upstream approval gate.
+
 For Beads task-native handoff, use only the exact active owner's persisted
 `providerRevision` and complete raw `taskEvidence`. Before delivery, the public
 handoff boundary performs one supported native pull, proves a clean published
