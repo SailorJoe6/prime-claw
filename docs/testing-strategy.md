@@ -59,6 +59,27 @@ no Docker CLI/socket or OpenShell control path, and the bridge passes only its
 fixed container-local HOME. Static tier 0 retains contract/string checks but no
 second execution of these named behaviors.
 
+## Native session evidence versus Orca recovery
+
+`tests/test_reviewed_plan_extension.py::test_native_creation_session_assignment_and_saved_session_reuse`
+uses the real isolated Prime Agent daemon, `PrimeSessionPublisher`, and a
+native-discovered inert provider at a disposable Git worktree. It admits one
+harmless fixture assignment, reads native messages/state, stops only that idle
+fixture route, and reopens the same saved session without another assignment.
+The public probe wrapper isolates settings, sessions and daemon generation;
+the tier-1 fixture verifies network absence and exact teardown.
+
+This is native session-component evidence, not an exercise of the complete
+owner-led creation procedure, canonical execute behavior, LLM compliance or
+ambiguous delivery. The current image does not install Orca; its native
+`CliOrcaAdapter` inventory reports a missing executable. A real Orca exercise
+needs a complete compatible Linux Orca/Orcad distribution, a fresh isolated
+profile and native terminal/launch readiness before testing. Headless
+`orca serve` is supported; the missing fixture is not a fundamental Linux or
+GUI limitation. Stage any required runtime artifacts before network cutoff.
+Do not copy the macOS launcher alone, expose a host profile/socket, use the
+production control plane, or silently replace Orca with the local engine.
+
 ## Fail-closed lifecycle control boundary
 
 `tests/lifecycle/support.py` owns identity generation, exact inspection,

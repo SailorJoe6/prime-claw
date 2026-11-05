@@ -78,6 +78,104 @@ export default function proof(pi){{pi.on('session_start',async()=>{{
     assert proof["published"]["activeSessionId"] == "route"
 
 
+
+def test_native_creation_session_assignment_and_saved_session_reuse(tier1_container, ctmp) -> None:
+    """Real daemon component proof; no claim of Orca or whole-creation recovery."""
+    repo = ctmp / "session-component"
+    repo.mkdir()
+    worktree = ctmp / "allocated-worktree"
+    for args in (("init", "-q", "-b", "main"),
+                 ("-c", "user.name=Fixture", "-c", "user.email=fixture@example.test",
+                  "commit", "--allow-empty", "-qm", "Native session fixture"),
+                 ("worktree", "add", "-q", "-b", "episode/native-component", str(worktree))):
+        command = tier1_container.run("git", "-C", str(repo), *args, workdir=None)
+        assert command.returncode == 0, command.stdout + command.stderr
+    inventory = tier1_container.run("git", "-C", str(repo), "worktree", "list", "--porcelain").stdout
+    # An inert local provider permits real native message admission/completion offline.
+    # It neither implements recovery judgment nor contacts a provider service.
+    provider = worktree / ".prime/agent/extensions/native-component-provider.ts"
+    provider.parent.mkdir(parents=True)
+    provider.write_text(r"""import {createAssistantMessageEventStream} from '@earendil-works/pi-ai';
+export default function fixture(pi){pi.registerProvider('native-component',{
+baseUrl:'offline',apiKey:'fixture',api:'native-component',streamSimple(model){
+const stream=createAssistantMessageEventStream();queueMicrotask(()=>{
+const m={role:'assistant',content:[{type:'text',text:'fixture acknowledged'}],api:model.api,
+provider:model.provider,model:model.id,usage:{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,
+cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:'stop',timestamp:Date.now()};
+stream.push({type:'start',partial:m});stream.push({type:'done',reason:'stop',message:m});stream.end();});
+return stream;},models:[{id:'m',name:'Fixture',reasoning:false,input:['text'],
+cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:100000,maxTokens:1000}]});}
+""")
+    result_path = ctmp / "native-component-result.json"
+    driver = ctmp / "native-component.ts"
+    driver.write_text(r"""import {existsSync,readFileSync,writeFileSync} from 'node:fs';
+import {DaemonJsonlClient,PrimeSessionPublisher,runtimeSessionManagerClass,CliOrcaAdapter}
+from '/workspace/src/prime-agent-plugin/extension-support/spec-episode.ts';
+const worktree=__WORKTREE__,repo=__REPO__,resultPath=__RESULT__;
+const assignment='Native fixture initial execute assignment. No tools or external actions.\n<operator-episode-task>FIXTURE-1</operator-episode-task>';
+export default function proof(pi){pi.on('session_start',async(_event,ctx)=>{
+let client,publisher,published;
+try{
+client=new DaemonJsonlClient(process.env.PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET);
+publisher=new PrimeSessionPublisher(client,runtimeSessionManagerClass(ctx.sessionManager));
+const before=(await publisher.list()).filter(s=>s.cwd===worktree);
+if(before.length)throw new Error('fixture worktree already has a native session');
+let allocated;
+published=await publisher.createFresh({worktree,sessionName:'native-component-episode',
+model:{provider:'native-component',id:'m'},onAllocated(identity){
+if(!existsSync(identity.sessionFile))throw new Error('session header was not durable');allocated=identity;}});
+await publisher.deliverExecute(published.activeSessionId,assignment);
+const idle=await client.request({type:'wait_for_idle',activeSessionId:published.activeSessionId},15000);
+if(idle.success!==true)throw new Error('native idle request failed');
+const firstMessages=await publisher.getMessages(published.activeSessionId);
+const userAssignments=messages=>messages.filter(m=>m.role==='user'&&JSON.stringify(m.content).includes('Native fixture initial execute assignment.'));
+if(userAssignments(firstMessages).length!==1)throw new Error('native session does not contain exactly one assignment');
+const beforeKill=await publisher.getState(published.activeSessionId);
+if(beforeKill.sessionId!==published.sessionId||beforeKill.cwd!==worktree)throw new Error('native state identity drift');
+await publisher.kill(published.activeSessionId);
+const saved=JSON.parse(readFileSync(published.sessionFile,'utf8').split('\n').find(Boolean));
+const reopened=await publisher.reopen({worktree,sessionName:'native-component-episode',
+sessionFile:published.sessionFile,sessionId:published.sessionId,model:{provider:'native-component',id:'m'}});
+const reused=await publisher.getMessages(reopened.activeSessionId);
+const after=(await publisher.list()).filter(s=>s.cwd===worktree);
+const state=await publisher.getState(reopened.activeSessionId);
+if(after.length!==1||after[0].sessionId!==published.sessionId||state.sessionId!==published.sessionId
+||state.cwd!==worktree||reopened.sessionFile!==published.sessionFile
+||userAssignments(reused).length!==1||saved.id!==published.sessionId)throw new Error('saved-session reuse changed identity or assignment count');
+let orca;
+try{await new CliOrcaAdapter().listReadyTaskPlacementSetups(repo);orca={available:true};}
+catch(e){orca={available:false,errorName:e.name,missingExecutable:e.cause?.code==='ENOENT'};}
+writeFileSync(resultPath,JSON.stringify({scope:'real native daemon/session component, not Orca or whole-recovery proof',
+realDaemon:true,initialSessionsAtWorktree:before.length,sessionAllocations:1,initialAssignments:1,
+allocatedHeaderDurable:allocated.sessionId===published.sessionId&&allocated.sessionFile===published.sessionFile,
+sameDurableSession:true,sameSavedFile:true,sameWorktree:true,finalSessionsAtWorktree:after.length,
+assignmentCountAfterReopen:userAssignments(reused).length,extraAssignmentOnReopen:false,orca,
+notProven:['owner-led complete creation recovery','Orca allocation/launch/visible terminal binding','ambiguous-delivery recovery','LLM policy compliance','activation']}));
+}catch(error){writeFileSync(resultPath,JSON.stringify({error:String(error),stack:error?.stack}));}
+finally{publisher?.close();}
+});}
+""".replace("__WORKTREE__", json.dumps(str(worktree)))
+        .replace("__REPO__", json.dumps(str(repo)))
+        .replace("__RESULT__", json.dumps(str(result_path))))
+    request = json.dumps({"id": "commands", "type": "get_commands"}) + "\n"
+    command = tier1_container.run(
+        "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent,
+        "--mode", "rpc", "--offline", "--no-session", "--no-skills", "--no-prompt-templates",
+        "--no-context-files", "--no-extensions", "--cwd", str(repo), "-e", str(driver),
+        input_text=request, timeout=90, workdir=None,
+    )
+    assert command.returncode == 0, command.stdout + command.stderr
+    proof = json.loads(result_path.read_text())
+    assert "error" not in proof, proof
+    assert proof["realDaemon"] and proof["allocatedHeaderDurable"]
+    assert proof["initialSessionsAtWorktree"] == 0
+    assert proof["finalSessionsAtWorktree"] == 1
+    assert proof["assignmentCountAfterReopen"] == 1
+    assert proof["sameDurableSession"] and proof["sameSavedFile"] and proof["sameWorktree"]
+    assert proof["extraAssignmentOnReopen"] is False
+    assert tier1_container.run("git", "-C", str(repo), "worktree", "list", "--porcelain").stdout == inventory
+    (tier1_container.share.parent / "creation-native-session-component.json").write_text(json.dumps(proof, indent=2) + "\n")
+
 def test_episode_creation_uses_fresh_host_session_without_runtime_package_import() -> None:
     source = EPISODE_EXTENSION.read_text()
     assert 'import("@earendil-works/pi-coding-agent")' not in source
