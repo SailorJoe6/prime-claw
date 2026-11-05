@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 01:16'
+updated_date: '2026-11-05 01:26'
 labels: []
 dependencies: []
 references:
@@ -33,6 +33,7 @@ modified_files:
   - scripts/testing/source_builder.py
   - scripts/testing/source_builder_payload.py
   - src/prime-agent-plugin/extension-support/prep-chain.ts
+  - src/prime-agent-plugin/extension-support/project-initialization.ts
   - src/prime-agent-plugin/extension-support/reviewed-plan-support.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
@@ -49,7 +50,9 @@ modified_files:
   - src/prime-agent-plugin/workflows/plan-task.md
   - tests/beads_task_episode_admission_extension.test.mjs
   - tests/conftest.py
+  - tests/project_initialization_extension.test.mjs
   - tests/reviewed_plan_extension.test.mjs
+  - tests/spec_episode_extension.test.mjs
   - tests/task_episode_admission_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
   - tests/task_history_workspace.test.mjs
@@ -621,4 +624,15 @@ These are current-slice regressions from replacing previously proved publication
 Normal in-scope revision and required validation are authorized by the original task plus Joe's ce2 correction, without another routine permission stop. Diagnose concretely, repair proportionately, test the real runner/caller/tool/prompt boundary (not only fake runner producer shapes), and publish honest code/native evidence. Retain all prior failed and passed runs, source/publicCAreadonly/TLS-on/privacy/identity/provenance/cleanup, independent task history and foreign/customized assets. This record is accepted owner findings for canonical SAME-Episode continuation, not a chat assignment or full-task completion.
 
 All remaining original BOTH-provider deeper admission/status/code-basis/exception handling, continuation/oversight/terminal/finalization/cleanup/tool prose, COMPLETE managed-asset durability audit and bounded recorded45same-operation recovery still stay on THIS task/Episode. All9AC unchecked/TaskInProgress; no next-slice/full-task/merge/activation claim. No new Episode, main merge/global apply/restart/dependency/trust-settings change/live45 action/retained redesign/destructive cleanup is authorized.
+
+## Accepted R1/R2 revision implemented — fresh runtime validation pending
+Continued the SAME selected lower preparation/publication slice under owner review b1f3e410 and living plan293e9d67. Code HEAD remains published88c17530578e6a9a6d4c8abdcefd9c47843cd632 plus the coherent R1/R2 working delta; neither the old candidate nor this unvalidated revision is accepted.
+
+R1 fixes the actual ProcessCommandRunner.run boundary with native spawnSync capture of both successful stdout/stderr; existing catch/failedCommandResult metadata and the separate file-backed capture/privacy path are retained. Real-subprocess tests cover exit-zero warnings and native failure/launch metadata. A provider mutation/push caller test routes fixture replies through actual OS pipes and the production runner. It is NOT a live Beads/Dolt history or isolation reproduction. The existing initialization failure spy now targets spawnSync, the actual boundary. Bounded independent same-model read-only R1 review found no concrete failure/privacy defect; no runtime tests or writes were performed by that reviewer.
+
+R2 keeps the existing full native pushed/evidence object in the create result and passes it ephemerally through the existing allocator to its ONE initial execute assignment. The pre-session helper delivers fresh Beads transport/native-task observations through the existing provider-observation block. No persisted evidence store/ownership schema, old-mutation replay fallback, new eligibility gate or second assignment was added. Continuation now delivers raw synchronization/preparation/currentTask facts to BOTH canonical prompts and names the observed local HEAD currentProviderRevision, not publishedProviderRevision. The first-message admission callback still owns evidence persistence; resources/operation/session identity remain unchanged. Legitimate Backlog publishedProviderRevision and strict retained/migration Beads publishedRevision proof remain intact. Registered create→real allocator→initial execute and actual evidence-advancement→handoff tests now check warnings/dirty native facts/absence of remote proof/one delivery/callback timing. Source/managed handoff, oversight and docs explain those qualifications without reopening approved Beads multi-issue semantics or the reviewed Backlog behavior.
+
+The final host-safe static selection passed55/13deselected; exact log and final runtime outcomes will follow. R2/test fixture review corrected an initially uncommitted root execute fixture by committing that fixture before its recorded base/upstream; production admission guards were not changed to satisfy it. No Docker actor or runtime plugin assertion has run for this new source yet. Previous probe/focused11PASS remain historical candidate88 evidence, not R1/R2 validation. Accepted diagnostics33f/sharedCAc963, source selection/identity, configured public CA read-only/TLS-on/privacy/provenance/cleanup and old failed artifacts remain unchanged. Next coordinate actual current capture capacity, run fresh supported Docker probe and focused coverage including the changed initialization runner suite, and preserve actual failures/normal diagnosed in-scope repairs without a per-test permission pause.
+
+All original deeper BOTH-provider lifecycle/tool-prose extraction, COMPLETE managed-asset durability audit and bounded recorded45same-operation disposable-fixture recovery remain on THIS task/Episode. All9AC unchecked/FinalSummary unfinished/InProgress unchanged; no full-task/mergeReady/activation claim. No dependency/trust/selector/version change, global apply/restart, live45 action, retained redesign, main merge/abandonment or destructive live cleanup.
 <!-- SECTION:NOTES:END -->
