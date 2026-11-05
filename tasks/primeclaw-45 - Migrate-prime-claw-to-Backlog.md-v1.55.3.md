@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Planning
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-04 19:38'
+updated_date: '2026-11-05 15:58'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -140,5 +140,13 @@ author: Backlog.md Expert Conversation 01a13199-736d-7469-9af6-a884cc1e85f9
 created: 2026-11-04 19:38
 ---
 Workflow-state correction authorized by the operator (2026-11-04): restore `In Planning` because the failed admission never established the durable Episode session identity and assignment required to begin implementation. `PRIMECLAW-55` remains the native dependency and therefore remains the computed readiness blocker. Existing partial-resource and recovery evidence is preserved; this correction does not retry creation, discard resources, or change the approved specification or plan. `PRIMECLAW-60` records the clarified requirement that dependencies represent prerequisite blocking and `Needs Operator` is reserved for actual operator intervention.
+---
+
+author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-05 15:58
+---
+Readiness preflight by owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec (2026-11-05): the operator explicitly requested implementation of PRIMECLAW-45. Native status is In Planning, dependency55 is Done, and the approved specification/plan are published. Historical failed45 resources were removed by the separately authorized workaround recorded in PRIMECLAW-56 and commit10e8f69871f770cd5956963eb49acddddb5657dd; current Git/Orca/ownership inspection shows no45 allocation to recover. Other owner's active56 resources and pending ownership bytes remain untouched.
+
+Nix prerequisite access is available through a disposable official container with no host mounts, credentials, privileged flags or caller trust-setting changes. Exact image: nixos/nix@sha256:f159a58f390677f41e8e900a74b6e2f9c7f27b364122ae6acf7a652ce6c551c0 (linux/arm64). Both commands exited0: docker run --rm IMAGE nix --extra-experimental-features "nix-command flakes" eval --raw --impure --expr builtins.currentSystem (aarch64-linux); docker run --rm IMAGE nix --extra-experimental-features "nix-command flakes" flake metadata --json github:MrLesk/Backlog.md/0cf4fdbc70020327f4366a29d3f405f83d180301 (exact revision resolved, source unpacked into native Nix store). This is access preflight ONLY, not package/build/persistence acceptance. The Episode must still run the approved native nix build, exact binary version/help, and fresh installCheck persistence/failed-write smoke and retain logs. Reuse native entry points; no new Nix framework or waived gate. No global activation, accepted artifact replacement, live migration, merge, restart or destructive cleanup is authorized by implementation. Selected placement remains id:afb6537c-e643-4a5f-b284-f0f627ddcbdf; starting code basis main at f5287c3647245a6a5e6d3baad64d9cecf1dab81b.
 ---
 <!-- COMMENTS:END -->
