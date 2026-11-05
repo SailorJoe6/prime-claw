@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-45
 title: Migrate prime-claw to Backlog.md v1.55.3
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-05 16:08'
+updated_date: '2026-11-05 20:49'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -176,5 +176,15 @@ created: 2026-11-05 16:08
 Owner transport follow-up (2026-11-05): read-only SSH ls-remote succeeds, but normal writes remain blocked. Initial task-note push and one separately reviewed non-force attempt after inspecting unchanged refs both received remote: fatal error in commit_refs_rules. Fresh direct reads after each refusal still show refs/heads/prime-claw/tasks at55530cc9f572adad5f966d6ac00635fe65518fb9. GitHub public status reported All Systems Operational with no incident; this does not explain the repository-specific failure. No rules, credentials, remotes or trust settings were changed.
 
 Local402073242017591e9928495853e2509c75665473 contains the exact45 transport note after other owner's reviewed59-only ee47f33981b02c8b2cae9b40309b90b813962a64. That owner explicitly confirmed its publication authority and observed the same server error. Preserve both commits unchanged; do not replay edits, force/reset or bypass repository rules. This blocker note is local-only until normal publication is restored. Published task status remains In Progress; no Blocked publication is claimed. The same Episode remains idle before implementation changes. Unblock condition: operator-cleared normal repository publication access, followed by inspection of current local/remote history and successful ordinary non-force publication/readback before canonical same-Episode continuation. No new Episode, initial assignment, credential extraction, deployment or activation is authorized.
+---
+
+author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-05 20:49
+---
+Owner accepted the publication-access report and verified its clearance on2026-11-05. All pending primary task commits were preserved in ordinary shared-history merge f8c839c2c03fc9632accfc66c065936be774fb86 and publication7f9f10fda9c54b0321fc8bbc0e9e7bf2997f42de. The Episode's original notes-only checkpoint da6cdaa24405c23a48a9581d526ee21390370b20 was preserved through ordinary merge b2f888c0ed51f1b776023ab70746cfbdb56cc1b8; one normal non-force push succeeded and a direct remote read proved the exact published task ref. No credentials, SSH/Git remotes or repository rules were changed. The earlier notes/comments remain historical evidence, not current unpublished-history claims.
+
+Implementation is now Blocked by a different, directly reproduced prerequisite failure: `docker ps --format ...` exits1 with "Sign in to continue using Docker Desktop. Membership in the [zendesk] organization is required. Sign in enforced by your administrators (via registry.json)." Required Docker-only plugin validation and the approved disposable Docker-based native Nix runner cannot run through this engine. No upgrade code edits or acceptance claims have been made. Accepted v1.53.0 remains authoritative; the same active Episode/resources are preserved and idle.
+
+Unblock condition: operator-managed Docker Desktop sign-in with the required organization membership (or administrator-approved restoration of normal Docker access), followed by a successful read-only engine check. Do not alter registry.json, disable organization enforcement, obtain credentials from Keychain/browser stores, bypass the policy, or switch placement. Once normal access is restored, the owner can publish In Progress and continue the same Episode through canonical handoff under the existing implementation authority. No replacement Episode, merge, deployment/global activation/restart, live migration or destructive cleanup is authorized.
 ---
 <!-- COMMENTS:END -->
