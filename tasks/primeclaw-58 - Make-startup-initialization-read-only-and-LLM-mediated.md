@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-58
 title: Make startup initialization read-only and LLM-mediated
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-11-04 16:00'
-updated_date: '2026-11-05 00:49'
+updated_date: '2026-11-05 02:04'
 labels: []
 dependencies: []
 references:
@@ -143,6 +143,12 @@ The earlier missing-selector and focused builder-setup failures are retained abo
 Evidence: .test-results/primeclaw-58-tier1-selected.log; .test-results/20261105T003633Z-77036-f2d6aa5d/tier1/manifest.json; .test-results/primeclaw-58-container-retry.log; .test-results/20261105T003843Z-82759-7595ba44/tier1/{manifest.json,source-build.json,project-initialization-node.tap,project-initialization-active-backlog-node.tap}. Selector contains only the approved source path. Original failed focused setup run is 20261105T003633Z-76935-4208f35d; do not misstate it as a plugin test failure or assert its cause without evidence.
 
 Candidate implementation slice complete, ready for owning Conversation review at f12d04993ed67d35d90cb564cee1801644fbeddb. All seven acceptance criteria have supporting isolated code/tests/guidance evidence. No merge, status transition, global activation, restart, live migration, or Episode cleanup was performed. Task content is published in the independent task DAG only; code HEAD is unchanged by these evidence updates. There is no active/committed new build or test startup intent.
+
+Owner terminal source landing, 2026-11-05: Joe delegated source landing of Ready PRIMECLAW-57 then PRIMECLAW-58 while PRIMECLAW-55 remains In Progress. After 57's published Done and exact cleanup, source tuple main 7f3282e1507ab60eb53daeeef649d9c1c7166abd -> candidate c62fe901d3158d06955b23cafdf91b927180e44c was ordinarily fast-forward merged and non-force pushed; local/upstream/direct main publication was verified. The final refresh added only 55's already-published ownership bookkeeping to combined candidate 5f8e43c09509ad8736e322721050eca587d29deb; reviewed 58 product bytes and foreign 55 identity/resources remain unchanged, and 57's deleted owner entry stays absent.
+
+Additional combined-generation validation: scripts/test-tier1.sh --probe PASS at clean pushed 5f8e43c09509ad8736e322721050eca587d29deb, run 20261105T015735Z-79040-c43e786e, finished 01:59:24 UTC. Passed manifest/no failure codes, absent runtime network, equal before/after source inventories, clean exact builder/runtime teardown, and all 15 recorded evidence hashes verified. Both exact containers independently inspected absent. The earlier focused 49-pass suite, separate passed probe, one skipped Node case, and pre-existing host-safe assertion failure remain as already disclosed; no full-suite or model-compliance claim is added.
+
+Before Episode cleanup, all owned test logs, failed/successful native manifests and hashed artifacts were preserved under canonical primary .test-results/primeclaw58-evidence-20261105T020100Z. Four archived manifests revalidated 6/15/16/15 hashes, retaining the historical failed first focused setup run. The private source-selector file was excluded. This native Done publication records completed authorized source landing; exact owned Episode cleanup follows. No 55 development code, global installation/activation/restart, retained TASK-2 live cleanup, new Episode, or foreign runtime action was authorized or performed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
