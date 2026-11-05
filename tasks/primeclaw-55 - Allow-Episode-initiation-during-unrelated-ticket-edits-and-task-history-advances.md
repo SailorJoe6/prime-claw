@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 05:26'
+updated_date: '2026-11-05 05:34'
 labels: []
 dependencies: []
 references:
@@ -1114,4 +1114,8 @@ Otherwise the reviewer found no additional material defect in this requested ter
 Normal SAME-Episode R3 repair and required validation are authorized by original Task55/Joece2 with no routine permission pause or revived cap. Preserve truthful aggregate5PASSfromFAILED045003 plus targeted6PASS050551, all FAILEDmanifests/original133753FAILEDshare+snapshot and exact cleanup/sourcea1fa/publicCAreadonlyTLSprivacy/diagnostics/provenance. New source changes require fresh normal Docker validation; test actual default production integration, not only injected resolver mocks. Publish coherent revised candidate/native evidence/actual remaining scope for normal owner review. Accepted COMPLETE46asset correction/G1/custom4/history/nonblockingplan-taskqualification/a575/bdd/R1R2/Backlog literal unrelated-state/nativeBeads multiissue semantics remain unchanged; no redundant audit or new requirements.
 
 Remaining original THIS-task other-stage embedded policy/prose/supportinglifecycle-role extraction and bounded recorded45SAMEoperation recovery/continuation with factualsession-assignment evidence and DISPOSABLEfixturesONLY remain required, no followups/live45/generalrecovery. TaskInProgress/all9ACunchecked/FinalSummaryunfinished/notmergeReady. No newEpisode/initialassignment/MAINmerge/globalapplyactivationrestart/dependencyversionselectortrustchange/live45/retainedredesign/abandonment/destructive live cleanup authority. Genuine scope/product/unsafeunsupportedinfra/outcomes stay Joe; ordinary diagnosed repairs/normalvalidation do not.
+
+## R3 default-path preservation regression selected — source fix not yet applied
+Fresh prepare revalidated the same exact active owner/provider/task/session/worktree/branch, current owner5dd R3 finding and latest1cc living plan. Accepted product base remainsCB883; B98 terminal candidate is unaccepted. The retained default resolver still trusts the intentionally relaxed task-native cleanup inspector, so a clean local-only Episode task-history Q with identical complete selected native view can be bound as primary/remoteP. This corrects the prior broad retained-unchanged claim; historical Notes remain historical.
+Added existing ownership-suite regressions with actual native Git/Backlog/default transition resolution, not injected transitionTargetResolver: matching publishedP success and clean-Q refusal before authority write, including drift during the resolver’s pair and before the final provider proof. They preserve exact v1 owner/resources/active frozen SPEC+living PLAN on refusal and assert ordinary cleanup inspection stays relaxed. Runtime reproduction is pending current shared capture coordination; no source fix, test result, Docker actor or capacity grant exists yet. Next reproduce the defect, apply the smallest retained-only native HEAD/publication inspection at both resolver inspections, then fresh required Docker source validation/proportional green regressions. No change to ordinary task cleanup, activation/session/code/source-provenance prerequisites, accepted46/G1/customizations/native provider history boundaries or full-task remaining scope. All9ACunchecked/FinalSummarynull/InProgress unchanged; no live transition/live45/global/main/resource authority added.
 <!-- SECTION:NOTES:END -->
