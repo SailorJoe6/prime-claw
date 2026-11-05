@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-05 16:12'
+updated_date: '2026-11-05 16:30'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -149,4 +149,12 @@ The isolated native-read exercise has a published independent Backlog task in In
 Validation setup/repair evidence: the first driver attempt rejected a temporary source selector through macOS's /var symlink during source inventory before building; a canonical resolved source path fixed the selector without changing upstream source. The first focused run's two test bodies passed, but sanitized-evidence teardown rejected raw temporary paths in the new JSON. Removed raw output/path values from the durable command/exit record and reran the same focused tests successfully. No production provider, live plugin refresh, restart or recovery was used.
 
 Remaining within the approved plan: full owner-led targeted reconciliation/compare-before-edit instructions; prep/blocked/oversight routing for broader partial creation; any still-required narrow deterministic enabling changes beyond PRIMECLAW-58; allocated-pre-session and existing-session/assignment Markdown-led exercises with the remaining status-publication/ambiguity evidence. All seven AC remain unchecked pending that full review. Keep In Progress and the exact same Episode; no new Episode, status transition, merge, activation/restart, abandonment or cleanup is authorized by this slice report. Unrelated PRIMECLAW-45 task-history descendants afc29a2/55530cc were inspected and retained through ordinary fast-forward in this Episode task clone; the selected task view was unchanged before the content update.
+
+## Slice 1 accepted; bounded creation-recovery guidance slice underway
+
+The owning Conversation accepted code b2657d09df7dfb59af816ee0dd813b88c0cb258a and native task publication 45b48559f7071597c6b7dc0bc99de2cb8c229c98 after reviewing the full eight-file diff. GPT-6 Astra (openai-codex/gpt-6-astra, max) independently found no material defect. The owner/reviewer checked both passing Docker manifests and their evidence hashes; they did not rerun tests. Keep the evidence limit: native-command smoke and policy ordering, not LLM compliance, full recovery or activation.
+
+Continue in this same Episode with a bounded Markdown-only recovery-guidance slice: route the exact existing owner before fresh admission checks; document owner-led targeted reconciliation with the current registry lock, selected-entry compare-before-edit and verification reread; route prep/blocked/oversight for incomplete creation before active-session/report requirements; align docs and narrow tests. Reuse PRIMECLAW-55/58's existing operationId/sessionId native seam. No remaining hard-coded obstacle has yet required TypeScript changes in this slice. Broader partial shapes and representative recovery exercises remain unfinished until their actual evidence is recorded; unsupported exact native operations must be reported as constraints rather than assumed to work.
+
+Preserve the reviewed specification, Implementation Plan, all seven unchecked AC and In Progress status. No live ownership/status mutation, new Episode/initial assignment, PRIMECLAW-45 recovery, merge, activation/restart, dependency patch or destructive action is performed by this Episode. Main's compatible ad96ebf ownership-only advance is not a required code merge or scope conflict.
 <!-- SECTION:NOTES:END -->
