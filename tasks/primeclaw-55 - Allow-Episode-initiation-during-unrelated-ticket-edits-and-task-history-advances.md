@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 00:16'
+updated_date: '2026-11-05 00:21'
 labels: []
 dependencies: []
 references:
@@ -273,6 +273,17 @@ The one new approved normal-driver attempt is launched and CONSUMED in run202611
 
 ## Public-CA attempt complete — STOP for owner review
 The ONE NEW attempt is consumed and terminal in run20261104T235606Z-76094-dbb25a94. Source build passed with approved public-CA support; task-history Node suite passed88/88. Provider Node suite failed1/87 on the concrete retained/migration submittedRevision assertion (undefined versus expectedrevision); Python fail-fast result1passed/1failed/14deselected, remaining bridges not reached. Final manifest FAILED/tests-failed; exact builder/runtime teardown clean/absent and new share/snapshot normally removed. Actual receipts/input hashes/limits are in Notes. Slot already returned at capture, monitor cancelled. STOP for owner review pass/fail, no source repair or further attempt/probe/retry authorized by this result. Preserve isolated codec9636c3 and historical failures. Whole slice3/fulltask remains unaccepted/all9ACunchecked; full remaining BOTH-provider lifecycle/audit/recorded-operation scope and approved Beads exception stay on THIS task.
+
+## Operator correction applied to continuation — finish the original full Task55
+Joe's exact instruction, recorded in the owner-published "Operator correction — remove the unnecessary test-typo approval stop and finish the approved task" note at ce2be9e1deef869ddd819188019b800e95c18c8f, is: "you do NOT need my permission to fix a type-o in a test! get this over the finish line!" The owner has restored this SAME Task55/Episode to In Progress. This supersedes the previous human wait and per-test/one-fresh-attempt approval stop. The prior CA-stage attempt remains historically consumed/FAILED; it is NOT a permanent normal-validation cap after this correction. Do not seek redundant permission for the accepted typo, ordinary diagnosed in-scope defects, normal required validation, or compatible task-history descendants.
+
+Queued canonical execute must prepare fresh, reload the exact owner/current native contract and correction, then FIRST apply the accepted TEST-ONLY finding at tests/task_providers.test.mjs:1148: explicit retained/migration preparation returns publishedRevision, not mutation-push submittedRevision. Preserve the existing proof/refusal assertions and production API; no alias, weakened retained proof or restored task-native policy gate. Continue normal in-scope implementation, supported Docker-only validation and evidence-based review toward the ORIGINAL FULL Task55, not just this typo. Diagnose actual failures before proportional fixes; do not blindly replay uncertain transport or make speculative unsafe infrastructure repairs.
+
+Coordinate actual current shared mutable-tag/source-builder/runtime startup/capture capacity with the owner when ready. That is resource coordination, not a standing authoring/approval hold. Preserve the accepted shared CA-support c963-versus33f and diagnostic33f-versusf499, configured public-CA read-only builder input/TLS-on/privacy/default-no-CA/source mode/version/identity/provenance/cleanup and historical failure/pass/teardown evidence. Product review base remains accepted1565c327; preservation WIPs and support acceptance are not full N3/product acceptance.
+
+Complete ALL original BOTH Backlog AND Beads task-native lifecycle policy/tool-prose extraction, secondary complete managed-asset ticket-durability audit and bounded recorded-operation recovery support on THIS task. Approved native Beads multi-issue history semantics remain unchanged. Keep rules in editable Markdown/LLM judgment, native shapes/facts/I/O/stage loading/exact resource mechanics in code; do not rename semantic gates as safety/provenance/transport or create classifier/reconciliation/retry/store/branch/row-filter/allocator/universal-snapshot machinery. Preserve unrelated bytes/staging/task history, customized managed assets, foreign ownership/resources and this exact Episode/operation.
+
+Publish coherent code and native living-plan/evidence updates promptly; report meaningful reviewable slices and true remaining coverage through normal owner oversight, not arbitrary per-test permission pauses. Genuine scope/product conflicts or unsafe unsupported infrastructure needs go to the owner. No dependency/version/selector/trust-settings change, global apply/activation/restart, live45 mutation, retained-folder redesign, main merge/abandonment or destructive live cleanup is authorized. All9AC remain unchecked until actually satisfied. This handoff makes NO source/test correction, CA read/copy, validation, Docker/resource action or new Episode/initial assignment; canonical execute is already queued independently.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
