@@ -4,7 +4,7 @@ title: Make startup initialization read-only and LLM-mediated
 status: In Progress
 assignee: []
 created_date: '2026-11-04 16:00'
-updated_date: '2026-11-05 00:33'
+updated_date: '2026-11-05 00:36'
 labels: []
 dependencies: []
 references:
@@ -16,6 +16,21 @@ references:
 documentation:
   - REQUIREMENTS.md
   - docs/project-initialization.md
+modified_files:
+  - README.md
+  - REQUIREMENTS.md
+  - docs/project-initialization.md
+  - docs/user-stories/B-project-initialization.md
+  - docs/user-stories/README.md
+  - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/project-initialization.ts
+  - src/prime-agent-plugin/extensions/project-initialization.ts
+  - src/prime-agent-plugin/skills/initialize-prime-claw/SKILL.md
+  - tests/project_initialization_extension.test.mjs
+  - tests/test_prime_agent_plugin_install.py
+  - tests/test_project_initialization.py
+  - src/prime-agent-plugin/skills/initialize-prime-claw/STARTUP.md
 priority: p1
 type: bug
 ordinal: 143000
@@ -89,10 +104,26 @@ Planning only. Implementation requires a separate operator request; this plan al
 5. Update affected guidance and validate the candidate.
    - Update `docs/project-initialization.md`, `REQUIREMENTS.md` P2, and directly affected README/story guidance to describe read-only startup, first-normal-turn guidance, any-Git-project scope, LLM deferral, and explicit mutation. Retain the global goals skill and consequential-action boundaries.
    - Run the focused initialization/install regressions through the existing Docker fixture and required Tier 1 validation (`scripts/test-tier1.sh --probe`) after plugin changes. Record actual results and any concrete fixture blocker in the native task; do not repair unrelated test infrastructure or claim green from setup failures. Publish the bounded candidate and its evidence through the normal implementation workflow. No host/global candidate apply, live migration, restart, or cleanup is part of this task.
+
+Execution checkpoint: steps 1–3 and 5 guidance/docs are implemented in code f12d049. Step 4 regression updates are written. Step 5 Docker validation is blocked before runtime setup by the absent approved selector. Resume the same Episode with an approved existing fixture; run tests before claiming candidate readiness. No live activation is authorized.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-05 Episode slice: verified exact owner/worktree/session and synchronized independent task history. Implementing read-only template inspection, one-shot first-normal-turn shipped Markdown guidance, and proportionate isolated regressions/docs. Startup will not reconcile, prepare providers/history, require Orca, or create a separate LLM turn. Live apply/restart remains out of scope.
+
+2026-11-05 published resumable implementation checkpoint (validation blocked).
+
+Code: f12d04993ed67d35d90cb564cee1801644fbeddb on JLanders/prime-claw-primeclaw-58-episode-cc9b5f11, non-force pushed to origin. Added shared pure template/hash comparisons and inspectPrimeClawProject; session_start now only inspects any Git project without Orca/provider/history preparation. Needed setup/update guidance loads shipped editable STARTUP.md once in the first normal before_agent_start systemPrompt. Existing user/assignment/attachments remain untouched; no startup-created turn or resources_discover install assumptions. Explicit initialization tool, customization decisions, and active/uncertain Episode protection remain. Updated P2, initialization docs/story guidance, global delivery inventory, and focused regressions. No global apply, restart, migration, or cleanup.
+
+Validation and exact blocker:
+- scripts/test-tier1.sh --probe: exit 1 before Docker, missing /Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-58-episode-cc9b5f11/.env (set exactly one selector). Repeated once after final plugin changes with the same setup failure. Primary checkout also has no .env; the current ~/code/prime-agent checkout is not the supported cwd-fix-v0.9.8-r1 source. No unsupported runtime was selected.
+- python3 -m pytest tests/test_project_initialization.py -q -m container: 7 deselected, 5 setup errors at tests/conftest.py:173, all caused by the same missing selector. No plugin runtime body ran.
+- python3 -m pytest tests/test_project_initialization.py tests/test_prime_agent_plugin_install.py -q: 7 passed, 49 skipped, 1 pre-existing failure in test_builder_project_uses_regular_project_assets_and_no_legacy_skill_tree at line 123. The existing manifest records project-workflow-plan-task as customized; that test falls through to a managed-state expectation. Verified both that test function and manifest state already exist at base f90defa00bce0a45820cd2684185a8573934160e; did not change live project assets or unrelated fixture expectations.
+- git diff --check passed; inventory source coverage includes every shipped file exactly once. Docker install/placement and actual Node/native-turn regressions remain unrun, not green.
+
+Local evidence: .test-results/primeclaw-58-tier1-final.log, .test-results/primeclaw-58-container.log, .test-results/primeclaw-58-static-final.log. The node tests now cover read-only snapshots, setup/update/current/customization/accepted override, no Orca, non-Git, active/uncertain protection, inspection/Markdown errors, explicit-tool mutation, and unchanged first-normal-turn request delivery. Markdown deferral/no-modification policy is reviewed as guidance, not a coded request classifier or claimed compliance test.
+
+Unblock condition: supply an existing approved TIER1_ENV_FILE selecting the verified supported source, then run the focused initialization/install/placement regressions and required Tier 1 --probe through the existing Docker fixture. If the fixture itself fails, report that exact failure without test-infrastructure redesign. Until runtime validation, this is a resumable checkpoint, not a validated/accepted candidate. Status remains In Progress; lifecycle disposition belongs to the owning Conversation.
 <!-- SECTION:NOTES:END -->
