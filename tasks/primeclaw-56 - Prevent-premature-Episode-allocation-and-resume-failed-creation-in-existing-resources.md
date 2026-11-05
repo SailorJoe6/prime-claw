@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-05 15:55'
+updated_date: '2026-11-05 16:12'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -16,6 +16,20 @@ references:
     Allow-Episode-initiation-during-unrelated-ticket-edits-and-task-history-advances.md
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+documentation:
+  - docs/backlog.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/E-episode-promotion.md
+  - docs/user-stories/traceability.md
+modified_files:
+  - .prime-claw/workflows/implement-task.md
+  - docs/backlog.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/E-episode-promotion.md
+  - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/skills/implement-task/SKILL.md
+  - src/prime-agent-plugin/workflows/implement-task.md
+  - tests/test_future_plan_skills.py
 priority: p1
 type: bug
 ordinal: 141000
@@ -118,4 +132,21 @@ The approved Markdown-first specification, seven acceptance criteria, Implementa
 Current implementation audit at code base f5287c3647245a6a5e6d3baad64d9cecf1dab81b: PRIMECLAW-55 removed the fresh-only reviewed-plan gate, and PRIMECLAW-58 already provides narrow independent-Backlog/Orca allocated-pre-session continuation and existing-session binding. Reuse those mechanics. This pass takes only the smallest remaining pre-allocation slice: editable implement-task instructions for discoverable provider/store/transport, selected code assets and placement/runtime prerequisites before reservation/allocation; aligned creation docs; and a representative isolated known-failure exercise with truthful native-status reporting. No new TypeScript preflight API or policy gate is needed for these native reads.
 
 The broader targeted ownership-reconciliation workflow, other partial creation shapes and remaining recovery exercises remain follow-up work inside this approved task. This slice is not a full-task candidate. Preserve the specification, plan, all seven AC and In Progress status. No live recovery, global activation/restart, merge, lifecycle-status edit or ownership edit is performed by this Episode.
+
+## Slice 1 published: native prerequisites before fresh allocation
+
+Published code candidate: b2657d09df7dfb59af816ee0dd813b88c0cb258a on JLanders/prime-claw-primeclaw-56-episode-b31eee86, based on the original code base f5287c3647245a6a5e6d3baad64d9cecf1dab81b; integration target remains main. The code branch is clean and directly published. This is a bounded partial-task candidate for Conversation review, not a claim that PRIMECLAW-56 is finished.
+
+The canonical/project implement-task workflow now directs available native checks before fresh In Progress admission, reservation or resource allocation: exact owner/existing-operation distinction; committed execute/code-store projection; selected native ticket/history/config and transport; selected placement/runtime availability. Supported Backlog folder-config layouts do not require a root configuration link; inspect that link only when root config is the selected authority. Only target-specific materialization/session/assignment work stays after allocation. Known failure reports actual native status and any local-versus-published status difference rather than inferring rollback. The global entry remains a thin pointer; creation docs and US-13/14/16 traceability are aligned. No TypeScript, ownership schema/state, recovery API, retry engine or new protocol was introduced.
+
+Validation:
+- `python3 -m pytest tests/test_future_plan_skills.py -q -k "task_native_implementation_policies or task_implementation_entry"`: 2 passed, 41 deselected.
+- `scripts/test-tier1.sh --probe`: passed in isolated Docker, source mode using a clean read-only standalone clone of `cwd-fix-v0.9.8-r1` at a1faacd53ac4473a75de1d434afaf50945c2f647 selected through TIER1_ENV_FILE/PRIME_AGENT_SOURCE. Evidence: .test-results/20261105T160234Z-22822-18bc65e8/tier1/manifest.json (run.status passed, no failure codes; network isolation and teardown verified).
+- `python3 -m pytest tests/test_future_plan_skills.py::test_documented_creation_preflight_native_failure tests/test_task_providers.py::test_backlog_task_episode_admission_node_suite -q -m container`: 2 passed, including clean fixture teardown. Evidence: .test-results/20261105T160706Z-32751-ce0ba2c6/tier1/manifest.json and preflight-native-read-exercise.json.
+
+The isolated native-read exercise has a published independent Backlog task in In Planning and a working-tree-only execute file absent from the committed code base. `git show HEAD:.agents/skills/execute/SKILL.md` reports exit 128; the procedure stops without requesting creation, allocation, session/assignment or status mutation. The selected native task view/status, code/task heads, worktree/branch inventory, other-owner bytes and unrelated staged-work status remain unchanged. This is native-command smoke evidence plus editable-policy ordering assertions, not an automated LLM-compliance or full recovery test. The existing Backlog admission suite also covers a failed native In Progress commit: actual In Progress task bytes remain, code HEAD is unchanged, and no ownership/allocation occurs.
+
+Validation setup/repair evidence: the first driver attempt rejected a temporary source selector through macOS's /var symlink during source inventory before building; a canonical resolved source path fixed the selector without changing upstream source. The first focused run's two test bodies passed, but sanitized-evidence teardown rejected raw temporary paths in the new JSON. Removed raw output/path values from the durable command/exit record and reran the same focused tests successfully. No production provider, live plugin refresh, restart or recovery was used.
+
+Remaining within the approved plan: full owner-led targeted reconciliation/compare-before-edit instructions; prep/blocked/oversight routing for broader partial creation; any still-required narrow deterministic enabling changes beyond PRIMECLAW-58; allocated-pre-session and existing-session/assignment Markdown-led exercises with the remaining status-publication/ambiguity evidence. All seven AC remain unchecked pending that full review. Keep In Progress and the exact same Episode; no new Episode, status transition, merge, activation/restart, abandonment or cleanup is authorized by this slice report. Unrelated PRIMECLAW-45 task-history descendants afc29a2/55530cc were inspected and retained through ordinary fast-forward in this Episode task clone; the selected task view was unchanged before the content update.
 <!-- SECTION:NOTES:END -->
