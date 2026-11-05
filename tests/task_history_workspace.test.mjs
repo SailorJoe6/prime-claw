@@ -25,6 +25,7 @@ import {
   cleanupEpisodeTaskHistoryStore,
   inspectEpisodeTaskHistoryStore,
   inspectPublishedPrimaryTaskHistory,
+  observePrimaryTaskHistory,
   publishTaskHistoryMutation,
   publishEpisodeTaskHistoryMutation,
 } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
@@ -1170,7 +1171,7 @@ test("reuse refuses a wrong remote URL but preserves unrelated dirt", (t) => {
   assert.equal(readFileSync(join(storeDir, "dirty.md"), "utf8"), "x\n");
 });
 
-test("cleanup removes one exact clean published clone and refuses foreign/dirty without deletion", (t) => {
+test("cleanup preserves uncommitted bytes and targets the exact clone without prior-revision approval", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, target, storeDir } = episodeFixture();
   assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
@@ -1185,14 +1186,13 @@ test("cleanup removes one exact clean published clone and refuses foreign/dirty 
   assert.ok(existsSync(storeDir), "dirty clone left in place");
   rmSync(join(storeDir, "dirty.md"));
   const rewritten = inspectEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision: "f".repeat(40) });
-  assert.equal(rewritten.status, "refused");
-  assert.equal(rewritten.code, "identity-mismatch");
-  assert.ok(existsSync(storeDir), "unproved ancestry preserves the clone");
+  assert.deepEqual(rewritten, { status: "ready", storeDir, present: true });
+  assert.ok(existsSync(storeDir), "identity inspection is read-only, not provider-revision approval");
   const expectedRevision = git(storeDir, "rev-parse", "HEAD");
   const cleanInspection = inspectEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision });
   assert.deepEqual(cleanInspection, { status: "ready", storeDir, present: true });
   assert.ok(existsSync(storeDir), "read-only cleanup proof preserves the clone");
-  // Clean published clone descended from the owned revision -> removed, target code untouched.
+  // Explicitly requested exact clean clone -> removed, target code untouched.
   const clean = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision });
   assert.equal(clean.status, "cleaned");
   assert.ok(!existsSync(storeDir), "proven clone removed");
@@ -1200,13 +1200,12 @@ test("cleanup removes one exact clean published clone and refuses foreign/dirty 
   assert.deepEqual(
     inspectEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision }),
     { status: "ready", storeDir, present: false },
-    "a partial replay may accept an absent clone only while direct authority still descends from ownership",
+    "an already absent exact clone is not a frozen-revision approval boundary",
   );
   const absentAfterRewrite = inspectEpisodeTaskHistoryStore({
     primaryRoot: root, targetWorktree: target, expectedRevision: "0".repeat(40),
   });
-  assert.equal(absentAfterRewrite.status, "refused");
-  assert.equal(absentAfterRewrite.code, "identity-mismatch");
+  assert.deepEqual(absentAfterRewrite, { status: "ready", storeDir, present: false });
 });
 
 test("retained backlog/ and a selected non-origin remote stay exact through prepare, reuse, and cleanup", (t) => {
@@ -1374,7 +1373,7 @@ test("cleanup with an absent primary store never recreates it or mutates primary
   assert.equal(git(root, "for-each-ref", "--format=%(refname) %(objectname)"), before.refs);
 });
 
-test("cleanup refuses clean local-ahead, remote-advanced, and unavailable-remote stores", (t) => {
+test("requested exact-clone cleanup does not classify committed local/remote history or require a live remote", (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   {
     const { root, target, storeDir } = episodeFixture();
@@ -1384,28 +1383,55 @@ test("cleanup refuses clean local-ahead, remote-advanced, and unavailable-remote
     git(storeDir, "-c", "user.email=t@e.st", "-c", "user.name=t", "commit", "-qm", "local ahead");
     assert.equal(git(storeDir, "status", "--porcelain"), "");
     const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
-    assert.equal(cleanup.status, "refused");
-    assert.equal(cleanup.code, "local-ahead");
-    assert.ok(existsSync(storeDir));
+    assert.equal(cleanup.status, "cleaned");
+    assert.equal(existsSync(storeDir), false);
   }
   {
     const { root, remote, target, storeDir } = episodeFixture();
     assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
     publishTaskBranch(remote, { "remote-advance.md": "advanced\n" });
     const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
-    assert.equal(cleanup.status, "refused");
-    assert.equal(cleanup.code, "remote-advanced");
-    assert.ok(existsSync(storeDir));
+    assert.equal(cleanup.status, "cleaned");
+    assert.equal(existsSync(storeDir), false);
   }
   {
     const { dir, root, remote, target, storeDir } = episodeFixture();
     assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
     renameSync(remote, join(dir, "remote-unavailable.git"));
     const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target });
-    assert.equal(cleanup.status, "refused");
-    assert.equal(cleanup.code, "remote-unavailable");
-    assert.ok(existsSync(storeDir));
+    assert.equal(cleanup.status, "cleaned");
+    assert.equal(existsSync(storeDir), false);
   }
+});
+
+test("terminal primary observations preserve dirty bytes/index and compatible remote descendants", (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote, target, storeDir, primaryStoreDir } = episodeFixture();
+  assert.equal(prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: target }).status, "prepared");
+  const primaryStore = primaryStoreDir;
+  const beforeHead = git(primaryStore, "rev-parse", "HEAD");
+  writeFileSync(join(primaryStore, "foreign-staged.txt"), "staged\n");
+  git(primaryStore, "add", "foreign-staged.txt");
+  writeFileSync(join(primaryStore, "foreign-staged.txt"), "unstaged\n");
+  writeFileSync(join(primaryStore, "foreign-untracked.txt"), "untracked\n");
+  const index = git(primaryStore, "ls-files", "--stage");
+  publishTaskBranch(remote, { "unrelated-descendant.md": "published elsewhere\n" });
+  const remoteHead = git(remote, "rev-parse", TASK_HISTORY_REF);
+  const facts = observePrimaryTaskHistory({ primaryRoot: root, taskId: "TASK-1" });
+  assert.equal(facts.storeDir, primaryStore);
+  assert.equal(facts.head.stdout.trim(), beforeHead);
+  assert.match(facts.workingTree.stdout, /foreign-staged.txt/);
+  assert.match(facts.publication.stdout, new RegExp(remoteHead));
+  assert.notEqual(beforeHead, remoteHead);
+  assert.equal(git(primaryStore, "rev-parse", "HEAD"), beforeHead);
+  assert.equal(git(primaryStore, "ls-files", "--stage"), index);
+  assert.equal(readFileSync(join(primaryStore, "foreign-staged.txt"), "utf8"), "unstaged\n");
+  assert.equal(readFileSync(join(primaryStore, "foreign-untracked.txt"), "utf8"), "untracked\n");
+  const cleanup = cleanupEpisodeTaskHistoryStore({ primaryRoot: root, targetWorktree: target, expectedRevision: "a".repeat(40) });
+  assert.equal(cleanup.status, "cleaned", "prior revision is an observation, not deletion approval");
+  assert.equal(existsSync(storeDir), false);
+  assert.equal(git(primaryStore, "ls-files", "--stage"), index);
+  assert.equal(readFileSync(join(primaryStore, "foreign-staged.txt"), "utf8"), "unstaged\n");
 });
 
 test("cleanup refuses dangling target-store symlinks and external primary work-tree identity", (t) => {

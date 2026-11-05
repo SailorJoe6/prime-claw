@@ -1567,7 +1567,7 @@ export interface EpisodeTaskHistoryWorkspaceInput {
   primaryRoot: string;
   /** Absolute path of the target linked Episode code worktree. */
   targetWorktree: string;
-  /** Optional owned published revision that must remain an ancestor at cleanup. */
+  /** Earlier native revision observation; not cleanup approval or a frozen head. */
   expectedRevision?: string;
   runner?: CommandRunner;
 }
@@ -1762,10 +1762,6 @@ type NonMutatingPrimaryTaskLocation =
       remote: string;
       remoteUrl: string;
     }
-  | EpisodeAuthorityBlocked;
-
-type NonMutatingPrimaryTaskAuthority =
-  | (Extract<NonMutatingPrimaryTaskLocation, { status: "ready" }> & { head: string })
   | EpisodeAuthorityBlocked;
 
 /** Derive one exact built-in target store from the prepared primary result. */
@@ -2110,19 +2106,6 @@ function inspectPrimaryTaskLocation(
     remoteUrl: selected.url,
   };
 }
-
-/** Non-mutating published-authority observation retained for cleanup. */
-function inspectPrimaryTaskAuthority(
-  primaryRootInput: string,
-  runner: CommandRunner,
-): NonMutatingPrimaryTaskAuthority {
-  const location = inspectPrimaryTaskLocation(primaryRootInput, runner);
-  if (location.status === "blocked") return location;
-  const direct = readDirectTaskHead(location.primaryRoot, location.remote, location.remoteUrl, runner);
-  if (direct.status === "blocked") return direct;
-  return { ...location, head: direct.head };
-}
-
 
 /**
  * Prepare the Backlog task-history workspace inside one exact target linked
@@ -2510,6 +2493,21 @@ function inspectMutationClone(
   };
 }
 
+/** Native facts from the existing primary task clone; no cleanup eligibility decision. */
+export function observePrimaryTaskHistory(
+  input: { primaryRoot: string; taskId: string; runner?: CommandRunner },
+): Record<string, unknown> {
+  const runner = input.runner ?? new ProcessCommandRunner();
+  const clone = inspectMutationClone({ ...input, targetWorktree: input.primaryRoot, edits: [] }, runner);
+  if ("status" in clone) return clone;
+  return {
+    storeDir: clone.storeDir,
+    head: runGit(runner, clone.storeDir, ["rev-parse", "--verify", "HEAD"]),
+    workingTree: runGit(runner, clone.storeDir, ["--no-optional-locks", "status", "--porcelain", "--ignored", "--untracked-files=all"]),
+    publication: runGit(runner, clone.storeDir, ["ls-remote", "--refs", "--", clone.remoteUrl, TASK_HISTORY_REF]),
+  };
+}
+
 export interface PublishedPrimaryTaskHistoryInspectionInput {
   primaryRoot: string;
   taskId: string;
@@ -2695,15 +2693,9 @@ export function publishEpisodeTaskHistoryMutation(input: EpisodeTaskHistoryMutat
   return publishTaskHistoryMutation(input);
 }
 
-/**
- * Guarded cleanup of the exact nested task-history clone inside one target
- * linked Episode code worktree. Before removal this freshly proves the direct
- * remote task ref, the exact clone identity/URL/branch, a clean
- * worktree/index, and HEAD equal to the authoritative remote head. It refuses
- * unchanged on any drift, divergence, or foreign identity and never deletes.
- * It removes ONLY the proven nested store directory — never the target code
- * branch/index/tracked files or the primary store. This is the plan's
- * clean/published cleanup guard, not operator-facing lifecycle cleanup.
+/** Inspect the exact nested clone targeted for removal, without synchronizing it.
+ * Publication, history compatibility and terminal disposition belong to the owner.
+ * Preserve uncommitted directory bytes; this operation never force-discards them.
  */
 function inspectEpisodeTaskHistoryStoreInternal(input: EpisodeTaskHistoryWorkspaceInput): EpisodeTaskHistoryInspection {
   const runner = input.runner ?? new ProcessCommandRunner();
@@ -2725,7 +2717,7 @@ function inspectEpisodeTaskHistoryStoreInternal(input: EpisodeTaskHistoryWorkspa
 
     // Pure authority inspection only: no primary preparation, ignore write,
     // clone, fetch, update-ref, or local ref creation is permitted in cleanup.
-    const authority = inspectPrimaryTaskAuthority(input.primaryRoot, runner);
+    const authority = inspectPrimaryTaskLocation(input.primaryRoot, runner);
     if (authority.status === "blocked") return refuse(authority);
     const storeDir = join(input.targetWorktree, authority.storeName);
     const storeEntry = lstatIfPresent(storeDir);
@@ -2745,15 +2737,6 @@ function inspectEpisodeTaskHistoryStoreInternal(input: EpisodeTaskHistoryWorkspa
     const targetAuthority = verifyTargetBacklogAuthority(input.targetWorktree, storeDir, runner, storeEntry === null);
     if (targetAuthority) return refuse(targetAuthority);
     if (storeEntry === null) {
-      if (input.expectedRevision !== undefined
-          && (!/^[0-9a-f]{40}$/.test(input.expectedRevision)
-            || !isAncestor(runner, authority.storeDir, input.expectedRevision, authority.head))) {
-        return {
-          status: "refused", code: "identity-mismatch",
-          detail: `the directly published task history ${authority.head} is not proved to descend from owned revision ${input.expectedRevision}; absent nested state never bypasses ownership ancestry`,
-          remediation: "inspect the task-history rewrite against ownership and recover through reviewed ordinary Git; never force cleanup",
-        };
-      }
       return { status: "ready", storeDir, present: false };
     }
 
@@ -2822,61 +2805,8 @@ function inspectEpisodeTaskHistoryStoreInternal(input: EpisodeTaskHistoryWorkspa
       return {
         status: "refused", code: "uncommitted-task-content",
         detail: `the nested clone has uncommitted/untracked changes: ${dirty.stdout.trim().split(/\r?\n/).slice(0, 5).join(", ")}; cleanup never deletes unpublished or dirty task content`,
-        remediation: "commit and publish the clone's changes (the deferred mutation loop) or inspect them; cleanup leaves the directory unchanged",
+        remediation: "preserve and inspect these uncommitted resource bytes before requesting removal; cleanup leaves the directory unchanged",
       };
-    }
-
-    const headResult = runGit(runner, storeDir, ["rev-parse", "--verify", "HEAD"]);
-    const cloneHead = headResult.stdout.trim();
-    if (headResult.status !== 0 || !/^[0-9a-f]{40}$/.test(cloneHead)) {
-      return {
-        status: "refused", code: "unreadable",
-        detail: `the nested clone HEAD proof failed: ${headResult.stderr.trim() || headResult.stdout.trim() || `exit ${headResult.status}`}`,
-        remediation: "repair the nested repository; cleanup leaves it unchanged until its exact HEAD can be proved",
-      };
-    }
-    if (cloneHead !== authority.head) {
-      // Classify without fetching/mutating: the clone-created tracking ref
-      // records whether local HEAD moved or the direct remote moved.
-      const trackingResult = runGit(runner, storeDir, ["rev-parse", "--verify", `refs/remotes/${authority.remote}/${TASK_HISTORY_BRANCH}`]);
-      const trackingHead = trackingResult.stdout.trim();
-      if (trackingResult.status !== 0 || !/^[0-9a-f]{40}$/.test(trackingHead)) {
-        return {
-          status: "refused", code: "unreadable",
-          detail: `the nested clone tracking-head proof failed while classifying divergence: ${trackingResult.stderr.trim() || trackingResult.stdout.trim() || `exit ${trackingResult.status}`}`,
-          remediation: "repair the nested repository; cleanup leaves it unchanged until local and remote heads can be proved",
-        };
-      }
-      if (trackingHead === authority.head) {
-        return {
-          status: "refused", code: "local-ahead",
-          detail: `the clean nested clone HEAD ${cloneHead} is ahead of/drifted from published head ${authority.head}; cleanup never deletes unpublished commits`,
-          remediation: "publish or explicitly reconcile the local commits through the deferred mutation loop; cleanup leaves the store unchanged",
-        };
-      }
-      if (trackingHead === cloneHead) {
-        return {
-          status: "refused", code: "remote-advanced",
-          detail: `the selected remote advanced from the clone's recorded head ${cloneHead} to ${authority.head}; cleanup never deletes a stale clone without reconciliation`,
-          remediation: "reconcile the clone with the remote through the deferred mutation loop; cleanup leaves the store unchanged",
-        };
-      }
-      return {
-        status: "refused", code: "identity-mismatch",
-        detail: `the nested clone HEAD ${cloneHead}, recorded tracking head ${trackingHead}, and published head ${authority.head} diverge`,
-        remediation: "inspect and reconcile the diverged clone; cleanup leaves the store unchanged",
-      };
-    }
-
-    if (input.expectedRevision !== undefined) {
-      if (!/^[0-9a-f]{40}$/.test(input.expectedRevision)
-          || !isAncestor(runner, storeDir, input.expectedRevision, cloneHead)) {
-        return {
-          status: "refused", code: "identity-mismatch",
-          detail: `the published nested history ${cloneHead} is not proved to descend from owned revision ${input.expectedRevision}; cleanup never accepts rewritten task authority`,
-          remediation: "inspect the task-history rewrite against ownership and recover through reviewed ordinary Git; never force cleanup",
-        };
-      }
     }
 
     // Exit the proof-only region before beginning the first mutation.

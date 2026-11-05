@@ -256,15 +256,18 @@ def test_task_native_cleanup_is_prompt_led_without_second_confirmation():
     assert "prime agent list/state responses" in lower
     assert "active or unprovable-idle sessions block readiness and merge" in lower
     assert "cleanup independently rechecks before mutation" in lower
-    assert "automatically" in lower and "immediately" in lower
-    assert "second cleanup confirmation" in lower
+    assert "cleanup** follows after the operator-authorized terminal outcome" in lower
+    assert "no second confirmation" in lower
     for identifier in ("taskId", "episodeHead", "outcome"):
         assert identifier in task_policy
-    error_policy = lower.split("on error/interruption", 1)[1]
-    assert "conversation interprets provider evidence" in error_policy
-    assert "re-read current ownership, prime agent, provider, and git state" in error_policy
-    assert "re-invoke only when current evidence proves safe progress" in error_policy
-    assert "consult the operator only when safe progress is impossible" in error_policy
+    assert "judge task/history/code/publication/runtime facts here, not in typescript" in lower
+    assert "without frozen-revision/equal-head/classifier gates" in lower
+    assert "supported idle-runtime safety remain mechanical" in lower
+    error_policy = lower.split("on error reread evidence", 1)[1]
+    assert "absence counts as removed" in error_policy
+    assert "re-invoke only for safe progress, never blind retry/reconciliation" in error_policy
+    assert "busy/changed/foreign resources or uncommitted bytes block removal" in error_policy
+    assert "consult only when safe progress is impossible" in error_policy
     for obsolete in (
         "confirmed: true", "cleanup needs separate authority",
         "Cleanup** is separately explicit", "Same-head retry is idempotent",
@@ -282,3 +285,29 @@ def test_current_task_cleanup_docs_remove_second_confirmation_but_keep_evidence(
         assert "current ownership, provider, Git, and selected-provider evidence" in text, path
         assert "durable cleanup head" not in text, path
         assert "Same-head retry is idempotent" not in text, path
+
+
+def test_task_native_terminal_policy_is_editable_while_exact_cleanup_mechanics_remain():
+    repo = REPO / "src/prime-agent-plugin"
+    source = (repo / "extension-support/spec-episode.ts").read_text()
+    terminal = source.split("function observeTaskEpisodeTerminalState", 1)[1].split("type BeadsProviderTaskResolution", 1)[0]
+    assert "providerTaskObservation" in terminal
+    assert "currentTask: task.nativeView" in terminal
+    assert "verifyTaskEpisodeTerminalState" not in source
+    for obsolete in ("meaningfulTaskImplementationPlan(", "beadsAbandonmentReason(", "git.assertCleanWorktree(", 'git.branch(projectRoot) !== "main"', "getHeader().rlmDepth", "git.isAncestor("):
+        assert obsolete not in terminal
+    assert "verifyTaskCleanupResources" in terminal
+    assert "store.removeTask(projectRoot, record)" in terminal
+    tools = (repo / "extensions/reviewed-plan.ts").read_text()
+    tool = tools.split('name: "finalize_task_episode"', 1)[1].split('name: "restore_blocked_spec_episode"', 1)[0]
+    assert "promptGuidelines: []" in tool
+    assert "JSON.stringify(details)" in tool
+    assert "providerTaskObservation" in tool
+    history = (repo / "extension-support/task-history-workspace.ts").read_text()
+    cleanup = history.split("function inspectEpisodeTaskHistoryStoreInternal", 1)[1]
+    assert "strict independent" not in cleanup
+    assert 'code: "local-ahead"' not in cleanup
+    assert 'code: "remote-advanced"' not in cleanup
+    assert "input.expectedRevision" not in cleanup
+    assert "verifyIndependentTaskClone" in cleanup
+    assert "uncommitted-task-content" in cleanup

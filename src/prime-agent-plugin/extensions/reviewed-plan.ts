@@ -433,7 +433,6 @@ type ReviewedPlanDependencies = EpisodeDependencies & EpisodeOwnershipTransition
   taskCleanupGit?: TaskEpisodeCleanupDependencies["cleanupGit"];
   taskCleanupBeadsTransport?: TaskEpisodeCleanupDependencies["beadsTransport"];
   taskCleanupBeadsTaskReader?: TaskEpisodeCleanupDependencies["beadsTaskReader"];
-  taskCleanupBeadsRevisionIsAncestor?: TaskEpisodeCleanupDependencies["beadsRevisionIsAncestor"];
   conversationAfterHandoff?: ConversationAfterHandoffHook;
 };
 
@@ -464,6 +463,7 @@ async function runTaskEpisodeCleanup(
     : new CliTaskEpisodeCleanupAdapter(projectRoot, params.episodeHead);
   const cleanup = dependencies.taskCleanup ?? ownedCleanup!;
   const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies.taskActions };
+  const guidance = conversationGuideText({ guideRoot: dependencies.guideRoot });
   try {
     const result = await actions.cleanup(
       taskId,
@@ -478,12 +478,10 @@ async function runTaskEpisodeCleanup(
         ...(dependencies.taskResolver ? { taskResolver: dependencies.taskResolver } : {}),
         ...(dependencies.taskCleanupBeadsTransport ? { beadsTransport: dependencies.taskCleanupBeadsTransport } : {}),
         ...(dependencies.taskCleanupBeadsTaskReader ? { beadsTaskReader: dependencies.taskCleanupBeadsTaskReader } : {}),
-        ...(dependencies.taskCleanupBeadsRevisionIsAncestor
-          ? { beadsRevisionIsAncestor: dependencies.taskCleanupBeadsRevisionIsAncestor } : {}),
         ...(dependencies.now ? { now: dependencies.now } : {}),
       },
     );
-    return { result };
+    return { result, guidance };
   } finally {
     ownedCleanup?.close();
   }
@@ -845,22 +843,16 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "finalize_task_episode",
       label: "Clean up task Episode resources",
-      description: "After an operator-authorized merge or abandonment is committed and pushed, remove the exact idle Episode resources and close ownership.",
-      promptSnippet: "Clean up the exact task Episode after its authorized pushed terminal outcome",
-      promptGuidelines: [
-        "Use finalize_task_episode only for one exact task-native Episode owned by this Conversation. Never use it for retained folder ownership.",
-        "Perform review, request changes, merge, abandonment, and provider-native terminal publication through the Conversation instructions, ordinary Git, and the selected provider's supported CLI before cleanup.",
-        "Call this tool immediately after the already operator-authorized terminal outcome is committed, pushed, and verified, with the exact pushed Episode head and truthful outcome. No second cleanup confirmation is needed. Backlog requires its pushed Done/archive terminal evidence; Beads requires current clean published native done completion or closed plus the exact abandonment reason.",
-        "Cleanup removes only the bound idle runtime and explicit descendants, exact upstream branch, provider worktree, and remaining local branch, then deletes the exact owner entry. It performs no merge, abandonment, task edit, archive, provider push, shared-store removal, or server shutdown.",
-        "On error, interpret the provider evidence and re-read current ownership, Prime Agent, provider, and Git state. Re-invoke only when current evidence proves safe progress; ask the operator only when safe progress is impossible.",
-      ],
+      description: "Remove the exact bound task Episode resources and owner entry.",
+      promptSnippet: "Remove bound task Episode resources",
+      promptGuidelines: [],
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
-          taskId: { type: "string", description: "Exact canonical provider-native task ID owned by this Conversation" },
-          episodeHead: { type: "string", description: "Exact pushed Episode head that was merged or abandoned" },
-          outcome: { type: "string", enum: ["merged", "abandoned"], description: "Terminal outcome already committed and pushed on canonical main" },
+          taskId: { type: "string", description: "Canonical task ID" },
+          episodeHead: { type: "string", description: "Requested Episode commit OID" },
+          outcome: { type: "string", enum: ["merged", "abandoned"], description: "Requested outcome label" },
         },
         required: ["taskId", "episodeHead", "outcome"],
         additionalProperties: false,
@@ -869,12 +861,15 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         try {
           const details = await runTaskEpisodeCleanup(params as TaskEpisodeCleanupParams, ctx, dependencies ?? {});
           return {
-            content: [{ type: "text", text: `Task Episode resources removed and ownership closed for ${params.taskId}.` }],
+            content: [{ type: "text", text: `Task Episode resources removed and ownership closed for ${params.taskId}.\n${JSON.stringify(details)}` }],
             details,
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          return { content: [{ type: "text", text: `Task Episode cleanup failed: ${message}` }], details: { error: message, taskId: params.taskId }, isError: true };
+          const observation = error && typeof error === "object" && "providerTaskObservation" in error
+            ? error.providerTaskObservation : undefined;
+          const details = { error: message, taskId: params.taskId, ...(observation ? { providerTaskObservation: observation } : {}) };
+          return { content: [{ type: "text", text: `Task Episode cleanup failed: ${message}\n${JSON.stringify(details)}` }], details, isError: true };
         }
       },
     });

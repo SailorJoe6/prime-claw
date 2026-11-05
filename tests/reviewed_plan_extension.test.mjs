@@ -713,7 +713,7 @@ test("ownership transition tool reports guarded failures without fallback", asyn
   assert.deepEqual(result.details, { error: "foreign owner or drift" });
 });
 
-test("tool guidance preserves operator authority and fixed fresh assignment", () => {
+test("tool guidance preserves operator authority and fixed fresh assignment", async () => {
   const f = fixture(); const create = f.tools.get("create_spec_episode"); const handoff = f.tools.get("handoff_spec_episode"); const finalize = f.tools.get("finalize_spec_episode");
   assert.match(create.promptGuidelines.join(" "), /fresh Episode/); assert.match(create.promptGuidelines.join(" "), /never send an initial handoff/);
   assert.match(handoff.promptGuidelines.join(" "), /product decisions/); assert.match(handoff.promptGuidelines.join(" "), /operator accepted the exact recorded unblock/); assert.match(handoff.promptGuidelines.join(" "), /restored active version-1 plan identity was revalidated/); assert.match(finalize.promptGuidelines.join(" "), /operator/);
@@ -722,9 +722,14 @@ test("tool guidance preserves operator authority and fixed fresh assignment", ()
   assert.equal(taskHandoff.promptGuidelines, undefined);
   assert.equal(taskHandoff.parameters.properties.taskId.description, "Canonical task ID");
   assert.equal(taskHandoff.parameters.properties.guidance.description, "Compaction focus text");
-  assert.match(taskFinalize.promptGuidelines.join(" "), /already operator-authorized terminal outcome/);
-  assert.match(taskFinalize.promptGuidelines.join(" "), /exact pushed Episode head/);
-  assert.match(taskFinalize.promptGuidelines.join(" "), /removes only the bound idle runtime/);
+  assert.deepEqual(taskFinalize.promptGuidelines, []);
+  const guide = "EDITED OWNER TERMINAL POLICY: operator outcome and exact idle cleanup rules live here.";
+  writeFileSync(join(f.deps.guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), guide);
+  const result = await taskFinalize.execute("cleanup", { taskId: "PRIMECLAW-10.38", episodeHead: "e".repeat(40), outcome: "merged" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined);
+  assert.equal(result.details.guidance, guide);
+  assert.equal(JSON.parse(result.content[0].text.slice(result.content[0].text.indexOf("\n") + 1)).guidance, guide);
+  assert.equal(f.sent.length, 0, "no workflow queue or second assignment");
 });
 
 
@@ -982,8 +987,8 @@ test("provider-native terminal cleanup and handoff retain the common public boun
   assert.equal(handoff.details.conversationCompaction.outcome, "prompt-delivered");
   assert.equal(f.sent.length, 1);
   const cleanup = f.tools.get("finalize_task_episode");
-  assert.match(cleanup.promptGuidelines.join(" "), /Beads requires current clean published native done/);
-  assert.match(cleanup.promptGuidelines.join(" "), /No second cleanup confirmation/);
+  assert.deepEqual(cleanup.promptGuidelines, []);
+  assert.doesNotMatch(cleanup.description + cleanup.promptSnippet, /operator-authorized|committed and pushed|canonical main/);
   const result = await cleanup.execute("cleanup", { taskId, episodeHead: "e".repeat(40), outcome: "merged" }, undefined, undefined, f.ctx);
   assert.equal(result.isError, undefined);
   assert.equal(result.details.result.ownershipRemoved, true);

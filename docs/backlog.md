@@ -467,23 +467,16 @@ not changed by this extraction.
 
 ### `cleanupEpisodeTaskHistoryStore({ primaryRoot, targetWorktree })`
 
-One guarded cleanup seam for that exact derived nested clone. Cleanup never
-calls primary preparation: it non-mutatingly derives primary store authority,
-selects the exact remote name+URL, and reads the fresh direct task ref with
-`git ls-remote`. It then proves target-native authority, strict independent
-clone identity, exact sole remote/URL/branch, successful read-only clean
-status (including ordinary and ignored untracked entries), and HEAD equal to
-the authoritative remote head. Every Git inspection must exit zero before its
-output is interpreted; an empty stdout from a failed status/read is never
-accepted. Dirty, ordinary-untracked, ignored-untracked, clean local-ahead,
-remote-advanced/diverged, unavailable remote, wrong identity, a dangling
-store symlink, symlinked `.git`, and external nested or primary
-`core.worktree` cases refuse unchanged. No primary store, ignore rule, fetch,
-or ref is created or changed; the first mutation is final removal of ONLY the
-proven target store. If that final removal fails, cleanup reports that state
-may be partial rather than claiming unchanged content. This is the plan's
-clean/published cleanup GUARD, not operator-facing lifecycle cleanup authority.
-
+The exact nested-clone removal derives the selected location without preparing,
+fetching or synchronizing the primary. It retains native target authority,
+independent Git identity, exact sole remote/URL/branch, containment and protection
+against discarding uncommitted/ordinary or ignored untracked bytes. It no longer
+requires a live remote, equal local/remote heads, prior-revision ancestry, or a
+local-ahead/remote-advanced classifier. The owner judges publication/history
+compatibility before requesting removal. No primary bytes/index/ref are changed;
+only the exact requested clone is removed. Native failures retain their facts,
+including potentially partial directory removal. Explicit initialization and
+retained/migration publication proofs remain separate.
 ### Boundary
 
 Out of scope for 2B: the per-task fetch/reconcile/native-mutate/commit/push
@@ -566,21 +559,26 @@ are reported separately. Lifecycle status stays Conversation-owned. No public
 tracker/status API, normalized task model, sidecar, receipt, force update, or
 raw task-file write is added.
 
-Cleanup-only finalization preserves terminal Done/archive and code ancestry
-checks. Independent Backlog first proves the clean primary nested clone equals
-one stable direct remote head, reads the terminal task from that exact revision
-(the committed archive file for abandonment), and checks that revision/evidence
-without persisting cleanup progress.
-Native abandonment prepares the built-in `archive/tasks/` directory before the
-archive command. The terminal workflow fast-forwards the Episode nested clone
-to the published Done/archive revision before cleanup. Cleanup then runs a
-separate read-only nested-history proof before deleting anything that contains
-it. The directly published clone head must still descend from the
-ownership-bound provider revision. Dirty, ignored-untracked, local-ahead, remote-ahead,
-divergent, unavailable, foreign, or unreadable history refuses before runtime
-or parent-worktree removal. Only the exact clean fully published nested clone is
-removed; primary task history and unrelated ownership survive. Migration and
-the real repository cutover remain PRIMECLAW-43.1.
+Cleanup-only finalization returns full current native task/code/history/resource
+observations for the owner; it does not approve terminal status/design, code
+ancestry/publication, primary cleanliness or stable provider heads. The editable
+oversight skill requires the operator-authorized merged/abandoned outcome and
+native Done/archive or Beads done/closed history/publication evidence before the
+call. Ordinary primary dirt and compatible descendants remain facts, not gates.
+Backlog archives are returned as complete native Git command results, not a
+reparsed normalized summary or exact-phrase classifier. Beads uses one native
+transport/task observation, not paired publication/ancestry approval.
+
+Independent Backlog clone removal retains exact resource targeting and byte
+preservation, without synchronizing another writer or requiring matching remote
+heads/old revisions. `observePrimaryTaskHistory` reports the existing clone's
+native HEAD, status and direct-ref result without accepting or reconciling them.
+The real registered tool returns these facts in text and details on success or
+resource failure. Supported idle-runtime/explicit-descendant checks, exact owned
+resource heads, remote expected-head lease, local compare-delete and atomic
+unchanged-owner removal remain. No lifecycle edit, merge, archive, push or shared
+provider deletion is performed by finalization. Retained-folder lifecycle and
+its strict transition/migration proofs are unchanged.
 
 ### Beads workspace and transport observations
 
@@ -909,7 +907,7 @@ native `ready_for_merge` preflight. Canonical main uses ordinary
 may one guarded native transition publish `done` with a truthful final note
 naming the authorized tuple and code outcome. Failure preserves exact evidence;
 there is no retry, force, replay, custom publisher, receipt, snapshot, or new
-transaction. Beads abandonment and cleanup now use only existing native/Git boundaries. Successful merge stays custom native `done`. Explicit abandonment uses supported built-in `closed` plus an exact task/Episode-head `close_reason`, one non-force publication, and complete raw/history proof; `closed` is never mapped to canonical `Done`. After the operator-authorized terminal outcome is committed, pushed, and verified, the Conversation automatically invokes cleanup-only `finalize_task_episode` without separate cleanup confirmation, passing exact `taskId`, terminal `episodeHead`, and truthful `outcome`. It verifies current published native outcome, code inclusion or exclusion, direct-remote heads, ancestry, and exact idle resources; removes only the bound runtime, upstream ref, worktree, and any remaining local branch; and removes only the unchanged owner entry after verified absence. It stores no cleanup head, progress state, inactive record, or successful-close replay result. The Conversation interprets errors and re-reads current ownership, provider, Git, and selected-provider evidence before any safe re-invocation; no retry loop drives cleanup. The shared Beads store/server/history and unrelated owners survive. Migration/cutover and provider-independent task-history changes remain outside this slice.
+transaction. Beads abandonment and cleanup now use only existing native/Git boundaries. Successful merge stays custom native `done`. Explicit abandonment uses supported built-in `closed` plus an exact task/Episode-head `close_reason`, one non-force publication, and complete raw/history proof; `closed` is never mapped to canonical `Done`. After the operator-authorized terminal outcome is committed, pushed, and verified, the Conversation automatically invokes cleanup-only `finalize_task_episode` without separate cleanup confirmation, passing exact `taskId`, terminal `episodeHead`, and truthful `outcome`. The Conversation judges native outcome, code inclusion/exclusion, direct refs and ancestry through editable guidance; the tool returns native facts and verifies exact idle resource targeting; removes only the bound runtime, upstream ref, worktree, and any remaining local branch; and removes only the unchanged owner entry after verified absence. It stores no cleanup head, progress state, inactive record, or successful-close replay result. The Conversation interprets errors and re-reads current ownership, provider, Git, and selected-provider evidence before any safe re-invocation; no retry loop drives cleanup. The shared Beads store/server/history and unrelated owners survive. Migration/cutover and provider-independent task-history changes remain outside this slice.
 
 ### Explicit selected-provider migration (AC18/19)
 
