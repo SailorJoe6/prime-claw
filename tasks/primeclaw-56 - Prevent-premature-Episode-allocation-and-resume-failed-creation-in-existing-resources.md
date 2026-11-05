@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-05 15:51'
+updated_date: '2026-11-05 15:55'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -112,4 +112,10 @@ Unblock when the PRIMECLAW-55 fix is available in the running plugin generation 
 Joe confirmed that PRIMECLAW-55, PRIMECLAW-57 and PRIMECLAW-58 are finished, merged and installed. Fresh native task views confirm all three are Done; PRIMECLAW-56 has no remaining blocking dependency. Accept this clearance of the recorded PRIMECLAW-55 admission blocker and restore In Planning before the canonical implementation-readiness workflow.
 
 The approved Markdown-first specification, seven acceptance criteria, Implementation Plan and PRIMECLAW-55 dependency are preserved. Joe's explicit implementation approval remains in effect; the full current semantic readiness review is still required, including the effect of the now-landed work on this plan. Current code base is main at f5287c3647245a6a5e6d3baad64d9cecf1dab81b, matching direct origin/main. There is no existing Episode ownership entry for this Conversation and no PRIMECLAW-56 Episode was created by the earlier failed admission. Resume through implement_task for this exact task; do not implement in the owner Conversation or replay an initial execute assignment. No merge, activation, restart or cleanup action is performed or newly authorized by this note.
+
+## Execute slice 1: native preflight before fresh allocation
+
+Current implementation audit at code base f5287c3647245a6a5e6d3baad64d9cecf1dab81b: PRIMECLAW-55 removed the fresh-only reviewed-plan gate, and PRIMECLAW-58 already provides narrow independent-Backlog/Orca allocated-pre-session continuation and existing-session binding. Reuse those mechanics. This pass takes only the smallest remaining pre-allocation slice: editable implement-task instructions for discoverable provider/store/transport, selected code assets and placement/runtime prerequisites before reservation/allocation; aligned creation docs; and a representative isolated known-failure exercise with truthful native-status reporting. No new TypeScript preflight API or policy gate is needed for these native reads.
+
+The broader targeted ownership-reconciliation workflow, other partial creation shapes and remaining recovery exercises remain follow-up work inside this approved task. This slice is not a full-task candidate. Preserve the specification, plan, all seven AC and In Progress status. No live recovery, global activation/restart, merge, lifecycle-status edit or ownership edit is performed by this Episode.
 <!-- SECTION:NOTES:END -->
