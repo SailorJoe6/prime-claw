@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 00:37'
+updated_date: '2026-11-05 00:45'
 labels: []
 dependencies: []
 references:
@@ -16,7 +16,9 @@ references:
 documentation:
   - docs/prep-chain.md
   - docs/backlog.md
+  - docs/handoff-chain.md
 modified_files:
+  - .prime-claw/workflows/handoff.md
   - .prime-claw/workflows/implement-task-prep.md
   - .prime-claw/workflows/implement-task.md
   - .prime-claw/workflows/plan-task-prep.md
@@ -24,6 +26,7 @@ modified_files:
   - DEVELOPERS.md
   - REQUIREMENTS.md
   - docs/backlog.md
+  - docs/handoff-chain.md
   - docs/prep-chain.md
   - docs/testing-strategy.md
   - scripts/testing/provenance.py
@@ -39,6 +42,7 @@ modified_files:
   - src/prime-agent-plugin/skills/implement-task/SKILL.md
   - src/prime-agent-plugin/skills/plan/SKILL.md
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/workflows/handoff.md
   - src/prime-agent-plugin/workflows/implement-task-prep.md
   - src/prime-agent-plugin/workflows/implement-task.md
   - src/prime-agent-plugin/workflows/plan-task-prep.md
@@ -546,4 +550,15 @@ Root cause from the exact production/test flow: the lower Episode task preparati
 Actual manifest FAILED/tests-failed ONLY, finished00:34:31UTC; network absent/disconnected00:30:46UTC. RuntimeIIDsha256:b94100d83d46c8a38f94e74d994f0ecaff860acba62ac92663ca92a72697d160/CID21092f89999a471327ea5bff8d314b17b1791c902fe6af3d2be89cdbea876da2 exact teardown CLEAN/ABSENT00:34:31UTC plus fresh native NoSuchObject. Builder clean/absent00:29:56UTC as already recorded; source-build PASS/source inventory/CA privacy/TLS-on unchanged. New run share/snapshot normally removed, durable receipts/log/historyTAP remain. Original failed20261104T133753Z-27442-5979e0d9 manifest/share/snapshot remain historical and preserved. Actual captured repository407entries/hash354d49cbdfdebc6f0a1dc2875062c25db6c72f32d40bb2e77f4f04a855f856f8, c963 codeHEAD plus only the test typo diff. No timeout/infrastructure cause, unsafe recovery or uncertain-transport replay is indicated.
 
 Capture slot was already returned2026-11-05T00:31:50.079288+00:00; no reservation now, peer57 has a separately coordinated current window. Continue ordinary diagnosed in-scope implementation/validation under Joe's ce2 correction without a per-test permission pause. Current repair is not yet runtime validated. Coordinate actual fresh capture capacity when ready, preserve truthful failed/passed/unrun evidence, and publish the coherent code/native candidate for normal owner review. No status/ownership/AC mutation, main/global activation, dependency/version/trust-settings change, live45 action, merge/abandonment or destructive live cleanup.
+
+## Supporting handoff repair ready — independent review/static checks and fresh Docker probe passed
+The directly supporting Backlog handoff preparation repair is complete in the current seven-path working diff versus c9636c3. It prepares/reads only the Episode task checkout once, preserves the exact task/resource identities, supplies complete previous/current native task/revision plus Episode code-head/upstream observations, and leaves mutable primary task bytes/index/history alone. Removed duplicate primary/Episode view equality, ancestry/status/plan/paired-head/upstream eligibility from this helper; no restoration of hidden primary synchronization, classifier, retry, framework or production alias. Matching integration checks stale primary staged/unstaged/untracked bytes and index, both prompts, one preparation, unchanged resources and native author synchronization before its own next edit. Canonical/managed handoff, oversight and docs are aligned. Full remaining wrapper/Beads/lifecycle/terminal extraction, complete asset durability audit and recorded-operation recovery remain on this SAME task; this is not full Task55 completion.
+
+Final host-safe static selection of test_future_plan_skills.py, test_reviewed_plan_extension.py, test_task_providers.py and test_oversee_episode_skill.py, -m "not container" with the same three historical baseline exclusions: PASS55/13deselected in0.16s, /tmp/primeclaw55-slice3-handoff-repair-static-final.log. Initial selection54passed/1failed only because the expanded oversight prose exceeded its existing1800-word bound; condensed the directly affected paragraph, did not weaken the test. Final guidance1798 regex words. Independent openai/gpt-6.1-sol READ-ONLY source/caller/fixture/guidance review found no remaining material defect after two concrete final-addition findings were fixed: add the missing preparation counting hook to handoffDependencies, and explicitly limit unchanged-code-HEAD/Episode-only-task-clone wording to independent mode (grandfathered task commits advance code history). Reviewer ran no tests/Docker/CA/env reads or writes, confirmed both corrections, finished and was deleted after idle proof. This source-only review is not runtime/full-task acceptance.
+
+Fresh required Docker scripts/test-tier1.sh --probe PASS, run20261105T004153Z-90170-0e50aa5f, actual launch2026-11-05T00:41:50.901124+00:00, Bash90057/driver90170, exit0/114.336s. Log/tmp/primeclaw55-slice3-handoff-repair-probe.log; manifest.test-results/20261105T004153Z-90170-0e50aa5f/tier1/manifest.json PASSED00:43:44UTC/no failure codes. Offline apply/check/RPC passed, network absence/disconnected00:43:34UTC; captured working candidate407entries/framed-sha256-v2/hash701f2174db870aa760f75e528d99a565102a35cfc4468dd90664b5db98bfe659, c963HEAD plus seven-path working diff. This is fresh coverage of the repaired bytes, not a blanket old-probe claim.
+
+Source-build PASS00:43:10UTC with unchanged approved sourcea1faacd/lock/mode/completecheckoutinventory, existing public-CA read-only/TLS-on/privacy support and diagnostic support preserved. Actual builderIIDsha256:e61feb46df29313b7188fd49839a9b2df673be241a2bab13cc684fd66ebb42ce/CID51b29485fdb11b5bc83bd702a20d575fcfb6ad08340e4cc7b44b8d910f143509, clean/absent00:42:48UTC. Actual runtimeIIDsha256:bb9c3004d4191b9eb5fa5de4d6400e4623be1970ce7c7fb7742d205574bca50a/CID3a953f0b1be7c020499061864399e9b4a73f7ce635060b4baa9248b28cee3da5, clean/absent00:43:44UTC. Both exact native fresh inspections returned NoSuchObject; normal run-owned cleanup succeeded, no manual recovery. Actual first startup capacity returned2026-11-05T00:43:58.166850+00:00 after completion follow-up arrived before capture heartbeat. Foreign58 already-captured runtime and all older failed artifacts were untouched.
+
+The separate focused three-file -m container -x rerun has NOT started. It is actually ready but awaits current owner resource coordination after the first probe's terminal/cleanup; no automatic second startup or future hold is inferred from the earlier20-minute grant. No new operator test permission is required. Keep actual success/failure/unrun/teardown evidence truthful; normal diagnosed in-scope fixes continue under Joe's ce2 correction. No code commit/whole focused pass/AC completion is claimed yet, status remains In Progress/all9ACunchecked, no main/global activation/live45/dependency/merge/abandonment/destructive cleanup authority is added.
 <!-- SECTION:NOTES:END -->
