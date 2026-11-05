@@ -4,7 +4,7 @@ title: Make startup initialization read-only and LLM-mediated
 status: In Progress
 assignee: []
 created_date: '2026-11-04 16:00'
-updated_date: '2026-11-05 00:30'
+updated_date: '2026-11-05 00:33'
 labels: []
 dependencies: []
 references:
@@ -90,3 +90,9 @@ Planning only. Implementation requires a separate operator request; this plan al
    - Update `docs/project-initialization.md`, `REQUIREMENTS.md` P2, and directly affected README/story guidance to describe read-only startup, first-normal-turn guidance, any-Git-project scope, LLM deferral, and explicit mutation. Retain the global goals skill and consequential-action boundaries.
    - Run the focused initialization/install regressions through the existing Docker fixture and required Tier 1 validation (`scripts/test-tier1.sh --probe`) after plugin changes. Record actual results and any concrete fixture blocker in the native task; do not repair unrelated test infrastructure or claim green from setup failures. Publish the bounded candidate and its evidence through the normal implementation workflow. No host/global candidate apply, live migration, restart, or cleanup is part of this task.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05 Episode slice: verified exact owner/worktree/session and synchronized independent task history. Implementing read-only template inspection, one-shot first-normal-turn shipped Markdown guidance, and proportionate isolated regressions/docs. Startup will not reconcile, prepare providers/history, require Orca, or create a separate LLM turn. Live apply/restart remains out of scope.
+<!-- SECTION:NOTES:END -->
