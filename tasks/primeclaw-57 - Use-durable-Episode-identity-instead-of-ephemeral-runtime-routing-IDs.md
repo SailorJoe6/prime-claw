@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-57
 title: Use durable Episode identity instead of ephemeral runtime routing IDs
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-05 00:37'
+updated_date: '2026-11-05 00:48'
 labels: []
 dependencies: []
 references:
@@ -182,6 +182,15 @@ created: 2026-11-05 00:14
 Owner clearance: the accepted shared test-harness fix we were waiting for is available. PRIMECLAW-55 accepted isolated diagnostics commit 33f18edc94df898542103ee072512a0955306e5a and public-CA support commit c9636c3499b23894b44b26aafe0f3d4bb5e7b7b7. Its source build and runtime setup passed with read-only public CA input and TLS verification enabled. Its remaining provider-test failure was independently classified as a test typo, not a CA-support defect.
 Resume PRIMECLAW-57 under Joe's original "fix it" / "do what you need to do" request after waiting for 55 as directed. This is use of accepted shared support, not a second CA implementation or borrowed 55 authority/attempt. Integrate only those two isolated support commits in the same Episode; exclude 55 N3/product and test-typo changes. Preserve reviewed routing code 36de6686eba6711af4a6fef97b7e677907bec663, current task specification/plan/AC and all owned resources.
 One bounded own validation pass may run the existing required tier1 probe with current configured public CA input, unchanged source selector and native isolation/capture safeguards. The 57 probe is still pending, not claimed passed by 55's evidence. No TLS bypass, Prime Agent/dependency patch, merge, activation/restart, replacement Episode or retained TASK-2 resource action. Report exact evidence and remaining defects; no per-test typo approval gate or speculative scope expansion.
+---
+
+author: Prime Claw owning Conversation 01a1a6e7-da13-750e-ae8b-f6a6888c3b42
+created: 2026-11-05 00:48
+---
+Owner review accepts PRIMECLAW-57 as Ready for Merge. Integration target: main at 2a3743f7c28f80124b041a34b8711d115393cfbd. Pushed candidate: 4d3e34ca0c996d3d1cc257fc77820144b23547cb.
+Acceptance evidence reviewed: AC1-2 durable identity/current-route cleanup and historical-route reuse; AC3 wrong/missing/ambiguous identity and busy/unknown-idle refusal; AC4 focused isolated regressions; AC5 both related bridge replay/migration route-only defects reproduced and corrected, with normal lookup/reopen/handoff audited. Two independent material reviews found no defect. Existing 356/356 related tests and 4/4 focused migration tests passed; required own scripts/test-tier1.sh --probe now PASSED on 575e5d393674c276f06951d0607eeefc61e0289b.
+Own native evidence proves source build, selected Prime Agent 0.9.8 install, network absence, isolated plugin apply/check/offline RPC and exact clean builder/runtime teardown. All 15 manifest evidence hashes were checked. Evidence: .test-results/primeclaw57-support-20261105T002815Z/20261105T003332Z-69482-f6f2a8b7/tier1/manifest.json in the Episode worktree. Only accepted isolated diagnostics/CA support was reused, with matching patch IDs; no 55 N3/product/test-typo changes. Routing bytes match reviewed 36de6686. Candidate adds only current main ownership metadata to the passed 575e5d3 source tree; no product/harness/test change from that integration.
+Exact provider-reported Episode identity is idle, no queued/unfinished work, running tools, Bash, RLM children or explicit descendants. Same owned resources remain. Full migration-suite completion and live activation/UAT are not claimed. This is Ready publication only: operator merge decision remains pending; no merge into main, global activation/restart, retained TASK-2 use or owned live Episode cleanup.
 ---
 <!-- COMMENTS:END -->
 
