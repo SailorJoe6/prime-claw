@@ -180,15 +180,17 @@ native `In Design` task or revise one exact operator-selected task already in
 `In Design`. Backlog keeps Description, native Acceptance Criteria, References,
 and Documentation and publishes only the exact task path. Beads keeps raw
 `description` and acceptance criteria, preserves reference/documentation
-meaning losslessly in ordinary specification prose, and proves one guarded
-native publication with the exact canonical ID, raw rereads, revision/ref, and
-clean working set. Uncertain creation never permits another create. Each
-workflow asks the operator to review the living specification and allocates no
-Episode. The operator may request as many specification revisions as needed.
+meaning losslessly in ordinary specification prose. Its editable guidance reviews
+native pending/staged touched-table and staged-set multi-issue consequences before
+mutation, commit or push, and verifies actual task-history inclusion/publication.
+Local task/revision or successful push alone is not that proof. Uncertain creation
+never permits another create. Each workflow asks the operator to review the living
+specification and allocates no Episode. The operator may request as many specification revisions as needed.
 
 When the specification is ready for planning, the discoverable `plan` skill
 routes a conversational request to `plan_task(taskId)`. Native code resolves the
-exact task through the selected provider and accepts only `In Design` or
+exact task through the selected provider and supplies its complete native view.
+Editable planning guidance, not code, decides eligibility at `In Design` or
 `In Planning`. The customizable workflow writes Backlog's native Implementation
 Plan or Beads' raw living `design` and publishes native `In Planning`. A
 planning-only request stops for review and allocates no Episode. Markdown owns
@@ -217,11 +219,15 @@ or dual write.
 The primary implementation entry is the discoverable `implement-task` skill and
 `implement_task(taskId, host?)`. It resolves an authorized `In Planning` task and
 placement, then queues compact-first semantic readiness. Self-contained
-`create_task_episode` revalidates concrete provider/identity/state/readiness,
-placement, ownership, and resources. It publishes `In Progress`, reserves
-version-2 ownership before resource creation, and creates one isolated Episode
-with one fixed execute assignment. No prior entry invocation is proof of
-approval. The Conversation retains lifecycle status while the Episode owns task
+`create_task_episode` targets the exact provider/task, placement, ownership and
+resources, supplies native facts, and performs the requested `In Progress`
+publication, reservation and allocation. Editable Markdown and the LLM own
+lifecycle eligibility, readiness, code-basis and failure-disposition decisions;
+code does not repeat them. Fresh creation makes one isolated Episode with one
+fixed execute assignment. Bounded existing-operation continuation reuses the
+allocated independent Backlog/Orca worktree; exact existing-session binding sends
+no assignment. Delivery ambiguity remains owner judgment, not permission to replay.
+No prior entry invocation is proof of approval. The Conversation retains lifecycle status while the Episode owns task
 content on its branch.
 
 Already-created `.ralph/plans/future/<slug>` bundles remain operational through

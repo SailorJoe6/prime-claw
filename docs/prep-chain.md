@@ -27,8 +27,12 @@ and planning, not dependency readiness alone. No separate phase-history or prior
 invocation proof supplements that state. Retained folder selection still requires
 an exact operator-selected location; skills do not search for or invent one.
 Both final create tools retain exact-resource mechanics, not approval stores.
-Lower-level task lifecycle policy gates still await later PRIMECLAW-55 work;
-this entry/prep-chain slice does not claim their removal.
+For both task providers, editable workflows own lifecycle eligibility, selected-
+ticket publication prerequisites, code basis, readiness and failure disposition
+through creation, continuation and terminal cleanup. Code supplies stage-needed
+native facts, loads guidance and performs exact requested native/resource actions.
+The dated slice sections below retain their original evidence limits; their
+as-of pending-work statements are not the current implementation boundary.
 
 Task planning resolves one exact task through the repository's selected native
 provider without an entry-code status eligibility test. The editable `plan`
@@ -79,15 +83,17 @@ absent and no explicit setup was requested. Malformed or negative inventory
 responses fail closed. Placement selection performs no task, Git,
 ownership, worktree, or session mutation.
 
-The deeper create/allocation path still contains policy pending extraction.
-For independent Backlog it requests `In Progress` publication and reserves task
-revision/native view separately from code. The lower publication operation now
-uses one exact-task native edit, path-only commit and non-force push, without a
-whole-clone cleanliness test or automatic reconciliation. Episode task workspace
-preparation obtains the intended native clone without preparing the primary
-clone again. Deeper reservation, code-base and reserved-task predicates still
-exist; native preparation success does not claim their removal. The registered
-code worktree and exact task are still addressed before session/execute delivery.
+For independent Backlog, create requests `In Progress` publication and reserves
+task revision/native view separately from code. Publication uses one exact-task
+native edit, literal path-only commit and non-force push, without whole-clone
+cleanliness, frozen task/history approval or automatic reconciliation. Episode
+preparation obtains the intended native clone without synchronizing another
+writer's mutable primary clone. Both providers leave status/plan/design, code
+basis, semantic compatibility and exception disposition to editable guidance.
+Exact owner/task/provider/worktree/session/resource targeting and native failures
+remain mechanical. The bounded existing-operation continuation reuses an allocated
+independent Backlog/Orca worktree; it neither repeats admission nor proves absent
+delivery from a missing stored session ID.
 
 The prep workflow may request focused compaction. It does not wait for a compact
 event, recreate the phase prompt, or control the already queued follow-up. The

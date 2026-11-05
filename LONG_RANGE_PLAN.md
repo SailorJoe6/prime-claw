@@ -182,10 +182,16 @@ builder repository removes its own tree at the final task-native cutover.
   customizable destinations, and supported old-layout handoff/execute fallback
   remain; this builder has no local plan tree.
 - **4b — episode mechanics.** `implement_task(taskId, host?)` prepares one exact
-  `In Planning` task; self-contained `create_task_episode` revalidates native
-  provider/identity/state/readiness, placement, ownership, and resource safety,
-  then reserves ownership before allocating one isolated Episode and one fixed
-  execute assignment. `handoff_task_episode` continues the exact durable session.
+  task and placement; editable workflows assess `In Planning`, meaningful plan,
+  implementation authority, code basis and readiness. Self-contained
+  `create_task_episode` supplies native facts and performs the requested native
+  status publication and exact ownership/resource operations, without repeating
+  those workflow decisions in code. Fresh creation reserves ownership before
+  allocating one isolated Episode and one fixed execute assignment. The bounded
+  allocated independent Backlog/Orca continuation addresses the original operation
+  without fresh admission/allocation; selected existing-session binding sends no
+  assignment. Actual delivery ambiguity never permits blind replay.
+  `handoff_task_episode` continues the exact durable session.
   Retained `implement_spec` and `create_spec_episode` preserve frozen bundle
   integrity, source-absent active replay with no new assignment, and the same
   version-1 resources and lifecycle. Neither creation path requires a prior-entry

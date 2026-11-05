@@ -10,9 +10,10 @@ receive complete native task/code/session facts. Coherent ticket edits commit
 ASAP and publish promptly: literal selected-file Backlog commits in both
 supported topologies, code separately; Beads consequence review BEFORE native
 mutation/commit/push and actual task-history/publication inclusion checks.
-See [handoff mechanics](handoff-chain.md) for the current slice and remaining
-terminal/cleanup/recovery scope. Old task-native capability/cleanliness/rollback
-details below are historical, not instructions to restore removed code policy.
+See [handoff mechanics](handoff-chain.md) and the editable implementation/oversight
+guidance for current continuation and terminal decisions. The bounded existing-
+operation continuation is documented below. Old task-native capability,
+cleanliness and rollback details below are historical, not instructions to restore removed code policy.
 
 ## Requested creation and failure decisions
 
@@ -36,8 +37,11 @@ blocked guidance decides role, code basis and lifecycle authority. Exact
 persisted owner/session/task/provider/root and requested resource bindings still
 apply; neither a child nor an Expert acquires another owner's authority. This
 changes no retained version-1 role, transition, or cleanup behavior. Bounded
-same-operation recovery remains separate unfinished Task55 work; no live
-recovery or whole-task completion is claimed here.
+same-operation continuation for an allocated independent Backlog/Orca worktree is
+supported through `create_task_episode` with its exact `operationId` and optional
+selected `sessionId`; see the final section. Its disposable regression evidence
+does not prove live recovery or historical assignment delivery. Broader partial
+shapes and unavailable session routes remain explicit limits.
 
 ## Current bounded release
 
