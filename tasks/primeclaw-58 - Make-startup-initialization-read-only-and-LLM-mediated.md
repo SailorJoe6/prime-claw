@@ -4,7 +4,7 @@ title: Make startup initialization read-only and LLM-mediated
 status: In Planning
 assignee: []
 created_date: '2026-11-04 16:00'
-updated_date: '2026-11-05 00:15'
+updated_date: '2026-11-05 00:21'
 labels: []
 dependencies: []
 references:
@@ -66,11 +66,11 @@ Candidate plugin validation must remain Docker-isolated. Prove the relevant star
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Planning only. Implementation requires a separate operator request; this plan allocates no Episode and authorizes no live activation or restart. No new runtime/package dependency or prerequisite task is needed.
+Planning only. Implementation requires a separate operator request; this plan allocates no Episode and authorizes no live activation or restart. No new runtime/package dependency or prerequisite task is needed. Do not add deterministic machinery for task reconciliation, iterative plan changes, authorization, or deciding whether initialization is relevant to the user's request. Those decisions remain in editable Markdown and LLM judgment.
 
 1. Separate inspection from mutation in `extension-support/project-initialization.ts`.
    - Reuse/extract the existing inventory, manifest, and content-hash comparisons into a small read-only assessment of missing setup, applicable template updates, current state, and concrete inspection problems. Keep managed/customized/accepted-override meaning consistent with explicit reconciliation; an accepted override against unchanged upstream is not an update.
-   - Use existing Git-root discovery and active/uncertain Episode detection. Inspect without Orca lookup/registration and preserve Episode snapshots. Read/report relevant legacy/recovery evidence without migrating, repairing, recovering, acquiring a mutation lock, writing metadata/exclusions, or invoking provider/task-history preparation. Do not implement inspection by calling reconcile or add a generic dry-run framework.
+   - Limit inspection to template/update facts, existing Git-root discovery, and active/uncertain Episode protection, without Orca lookup/registration. Surface encountered blockers; do not build a legacy, recovery, or provider-readiness audit. Do not migrate, repair, recover, acquire a mutation lock, write metadata/exclusions, or invoke provider/task-history preparation. Do not implement inspection by calling reconcile or add a generic dry-run framework.
 
 2. Ship the editable startup guidance before project initialization.
    - Add internal Markdown alongside the global initializer (for example, `skills/initialize-prime-claw/STARTUP.md`) with an existing `plugin-root-managed` delivery target in `asset-inventory.json`, not a new project-local or discoverable skill. Use existing delivery/drift handling.
@@ -84,7 +84,7 @@ Planning only. Implementation requires a separate operator request; this plan al
 4. Update the existing isolated regressions, not a new test framework.
    - Extend `tests/project_initialization_extension.test.mjs` and its Docker bridge in `tests/test_project_initialization.py`: fresh setup, missing/new/changed templates, current project, customization/accepted overrides, no Orca, non-Git directory, active/uncertain Episode, and an inspection failure. Assert startup/first-turn inspection does not alter fixture files, manifests, lock/exclude state, code index, or provider/history state and never calls the mutation seams; explicit tool invocation still performs setup/update.
    - Exercise the first normal turn with an existing user request and assigned-task text: guidance coexists with the unchanged request/system context, no separate turn or replacement user message is sent, and a current project gets no guidance. Review the delivered Markdown for deferral/no-modification policy; do not encode LLM compliance as a classifier. Update startup-mutates/Orca-gated expectations rather than preserving those bugs.
-   - Extend the existing container install checks for the shipped startup Markdown and unchanged global-only `goals-and-heartbeats` placement.
+   - Add coverage for the shipped startup Markdown to the existing container install checks. Run the existing global-only `goals-and-heartbeats` placement regressions unchanged; do not duplicate that coverage.
 
 5. Update affected guidance and validate the candidate.
    - Update `docs/project-initialization.md`, `REQUIREMENTS.md` P2, and directly affected README/story guidance to describe read-only startup, first-normal-turn guidance, any-Git-project scope, LLM deferral, and explicit mutation. Retain the global goals skill and consequential-action boundaries.
