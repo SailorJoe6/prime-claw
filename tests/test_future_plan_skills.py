@@ -246,6 +246,25 @@ def test_authoring_skill_publishes_only_through_the_selected_provider_and_stops_
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)
+def test_independent_backlog_authoring_preserves_code_without_a_cleanliness_gate(skill_name: str) -> None:
+    text = " ".join(project_skill(skill_name).read_text().split())
+    backlog = text.split("## Verify and publish exactly once", 1)[1].split("### Beads", 1)[0]
+    for fragment in (
+        "Immediately before mutation, synchronize and reread the intended task workspace",
+        "Unrelated staged, unstaged, or untracked task/code changes and compatible history descendants are not cleanliness prerequisites",
+        "Never absorb, stash, revert, or delete them",
+        "commit contains only that task path and excludes unrelated index entries",
+        "Task-only work must not write the code checkout's HEAD, index or files",
+        "In branch-local mode, make the same exact-task-only commit",
+        "A native conflict or rejected or uncertain push is evidence to inspect",
+    ):
+        assert fragment in backlog
+    assert "require canonical code HEAD clean" not in backlog
+    assert "require the independent clone to be clean" not in backlog
+    assert backlog.index("Immediately before mutation") < backlog.index("After creation or revision")
+
+
+@pytest.mark.parametrize("skill_name", SKILLS)
 def test_authoring_skill_keeps_the_product_contract_proportional(skill_name: str) -> None:
     text = " ".join(project_skill(skill_name).read_text().split())
 

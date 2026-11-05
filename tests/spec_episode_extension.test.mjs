@@ -3,20 +3,25 @@ import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realp
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
   CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, CliTaskEpisodeCleanupGit, PrimeSessionPublisher,
   EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
-  allocateReservedTaskEpisode, bundleContentDigest, createSpecEpisode, handoffSpecEpisode,
+  allocateReservedTaskEpisode, bundleContentDigest, commitConversationTaskStatus, createSpecEpisode, createTaskEpisode, handoffSpecEpisode,
   restoreBlockedSpecEpisode, transitionSpecEpisodeToTaskOwnership,
   handoffTaskEpisode, resolveBlockedWorkflowAuthority, finalizeTaskEpisodeCleanup,
   verifyActiveTaskEpisodeContinuity,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import { CliTaskEpisodeCleanupAdapter } from "../src/prime-agent-plugin/extension-support/task-episode-cleanup.ts";
+import { exactDirectRemoteBranchHead } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
+import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
+import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
+import { prepareTaskHistoryWorkspace, publishTaskHistoryMutation, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 
 const LOCATION = ".ralph/plans/future/alpha";
 function diskFixture() {
@@ -63,7 +68,7 @@ function harness(options = {}) {
   const wt = { id: `repo::${disk.worktree}`, identity: "wt2:local:one", path: disk.worktree, branch: "JLanders/generated", head: "base", projectSetupId: "setup-local" };
   const git = {
     entries: [{ path: disk.root, branch: "main" }, { path: disk.worktree, branch: wt.branch }],
-    repositoryRoot: () => disk.root, head: (path) => path === disk.root ? "base" : "promoted",
+    repositoryRoot: () => disk.root, head: (path) => path === disk.root ? (options.record?.version === 2 ? options.record.baseRef : "base") : "promoted",
     branch: (path) => path === disk.root ? "main" : wt.branch, worktrees() { return this.entries; },
     createWorktree(_repo, branch, path, base) { calls.push(["local-create", branch, path, base]); mkdirSync(path, { recursive: true }); this.entries.push({ path, branch }); mkdirSync(join(path, ".agents", "skills", "execute"), { recursive: true }); writeFileSync(join(path, ".agents", "skills", "execute", "SKILL.md"), "EXECUTE POLICY"); mkdirSync(join(path, ".prime-claw", "workflows"), { recursive: true }); writeFileSync(join(path, ".prime-claw", "workflows", "handoff.md"), "HANDOFF POLICY"); },
     assertCleanWorktree(path) { calls.push(["clean", path]); },
@@ -125,6 +130,12 @@ function createRetained(f, options = {}) {
 }
 
 const TASK_BASE = "a".repeat(40);
+const TASK_INTEGRATION_BRANCH = "stack/reviewed-foundation";
+function bindTaskIntegrationBranch(f, branch = TASK_INTEGRATION_BRANCH) {
+  const previousBranch = f.git.branch;
+  f.git.branch = (path) => path === f.root ? branch : previousBranch(path);
+  f.git.entries[0].branch = branch;
+}
 function taskReservation(overrides = {}) {
   return parseEpisodeOwnership({
     version: 2,
@@ -720,9 +731,31 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
   assert.equal(f.calls.some((value) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(value[0])), false);
 });
 
+test("task-native handoff retains its non-main integration target as that branch advances", async () => {
+  const f = harness({ list: (_count, session) => [session] });
+  bindTaskIntegrationBranch(f);
+  const initial = activeTaskRecord(f, { integrationBranch: TASK_INTEGRATION_BRANCH });
+  f.ownership.write(f.root, initial);
+  let targetHead = "c".repeat(40);
+  const episodeHead = "b".repeat(40);
+  f.git.head = (path) => path === f.root ? targetHead : episodeHead;
+  for (const nextTargetHead of [targetHead, "d".repeat(40)]) {
+    targetHead = nextTargetHead;
+    await handoffTaskEpisode("PRIMECLAW-10.38", "", f.ctx, { ...f.deps, taskResolver: boundTaskResolver(f) });
+    assert.equal(f.record.integrationBranch, TASK_INTEGRATION_BRANCH);
+    assert.equal(f.record.baseRef, TASK_BASE);
+    assert.equal(f.record.branch, initial.branch);
+    assert.equal(f.record.episodeId, initial.episodeId);
+    assert.equal(f.git.branch(f.root), TASK_INTEGRATION_BRANCH);
+  }
+  assert.equal(f.calls.filter(([kind]) => kind === "handoff").length, 2);
+  assert.equal(f.calls.some(([kind]) => ["fresh", "execute", "local-create", "orca-create"].includes(kind)), false);
+});
+
 test("registered active Beads handoff delivers owner-authored published design and notes observations to the existing workflow", async () => {
   const f = harness({ list: (_count, session) => [session] });
-  const initial = activeBeadsTaskRecord(f);
+  bindTaskIntegrationBranch(f);
+  const initial = activeBeadsTaskRecord(f, { integrationBranch: TASK_INTEGRATION_BRANCH });
   f.ownership.write(f.root, initial);
   f.calls.length = 0;
   const currentHead = "b".repeat(40);
@@ -782,7 +815,7 @@ test("registered active Beads handoff delivers owner-authored published design a
   assert.deepEqual(f.record.taskEvidence, currentEvidence);
   assert.equal(f.record.head, currentHead);
   for (const key of [
-    "operationId", "engine", "ownerSessionId", "taskId", "baseRef", "worktreeName", "worktree",
+    "operationId", "engine", "ownerSessionId", "taskId", "baseRef", "integrationBranch", "worktreeName", "worktree",
     "branch", "episodeId", "episodeSessionFile", "episodeActiveSessionId",
   ]) assert.deepEqual(f.record[key], initial[key], key);
   const deliveries = f.calls.filter((call) => call[0] === "handoff");
@@ -1105,12 +1138,14 @@ test("blocked workflow authority routes owner Conversation to task mode and neve
 test("task-native blocked selection preserves exact bindings without branch-label or depth policy", () => {
   for (const provider of ["backlog", "beads"]) {
     const f = harness();
-    const record = provider === "beads" ? activeBeadsTaskRecord(f) : activeTaskRecord(f);
+    const record = provider === "beads"
+      ? activeBeadsTaskRecord(f, { integrationBranch: "selected-review-base" })
+      : activeTaskRecord(f, { integrationBranch: "selected-review-base" });
     f.ownership.write(f.root, record);
     const before = JSON.stringify(f.record);
     const calls = structuredClone(f.calls);
     execFileSync("git", ["switch", "-q", "-c", "selected-review-base"], { cwd: f.root });
-    f.git.branch = () => { assert.fail("blocked selection must not approve a branch label"); };
+    f.git.branch = () => "selected-review-base";
     f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 3 });
     const result = resolveBlockedWorkflowAuthority(record.taskId, f.ctx, f.deps);
     assert.equal(result.provider, provider);
@@ -1125,6 +1160,24 @@ test("task-native blocked selection preserves exact bindings without branch-labe
       ...f.ctx, sessionManager: { ...f.ctx.sessionManager, getSessionId: () => "unbound-owner" },
     }, f.deps), /requires active version-2 Episode ownership/);
     assert.equal(JSON.stringify(f.record), before);
+  }
+});
+
+test("task-native blocked authority uses the owned integration branch and refuses a switch without changing ownership", () => {
+  for (const provider of ["backlog", "beads"]) {
+    const f = harness();
+    bindTaskIntegrationBranch(f);
+    const record = provider === "beads"
+      ? activeBeadsTaskRecord(f, { integrationBranch: TASK_INTEGRATION_BRANCH })
+      : activeTaskRecord(f, { integrationBranch: TASK_INTEGRATION_BRANCH });
+    f.ownership.write(f.root, record);
+    assert.equal(resolveBlockedWorkflowAuthority(record.taskId, f.ctx, f.deps).mode, "task");
+    assert.deepEqual(f.record, record);
+    f.calls.length = 0;
+    bindTaskIntegrationBranch(f, "main");
+    assert.throws(() => resolveBlockedWorkflowAuthority(record.taskId, f.ctx, f.deps), /integration branch|integration target/);
+    assert.deepEqual(f.record, record);
+    assert.equal(f.calls.length, 0);
   }
 });
 
@@ -1171,7 +1224,7 @@ test("cleanup Git adapter resolves the current root without a primary-cleanlines
 function cleanupHarness(outcome = "merged", options = {}) {
   const f = harness({ list: (_count, session) => [session] });
   const episodeHead = "b".repeat(40);
-  const mainHead = "c".repeat(40);
+  const integrationHead = "c".repeat(40);
   const record = activeTaskRecord(f, options.record ?? {});
   const foreign = activeTaskRecord(f, {
     ownerSessionId: "foreign-owner", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md",
@@ -1197,17 +1250,18 @@ function cleanupHarness(outcome = "merged", options = {}) {
   };
   const cleanupGit = {
     repositoryRoot: () => f.root,
-    branch: () => "main",
-    head: () => mainHead,
-    upstreamHead: () => options.unpushed ? "d".repeat(40) : mainHead,
+    branch: () => options.currentBranch ?? record.integrationBranch ?? "main",
+    head: () => integrationHead,
+    upstreamHead: () => options.unpushed ? "d".repeat(40) : integrationHead,
     assertCleanWorktree() { calls.push(["clean"]); if (options.dirty) throw new Error("dirty main"); },
     isAncestor(_repo, ancestor, descendant) {
+      calls.push(["ancestor", ancestor, descendant]);
       if (ancestor === TASK_BASE && descendant === episodeHead) return !options.foreignBase;
-      if (ancestor === episodeHead && descendant === mainHead) return outcome === "merged" && !options.unmerged;
+      if (ancestor === episodeHead && descendant === integrationHead) return outcome === "merged" && !options.unmerged;
       return false;
     },
     pathTrackedAtRef(_repo, ref, path) {
-      assert.equal(ref, mainHead);
+      assert.equal(ref, integrationHead);
       if (outcome !== "abandoned" || options.notArchived) return path === "backlog/tasks/primeclaw-10.38.md";
       return path === "backlog/archive/tasks/primeclaw-10.38.md";
     },
@@ -1221,7 +1275,7 @@ function cleanupHarness(outcome = "merged", options = {}) {
   };
   const taskResolver = (cwd) => taskSelection(f, { projectRoot: cwd, status: options.taskStatus ?? "Done" });
   return {
-    f, episodeHead, calls, ownership, cleanupGit, cleanup, taskResolver, state, records,
+    f, episodeHead, integrationHead, calls, ownership, cleanupGit, cleanup, taskResolver, state, records,
     get record() { return records.get("owner"); },
     get foreignRecord() { return records.get("foreign-owner"); },
     deps: { ownership, cleanupGit, cleanup, taskResolver },
@@ -1231,7 +1285,7 @@ function cleanupHarness(outcome = "merged", options = {}) {
 function beadsCleanupHarness(outcome = "merged", options = {}) {
   const f = harness({ list: (_count, session) => [session] });
   const episodeHead = "b".repeat(40);
-  const mainHead = "c".repeat(40);
+  const integrationHead = "c".repeat(40);
   const providerRevision = "c".repeat(32);
   const record = activeBeadsTaskRecord(f, { head: "9".repeat(40), ...(options.record ?? {}) });
   const records = new Map([[record.ownerSessionId, record]]);
@@ -1255,20 +1309,21 @@ function beadsCleanupHarness(outcome = "merged", options = {}) {
   };
   const cleanupGit = {
     repositoryRoot: () => f.root,
-    branch: () => "main",
-    head: () => mainHead,
-    upstreamHead: () => options.unpushedMain ? "d".repeat(40) : mainHead,
+    branch: () => options.currentBranch ?? record.integrationBranch ?? "main",
+    head: () => integrationHead,
+    upstreamHead: () => options.unpushedMain ? "d".repeat(40) : integrationHead,
     directRemoteHead(_repo, branch) {
       calls.push(["direct-remote", branch]);
-      if (branch === "main") return options.remoteMainHead ?? mainHead;
+      if (branch === (record.integrationBranch ?? "main")) return options.remoteMainHead ?? integrationHead;
       return options.remoteEpisodeHead ?? episodeHead;
     },
     assertCleanWorktree() { calls.push(["clean"]); if (options.dirty) throw new Error("dirty main"); },
     isAncestor(_repo, ancestor, descendant) {
+      calls.push(["ancestor", ancestor, descendant]);
       if (ancestor === TASK_BASE && descendant === record.head) return true;
       if (ancestor === TASK_BASE && descendant === episodeHead) return true;
       if (ancestor === record.head && descendant === episodeHead) return !options.unsafeAncestry;
-      if (ancestor === episodeHead && descendant === mainHead) return outcome === "merged";
+      if (ancestor === episodeHead && descendant === integrationHead) return outcome === "merged";
       return false;
     },
     pathTrackedAtRef() { throw new Error("Beads cleanup must not inspect a task path"); },
@@ -1315,7 +1370,7 @@ function beadsCleanupHarness(outcome = "merged", options = {}) {
   const sentinel = join(f.root, ".beads", "shared-store-sentinel");
   writeFileSync(sentinel, "preserve shared provider state\n");
   return {
-    f, episodeHead, calls, ownership, cleanupGit, cleanup, beadsTransport, beadsTaskReader,
+    f, episodeHead, integrationHead, calls, ownership, cleanupGit, cleanup, beadsTransport, beadsTaskReader,
     beadsRevisionIsAncestor, sentinel, state, records,
     get record() { return records.get("owner"); },
     deps: {
@@ -1343,7 +1398,7 @@ test("cleanup-only task finalization removes exact resources then deletes only t
 test("independent Backlog merged cleanup verifies published terminal evidence and removes nested history first", async () => {
   const taskPath = "backlog/tasks/primeclaw-10.38.md";
   const h = cleanupHarness("merged", { record: {
-    provider: "backlog", providerRevision: "e".repeat(40),
+    provider: "backlog", providerRevision: "e".repeat(40), integrationBranch: TASK_INTEGRATION_BRANCH,
     taskEvidence: { task: { id: "PRIMECLAW-10.38", path: taskPath, status: "In Progress", title: "Task-native lifecycle" } },
   } });
   const publishedHead = "f".repeat(40);
@@ -1357,6 +1412,9 @@ test("independent Backlog merged cleanup verifies published terminal evidence an
   const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
   assert.equal(result.ownershipRemoved, true);
   assert.equal(h.record, undefined);
+  assert.equal(h.cleanupGit.branch(h.f.root), TASK_INTEGRATION_BRANCH);
+  assert.equal(h.calls.some(([kind]) => ["ancestor", "direct-remote"].includes(kind)), false);
+  assert.equal(h.calls.some(([kind, , descendant]) => kind === "ancestor" && descendant === publishedHead), false, "provider task revision is not code ancestry");
   assert.ok(h.calls.findIndex((call) => call[0] === "remove-task-history") < h.calls.findIndex((call) => call[0] === "remove-runtime"));
 });
 
@@ -1408,7 +1466,7 @@ test("independent Backlog cleanup returns unpublished primary facts without appr
 test("independent Backlog abandonment verifies the published archive without active-task resolution", async () => {
   const taskPath = "backlog/tasks/primeclaw-10.38.md";
   const h = cleanupHarness("abandoned", { record: {
-    provider: "backlog", providerRevision: "e".repeat(40),
+    provider: "backlog", providerRevision: "e".repeat(40), integrationBranch: TASK_INTEGRATION_BRANCH,
     taskEvidence: { task: { id: "PRIMECLAW-10.38", path: taskPath, status: "In Progress", title: "Task-native lifecycle" } },
   } });
   const publishedHead = "f".repeat(40);
@@ -1433,6 +1491,9 @@ test("independent Backlog abandonment verifies the published archive without act
   const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
   assert.equal(result.ownershipRemoved, true);
   assert.equal(h.record, undefined);
+  assert.equal(h.cleanupGit.branch(h.f.root), TASK_INTEGRATION_BRANCH);
+  assert.equal(h.calls.some(([kind]) => ["ancestor", "direct-remote"].includes(kind)), false);
+  assert.equal(h.calls.some(([kind, , descendant]) => kind === "ancestor" && descendant === publishedHead), false, "provider task revision is not code ancestry");
 });
 
 test("cleanup finalization treats the actual upstream as an independent exact resource", async (t) => {
@@ -1487,6 +1548,46 @@ test("independent Backlog cleanup accepts an absent worktree without inspecting 
   assert.deepEqual(h.calls.filter(([kind]) => kind.startsWith("remove-")), [["remove-runtime"], ["remove-branch"], ["remove-owner"]]);
 });
 
+test("task cleanup refuses a different owner branch without touching either provider or any Episode resources", async () => {
+  for (const provider of ["backlog", "beads"]) {
+    const options = { currentBranch: "main", upstream: true, record: { integrationBranch: TASK_INTEGRATION_BRANCH } };
+    const h = provider === "beads" ? beadsCleanupHarness("merged", options) : cleanupHarness("merged", options);
+    const record = structuredClone(h.record), resources = structuredClone(h.state);
+    await assert.rejects(
+      finalizeTaskEpisodeCleanup(h.record.taskId, h.episodeHead, "merged", h.f.ctx, h.deps),
+      /integration branch|integration target/,
+    );
+    assert.deepEqual(h.record, record);
+    assert.deepEqual(h.state, resources);
+    assert.equal(h.calls.length, 0);
+  }
+});
+
+test("non-main terminal cleanup keeps code publication and outcome judgment in editable policy", async () => {
+  const scenarios = [
+    { provider: "backlog", outcome: "merged", options: { unpushed: true }, pattern: /pushed integration branch/ },
+    { provider: "backlog", outcome: "merged", options: { unmerged: true }, pattern: /exact Episode candidate in integration branch history/ },
+    { provider: "beads", outcome: "merged", options: { remoteMainHead: "d".repeat(40) }, pattern: /local\/upstream\/direct-remote integration branch/ },
+    { provider: "beads", outcome: "abandoned", options: {}, pattern: /abandoned Episode code in integration branch history/ },
+  ];
+  for (const scenario of scenarios) {
+    const options = { ...scenario.options, record: { integrationBranch: TASK_INTEGRATION_BRANCH } };
+    const h = scenario.provider === "beads" ? beadsCleanupHarness(scenario.outcome, options) : cleanupHarness(scenario.outcome, options);
+    if (scenario.outcome === "abandoned") {
+      const isAncestor = h.cleanupGit.isAncestor;
+      h.cleanupGit.isAncestor = (repo, ancestor, descendant) => ancestor === h.episodeHead && descendant === h.integrationHead
+        ? true : isAncestor(repo, ancestor, descendant);
+    }
+    const record = structuredClone(h.record);
+    const result = await finalizeTaskEpisodeCleanup(record.taskId, h.episodeHead, scenario.outcome, h.f.ctx, h.deps);
+    assert.equal(result.ownershipRemoved, true);
+    assert.equal(typeof result.providerTaskObservation.code.branch.stdout, "string");
+    assert.equal(h.cleanupGit.branch(h.f.root), TASK_INTEGRATION_BRANCH);
+    assert.equal(h.calls.some(([kind]) => ["clean", "ancestor", "direct-remote"].includes(kind)), false);
+    assert.equal(h.record, undefined);
+  }
+});
+
 test("cleanup-only task finalization supports abandonment without an inactive replay record", async () => {
   const h = cleanupHarness("abandoned");
   await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
@@ -1500,12 +1601,14 @@ test("cleanup-only task finalization supports abandonment without an inactive re
 });
 
 test("cleanup-only finalization verifies merged Beads terminal publication without a task path", async () => {
-  const h = beadsCleanupHarness("merged", { upstream: true });
+  const h = beadsCleanupHarness("merged", { upstream: true, record: { integrationBranch: TASK_INTEGRATION_BRANCH } });
   assert.equal(h.record.provider, "beads");
   assert.equal("taskPath" in h.record, false);
   const result = await finalizeTaskEpisodeCleanup(BEADS_TASK_ID, h.episodeHead, "merged", h.f.ctx, h.deps);
   assert.equal(result.ownershipRemoved, true);
   assert.equal(h.record, undefined);
+  assert.equal(h.cleanupGit.branch(h.f.root), TASK_INTEGRATION_BRANCH);
+  assert.equal(h.calls.some(([kind]) => ["ancestor", "direct-remote"].includes(kind)), false);
   assert.equal(existsSync(h.sentinel), true);
   assert.deepEqual(h.calls.filter((call) => call[0] === "direct-remote"), []);
   assert.deepEqual(h.calls.filter(([kind]) => kind.startsWith("remove-")), [
@@ -1514,10 +1617,13 @@ test("cleanup-only finalization verifies merged Beads terminal publication witho
 });
 
 test("cleanup-only finalization verifies exact closed Beads abandonment without retaining a replay record", async () => {
-  const h = beadsCleanupHarness("abandoned");
+  const h = beadsCleanupHarness("abandoned", { record: { integrationBranch: TASK_INTEGRATION_BRANCH } });
   await finalizeTaskEpisodeCleanup(BEADS_TASK_ID, h.episodeHead, "abandoned", h.f.ctx, h.deps);
   assert.equal(h.record, undefined);
+  assert.equal(h.cleanupGit.branch(h.f.root), TASK_INTEGRATION_BRANCH);
+  assert.equal(h.calls.some(([kind]) => ["ancestor", "direct-remote"].includes(kind)), false);
   assert.equal(existsSync(h.sentinel), true);
+  assert.equal(h.calls.some(([kind]) => ["ancestor", "direct-remote"].includes(kind)), false);
   const before = structuredClone(h.calls);
   await assert.rejects(finalizeTaskEpisodeCleanup(BEADS_TASK_ID, h.episodeHead, "abandoned", h.f.ctx, h.deps), /No durable task-native Episode ownership/);
   assert.deepEqual(h.calls, before);
@@ -1587,7 +1693,8 @@ test("both Beads outcomes carry full current native facts without terminal eligi
     h.deps.beadsTransport = () => { transportReads += 1; return preparation; };
     h.deps.beadsTaskReader = () => { taskReads += 1; return { provider: "beads", projectRoot: h.f.root, taskId: BEADS_TASK_ID, nativeStatus: raw.status, nativeView: raw }; };
     h.f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 3 });
-    h.deps.cleanupGit = { repositoryRoot: () => h.f.root };
+    h.deps.cleanupGit = { repositoryRoot: () => h.f.root, branch: () => "terminal-topic" };
+    h.records.set("owner", { ...h.record, integrationBranch: "terminal-topic" });
     execFileSync("git", ["-C", h.f.root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-qm", "seed terminal observation fixture"]);
     execFileSync("git", ["-C", h.f.root, "branch", "-m", "terminal-topic"]);
     writeFileSync(join(h.f.root, "foreign-staged.txt"), "staged\n");
@@ -1629,7 +1736,7 @@ test("registered Backlog cleanup carries complete native views in both history l
     mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
     writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), "EDITED BACKLOG TERMINAL POLICY");
     const tools = new Map();
-    createReviewedPlanExtension({ guideRoot, ownership: h.ownership, taskCleanupGit: { repositoryRoot: () => h.f.root },
+    createReviewedPlanExtension({ guideRoot, ownership: h.ownership, taskCleanupGit: { repositoryRoot: () => h.f.root, branch: () => "main" },
       taskCleanup: h.cleanup, taskActions: { cleanup: (id, head, outcome, ctx, deps) => finalizeTaskEpisodeCleanup(id, head, outcome, ctx, { ...deps,
         taskResolver: h.deps.taskResolver, observeTaskHistory: h.deps.observeTaskHistory,
         inspectTaskHistory: h.deps.inspectTaskHistory, cleanupTaskHistory: h.deps.cleanupTaskHistory }) },
@@ -1853,9 +1960,24 @@ test("task-native handoff retains active resource identity without branch, role 
     );
     assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
   });
+  await t.test("omitted integration target stays bound to main after a checkout switch", async () => {
+    const f = harness();
+    const original = activeTaskRecord(f);
+    f.ownership.write(f.root, original);
+    f.git.branch = () => "feature";
+    await assert.rejects(
+      handoffTaskEpisode(
+        "PRIMECLAW-10.38", "continue", f.ctx,
+        { ...f.deps, taskResolver: boundTaskResolver(f) },
+      ),
+      /recorded integration branch main; found feature/,
+    );
+    assert.deepEqual(f.record, original);
+    assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
+  });
   await t.test("primary branch, role depth and dirty code are facts, not eligibility", async () => {
     const f = harness({ list: (_count, session) => [session] });
-    f.ownership.write(f.root, activeTaskRecord(f));
+    f.ownership.write(f.root, activeTaskRecord(f, { integrationBranch: "selected-integration" }));
     f.git.branch = (cwd) => cwd === f.root ? "selected-integration" : f.wt.branch;
     f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 2 });
     f.git.assertCleanWorktree = () => { throw new Error("must not run"); };
@@ -2045,6 +2167,332 @@ test("retained CLI inventory permits local fallback only for a missing executabl
   }
 });
 
+
+// Real code/task DAGs and a disposable bare remote; only session transport is faked.
+function independentStatusFixture(t) {
+  const backlog = process.platform === "linux" && existsSync("/usr/local/bin/backlog")
+    ? "/usr/local/bin/backlog"
+    : fileURLToPath(new URL("../deps/backlog/dist/backlog", import.meta.url));
+  if (!existsSync(backlog)) { t.skip("managed backlog executable unavailable"); return null; }
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-independent-status-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const root = join(dir, "repo"), remote = join(dir, "remote.git");
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  const git = (cwd, ...args) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
+  git(root, "config", "user.name", "Prime Claw Test");
+  git(root, "config", "user.email", "prime-claw@example.invalid");
+  mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true });
+  writeFileSync(join(root, ".agents", "skills", "execute", "SKILL.md"), "---\nname: execute\n---\nImplement the exact task.\n");
+  writeFileSync(join(root, "staged.txt"), "baseline staged file\n");
+  writeFileSync(join(root, "code.txt"), "baseline code\n");
+  mkdirSync(join(root, ".prime-claw"));
+  writeFileSync(join(root, ".prime-claw", "ownership.json"), `${JSON.stringify({ schemaVersion: 1, owners: {} }, null, 2)}\n`);
+  git(root, "add", "."); git(root, "commit", "-qm", "code baseline");
+  git(root, "remote", "add", "origin", remote); git(root, "push", "-qu", "origin", "main");
+  const processRunner = new ProcessCommandRunner();
+  const runner = { run(command, args, options) { return processRunner.run(command === "backlog" ? backlog : command, args, options); } };
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner });
+  assert.equal(prepared.status, "prepared");
+  const store = prepared.storeDir;
+  git(store, "config", "user.name", "Prime Claw Test");
+  git(store, "config", "user.email", "prime-claw@example.invalid");
+  runner.run("backlog", ["task", "create", "Independent status regression", "--status", "In Planning",
+    "--description", "Publish only the selected task without changing parent code",
+    "--plan", "1. Create the bounded resource.\n2. Verify exact identity.", "--plain"], { cwd: root });
+  const taskId = JSON.parse(runner.run("backlog", ["task", "list", "--json"], { cwd: root }).stdout).tasks[0].id;
+  const view = () => JSON.parse(runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd: root }).stdout).task;
+  const task = view();
+  git(store, "add", "."); git(store, "commit", "-qm", "plan selected task");
+  git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  git(root, "add", ".gitignore"); git(root, "commit", "-qm", "ignore independent task history"); git(root, "push", "-q");
+  const records = new Map(), events = [];
+  const ownership = {
+    read(_root, owner) { return owner ? records.get(owner) ?? null : [...records.values()][0] ?? null; },
+    write(_root, value) {
+      writeEpisodeOwnership(root, value);
+      records.set(value.ownerSessionId, structuredClone(value)); events.push(["ownership", value.status]);
+    },
+    removeTask() { events.push(["cleanup"]); throw new Error("unexpected ownership cleanup"); },
+  };
+  const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+    getSessionId: () => "independent-status-owner", getSessionFile: () => join(dir, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
+  } };
+  const taskResolver = (cwd, id) => resolveBacklogTask(cwd, id, runner);
+  const admissionGit = new CliTaskEpisodeAdmissionGit();
+  const dependencies = { admissionGit, admissionRunner: runner, taskResolver, ownership,
+    reservationOperationId: "status-regression-operation", now: () => "2026-11-03T19:00:00.000Z" };
+  const statusOptions = { taskId, projectRoot: root, taskPath: task.path, status: "In Progress",
+    expectedProvider: "backlog",
+    message: `admit ${taskId}`, runner, git: admissionGit, resolveTask: taskResolver };
+  const remoteHead = (ref) => git(root, "ls-remote", "--refs", "origin", ref).split(/\s+/)[0];
+  const codeSnapshot = () => ({
+    head: git(root, "rev-parse", "HEAD"), branch: git(root, "symbolic-ref", "--short", "HEAD"),
+    upstream: git(root, "rev-parse", "@{upstream}"), remoteMain: remoteHead("refs/heads/main"),
+    // Recovery may update its own tracked binding; unrelated code must remain byte-for-byte unchanged.
+    status: git(root, "status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude).prime-claw/ownership.json"),
+    index: git(root, "ls-files", "--stage"),
+    staged: git(root, "diff", "--cached", "--binary", "--", ".", ":(exclude).prime-claw/ownership.json"),
+    unstaged: git(root, "diff", "--binary", "--", ".", ":(exclude).prime-claw/ownership.json"),
+    untracked: existsSync(join(root, "scratch.txt")) ? readFileSync(join(root, "scratch.txt"), "utf8") : null,
+  });
+  const dirtyCode = () => {
+    writeFileSync(join(root, "staged.txt"), "unrelated staged code\n"); git(root, "add", "staged.txt");
+    writeFileSync(join(root, "code.txt"), "unrelated unstaged code\n");
+    writeFileSync(join(root, "scratch.txt"), "unrelated untracked code\n");
+  };
+  const divergeCode = () => {
+    const base = git(root, "rev-parse", "HEAD");
+    git(root, "commit", "--allow-empty", "-qm", "unpublished local code");
+    const remoteAdvance = git(root, "commit-tree", `${base}^{tree}`, "-p", base, "-m", "independent remote code");
+    git(root, "push", "-q", "origin", `${remoteAdvance}:refs/heads/main`); git(root, "fetch", "-q", "origin", "main");
+    assert.equal(git(root, "rev-list", "--left-right", "--count", "HEAD...@{upstream}"), "1\t1");
+  };
+  const taskCommitPaths = (ref = "HEAD") => git(store, "diff-tree", "--no-commit-id", "--name-only", "-r", ref).split(/\r?\n/);
+  const diskRecord = () => JSON.parse(readFileSync(join(root, ".prime-claw", "ownership.json"), "utf8")).owners["independent-status-owner"] ?? null;
+  return { root, dir, store, task, taskId, git, runner, view, events, ownership, ctx, dependencies, statusOptions,
+    remoteHead, codeSnapshot, dirtyCode, divergeCode, taskCommitPaths, diskRecord, get record() { return records.get("independent-status-owner") ?? null; } };
+}
+
+test("independent Backlog status publication preserves unrelated staged, unstaged, untracked and divergent parent code", (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  f.divergeCode(); f.dirtyCode();
+  const before = f.codeSnapshot(), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+  // Integration-target observations belong to admission, not task-only publication.
+  const publicationGit = Object.create(f.statusOptions.git);
+  for (const method of ["branch", "operationInProgress", "trackedStatus", "upstreamHead"]) {
+    publicationGit[method] = () => { throw new Error(`task-only publication called code admission ${method}`); };
+  }
+  const result = commitConversationTaskStatus({ ...f.statusOptions,
+    git: publicationGit,
+  });
+  assert.equal(result.commit, before.head);
+  assert.equal(result.taskHistory.status, "published");
+  assert.equal(result.selection.status, "In Progress");
+  assert.equal(result.taskHistory.publishedHead, f.remoteHead(TASK_HISTORY_REF));
+  assert.notEqual(result.taskHistory.publishedHead, taskBefore);
+  assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  assert.equal(f.git(f.store, "status", "--porcelain"), "");
+  assert.deepEqual(f.codeSnapshot(), before, "publication must not stage, commit, reset, stash, clean or push parent code");
+  assert.equal(f.record, null, "status publication alone does not reserve an Episode");
+  assert.equal(f.diskRecord(), null);
+});
+
+test("independent Backlog admission leaves dirty and divergent code suitability to editable policy", async (t) => {
+  for (const scenario of ["dirty", "divergent"]) await t.test(scenario, async (t) => {
+    const f = independentStatusFixture(t); if (!f) return;
+    if (scenario === "dirty") f.dirtyCode(); else f.divergeCode();
+    const before = f.codeSnapshot(), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+    let allocations = 0;
+    await assert.rejects(createTaskEpisode(f.taskId, "unsuitable-code", f.ctx, {
+      ...f.dependencies, allocateTaskEpisode: async () => { allocations += 1; throw new Error("observed requested allocation"); },
+    }, { engine: "local" }), /observed requested allocation/);
+    assert.equal(f.view().status, "In Progress");
+    assert.equal(f.record.status, "provisioning");
+    assert.equal(allocations, 1);
+    assert.deepEqual(f.codeSnapshot(), before);
+    assert.equal(f.git(f.store, "rev-list", "--count", `${taskBefore}..HEAD`), "1", "one requested native admission; no exception-chosen rollback");
+    assert.equal(f.git(f.store, "rev-parse", "HEAD"), f.remoteHead(TASK_HISTORY_REF));
+    assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  });
+});
+
+test("independent Backlog admission preserves a concurrent published code advance without frozen-base approval", async (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const base = f.git(f.root, "rev-parse", "HEAD"), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+  const run = f.runner.run.bind(f.runner);
+  let changedBase, allocations = 0;
+  f.runner.run = (command, args, options) => {
+    if (!changedBase && command === "git" && args[0] === "ls-files" && args.includes("--error-unmatch") && args.at(-1) === f.task.path) {
+      // A concurrent actor moves and publishes the integration branch after the
+      // caller's last pre-publication check but before the publisher captures HEAD.
+      f.git(f.root, "commit", "--allow-empty", "-qm", "concurrent published code base");
+      f.git(f.root, "push", "-q");
+      changedBase = f.git(f.root, "rev-parse", "HEAD");
+    }
+    return run(command, args, options);
+  };
+  await assert.rejects(createTaskEpisode(f.taskId, "changed-code-base", f.ctx, {
+    ...f.dependencies, allocateTaskEpisode: async () => { allocations += 1; throw new Error("observed requested allocation"); },
+  }, { engine: "local" }), /observed requested allocation/);
+  assert.ok(changedBase); assert.notEqual(changedBase, base);
+  assert.equal(f.git(f.root, "rev-parse", "HEAD"), changedBase, "do not repair the concurrent actor's code commit");
+  assert.equal(f.remoteHead("refs/heads/main"), changedBase);
+  assert.equal(f.view().status, "In Progress");
+  assert.equal(f.record.status, "provisioning"); assert.deepEqual(f.diskRecord(), f.record);
+  assert.equal(f.record.baseRef, changedBase);
+  assert.equal(allocations, 1);
+  assert.equal(f.git(f.store, "rev-list", "--count", `${taskBefore}..HEAD`), "1");
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), f.remoteHead(TASK_HISTORY_REF));
+  assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+});
+
+test("independent Backlog admission never pushes another actor's local code or chooses rollback", async (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const before = f.codeSnapshot(), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+  const publications = [];
+  let actorSnapshot, codePushes = 0, allocations = 0;
+  const realPush = f.dependencies.admissionGit.push.bind(f.dependencies.admissionGit);
+  f.dependencies.admissionGit.push = (root) => { codePushes += 1; return realPush(root); };
+  await assert.rejects(createTaskEpisode(f.taskId, "head-drift-rollback", f.ctx, {
+    ...f.dependencies,
+    publishTaskHistory(input) {
+      const publication = publishTaskHistoryMutation(input);
+      assert.equal(publication.status, "published");
+      publications.push({ status: JSON.parse(publication.nativeAfter).task.status, head: publication.publishedHead });
+      if (!actorSnapshot && input.edits.some(edit => edit.option === "--status" && edit.value === "In Progress")) {
+        // A different actor commits code after actual task publication but before
+        // the publisher's HEAD check returns the independent admission result.
+        writeFileSync(join(f.root, "code.txt"), "concurrent actor's unpublished code\n");
+        f.git(f.root, "add", "code.txt");
+        f.git(f.root, "commit", "-qm", "concurrent actor's local code commit");
+        actorSnapshot = f.codeSnapshot();
+        assert.notEqual(actorSnapshot.head, before.head);
+        assert.equal(actorSnapshot.remoteMain, before.remoteMain);
+      }
+      return publication;
+    },
+    allocateTaskEpisode: async () => { allocations += 1; throw new Error("observed requested allocation"); },
+  }, { engine: "local" }), /observed requested allocation/);
+  assert.ok(actorSnapshot, "exercise the concurrent code advance after exact task publication");
+  assert.deepEqual(publications.map(publication => publication.status), ["In Progress"]);
+  assert.equal(f.view().status, "In Progress");
+  assert.equal(codePushes, 0, "independent rollback must never attempt a parent-code push");
+  assert.equal(f.remoteHead("refs/heads/main"), before.remoteMain, "the actor's code must remain unpublished");
+  assert.equal(f.git(f.root, "rev-parse", "HEAD"), actorSnapshot.head, "preserve the actor's local code commit");
+  assert.deepEqual(f.codeSnapshot(), actorSnapshot, "task rollback must not repair or publish the actor's code");
+  assert.equal(allocations, 1);
+  assert.equal(f.record.status, "provisioning"); assert.deepEqual(f.diskRecord(), f.record);
+  assert.equal(f.git(f.store, "rev-list", "--count", `${taskBefore}..HEAD`), "1");
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), publications[0].head);
+  assert.equal(f.remoteHead(TASK_HISTORY_REF), publications[0].head);
+  for (const ref of ["HEAD"]) {
+    assert.deepEqual(f.taskCommitPaths(ref), [f.task.path.replace(/^\.backlog\//, "")]);
+  }
+  assert.equal(f.git(f.store, "status", "--porcelain"), "");
+});
+
+test("session binding failure retains uncertain resources and permits owner-requested task-only Blocked publication despite parent code changes", async (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const base = f.git(f.root, "rev-parse", "HEAD"), taskBefore = f.git(f.store, "rev-parse", "HEAD");
+  let beforeRecovery, allocatedRecord, allocatedSession, starts = 0, assignments = 0, cleanups = 0;
+  const publisher = {
+    async createFresh(options) {
+      starts += 1;
+      assert.equal(f.view().status, "In Progress");
+      assert.equal(f.record.status, "provisioning");
+      assert.equal(f.git(f.root, "ls-files", "--", ".prime-claw/ownership.json"), ".prime-claw/ownership.json");
+      assert.equal(f.git(f.root, "status", "--porcelain"), "M .prime-claw/ownership.json", "ownership writes alone dirty the tracked parent before session binding");
+      assert.deepEqual(f.diskRecord(), f.record);
+      assert.ok(existsSync(join(options.worktree, ".backlog", ".git")));
+      allocatedSession = { sessionId: "uncertain-session", sessionFile: join(f.dir, "uncertain.jsonl") };
+      writeFileSync(allocatedSession.sessionFile, "{}\n");
+      await options.onAllocated(allocatedSession);
+      allocatedRecord = structuredClone(f.record);
+      // A second actor changes main after allocation, before recovery publication.
+      const remoteAdvance = f.git(f.root, "commit-tree", `${base}^{tree}`, "-p", base, "-m", "concurrent remote advance");
+      f.git(f.root, "push", "-q", "origin", `${remoteAdvance}:refs/heads/main`); f.git(f.root, "fetch", "-q", "origin", "main");
+      f.dirtyCode(); beforeRecovery = f.codeSnapshot();
+      throw new EpisodeStateUncertainError("session binding outcome unknown");
+    },
+    async deliverExecute() { assignments += 1; },
+    async kill() { cleanups += 1; }, async deleteSaved() { cleanups += 1; },
+    close() {},
+  };
+  const dependencies = { ...f.dependencies, publisher };
+  await assert.rejects(createTaskEpisode(f.taskId, "binding-failure", f.ctx, dependencies, { engine: "local" }),
+    /session binding outcome unknown/);
+  assert.equal(f.view().status, "In Progress", "an allocation exception must not choose a second native status");
+  assert.equal(f.record.taskEvidence.task.status, "In Progress");
+  const taskAfterAdmission = f.git(f.store, "rev-parse", "HEAD");
+  const blocked = commitConversationTaskStatus({ ...f.statusOptions, status: "Blocked", note: "Owner-requested blocker: session binding outcome unknown", message: "record actual blocker" });
+  assert.equal(blocked.taskHistory.status, "published");
+  assert.equal(f.view().status, "Blocked");
+  assert.match(f.view().implementationNotes, /session binding outcome unknown/);
+  assert.equal(f.record.status, "uncertain");
+  assert.equal(f.record.operationId, allocatedRecord.operationId);
+  assert.equal(f.record.baseRef, base);
+  for (const key of ["worktree", "branch", "head", "episodeId", "episodeSessionFile"]) assert.equal(f.record[key], allocatedRecord[key]);
+  assert.equal(f.record.providerRevision, taskAfterAdmission);
+  assert.notEqual(f.record.providerRevision, f.remoteHead(TASK_HISTORY_REF));
+  assert.equal(f.record.taskEvidence.task.status, "In Progress", "owner publication alone does not silently advance runtime observations");
+  assert.deepEqual(f.diskRecord(), f.record, "retain the exact uncertain binding and truthful Blocked publication on disk");
+  assert.equal(f.git(f.root, "status", "--porcelain", "--", ".prime-claw/ownership.json"), "M .prime-claw/ownership.json");
+  assert.ok(existsSync(f.record.worktree)); assert.ok(existsSync(allocatedSession.sessionFile));
+  assert.equal(f.git(f.root, "rev-parse", f.record.branch), base);
+  assert.deepEqual(f.codeSnapshot(), beforeRecovery);
+  assert.equal(f.git(f.store, "rev-list", "--count", `${taskBefore}..HEAD`), "2");
+  assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  assert.deepEqual(f.taskCommitPaths("HEAD^"), [f.task.path.replace(/^\.backlog\//, "")]);
+  const uncertain = structuredClone(f.record), taskHead = f.git(f.store, "rev-parse", "HEAD");
+  await assert.rejects(createTaskEpisode(f.taskId, "no-fresh-retry", f.ctx, dependencies, { engine: "local" }), /Non-terminal Episode ownership already exists/);
+  await assert.rejects(allocateReservedTaskEpisode(f.taskId, f.ctx, dependencies), /ownership is uncertain/);
+  assert.deepEqual(f.record, uncertain);
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), taskHead);
+  assert.equal(starts, 1); assert.equal(assignments, 0); assert.equal(cleanups, 0);
+  assert.equal(f.events.some(([kind]) => kind === "cleanup"), false);
+});
+
+test("independent status publication incorporates an authorized selected-ticket edit without whole-store dirt or frozen-head approval", async (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const before = f.codeSnapshot();
+  appendFileSync(join(f.root, f.task.path), "\nAuthorized selected-ticket evidence.\n");
+  const result = commitConversationTaskStatus(f.statusOptions);
+  assert.equal(result.taskHistory.status, "published");
+  assert.match(readFileSync(join(f.root, f.task.path), "utf8"), /Authorized selected-ticket evidence/);
+  assert.equal(f.view().status, "In Progress");
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), f.remoteHead(TASK_HISTORY_REF));
+  assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  assert.deepEqual(f.codeSnapshot(), before);
+});
+
+test("independent status publication preserves exact identity checks before native edit", (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const current = f.dependencies.taskResolver(f.root, f.taskId), published = f.remoteHead(TASK_HISTORY_REF);
+  let publications = 0;
+  for (const [patch, pattern] of [
+    [{ taskId: "FOREIGN-1" }, /could not be re-resolved exactly/],
+    [{ taskPathRelative: ".backlog/tasks/foreign.md" }, /changed project or path/],
+  ]) assert.throws(() => commitConversationTaskStatus({ ...f.statusOptions,
+    resolveTask: () => ({ ...current, ...patch }),
+    publishTaskHistory: () => { publications += 1; throw new Error("must not publish"); },
+  }), pattern);
+  assert.equal(publications, 0);
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), published);
+  assert.equal(f.view().status, "In Planning");
+});
+
+test("independent status publication reports task push failure without claiming success or discarding local evidence", (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const before = f.codeSnapshot(), published = f.remoteHead(TASK_HISTORY_REF);
+  const run = f.runner.run.bind(f.runner);
+  f.runner.run = (command, args, options) => command === "git" && args[0] === "-C" && args[1] === f.store && args[2] === "push"
+    ? { status: 1, stdout: "", stderr: "fixture task-history push rejected" } : run(command, args, options);
+  assert.throws(() => commitConversationTaskStatus(f.statusOptions), /did not return published task-history evidence.*push-failed/);
+  assert.equal(f.remoteHead(TASK_HISTORY_REF), published);
+  assert.notEqual(f.git(f.store, "rev-parse", "HEAD"), published);
+  assert.equal(f.view().status, "In Progress", "retain the unpublished local task mutation for recovery");
+  assert.deepEqual(f.taskCommitPaths(), [f.task.path.replace(/^\.backlog\//, "")]);
+  assert.deepEqual(f.codeSnapshot(), before);
+  assert.equal(f.record, null);
+});
+
+test("independent status publication reports success without attributing a concurrent code HEAD advance to task work", (t) => {
+  const f = independentStatusFixture(t); if (!f) return;
+  const before = f.git(f.root, "rev-parse", "HEAD");
+  const result = commitConversationTaskStatus({ ...f.statusOptions, publishTaskHistory(input) {
+    const publication = publishTaskHistoryMutation(input);
+    assert.equal(publication.status, "published");
+    f.git(f.root, "commit", "--allow-empty", "-qm", "concurrent code HEAD mutation");
+    return publication;
+  } });
+  assert.equal(result.taskHistory.status, "published");
+  assert.equal(result.commit, before, "the reported code basis is the observation taken before the task operation");
+  assert.notEqual(f.git(f.root, "rev-parse", "HEAD"), before);
+  assert.equal(f.git(f.store, "rev-parse", "HEAD"), f.remoteHead(TASK_HISTORY_REF));
+  assert.equal(f.view().status, "In Progress", "do not hide or undo a task publication that already succeeded");
+});
+
 test("reserved task allocates a local worktree from the status commit and assigns execute once", async () => {
   const f = harness({ record: taskReservation() });
   f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 3 });
@@ -2112,16 +2560,29 @@ test("missing reserved Orca setup becomes uncertain without resource creation", 
   assert.equal(f.calls.some((call) => ["orca-create", "auto-create", "auto-run", "fresh", "execute"].includes(call[0])), false);
 });
 
-test("active task-native allocation replay validates identity without replaying assignment", async () => {
-  const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });
+test("active task-native allocation replay retains a non-main target and exact base after that target advances", async () => {
+  const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local", integrationBranch: TASK_INTEGRATION_BRANCH }) });
+  bindTaskIntegrationBranch(f);
   bindTaskOrcaHead(f);
   await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  const initial = structuredClone(f.record);
+  assert.equal(initial.baseRef, TASK_BASE);
+  assert.equal(initial.integrationBranch, TASK_INTEGRATION_BRANCH);
+  assert.equal(f.calls.find(([kind]) => kind === "orca-create")[1].baseRef, TASK_BASE);
+  f.git.head = (path) => path === f.root ? "d".repeat(40) : TASK_BASE;
   f.calls.length = 0;
   const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
   assert.equal(result.status, "active");
   assert.equal(result.reused, true);
+  assert.deepEqual(f.record, initial);
+  assert.equal(f.git.branch(f.root), TASK_INTEGRATION_BRANCH);
   assert.equal(f.calls.some((call) => ["orca-create", "local-create", "auto-create", "auto-run", "fresh", "execute"].includes(call[0])), false);
   assert.equal(f.calls.some((call) => call[0] === "orca-show"), true);
+  bindTaskIntegrationBranch(f, "main");
+  f.calls.length = 0;
+  await assert.rejects(allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps), /integration branch|integration target/);
+  assert.deepEqual(f.record, initial);
+  assert.equal(f.calls.some(([kind]) => ["ownership", "orca-create", "local-create", "auto-create", "auto-run", "fresh", "execute", "reopen"].includes(kind)), false);
 });
 
 
@@ -2186,6 +2647,27 @@ test("task-native allocation rejects mismatched ownership before resource mutati
   assert.equal(f.calls.some((call) => ["ownership", "orca-create", "local-create", "fresh", "execute"].includes(call[0])), false);
 });
 
+test("task-native fresh allocation refuses a different integration target before resource mutation", async () => {
+  const f = harness({ record: taskReservation({ integrationBranch: TASK_INTEGRATION_BRANCH }) });
+  const original = structuredClone(f.record);
+  await assert.rejects(allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps), /integration branch|integration target/);
+  assert.deepEqual(f.record, original);
+  assert.equal(f.calls.some(([kind]) => ["ownership", "orca-create", "local-create", "auto-create", "auto-run", "fresh", "execute"].includes(kind)), false);
+});
+
+test("same-target code advancement preserves the reserved allocation base without frozen-head approval", async () => {
+  const f = harness({ record: taskReservation({ integrationBranch: TASK_INTEGRATION_BRANCH }) });
+  bindTaskIntegrationBranch(f);
+  f.filesystem.exists = () => false;
+  f.git.head = (cwd) => cwd === f.root ? "d".repeat(40) : TASK_BASE;
+  const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
+  assert.equal(result.baseRef, TASK_BASE);
+  assert.equal(result.head, TASK_BASE);
+  assert.equal(result.integrationBranch, TASK_INTEGRATION_BRANCH);
+  assert.equal(f.calls.filter(([kind]) => kind === "local-create").length, 1);
+  assert.equal(f.calls.filter(([kind]) => kind === "execute").length, 1);
+});
+
 test("partial provisioning becomes uncertain and cannot replay allocation", async () => {
   const f = harness({ record: taskReservation({ worktreeName: "already-derived" }) });
   await assert.rejects(
@@ -2233,7 +2715,8 @@ function allocatedPreSessionFixture() {
   f.ownership.write(f.root, original);
   f.ownership.write(f.root, taskReservation({ ownerSessionId: "foreign-owner", taskId: "PRIMECLAW-99" }));
   f.deps.taskResolver = () => taskSelection(f, { taskId: original.taskId, nativeView: original.taskEvidence });
-  f.deps.admissionRunner = { run(command, args) {
+  f.deps.admissionRunner = { run(command, args, options) {
+    if (command === "git") return new ProcessCommandRunner().run(command, args, options);
     assert.equal(command, "backlog"); assert.deepEqual(args, ["task", "view", "--json", "--", original.taskId]);
     return { status: 0, stdout: JSON.stringify(original.taskEvidence), stderr: "" };
   } };
@@ -2401,6 +2884,51 @@ test("cleanup transport deletes the configured renamed remote ref before the loc
   ]);
 });
 
+test("cleanup deletes only the Episode refs while preserving its non-main integration branch and renamed upstream", async (t) => {
+  const f = cleanupTransportFixture(t);
+  f.git("branch", TASK_INTEGRATION_BRANCH, f.otherHead);
+  f.git("push", "-q", f.upstream.remote, `${TASK_INTEGRATION_BRANCH}:refs/heads/published-stack-target`);
+  f.git("config", `branch.${TASK_INTEGRATION_BRANCH}.remote`, f.upstream.remote);
+  f.git("config", `branch.${TASK_INTEGRATION_BRANCH}.merge`, "refs/heads/published-stack-target");
+  f.git("checkout", "-q", TASK_INTEGRATION_BRANCH);
+  const record = parseEpisodeOwnership({ ...f.record, integrationBranch: TASK_INTEGRATION_BRANCH });
+  const targetBefore = f.git("rev-parse", TASK_INTEGRATION_BRANCH);
+  const targetRemoteBefore = f.remoteHead(f.upstream.remote, "refs/heads/published-stack-target");
+  assert.equal(exactDirectRemoteBranchHead(f.root, TASK_INTEGRATION_BRANCH), targetRemoteBefore);
+  const adapter = f.adapter();
+  await adapter.removeBranch(record);
+  assert.equal(f.localPresent(), false);
+  assert.equal(f.remoteHead(), undefined);
+  assert.equal(f.git("branch", "--show-current"), TASK_INTEGRATION_BRANCH);
+  assert.equal(f.git("rev-parse", TASK_INTEGRATION_BRANCH), targetBefore);
+  assert.equal(f.remoteHead(f.upstream.remote, "refs/heads/published-stack-target"), targetRemoteBefore);
+  assert.deepEqual(await adapter.inspect(record), {});
+});
+
+test("cleanup refuses an Episode upstream that aliases the integration target without deleting either branch", async (t) => {
+  const f = cleanupTransportFixture(t);
+  const targetRef = "refs/heads/published-stack-target";
+  f.git("branch", TASK_INTEGRATION_BRANCH, f.head);
+  f.git("push", "-q", f.upstream.remote, `${TASK_INTEGRATION_BRANCH}:${targetRef}`);
+  f.git("config", `branch.${TASK_INTEGRATION_BRANCH}.remote`, f.upstream.remote);
+  f.git("config", `branch.${TASK_INTEGRATION_BRANCH}.merge`, targetRef);
+  f.git("config", `branch.${f.branch}.merge`, targetRef);
+  f.git("checkout", "-q", TASK_INTEGRATION_BRANCH);
+  const record = parseEpisodeOwnership({ ...f.record, integrationBranch: TASK_INTEGRATION_BRANCH });
+  const branchesBefore = f.git("show-ref", "--heads");
+  const targetRemoteBefore = f.remoteHead(f.upstream.remote, targetRef);
+  const episodeRemoteBefore = f.remoteHead();
+  const adapter = f.adapter();
+  for (const operation of ["inspect", "removeUpstream", "removeBranch"]) {
+    await assert.rejects(adapter[operation](record), /cannot remove the recorded integration upstream/);
+    assert.equal(f.git("show-ref", "--heads"), branchesBefore);
+    assert.equal(f.remoteHead(f.upstream.remote, targetRef), targetRemoteBefore);
+    assert.equal(f.remoteHead(), episodeRemoteBefore);
+    assert.equal(f.git("branch", "--show-current"), TASK_INTEGRATION_BRANCH);
+  }
+  assert.equal(f.calls.some((args) => args[0] === "push" || (args[0] === "update-ref" && args.includes("-d"))), false);
+});
+
 test("cleanup transport resumes either remote or local partial absence using retained exact config", async (t) => {
   for (const absent of ["remote", "local"]) await t.test(absent, async (t) => {
     const f = cleanupTransportFixture(t);
@@ -2544,7 +3072,6 @@ test("cleanup without its root still rejects live CWD and exact saved-identity c
   const unrelated = { sessionId: "unrelated", sessionFile: path, cwd: f.record.worktree, isSessionActive: false };
   for (const collision of [
     { ...unrelated, activeSessionId: "foreign-route" },
-    { ...unrelated, activeSessionId: f.record.episodeActiveSessionId, cwd: f.root },
     { ...unrelated, sessionId: f.record.episodeId, cwd: f.root },
     { ...unrelated, sessionFile: f.record.episodeSessionFile, cwd: f.root },
   ]) {
@@ -2555,6 +3082,87 @@ test("cleanup without its root still rejects live CWD and exact saved-identity c
     assert.equal(f.localPresent(), true);
     assert.equal(f.remoteHead(), f.head);
   }
+});
+
+test("cleanup preserves an unrelated session reusing the historical route", async (t) => {
+  const f = cleanupTransportFixture(t);
+  const foreignFile = join(f.root, "foreign.jsonl"); writeFileSync(foreignFile, "preserve\n");
+  const foreign = { sessionId: "foreign", sessionFile: foreignFile, cwd: f.root,
+    activeSessionId: f.record.episodeActiveSessionId, isSessionActive: true };
+  const sessions = { async list() { return [structuredClone(foreign)]; } };
+  const adapter = new CliTaskEpisodeCleanupAdapter(f.root, f.head, { sessions });
+  assert.equal((await adapter.inspect(f.record)).runtime, undefined);
+  await adapter.removeUpstream(f.record);
+  await adapter.removeBranch(f.record);
+  assert.deepEqual(await adapter.inspect(f.record), {});
+  assert.equal(readFileSync(foreignFile, "utf8"), "preserve\n");
+});
+
+test("cleanup resolves a changed route only for the exact durable idle Episode", async (t) => {
+  const f = cleanupTransportFixture(t);
+  const sessionFile = f.record.episodeSessionFile; writeFileSync(sessionFile, "episode\n");
+  const foreignFile = join(f.root, "foreign.jsonl"); writeFileSync(foreignFile, "preserve\n");
+  const idle = { isSessionActive: false, isStreaming: false, isCompacting: false,
+    sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } };
+  const rootRow = { ...idle, sessionId: f.record.episodeId, sessionFile, cwd: f.record.worktree,
+    activeSessionId: "current-route" };
+  const foreignRow = { ...idle, sessionId: "foreign", sessionFile: foreignFile, cwd: f.root,
+    activeSessionId: f.record.episodeActiveSessionId };
+  let rows = []; let stateOverride;
+  const stateCalls = []; const mutations = [];
+  const sessions = {
+    async list() { return structuredClone(rows); },
+    async getState(id) {
+      stateCalls.push(id);
+      return structuredClone(stateOverride ?? rows.find((row) => row.activeSessionId === id));
+    },
+    async kill(id) {
+      mutations.push(["kill", id]);
+      rows = rows.map((row) => row.activeSessionId === id ? { ...row, activeSessionId: undefined } : row);
+    },
+    async deleteSaved(path) {
+      mutations.push(["delete", path]); unlinkSync(path);
+      rows = rows.filter((row) => row.sessionFile !== path);
+    },
+  };
+  const adapter = new CliTaskEpisodeCleanupAdapter(f.root, f.head, { sessions });
+  for (const [label, invalidRows] of [
+    ["missing root", [foreignRow]],
+    ["missing root with explicit child ID", [{ ...foreignRow, parentSessionId: f.record.episodeId }]],
+    ["missing root with explicit child file", [{ ...foreignRow, parentSessionPath: sessionFile }]],
+    ["changed permanent ID", [{ ...rootRow, sessionId: "foreign" }]],
+    ["changed session file", [{ ...rootRow, sessionFile: foreignFile }]],
+    ["changed worktree", [{ ...rootRow, cwd: f.root }]],
+    ["duplicate permanent identity", [rootRow, { ...rootRow, activeSessionId: "duplicate-route" }]],
+    ["duplicate current route", [rootRow, { ...foreignRow, activeSessionId: "current-route" }]],
+  ]) await t.test(label, async () => {
+    rows = invalidRows;
+    await assert.rejects(adapter.removeRuntime(f.record), /Prime Agent session identity|untracked saved-session file|explicit descendant without its recorded root/);
+  });
+  await t.test("current route resolves to foreign state", async () => {
+    rows = [rootRow, foreignRow]; stateOverride = { ...foreignRow, activeSessionId: "current-route" };
+    await assert.rejects(adapter.removeRuntime(f.record), /changed Prime Agent session identity/);
+    stateOverride = undefined;
+  });
+  for (const [field, value] of [["isSessionActive", true], ["isStreaming", true],
+    ["isCompacting", true], ["isSessionActive", undefined], ["sessionActions", undefined]]) {
+    await t.test(`changed route retains idle proof: ${field}=${value}`, async () => {
+      rows = [{ ...rootRow, [field]: value }, foreignRow];
+      assert.equal((await adapter.inspect(f.record)).runtime.idle, false);
+      await assert.rejects(adapter.removeRuntime(f.record), /exact idle runtime/);
+    });
+  }
+  assert.deepEqual(mutations, []);
+  assert.equal(readFileSync(sessionFile, "utf8"), "episode\n");
+  rows = [rootRow, foreignRow]; stateCalls.length = 0;
+  assert.equal((await adapter.inspect(f.record)).runtime.idle, true);
+  await adapter.removeRuntime(f.record);
+  assert.deepEqual(new Set(stateCalls), new Set(["current-route"]));
+  assert.deepEqual(mutations, [["kill", "current-route"], ["delete", sessionFile]]);
+  assert.deepEqual(rows, [foreignRow]);
+  assert.equal(readFileSync(foreignFile, "utf8"), "preserve\n");
+  assert.equal(f.record.episodeActiveSessionId, "route");
+  assert.equal((await adapter.inspect(f.record)).runtime, undefined);
 });
 
 test("production local cleanup adapter proves exact idle runtime, worktree, and unmerged branch removal", async () => {
@@ -2574,7 +3182,7 @@ test("production local cleanup adapter proves exact idle runtime, worktree, and 
   const terminalHead = execFileSync("git", ["-C", worktree, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   configureCleanupUpstream(root, "episode-cleanup");
   const sessionFile = join(root, "episode.jsonl"); writeFileSync(sessionFile, "{}\n");
-  let rows = [{ activeSessionId: "route", sessionId: "episode", sessionFile, cwd: worktree, isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } }];
+  let rows = [{ activeSessionId: "current-route", sessionId: "episode", sessionFile, cwd: worktree, isSessionActive: false, isStreaming: false, isCompacting: false, attachedClients: 0, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } }];
   const calls = []; let deleteAttempts = 0; let stateCwd = worktree;
   const sessions = {
     async list() { return rows.map((row) => ({ ...row })); },
@@ -2613,7 +3221,8 @@ test("production local cleanup adapter proves exact idle runtime, worktree, and 
   await adapter.removeBranch(record);
   snapshot = await adapter.inspect(record);
   assert.deepEqual(snapshot, {});
-  assert.deepEqual(calls, [["kill", "route"], ["delete", sessionFile], ["delete", sessionFile]]);
+  assert.deepEqual(calls, [["kill", "current-route"], ["delete", sessionFile], ["delete", sessionFile]]);
+  assert.equal(record.episodeActiveSessionId, "route", "cleanup does not rewrite historical ownership routing");
 });
 
 test("cleanup retains ownership when an explicit child survives its missing root", async (t) => {
@@ -2676,6 +3285,9 @@ test("production cleanup adapter removes an exact idle runtime after worktree an
     }
     if (args[0] === "config") {
       assert.equal(args[1], "--get-all");
+      if (["branch.main.remote", "branch.main.merge"].includes(args[2])) {
+        return { status: 1, stdout: "", stderr: "" };
+      }
       assert.ok(["branch.episode-cleanup.remote", "branch.episode-cleanup.merge"].includes(args[2]));
       return { status: 0, stdout: args[2].endsWith(".remote") ? "delivery\n" : "refs/heads/published-episode\n", stderr: "" };
     }

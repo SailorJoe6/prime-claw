@@ -204,6 +204,15 @@ coherent authorized ticket edit promptly and publish it through its native
 history. Code reports the operation result; it does not choose a lifecycle
 rollback or Blocked disposition on the Agent's behalf.
 
+## Show the code basis
+
+Show the current named branch and code HEAD during readiness. Fresh admission
+records that branch as `integrationBranch`, the merge/publication target;
+`baseRef` is the exact starting code commit and `branch` names the isolated
+Episode branch. Grandfathered Backlog uses its task-only status commit as base;
+independent Backlog and Beads keep code and provider revisions separate.
+Never switch or silently substitute the target branch.
+
 ## Create the Episode
 
 The full ordinary `prime-claw-oversee-episode` guidance is loaded above this
@@ -350,7 +359,7 @@ Episode to bypass owner review, merge, abandonment, or cleanup decisions.
 
 Report the selected provider, canonical task ID, project root, durable Episode
 and routing identities, lifecycle engine, exact Orca setup/worktree identity
-when applicable, actual branch and worktree, and current ownership state. For
+when applicable, exact `baseRef`, recorded `integrationBranch`, isolated Episode branch and worktree, and current ownership state. For
 Backlog include the exact status commit, task path and actual push result. For
 Beads include complete raw pre/post/current views, native command results,
 observed local revisions, publication qualifications and exact code `baseRef`;

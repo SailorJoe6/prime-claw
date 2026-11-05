@@ -2,6 +2,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, wri
 import { dirname, isAbsolute, join, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { execFileSync } from "node:child_process";
 import { ensurePrimeClawDirectory } from "./prime-claw-directory.ts";
 
 export type EpisodeLifecycleStatus = "provisioning" | "active" | "uncertain" | "inactive";
@@ -46,6 +47,8 @@ interface TaskEpisodeOwnershipBase extends EpisodeOwnershipBase {
   version: 2;
   /** Canonical provider-native task ID. */
   taskId: string;
+  /** Fixed integration target. Older task records without this field target main. */
+  integrationBranch?: string;
 }
 
 /** Compatibility shape for version-2 records written before provider identity existed. */
@@ -116,10 +119,10 @@ const COMMON_RECORD_FIELDS = new Set<string>([
 ]);
 const LEGACY_RECORD_FIELDS = new Set<string>([...COMMON_RECORD_FIELDS, "sourceLocation", "slug", "bundleDigest"]);
 const BACKLOG_TASK_RECORD_FIELDS = new Set<string>([
-  ...COMMON_RECORD_FIELDS, "provider", "taskId", "taskPath", "providerRevision", "taskEvidence", "cleanupHead",
+  ...COMMON_RECORD_FIELDS, "provider", "taskId", "integrationBranch", "taskPath", "providerRevision", "taskEvidence", "cleanupHead",
 ]);
 const BEADS_TASK_RECORD_FIELDS = new Set<string>([
-  ...COMMON_RECORD_FIELDS, "provider", "taskId", "providerRevision", "taskEvidence", "cleanupHead",
+  ...COMMON_RECORD_FIELDS, "provider", "taskId", "integrationBranch", "providerRevision", "taskEvidence", "cleanupHead",
 ]);
 
 function hasOnlyFields(item: Record<string, unknown>, allowed: Set<string>): boolean {
@@ -133,6 +136,19 @@ function safeTaskPath(value: unknown): value is string {
 
 function canonicalTaskId(value: unknown): value is string {
   return typeof value === "string" && value !== "" && !/\s/.test(value) && !value.startsWith("-");
+}
+
+function exactIntegrationBranch(value: unknown): value is string {
+  if (typeof value !== "string" || value === "") return false;
+  try {
+    // Validate a literal ref first so --branch never expands checkout shorthand.
+    execFileSync("git", ["check-ref-format", `refs/heads/${value}`], { stdio: "ignore" });
+    return execFileSync("git", ["check-ref-format", "--branch", value], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+    }).trim() === value;
+  } catch {
+    return false;
+  }
 }
 
 function exactBeadsTaskEvidence(value: unknown, taskId: unknown): value is Record<string, unknown> {
@@ -167,6 +183,11 @@ export function isTaskEpisodeOwnership(record: EpisodeOwnershipRecord): record i
 
 export function taskEpisodeProvider(record: TaskEpisodeOwnershipRecord): "backlog" | "beads" {
   return record.provider ?? "backlog";
+}
+
+/** Missing pre-field task records target main, never the branch of a checkout. */
+export function effectiveTaskEpisodeIntegrationBranch(record: TaskEpisodeOwnershipRecord): string {
+  return record.integrationBranch === undefined ? "main" : record.integrationBranch;
 }
 
 export function isBacklogTaskEpisodeOwnership(
@@ -218,6 +239,7 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
     if (!legacy) throw new Error(`Episode ownership has an unsupported shape: ${path}`);
   } else {
     const commonTask = canonicalTaskId(item.taskId)
+      && (item.integrationBranch === undefined || exactIntegrationBranch(item.integrationBranch))
       && GIT_OID.test(String(item.baseRef))
       && (item.cleanupHead === undefined || GIT_OID.test(String(item.cleanupHead)));
     const legacyBacklogTask = item.provider === undefined
@@ -331,7 +353,8 @@ function active(record: EpisodeOwnershipRecord): boolean {
 function sameEpisodeBinding(left: EpisodeOwnershipRecord, right: EpisodeOwnershipRecord): boolean {
   if (left.version === 1 && right.version === 1) return left.sourceLocation === right.sourceLocation;
   if (left.version === 2 && right.version === 2) {
-    if (taskEpisodeProvider(left) !== taskEpisodeProvider(right) || left.taskId !== right.taskId) return false;
+    if (taskEpisodeProvider(left) !== taskEpisodeProvider(right) || left.taskId !== right.taskId
+      || effectiveTaskEpisodeIntegrationBranch(left) !== effectiveTaskEpisodeIntegrationBranch(right)) return false;
     return isBacklogTaskEpisodeOwnership(left) && isBacklogTaskEpisodeOwnership(right)
       ? left.taskPath === right.taskPath
       : isBeadsTaskEpisodeOwnership(left) && isBeadsTaskEpisodeOwnership(right);

@@ -88,7 +88,12 @@ compatibility uses `plan-spec` and `implement-spec` with `plan_spec` and `implem
 `create_spec_episode`; blocked recovery, continuation and bookkeeping remain
 `restore_blocked_spec_episode`, `handoff_spec_episode`, and `finalize_spec_episode`.
 Ordinary `handoff` uses `ralph_handoff`, not an owner lifecycle shortcut.
-`initialize-prime-claw` uses `initialize_prime_claw` for setup and upgrades.
+`initialize-prime-claw` uses explicit `initialize_prime_claw` invocations for
+setup and upgrades. Startup only inspects Git projects, without an Orca gate;
+when needed, editable Markdown adds background guidance on the first normal
+turn. It preserves the current request and lets the LLM defer unrelated
+initialization. No separate startup turn or new routine approval is added;
+no-modification instructions and consequential-action decisions remain intact.
 The five custom workflow commands are removed, not Prime Agent built-ins.
 
 Markdown owns phase authority: planning alone stops, while explicit conditional

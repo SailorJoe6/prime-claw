@@ -67,7 +67,7 @@ def test_managed_execute_asset_is_reconciled_to_the_canonical_source() -> None:
     assert entry == {
         "source": "skills/project-templates/execute.md",
         "destination": ".agents/skills/execute/SKILL.md",
-        "baselineSha256": digest,
+        "baselineSha256": "cc0453ff3aad661c78e550997fd9ea6359fa7f76b1b87d552c69dfb5d9c52a6c",  # historical baseline remains unchanged
         "installedSha256": digest,
         "acceptedOverrideSha256": None,
         "availableUpstreamSha256": digest,

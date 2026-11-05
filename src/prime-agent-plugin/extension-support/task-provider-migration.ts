@@ -940,7 +940,7 @@ function statusFromBeads(value: unknown): CanonicalLifecycleStatus {
   const status = String(value ?? "");
   const found = Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === status)?.[0];
   if (found) return found as CanonicalLifecycleStatus;
-  if (status === "open") return "In Design";
+  if (status === "open" || status === "deferred") return "In Design";
   if (status === "closed") return "Done";
   throw new Error(`Beads task has unmapped status ${JSON.stringify(status)}`);
 }
@@ -2789,14 +2789,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
         if (!record || record.version !== 2 || record.status !== "active") throw new Error(`switched ownership is absent for ${row.ownerSessionId}`);
         return { ...row, taskId: record.taskId, record };
       });
-      const postSwitchProofs = await proveActiveRuntimeContinuity(switchedRows, options.verifyActiveRuntime);
-      for (const row of switchedRows) {
-        const proof = postSwitchProofs[row.ownerSessionId];
-        if (proof.expectedPreviousEpisodeActiveSessionId !== row.record.episodeActiveSessionId
-            || proof.verifiedCurrentEpisodeActiveSessionId !== row.record.episodeActiveSessionId) {
-          throw new Error(`active runtime route changed after ownership switch for ${row.ownerSessionId}`);
-        }
-      }
+      await proveActiveRuntimeContinuity(switchedRows, options.verifyActiveRuntime);
       withCurrentTaskProviderOwnershipSwitch(project.root, ownershipSwitch, () => {
         candidate.verifyCodeProjection?.();
         const destinationBeforeDelete = candidate.refreshAfterReceipt();

@@ -47,6 +47,13 @@ may be absent. The specification is frozen while the plan remains living.
 Missing active files are not reviewable live identity and require the exact
 version-1 blocked recovery path rather than task-native fallback.
 
+For a version-2 candidate, retain the recorded `integrationBranch` (only an
+omitted old field falls back to `main`), exact starting code `baseRef`, isolated
+Episode `branch`, and current target/candidate heads. Review the candidate
+against that integration target, not a substituted default branch. Keep code
+and provider revisions separate. A switched owner checkout does not authorize
+retargeting or replacement resources.
+
 - For provider-absent or grandfathered `provider: "backlog"` version-2 ownership
   without revision/evidence, bind the exact task ID/path in branch-local history
   at the code candidate. For explicit independent Backlog with `providerRevision`
@@ -63,7 +70,7 @@ version-1 blocked recovery path rather than task-native fallback.
 - For `provider: "beads"` version-2 ownership, require no `taskPath`. Bind the
   exact canonical task ID, published `providerRevision`, complete raw
   `taskEvidence`, code `baseRef`, candidate head, recorded Episode worktree,
-  branch, and session identity. From the correct canonical-main and Episode
+  branch, and session identity. From the primary integration-branch and Episode
   contexts, use `bd context --json`, one supported `bd dolt pull`,
   and exact `bd show TASK-ID --json --long --include-comments` results without
   force, uncertain-transport retry, or raw Dolt writes. Preserve
@@ -111,7 +118,7 @@ failure.
 ## Send a self-contained review task
 
 The one ordinary parent-to-child task must state the resolved repository,
-commit, relevant artifact paths or contents, evidence, and focus. For independent
+commit, relevant artifact paths or contents, evidence, and focus. Include the recorded integration branch and exact target/candidate heads. For independent
 Backlog and Beads include exact persisted/current complete native task values,
 recorded/current task-history revisions and actual publication facts separately
 from code base/head. Beads retains raw names/absence and native refs. Include Episode

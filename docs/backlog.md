@@ -137,6 +137,26 @@ second create. Both paths preserve every unrelated native field, reject later
 states before mutation, keep a living specification, and stop for operator
 review without writing a plan or authorizing an Episode.
 
+### Independent Backlog publication and parent code
+
+Task-only authoring and lifecycle status publication use the intended independent
+clone, not the parent code index. Inspect current selected-task/history facts,
+synchronize and reread that workspace before a write, and incorporate compatible
+changes. Unrelated dirt or descendants are not whole-clone cleanliness or frozen
+head prerequisites. Verify the intended selected-task delta; commit only its
+literal path, push once without force, and inspect actual direct publication.
+Preserve unrelated bytes, staging, history and parent code. Never stash, reset,
+clean, absorb or sync another writer's work merely to publish the task.
+
+Editable guidance decides code-basis suitability before admission and any failure
+disposition afterward. Code supplies native effects and exact ownership/resource
+facts, not automatic In Planning rollback or Blocked publication. A partial
+operation retains its exact resources; uncertain delivery never permits another
+assignment or fresh creation. Actual native conflicts and unavailable selected
+history need factual recovery, not automatic reconciliation or a dependency patch.
+Independent task-only failure reporting does not require clean or pushed parent
+code. These source behaviors do not imply live activation.
+
 The global `plan` skill and `plan_task({"taskId":"TASK-ID"})` tool resolve
 one exact task through the live native provider and admit it only in canonical
 `In Design` or `In Planning`. They preload the project-customizable

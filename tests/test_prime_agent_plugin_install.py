@@ -201,11 +201,16 @@ def test_primary_main_user_global_mode_is_deliberate_and_container_only(
     assert "target mode: user-global" in applied.stdout
     user_skill = tier1_container.run(
         "cmp", "-s",
-        f"{home}/.agents/skills/goals-and-heartbeats/SKILL.md",
+        f"{home}/.prime/agent/skills/goals-and-heartbeats/SKILL.md",
         f"{base}/primary/src/prime-agent-plugin/skills/goals-and-heartbeats/SKILL.md",
         workdir=None, timeout=10,
     )
     assert user_skill.returncode == 0, user_skill.stdout + user_skill.stderr
+    shared_absent = tier1_container.run(
+        "test", "!", "-e", f"{home}/.agents/skills/goals-and-heartbeats/SKILL.md",
+        workdir=None, timeout=10,
+    )
+    assert shared_absent.returncode == 0, shared_absent.stdout + shared_absent.stderr
     redirected_absent = tier1_container.run("test", "!", "-e", redirected_user_agents, workdir=None, timeout=10)
     assert redirected_absent.returncode == 0, redirected_absent.stdout + redirected_absent.stderr
     checked = tier1_container.run(
@@ -320,6 +325,13 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     discovered = {path.parent.name for path in (destination / "skills").glob("*/SKILL.md")}
     assert discovered == {"goals-and-heartbeats", "prime-claw-oversee-episode", "prime-claw-expert-review", "initialize-prime-claw", "plan", "plan-spec", "implement-task", "implement-spec", "handoff"}
     assert not list((destination / "skills/project-templates").rglob("SKILL.md"))
+    # Internal startup guidance is globally delivered before any project setup,
+    # but it is not a separate discoverable skill or project-local asset.
+    startup = "skills/initialize-prime-claw/STARTUP.md"
+    assert startup in MANAGED_FILES
+    assert (destination / startup).read_bytes() == (SOURCE / startup).read_bytes()
+    assert not (destination / ".agents/skills/initialize-prime-claw/STARTUP.md").exists()
+    assert (destination / "skills/goals-and-heartbeats/SKILL.md").is_file()
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode == 0, checked.stdout + checked.stderr
 
@@ -372,7 +384,9 @@ def test_backup_reset_preflight_blocks_before_role_exact_or_user_mutation(
     assert applied.returncode == 0, applied.stdout + applied.stderr
     role = destination / "AGENTS.md"
     exact = destination / "extensions/handoff-chain.ts"
-    user = destination / ".agents/skills/goals-and-heartbeats/SKILL.md"
+    user = destination / ".agents/skills/unrelated/SKILL.md"
+    user.parent.mkdir(parents=True)
+    user.write_text("unrelated shared skill\n")
     before = {path: path.read_bytes() for path in (role, exact, user)}
     (fixture / "src/prime-agent-plugin/ROLE_KERNEL.md").write_bytes(role.read_bytes().replace(b"Prime Claw", b"Prime Claw candidate", 1))
     exact_source = fixture / "src/prime-agent-plugin/extensions/handoff-chain.ts"
@@ -469,6 +483,53 @@ def _installed_delivery(tier1_container, ctmp) -> tuple[Path, Path]:
     source = _copy_delivery_source(ctmp); destination = ctmp / "agent"; destination.mkdir()
     applied = _run_delivery(tier1_container, "apply", source, destination); assert applied.returncode == 0, applied.stdout + applied.stderr
     return source, destination
+
+
+@pytest.mark.parametrize("customized", [False, True])
+def test_goals_skill_upgrade_retires_only_unchanged_shared_copy(
+    tier1_container, ctmp, customized,
+) -> None:
+    source = _copy_delivery_source(ctmp)
+    manifest = source / "asset-inventory.json"
+    current = manifest.read_text()
+    legacy = json.loads(current)
+    goal = next(asset for asset in legacy["assets"] if asset["id"] == "global-goals-and-heartbeats")
+    assert goal["targets"] == [{
+        "class": "plugin-root-managed",
+        "destination": "skills/goals-and-heartbeats/SKILL.md",
+    }]
+    goal["targets"].append({
+        "class": "user-skill-exact",
+        "destination": "skills/goals-and-heartbeats/SKILL.md",
+    })
+    manifest.write_text(json.dumps(legacy))
+    destination = ctmp / "agent"
+    destination.mkdir()
+    installed = _run_delivery(tier1_container, "apply", source, destination)
+    assert installed.returncode == 0, installed.stdout + installed.stderr
+    shared = destination / ".agents/skills/goals-and-heartbeats/SKILL.md"
+    primary = destination / "skills/goals-and-heartbeats/SKILL.md"
+    assert shared.read_bytes() == primary.read_bytes()
+    primary_before = primary.read_bytes()
+    unrelated = destination / ".agents/skills/unrelated/SKILL.md"
+    unrelated.parent.mkdir()
+    unrelated.write_text("unrelated shared skill\n")
+    if customized:
+        shared.write_text("operator customization\n")
+    manifest.write_text(current)
+    assert _run_delivery(tier1_container, "check", source, destination).returncode != 0
+    upgraded = _run_delivery(tier1_container, "apply", source, destination)
+    assert primary.read_bytes() == primary_before
+    assert unrelated.read_text() == "unrelated shared skill\n"
+    if customized:
+        assert upgraded.returncode != 0
+        assert shared.read_text() == "operator customization\n"
+    else:
+        assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+        assert not shared.exists()
+        assert _run_delivery(tier1_container, "check", source, destination).returncode == 0
+        state = json.loads((destination / ".prime-claw/delivery-state.json").read_text())
+        assert "user-skill:skills/goals-and-heartbeats/SKILL.md" not in state["ownedFiles"]
 
 
 def test_schema1_upgrade_prunes_hash_bound_retired_files_and_check_rejects_them_first(

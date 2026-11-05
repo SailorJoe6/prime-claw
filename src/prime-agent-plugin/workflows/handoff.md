@@ -46,6 +46,13 @@ revision and complete raw task evidence and must not carry a task path. If an
 value to match that persisted task ID. A prompt tag never overrides persisted
 ownership, and task-native handoff never redetects or substitutes the provider.
 
+For version 2, retain `integrationBranch` as the owner merge/publication target;
+only an omitted field in old records means `main`. It is separate from code
+`baseRef`, isolated Episode `branch`, and provider revisions. The owner primary
+checkout must match that target. A mismatch blocks without switching branches,
+rebinding ownership, or allocating again; same-target advancement follows the
+existing ancestry/publication rules.
+
 With no ownership, active legacy `SPECIFICATION.md` and
 `IMPLEMENTATION_PLAN.md` files on canonical main (or the retained
 `EXECUTION_PLAN.md` spelling) select valid old in-place folder work without
@@ -130,7 +137,9 @@ owner/task/worktree/branch/session/route targeting and the native send result.
 In either task-native branch, guidance is bounded compaction focus only. It
 never accepts task content or supplies provider revision or raw evidence. Never pass `--status`, complete or archive the task, select replacement work,
 consult `.ralph/plans`, or copy task content across checkouts. The owning
-Conversation alone publishes lifecycle status on main.
+Conversation alone publishes lifecycle status through the selected provider:
+grandfathered Backlog on the recorded integration branch, independent Backlog
+on its task ref, and Beads through native publication.
 
 In retained folder-plan handoff, keep the promoted specification frozen even
 when its original future source is absent. Put accepted in-scope execution and

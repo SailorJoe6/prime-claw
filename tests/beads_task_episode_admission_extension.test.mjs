@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -182,6 +182,7 @@ function fixture() {
       providerRevision: input.publication.evidence.submittedRevision,
       taskEvidence: input.publication.evidence.taskAfterPush.nativeView,
       baseRef: input.baseRef,
+      ...(input.integrationBranch ? { integrationBranch: input.integrationBranch } : {}),
       createdAt: now,
       updatedAt: now,
       ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
@@ -362,6 +363,7 @@ test("direct Beads admission publishes, reserves, allocates, and proves one exac
   assert.equal(result.taskId, f.taskId);
   assert.equal(result.baseRef, codeHead);
   assert.equal(result.head, codeHead);
+  assert.equal(result.integrationBranch, "main");
   assert.equal(result.providerRevision, revision["In Progress"]);
   assert.equal(result.taskEvidence.design, f.design);
   assert.deepEqual(f.statusCalls, ["In Progress"]);
@@ -369,6 +371,7 @@ test("direct Beads admission publishes, reserves, allocates, and proves one exac
   assert.equal(f.reservationCalls[0].baseRef, codeHead);
   // Native push success is not proof that this task reached published history.
   assert.equal(f.reservationCalls[0].publication.status, "pushed");
+  assert.equal(f.reservationCalls[0].integrationBranch, "main");
   assert.equal(f.allocatorCalls, 1);
   assert.equal(f.status, "In Progress");
   assert.equal(git(f.root, "rev-parse", "HEAD"), codeHead);
@@ -392,6 +395,126 @@ test("Beads creation leaves status, design, code cleanliness and upstream suitab
   const wrong = fixture(); wrong.resolvedId = "BEADS-43-full";
   await assert.rejects(create(wrong), /exact requested canonical ID/);
   assert.deepEqual(wrong.statusCalls, []);
+});
+
+test("Beads admission allocates one isolated Episode at the exact clean published feature base", async (t) => {
+  const f = fixture();
+  const artifacts = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-beads-stack-")));
+  const remote = join(artifacts, "remote.git");
+  let episodeWorktree;
+  t.after(() => {
+    if (episodeWorktree) rmSync(episodeWorktree, { recursive: true, force: true });
+    rmSync(f.root, { recursive: true, force: true });
+    rmSync(artifacts, { recursive: true, force: true });
+  });
+  const mainHead = git(f.root, "rev-parse", "main");
+  const integrationBranch = "feature/stack";
+  git(f.root, "checkout", "-qb", integrationBranch);
+  mkdirSync(join(f.root, ".agents", "skills", "execute"), { recursive: true });
+  writeFileSync(join(f.root, ".agents", "skills", "execute", "SKILL.md"), "Execute the exact provider-native task.\n");
+  writeFileSync(join(f.root, "code.txt"), "accepted stacked baseline\n");
+  git(f.root, "add", ".agents/skills/execute/SKILL.md", "code.txt");
+  git(f.root, "commit", "-qm", "accepted stacked code");
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  git(f.root, "remote", "add", "origin", remote);
+  git(f.root, "push", "-qu", "origin", integrationBranch);
+  const codeHead = git(f.root, "rev-parse", "HEAD");
+  assert.notEqual(codeHead, mainHead);
+  let sessions = 0, assignments = 0;
+  const result = await createTaskEpisode(f.taskId, "stack-call", f.ctx, {
+    ...f.dependencies,
+    admissionGit: new CliTaskEpisodeAdmissionGit(),
+    allocateTaskEpisode: undefined,
+    beadsTransport(cwd) {
+      return { status: "ready", evidence: {
+        provider: "beads", projectRoot: cwd, revision: revision["In Progress"],
+        workingSet: [], publication: { raw: "disposable transport observation; no exact-task remote proof" },
+      } };
+    },
+    beadsTaskReader(cwd, taskId) {
+      return { ...f.dependencies.providerTaskResolver(f.root, taskId), projectRoot: cwd };
+    },
+    publisher: {
+      async createFresh(options) {
+        sessions += 1;
+        episodeWorktree = options.worktree;
+        const reserved = f.ownership.read(f.root, "owner-session");
+        assert.equal(reserved.baseRef, codeHead);
+        assert.equal(reserved.integrationBranch, integrationBranch);
+        assert.notEqual(realpathSync(options.worktree), f.root);
+        assert.equal(git(options.worktree, "rev-parse", "HEAD"), codeHead);
+        const identity = { sessionId: "stack-episode", sessionFile: join(artifacts, "episode.jsonl") };
+        writeFileSync(identity.sessionFile, "{}\n");
+        await options.onAllocated?.(identity);
+        return { ...identity, activeSessionId: "stack-route" };
+      },
+      async deliverExecute(route) { assert.equal(route, "stack-route"); assignments += 1; },
+      close() {},
+    },
+  }, { engine: "local" });
+
+  assert.equal(result.status, "active");
+  assert.equal(result.integrationBranch, integrationBranch);
+  assert.equal(result.baseRef, codeHead);
+  assert.equal(result.head, codeHead);
+  assert.equal(result.providerRevision, revision["In Progress"]);
+  assert.notEqual(result.providerRevision, codeHead);
+  assert.equal(result.taskEvidence.design, f.design);
+  assert.equal(f.reservationCalls.length, 1);
+  assert.equal(f.reservationCalls[0].integrationBranch, integrationBranch);
+  assert.equal(f.reservationCalls[0].baseRef, codeHead);
+  assert.equal(sessions, 1);
+  assert.equal(assignments, 1);
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(git(f.root, "branch", "--show-current"), integrationBranch);
+  assert.equal(git(f.root, "rev-parse", "HEAD"), codeHead);
+  assert.equal(git(f.root, "rev-parse", "@{upstream}"), codeHead);
+  assert.equal(git(f.root, "rev-parse", "main"), mainHead);
+  assert.equal(git(f.root, "status", "--porcelain"), "");
+  assert.notEqual(result.branch, integrationBranch);
+  assert.equal(git(result.worktree, "branch", "--show-current"), result.branch);
+  assert.equal(git(result.worktree, "rev-parse", "HEAD"), codeHead);
+  assert.equal(git(result.worktree, "status", "--porcelain"), "");
+});
+
+test("Beads admission retains exact named integration-target addressing before mutation", async (t) => {
+  const cases = [
+    ["detached HEAD", (f) => { git(f.root, "checkout", "-q", "--detach"); }, /named.*branch|detached|not a symbolic ref/i],
+    ["same-SHA branch drift", (f) => {
+      const resolve = f.dependencies.providerTaskResolver;
+      let resolutions = 0;
+      f.dependencies.providerTaskResolver = (...args) => {
+        const selected = resolve(...args);
+        if (++resolutions === 1) git(f.root, "checkout", "-qb", "feature/other");
+        return selected;
+      };
+    }, /integration branch|branch.*changed/i],
+    ["canonical ID drift", (f) => { f.resolvedId = "BEADS-43-full"; }, /exact requested canonical ID/],
+  ];
+  for (const [name, arrange, message] of cases) {
+    await t.test(name, async () => {
+      const f = fixture();
+      t.after(() => rmSync(f.root, { recursive: true, force: true }));
+      arrange(f);
+      const beforeHead = git(f.root, "rev-parse", "HEAD");
+      const beforeStatus = git(f.root, "status", "--porcelain");
+      const beforeTaskStatus = f.status;
+      const beforeUnrelated = f.unrelatedTask;
+      const worktrees = () => git(f.root, "worktree", "list", "--porcelain").split(/\r?\n/).filter((line) => line.startsWith("worktree "));
+      const beforeWorktrees = worktrees();
+      await assert.rejects(create(f), message);
+      assert.equal(git(f.root, "rev-parse", "HEAD"), beforeHead);
+      assert.equal(git(f.root, "status", "--porcelain"), beforeStatus);
+      assert.equal(f.status, beforeTaskStatus);
+      assert.deepEqual(f.unrelatedTask, beforeUnrelated);
+      assert.deepEqual(worktrees(), beforeWorktrees);
+      assert.equal(existsSync(join(f.root, ".prime-claw", "ownership.json")), false);
+      assert.deepEqual(f.statusCalls, []);
+      assert.equal(f.reservationCalls.length, 0);
+      assert.equal(f.allocatorCalls, 0);
+      assert.equal(f.ownership.read(f.root, "owner-session"), null);
+    });
+  }
 });
 
 
@@ -536,6 +659,7 @@ test("registered Beads creation carries native mutation qualifications and fresh
     filesystem: { exists: () => false },
     git: {
       repositoryRoot: () => f.root, head: () => baseRef, worktrees: () => [],
+      branch: () => git(f.root, "branch", "--show-current"),
       assertCleanWorktree() { assert.fail("task allocation must not reapply cleanliness eligibility"); },
       createWorktree(_repo, branch, path, head) {
         calls.push(["worktree", branch, path, head]); worktree = path; writeExecute(path);

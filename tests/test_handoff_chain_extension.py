@@ -134,7 +134,7 @@ def test_handoff_skill_keeps_task_native_and_folder_authorities_disjoint():
         "commit and push the single-purpose checkpoint before compacting",
         "Never pass `--status`",
         "consult `.ralph/plans`",
-        "owning Conversation alone publishes lifecycle status on main",
+        "owning Conversation alone publishes lifecycle status through the selected provider",
         "`<operator-episode-owner-session>`",
         "owning Conversation's registry key",
         "intentionally differs from the Episode's own session ID",

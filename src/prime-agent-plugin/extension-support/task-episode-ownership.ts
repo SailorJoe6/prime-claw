@@ -75,6 +75,8 @@ export interface TaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /** Recorded integration branch; omitted old bindings use main. */
+  integrationBranch?: string;
   operationId?: string;
   /** Exact verified In Progress admission commit supplied by the public admission boundary. */
   baseRef?: string;
@@ -94,6 +96,8 @@ export interface PublishedBacklogTaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /** Recorded integration branch; omitted old bindings use main. */
+  integrationBranch?: string;
   operationId?: string;
   /** Exact clean code HEAD, separate from the published task-history revision. */
   baseRef: string;
@@ -119,6 +123,8 @@ export interface BeadsTaskEpisodeReservationInput {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  /** Recorded integration branch; omitted old bindings use main. */
+  integrationBranch?: string;
   operationId?: string;
   /** Requested code-base identifier, independent of current checkout state. */
   baseRef: string;
@@ -266,9 +272,10 @@ export class CliBeadsTaskEpisodeReservationGit implements BeadsTaskEpisodeReserv
 export function exactDirectRemoteBranchHead(repo: string, branch: string, action = "Beads lifecycle"): string {
   const remote = runGit(repo, ["config", "--get", `branch.${branch}.remote`]);
   const mergeRef = runGit(repo, ["config", "--get", `branch.${branch}.merge`]);
-  if (!remote || !mergeRef || mergeRef !== `refs/heads/${branch}`) {
+  if (!remote || !mergeRef.startsWith("refs/heads/")) {
     throw new Error(`${action} requires the recorded branch's exact ordinary upstream`);
   }
+  runGit(repo, ["check-ref-format", mergeRef]);
   const urls = runGit(repo, ["remote", "get-url", "--all", remote]).split(/\r?\n/).filter(Boolean);
   if (urls.length !== 1) {
     throw new Error(`${action} requires one exact code remote transport`);
@@ -278,7 +285,7 @@ export function exactDirectRemoteBranchHead(repo: string, branch: string, action
   const match = rows.length === 1
     ? /^([0-9a-f]{40}|[0-9a-f]{64})\s+refs\/heads\/(.+)$/.exec(rows[0]!)
     : null;
-  if (!match || match[2] !== branch) {
+  if (!match || `refs/heads/${match[2]}` !== mergeRef) {
     throw new Error(`${action} could not prove the exact direct-remote code head`);
   }
   return match[1]!;
@@ -671,13 +678,12 @@ export function transitionLegacyEpisodeOwnershipToTask(
   if (!initial) throw new Error("Exact Episode ownership is missing before ownership transition");
   if (initial.status !== "active") throw new Error(`Ownership transition requires active ownership; found ${initial.status}`);
   if (initial.ownerSessionId !== input.ownerSessionId) throw new Error("Ownership transition requires the exact owner Conversation");
+  if (initial.episodeActiveSessionId !== input.expectedPreviousEpisodeActiveSessionId) {
+    throw new Error("Ownership transition previous runtime route drifted before atomic replacement");
+  }
   if (isLegacyEpisodeOwnership(initial)) {
     if (initial.sourceLocation !== input.sourceLocation) throw new Error("Ownership transition source location does not match active ownership");
-    if (initial.episodeActiveSessionId !== input.expectedPreviousEpisodeActiveSessionId) {
-      throw new Error("Ownership transition previous runtime route drifted before atomic replacement");
-    }
-  } else if (initial.taskId !== input.taskId
-      || initial.episodeActiveSessionId !== input.verifiedCurrentEpisodeActiveSessionId) {
+  } else if (initial.taskId !== input.taskId) {
     throw new Error("Existing task-native ownership does not match the completed transition binding");
   }
 
@@ -782,34 +788,46 @@ export function transitionLegacyEpisodeOwnershipToTask(
   // A provider read may be slow or synchronize native state. Pair every replay
   // return with a fresh code-state proof rather than trusting the pre-read view.
   assertLegacyTransitionGitState(root, episodeRoot, initial, input, git);
-  if (isTaskEpisodeOwnership(initial)) {
+  if (isTaskEpisodeOwnership(initial)
+      && initial.episodeActiveSessionId === input.verifiedCurrentEpisodeActiveSessionId) {
     return { record: initial, reused: true, mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
   }
 
-  const { version: _version, sourceLocation: _sourceLocation, slug: _slug, bundleDigest: _bundleDigest, ...preserved } = initial;
-  const commonTarget = {
-    ...preserved,
-    version: 2 as const,
-    taskId: input.taskId,
-    episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
-    updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-  };
-  const target = parseEpisodeOwnership(providerTarget.provider === "beads" ? {
-    ...commonTarget,
-    provider: "beads",
-    providerRevision: providerTarget.providerRevision,
-    taskEvidence: providerTarget.taskEvidence,
-  } : providerTarget.history === "independent" ? {
-    ...commonTarget,
-    provider: "backlog",
-    taskPath,
-    providerRevision: providerTarget.providerRevision,
-    taskEvidence: providerTarget.taskEvidence,
-  } : {
-    ...commonTarget,
-    provider: "backlog",
-    taskPath,
-  });
+  // Replay keeps the same authority and resources, but may refresh its separately
+  // verified current address. The saved route above detects record drift only.
+  let target: EpisodeOwnershipRecord;
+  if (isTaskEpisodeOwnership(initial)) {
+    target = parseEpisodeOwnership({
+      ...initial,
+      episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
+      updatedAt: dependencies.now?.() ?? new Date().toISOString(),
+    });
+  } else {
+    const { version: _version, sourceLocation: _sourceLocation, slug: _slug, bundleDigest: _bundleDigest, ...preserved } = initial;
+    const commonTarget = {
+      ...preserved,
+      version: 2 as const,
+      taskId: input.taskId,
+      episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
+      updatedAt: dependencies.now?.() ?? new Date().toISOString(),
+    };
+    target = parseEpisodeOwnership(providerTarget.provider === "beads" ? {
+      ...commonTarget,
+      provider: "beads",
+      providerRevision: providerTarget.providerRevision,
+      taskEvidence: providerTarget.taskEvidence,
+    } : providerTarget.history === "independent" ? {
+      ...commonTarget,
+      provider: "backlog",
+      taskPath,
+      providerRevision: providerTarget.providerRevision,
+      taskEvidence: providerTarget.taskEvidence,
+    } : {
+      ...commonTarget,
+      provider: "backlog",
+      taskPath,
+    });
+  }
 
   const pairedProviderTarget = targetResolver(root, episodeRoot, input.taskId, runner);
   if (JSON.stringify(pairedProviderTarget) !== JSON.stringify(providerTarget)) {
@@ -832,7 +850,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
   }
   const stored = ownership.read(root, input.ownerSessionId);
   if (!sameOwnership(stored, target)) throw new Error("Ownership transition could not verify the exact completed binding");
-  return { record: target as LegacyTaskOwnershipTransitionResult["record"], reused: false, mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
+  return { record: target as LegacyTaskOwnershipTransitionResult["record"], reused: isTaskEpisodeOwnership(initial), mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
 }
 
 /**
@@ -900,6 +918,7 @@ export function reserveTaskEpisodeOwnership(
     baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   };
@@ -984,6 +1003,7 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
     baseRef: input.baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   }) as PublishedBacklogTaskEpisodeOwnershipRecord;
@@ -1080,6 +1100,7 @@ export function reservePublishedBeadsTaskEpisodeOwnership(
     baseRef: input.baseRef,
     createdAt: now,
     updatedAt: now,
+    ...(input.integrationBranch !== undefined ? { integrationBranch: input.integrationBranch } : {}),
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   }) as BeadsTaskEpisodeOwnershipRecord;

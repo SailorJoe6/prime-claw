@@ -73,6 +73,13 @@ shape continues through the Backlog branch below. Only `provider: "beads"` selec
 the Beads branch. Never mix commands, content, commits, or evidence between the
 two branches.
 
+Retain the recorded `integrationBranch` as the owner's merge/publication target;
+only an omitted field in old version-2 records means `main`. Keep it separate
+from `baseRef` (exact starting code commit), `branch` (this isolated Episode
+branch), and provider revisions. A switched owner checkout is a recovery
+blocker, not permission to retarget or switch branches. Continue the same
+owner/task/worktree/session binding.
+
 ### Provider-absent or Backlog task authority
 
 First retain the ownership-selected Backlog topology. Provider-absent and
@@ -117,9 +124,9 @@ maintain references, documentation, and modified-file paths, and prepare the
 Final Summary. Reload after each mutation and verify the canonical ID, task
 path, parent identity, and lifecycle status are unchanged.
 
-The owning Conversation exclusively owns lifecycle status: on canonical main
-for grandfathered Backlog, or in the primary nested task clone for independent
-Backlog. The Episode must not pass `--status`, call `backlog task complete` or `backlog task archive`,
+The owning Conversation exclusively owns lifecycle status: on the recorded
+integration branch in the primary checkout for grandfathered Backlog, or in the
+primary nested task clone for independent Backlog. The Episode must not pass `--status`, call `backlog task complete` or `backlog task archive`,
 mark the task `Done`, publish `Blocked` or `Ready for Merge`, or write task
 content in another checkout. Ordinary execution performs no cross-checkout
 copy, mirroring, or dual write.
@@ -154,7 +161,8 @@ one task-path-only commit in the nested clone and push
 when code changed. Report both exact heads and push
 evidence through the existing Episode-to-Conversation channel. Then stop. Do
 not change status or move plan files; the Conversation decides whether to
-publish `Blocked` on main.
+publish `Blocked` through the selected task authority; grandfathered Backlog
+uses the recorded integration branch.
 
 When the candidate is complete, ensure the task holds the current plan, notes,
 acceptance evidence, references, documentation, modified files, and a useful

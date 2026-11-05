@@ -50,7 +50,8 @@ def main():
                    str(bundle), digest, "check", ",".join(names)])
     assert checked.returncode == 0, checked.stderr[-500:]
     assert (ROOT / ".agents/skills/github/SKILL.md").read_bytes() == original
-    assert (ROOT / ".agents/skills/goals-and-heartbeats/SKILL.md").read_bytes() == (SOURCE / "skills/goals-and-heartbeats/SKILL.md").read_bytes()
+    assert (agent / "skills/goals-and-heartbeats/SKILL.md").read_bytes() == (SOURCE / "skills/goals-and-heartbeats/SKILL.md").read_bytes()
+    assert not (ROOT / ".agents/skills/goals-and-heartbeats/SKILL.md").exists()
     assert not (agent / ".agents").exists()
     state = json.loads((agent / ".prime-claw/role-protocol-state.json").read_text())
     assert state["schemaVersion"] == 2 and state["selectedContext"] == "AGENTS.md"

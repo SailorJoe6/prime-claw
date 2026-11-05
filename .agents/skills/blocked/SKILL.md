@@ -31,8 +31,12 @@ persisted ownership and does not require the original future source folder or a
 live task provider. A valid version-2
 record selects task mode even when the assignment has no task block.
 Require the exact persisted owner session, a top-level Conversation, the
-repository root of the canonical primary `main` checkout, and the record's exact
-provider and task ID. Provider-absent, or explicit Backlog without
+repository root of the primary checkout on the recorded `integrationBranch`,
+and the record's exact provider and task ID. Only an omitted integration field
+in old version-2 records falls back to `main`; never infer or retarget it from
+the current checkout. Keep code `baseRef`, isolated Episode `branch`, and provider
+revisions distinct. A branch mismatch blocks without switching or allocation.
+Provider-absent, or explicit Backlog without
 `providerRevision`/`taskEvidence`, is grandfathered branch-local authority. An
 explicit Backlog record with both fields selects the independent nested task
 branch; both shapes carry the exact project-relative task path. A
@@ -63,7 +67,7 @@ backlog task view --json -- TASK-ID
 Require the returned canonical ID and project-relative task path to match the
 ownership record, and require status to be exactly `Blocked` in the selected
 Backlog store. The task is the sole lifecycle authority in this branch.
-Grandfathered Backlog reads the bound primary task. Independent Backlog inspects
+Grandfathered Backlog reads the bound integration-branch task in the primary checkout. Independent Backlog inspects
 and synchronizes only this owning Conversation's intended task workspace when
 needed. Preserve unrelated bytes/staging and compatible history descendants;
 inspect actual native conflicts or unavailable selected-task publication, not
@@ -78,7 +82,7 @@ an approval gate; never add an equality gate or deterministic classifier. Work
 with the user to satisfy the recorded unblock condition. After the user or accepted
 evidence clears it, only that exact owning Conversation may publish the same
 task as `In Progress`. Grandfathered Backlog preserves the existing one exact-
-task-only main commit: unrelated main dirt is allowed. Inspect the selected diff
+task-only integration-branch commit: unrelated code dirt is allowed. Inspect the selected diff
 and commit with literal `git add`/`git commit --only` pathspecs, excluding other
 index entries. Commit each coherent authorized blocker/clearance note ASAP and
 publish promptly; do not wait for handoff or session end. Independent Backlog uses the supported CLI in the primary

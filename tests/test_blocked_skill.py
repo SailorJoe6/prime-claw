@@ -32,10 +32,10 @@ def test_blocked_skill_supports_disjoint_task_and_retained_folder_authority() ->
         "task is the sole lifecycle authority",
         "accepted Episode-to-Conversation report",
         "Do not infer missing evidence or copy Episode-owned task content across checkouts",
-        "repository root of the canonical primary `main` checkout",
-        "one exact- task-only main commit",
+        "repository root of the primary checkout on the recorded `integrationBranch`",
+        "one exact- task-only integration-branch commit",
         "pushes `HEAD:refs/heads/prime-claw/tasks` without force",
-        "unrelated main dirt is allowed",
+        "unrelated code dirt is allowed",
         "Commit each coherent authorized blocker/clearance note ASAP and publish promptly",
         "same task, ownership, branch, worktree, and durable Episode session",
         "Never create a new task, admission, Episode resource, status-sync message",
@@ -80,7 +80,7 @@ def test_blocked_skill_tracked_copy_and_manifest_hash_match_source() -> None:
     assert TRACKED.read_bytes() == source
     digest = hashlib.sha256(source).hexdigest()
     item = json.loads(MANIFEST.read_text())["assets"]["project-skill-blocked"]
-    assert item["baselineSha256"] == digest
+    assert item["baselineSha256"] == "eca05a76c08279aa95d90de7ca3ce78737addfc3177f80f0b4273ca23bd56d39"  # retained historical baseline; current bytes are verified below
     assert item["installedSha256"] == digest
     assert item["availableUpstreamSha256"] == digest
     assert item["state"] == "managed"
