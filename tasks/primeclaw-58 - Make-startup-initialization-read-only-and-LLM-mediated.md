@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-58
 title: Make startup initialization read-only and LLM-mediated
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-11-04 16:00'
-updated_date: '2026-11-04 18:20'
+updated_date: '2026-11-05 00:15'
 labels: []
 dependencies: []
 references:
@@ -62,3 +62,31 @@ Candidate plugin validation must remain Docker-isolated. Prove the relevant star
 - [ ] #6 The Prime Claw global installer continues owning the Prime-Agent-global goals-and-heartbeats skill; this change neither creates a project/shared duplicate nor removes the intended global asset. Affected requirements/guidance no longer describe direct automatic startup reconciliation.
 - [ ] #7 Proportionate isolated regressions cover first initialization, available updates, current/no-op state, customization, Git projects without Orca, Episode protection, inspection failure, and explicit-tool mutation. Relevant prompt/turn evidence covers an existing user request or assigned task, no separate startup turn, and LLM deferral guidance without a coded compliance classifier. Required Docker validation reports actual outcomes or a blocker; no live activation/restart or test-infrastructure redesign is performed.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Planning only. Implementation requires a separate operator request; this plan allocates no Episode and authorizes no live activation or restart. No new runtime/package dependency or prerequisite task is needed.
+
+1. Separate inspection from mutation in `extension-support/project-initialization.ts`.
+   - Reuse/extract the existing inventory, manifest, and content-hash comparisons into a small read-only assessment of missing setup, applicable template updates, current state, and concrete inspection problems. Keep managed/customized/accepted-override meaning consistent with explicit reconciliation; an accepted override against unchanged upstream is not an update.
+   - Use existing Git-root discovery and active/uncertain Episode detection. Inspect without Orca lookup/registration and preserve Episode snapshots. Read/report relevant legacy/recovery evidence without migrating, repairing, recovering, acquiring a mutation lock, writing metadata/exclusions, or invoking provider/task-history preparation. Do not implement inspection by calling reconcile or add a generic dry-run framework.
+
+2. Ship the editable startup guidance before project initialization.
+   - Add internal Markdown alongside the global initializer (for example, `skills/initialize-prime-claw/STARTUP.md`) with an existing `plugin-root-managed` delivery target in `asset-inventory.json`, not a new project-local or discoverable skill. Use existing delivery/drift handling.
+   - Direct the LLM to read `initialize-prime-claw` and invoke `initialize_prime_claw(action="reconcile")` when initialization is needed for the current work; otherwise allow deferral. Preserve the user request/assignment and explicit no-modification instructions. Preserve separate reset/override/migration/deletion/local-only-history decisions without adding routine human confirmation. Align the initializer's setup wording with this LLM-mediated entry; keep this policy in Markdown, not a TypeScript request classifier.
+
+3. Replace the automatic startup reconcile in `extensions/project-initialization.ts`.
+   - Make `session_start` perform only the read-only assessment for the nearest Git project, with no Orca prerequisite. Keep only session-local pending guidance; report real inspection errors and protected Episode state without mutation or a false current-state claim. Current projects remain quiet; non-Git directories are not initialized.
+   - On the first normal `before_agent_start`, load the Markdown and add labeled background guidance plus project/inspection facts through the supported system-prompt result, preserving the existing system prompt and leaving the user prompt/attachments untouched. Consume the pending guidance once; do not enqueue a user message, manufacture a turn, or add persistent reminder state.
+   - Remove the startup-created-skill assumptions in `pendingSkillPaths`/`resources_discover`. Keep the global initializer available without project setup and retain the existing explicit tool's mutation path, customization behavior, and Episode protection. Orca unavailability must not prevent initialization.
+
+4. Update the existing isolated regressions, not a new test framework.
+   - Extend `tests/project_initialization_extension.test.mjs` and its Docker bridge in `tests/test_project_initialization.py`: fresh setup, missing/new/changed templates, current project, customization/accepted overrides, no Orca, non-Git directory, active/uncertain Episode, and an inspection failure. Assert startup/first-turn inspection does not alter fixture files, manifests, lock/exclude state, code index, or provider/history state and never calls the mutation seams; explicit tool invocation still performs setup/update.
+   - Exercise the first normal turn with an existing user request and assigned-task text: guidance coexists with the unchanged request/system context, no separate turn or replacement user message is sent, and a current project gets no guidance. Review the delivered Markdown for deferral/no-modification policy; do not encode LLM compliance as a classifier. Update startup-mutates/Orca-gated expectations rather than preserving those bugs.
+   - Extend the existing container install checks for the shipped startup Markdown and unchanged global-only `goals-and-heartbeats` placement.
+
+5. Update affected guidance and validate the candidate.
+   - Update `docs/project-initialization.md`, `REQUIREMENTS.md` P2, and directly affected README/story guidance to describe read-only startup, first-normal-turn guidance, any-Git-project scope, LLM deferral, and explicit mutation. Retain the global goals skill and consequential-action boundaries.
+   - Run the focused initialization/install regressions through the existing Docker fixture and required Tier 1 validation (`scripts/test-tier1.sh --probe`) after plugin changes. Record actual results and any concrete fixture blocker in the native task; do not repair unrelated test infrastructure or claim green from setup failures. Publish the bounded candidate and its evidence through the normal implementation workflow. No host/global candidate apply, live migration, restart, or cleanup is part of this task.
+<!-- SECTION:PLAN:END -->
