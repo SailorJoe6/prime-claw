@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 03:41'
+updated_date: '2026-11-05 03:47'
 labels: []
 dependencies: []
 references:
@@ -17,7 +17,15 @@ documentation:
   - docs/prep-chain.md
   - docs/backlog.md
   - docs/handoff-chain.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/H-handoff-and-continuation.md
 modified_files:
+  - .agents/skills/backlog/SKILL.md
+  - .agents/skills/blocked/SKILL.md
+  - .agents/skills/design/SKILL.md
+  - .agents/skills/execute/SKILL.md
+  - .agents/skills/spec-it-out/SKILL.md
+  - .prime-claw/templates.json
   - .prime-claw/workflows/handoff.md
   - .prime-claw/workflows/implement-task-prep.md
   - .prime-claw/workflows/implement-task.md
@@ -26,9 +34,11 @@ modified_files:
   - DEVELOPERS.md
   - REQUIREMENTS.md
   - docs/backlog.md
+  - docs/conversation-driven-episode-oversight.md
   - docs/handoff-chain.md
   - docs/prep-chain.md
   - docs/testing-strategy.md
+  - docs/user-stories/H-handoff-and-continuation.md
   - scripts/testing/provenance.py
   - scripts/testing/source_builder.py
   - scripts/testing/source_builder_payload.py
@@ -39,10 +49,17 @@ modified_files:
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
+  - src/prime-agent-plugin/extension-support/workflow-chain.ts
+  - src/prime-agent-plugin/extensions/handoff-chain.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
   - src/prime-agent-plugin/skills/implement-task/SKILL.md
   - src/prime-agent-plugin/skills/plan/SKILL.md
+  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/design.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/skills/project-templates/spec-it-out.md
   - src/prime-agent-plugin/workflows/handoff.md
   - src/prime-agent-plugin/workflows/implement-task-prep.md
   - src/prime-agent-plugin/workflows/implement-task.md
@@ -50,6 +67,8 @@ modified_files:
   - src/prime-agent-plugin/workflows/plan-task.md
   - tests/beads_task_episode_admission_extension.test.mjs
   - tests/conftest.py
+  - tests/handoff_chain_extension.test.mjs
+  - tests/project_conversation_extension.test.mjs
   - tests/project_initialization_extension.test.mjs
   - tests/reviewed_plan_extension.test.mjs
   - tests/spec_episode_extension.test.mjs
@@ -57,14 +76,16 @@ modified_files:
   - tests/task_episode_ownership_extension.test.mjs
   - tests/task_history_workspace.test.mjs
   - tests/task_providers.test.mjs
+  - tests/test_blocked_skill.py
+  - tests/test_execute_skill.py
+  - tests/test_expert_review_skill.py
   - tests/test_future_plan_skills.py
+  - tests/test_handoff_chain_extension.py
   - tests/test_oversee_episode_skill.py
   - tests/test_reviewed_plan_extension.py
   - tests/test_source_builder.py
   - tests/test_task_providers.py
   - tests/test_tier1_fixture.py
-  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
-  - tests/test_expert_review_skill.py
 priority: p1
 type: bug
 ordinal: 140000
@@ -354,6 +375,11 @@ Normal diagnosed in-scope repairs and required Docker-only validation after sour
 Peer57durableIDs/58read-onlystartup source is on main but not globally activated. This Episode has not integrated it. If own-feature-branch synchronization is actually needed, perform intentional clean supported normal Git here, preserving57/58 plus ownR1R2/requirements, no force/whole-file overwrites/blind conflict resolution/foreign actions or extra product permission gate. No55intoMAIN merge/global apply/activation/restart/dependency version-selector-trust change/live45/retained lifecycle redesign/abandonment/destructive live cleanup is authorized. Same existing Episode/operation/resources/one initial assignment only; no new allocation/Episode/chat-source assignment.
 
 This handoff makes ONLY this native living-plan checkpoint and one compaction request, no source/test implementation, main integration, validation, Docker/resource action or CA read/copy. Canonical execute is already independently queued as the sole follow-up.
+
+## Continuation/oversight and complete durability correction — published aggregate-validated candidate
+Codeb0d124a58af9989740ffcdd2bbd5a2b77f8e1e9c is clean/pushed/direct-remote-equal,35paths/+990/-720 from ACCEPTEDa575007. Fresh031619DockerprobePASS; expanded033430 actuallyFAILED11PASS1FAIL14deselected with ALL11 original bridgesPASS, then final034235targeted2PASS118.75s after isolated added-guide fixture repair. Exactdiff proves only projectConversation test changed after11PASS; finaltestdiff equals committed35pathdiff. Static76PASS12deselected includes repaired/re-enabledcustomization regression; exact source/privacy/network/cleanup and three honest test-only failure/repair histories are in Notes. Do not misreport failedexpanded command as13PASS or this candidate as accepted/fullTask55.
+Selected BOTH-provider continuation policy extraction and actualCOMPLETE46file durability corrections are implemented and validated for NORMAL owner review, preserving customized assets/nativeBeads multiissue consequences/Backlogliteralexactfile isolation/R1R2/rawfacts/ONEassignment and unchangedretained behavior. No next product slice starts in this pass. Wait for owning Conversation review of this coherent increment froma575, not another routine Usertestfix permission.
+All original remaining merge/terminal/abandonment/finalization/cleanup and other-stage embedded TypeScript tool prose/supporting lifecycle policy, plus bounded recorded45same-operation recovery with factual session/assignment evidence and disposablefixturesONLY remain required on THIS Task/Episode. Keep all9ACunchecked until actuallymet/FinalSummaryunfinished/InProgress; no fullTask/mergeReady/activation claim from aggregate tests. Sameoperatorauthority/no policyframework/gates/classifier/reconcile-retry/store/rowfilter/allocator/dependencywork/retainedredesign/mainmerge/globalapplyrestart/live45/destructiveactions. Joece2 routinefix/normalDocker validation authority unchanged. Source/codepublication and native task authority remain separate.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -858,4 +884,24 @@ Expanded run20261105T033430Z-75207-77e79885/launch2026-11-05T03:34:29.451749+00:
 Added projectConversationNode15/16PASS588.7335ms. Its NEW Beads guide-loader case failed BEFORE guide injection at test163: fixture initially created a live Backlog owner, then attempted to replace it with Beads via writeEpisodeOwnership. Actual existing exact-provider ownership protection correctly rejected 'Conversation owner already owns a different active Episode'. TEST-ONLY fixture now starts with the requested provider and then refines that SAME owner/task; no simulated provider migration/bypass or production change. Backlog variant and other15cases passed. Added handoffchain bridge was not reached under-x. No full13bodygreen command is claimed.
 All production/guidance and the original11bridge input files are unchanged from that passing run. Next proportional normal validation targets the two added bridges only: python3 -m pytest tests/test_project_conversation_extension.py::test_project_conversation_node_suite tests/test_handoff_chain_extension.py::test_handoff_chain_node_suite -q -m container -x. This obtains current corrected guide-loader and handoff-chain evidence without rerunning unrelated original11/history after an isolated test-fixture fix. Report aggregate actual coverage, not fabricated '13passed' for the failed full command. Freshprobe031619 still covers unchanged production/guidance; next narrow fixture captures this test-only correction. Normal task authority/Joece2 covers repair and focused validation, no routine user approval gate.
 ManifestFAILED03:40:07Z/tests-failedONLY/networkabsent03:36:16Z; runtimeIIDsha256:e663178baafbdeeb38b4618bcb0a0a391f87a35aebc644dc816ee7b60f06775f/CID93f2905575e19dc820725b56c2398f696ee244b6b46f0bee0db6dc85d4be8c56 cleanabsent03:40:07Z; builderIIDsha256:e83e796587f873a370842416195b85273ac681dcccc18c560accd853fbe2767d/CID59ec84d8b7692e976af462a27bc1a1a8d72ee78a9bb5a90262837676761be5df cleanabsent03:35:19Z/sourcebuildPASS03:35:34Z; freshBOTHexactnativeNoSuch verified. Capturedbinarydiff matched before this test-only repair. Samea1fa/sourcecheckoutinventory/readonlypublicCA/TLSprivacy/diag preserved; failedmanifest/log and old133753artifacts remainhonest/preserved. CapacityalreadyRETURNED2026-11-05T03:35:40.091501+00:00 atcapture/noactiveactor/hold. FullTask55remainingterminal/otherstageprose/recorded45fixture scope/all9ACunchecked unchanged.
+
+## Continuation/oversight and complete ticket-durability correction published — aggregate focused coverage PASS
+Published codeb0d124a58af9989740ffcdd2bbd5a2b77f8e1e9c onJLanders/prime-claw-primeclaw-55-episode-96306686,35paths/+990/-720 incrementally from ACCEPTEDa5750073230a1eeb3612ecad869b29056bbd10fa. Tested final binarydiff equals committed diff before/after commit; code clean/upstream/direct-remote-equal after commit, ordinary own-branch gitpull--rebase(noHEADchange), normalpush and verification. Separate native task DAG remains independent. No source-main integration, primary code/index writer or activation occurred. This is a coherent selected slice for NORMAL owner review, not automatic acceptance, fullTask55 or mergeReady.
+
+Production: ordinary task-native handoff no longer duplicates literal-main/rlmDepth/whole-Episode-clean policy, old persisted Beads-design readiness, branch-local Backlog selected-byte/status/plan approval, or Beads callback clean/pushed-head/ancestry approval. Beads exact repository/recorded-branch targeting occurs before native pull/delivery; exact owner/task/worktree/branch/durable-session/runtime-route/Orca identity, resource-active shape, atomic foreign-collision/readback and native failure mechanics remain. Shared retained version-1 idle/plan/spec and terminal source behavior are unchanged. Native first prompt still uses queueIfBusy:false; actual refusal/uncertainty is not retried. Existing first-message admission callback updates only existing factual provider/task/code observations, followed by ONE execute. No new allocation, session, status, initial assignment, schema/store/proof/classifier/retry framework or API was added.
+Current complete native task and code-status/head/upstream facts reach BOTH canonical prompts and the initiating tool's content text/details. Branch-local Backlog now carries both complete current task views; independent Backlog keeps prior/current native observations with ONE Episode-only task preparation/no mutable-primary sync. Both prompts also receive actual native session-list/get_state flags for editable idle/children/queue judgment; exact state identity remains mechanical. Complete unknown status/absent design and successful stderr/working-set/publication qualifications remain lossless, not semantic acceptance. R1/R2 creation result/ONEinitial/BOTHcontinuation channels are preserved; a local revision or pushed native result is not fabricated task publication proof. Workflow-chain and ordinary/task handoff tool metadata no longer contain duplicate owner/status/scope/continuation rules; editable execute/handoff/oversee/global entry skills own them.
+
+The COMPLETE46file secondary audit is corrected, not merely inventoried:28shippedMarkdown+17managedcopies+project Backlogskill. Fourteen affected Markdown assets corrected (source+managed design/spec-it-out/execute/blocked/plan-task/handoff, global oversee, project-only Backlog);32 no-native-authoring/retained/already adequate assets remain unchanged. Backlog commits coherent selected tickets ASAP and publishes promptly in BOTH topologies with literal add/commit--only paths, excludes unrelated staging/bytes/history, commits code separately, and does not synchronize another writer's primary clone or require whole-index/clone/parent-code cleanliness. Beads reviews native pending/staged touched-table/staged-set multi-issue commit consequences BEFORE create/update/nativecommit/push, discloses and consults unauthorized/unclear work, and inspects actual native task history CommitHash/Issue snapshots plus publication facts before claiming durability. Auto-commit may include pending work BEFOREpush; exit-zero/localtask/HEAD/push success alone is insufficient. No per-issue isolation/rowfilter/extra store/branch/dependency workaround/blanket quiescence or dirty gate. Prompt commit/publication timing covers authoring/planning/content/review/blocker/status/terminal notes, not just end/handoff/compaction/admission. Preserve all four project customizations (design default; prepare orientation unchanged; spec-it-out concurrency/ownership.json/code isolation; plan-task concurrency). Updated only accurate managed execute/blocked baseline/installed/available hashes and custom design/spec-it-out current installed/available hashes; historical custom baselines/states/accepted-override decisions stay unchanged. No blanket reset/global activation. Lean overseer body1793regexwords/unchanged1800bound.
+
+Evidence is AGGREGATE, not a fabricated all-green13body command. Expanded normal command `python3 -m pytest tests/test_task_history_workspace.py tests/test_task_providers.py tests/test_reviewed_plan_extension.py tests/test_project_conversation_extension.py::test_project_conversation_node_suite tests/test_handoff_chain_extension.py::test_handoff_chain_node_suite -q -m container -x` run20261105T033430Z-75207-77e79885 actually finished FAILED11passed/1failed/14deselected337.44s/-x (shell1/337.918s). ALL11 original task_history/task_providers/reviewed_plan selected bodies PASSED: history/provider/defaultBacklogadmission/ownership/Beadsadmission/reviewedplan/retainedSpecEpisode/episodeClose/realv098freshsessionflush/RPCnativeSkilldiscovery. History88/88PASS131590.728809ms/TAPSHAe0b3e6c51586b8527c5304d250ed849c1a002076a31174394cf00ba964fb199e. This proves directly changed default registered/native/caller/prompt paths and unchanged retained/terminal regressions, not full task-native terminal extraction or native Dolt isolation. Successful other TAP isn't separately retained by existing wrappers; no invented detailed counts/artifacts.
+That run's added projectConversation bridge was15/16: NEW Beads fixture incorrectly tried replacing an alreadyactiveBacklog owner and was correctly refused BEFOREguide loading. TEST-ONLY fixture now initializes the selected provider and refines that SAMEowner/task. The ONLY file changed after those11PASS is tests/project_conversation_extension.test.mjs, proven by exact per-path binarydiff comparison; production/guidance/original11suite inputs are unchanged. Later added handoff bridge was unrun under-x in that failed command.
+Final proportional targeted command `python3 -m pytest tests/test_project_conversation_extension.py::test_project_conversation_node_suite tests/test_handoff_chain_extension.py::test_handoff_chain_node_suite -q -m container -x` launched2026-11-05T03:42:33.923926+00:00/Bash88108/pytest88110/run20261105T034235Z-88110-5aedc19f. PASS2passed118.75s(shell0/119.264s), log/tmp/primeclaw55-continuation-guide-fixture-targeted.log. Both added project-conversation and handoff-chain Node bridges completed. This supplies current BOTH-provider edited-guide loading/raw-status/absence/unchanged-owner tests and mechanical ordinary handoff metadata/loading/native delivery coverage, without replaying the unchanged original11/history. Report this actual11PASS+2PASS aggregate, NEVER '13passed' for the FAILED expanded command. Finalcapturedrepo407/framed-sha256-v2/hash7f7218b28cafeeae4d986802c21af73164978ae7c1381104a30370a284c72b01, a575HEAD+exactnowcommitted35pathdiff; tested-diff equality checked before/after commit.
+
+Finaltargeted manifestPASSED03:44:33Z/emptycodes/networkabsent03:44:28Z. RuntimeIIDsha256:b76a3a6385226e68f65cfb2a1ac80b7ce62c8e8f58841a17feffdce78e438ce0/CID4352d402e86330fcca0a1783493870d042d7858160083997daa96b3a6c11e427 CLEANABSENT03:44:32Z; builderIIDsha256:a1ba7a9f366011d075b69ae96888274aec0b1ff7cdd7d599ab42ab540f01eaef/CID64b9bb9fc7e8278b240e718ac6d55de7ca97f55399562b3ed343b0d3e45cd013 CLEANABSENT2026-11-05T03:43:26Z/sourcebuildPASS2026-11-05T03:43:42Z; fresh BOTH exact nativeNoSuch verified. Actualcurrent03:42:23–04:02:23UTCwindow RETURNED2026-11-05T03:44:13.120450+00:00 atnativeexactmatchingrunningcapture beforeofflinecompletion. New run-owned share/snapshot normally removed after clean teardown; receipts under.test-results/20261105T034235Z-88110-5aedc19f/tier1 and log remain. Sourceclean a1faacd53ac4473a75de1d434afaf50945c2f647/tree5301/tag8ca4/lockSHA3e804/mode/version/source1258hashc159 unchanged; completecheckoutbeforeafter34038/hashb10e91 equal. Existing publicCAhashb266/269769bytes remained bounded/read-only/TLS-on/privacy/default-no-CA/accepted diagnostics/provenance; no contents/hostpath/credentials exposed or trust/selector/dependency change. No manual or foreign cleanup.
+Fresh REQUIRED source-change probe scripts/test-tier1.sh --probe independently PASSED run20261105T031619Z-44102-acce203d/launch2026-11-05T03:16:17.950688+00:00/Bash43987/shell0/112.652s, offlineapply/check/RPC/networkabsence03:18:00Z/manifest03:18:09Z/exactcleanup/freshBOTHDockerNoSuch; log/tmp/primeclaw55-continuation-probe.log. RuntimeIIDsha256:7126596ea664bc39172e805cdcacdc5c4d01c1089a0c6e46b24ac02f7e56dd80/CIDb093c0d1a3bbeb919f0478a8d926ec2d38314e1c270d734adbc44015912c52c3; builderIIDsha256:9d09f310739f512962408b52215335186a0c00dc119f549480ae2d74babfe0ff/CID7c9c59300041e4cd9348a7627a65818cd3f718914d56b80bb22271f02be4179b; sourcebuildPASS03:17:37Z/builderabsent03:17:23Z/runtimeabsent03:18:09Z. Capturedrepo407/hash934fbab57a20b61a68d6f3d11203c01af1a2ded98100907cde7ee4f742122c48 covers FINALproduction/guidance before subsequent TEST-ONLY framing/owner-policy/selected-provider fixture corrections. Exact per-path binarydiff proof shows only four test files differ since that probe; final runtime coverage captures them. No duplicate probe or old support-only pass is substituted for actual current source proof. Final host-safe static76PASS12deselected0.25s, /tmp/primeclaw55-continuation-static-publish.log. Existing corrected customization regression is re-enabled; three explicit old missing-config fixture exclusions remain: repository_status_cutover_uses_task_native_order_without_to_do, documented_task_authoring_cli_sequence_is_atomic_and_task_only, supported_task_content_edits_leave_status_and_unrelated_work_unchanged. These and adapter/process/static limits are not hidden.
+
+Independent read-only continuation/default-caller and full46asset audits/reviews found no remaining material defect after two concrete guidance repairs (whole-task-store merge clean/equal-head wording; newly edited custom installed/available hashes), confirmed precisely before probe. Final code tool-text serialization boundary was also read-only reviewed. Reviewers ran no tests/Docker/native provider mutations/credential or CA reads and made no writes; all completed/deleted. Runtime integration is actual test evidence above, not an independent full Expert acceptance. No live native Beads/Dolt publication/isolation reproduction or liveactivation UAT is claimed.
+Preserve failures:031946FAILED2PASS1FAIL14deselected286.13s/Backlog18of19 exposed TEST unanchored observation-frame parser matching an inline quoted Markdown tag; TESTONLY standalone-line regex retains exactJSON assertions.032657FAILED6PASS1FAIL14deselected320.57s/SpecEpisode218of219 exposed old TypeScript-owner-prose assertion; TESTONLY fixture now asserts editedMarkdown plus exacttask/ownerXMLtags and oneassignment/noTSappendedpolicy.033430FAILED11PASS1FAIL14deselected is the selected-provider TEST fixture defect above. All manifests/logs remainFAILED, not rewritten by later positive coverage. Their exact actors were clean/absent/freshNoSuch and windows returned atcapture, no current actors/reservation/goal/heartbeat/children remain after final report. Original20261104T133753Z-27442-5979e0d9 FAILEDmanifest AND originalshare AND snapshot remain PRESENT atfinalinspection, neverdeleted/reused/rebaselined. The one initial probe-postcheck capitalized-vs-lowercase no-such-object assertion was corrected only in-memory and re-inspected exactabsence; it is not a candidate failure or actor replay.
+
+Task remains InProgress/all9ACunchecked/FinalSummaryunfinished. This closes ONLY selected continuation/oversight and complete guidance-durability correction as a reviewable candidate. Remaining original scope on THIS Task/Episode: all remaining merge/abandonment/terminal publication/finalization/cleanup and other-stage embedded TypeScript tool prose/supporting lifecycle policy, plus bounded recordedTask45 SAMEoperation continuation with factual session/assignment evidence and DISPOSABLEfixtures only. Useful old tests passing does not mean those remaining coded gates are gone. No followup deferral/fullACclaim/mergeReady/globalactivation/restart/mainmerge/live45/dependency/trust/retainedredesign/abandonment/destructive live action is authorized. Stop for NORMAL owner review, not a per-testpermission pause; Joece2 still governs routine diagnosed repairs/normal required validation.
 <!-- SECTION:NOTES:END -->
