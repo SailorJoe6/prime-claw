@@ -12,6 +12,7 @@ import {
   acceptProjectOverride,
   loadAssetInventory,
   reconcilePrimeClawProject,
+  inspectPrimeClawProject,
   resetProjectAsset,
   ensureOrcaRegistration,
   isOrcaRegistered,
@@ -89,6 +90,62 @@ class Runner {
   }
 }
 
+
+// Startup inspection must not write even a lock, exclude, index, or provider receipt.
+// Keep bytes AND file identity so a rewrite of unchanged content is visible.
+function treeSnapshot(root) {
+  const rows = [];
+  function visit(path, relative = ".") {
+    const stat = lstatSync(path, { bigint: true });
+    const row = { path: relative, mode: stat.mode, ino: stat.ino, mtimeNs: stat.mtimeNs };
+    if (stat.isSymbolicLink()) row.link = fs.readlinkSync(path);
+    else if (stat.isDirectory()) {
+      row.directory = true; rows.push(row);
+      for (const name of fs.readdirSync(path).sort()) visit(join(path, name), join(relative, name));
+      return;
+    } else row.sha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
+    rows.push(row);
+  }
+  visit(root);
+  return rows;
+}
+function inspectionRunner() {
+  const runner = new Runner(), run = runner.run.bind(runner);
+  runner.calls = [];
+  runner.run = (command, args, options = {}) => {
+    runner.calls.push({ command, args });
+    assert.equal(command, "git", "startup must not call Orca or a task provider");
+    const operation = args[0] === "-C" ? args[2] : args[0];
+    assert.ok(operation === "rev-parse" || (operation === "worktree" && args.includes("list")), `startup Git mutation: ${args.join(" ")}`);
+    return run(command, args, options);
+  };
+  return runner;
+}
+function initializationHarness(root, dependencies = {}) {
+  const events = new Map(), tools = new Map(), commands = new Map(), notifications = [], sent = [];
+  let prepared = 0;
+  const runner = dependencies.runner ?? inspectionRunner();
+  createProjectInitializationExtension({
+    pluginRoot: PLUGIN, home: dirname(root), runner,
+    taskHistoryPreparer() { prepared++; throw Error("startup must not prepare task history"); },
+    ...dependencies,
+  })({
+    registerCommand(name, command) { commands.set(name, command); },
+    registerTool(tool) { tools.set(tool.name, tool); },
+    on(name, handler) { events.set(name, handler); },
+    sendMessage(...args) { sent.push(args); throw Error("startup must not send messages"); },
+    sendUserMessage(...args) { sent.push(args); throw Error("startup must not send user messages"); },
+  });
+  const ctx = { cwd: root, ui: { notify(message, level) { notifications.push({ message, level }); } } };
+  return { events, tools, commands, notifications, sent, runner, ctx, prepared: () => prepared };
+}
+function inspectFixture(root, overrides = {}) {
+  return inspectPrimeClawProject({ cwd: root, pluginRoot: PLUGIN, home: dirname(root), runner: inspectionRunner(), ...overrides });
+}
+function normalTurn(prompt = "Explain this project without modifying any files.") {
+  return { systemPrompt: "Existing system context must remain first.\n", prompt, images: [{ type: "image", data: "unchanged attachment" }] };
+}
+
 // These spies exercise ProcessCommandRunner itself; no host plugin activation is involved.
 function captureResources(t, overrides = {}) {
   const original = {
@@ -130,6 +187,183 @@ function assertCaptureCleaned(resources) {
     assert.throws(() => fs.fstatSync(descriptor), { code: "EBADF" });
   }
 }
+
+
+test("read-only first initialization ignores provider/history state and never takes a reconciliation lock", (t) => {
+  const root=repo(t), future=join(root,".ralph/plans/future/alpha");
+  mkdirSync(future,{recursive:true});writeFileSync(join(future,"SPECIFICATION.md"),"retained accepted bytes\n");
+  for(const [relative,bytes] of [[".beads/issues.jsonl","opaque native history\n"],[".backlog/tasks/user.md","existing native task\n"]]) {
+    const path=join(root,relative);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,bytes);
+  }
+  git(root,"update-ref","refs/heads/prime-claw-task-history",git(root,"rev-parse","HEAD").trim());
+  const before=treeSnapshot(root), runner=inspectionRunner();let prepared=0;
+  const result=inspectFixture(root,{runner,taskHistoryPreparer(){prepared++;throw Error("must not prepare");}});
+  assert.equal(result.project.root,realpathSync(root));assert.equal(result.status,"needs-initialization");
+  assert.ok(result.items.some(item=>item.assetId==="project-skill-prepare"&&item.destination===".agents/skills/prepare/SKILL.md"&&item.reason));
+  assert.equal(prepared,0);assert.deepEqual(treeSnapshot(root),before);
+  assert.equal(existsSync(join(root,LEGACY_SPECIFICATION_INVENTORY)),false);
+  assert.equal(existsSync(join(root,".prime-claw")),false);
+});
+
+test("inspection distinguishes missing, new, changed, retired, and current templates without writes", (t) => {
+  const root=repo(t), plugin=join(dirname(root),"inspection-plugin");cpSync(PLUGIN,plugin,{recursive:true});
+  reconcileFixture(root,{pluginRoot:plugin});
+  const inspect=()=>inspectFixture(root,{pluginRoot:plugin});
+  let before=treeSnapshot(root);assert.equal(inspect().status,"current");assert.deepEqual(treeSnapshot(root),before);
+  unlinkSync(join(root,".agents/skills/prepare/SKILL.md"));
+  before=treeSnapshot(root);let result=inspect();assert.equal(result.status,"update-available");
+  assert.ok(result.items.some(item=>item.assetId==="project-skill-prepare"));assert.deepEqual(treeSnapshot(root),before);
+  reconcileFixture(root,{pluginRoot:plugin});
+  const source=join(plugin,"skills/project-templates/prepare.md");appendFileSync(source,"\nchanged upstream\n");
+  before=treeSnapshot(root);result=inspect();assert.equal(result.status,"update-available");
+  assert.ok(result.items.some(item=>item.assetId==="project-skill-prepare"));assert.deepEqual(treeSnapshot(root),before);
+  reconcileFixture(root,{pluginRoot:plugin});
+  const inventoryPath=join(plugin,"asset-inventory.json"),inventory=JSON.parse(readFileSync(inventoryPath,"utf8"));
+  const original=inventory.assets.find(asset=>asset.id==="project-skill-prepare");
+  inventory.assets.push({...original,id:"project-skill-future",source:"skills/project-templates/future.md",targets:[
+    {class:"plugin-root-exact",destination:"skills/project-templates/future.md"},
+    {class:"project-customizable",destination:".agents/skills/future/SKILL.md",exposure:"discoverable",lifecycleTrigger:"project-reconcile"},
+  ]});
+  writeFileSync(join(plugin,"skills/project-templates/future.md"),"new template\n");writeFileSync(inventoryPath,JSON.stringify(inventory));
+  before=treeSnapshot(root);result=inspect();assert.equal(result.status,"update-available");
+  assert.ok(result.items.some(item=>item.assetId==="project-skill-future"));assert.deepEqual(treeSnapshot(root),before);
+  reconcileFixture(root,{pluginRoot:plugin});
+  inventory.assets=inventory.assets.filter(asset=>asset.id!=="project-skill-future");writeFileSync(inventoryPath,JSON.stringify(inventory));
+  unlinkSync(join(plugin,"skills/project-templates/future.md"));
+  before=treeSnapshot(root);result=inspect();assert.equal(result.status,"update-available");
+  assert.ok(result.items.some(item=>item.assetId==="project-skill-future"));assert.deepEqual(treeSnapshot(root),before);
+});
+
+for(const state of ["customized","accepted-override"]) {
+  test(`inspection preserves ${state} meaning and detects later upstream changes`,(t)=>{
+    const root=repo(t),plugin=join(dirname(root),`inspect-${state}`);cpSync(PLUGIN,plugin,{recursive:true});
+    reconcileFixture(root,{pluginRoot:plugin});
+    const destination=join(root,".agents/skills/prepare/SKILL.md"),source=join(plugin,"skills/project-templates/prepare.md");
+    appendFileSync(destination,"\noperator local policy\n");
+    if(state==="accepted-override")acceptProjectOverride(root,"project-skill-prepare",{pluginRoot:plugin,home:dirname(root),runner:new Runner()});
+    else reconcileFixture(root,{pluginRoot:plugin});
+    let before=treeSnapshot(root);assert.equal(inspectFixture(root,{pluginRoot:plugin}).status,"current");assert.deepEqual(treeSnapshot(root),before);
+    appendFileSync(source,"\nnew upstream policy\n");before=treeSnapshot(root);
+    const result=inspectFixture(root,{pluginRoot:plugin});assert.equal(result.status,"update-available");
+    assert.ok(result.items.some(item=>item.assetId==="project-skill-prepare"));assert.deepEqual(treeSnapshot(root),before);
+    assert.match(readFileSync(destination,"utf8"),/operator local policy/);
+  });
+}
+
+for(const prompt of ["What is 2 + 2? Do not modify this project.","[task from parent] Implement the already assigned bounded task."]) {
+  test(`startup adds shipped background guidance once alongside unchanged request: ${prompt.slice(0,25)}`,async(t)=>{
+    const root=repo(t),plugin=join(dirname(root),"startup-plugin");cpSync(PLUGIN,plugin,{recursive:true});
+    const markdown=join(plugin,"skills/initialize-prime-claw/STARTUP.md");
+    appendFileSync(markdown,"\nEditable startup marker from the delivered Markdown.\n");
+    const harness=initializationHarness(root,{pluginRoot:plugin}),before=treeSnapshot(root),turn=normalTurn(prompt),turnBefore=structuredClone(turn);
+    assert.deepEqual([...harness.tools.keys()],["initialize_prime_claw"]);assert.equal(harness.commands.size,0);
+    assert.equal(harness.events.has("resources_discover"),false);
+    await harness.events.get("session_start")({},harness.ctx);
+    assert.deepEqual(harness.sent,[]);assert.equal(harness.prepared(),0);assert.deepEqual(treeSnapshot(root),before);
+    const guidance=await harness.events.get("before_agent_start")(turn,harness.ctx);
+    assert.deepEqual(Object.keys(guidance),["systemPrompt"]);
+    assert.ok(guidance.systemPrompt.startsWith(turn.systemPrompt));
+    assert.ok(guidance.systemPrompt.includes(readFileSync(markdown,"utf8").trim()));
+    assert.match(guidance.systemPrompt,/needs-initialization/);assert.ok(guidance.systemPrompt.includes(root));
+    assert.match(guidance.systemPrompt,/project-skill-prepare/);
+    assert.deepEqual(turn,turnBefore);assert.deepEqual(harness.sent,[]);assert.equal(harness.prepared(),0);
+    assert.equal(await harness.events.get("before_agent_start")(normalTurn("Follow-up question"),harness.ctx),undefined);
+    assert.deepEqual(treeSnapshot(root),before);
+  });
+}
+
+test("current startup is quiet, including accepted local overrides",async(t)=>{
+  const root=repo(t);reconcileFixture(root);
+  appendFileSync(join(root,".agents/skills/prepare/SKILL.md"),"\naccepted local policy\n");
+  acceptProjectOverride(root,"project-skill-prepare",{pluginRoot:PLUGIN,home:dirname(root),runner:new Runner()});
+  const harness=initializationHarness(root),before=treeSnapshot(root);
+  await harness.events.get("session_start")({},harness.ctx);
+  assert.equal(await harness.events.get("before_agent_start")(normalTurn(),harness.ctx),undefined);
+  assert.deepEqual(harness.notifications,[]);assert.deepEqual(harness.sent,[]);assert.equal(harness.prepared(),0);
+  assert.deepEqual(treeSnapshot(root),before);
+});
+
+test("available update prompts without rewriting managed or customized files",async(t)=>{
+  const root=repo(t),plugin=join(dirname(root),"startup-update-plugin");cpSync(PLUGIN,plugin,{recursive:true});
+  reconcileFixture(root,{pluginRoot:plugin});appendFileSync(join(plugin,"skills/project-templates/prepare.md"),"\nnew upstream\n");
+  const harness=initializationHarness(root,{pluginRoot:plugin}),before=treeSnapshot(root);
+  await harness.events.get("session_start")({},harness.ctx);
+  const guidance=await harness.events.get("before_agent_start")(normalTurn(),harness.ctx);
+  assert.match(guidance.systemPrompt,/update-available/);assert.match(guidance.systemPrompt,/project-skill-prepare/);
+  assert.deepEqual(treeSnapshot(root),before);assert.deepEqual(harness.sent,[]);
+});
+
+test("startup ignores non-Git directories and resets pending guidance between sessions",async(t)=>{
+  const root=repo(t),plain=join(dirname(root),"plain");mkdirSync(plain);
+  const harness=initializationHarness(root),before=treeSnapshot(plain);
+  await harness.events.get("session_start")({},harness.ctx);
+  harness.ctx.cwd=plain;
+  await harness.events.get("session_start")({},harness.ctx);
+  assert.equal(await harness.events.get("before_agent_start")(normalTurn(),harness.ctx),undefined);
+  assert.deepEqual(harness.notifications,[]);assert.deepEqual(treeSnapshot(plain),before);
+});
+
+for(const activity of ["active","uncertain"]) {
+  test(`inspection and startup preserve an ${activity} Episode snapshot`,async(t)=>{
+    const root=repo(t),linked=join(dirname(root),`protected-${activity}`);
+    git(root,"worktree","add","-q","-b",`episode/${activity}`,linked);
+    t.after(()=>git(root,"worktree","remove","--force",linked));
+    if(activity==="active")writeEpisodeOwnership(root,activeOwnership("snapshot",linked));
+    else {mkdirSync(join(root,".prime-claw"),{recursive:true});writeFileSync(join(root,".prime-claw/ownership.json"),"{unreadable json");}
+    const before=treeSnapshot(dirname(root)),result=inspectFixture(linked);
+    assert.equal(result.status,"protected");assert.equal(result.activity,activity);assert.deepEqual(result.items,[]);
+    const harness=initializationHarness(linked);
+    await harness.events.get("session_start")({},harness.ctx);
+    assert.equal(await harness.events.get("before_agent_start")(normalTurn(),harness.ctx),undefined);
+    assert.deepEqual(harness.sent,[]);assert.equal(harness.prepared(),0);
+    assert.ok(harness.notifications.some(row=>row.level==="warning"&&/Episode|activity/i.test(row.message)));
+    assert.deepEqual(treeSnapshot(dirname(root)),before);
+  });
+}
+
+test("startup reports a concrete inspection failure without mutation or a current-state claim",async(t)=>{
+  const root=repo(t);mkdirSync(join(root,".prime-claw"));writeFileSync(join(root,".prime-claw/templates.json"),"{bad manifest json");
+  const before=treeSnapshot(root),harness=initializationHarness(root);
+  assert.throws(()=>inspectFixture(root),/templates\.json|JSON/i);
+  await harness.events.get("session_start")({},harness.ctx);
+  assert.equal(await harness.events.get("before_agent_start")(normalTurn(),harness.ctx),undefined);
+  assert.equal(harness.notifications.length,1);assert.equal(harness.notifications[0].level,"warning");
+  assert.match(harness.notifications[0].message,/templates\.json|JSON/i);assert.doesNotMatch(harness.notifications[0].message,/project is current|no updates/i);
+  assert.equal(harness.prepared(),0);assert.deepEqual(harness.sent,[]);assert.deepEqual(treeSnapshot(root),before);
+});
+
+test("startup reports Git discovery failure instead of treating it as a non-project",async(t)=>{
+  const root=repo(t),before=treeSnapshot(root),runner=inspectionRunner();
+  runner.run=()=>({stdout:"",stderr:"fatal: Git metadata unavailable for fixture",status:128});
+  const harness=initializationHarness(root,{runner});
+  assert.throws(()=>inspectFixture(root,{runner}),/Git metadata unavailable/);
+  await harness.events.get("session_start")({},harness.ctx);
+  assert.equal(await harness.events.get("before_agent_start")(normalTurn(),harness.ctx),undefined);
+  assert.ok(harness.notifications.some(row=>row.level==="warning"&&/Git metadata unavailable/.test(row.message)));
+  assert.deepEqual(treeSnapshot(root),before);assert.deepEqual(harness.sent,[]);
+});
+
+test("missing shipped Markdown reports guidance failure without a turn or mutation",async(t)=>{
+  const root=repo(t),plugin=join(dirname(root),"missing-startup-guidance");cpSync(PLUGIN,plugin,{recursive:true});
+  unlinkSync(join(plugin,"skills/initialize-prime-claw/STARTUP.md"));
+  const harness=initializationHarness(root,{pluginRoot:plugin}),before=treeSnapshot(root);
+  await harness.events.get("session_start")({},harness.ctx);
+  assert.equal(await harness.events.get("before_agent_start")(normalTurn(),harness.ctx),undefined);
+  assert.ok(harness.notifications.some(row=>row.level==="warning"&&/STARTUP\.md/.test(row.message)));
+  assert.equal(await harness.events.get("before_agent_start")(normalTurn(),harness.ctx),undefined);
+  assert.deepEqual(treeSnapshot(root),before);assert.deepEqual(harness.sent,[]);
+});
+
+test("inspection leaves stale lock and reset recovery evidence untouched",(t)=>{
+  const root=repo(t);reconcileFixture(root);
+  const destination=join(root,".agents/skills/prepare/SKILL.md"),source=join(PLUGIN,"skills/project-templates/prepare.md");
+  appendFileSync(destination,"\noperator customization before reset\n");
+  writeFileSync(join(root,".prime-claw/reconcile.lock"),JSON.stringify({pid:99999999,createdAt:"2020-01-01T00:00:00Z"}));
+  writeFileSync(join(root,".prime-claw/reset-intent.json"),JSON.stringify({schemaVersion:1,action:"reset",assetId:"project-skill-prepare",destination:".agents/skills/prepare/SKILL.md",upstreamSha256:createHash("sha256").update(readFileSync(source)).digest("hex"),beforeSha256:createHash("sha256").update(readFileSync(destination)).digest("hex")}));
+  const before=treeSnapshot(root);
+  try {inspectFixture(root);} catch(error) {assert.match(error.message,/reset|recovery|intent/i);}
+  assert.deepEqual(treeSnapshot(root),before);
+});
 
 test("file-backed production runner captures complete multibyte output above pipe limits", (t) => {
   const resources = captureResources(t);
@@ -598,8 +832,15 @@ test("skill-led extension exposes only its tool and keeps awaited startup separa
       return {status:"prepared",storeDir:join(primaryRoot,".backlog"),head:"a".repeat(40)};
     },
   })(pi);
-  assert.deepEqual([...commands.keys()],[]); assert.deepEqual([...tools.keys()],["initialize_prime_claw"]); assert.ok(events.has("session_start")); assert.ok(events.has("resources_discover"));
-  const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}}; await events.get("session_start")({},ctx); assert.ok(existsSync(join(root,".prime-claw/templates.json"))); assert.equal(notifications.length,1); const discovered=await events.get("resources_discover")({},ctx); assert.equal(discovered.skillPaths.length,7); assert.ok(discovered.skillPaths.every(path=>path.endsWith("SKILL.md"))); assert.equal(await events.get("resources_discover")({},ctx),undefined); await events.get("session_start")({},ctx); assert.equal(notifications.length,1);
+  assert.deepEqual([...commands.keys()],[]); assert.deepEqual([...tools.keys()],["initialize_prime_claw"]); assert.ok(events.has("session_start")); assert.ok(events.has("before_agent_start")); assert.equal(events.has("resources_discover"),false);
+  const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}};
+  const before=treeSnapshot(root);
+  await events.get("session_start")({},ctx);
+  assert.deepEqual(treeSnapshot(root),before);
+  assert.equal(existsSync(join(root,".prime-claw/templates.json")),false);
+  const guidance=await events.get("before_agent_start")(normalTurn(),ctx);
+  assert.match(guidance.systemPrompt,/initialize_prime_claw/);
+  assert.equal(await events.get("before_agent_start")(normalTurn(),ctx),undefined);
   const result=await tools.get("initialize_prime_claw").execute("id",{action:"reconcile"},null,null,ctx); assert.equal(result.isError,undefined); assert.equal(runner.adds,0);
   const comparison=await tools.get("initialize_prime_claw").execute("review",{action:"review-request",assetId:"project-skill-prepare"},null,null,ctx);
   assert.match(comparison.content[0].text,/Text comparison only/);
@@ -653,7 +894,9 @@ test("startup verifies but only explicit reconcile creates the legacy allowlist"
   const ctx={cwd:root,ui:{notify(message,level){notifications.push({message,level})}}};
   await events.get("session_start")({},ctx);
   assert.equal(existsSync(join(root,LEGACY_SPECIFICATION_INVENTORY)),false);
-  assert.match(notifications.at(-1).message,/legacy-specs=explicit-initialization-required/);
+  assert.equal(existsSync(join(root,".prime-claw/templates.json")),false);
+  const guidance=await events.get("before_agent_start")(normalTurn(),ctx);
+  assert.match(guidance.systemPrompt,/needs-initialization/);
   const result=await tools.get("initialize_prime_claw").execute("explicit",{action:"reconcile"},null,null,ctx);
   assert.equal(result.isError,undefined);assert.equal(existsSync(join(root,LEGACY_SPECIFICATION_INVENTORY)),true);
   assert.equal(result.details.legacySpecifications.status,"created");
@@ -818,11 +1061,14 @@ test("Orca failures are visible while independently safe files reconcile", (t) =
   assert.equal(result.registration.status,"unavailable");assert.match(result.registration.error,/orca unavailable/);assert.ok(existsSync(join(root,".agents/skills/prepare/SKILL.md")));
 });
 
-test("startup reports Orca lookup failure and does not initialize an unproven project", async (t) => {
-  const root=repo(t),runner=new Runner();runner.orcaError="orca lookup unavailable";const events=new Map(),notifications=[];
-  createProjectInitializationExtension({pluginRoot:PLUGIN,home:dirname(root),runner})({registerCommand(){},registerTool(){},on(name,handler){events.set(name,handler)}});
-  await events.get("session_start")({}, {cwd:root,ui:{notify(message,level){notifications.push({message,level})}}});
-  assert.equal(existsSync(join(root,".prime-claw/templates.json")),false);assert.equal(notifications.length,1);assert.match(notifications[0].message,/orca lookup unavailable/);assert.equal(notifications[0].level,"warning");
+test("startup does not require available or registered Orca", async (t) => {
+  const root=repo(t), harness=initializationHarness(root), before=treeSnapshot(root);
+  await harness.events.get("session_start")({},harness.ctx);
+  const guidance=await harness.events.get("before_agent_start")(normalTurn(),harness.ctx);
+  assert.match(guidance.systemPrompt,/needs-initialization/);
+  assert.equal(harness.runner.calls.some(call=>call.command==="orca"),false);
+  assert.deepEqual(harness.notifications,[]);
+  assert.deepEqual(treeSnapshot(root),before);
 });
 
 
@@ -1301,51 +1547,42 @@ test("no directory creation means no exclusion mutation for skipped or colliding
   assert.deepEqual(readFileSync(localExclude(skipped)), before);
 });
 
-test("startup first creation excludes state but never restores a user-removed rule", async (t) => {
+test("startup neither creates exclusions nor restores a user-removed rule", async (t) => {
   const root = exclusionFixture(t), events = new Map(), notifications = [];
   createProjectInitializationExtension({ pluginRoot: PLUGIN, home: dirname(root), runner: new Runner([{ id: "fixture", path: root }]) })({
     registerCommand() {}, registerTool() {}, on(n, h) { events.set(n, h); },
   });
   const ctx = { cwd: root, ui: { notify(message, level) { notifications.push({ message, level }); } } };
+  const before=treeSnapshot(root);
   await events.get("session_start")({}, ctx);
-  assertStateIgnored(root);
+  await events.get("before_agent_start")(normalTurn(), ctx);
+  assert.deepEqual(treeSnapshot(root),before);
+  assert.equal(existsSync(join(root,".prime-claw")),false);
   const deliberate = "# removed by operator\n";
   writeFileSync(localExclude(root), deliberate);
   await events.get("session_start")({}, ctx);
   assert.equal(readFileSync(localExclude(root), "utf8"), deliberate);
 });
 
-test("exclude write failure warns in startup and agent-facing tool while creating assets, with no later retry", async (t) => {
-  for (const surface of ["startup", "tool"]) {
-    const root = exclusionFixture(t), exclude = localExclude(root);
-    unlinkSync(exclude); mkdirSync(exclude); // Fails even as container root; not a permissions-dependent fixture.
-    const events = new Map(), commands = new Map(), tools = new Map(), notifications = [];
-    createProjectInitializationExtension({ pluginRoot: PLUGIN, home: dirname(root), runner: new Runner([{ id: "fixture", path: root }]) })({
-      registerCommand(n, d) { commands.set(n, d); }, registerTool(d) { tools.set(d.name, d); }, on(n, h) { events.set(n, h); },
-    });
-    assert.equal(commands.has("initialize-prime-claw"), false);
-    const ctx = { cwd: root, ui: { notify(message, level) { notifications.push({ message, level }); } } };
-    let text;
-    if (surface === "startup") {
-      await events.get("session_start")({}, ctx);
-      text = notifications.map(n => n.message).join("\n");
-      assert.ok(notifications.some(n => n.level === "warning"));
-    } else {
-      const result = await tools.get("initialize_prime_claw").execute("fixture", { action: "reconcile" }, null, null, ctx);
-      assert.equal(result.isError, undefined);
-      assert.equal(result.details.warnings.length, 1);
-      text = result.content[0].text;
-    }
-    assert.match(text, /warn|dirty/i);
-    assert.ok(text.includes(exclude), text);
-    assert.ok(text.includes("/.prime-claw/"), text);
-    assert.ok(existsSync(join(root, ".prime-claw/templates.json")));
-    assert.ok(existsSync(join(root, ".agents/skills/prepare/SKILL.md")));
-    rmSync(exclude, { recursive: true }); writeFileSync(exclude, "# repaired manually, no rule\n");
-    const later = reconcileFixture(root);
-    assert.equal((later.warnings ?? []).length, 0);
-    assert.equal(readFileSync(exclude, "utf8"), "# repaired manually, no rule\n");
-  }
+test("exclude write failure warns only when the explicit tool creates assets, with no later retry", async (t) => {
+  const root=exclusionFixture(t),exclude=localExclude(root);
+  unlinkSync(exclude);mkdirSync(exclude); // Fails as container root too.
+  const harness=initializationHarness(root,{runner:new Runner([{id:"fixture",path:root}])});
+  const before=treeSnapshot(root);
+  await harness.events.get("session_start")({},harness.ctx);
+  await harness.events.get("before_agent_start")(normalTurn(),harness.ctx);
+  assert.deepEqual(treeSnapshot(root),before);
+  assert.deepEqual(harness.notifications,[]);
+  const result=await harness.tools.get("initialize_prime_claw").execute("fixture",{action:"reconcile"},null,null,harness.ctx);
+  assert.equal(result.isError,undefined);assert.equal(result.details.warnings.length,1);
+  const text=result.content[0].text;
+  assert.match(text,/warn|dirty/i);assert.ok(text.includes(exclude),text);assert.ok(text.includes("/.prime-claw/"),text);
+  assert.ok(existsSync(join(root,".prime-claw/templates.json")));
+  assert.ok(existsSync(join(root,".agents/skills/prepare/SKILL.md")));
+  rmSync(exclude,{recursive:true});writeFileSync(exclude,"# repaired manually, no rule\n");
+  const later=reconcileFixture(root);
+  assert.equal((later.warnings??[]).length,0);
+  assert.equal(readFileSync(exclude,"utf8"),"# repaired manually, no rule\n");
 });
 
 test("ownership and legacy inventory first creators share the same creation-only default", (t) => {

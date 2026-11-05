@@ -38,6 +38,16 @@ review candidate, not proof of live activation or full Phase 4 acceptance.
 
 ## Phase 4 operator workflows
 
+- [Project initialization and updates](docs/project-initialization.md) — startup
+  only inspects Git projects, without requiring Orca. Needed setup or updates
+  add editable background guidance on the first normal turn, not a separate
+  startup turn or a replacement user request. The agent uses
+  `initialize-prime-claw` and explicitly invokes `initialize_prime_claw` when
+  needed for the current work; it may defer unrelated initialization and must
+  respect no-modification instructions. Current projects stay quiet. Routine
+  setup adds no new approval dialog; content replacement, provider migration,
+  local-only history, and other consequential decisions remain explicit. Active
+  or uncertain Episodes retain their template snapshots.
 - [Task-native specification authoring and retained bundle compatibility](docs/future-specification-bundles.md)
   — use `/skill:design` or `/skill:spec-it-out` to author or revise an `In Design`
   task. Ask the agent to plan it, then implement it when authorized. Discoverable

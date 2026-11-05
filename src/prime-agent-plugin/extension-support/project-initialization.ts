@@ -345,6 +345,9 @@ export function resolveNearestProjectRoot(start: string, home = process.env.HOME
   const homeReal = home && existsSync(home) ? realpathSync(resolve(home)) : resolve(home || "/__prime_claw_no_home__");
   if (startReal === homeReal) throw new Error("Prime Claw initialization refuses the user's HOME as a project root");
   const probe = runGit(runner, startReal, ["rev-parse", "--show-toplevel"], true);
+  if (probe.status !== 0 && (probe.errorCode !== undefined || !/not a git repository/i.test(probe.stderr))) {
+    throw new Error(`Git project discovery failed: ${probe.stderr.trim() || commandFailureMetadata(probe)}`);
+  }
   if (probe.status !== 0 || !probe.stdout.trim()) throw new Error("No Git worktree exists before the user's HOME boundary");
   const root = realpathSync(probe.stdout.trim());
   if (root === homeReal || (containedBy(root, homeReal) && containedBy(homeReal, startReal))) {
@@ -724,8 +727,8 @@ function ensureProjectTaskProvider(
   taskHistoryPreparer?: ReconcileOptions["taskHistoryPreparer"],
   normalizeExisting = false,
 ): TaskProviderSetup {
-  // Explicit install/upgrade only. Startup reconciliation and ordinary reads
-  // keep the strict non-adopting preparer and never move a live task store.
+  // Explicit install/upgrade only. Ordinary provider reads keep the strict
+  // non-adopting preparer; read-only startup inspection never enters here.
   if (normalizeExisting && !taskHistoryPreparer) taskHistoryPreparer = (input) => prepareExistingBacklogTaskHistoryWorkspace(input);
   let detection;
   try {
@@ -860,6 +863,83 @@ function establishCanonicalBacklogLifecycle(configPath: string): void {
   }
 }
 
+/** Compare an existing regular asset without writing it or its manifest. */
+function compareProjectAsset(asset: AssetDefinition, prior: TemplateEntry | undefined, current: string, upstream: string): {
+  entry: TemplateEntry; action: ReconcileItem["action"]; reason?: string; replace: boolean;
+} {
+  const base = { source: asset.source, destination: asset.destination, installedSha256: current, availableUpstreamSha256: upstream, provenance: provenance(asset) };
+  if (!prior) {
+    const managed = current === upstream;
+    return {
+      entry: { ...base, baselineSha256: managed ? upstream : null, acceptedOverrideSha256: null, state: managed ? "managed" : "customized" },
+      action: managed ? "unchanged" : "preserved", ...(managed ? {} : { reason: "unknown pre-existing file" }), replace: false,
+    };
+  }
+  if (prior.state === "managed" && (current === upstream
+    || (current === prior.installedSha256 && (prior.baselineSha256 === prior.installedSha256 || prior.baselineSha256 === current)))) {
+    const replace = current !== upstream;
+    const recovered = !replace && prior.installedSha256 !== upstream;
+    return {
+      entry: { ...prior, ...base, baselineSha256: upstream, installedSha256: upstream, acceptedOverrideSha256: null, state: "managed" },
+      action: replace ? "updated" : recovered ? "recovered" : "unchanged",
+      ...(recovered ? { reason: "recovered completed template write" } : {}), replace,
+    };
+  }
+  const accepted = prior.state === "accepted-override" && current === prior.acceptedOverrideSha256;
+  return {
+    entry: { ...prior, ...base, state: accepted ? "accepted-override" : "customized" },
+    action: accepted && prior.baselineSha256 === upstream ? "unchanged" : "preserved",
+    reason: accepted ? (prior.baselineSha256 === upstream ? "accepted override" : "new upstream available for accepted override") : "customized file",
+    replace: false,
+  };
+}
+
+export interface ProjectInspection {
+  project: ProjectRoot;
+  status: "needs-initialization" | "update-available" | "current" | "protected";
+  items: { assetId: string; destination: string; reason: string }[];
+  activity?: "active" | "uncertain";
+}
+
+/** Startup observes templates only. No locks, recovery, provider preparation, or writes. */
+export function inspectPrimeClawProject(options: Pick<ReconcileOptions, "cwd" | "pluginRoot" | "home" | "runner" | "isActiveEpisode">): ProjectInspection {
+  const runner = options.runner ?? new ProcessCommandRunner();
+  const project = resolveNearestProjectRoot(options.cwd, options.home, runner);
+  const activity = options.isActiveEpisode
+    ? (options.isActiveEpisode(project.root) ? "active" : "inactive")
+    : episodeWorktreeActivity(project.root, project.kind, runner);
+  if (activity !== "inactive") return { project, status: "protected", activity, items: [] };
+  const pluginRoot = options.pluginRoot ? realpathSync(options.pluginRoot) : pluginRootFromModule();
+  const inventory = loadAssetInventory(pluginRoot);
+  assertSafePathAncestors(project.root, join(project.root, TEMPLATE_MANIFEST));
+  const initialized = !!lstatIfPresent(join(project.root, TEMPLATE_MANIFEST));
+  const manifest = readManifest(project.root);
+  const items: ProjectInspection["items"] = [];
+  for (const asset of inventory.assets) {
+    const destination = join(project.root, asset.destination);
+    assertSafePathAncestors(project.root, destination);
+    const destinationStat = lstatIfPresent(destination);
+    const prior = manifest.assets[asset.id];
+    const upstream = digest(readFileSync(join(pluginRoot, asset.source)));
+    let reason: string | undefined;
+    if (!destinationStat) reason = "missing project asset";
+    else {
+      if (!destinationStat.isFile() || destinationStat.isSymbolicLink()) throw new Error(`${asset.destination} is not a regular file`);
+      const current = digest(readFileSync(destination));
+      const comparison = compareProjectAsset(asset, prior, current, upstream);
+      if (!prior) reason = "project asset is not recorded in the template manifest";
+      else if (["updated", "recovered"].includes(comparison.action)) reason = comparison.reason ?? "upstream template update";
+      else if (comparison.action === "preserved" && upstream !== (prior.state === "accepted-override" ? prior.baselineSha256 : prior.availableUpstreamSha256)) reason = "upstream update available for customized asset";
+    }
+    if (reason) items.push({ assetId: asset.id, destination: asset.destination, reason });
+  }
+  const currentIds = new Set(inventory.assets.map((asset) => asset.id));
+  for (const [assetId, prior] of Object.entries(manifest.assets)) {
+    if (!currentIds.has(assetId)) items.push({ assetId, destination: prior.destination, reason: "retired project asset" });
+  }
+  return { project, status: !initialized ? "needs-initialization" : items.length ? "update-available" : "current", items };
+}
+
 export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileResult {
   const runner = options.runner ?? new ProcessCommandRunner();
   const pluginRoot = options.pluginRoot ? realpathSync(options.pluginRoot) : pluginRootFromModule();
@@ -958,28 +1038,11 @@ export function reconcilePrimeClawProject(options: ReconcileOptions): ReconcileR
           if (!destinationStat.isFile() || destinationStat.isSymbolicLink()) throw new Error("destination is not a regular file");
           const currentBytes = readFileSync(destination);
           const current = digest(currentBytes);
-          if (!prior) {
-            const state: TemplateState = current === upstream ? "managed" : "customized";
-            manifest.assets[asset.id] = { source: asset.source, destination: asset.destination, baselineSha256: state === "managed" ? upstream : null, installedSha256: current, acceptedOverrideSha256: null, availableUpstreamSha256: upstream, state, provenance: provenance(asset) };
-            action = state === "managed" ? "unchanged" : "preserved";
-            if (state === "customized") reason = "unknown pre-existing file";
-          } else if (prior.state === "managed" && current === upstream) {
-            manifest.assets[asset.id] = { ...prior, source: asset.source, destination: asset.destination, baselineSha256: upstream, installedSha256: upstream, acceptedOverrideSha256: null, availableUpstreamSha256: upstream, state: "managed", provenance: provenance(asset) };
-            if (prior.installedSha256 !== upstream) { action = "recovered"; reason = "recovered completed template write"; }
-          } else if (prior.state === "managed" && current === prior.installedSha256 && (prior.baselineSha256 === prior.installedSha256 || prior.baselineSha256 === current)) {
-            if (current !== upstream) {
-              atomicWrite(destination, sourceBytes);
-              action = "updated";
-            }
-            manifest.assets[asset.id] = { ...prior, source: asset.source, destination: asset.destination, baselineSha256: upstream, installedSha256: upstream, acceptedOverrideSha256: null, availableUpstreamSha256: upstream, state: "managed", provenance: provenance(asset) };
-          } else {
-            const accepted = prior.state === "accepted-override" && current === prior.acceptedOverrideSha256;
-            manifest.assets[asset.id] = { ...prior, source: asset.source, destination: asset.destination, installedSha256: current, availableUpstreamSha256: upstream, state: accepted ? "accepted-override" : "customized", provenance: provenance(asset) };
-            action = accepted && prior.baselineSha256 === upstream ? "unchanged" : "preserved";
-            reason = accepted
-              ? (prior.baselineSha256 === upstream ? "accepted override" : "new upstream available for accepted override")
-              : "customized file";
-          }
+          const comparison = compareProjectAsset(asset, prior, current, upstream);
+          if (comparison.replace) atomicWrite(destination, sourceBytes);
+          manifest.assets[asset.id] = comparison.entry;
+          action = comparison.action;
+          reason = comparison.reason;
           if (legacy && existsSync(legacy)) {
             const legacyStat = lstatSync(legacy);
             if (legacyStat.isFile() && !legacyStat.isSymbolicLink() && digest(readFileSync(legacy)) === current) unlinkSync(legacy);

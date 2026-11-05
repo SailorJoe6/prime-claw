@@ -7,7 +7,8 @@ manually copying lifecycle files, so that it gains the standard Prime Claw
 skills and workflows.**
 
 The globally discoverable `initialize-prime-claw` Markdown skill guides the
-agent through `initialize_prime_claw(action="reconcile")` to install or reconcile the project-owned `prepare`, `design`, `spec-it-out`,
+agent through an explicit `initialize_prime_claw(action="reconcile")` invocation
+to install or reconcile the project-owned `prepare`, `design`, `spec-it-out`,
 `design-legacy`, `spec-it-out-legacy`, `execute`, and `blocked` skills plus the
 `handoff`, task-native planning/implementation workflows, and the retained
 `plan-prep`, `plan-spec`, `implement-prep`, and `implement-spec` runtime
@@ -15,6 +16,12 @@ workflows. Template assets are never staged or committed by reconciliation.
 Explicit task-history preservation may commit/publish the separate task DAG and
 stage only original task-path deletions in the code index. Code branch HEAD
 stays unchanged; root-link and ignore bookkeeping remain explicit code changes.
+Git-project initialization does not require Orca installation, availability, or
+registration. Optional Orca integration does not gate setup. Routine setup and
+safe updates add no new human approval dialog; consequential decisions remain
+separate. Global delivery keeps `goals-and-heartbeats` at Prime Agent's global
+`~/.prime/agent/skills/goals-and-heartbeats/` location, not in a project or the
+shared `~/.agents/skills/` tree.
 
 Global delivery includes thin `plan`, `plan-spec`, `implement-task`,
 `implement-spec`, and `handoff` entry skills, discoverable even when an active
@@ -33,9 +40,10 @@ continue creating assets, without a later retry while the directory exists.
 
 The first explicit initialization or upgrade also records the exact unfinished
 retained-legacy locations and accepted specification digests in one
-`.prime-claw/legacy-specifications.json` allowlist. Startup is verification-only:
-it does not create, extend, or rebaseline the inventory. Empty and archive-only
-projects produce no unfinished-work warning.
+`.prime-claw/legacy-specifications.json` allowlist. Startup only inspects
+template state and Episode protection; it does not prepare provider/history
+state, perform legacy recovery, or create, extend, or rebaseline that inventory.
+Empty and archive-only projects produce no unfinished-work warning.
 
 ## US-04 — Upgrade templates without destroying customization
 
@@ -65,18 +73,35 @@ until the operator explicitly chooses restore or keep; comparison never clears
 that evidence silently. This supersedes DD-001's old overwrite/viewer policy,
 while retaining its historical probes.
 
-## US-06 — Reconcile a registered project when a session starts
+## US-06 — Inspect startup needs without interrupting the current request
 
-**As a user opening a registered project, I want safe project updates applied
-before I begin work, so that newly installed skills are discoverable without
-silently changing active Episode snapshots.**
+**As a user opening any Git project, I want read-only startup inspection and
+relevant initialization guidance, so that updates do not silently change the
+project, interrupt unrelated work, or alter active Episode snapshots.**
 
-Startup reconciliation is awaited. No-op starts remain quiet; changes,
-conflicts, exclusion failures, or degraded registration produce a concise notice. Active or
-uncertain Episode worktrees retain their starting template snapshot. Supported
-old-layout handoff/execute fallback remains. Entry cutover does not retire
-version-1 ownership, plans, or resources. Later accepted-main global refresh
-requires separate authority, one coordinated full restart, and resumed
+Startup uses existing template/manifest/hash facts without writing project files,
+metadata, locks, exclusions, provider state, or task history. It requires no Orca
+installation, availability, or registration. Non-Git directories are not
+initialized. A current project stays quiet; an accepted override alone against
+unchanged upstream is not an update to overwrite. Actual inspection failures
+are reported without mutation or a false current-state claim.
+
+Needed setup or updates load internal editable `STARTUP.md` as background
+guidance in the first normal turn's system prompt, preserving the existing
+system context, user request or assigned task, and attachments. No separate turn
+or new user message is created. The global initializer is available before
+project setup. Markdown lets the LLM initialize first when needed for the current
+work or defer when unrelated, such as a quick question; explicit instructions
+not to modify the project win. An explicit initialization-tool invocation is the
+mutation boundary, not startup inspection. No request classifier or routine
+human approval gate is added. Content replacement/reset/override, legacy review
+recovery, provider switch/source deletion, unpublished local-only history, and
+other consequential actions retain their separate operator decisions.
+
+Active or uncertain Episode worktrees retain their starting template snapshot.
+Supported old-layout handoff/execute fallback remains. Entry cutover does not
+retire version-1 ownership, plans, or resources. Later accepted-main global
+refresh requires separate authority, one coordinated full restart, and resumed
 owner/Episode plus ordinary-session UAT. Keep everything the old generation may
 read until that proof succeeds; copy success, `/reload`, and a fresh probe alone
 are not proof.
@@ -146,6 +171,8 @@ separately confirmed operator action, not an implementation test.
 - `extension-support/task-provider-migration.ts`
 - `extension-support/episode-ownership.ts`
 - `skills/project-templates/prepare.md`
+- `skills/initialize-prime-claw/SKILL.md`
+- `skills/initialize-prime-claw/STARTUP.md`
 - `asset-inventory.json`
 
 All paths above are relative to `src/prime-agent-plugin/`.

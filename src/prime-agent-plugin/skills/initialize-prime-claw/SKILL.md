@@ -9,17 +9,33 @@ language; do not ask them to learn tool action arguments. This skill is installe
 globally, not copied into the project. There is no separate migration skill or
 custom initialization command parser.
 
-Read `/skill:goals-and-heartbeats` unless it is already in context. Confirm the
+Read `/skill:goals-and-heartbeats` unless it is already in context. Identify the
 current Git project and the requested outcome: setup/upgrade, compare an exact
-asset, an explicit content decision, or one-way Beads-to-Backlog migration. Do
-not turn a setup request or startup reconciliation into migration authority.
-Use supported native tools and existing mechanics; do not invent a controller,
-review state machine, retry loop, alternate destination, or mapping framework.
+asset, an explicit content decision, or one-way Beads-to-Backlog migration. Ask
+only when the target or a material decision is unclear. Do not turn a setup
+request or startup reminder into migration authority. Use supported native tools
+and existing mechanics; do not invent a controller, review state machine, retry
+loop, alternate destination, or mapping framework.
+
+Startup performs only read-only inspection. When setup or applicable updates are
+needed, shipped editable `STARTUP.md` adds background guidance on the first
+normal turn alongside the unchanged user request or assignment; it starts no
+separate turn. Preserve that request's priority. Initialize first when needed to
+fulfill the current work; otherwise defer, such as for a quick unrelated
+question. An explicit instruction not to modify the project wins. This timing
+and relevance decision belongs to ordinary LLM judgment, not a coded classifier.
 
 ## Setup and upgrades
 
-For an explicit setup or upgrade request, call `action=reconcile`. Explain the
-created, updated, customized, blocked, provider, and registration results.
+For an explicit setup or upgrade request, or when initialization is relevant
+and needed for the current request under the startup guidance, call
+`initialize_prime_claw(action="reconcile")`. This explicit LLM tool invocation
+is the mutation boundary. Routine setup and safe updates need no new mandatory
+human approval dialog. Preserve the separate content, migration, local-only
+history, and consequential-action decisions below. Explain the actual created,
+updated, customized, blocked, provider, and optional Orca registration results.
+Initialization does not require Orca installation, availability, or registration;
+optional Orca integration must not prevent setup of a Git project.
 Template assets are never staged or committed by reconciliation. Explicit task
 history preservation may stage only the original task-path deletions in the
 code index and commit/publish the separate task-history DAG; it leaves code
@@ -31,8 +47,12 @@ whether the operator wants unpublished local-only task history. Set
 
 The first explicit setup inventories unfinished retained legacy specifications;
 later runs must not enroll or rebaseline more legacy specifications. Startup
-reconciliation remains separate and must never trigger provider migration.
-An active Episode keeps its starting templates; do not bypass its protection.
+inspection does not perform reconciliation, legacy recovery, or provider/history
+preparation. It never grants provider migration or source-deletion authority.
+An active or uncertain Episode keeps its starting templates; do not bypass its
+protection. Do not initialize arbitrary non-Git directories. Report concrete
+inspection or tool errors without claiming the project is current or retrying an
+uncertain operation automatically.
 
 Backlog configuration selects the dedicated store. Default `backlog/` becomes
 `.backlog/` with the native root configuration symlink. Existing `.backlog/`

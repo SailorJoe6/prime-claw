@@ -325,6 +325,13 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     discovered = {path.parent.name for path in (destination / "skills").glob("*/SKILL.md")}
     assert discovered == {"goals-and-heartbeats", "prime-claw-oversee-episode", "prime-claw-expert-review", "initialize-prime-claw", "plan", "plan-spec", "implement-task", "implement-spec", "handoff"}
     assert not list((destination / "skills/project-templates").rglob("SKILL.md"))
+    # Internal startup guidance is globally delivered before any project setup,
+    # but it is not a separate discoverable skill or project-local asset.
+    startup = "skills/initialize-prime-claw/STARTUP.md"
+    assert startup in MANAGED_FILES
+    assert (destination / startup).read_bytes() == (SOURCE / startup).read_bytes()
+    assert not (destination / ".agents/skills/initialize-prime-claw/STARTUP.md").exists()
+    assert (destination / "skills/goals-and-heartbeats/SKILL.md").is_file()
     checked = _run_script(tier1_container, WS_CHECK, destination)
     assert checked.returncode == 0, checked.stdout + checked.stderr
 

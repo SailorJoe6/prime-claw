@@ -158,6 +158,9 @@ def test_project_initialization_docs_name_every_managed_workflow():
 
 def test_project_initialization_node_suite(tier1_container):
     result=tier1_container.run("node","--experimental-strip-types","--test","/workspace/tests/project_initialization_extension.test.mjs",timeout=180)
+    (tier1_container.share.parent / "project-initialization-node.tap").write_text(
+        result.stdout + result.stderr
+    )
     assert result.returncode==0,result.stdout+result.stderr
 
 def test_project_initialization_active_backlog_node_suite(tier1_container):
@@ -191,30 +194,30 @@ def test_two_processes_cannot_both_take_over_the_same_stale_lock(tmp_path):
     assert not (state/"reconcile.lock.recovery").exists()
 
 
-def test_first_native_v098_session_discovers_initialized_skills(tier1_container, ctmp):
+def test_first_native_session_does_not_initialize_or_discover_project_skills(tier1_container, ctmp):
     project=ctmp/"first-session-project";project.mkdir()
     subprocess.run(["git","init","-q","-b","main",str(project)],check=True)
-    bindir=ctmp/"bin";bindir.mkdir();orca=bindir/"orca"
-    orca_payload=json.dumps({"result":{"repos":[{"id":"fixture","path":str(project),"displayName":"fixture"}]}})
-    orca.write_text("#!/bin/sh\nprintf '%s\\n' '"+orca_payload+"'\n")
-    orca.chmod(0o755)
+    before={str(path.relative_to(project)):path.read_bytes() for path in project.rglob("*") if path.is_file()}
     request=json.dumps({"id":"commands","type":"get_commands"})+"\n"
-    path_result=tier1_container.run("sh","-c","printf %s \"$PATH\"",wrap=False,timeout=10)
-    assert path_result.returncode==0,path_result.stderr
     result=tier1_container.run(
         "/workspace/scripts/run-prime-agent-probe.sh",tier1_container.prime_agent,"--mode","rpc","--offline","--no-session",
         "--no-prompt-templates","--no-context-files","--no-extensions",
         "--cwd",str(project),"-e","/workspace/src/prime-agent-plugin/extensions/project-initialization.ts",
-        input_text=request,env={"PATH":str(bindir)+":"+path_result.stdout,"HOME":str(ctmp)},timeout=60,workdir=None,
+        input_text=request,env={"HOME":str(ctmp)},timeout=60,workdir=None,
     )
     assert result.returncode==0,result.stdout+result.stderr
     responses=[json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
     command_response=next(row for row in responses if row.get("id")=="commands")
     commands=command_response["data"]["commands"]
     by_name={row["name"]:row for row in commands}
+    # get_commands is not a normal LLM turn. Startup must neither manufacture a
+    # turn nor install project skills in order to make this request succeed.
     for name in ("skill:prepare","skill:execute","skill:design-legacy","skill:spec-it-out-legacy"):
-        assert name in by_name
-        assert by_name[name]["sourceInfo"]["path"]==str(project/".agents/skills"/name.split(":",1)[1]/"SKILL.md")
+        assert name not in by_name
+    after={str(path.relative_to(project)):path.read_bytes() for path in project.rglob("*") if path.is_file()}
+    assert after==before
+    for relative in (".agents", ".prime-claw", ".backlog", "backlog", "backlog.config.yml"):
+        assert not (project/relative).exists(),relative
 
 
 def test_initialization_skill_is_one_global_managed_asset_before_project_setup():
@@ -227,14 +230,14 @@ def test_initialization_skill_is_one_global_managed_asset_before_project_setup()
     }
     text=" ".join((SOURCE/source).read_text().split())
     for required in (
-        "name: initialize-prime-claw", "setup, upgrades", "action=reconcile",
+        "name: initialize-prime-claw", "setup, upgrades", 'initialize_prime_claw(action="reconcile")',
         "action=review-request", "standard Git patch as text", "Git index stay unchanged",
         "action=accept-override", "action=reset", "explicit content decision",
         "action=review-restore", "action=review-keep", "Never discard the record automatically",
         "action=switch-request", "action=switch-confirm", "targetProvider=backlog",
         "quiesced", "source deletion", "Existing active version-2 Episodes",
         "An existing Backlog destination alongside Beads is expected input",
-        "Read outgoing Beads as-is", "publication", "never trigger provider migration",
+        "Read outgoing Beads as-is", "publication", "never grants provider migration",
     ):
         assert required in text
     assert not any("migration" in path.parent.name for path in (SOURCE/"skills").glob("*/SKILL.md"))
@@ -242,6 +245,29 @@ def test_initialization_skill_is_one_global_managed_asset_before_project_setup()
     assert "registerCommand" not in extension
     assert "parseCommand" not in extension
     assert "confirmedReady" not in extension and "visibleConfirmed" not in extension
+
+
+def test_startup_guidance_is_delivered_markdown_with_llm_timing_and_existing_decision_boundaries():
+    inventory=json.loads((SOURCE/"asset-inventory.json").read_text())
+    source="skills/initialize-prime-claw/STARTUP.md"
+    rows=[row for row in inventory["assets"] if row["source"]==source]
+    assert len(rows)==1
+    assert rows[0]["targets"]==[{"class":"plugin-root-managed","destination":source}]
+    assert not any(target["class"]=="project-customizable" for target in rows[0]["targets"])
+    text=" ".join((SOURCE/source).read_text().split())
+    # Check the editable instruction, not a TypeScript request classifier or
+    # a claimed model-compliance test. Node tests prove actual prompt delivery.
+    for required in (
+        "background guidance", "first normal turn", "not a new user command",
+        "current request or assigned task", "defer initialization",
+        "quick unrelated question", "not to modify the project",
+        "ordinary LLM judgment", 'initialize_prime_claw(action="reconcile")',
+        "mutation boundary", "no new mandatory human approval",
+        "accepted local override", "resetting customized content", "deleting source data",
+        "unpublished local-only task history", "active or uncertain Episode",
+    ):
+        assert required in text
+    assert not (SOURCE/"skills/initialize-prime-claw/STARTUP.md/SKILL.md").exists()
 
 
 def test_native_initialization_skill_discovery_before_any_project_setup(tier1_container, ctmp):

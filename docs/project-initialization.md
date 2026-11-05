@@ -5,6 +5,11 @@ regular, customizable files that the operator may track. The globally discoverab
 `initialize-prime-claw` Markdown skill guides setup, upgrades, text comparisons,
 and one-way migration through the model-callable `initialize_prime_claw` tool.
 There is no custom initializer command/action syntax for the operator to learn.
+Startup is read-only: it may inspect and supply background guidance on the first
+normal turn, but only an explicit LLM initialization-tool invocation performs
+setup or update mutations. The LLM preserves the current request's priority and
+may defer unrelated initialization. Routine setup adds no mandatory human approval
+dialog; separate consequential decisions remain explicit.
 Template reconciliation never stages or commits template assets. Explicit setup
 may preserve an existing store in an independent task-history DAG, commit and
 publish that history, and stage only original task-path deletions in the code
@@ -25,8 +30,14 @@ Global discoverable skills include `initialize-prime-claw`, `goals-and-heartbeat
 entries `plan`, `plan-spec`, `implement-task`, `implement-spec`, and `handoff`.
 They remain discoverable for active Episode snapshots that skip reconciliation.
 Prime Claw's five custom workflow command registrations are removed, not Prime
-Agent built-ins or native `/skill:` invocation. `ROLE_KERNEL.md`
-and the goal-continuation fragment are global internal assets. Project skill
+Agent built-ins or native `/skill:` invocation. `ROLE_KERNEL.md`,
+the goal-continuation fragment, and `skills/initialize-prime-claw/STARTUP.md` are
+global internal assets. The startup Markdown uses a `plugin-root-managed` target
+and the existing global drift handling. It is available before project setup,
+not a second discoverable skill or a project-local copy. The global installer
+continues to own `goals-and-heartbeats` at
+`~/.prime/agent/skills/goals-and-heartbeats/`; project initialization does not
+install it in a project or under `~/.agents/skills/`. Project skill
 sources remain under `src/prime-agent-plugin/skills/project-templates/` but use
 plain `.md` filenames, so installing the plugin cannot expose them as global
 `SKILL.md` candidates.
@@ -86,29 +97,31 @@ delivery sources stay generic for other initialized repositories. Reconciliation
 preserves those bounded customizations; it does not use tracker choice to retire
 the separately named legacy assets.
 
-## Project selection and Orca registration
+## Project selection and optional Orca registration
 
-Initialization starts at the current directory and uses Git's nearest-worktree
-root. Starting below that root needs no confirmation. A nested repository,
-submodule, or linked worktree is its own target and is reported as such. If Git
-would reach the user's HOME before a project root, initialization fails before
-creating a lock, directory, or Orca registration.
+Initialization and startup inspection start at the current directory and use
+Git's nearest-worktree root. Starting below that root needs no confirmation. A
+nested repository, submodule, or linked worktree is its own target and is reported
+as such. Arbitrary non-Git directories are not initialized. If Git would reach
+the user's HOME before a project root, initialization fails before creating a
+lock, directory, or Orca registration.
 
-Explicit initialization looks up Orca repositories by exact canonical path. It
-reuses an existing registration without changing metadata. If none exists, it
-adds that exact path once and then verifies the resulting identity. Orca failure
-is visible; independently safe file reconciliation is not rolled back. Automatic
-startup reconciliation is lookup-only and never auto-registers arbitrary Git
-repositories.
+Startup inspection and guidance work in any eligible Git project without Orca
+installation, availability, or registration. They make no Orca registration call.
+Explicit initialization may look up Orca repositories by exact canonical path,
+reuse an existing registration without changing metadata, or add and verify that
+exact path once. This optional integration is separate: Orca failure is visible
+but must not prevent independently safe Git-project initialization or roll back
+its file reconciliation.
 
 ## Local Git exclusion on first directory creation
 
 Only when Prime Claw itself creates a previously absent root `.prime-claw/`
 directory, it appends the exact root-anchored `/.prime-claw/` rule to Git's
-local exclusions. This applies to explicit initialization, registered-project
-`session_start` reconciliation, and the ownership or retained-inventory paths
-that first create the directory. Existing comments, patterns, bytes, and order
-are preserved. An existing exact rule is not duplicated. Other generated
+local exclusions. This applies to explicit initialization and the ownership or
+retained-inventory paths that first create the directory. Read-only startup
+inspection never creates the directory or edits exclusions. Existing comments,
+patterns, bytes, and order are preserved. An existing exact rule is not duplicated. Other generated
 project skills and unrelated untracked files are not hidden by this rule.
 
 The exclude path comes from `git -C <root> rev-parse --git-path info/exclude`,
@@ -120,12 +133,12 @@ behavior. Exclusions do not untrack files already in Git's index.
 If `.prime-claw/` already exists when the operation starts, Prime Claw does not
 change exclusions. To deliberately track the directory, remove `/.prime-claw/`
 from the Git-resolved exclude file, then add and commit the desired files.
-Later initialization and startup reconciliation do not restore the removed
-rule or repair a missing exclusion for an existing directory.
+Later initialization does not restore the removed rule or repair a missing
+exclusion for an existing directory; startup inspection changes no exclusions.
 
 If resolving or updating the exclusion fails, directory and asset creation
-continue. Agent-facing tool output and startup notifications warn that the worktree
-may remain dirty, include the cause, and give manual remediation using the
+continue. Agent-facing mutation-tool output warns that the worktree may remain
+dirty, includes the cause, and gives manual remediation using the
 resolved path when available. There is no later retry while the directory
 exists. Skipped reconciliation and operations that do not create the directory
 do not authorize an exclusion edit.
@@ -173,20 +186,44 @@ operator explicitly accepts unpublished local-only history, the agent uses tool
 `action="reconcile", unpublishedLocalOnly=true`. That route creates or reuses
 one clean independent nested Backlog repository on `prime-claw/tasks` with no
 remote, labels the result unpublished, and never treats it as admission,
-terminal-publication, or cleanup proof. Startup reconciliation never selects
-this route implicitly. Adding and selecting a remote later remains a separate
-operator action.
+terminal-publication, or cleanup proof. Startup inspection never prepares task
+history or selects this route implicitly. Adding and selecting a remote later
+remains a separate operator action.
 
-## Startup ordering and Episode snapshots
+## Startup inspection, first-turn guidance, and Episode snapshots
 
-The plugin's awaited `session_start` handler first verifies that the Git project
-is already registered with Orca. It then awaits the complete deterministic
-reconcile before Prime Agent accepts the initial prompt. Newly created, migrated, updated,
-or recovered discoverable skill paths are returned through Prime Agent v0.9.8's
-post-start `resources_discover` seam, so the same first session receives both their
-slash commands and model-visible skill entries. It sends no user message and starts
-no model turn. Changes, conflicts, or degraded state produce one
-concise UI notice; a current project is silent.
+The awaited `session_start` handler inspects the nearest Git project's template
+inventory, manifest, and content hashes without mutation. It distinguishes
+missing initialization and applicable upstream updates from current templates.
+It preserves customization semantics: an accepted local difference against
+unchanged upstream alone is not an update to overwrite. The check does not call
+reconciliation, simulate it with redirected writes, acquire a mutation lock, or
+change assets, manifests, exclusions, provider state, task history, or recovery
+evidence. It does not require Orca or audit provider/legacy readiness. Non-Git
+directories receive no initialization. Real inspection problems and protected
+Episode state are reported without claiming the project is current.
+
+When work is needed, the plugin holds only session-local inspection facts. On
+the first normal `before_agent_start`, it reads the shipped editable
+`skills/initialize-prime-claw/STARTUP.md` and appends labeled background guidance
+and project/inspection facts to the existing system prompt. The user request or
+assigned task, attachments, and normal session flow remain unchanged. This starts
+no separate LLM turn, sends no user message, and does not consume or replace the
+initial task. The pending guidance is consumed once, with no persistent reminder
+cache or receipt. A current project receives no initialization prompt and stays
+quiet. No startup-created skill or `resources_discover` step is assumed; the
+global initializer is available before project setup.
+
+Markdown directs the LLM to read `initialize-prime-claw` and explicitly call
+`initialize_prime_claw(action="reconcile")` when setup or updates are needed to
+fulfill the current work. Otherwise it may defer initialization and answer the
+current request, such as a quick unrelated question. An explicit no-modification
+instruction wins. Relevance and timing remain ordinary LLM judgment, not a coded
+request classifier, queue, or authorization mechanism. The explicit tool call is
+the mutation boundary. Routine setup requires no new human confirmation, while
+customized-content replacement, reset/override decisions, legacy review recovery,
+provider switch/source deletion, unpublished local-only history, and other
+consequential actions retain their separate operator decisions.
 
 Explicit Backlog adoption on canonical primary also preserves nonterminal
 Backlog Episode task bindings. If detaching an ordinary selected store or moving
@@ -197,9 +234,9 @@ lifecycle before retrying adoption; initialization does not rewrite its binding
 or perform a continuity transition. Unrelated bindings and providers do not block
 adoption, and an already independent store at an unchanged path remains usable.
 
-An active Episode worktree is skipped. It retains the project workflow snapshot
-with which it started. Runtime handoff readers prefer the new topology but retain
-read-only fallback to the corresponding legacy `.ralph/skills/{handoff,execute}`
+An active or uncertain Episode worktree is protected from template updates.
+It retains the project workflow snapshot with which it started. Runtime handoff
+readers prefer the new topology but retain read-only fallback to the corresponding legacy `.ralph/skills/{handoff,execute}`
 bytes, so an old-layout active Episode can finish without policy migration. The implementation has an injected activity seam for the one minimal ownership
 record and a bounded reader that scans the current Git worktree set to find that
 record in the canonical project checkout when startup occurs inside a linked
@@ -563,9 +600,10 @@ must explicitly prove the superseding semantics and remaining requirements.
 
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,
-`registerTool`, and awaited `session_start`). Prime Claw remains pinned to v0.9.8
+`registerTool`, awaited `session_start`, and first-normal-turn
+`before_agent_start` system-prompt guidance). Prime Claw remains pinned to v0.9.8
 until a released upstream CWD fix and supported Orca lifecycle, identity, and
 finality integration pass acceptance tests. This code adds no speculative v0.10
 behavior or adapter. Any future runtime change must re-prove extension loading,
-startup-before-prompt ordering, command/tool registration, skill discovery, and
-notices before changing the adapter.
+read-only startup and first-normal-turn ordering, unchanged user assignments,
+command/tool registration, skill discovery, and notices before changing the adapter.

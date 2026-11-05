@@ -1,8 +1,11 @@
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   acceptProjectOverride,
-  isOrcaRegistered,
+  inspectPrimeClawProject,
+  type ProjectInspection,
   reconcilePrimeClawProject,
   resetProjectAsset,
   resolveNearestProjectRoot,
@@ -171,7 +174,7 @@ async function executeAction(action: Action, args: ActionArguments, ctx: Extensi
 
 export function createProjectInitializationExtension(dependencies: ProjectInitializationDependencies = {}) {
   return function projectInitialization(pi: ExtensionAPI): void {
-    let pendingSkillPaths: string[] = [];
+    let pendingInspection: ProjectInspection | undefined;
     pi.registerTool({
       name: "initialize_prime_claw",
       label: "Initialize Prime Claw project",
@@ -222,35 +225,32 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
     });
 
     pi.on("session_start", async (_event, ctx) => {
-      pendingSkillPaths = [];
+      pendingInspection = undefined;
       try {
-        const project = resolveNearestProjectRoot(ctx.cwd, dependencies.home, dependencies.runner);
-        if (!isOrcaRegistered(project.root, dependencies.runner)) return;
-        const result = reconcilePrimeClawProject({
-          ...productionReconcileOptions(dependencies),
-          cwd: ctx.cwd,
-          registerOrca: false,
-          legacyInventoryMode: "verify",
-        });
-        pendingSkillPaths = result.items
-          .filter((item) => ["created", "migrated", "updated", "recovered"].includes(item.action) && item.destination.startsWith(".agents/skills/") && item.destination.endsWith("/SKILL.md"))
-          .map((item) => join(result.project.root, item.destination));
-        if (result.skipReason === "uncertain-episode-activity") {
-          ctx.ui.notify(summarizeReconcile(result), "warning");
-        } else if (result.changed || result.conflicts > 0 || result.registration.status === "unavailable" || result.warnings?.length) {
-          ctx.ui.notify(summarizeReconcile(result), result.conflicts > 0 || result.warnings?.length ? "warning" : "info");
+        const result = inspectPrimeClawProject({ ...dependencies, cwd: ctx.cwd });
+        if (result.status === "protected") {
+          ctx.ui.notify(`Prime Claw startup inspection protected ${result.project.root}: ${result.activity === "active" ? "active Episode worktree" : "Episode activity could not be proven inactive"}`, "warning");
+        } else if (result.status !== "current") {
+          pendingInspection = result;
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (/No Git worktree|HOME boundary/.test(message)) return;
-        ctx.ui.notify(`Prime Claw startup reconciliation degraded: ${message}`, "warning");
+        if (/No Git worktree|HOME boundary|refuses the user's HOME/.test(message)) return;
+        ctx.ui.notify(`Prime Claw startup inspection failed: ${message}`, "warning");
       }
     });
 
-    pi.on("resources_discover", async () => {
-      const skillPaths = pendingSkillPaths;
-      pendingSkillPaths = [];
-      return skillPaths.length ? { skillPaths } : undefined;
+    pi.on("before_agent_start", async (event, ctx) => {
+      const inspection = pendingInspection;
+      pendingInspection = undefined;
+      if (!inspection) return;
+      try {
+        const pluginRoot = dependencies.pluginRoot ?? resolve(dirname(fileURLToPath(import.meta.url)), "..");
+        const guidance = readFileSync(join(pluginRoot, "skills/initialize-prime-claw/STARTUP.md"), "utf8");
+        return { systemPrompt: `${event.systemPrompt}\n\n${guidance}\n\nStartup inspection facts (data):\n${JSON.stringify(inspection, null, 2)}` };
+      } catch (error) {
+        ctx.ui.notify(`Prime Claw startup guidance failed: ${error instanceof Error ? error.message : String(error)}`, "warning");
+      }
     });
   };
 }

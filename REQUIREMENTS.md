@@ -130,11 +130,31 @@ Sources: [PRIMECLAW-21][T21], [33.6][T33_6]; existing stories US-01–02.
 ### P2. Initialize and upgrade existing projects without erasing customization
 
 A discoverable initialization skill must make an existing Git project usable
-without manual file copying. Install editable project skills and workflows.
-Update untouched templates; preserve customized and unknown content; explain
-conflicts while allowing independent safe updates. Ordinary startup should be
-quiet when nothing changes and must not rewrite an active Episode's snapshot.
-Do not dirty a clean code checkout solely by creating local runtime state.
+without manual file copying or requiring Orca installation, availability, or
+registration. Install editable project skills and workflows through an explicit
+LLM initialization-tool invocation. Update untouched templates; preserve
+customized and unknown content; explain conflicts while allowing independent
+safe updates. An accepted override against unchanged upstream alone is not an
+update to overwrite.
+
+Startup must only inspect template state without writing files, metadata,
+locks, exclusions, provider state, or task history. When setup or applicable
+updates are needed, shipped editable Markdown must add background guidance on
+the first normal LLM turn alongside the unchanged user request or assigned task,
+not start a separate turn or replace that request. The LLM may initialize first
+when needed for the current work or defer when unrelated, such as a quick
+question. Explicit no-modification instructions win. This judgment must not
+become a coded request classifier or new routine human approval gate. Keep
+separate operator decisions for content replacement/reset/override, legacy
+review recovery, provider migration/source deletion, unpublished local-only
+history, and other consequential actions.
+
+A current project stays quiet. Non-Git directories are not initialized. Preserve
+active or uncertain Episode template snapshots; report actual inspection
+problems without mutation or false current-state claims. Do not dirty a clean
+code checkout solely by creating local runtime state. The global installer keeps
+owning `goals-and-heartbeats` at `~/.prime/agent/skills/goals-and-heartbeats/`,
+not a project-local or shared `~/.agents/skills/` copy.
 
 Sources: [PRIMECLAW-10.37.2][T10_37_2], [44][T44], [47][T47]; US-03–07.
 
