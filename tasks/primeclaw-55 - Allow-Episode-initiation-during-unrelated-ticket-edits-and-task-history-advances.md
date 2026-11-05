@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 01:26'
+updated_date: '2026-11-05 01:31'
 labels: []
 dependencies: []
 references:
@@ -635,4 +635,11 @@ R2 keeps the existing full native pushed/evidence object in the create result an
 The final host-safe static selection passed55/13deselected; exact log and final runtime outcomes will follow. R2/test fixture review corrected an initially uncommitted root execute fixture by committing that fixture before its recorded base/upstream; production admission guards were not changed to satisfy it. No Docker actor or runtime plugin assertion has run for this new source yet. Previous probe/focused11PASS remain historical candidate88 evidence, not R1/R2 validation. Accepted diagnostics33f/sharedCAc963, source selection/identity, configured public CA read-only/TLS-on/privacy/provenance/cleanup and old failed artifacts remain unchanged. Next coordinate actual current capture capacity, run fresh supported Docker probe and focused coverage including the changed initialization runner suite, and preserve actual failures/normal diagnosed in-scope repairs without a per-test permission pause.
 
 All original deeper BOTH-provider lifecycle/tool-prose extraction, COMPLETE managed-asset durability audit and bounded recorded45same-operation disposable-fixture recovery remain on THIS task/Episode. All9AC unchecked/FinalSummary unfinished/InProgress unchanged; no full-task/mergeReady/activation claim. No dependency/trust/selector/version change, global apply/restart, live45 action, retained redesign, main merge/abandonment or destructive live cleanup.
+
+## R1/R2 fresh Docker probe PASS — focused regression fixture not started
+scripts/test-tier1.sh --probe launched2026-11-05T01:28:08.905737+00:00, Bash5334/driver5568, run20261105T012812Z-5568-bbbb541c. Terminal exit0/122.149seconds. Manifest PASSED01:30:10UTC/empty failure_codes; offline apply/check/RPC succeeded, network absent/disconnected01:29:59UTC. Captured current code88c175+14pathR1/R2delta:407entries/framed-sha256-v2/hash3696ad1e7ec06a8206208f059e379d573a8e9eafc1321f4e14ff8123295a960f. Source/tests unchanged since capture. Log/tmp/primeclaw55-r1r2-probe.log; receipts.test-results/20261105T012812Z-5568-bbbb541c/tier1.
+
+RuntimeIIDsha256:5979294c1bc60bb95a4351a873ea13e05eff73afe34a8f098a12a4633d6c465e/CID19c08cbeee22601f6c98712955d55d8287da68a4f5292da9a0a91ad7bcc2aeeb CLEAN/ABSENT01:30:09UTC; builderIIDsha256:b2fce278b362e67e10ebc2fa31366c275c7a017de1214468315babf4e3965a40/CIDc32c8fabeb48e2a1f5c00db2baaece7edf85a944dfaf6ba36090ebc190af0855 CLEAN/ABSENT01:29:14UTC; fresh native exact inspections of BOTH returned1/emptyarray/ordinary no-such-object at01:30:41UTC. Source-build PASS01:29:32UTC, sourcea1faacd/1258hashc159dd4 unchanged, full before/after checkout34038/hashb10e91equal. Existing configured publicCAhashb266ade9/size269769 participated read-only/TLS-on, no contents/path exposure or trust/selector/version change. Accepted diagnostics/CA support unchanged. Previous FAILED manifests/logs/original133753share/snapshot remain historical and preserved; no manual/foreign cleanup.
+
+Actual current first capture window01:27:55–01:47:55UTC was returned01:30:18.228286UTC when completion follow-up arrived before next capture tick. No second actor or standing hold is inferred. Requested separately coordinated current capacity for ONE normal focused three-file -m container -x command PLUS tests/test_project_initialization.py::test_project_initialization_node_suite to exercise changed runner and existing file-backed/failure/privacy coverage. That fixture has NOT started; probe success is not focused R1/R2 test success, whole-slice acceptance or full Task55 completion. All9AC remain unchecked; full original BOTH-provider deeper lifecycle/tool-prose extraction, complete managed-asset audit and bounded recorded45same-operation disposable-fixture recovery remain on THIS task. Same exact Episode/resources; no lifecycle/ownership change, global activation/main merge/dependency/live45/retained redesign/abandonment/destructive action.
 <!-- SECTION:NOTES:END -->
