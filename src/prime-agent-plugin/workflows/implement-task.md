@@ -213,6 +213,88 @@ Episode branch. Grandfathered Backlog uses its task-only status commit as base;
 independent Backlog and Beads keep code and provider revisions separate.
 Never switch or silently substitute the target branch.
 
+## Check prerequisites before fresh allocation
+
+First inspect this Conversation's exact entry in canonical-primary
+`.prime-claw/ownership.json`, using its durable owner session ID as the registry
+key. Do not scan other owners to select work. If this task already has an owned
+operation, keep its original binding and use the existing continuation and
+failure-disposition sections below instead of fresh admission. A missing recorded
+session does not prove that no session or assignment exists. Do not reserve,
+republish In Progress, or allocate again to discover what happened.
+
+For a fresh request, finish the native checks that do not need Episode resources
+BEFORE calling `create_task_episode`, publishing its In Progress admission, or
+reserving ownership. This is editable LLM guidance, not a new preflight tool,
+receipt, code gate, or promise that later external operations cannot fail:
+
+1. **Code and execute assets.** Inspect `git worktree list --porcelain`, the
+   canonical primary root, current branch, exact code HEAD, status and upstream.
+   Use `git rev-parse --show-toplevel`, `git rev-parse --git-dir` and
+   `git rev-parse --git-common-dir`; compare resolved paths rather than relative
+   spellings. Creation must address the intended primary checkout, not a linked
+   Episode checkout. Read `git show HEAD:.agents/skills/execute/SKILL.md` to check
+   the execute instructions the new worktree will actually receive. A readable
+   untracked or working-tree-only asset is not evidence it exists at the code
+   base. Decide suitability from the actual facts; do not turn unrelated work
+   or a non-main branch into a cleanliness/approval gate.
+2. **Provider and selected ticket.** Reread the exact native task and its
+   committed/published history as above. Inspect the native CLI/configuration
+   needed for the intended status update and subsequent execution, including
+   commit identity where a native history commit needs it. For independent
+   Backlog, inspect the selected store's native `config.yml` or `config.yaml`,
+   store/config containment, and effective ignore evidence with
+   `git check-ignore -v -- <store>/probe`. Only when root configuration is the
+   selected authority, inspect `backlog.config.yml` and its relative link into
+   that store; a supported folder-config layout needs no root link. Inspect the
+   chosen code base with
+   `git ls-tree HEAD -- backlog.config.yml .gitignore` and `git show HEAD:<path>`
+   as needed: a root-link or ignore repair only in current working bytes will
+   not transfer to the new worktree. Retain the actual ignore-rule source;
+   do not require one particular ignore file or synchronize another owner's
+   clone. Do not apply independent-store requirements to grandfathered
+   code-DAG Backlog or copy a Beads store into an Episode.
+3. **Provider transport.** For independent Backlog, resolve the current branch's
+   upstream remote (or the sole configured remote), inspect
+   `git remote get-url <remote>`, the intended push target with
+   `git remote get-url --push <remote>`, and
+   `git ls-remote --heads <url> refs/heads/prime-claw/tasks`. If publication or
+   selected-ticket/config readability needs confirmation, use a disposable
+   ordinary clone of that exact task branch; never another writer's mutable
+   primary clone. No remote, an ambiguous target, unavailable credentials, or
+   unreadable published content needs resolution before allocation; local-only
+   initialization does not establish remote-backed Episode support. For Beads,
+   inspect `bd context --json`, `bd dolt show --json`, `bd dolt status --json`,
+   `bd config get sync.remote --json` and `bd dolt remote list --json` on the
+   selected native workspace, with native history/ref observations as needed.
+   Judge pending/staged multi-issue consequences and actual publication facts
+   under the existing Beads guidance, not a blanket clean-store or frozen-head
+   requirement. Never print credentials or infer success from CLI exit alone.
+4. **Placement and runtime.** Read `orca project setups --json` when Orca is
+   selected/available and inspect the exact project path, setup readiness,
+   selected stable host and its native runtime/transport availability. Check
+   the selected environment's Prime Agent command availability without starting
+   an Episode or launch automation. Retain explicit placement; do not silently
+   select another setup, treat inventory/transport failure as an absent CLI, or
+   fall back to local execution. Missing CLI and native inventory failure are
+   different facts. Resolve any material placement decision before creation.
+
+A known prerequisite failure stops here without a branch, worktree, session or
+ownership reservation. Report the failed native command and the exact current
+native task status/history. If a justified selected-task lifecycle correction
+is needed, the owning Conversation publishes it promptly through the native
+exact-task procedure above, preserving unrelated content, staging and owners.
+If that publication fails, inspect and report local versus published status;
+do not claim rollback, retry blindly, or allocate while the cause is unresolved.
+An untouched In Planning task needs no synthetic rollback or status churn.
+
+Only target-specific workspace materialization and checks that require the new
+resource stay after allocation. Preflight cannot prove the future worktree,
+clone, session, Orca launch or initial assignment will succeed. Preserve and
+inspect any late effects through the existing failure/continuation guidance;
+deleting branches or worktrees is not routine recovery and requires separate
+operator authority.
+
 ## Create the Episode
 
 The full ordinary `prime-claw-oversee-episode` guidance is loaded above this
@@ -227,8 +309,9 @@ owner/session and placement facts; never substitute another owner's identity.
 Code preserves the exact requested owner, task, root and resource bindings rather
 than treating runtime depth as a second role-approval rule.
 
-Only when the complete task is ready and operator implementation authority
-applies, call `create_task_episode` exactly once, whether readiness was reached
+Only when the complete task is ready, the native pre-allocation checks above
+are resolved, and operator implementation authority applies, call
+`create_task_episode` exactly once, whether readiness was reached
 through `implement_task` or directly through this guidance. Status alone never
 supplies that authority. Use the exact canonical `taskId` and optional
 stable `host` from `<operator-implementation-host>`. Pass that host unchanged as

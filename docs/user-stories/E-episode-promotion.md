@@ -22,8 +22,19 @@ then implement when ready may authorize that sequence within approved scope;
 planning alone does not authorize implementation. Preparation and compaction
 preserve the operator's instruction, scope, conditional authority, exact task,
 and optional stable host. Material ambiguity or new scope requires clarification.
-Final `create_task_episode(taskId, host?)` independently resolves concrete native
-identity, state, readiness, placement, and ownership; it requires no prior entry
+Before fresh `create_task_episode(taskId, host?)`, the LLM completes supported
+native checks that do not need Episode resources:
+
+- selected-ticket history and publication;
+- chosen code base execute workflow and task-store configuration;
+- selected placement/runtime availability; and
+- provider remote/store configuration and transport available without an
+  allocated worktree.
+
+Known failure creates no reservation or Episode resources and reports actual
+native task status. These checks belong in editable guidance, not a code
+preflight gate or approval protocol. Final create supplies current native
+identity, state, placement and ownership facts; it requires no prior entry
 invocation, approval store, or turn receipt.
 
 The five custom workflow command registrations are removed. Thin global entry
@@ -56,8 +67,9 @@ assignment, not a new admission.
 Episode, so that implementation occurs against one exact durable authority
 outside the canonical checkout.**
 
-The primary `create_task_episode(taskId=..., host=...)` transaction (with optional
-stable `id:<setup-id>` host) publishes the exact task's `In Progress` transition,
+After the pre-allocation native checks in US-13, the primary
+`create_task_episode(taskId=..., host=...)` transaction (with optional stable
+`id:<setup-id>` host) publishes the exact task's `In Progress` transition,
 persists version-2 ownership, and creates one matching Episode only when that
 Conversation has no non-terminal ownership and no other owner holds the same
 task binding. Grandfathered branch-local Backlog uses a task-only code commit;
@@ -66,7 +78,9 @@ reservation before push/allocation. Independent Backlog and Beads publish throug
 their native task histories separately from the selected code base. Public
 admission replay fails closed rather than returning or duplicating an existing Episode; an
 owner inspects or continues that exact Episode through its lifecycle surfaces. A
-fresh task-native Episode receives:
+fresh task-native Episode receives the resources below. Target-worktree task-clone
+materialization, session creation and initial assignment follow allocation; they
+are not moved into the prerequisite checks.
 
 - a feature worktree created from exact code `baseRef`: the task status commit
   for grandfathered Backlog, or the selected code base for independent
@@ -143,12 +157,16 @@ selection creates nothing. An explicit host request never silently falls back.
 **As an operator, I want partially created resources preserved and identified,
 so that retries cannot create duplicate worktrees, sessions, or assignments.**
 
-Primary task-native recovery distinguishes exact mutation boundaries. A proven
-clean failure after the task status commit but before ownership or resource
-mutation commits the exact task back to `In Planning`. Any recorded, partial, or
-uncertain ownership/resource mutation instead publishes `Blocked` with exact
-recovery evidence; public admission replay fails closed and never creates or
-assigns a duplicate Episode.
+A known pre-allocation native prerequisite failure leaves no new reservation or
+Episode resources and reports the actual native task status. A failed native
+`In Progress` publication may still have changed local state or reached history;
+inspect the exact task and native history before reporting its outcome. Failure
+is not proof of rollback to `In Planning`.
+
+Later partial or uncertain ownership/resource mutation retains exact evidence;
+public admission is never replayed as fresh allocation or delivery. Follow the
+existing bounded same-operation continuation guidance; these checks do not
+guarantee that later external operations will succeed.
 
 For retained version-1 compatibility, this Conversation's project-registry ownership entry can be
 `provisioning`, `active`, `uncertain`, or `inactive`. Partial provisioning or

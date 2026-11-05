@@ -89,11 +89,22 @@ malformed/negative inventory fail before messages or mutation.
 The messages carry exact task/provider/root and optional stable host as facts,
 not private approval. Preparation preserves the operator's actual instruction,
 scope and conditional authority through compaction. The complete ordinary
-`prime-claw-oversee-episode` guidance precedes semantic readiness. Self-contained
-`create_task_episode(taskId, host?)` re-resolves current native identity/state,
-meaningful plan, publication, placement, ownership, and resources before mutation.
-It revalidates carried stable placement and never silently substitutes it. There
-is no approval store, consume/expiry guard, or required prior-entry sequence.
+`prime-claw-oversee-episode` guidance precedes semantic readiness. Before fresh
+`create_task_episode(taskId, host?)`, the LLM uses supported native operations to
+check selected-ticket history/publication, the chosen code base's execute and
+task-store configuration, selected placement/runtime availability, and provider
+remote/store configuration and transport that need no allocated worktree. A known
+failure stops before creation with no new reservation or Episode resources and
+reports actual native task status. These are editable workflow decisions, not a
+new code preflight gate or approval protocol. Target-worktree clone materialization,
+session creation and initial assignment remain after allocation.
+
+Self-contained create supplies current native task, placement, ownership and
+resource facts. It revalidates carried stable placement and never silently
+substitutes it. A failed native status publication requires inspection of actual
+task/history state, not an assumed rollback. There is no approval store,
+consume/expiry guard, or required prior-entry sequence. For partial creation,
+follow the existing bounded same-operation continuation guidance below.
 
 ### Retained version-1 compatibility path
 

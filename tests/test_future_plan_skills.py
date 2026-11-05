@@ -698,6 +698,20 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     ):
         assert obsolete not in implement
 
+    # Prerequisite ordering is editable guidance, not a second code gate.
+    assert implement.index("## Check prerequisites before fresh allocation") < implement.index("## Create the Episode")
+    for fragment in (
+        "BEFORE calling `create_task_episode`",
+        "git show HEAD:.agents/skills/execute/SKILL.md",
+        "git ls-remote --heads <url> refs/heads/prime-claw/tasks",
+        "orca project setups --json",
+        "without a branch, worktree, session or ownership reservation",
+        "inspect and report local versus published status",
+        "Only target-specific workspace materialization",
+        "use the existing continuation and failure-disposition sections",
+    ):
+        assert fragment in implement
+
     # Installed prep policy may differ until deliberate candidate activation.
     for name in ("implement-task-prep", "implement-task"):
         source = workflow(name)
@@ -1113,3 +1127,86 @@ def test_documented_backlog_publication_commands_preserve_literal_task_isolation
     if topology == "independent":
         assert run(project, "git", "rev-parse", "HEAD").stdout.strip() == code_head
         assert run(project, "git", "ls-files", "--stage", "-z").stdout == before_code_index
+
+
+def test_documented_creation_preflight_native_failure(tier1_container, ctmp) -> None:
+    """Exercise the documented reads; this is not an automated LLM recovery test."""
+    repo = ctmp / "preflight-code"
+    store = repo / ".backlog"
+    store.mkdir(parents=True)
+    origin = ctmp / "tasks.git"
+    evidence = []
+
+    def native(cwd, *args, check=True):
+        result = tier1_container.run(*args, workdir=str(cwd))
+        evidence.append({"command": list(args), "exit": result.returncode,
+                         "stdout": result.stdout, "stderr": result.stderr})
+        if check:
+            assert result.returncode == 0, result.stdout + result.stderr
+        return result.stdout.strip()
+
+    native(repo, "git", "init", "-q", "-b", "main")
+    native(store, "git", "init", "-q", "-b", "prime-claw/tasks")
+    for cwd in (repo, store):
+        native(cwd, "git", "config", "user.name", "Preflight fixture")
+        native(cwd, "git", "config", "user.email", "preflight@example.test")
+    (store / "config.yml").write_text(
+        'project_name: "preflight"\n'
+        'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\n'
+        'default_status: "In Design"\nauto_commit: false\n'
+        'remote_operations: false\ntask_prefix: "preflight"\n'
+    )
+    native(repo, "backlog", "task", "create", "Preflight fixture", "--status", "In Planning",
+           "--description", "Read published task before allocating", "--plan", "Run native prerequisite reads", "--plain")
+    task = json.loads(native(repo, "backlog", "task", "view", "--json", "--", "PREFLIGHT-1"))["task"]
+    native(store, "git", "add", ".")
+    native(store, "git", "commit", "-q", "-m", "Published fixture task")
+    native(ctmp, "git", "init", "-q", "--bare", str(origin))
+    native(store, "git", "remote", "add", "origin", str(origin))
+    native(store, "git", "push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks")
+    task_head = native(store, "git", "rev-parse", "HEAD")
+    (repo / ".gitignore").write_text(".backlog/\n")
+    owners = repo / ".prime-claw" / "ownership.json"
+    owners.parent.mkdir()
+    owners.write_text('{"schemaVersion":1,"owners":{"other-owner":{"fixture":"unchanged"}}}\n')
+    (repo / "unrelated.txt").write_text("baseline\n")
+    native(repo, "git", "add", ".")
+    native(repo, "git", "commit", "-q", "-m", "Code fixture without committed execute")
+    # A working-tree-only execute file must not hide a missing code-base asset.
+    execute = repo / ".agents" / "skills" / "execute" / "SKILL.md"
+    execute.parent.mkdir(parents=True)
+    execute.write_text("Working-tree-only execute instructions\n")
+    (repo / "unrelated.txt").write_text("staged unrelated work\n")
+    native(repo, "git", "add", "unrelated.txt")
+    (store / "unrelated.txt").write_text("staged unrelated task work\n")
+    native(store, "git", "add", "unrelated.txt")
+    code_head = native(repo, "git", "rev-parse", "HEAD")
+    before_code = native(repo, "git", "status", "--porcelain=v1")
+    before_store = native(store, "git", "status", "--porcelain=v1")
+    before_worktrees = native(repo, "git", "worktree", "list", "--porcelain")
+    before_owners = owners.read_bytes()
+
+    native(store, "git", "remote", "get-url", "origin")
+    assert task_head in native(store, "git", "ls-remote", "--heads", str(origin), "refs/heads/prime-claw/tasks")
+    native(repo, "git", "check-ignore", "-v", "--", ".backlog/probe")
+    native(repo, "git", "show", "HEAD:.agents/skills/execute/SKILL.md", check=False)
+    assert evidence[-1]["exit"] != 0
+    # The Conversation stops here. No creation, status mutation or reservation is requested.
+    assert json.loads(native(repo, "backlog", "task", "view", "--json", "--", "PREFLIGHT-1"))["task"] == task
+    assert task["status"] == "In Planning"
+    assert native(repo, "git", "rev-parse", "HEAD") == code_head
+    assert native(store, "git", "rev-parse", "HEAD") == task_head
+    assert native(repo, "git", "status", "--porcelain=v1") == before_code
+    assert native(store, "git", "status", "--porcelain=v1") == before_store
+    assert native(repo, "git", "worktree", "list", "--porcelain") == before_worktrees
+    assert native(repo, "git", "branch", "--format=%(refname:short)") == "main"
+    assert owners.read_bytes() == before_owners
+    (tier1_container.share.parent / "preflight-native-read-exercise.json").write_text(
+        json.dumps({"scope": "native command exercise, not LLM compliance proof",
+                    "taskStatus": task["status"], "allocationRequested": False,
+                    "commands": [
+                        {"command": [arg.replace(str(ctmp), "<fixture>") for arg in row["command"]],
+                         "exit": row["exit"]}
+                        for row in evidence
+                    ]}, indent=2) + "\n"
+    )
