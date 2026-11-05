@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-57
 title: Use durable Episode identity instead of ephemeral runtime routing IDs
-status: Blocked
+status: In Progress
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-04 16:37'
+updated_date: '2026-11-05 00:14'
 labels: []
 dependencies: []
 references:
@@ -131,6 +131,14 @@ Owner review accepted routing code 36de6686eba6711af4a6fef97b7e677907bec663: bot
 Blocked on required isolated tier1 installation/load/probe: the fresh normal driver failed in its native source builder before plugin installation. The sanitized fresh receipt does not establish command-level cause; source checkout and selected runtime remain unchanged.
 Separate bounded HTTPS diagnostic in the exact immutable builder image showed default trust fails SELF_SIGNED_CERT_IN_CHAIN, while supplying the already-configured public CA bundle with TLS verification enabled returns HTTP200. Evidence: .test-results/primeclaw57-trust-check-20261104T163522Z/summary.json and default.log/provided-ca.log. Both exact diagnostic containers are verified absent; temporary CA copy removed. This proves the trust-input gap for that HTTPS request, not a successful npm install, source build or probe.
 Unblock condition: an explicitly approved isolated native build/trust environment completes the existing required tier1 probe, without disabling TLS or patching Prime Agent/dependencies. No test-harness CA-forwarding change has been implemented. Keep this same Episode, code/resources and existing task specification/plan/evidence. No merge, activation, replacement or live retained TASK-2 action.
+---
+
+author: Prime Claw owning Conversation 01a1a6e7-da13-750e-ae8b-f6a6888c3b42
+created: 2026-11-05 00:14
+---
+Owner clearance: the accepted shared test-harness fix we were waiting for is available. PRIMECLAW-55 accepted isolated diagnostics commit 33f18edc94df898542103ee072512a0955306e5a and public-CA support commit c9636c3499b23894b44b26aafe0f3d4bb5e7b7b7. Its source build and runtime setup passed with read-only public CA input and TLS verification enabled. Its remaining provider-test failure was independently classified as a test typo, not a CA-support defect.
+Resume PRIMECLAW-57 under Joe's original "fix it" / "do what you need to do" request after waiting for 55 as directed. This is use of accepted shared support, not a second CA implementation or borrowed 55 authority/attempt. Integrate only those two isolated support commits in the same Episode; exclude 55 N3/product and test-typo changes. Preserve reviewed routing code 36de6686eba6711af4a6fef97b7e677907bec663, current task specification/plan/AC and all owned resources.
+One bounded own validation pass may run the existing required tier1 probe with current configured public CA input, unchanged source selector and native isolation/capture safeguards. The 57 probe is still pending, not claimed passed by 55's evidence. No TLS bypass, Prime Agent/dependency patch, merge, activation/restart, replacement Episode or retained TASK-2 resource action. Report exact evidence and remaining defects; no per-test typo approval gate or speculative scope expansion.
 ---
 <!-- COMMENTS:END -->
 
