@@ -353,6 +353,267 @@ finally:
     assert proof["terminalConnected"] and proof["terminalWritable"] and proof["actualPtyNonceObserved"]
     (tier1_container.share.parent / "creation-native-orca-readiness.json").write_text(json.dumps(proof, indent=2) + "\n")
 
+def test_native_same_operation_creation_recovery_and_session_binding(tier1_container) -> None:
+    """Full-path native mechanics with explicit fixture-owner decisions, not LLM compliance."""
+    script = r"""import json,os,pathlib,selectors,shlex,shutil,subprocess,time
+base=pathlib.Path('/home/orca-fixture/native-recovery');base.mkdir()
+profile=base/'profile'
+env=dict(os.environ,HOME=str(base),XDG_CONFIG_HOME=str(base/'config'),XDG_DATA_HOME=str(base/'data'),
+ XDG_CACHE_HOME=str(base/'cache'),ORCA_USER_DATA_PATH=str(profile),ORCA_USER_DATA=str(profile),ORCA_SERVE_RUNTIME='orcad')
+cli='/usr/local/bin/orca-ide';real_prime=shutil.which('prime-agent');assert real_prime
+probe=base/'recovery.ts';probe.write_text(r'''import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync,renameSync,rmdirSync,openSync,closeSync,fchmodSync,statSync,existsSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {randomUUID} from 'node:crypto';
+import {CliOrcaAdapter,DaemonJsonlClient,PrimeSessionPublisher,allocateReservedTaskEpisode,runtimeSessionManagerClass}
+from '/workspace/src/prime-agent-plugin/extension-support/spec-episode.ts';
+import {prepareEpisodeTaskHistoryWorkspace} from '/workspace/src/prime-agent-plugin/extension-support/task-history-workspace.ts';
+import {createAssistantMessageEventStream} from '@earendil-works/pi-ai';
+const base="/home/orca-fixture/native-recovery",config=JSON.parse(readFileSync(base+'/fixture.json','utf8'));
+const repo=config.repo,wt=config.worktree;
+const run=(cmd,args,cwd=repo)=>execFileSync(cmd,args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+const git=(cwd,...args)=>run('git',args,cwd);
+export default function fixture(pi){
+pi.registerProvider('native-recovery',{baseUrl:'offline',apiKey:'fixture',api:'native-recovery',streamSimple(model){
+ const stream=createAssistantMessageEventStream();queueMicrotask(()=>{
+ const m={role:'assistant',content:[{type:'text',text:'fixture acknowledged'}],api:model.api,provider:model.provider,model:model.id,
+ usage:{input:1,output:1,cacheRead:0,cacheWrite:0,totalTokens:2,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:'stop',timestamp:Date.now()};
+ stream.push({type:'start',partial:m});stream.push({type:'done',reason:'stop',message:m});stream.end();});return stream;},
+ models:[{id:'m',name:'Fixture',reasoning:false,input:['text'],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:100000,maxTokens:1000}]});
+pi.on('session_start',async(_event,ctx)=>{
+ ctx.sessionManager.flushNow();
+ if(process.cwd()!==repo){writeFileSync(base+'/launched.json',JSON.stringify({sessionId:ctx.sessionManager.getSessionId(),sessionFile:ctx.sessionManager.getSessionFile(),cwd:process.cwd()}));return;}
+ let publisher,client;
+ try{
+  writeFileSync(base+'/controller-socket',process.env.PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET);
+  client=new DaemonJsonlClient(process.env.PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_SOCKET);
+  const daemonCommands=[],request=client.request.bind(client);
+  client.request=async(...args)=>{daemonCommands.push(args[0].type);return request(...args);};
+  publisher=new PrimeSessionPublisher(client,runtimeSessionManagerClass(ctx.sessionManager));
+  const commands=[];
+  const orca=new CliOrcaAdapter(args=>{commands.push(args.slice(0,2));return run('/usr/local/bin/orca-ide',args);});
+  const native=(...args)=>JSON.parse(run('/usr/local/bin/orca-ide',[...args,'--json']));
+  const owner=ctx.sessionManager.getSessionId(),operation=randomUUID(),owners=repo+'/.prime-claw/ownership.json';
+  const nativeTask=JSON.parse(run('backlog',['task','view','--json','--','RECOVERY-1']));
+  const initial={version:2,provider:'backlog',status:'uncertain',engine:'orca',ownerSessionId:owner,operationId:operation,
+   taskId:'RECOVERY-1',taskPath:nativeTask.task.path,providerRevision:config.taskHead,taskEvidence:nativeTask,
+   baseRef:config.baseHead,head:config.baseHead,integrationBranch:'main',projectSetupId:config.setupId,
+   worktreeId:wt.id,worktreeIdentity:wt.identity.key,worktreeName:'native-recovery',worktree:wt.path,branch:wt.branch.replace(/^refs\/heads\//,''),
+   createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),uncertaintyReason:'fixture late task clone failure'};
+  const foreign={...initial,ownerSessionId:'foreign-owner',operationId:randomUUID(),taskId:'RECOVERY-2',
+   taskPath:config.otherTask.task.path,taskEvidence:config.otherTask};
+  for(const key of ['head','worktree','branch','worktreeId','worktreeIdentity','worktreeName'])delete foreign[key];
+  mkdirSync(repo+'/.prime-claw',{recursive:true});writeFileSync(owners,JSON.stringify({schemaVersion:1,owners:{[owner]:initial,'foreign-owner':foreign}}));
+  const selected=()=>JSON.parse(readFileSync(owners,'utf8')).owners[owner];
+  const originalBindings=Object.fromEntries(['ownerSessionId','operationId','taskId','taskPath','provider','baseRef','integrationBranch','engine',
+   'projectSetupId','worktreeId','worktreeIdentity','worktreeName','worktree','branch','head'].map(k=>[k,initial[k]]));
+  const worktrees=git(repo,'worktree','list','--porcelain'),taskHead=config.taskHead;
+  const unrelated=()=>[repo,repo+'/.backlog',wt.path].map(cwd=>({
+   bytes:readFileSync(cwd+'/unrelated.txt','utf8'),staged:git(cwd,'diff','--cached','--binary','--','unrelated.txt')}));
+  const unrelatedBefore=unrelated();
+  assert.equal((await publisher.list()).filter(s=>s.cwd===wt.path).length,0);
+  assert.equal((await orca.listTerminals(wt.id)).length,0);
+  assert.equal(native('automations','list').ok,true);
+  assert.equal(existsSync(wt.path+'/.backlog'),false);
+  // Deliberate native transport failure AFTER the one real worktree allocation.
+  const failed=prepareEpisodeTaskHistoryWorkspace({primaryRoot:repo,targetWorktree:wt.path});
+  assert.equal(failed.status,'blocked');assert.equal(failed.code,'remote-unavailable');
+  assert.deepEqual(selected(),initial);
+  assert.equal((await publisher.list()).filter(s=>s.cwd===wt.path).length,0);
+  assert.equal((await orca.listTerminals(wt.id)).length,0);
+  // Cleared only this disposable fixture's observed cause; no provider status write.
+  renameSync(config.offlineOrigin,config.origin);
+  assert.equal(git(repo+'/.backlog','ls-remote','origin','refs/heads/prime-claw/tasks').split(/\s/)[0],taskHead);
+  // The owner LLM chooses this single patch. This inline edit is not a recovery engine.
+  // Compare selected entry under the existing lock; preserve a newer foreign raw value.
+  const advance=JSON.parse(readFileSync(owners,'utf8'));advance.owners['foreign-owner'].uncertaintyReason='latest foreign observation, retain me';
+  writeFileSync(owners,JSON.stringify(advance));const foreignBefore=advance.owners['foreign-owner'];
+  const lock=owners+'.lock';mkdirSync(lock);
+  try{
+   const latest=JSON.parse(readFileSync(owners,'utf8'));assert.deepEqual(latest.owners[owner],initial);
+   const next={...initial,status:'provisioning'};delete next.uncertaintyReason;latest.owners[owner]=next;
+   const temp=owners+'.'+randomUUID(),fd=openSync(temp,'wx',statSync(owners).mode & 0o777);
+   try{fchmodSync(fd,statSync(owners).mode & 0o777);writeFileSync(fd,JSON.stringify(latest));}finally{closeSync(fd);}
+   renameSync(temp,owners);assert.deepEqual(JSON.parse(readFileSync(owners,'utf8')),latest);
+  }finally{rmdirSync(lock);}
+  // Existing allocator, real Orca and real publisher: no admission/status/reservation mocks.
+  const deps={orca,publisher,bindingAttempts:80};
+  const result=await allocateReservedTaskEpisode('RECOVERY-1',ctx,deps,undefined,{operationId:operation});
+  assert.equal(result.status,'active');assert.equal(result.reused,false);
+  assert.deepEqual(Object.fromEntries(Object.keys(originalBindings).map(k=>[k,result[k]])),originalBindings);
+  const idle=await client.request({type:'wait_for_idle',activeSessionId:result.episodeActiveSessionId},30000);
+  assert.equal(idle.success,true);
+  const session=(await publisher.list()).filter(s=>s.cwd===wt.path);assert.equal(session.length,1);
+  assert.equal(session[0].sessionId,result.episodeId);
+  const state=await publisher.getState(result.episodeActiveSessionId);
+  const messages=await publisher.getMessages(result.episodeActiveSessionId);
+  const assignments=rows=>rows.filter(m=>m.role==='user'&&JSON.stringify(m.content).includes('Native fixture initial execute assignment.'));
+  assert.equal(assignments(messages).length,1);assert.equal(messages.filter(m=>m.role==='user').length,1);
+  assert.equal(state.cwd,wt.path);assert.equal(state.sessionId,result.episodeId);
+  const launch=JSON.parse(readFileSync(base+'/launched.json','utf8'));
+  assert.equal(launch.sessionId,result.episodeId);assert.equal(launch.cwd,wt.path);
+  const saved=readFileSync(result.episodeSessionFile,'utf8').trim().split('\n').map(l=>JSON.parse(l));
+  assert.equal(saved[0].id,result.episodeId);assert.equal(saved[0].cwd,wt.path);
+  assert.equal(saved.filter(r=>r.message?.role==='user').length,1);
+  const terminals=await orca.listTerminals(wt.id);
+  const tab=terminals.find(t=>t.handle===result.terminalHandle);
+  assert.ok(tab.connected&&tab.writable&&tab.visible&&tab.agentIdentity==='prime-agent'&&tab.tabId&&tab.leafId);
+  assert.equal(tab.worktreePath,wt.path);
+  assert.ok((await orca.readTerminalScreen(tab.handle)).text.includes('← manage'));
+  assert.equal(existsSync(wt.path+'/.backlog/.git'),true);
+  assert.equal(git(wt.path+'/.backlog','rev-parse','HEAD'),taskHead);
+  assert.deepEqual(JSON.parse(run('backlog',['task','view','--json','--','RECOVERY-1'],wt.path)),nativeTask);
+  const firstCommands=commands.slice();
+  assert.equal(firstCommands.filter(a=>a.join(' ')==='automations run').length,1);
+  assert.equal(firstCommands.some(a=>a.join(' ')==='worktree create'),false);
+  // Representative late owner-acknowledgement uncertainty: KEEP all known bindings.
+  // Complete native messages establish the assignment; the chosen bind sends nothing.
+  const established=selected();const late={...established,status:'uncertain',uncertaintyReason:'fixture owner acknowledgement interrupted after assignment'};
+  const lock2=owners+'.lock';mkdirSync(lock2);
+  try{const latest=JSON.parse(readFileSync(owners,'utf8'));assert.deepEqual(latest.owners[owner],established);
+   latest.owners[owner]=late;const temp=owners+'.'+randomUUID();writeFileSync(temp,JSON.stringify(latest),{flag:'wx',mode:statSync(owners).mode & 0o777});renameSync(temp,owners);
+   assert.deepEqual(selected(),late);
+  }finally{rmdirSync(lock2);}
+  const countBeforeBind=commands.length,daemonBeforeBind=daemonCommands.length;
+  const bound=await allocateReservedTaskEpisode('RECOVERY-1',ctx,deps,undefined,{operationId:operation,sessionId:result.episodeId});
+  assert.equal(bound.reused,true);assert.equal(bound.episodeId,result.episodeId);
+  assert.equal(bound.episodeActiveSessionId,result.episodeActiveSessionId);assert.equal(bound.episodeSessionFile,result.episodeSessionFile);
+  assert.equal(assignments(bound.sessionObservation.messages).length,1);
+  const replay=await allocateReservedTaskEpisode('RECOVERY-1',ctx,deps,undefined,{operationId:operation});
+  assert.equal(replay.reused,true);assert.equal(replay.episodeId,result.episodeId);
+  assert.equal(commands.slice(countBeforeBind).some(a=>['create','run','remove'].includes(a[1])),false);
+  assert.equal((await publisher.list()).filter(s=>s.cwd===wt.path).length,1);
+  const messagesAfterReuse=await publisher.getMessages(result.episodeActiveSessionId);
+  assert.equal(assignments(messagesAfterReuse).length,1);
+  assert.equal(messagesAfterReuse.filter(m=>m.role==='user').length,1);
+  assert.equal(daemonCommands.slice(daemonBeforeBind).some(type=>['create','prompt'].includes(type)),false);
+  assert.equal(git(repo,'worktree','list','--porcelain'),worktrees);
+  assert.equal(git(repo,'rev-parse','HEAD'),config.baseHead);
+  assert.equal(git(repo+'/.backlog','rev-parse','HEAD'),taskHead);
+  assert.equal(git(repo+'/.backlog','ls-remote','origin','refs/heads/prime-claw/tasks').split(/\s/)[0],taskHead);
+  assert.deepEqual(unrelated(),unrelatedBefore);
+  assert.deepEqual(JSON.parse(readFileSync(owners,'utf8')).owners['foreign-owner'],foreignBefore);
+  assert.deepEqual(JSON.parse(run('backlog',['task','view','--json','--','RECOVERY-2'])),config.otherTask);
+  assert.deepEqual(Object.fromEntries(Object.keys(originalBindings).map(k=>[k,selected()[k]])),originalBindings);
+  const proof={scope:'scripted application of reviewed Markdown decisions through real same-operation native interfaces',
+   realOrca:true,realDaemon:true,originalBindingsPreserved:true,otherOwnerAndUnrelatedStagingPreserved:true,
+   nativeLateFailure:failed.code,missingTargetClonePrepared:true,worktreeAllocations:1,sessionAllocations:1,
+   initialAssignments:1,initialAutomationRuns:1,existingSessionBinding:true,activeReplay:true,extraDeliveryOnReuse:false,
+   zeroStatusPublication:true,exactVisibleConnectedWritableTab:true,durableSavedAssignmentCount:1,
+   notProven:['canonical execute workflow','LLM policy compliance','lost-assignment ambiguity stop','activation']};
+  native('terminal','close','--terminal',tab.handle);
+  writeFileSync(base+'/result.json',JSON.stringify(proof));
+ }catch(error){writeFileSync(base+'/result.json',JSON.stringify({error:String(error),stack:error?.stack}));}
+ finally{publisher?.close();}
+});}
+''')
+bin_dir=base/'bin';bin_dir.mkdir()
+wrapped=bin_dir/'prime-agent'
+wrapped.write_text('#!/bin/sh\nprintf used >> '+shlex.quote(str(base/'wrapper-used'))+'\nexec /workspace/scripts/run-prime-agent-probe.sh '+shlex.quote(real_prime)+
+ ' --daemon-socket "$(cat '+shlex.quote(str(base/'controller-socket'))+')" --offline --no-tools --no-skills --no-prompt-templates --no-context-files --no-extensions -e '+shlex.quote(str(probe))+' --provider native-recovery --model m "$@"\n')
+wrapped.chmod(0o755);env['PATH']=str(bin_dir)+':'+env['PATH']
+for login_file in ['.bashrc','.bash_profile','.profile']:(base/login_file).write_text('export PATH='+shlex.quote(str(bin_dir))+':$PATH\n')
+commands=[]
+def native(*args):
+    result=subprocess.run([cli,*args,'--json'],env=env,cwd=base,text=True,capture_output=True,timeout=45)
+    commands.append({'command':list(args[:2]),'exitCode':result.returncode})
+    if result.returncode:
+        raise RuntimeError('native '+str(args[:2])+' failed: '+result.stderr[-1800:]+result.stdout[-1800:])
+    envelope=json.loads(result.stdout)
+    # Pure documentation commands return their JSON directly, unlike RPC envelopes.
+    if args==('skills','get','orca-cli'):
+        return envelope
+    if envelope.get('ok') is not True:
+        raise RuntimeError('native '+str(args[:2])+' refused: '+str(envelope.get('error')))
+    return envelope['result']
+# Load the selected distribution's own guide before runtime operations.
+guide=native('skills','get','orca-cli')
+assert guide
+server=subprocess.Popen([cli,'serve','--json','--no-pairing','--port','6768'],env=env,cwd=base,
+                        text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
+output=[]; errors=[]; ready=None
+try:
+    selector=selectors.DefaultSelector()
+    selector.register(server.stdout,selectors.EVENT_READ,'out')
+    selector.register(server.stderr,selectors.EVENT_READ,'err')
+    deadline=time.monotonic()+60
+    while ready is None and time.monotonic()<deadline:
+        for key,_ in selector.select(max(0,deadline-time.monotonic())):
+            line=key.fileobj.readline()
+            if not line:
+                selector.unregister(key.fileobj)
+                continue
+            (output if key.data=='out' else errors).append(line)
+            try: payload=json.loads(line)
+            except json.JSONDecodeError: continue
+            if payload.get('type')=='orca_server_ready': ready=payload
+        if server.poll() is not None:
+            raise RuntimeError('native server exited before ready: '+''.join(errors)[-3000:])
+    selector.close()
+    assert ready is not None, 'native server did not report ready: '+''.join(errors)[-3000:]
+    stderr=''.join(errors)
+    assert '[serve] running on orcad ' in stderr, stderr
+    assert '[serve] using Electron serve:' not in stderr, stderr
+    status=native('status')
+    def command(cwd,*args):
+        r=subprocess.run(args,cwd=cwd,env=env,text=True,capture_output=True,timeout=40)
+        assert r.returncode==0,r.stdout+r.stderr
+        return r.stdout.strip()
+    repo=base/'repo';repo.mkdir();store=repo/'.backlog';store.mkdir();origin=base/'origin.git';offline_origin=base/'offline-origin.git'
+    command(repo,'git','init','-q','-b','main');command(store,'git','init','-q','-b','prime-claw/tasks')
+    for cwd in [repo,store]:
+        command(cwd,'git','config','user.name','Fixture');command(cwd,'git','config','user.email','fixture@example.test')
+        (cwd/'unrelated.txt').write_text('baseline\n')
+    (store/'config.yml').write_text('project_name: "recovery"\nstatuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\ndefault_status: "In Design"\nauto_commit: false\nremote_operations: false\ntask_prefix: "recovery"\n')
+    for title in ['Recovery fixture','Other fixture owner']:
+        command(repo,'backlog','task','create',title,'--status','In Progress','--description','Disposable native exercise only','--plan','Inspect native evidence and finish the same operation','--plain')
+    other=json.loads(command(repo,'backlog','task','view','--json','--','RECOVERY-2'))
+    command(store,'git','add','.');command(store,'git','commit','-qm','Task baseline')
+    command(base,'git','init','-q','--bare',str(origin));command(store,'git','remote','add','origin',str(origin))
+    command(store,'git','push','-q','origin','HEAD:refs/heads/prime-claw/tasks');task_head=command(store,'git','rev-parse','HEAD')
+    (repo/'.gitignore').write_text('.backlog/\n.prime/\n.prime-claw/ownership.json\n')
+    execute=repo/'.agents/skills/execute/SKILL.md';execute.parent.mkdir(parents=True)
+    execute.write_text('---\nname: execute\ndescription: Harmless isolated recovery fixture\n---\nNative fixture initial execute assignment. No tools or external actions. Reply fixture acknowledged.\n')
+    command(repo,'git','add','.');command(repo,'git','commit','-qm','Code baseline')
+    command(repo,'git','remote','add','origin',str(origin));command(repo,'git','push','-qu','origin','main');head=command(repo,'git','rev-parse','HEAD')
+    native('repo','add','--path',str(repo));setups=native('project','setups')['setups']
+    matching=[s for s in setups if s.get('path')==str(repo) and s.get('setupState')=='ready'];assert len(matching)==1
+    created=native('worktree','create','--project-host-setup',matching[0]['id'],'--name','native-recovery','--no-parent','--setup','skip','--base-branch',head)['worktree']
+    settings=pathlib.Path(created['path'])/'.prime/agent/settings.json';settings.parent.mkdir(parents=True)
+    settings.write_text(json.dumps({'onboardingShown':True,'agentTraces':{'enabled':False},'telemetry':{'enabled':False}}))
+    for cwd in [repo,store,pathlib.Path(created['path'])]:
+        (cwd/'unrelated.txt').write_text('preserve staged unrelated bytes\n');command(cwd,'git','add','unrelated.txt')
+    (base/'fixture.json').write_text(json.dumps({'repo':str(repo),'origin':str(origin),'offlineOrigin':str(offline_origin),'worktree':created,'setupId':matching[0]['id'],'taskHead':task_head,'baseHead':head,'otherTask':other}))
+    origin.rename(offline_origin)
+    result=subprocess.run(['/workspace/scripts/run-prime-agent-probe.sh',real_prime,'--mode','rpc','--offline',
+     '--no-tools','--no-skills','--no-prompt-templates','--no-context-files','--no-extensions','--cwd',str(repo),'-e',str(probe),
+     '--provider','native-recovery','--model','m'],env=env,cwd=repo,text=True,capture_output=True,
+     input=json.dumps({'id':'commands','type':'get_commands'})+'\n',timeout=180)
+    assert result.returncode==0,result.stdout[-4000:]+result.stderr[-4000:]
+    assert (base/'result.json').is_file(),result.stdout[-4000:]+result.stderr[-4000:]
+    proof=json.loads((base/'result.json').read_text());assert 'error' not in proof,proof
+    assert (base/'wrapper-used').read_text()=='used'
+    print(json.dumps(proof),flush=True)
+finally:
+    if server.poll() is None:
+        server.terminate()
+        try:server.wait(timeout=15)
+        except subprocess.TimeoutExpired:server.kill();server.wait(timeout=5)
+"""
+    result = tier1_container.run(
+        "runuser", "--user", "orca-fixture", "--", "python3", "-c", script,
+        timeout=240, workdir=None,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    proof = json.loads(result.stdout.strip().splitlines()[-1])
+    assert proof["realOrca"] and proof["realDaemon"]
+    assert proof["originalBindingsPreserved"] and proof["otherOwnerAndUnrelatedStagingPreserved"]
+    assert proof["worktreeAllocations"] == proof["sessionAllocations"] == proof["initialAssignments"] == 1
+    assert proof["existingSessionBinding"] and proof["activeReplay"] and not proof["extraDeliveryOnReuse"]
+    assert proof["zeroStatusPublication"] and proof["exactVisibleConnectedWritableTab"]
+    (tier1_container.share.parent / "creation-native-same-operation-recovery.json").write_text(json.dumps(proof, indent=2) + "\n")
+
+
 def test_episode_creation_uses_fresh_host_session_without_runtime_package_import() -> None:
     source = EPISODE_EXTENSION.read_text()
     assert 'import("@earendil-works/pi-coding-agent")' not in source
@@ -422,7 +683,8 @@ def test_task_finalization_surface_is_cleanup_only() -> None:
 
 
 def test_repository_status_cutover_uses_task_native_order_without_to_do() -> None:
-    config = yaml.safe_load((REPO / "backlog/config.yml").read_text())
+    # This repository's selected native root config links into its independent store.
+    config = yaml.safe_load((REPO / "backlog.config.yml").read_text())
     assert config["default_status"] == "In Design"
     assert config["statuses"] == [
         "In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done",
@@ -520,7 +782,7 @@ def test_activation_truth_docs_are_task_native_first_with_explicit_folder_compat
             "implement_task",
             "create_task_episode",
             "public admission replay fails closed",
-            "proven clean failure",
+            "owner-led creation recovery",
             "blocked",
             "retained version-1 compatibility",
         ),
@@ -552,10 +814,11 @@ def test_traceability_covers_both_episode_schemas_at_creation_recovery_and_finis
     assert "different conversations can reserve and create independent episodes concurrently" in rows["US-14"]
     assert "retained version-1 compatibility promotes and commits the exact approved bundle, and `create_spec_episode` may return" in rows["US-14"]
 
-    assert "primary task-native recovery returns the exact task to `in planning` after a proven clean failure before ownership/resource mutation" in rows["US-16"]
-    assert "publishes `blocked` with exact recovery evidence after any recorded, partial, or uncertain ownership/resource mutation" in rows["US-16"]
+    assert "known native prerequisite failure before fresh creation leaves no reservation/resources" in rows["US-16"]
+    assert "the owning conversation inspects facts and decides any lifecycle correction" in rows["US-16"]
+    assert "instead of code choosing an automatic rollback or blocked state" in rows["US-16"]
     assert "retained version-1 compatibility preserves partial provisioning/allocation as exact `uncertain` ownership" in rows["US-16"]
-    assert "public admission replay fails closed" in rows["US-16"]
+    assert "public admission is not replayed as fresh allocation or delivery" in rows["US-16"]
 
     assert "finalize_task_episode" in rows["US-24"]
     assert "without separate cleanup confirmation" in rows["US-24"]
