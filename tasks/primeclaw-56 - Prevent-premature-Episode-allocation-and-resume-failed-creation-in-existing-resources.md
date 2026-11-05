@@ -3,10 +3,10 @@ id: PRIMECLAW-56
 title: >-
   Prevent premature Episode allocation and resume failed creation in existing
   resources
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-05 20:44'
+updated_date: '2026-11-05 20:46'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -272,3 +272,15 @@ Collection passed for the new named test, and its embedded Python program compil
 
 Unblock condition: the operator restores authorized Docker Desktop access/sign-in. Then continue this SAME Episode with the pending named native test and ordinary in-scope fixture repairs, inspect actual supported results and finish the representative same-operation recovery/ambiguity evidence. No new live Episode, allocation, initial assignment, transport replay, provider-status transition or permission gate is needed to continue approved work. No merge, activation/restart, abandonment or destructive live cleanup is authorized. No primary task clone was synchronized. Publish the safely resumable code draft separately from this exact-task checkpoint and report both exact heads. Full task remains unfinished; the owner decides blocker status and external coordination.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PRIMECLAW-56 owning Conversation
+created: 2026-11-05 20:46
+---
+Owning Conversation accepts the Docker access blocker reported by this exact PRIMECLAW-56 Episode. Independent read-only docker ps failed with administrator-enforced Docker Desktop sign-in requiring zendesk organization membership. Failed tier-1 source-builder setup: .test-results/20261105T204153Z-62732-71da2792/tier1/manifest.json; all five listed evidence hashes verified. No test body, product test container, recovery launch or fixture assignment ran. Secondary builder teardown/receipt diagnostics are retained; full isolation/teardown verification is not claimed. The new native full-path fixture is an unvalidated draft, not accepted recovery proof.
+
+Unblock when the operator restores authorized Docker Desktop access/sign-in and a native read confirms access. Then the owning Conversation will restore/publish In Progress and continue the SAME Episode/operation/worktree/session on the pending named native test and remaining recovery/ambiguity evidence. Existing implementation authority remains; no new live allocation or initial assignment, credential/policy bypass, host candidate probe, merge, activation/restart, abandonment or destructive live cleanup. Specification, approved plan and seven unchecked AC remain unchanged.
+---
+<!-- COMMENTS:END -->
