@@ -32,6 +32,14 @@ import {
   transitionLegacyEpisodeOwnershipToTask,
 } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
 
+import {
+  prepareTaskHistoryWorkspace,
+  prepareEpisodeTaskHistoryWorkspace,
+  inspectEpisodeTaskHistoryStore,
+  resolveSynchronizedProviderTask,
+} from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
+import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
+
 function git(root, ...args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
 }
@@ -451,6 +459,141 @@ test("guarded transition records published independent Backlog authority without
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.record, result.record);
 });
+
+function independentTransitionFixture() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-")));
+  const remote = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-remote-")));
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  git(root, "config", "user.name", "Prime Claw Test");
+  git(root, "config", "user.email", "prime-claw@example.invalid");
+  writeFileSync(join(root, "code.txt"), "retained code basis\n");
+  git(root, "add", "code.txt");
+  git(root, "commit", "-qm", "original retained code");
+  git(root, "remote", "add", "origin", remote);
+  git(root, "push", "-qu", "origin", "main");
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root });
+  assert.equal(prepared.status, "prepared");
+  git(root, "add", ".gitignore");
+  git(root, "commit", "-qm", "retain task-store ignore");
+  const baseRef = git(root, "rev-parse", "HEAD");
+  const taskId = "TASK-BRIDGE";
+  const sourceLocation = ".ralph/plans/future/bridge";
+  const sourceReference = `legacy-episode-source=${sourceLocation}; superseded-by=${taskId}`;
+  const taskFile = "tasks/task-bridge - Bridge.md";
+  mkdirSync(join(prepared.storeDir, "tasks"), { recursive: true });
+  writeFileSync(join(prepared.storeDir, taskFile), [
+    "---", `id: ${taskId}`, "title: Bridge retained authority", "status: In Progress", "assignee: []",
+    "created_date: '2026-10-27 00:00'", "updated_date: '2026-10-27 00:00'", "labels: []", "dependencies: []",
+    "references:", `  - '${sourceReference}'`, "priority: p2", "type: task", "---", "",
+    "## Description", "", "Preserve the reviewed retained specification.", "",
+    "## Implementation Plan", "", "Complete bridge candidate plan", "",
+  ].join("\n"));
+  git(prepared.storeDir, "add", "--", taskFile);
+  git(prepared.storeDir, "-c", "user.name=Prime Claw Test", "-c", "user.email=prime-claw@example.invalid", "commit", "-qm", "publish retained task");
+  git(prepared.storeDir, "push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks");
+  const providerRevision = git(prepared.storeDir, "rev-parse", "HEAD");
+  const episodeRoot = join(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-episode-")), "episode");
+  git(root, "worktree", "add", "-qb", "episode-transition", episodeRoot);
+  const episode = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: episodeRoot });
+  assert.equal(episode.status, "prepared");
+  mkdirSync(join(episodeRoot, ".ralph", "plans"), { recursive: true });
+  writeFileSync(join(episodeRoot, ".ralph", "plans", "SPECIFICATION.md"), "Preserve the reviewed retained specification.\n");
+  writeFileSync(join(episodeRoot, ".ralph", "plans", "EXECUTION_PLAN.md"), "Complete bridge candidate plan\n");
+  git(episodeRoot, "add", ".ralph/plans/SPECIFICATION.md", ".ralph/plans/EXECUTION_PLAN.md");
+  git(episodeRoot, "commit", "-qm", "reviewed retained bridge candidate");
+  const episodeHead = git(episodeRoot, "rev-parse", "HEAD");
+  git(episodeRoot, "push", "-qu", "origin", "episode-transition");
+  git(root, "merge", "-q", "--no-ff", "episode-transition", "-m", "merge retained bridge candidate");
+  const mainHead = git(root, "rev-parse", "HEAD");
+  git(root, "push", "-q", "origin", "main");
+  const transcript = join(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-session-")), "episode.jsonl");
+  writeFileSync(transcript, '{"session":"episode"}\n');
+  const legacy = {
+    version: 1, status: "active", operationId: "operation-transition", engine: "local", ownerSessionId: "owner-session",
+    sourceLocation, slug: "bridge", bundleDigest: "a".repeat(64), baseRef, head: baseRef,
+    createdAt: "2026-10-13T08:00:00.000Z", updatedAt: "2026-10-14T08:00:00.000Z",
+    worktreeName: "episode-transition", worktree: realpathSync(episodeRoot), branch: "episode-transition",
+    episodeId: "episode-id", episodeSessionFile: transcript, episodeActiveSessionId: "active-session-id",
+  };
+  writeEpisodeOwnership(root, legacy);
+  const selection = resolveSynchronizedProviderTask(root, taskId);
+  assert.equal(selection.provider, "backlog");
+  return { root, remote, episodeRoot: realpathSync(episodeRoot), baseRef, episodeHead, mainHead, transcript,
+    legacy, selection, providerRevision, primaryStore: prepared.storeDir, episodeStore: episode.storeDir };
+}
+
+function retainedTransitionResources(f) {
+  return {
+    owner: readFileSync(join(f.root, ".prime-claw", "ownership.json"), "utf8"),
+    transcript: readFileSync(f.transcript, "utf8"),
+    specification: readFileSync(join(f.episodeRoot, ".ralph/plans/SPECIFICATION.md"), "utf8"),
+    plan: readFileSync(join(f.episodeRoot, ".ralph/plans/EXECUTION_PLAN.md"), "utf8"),
+    worktrees: git(f.root, "worktree", "list", "--porcelain"),
+    mainHead: git(f.root, "rev-parse", "HEAD"), episodeHead: git(f.episodeRoot, "rev-parse", "HEAD"),
+    mainIndex: git(f.root, "ls-files", "--stage"), episodeIndex: git(f.episodeRoot, "ls-files", "--stage"),
+  };
+}
+
+test("default retained transition binds matching published independent history without replacing resources", () => {
+  const f = independentTransitionFixture();
+  const before = retainedTransitionResources(f);
+  const evidence = resolveSynchronizedProviderTask(f.episodeRoot, f.selection.taskId).nativeView;
+  const result = transition(f, {}, { transitionTargetResolver: undefined });
+  assert.equal(result.record.providerRevision, f.providerRevision);
+  assert.deepEqual(result.record.taskEvidence, evidence);
+  for (const key of ["operationId", "engine", "ownerSessionId", "baseRef", "head", "createdAt", "worktreeName",
+    "worktree", "branch", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
+    assert.deepEqual(result.record[key], f.legacy[key]);
+  }
+  const { owner: _ownerBefore, ...resourcesBefore } = before;
+  const { owner: _ownerAfter, ...resourcesAfter } = retainedTransitionResources(f);
+  assert.deepEqual(resourcesAfter, resourcesBefore);
+  assert.equal(transition(f, {}, { transitionTargetResolver: undefined }).reused, true);
+});
+
+for (const driftAt of ["before transition", "during resolver paired proof", "before final provider proof"]) {
+  test(`default retained transition refuses clean local-only Episode history ${driftAt} with identical complete task evidence`, () => {
+    const f = independentTransitionFixture();
+    const before = retainedTransitionResources(f);
+    const nativeBefore = resolveSynchronizedProviderTask(f.episodeRoot, f.selection.taskId).nativeView;
+    let drifted = false;
+    const drift = () => {
+      writeFileSync(join(f.episodeStore, "local-only.txt"), "unpublished history, selected task unchanged\n");
+      git(f.episodeStore, "add", "local-only.txt");
+      git(f.episodeStore, "-c", "user.name=Prime Claw Test", "-c", "user.email=prime-claw@example.invalid", "commit", "-qm", "local-only task-history commit");
+      drifted = true;
+    };
+    if (driftAt === "before transition") drift();
+    const native = new ProcessCommandRunner();
+    let primaryReads = 0;
+    const runner = { run(command, args, options) {
+      if (command === "backlog" && args[0] === "task" && args[1] === "view" && options.cwd === f.root) {
+        primaryReads++;
+        if ((driftAt === "during resolver paired proof" && primaryReads === 2)
+          || (driftAt === "before final provider proof" && primaryReads === 3)) drift();
+      }
+      return native.run(command, args, options);
+    } };
+    let writes = 0;
+    assert.throws(() => transition(f, {}, {
+      transitionTargetResolver: undefined, runner,
+      ownership: { read: readEpisodeOwnership, write(root, record) { writes++; writeEpisodeOwnership(root, record); } },
+    }), /Episode.*published|independent Backlog publication changed during paired proof/);
+    assert.equal(drifted, true, "the concrete local-only commit was created before the inspected boundary");
+    assert.equal(writes, 0, "refusal precedes the sole authority write");
+    assert.deepEqual(retainedTransitionResources(f), before);
+    assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), f.legacy);
+    assert.equal(git(f.primaryStore, "rev-parse", "HEAD"), f.providerRevision);
+    assert.equal(git(f.root, "ls-remote", "--heads", "origin", "refs/heads/prime-claw/tasks").split(/\s+/)[0], f.providerRevision);
+    assert.notEqual(git(f.episodeStore, "rev-parse", "HEAD"), f.providerRevision);
+    assert.equal(git(f.episodeStore, "status", "--porcelain", "--ignored", "--untracked-files=all"), "");
+    assert.deepEqual(resolveSynchronizedProviderTask(f.root, f.selection.taskId).nativeView, nativeBefore);
+    assert.deepEqual(resolveSynchronizedProviderTask(f.episodeRoot, f.selection.taskId).nativeView, nativeBefore);
+    assert.equal(inspectEpisodeTaskHistoryStore({ primaryRoot: f.root, targetWorktree: f.episodeRoot,
+      expectedRevision: f.providerRevision }).status, "ready", "ordinary exact-clone cleanup remains relaxed");
+  });
+}
 
 test("guarded transition records published Beads authority and its first normal handoff remains usable", () => {
   const f = makeBeadsTransitionContinuable(transitionFixture());

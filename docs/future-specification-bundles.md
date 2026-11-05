@@ -120,9 +120,13 @@ Separately, it proves the selected provider in both primary and Episode
 workspaces. Branch-local Backlog retains its committed task/blob and exact-plan
 checks. Independent Backlog binds the clean stable direct
 `refs/heads/prime-claw/tasks` revision and complete native task view without
-putting that task commit on the code DAG. Beads binds the clean stable published
-Dolt revision/ref and complete raw task view without a Backlog path. The native
-Backlog Implementation Plan or Beads design must exactly retain the living
+putting that task commit on the code DAG. Both independent Backlog clone HEADs
+must equal that published revision on the initial inspection and paired recheck;
+identical task content does not make an unpublished Episode history commit
+published. This retained cutover check is separate from ordinary task-native
+cleanup, which can remove an exact clean clone with local-only commits.
+Beads binds the clean stable published Dolt revision/ref and complete raw task
+view without a Backlog path. The native Backlog Implementation Plan or Beads design must exactly retain the living
 execution plan. Provider publication is paired again immediately before the sole ownership
 write, then the host re-proves the exact reviewed code heads and clean worktrees
 so a slow native read cannot hide concurrent code drift. Before a Beads switch,

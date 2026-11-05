@@ -474,13 +474,24 @@ export function resolveLegacyTaskOwnershipTransitionTarget(
     if (primary.status !== "ready") {
       throw new Error(`Ownership transition cannot prove published independent Backlog history: ${primary.code}: ${primary.detail}`);
     }
-    const episode = inspectEpisodeTaskHistoryStore({
-      primaryRoot: projectRoot, targetWorktree: episodeRoot, expectedRevision: primary.head, runner,
-    });
-    if (episode.status !== "ready" || !episode.present) {
-      const detail = episode.status === "refused" ? `${episode.code}: ${episode.detail}` : "the Episode task-history clone is absent";
-      throw new Error(`Ownership transition cannot prove the pre-existing Episode Backlog workspace: ${detail}`);
-    }
+    // Ordinary requested cleanup accepts clean local-only task commits. Retained
+    // authority cutover still requires this exact Episode clone at the published
+    // revision, both before the native task reads and in the paired recheck.
+    const inspectPublishedEpisode = () => {
+      const episode = inspectEpisodeTaskHistoryStore({
+        primaryRoot: projectRoot, targetWorktree: episodeRoot, expectedRevision: primary.head, runner,
+      });
+      if (episode.status !== "ready" || !episode.present) {
+        const detail = episode.status === "refused" ? `${episode.code}: ${episode.detail}` : "the Episode task-history clone is absent";
+        throw new Error(`Ownership transition cannot prove the pre-existing Episode Backlog workspace: ${detail}`);
+      }
+      const head = runner.run("git", ["rev-parse", "--verify", "HEAD"], { cwd: episode.storeDir, allowFailure: true });
+      if (head.status !== 0 || head.stdout.trim() !== primary.head) {
+        throw new Error(`Ownership transition Episode Backlog HEAD does not equal the exact published history ${primary.head}: ${head.stderr.trim() || head.stdout.trim() || `exit ${head.status}`}`);
+      }
+      return episode;
+    };
+    inspectPublishedEpisode();
     const episodeTask = resolveSynchronizedProviderTask(episodeRoot, taskId, runner);
     if (!episodeTask || episodeTask.provider !== "backlog" || episodeTask.taskId !== taskId
         || episodeTask.status !== "In Progress" || episodeTask.taskPathRelative !== mainTask.taskPathRelative
@@ -501,9 +512,7 @@ export function resolveLegacyTaskOwnershipTransitionTarget(
       throw new Error("Ownership transition primary and Episode Backlog native task evidence differ");
     }
     const pairedPrimary = inspectPublishedPrimaryTaskHistory({ primaryRoot: projectRoot, taskId, expectedRevision: primary.head, runner });
-    const pairedEpisode = inspectEpisodeTaskHistoryStore({
-      primaryRoot: projectRoot, targetWorktree: episodeRoot, expectedRevision: primary.head, runner,
-    });
+    const pairedEpisode = inspectPublishedEpisode();
     if (pairedPrimary.status !== "ready" || pairedPrimary.head !== primary.head
         || pairedEpisode.status !== "ready" || !pairedEpisode.present) {
       throw new Error("Ownership transition independent Backlog publication changed during paired proof");
