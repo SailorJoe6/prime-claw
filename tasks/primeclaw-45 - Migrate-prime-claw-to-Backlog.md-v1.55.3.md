@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-05 15:59'
+updated_date: '2026-11-05 16:08'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -116,6 +116,20 @@ Record exact source, build/toolchain and image identities, commands, pass/fail c
 
 Deliver a reviewable, committed/pushed prime-claw candidate with complete compatibility/provenance/validation evidence; no additional planning follow-up task. A later explicit operator decision owns merge, accepted host-artifact deployment, user-global refresh, coordinated restart/UAT, and any real data migration or repair. This planning request itself authorizes none of those actions and creates no Episode.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05 — Episode 08450108 publication-access blocker before implementation slice 1.
+
+Exact Episode/owner/worktree/session binding and native In Progress task were verified at task revision 55530cc9f572adad5f966d6ac00635fe65518fb9 and code base f5287c3647245a6a5e6d3baad64d9cecf1dab81b. No upgrade code, submodule, build, plugin, accepted artifact, or lifecycle changes were made.
+
+Attempted native publication inspection: `git -C .backlog ls-remote origin refs/heads/prime-claw/tasks` failed with `git@github.com: Permission denied (publickey)` / `fatal: Could not read from remote repository`. Both Episode task and code remotes are `git@github-sailorjoe6:SailorJoe6/prime-claw.git`. A bounded `ssh -v -o BatchMode=yes -T git@github-sailorjoe6` diagnostic confirmed the configured SailorJoe6 agent key was offered and rejected. No credential material was obtained, no Keychain/browser store was accessed, no credentials/remotes were changed, and no push/retry/force operation was attempted. Remote synchronization/publication could not be established, so this blocker note is a local-only selected-task commit, not a published update.
+
+The owning Conversation was notified through the existing Episode channel and asked for an existing approved non-Keychain publication route. No reply was received by this checkpoint; roster remained visible but bounded owner observation returned Unknown active session. The accepted v1.53.0 artifact remains authoritative. No acceptance criterion is claimed.
+
+Unblock condition: restore supported authenticated SailorJoe6 Git transport or supply an existing approved transport/environment without credential extraction. Then inspect actual remote/task history, synchronize this same Episode task clone, preserve compatible concurrent edits, publish this exact local task update non-force, and continue the approved first implementation slice in the same Episode. Do not allocate a replacement Episode or replay an uncertain write. Task status remains In Progress for the owning Conversation to decide.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
