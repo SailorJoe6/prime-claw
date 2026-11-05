@@ -4,7 +4,7 @@ title: Use durable Episode identity instead of ephemeral runtime routing IDs
 status: In Progress
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-05 00:24'
+updated_date: '2026-11-05 00:28'
 labels: []
 dependencies: []
 references:
@@ -14,15 +14,25 @@ references:
   - >-
     https://github.com/SailorJoe6/prime-agent-pi/commit/f80340d93dc3b1c6de3459b54a82f351e136f75e
 documentation:
+  - DEVELOPERS.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/testing-strategy.md
 modified_files:
+  - DEVELOPERS.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/testing-strategy.md
+  - scripts/testing/provenance.py
+  - scripts/testing/source_builder.py
+  - scripts/testing/source_builder_payload.py
   - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/task-provider-migration.ts
+  - tests/conftest.py
   - tests/spec_episode_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
   - tests/task_provider_migration.test.mjs
+  - tests/test_source_builder.py
+  - tests/test_tier1_fixture.py
 priority: p1
 type: bug
 ordinal: 142000
@@ -67,7 +77,7 @@ This request logs the bug only. It authorizes no planning, implementation, live 
 4. Run the focused regressions and related Episode suites inside the existing isolated Docker test environment, plus the required scripts/test-tier1.sh --probe after plugin-source changes. Record the actual results and related-path audit in the native task notes, add only explanatory comments/docs needed for changed behavior, and commit/push the bounded candidate for review. No live activation/restart, Prime Agent source change, or use/removal of retained TASK-2 resources is included.
 
 Validation continuation after owner clearance (2026-11-05):
-- Preserve reviewed routing code 36de6686eba6711af4a6fef97b7e677907bec663. Integrate only the accepted shared diagnostics commit 33f18edc94df898542103ee072512a0955306e5a, then accepted public-CA support commit c9636c3499b23894b44b26aafe0f3d4bb5e7b7b7, in separate provenance-preserving history through ordinary Git (prefer cherry-pick -x). Do not merge the whole branch or include PRIMECLAW-55 N3/product or provider-test typo changes. Owner verified relevant shared harness files unchanged between diagnostics parent and this base. Report nontrivial conflict/dependency evidence rather than import unvalidated work; ordinary mechanical unchanged-scope integration/test repairs remain authorized.
+- Preserve reviewed routing code 36de6686eba6711af4a6fef97b7e677907bec663. Completed clean cherry-pick -x integration of accepted shared diagnostics commit 33f18edc94df898542103ee072512a0955306e5a as 0fd70cc54f234a5fd1e2fe4303136918eb3a0d26, then accepted public-CA support commit c9636c3499b23894b44b26aafe0f3d4bb5e7b7b7 as 575e5d393674c276f06951d0607eeefc61e0289b. Separate history/original provenance retained; no conflict or additional dependency imported. Next: the one own bounded required tier1 probe below. Do not merge the whole branch or include PRIMECLAW-55 N3/product or provider-test typo changes. Owner verified relevant shared harness files unchanged between diagnostics parent and this base. Report nontrivial conflict/dependency evidence rather than import unvalidated work; ordinary mechanical unchanged-scope integration/test repairs remain authorized.
 - Use the existing selected source/.env and already-configured NODE_EXTRA_CA_CERTS input, read-only public CA and TLS verification enabled. Do not log CA contents or host path, access credentials/Keychain, change host/Docker trust, disable TLS, patch Prime Agent/dependencies, or author a new CA feature.
 - When actually ready, coordinate one concrete bounded source-build/runtime-capture startup window with the owner against actual peer reservations; no future hold, indefinite reservation or private-authoring freeze. Run one own scripts/test-tier1.sh --probe with adequate explicit finite native source-build/install/check/probe bounds, fresh nonblocking Bash handles and the accepted native isolation/captured IID/CID/provenance/teardown guards. Report actual capture return or bounded conflict before its deadline. Previous dead handles are invalid.
 - Keep native plan/notes, support provenance, actual own validation results and Final Summary current; publish code/task separately without force while preserving unrelated task descendants, report exact clean pushed heads/outcome and stop for owner review. No status/Ready/Done, merge, activation/restart, replacement Episode/assignment, retained TASK-2 resource use or owned live-resource cleanup.
@@ -132,6 +142,12 @@ Validation continuation after owner clearance (2026-11-05):
 - Owner reports 55 source build PASSED with configured public CA input read-only and TLS verification enabled, runtime version 0.9.8/network absence/cleanup proven. Its later provider-test assertion was independently classified as publishedRevision vs submittedRevision test typo, not a CA-production defect. This is NOT PRIMECLAW-57 runtime/probe proof; one own bounded pass is still pending. No 55 N3/product, typo fix, whole-branch merge, new CA feature, upstream/dependency/trust-store patch or TLS bypass is authorized here.
 - Follow the living-plan continuation above for exact provenance-preserving Git integration and one own native tier1 probe. Current source selector and already-configured NODE_EXTRA_CA_CERTS remain factual inputs; never log CA contents or host path or access credentials/Keychain. Only reserve shared startup/capture when actually ready and coordinate actual peers through owner. Ordinary in-scope integration/test repairs do not need per-typo permission; material unexpected scope/source/identity/authority conflict remains a real blocker.
 - This handoff retains the same owner/operation/durable Episode/session/worktree/branch and In Progress task; specification/AC unchanged. No source code, live ownership, status, merge, activation/restart, replacement assignment, retained TASK-2 resources or cleanup is changed during handoff. Publish the handoff task-only checkpoint, request compaction once; canonical execute is independently queued.
+
+2026-11-05 accepted shared-support integration complete; own validation pending:
+- Ordinary Git cherry-pick -x applied exactly 33f18edc94df898542103ee072512a0955306e5a as 0fd70cc54f234a5fd1e2fe4303136918eb3a0d26, then c9636c3499b23894b44b26aafe0f3d4bb5e7b7b7 as 575e5d393674c276f06951d0607eeefc61e0289b. Both were clean and retain original provenance as separate commits. No whole-branch merge, PRIMECLAW-55 N3/product, provider-test typo or extra dependency change. Reviewed routing source/tests 36de6686eba6711af4a6fef97b7e677907bec663 unchanged. Integrated candidate is clean/pushed at 575e5d393674c276f06951d0607eeefc61e0289b.
+- Existing source selector/.env unchanged, source revision a1faacd53ac4473a75de1d434afaf50945c2f647; current configured NODE_EXTRA_CA_CERTS input is present. No CA contents/host path logged, no credential/Keychain/trust-store/TLS or upstream/dependency mutation. Provenance/selected finite bounds recorded in .test-results/primeclaw57-support-20261105T002815Z/integration.json.
+- Requested immediate concrete five-minute source-build/runtime-capture window from owner only after ready; no probe launched or reservation inferred before actual peer coordination. Own required scripts/test-tier1.sh --probe remains pending. Bounds: source-builder600s, runtime-image600s, install300s, check180s, RPC90s, Docker60s, publication60s, removal60s, final-inspect30s with native kill grace/ownership/capture safeguards. Report actual capture return or bounded conflict/extension before window end. One fresh nonblocking handle will be used; old handles remain invalid.
+- Prior own 356/356 and 4/4 offline routing results remain earlier-candidate evidence, not a support-integrated tier1 pass. Same bound Episode/task/resources and In Progress; no Ready/Done, merge, activation or live-resource cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -158,5 +174,5 @@ One bounded own validation pass may run the existing required tier1 probe with c
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Reviewed routing code 36de6686eba6711af4a6fef97b7e677907bec663 is preserved; prior own corrected-snapshot related tests pass 356/356 and focused migration tests 4/4. Owner cleared use of accepted shared diagnostics 33f18edc94df898542103ee072512a0955306e5a followed by public-CA support c9636c3499b23894b44b26aafe0f3d4bb5e7b7b7 in this same Episode. Integration and one own bounded required tier1 probe are now the remaining validation work, not a new CA implementation. 55's source-build/runtime success with read-only public CA/TLS enabled is not proof of 57's probe. Exclude 55 N3/product and provider-test typo changes; retain current source selector/configured public CA input without exposing its path/contents or bypassing TLS. Same task/resources, In Progress, specification/unchecked AC unchanged. See latest notes and living plan for exact integration/provenance, startup coordination, truthful validation and stop-for-review boundaries. No Ready/Done, merge or activation authority.
+Reviewed routing candidate 36de6686eba6711af4a6fef97b7e677907bec663 preserved. The two exact owner-accepted shared support commits are cleanly integrated with separate cherry-pick -x provenance as 0fd70cc54f234a5fd1e2fe4303136918eb3a0d26 and 575e5d393674c276f06951d0607eeefc61e0289b; integrated code is clean/pushed. One own required bounded tier1 probe remains pending actual startup coordination and native capture. Existing source selector and configured public CA input unchanged; TLS stays on. Prior own 356/356 related and 4/4 focused migration tests are earlier routing-candidate evidence, not new runtime/probe success. No 55 N3/product/typo work imported; same Episode/resources and In Progress/specification/unchecked AC. See latest notes for exact support provenance and finite validation bounds. Stop for owner review after reporting actual own probe outcome; no Ready/Done, merge or activation authority.
 <!-- SECTION:FINAL_SUMMARY:END -->
