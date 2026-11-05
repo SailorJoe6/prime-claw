@@ -176,6 +176,183 @@ finally{publisher?.close();}
     assert tier1_container.run("git", "-C", str(repo), "worktree", "list", "--porcelain").stdout == inventory
     (tier1_container.share.parent / "creation-native-session-component.json").write_text(json.dumps(proof, indent=2) + "\n")
 
+
+def test_native_orca_packaged_runtime_and_terminal_boundary(tier1_container) -> None:
+    """Real packaged headless runtime/PTY evidence, not a recovery simulation."""
+    script = r"""import hashlib,json,os,pathlib,selectors,shlex,shutil,subprocess,time
+base=pathlib.Path('/home/orca-fixture/native-readiness')
+base.mkdir()
+profile=base/'profile'
+env=dict(os.environ,HOME=str(base),XDG_CONFIG_HOME=str(base/'config'),
+         XDG_DATA_HOME=str(base/'data'),XDG_CACHE_HOME=str(base/'cache'),
+         ORCA_USER_DATA_PATH=str(profile),ORCA_USER_DATA=str(profile),ORCA_SERVE_RUNTIME='orcad')
+cli='/usr/local/bin/orca-ide'
+# This is a transport wrapper around the real installed binary, not a mock agent.
+# Every native Prime Agent process still uses the existing isolation/cleanup wrapper.
+real_prime=shutil.which('prime-agent')
+assert real_prime
+probe=base/'launch-probe.ts'
+launch_file=base/'launch.json'
+probe.write_text('''import {writeFileSync} from 'node:fs';
+export default function probe(pi){pi.registerProvider('native-readiness',{
+baseUrl:'offline',apiKey:'fixture',api:'native-readiness',streamSimple(){throw new Error('readiness sent unexpected work');},
+models:[{id:'m',name:'Fixture',reasoning:false,input:['text'],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:100000,maxTokens:1000}]});
+pi.on('session_start',async(_event,ctx)=>{ctx.sessionManager.flushNow();
+writeFileSync('''+json.dumps(str(launch_file))+''',JSON.stringify({cwd:process.cwd(),sessionId:ctx.sessionManager.getSessionId(),sessionFile:ctx.sessionManager.getSessionFile()}));});}
+''')
+bin_dir=base/'bin';bin_dir.mkdir()
+wrapped=bin_dir/'prime-agent'
+wrapped.write_text('#!/bin/sh\nprintf used > '+shlex.quote(str(base/'wrapper-used'))+'\nexec /workspace/scripts/run-prime-agent-probe.sh '+shlex.quote(real_prime)+
+                  ' --offline --no-tools --no-skills --no-prompt-templates --no-context-files --no-extensions -e '+
+                  shlex.quote(str(probe))+' --provider native-readiness --model m "$@"\n')
+wrapped.chmod(0o755)
+env['PATH']=str(bin_dir)+':'+env['PATH']
+# Login shells may rebuild PATH; this is only the fixture user's fresh HOME.
+for login_file in ['.bashrc','.bash_profile','.profile']:
+    (base/login_file).write_text('export PATH='+shlex.quote(str(bin_dir))+':$PATH\n')
+commands=[]
+def native(*args):
+    result=subprocess.run([cli,*args,'--json'],env=env,cwd=base,text=True,capture_output=True,timeout=45)
+    commands.append({'command':list(args[:2]),'exitCode':result.returncode})
+    if result.returncode:
+        raise RuntimeError('native '+str(args[:2])+' failed: '+result.stderr[-1800:]+result.stdout[-1800:])
+    envelope=json.loads(result.stdout)
+    # Pure documentation commands return their JSON directly, unlike RPC envelopes.
+    if args==('skills','get','orca-cli'):
+        return envelope
+    if envelope.get('ok') is not True:
+        raise RuntimeError('native '+str(args[:2])+' refused: '+str(envelope.get('error')))
+    return envelope['result']
+# Load the selected distribution's own guide before runtime operations.
+guide=native('skills','get','orca-cli')
+assert guide
+server=subprocess.Popen([cli,'serve','--json','--no-pairing','--port','6768'],env=env,cwd=base,
+                        text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
+output=[]; errors=[]; ready=None
+try:
+    selector=selectors.DefaultSelector()
+    selector.register(server.stdout,selectors.EVENT_READ,'out')
+    selector.register(server.stderr,selectors.EVENT_READ,'err')
+    deadline=time.monotonic()+60
+    while ready is None and time.monotonic()<deadline:
+        for key,_ in selector.select(max(0,deadline-time.monotonic())):
+            line=key.fileobj.readline()
+            if not line:
+                selector.unregister(key.fileobj)
+                continue
+            (output if key.data=='out' else errors).append(line)
+            try: payload=json.loads(line)
+            except json.JSONDecodeError: continue
+            if payload.get('type')=='orca_server_ready': ready=payload
+        if server.poll() is not None:
+            raise RuntimeError('native server exited before ready: '+''.join(errors)[-3000:])
+    selector.close()
+    assert ready is not None, 'native server did not report ready: '+''.join(errors)[-3000:]
+    stderr=''.join(errors)
+    assert '[serve] running on orcad ' in stderr, stderr
+    assert '[serve] using Electron serve:' not in stderr, stderr
+    status=native('status')
+    repo=base/'repo'; repo.mkdir()
+    for args in [('init','-q','-b','main'),('config','user.name','Fixture'),
+                 ('config','user.email','fixture@example.test'),
+                 ('commit','--allow-empty','-qm','Native Orca fixture')]:
+        subprocess.run(['git','-C',str(repo),*args],env=env,check=True,capture_output=True)
+    base_head=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD'],env=env,text=True).strip()
+    registered=native('repo','add','--path',str(repo))['repo']
+    setups=native('project','setups')['setups']
+    matching=[s for s in setups if s.get('path')==str(repo) and s.get('setupState')=='ready']
+    assert len(matching)==1, 'exact local project setup is not ready'
+    created=native('worktree','create','--project-host-setup',matching[0]['id'],
+                   '--name','native-orca-readiness','--no-parent','--setup','skip','--base-branch',base_head)['worktree']
+    shown=native('worktree','show','--worktree','id:'+created['id'])['worktree']
+    assert shown['id']==created['id'] and shown['head']==base_head
+    assert shown['projectHostSetupId']==matching[0]['id']
+    term=native('terminal','create','--worktree','id:'+created['id'])['terminal']
+    before=native('terminal','read','--terminal',term['handle'])['terminal']
+    cursor=before['nextCursor']
+    nonce=os.urandom(8).hex()
+    marker='ORCA_NATIVE_'+nonce
+    sent="printf 'ORCA_NATIVE_%s\\n' '"+nonce+"'"
+    assert marker not in sent  # Input echo must not satisfy execution evidence.
+    native('terminal','send','--terminal',term['handle'],'--text',sent,'--enter')
+    emitted=[]
+    deadline=time.monotonic()+15
+    while marker not in emitted and time.monotonic()<deadline:
+        read=native('terminal','read','--terminal',term['handle'],'--cursor',str(cursor),'--limit','1000')['terminal']
+        emitted.extend(line.strip() for line in read.get('tail',[]))
+        cursor=read['nextCursor']
+    assert marker in emitted, 'actual PTY produced no standalone split-nonce output'
+    screen=native('terminal','read','--terminal',term['handle'],'--screen')['terminal']
+    listed=native('terminal','list','--worktree','id:'+created['id'],'--include-visual-layouts')
+    actual=[t for t in listed['terminals'] if t['handle']==term['handle']]
+    assert len(actual)==1 and actual[0]['connected'] and actual[0]['writable']
+    layouts=listed.get('visualLayouts',[])
+    visible=any(l.get('worktreeId')==created['id'] and term['handle'] in json.dumps(l) for l in layouts)
+    assert visible, 'native shell terminal is not visible'
+    # Supported project settings avoid an interactive first-run trace-sharing choice.
+    # This fixture never supplies credentials or opts into telemetry/trace upload.
+    settings=pathlib.Path(created['path'])/'.prime/agent/settings.json'
+    settings.parent.mkdir(parents=True)
+    settings.write_text(json.dumps({'onboardingShown':True,'agentTraces':{'enabled':False},'telemetry':{'enabled':False}}))
+    prior_handles={t['handle'] for t in listed['terminals']}
+    launch=native('agent','launch','--agent','prime-agent','--worktree','id:'+created['id'],'--surface','terminal')
+    launched=native('terminal','list','--worktree','id:'+created['id'],'--include-visual-layouts')
+    new_terms=[t for t in launched['terminals'] if t['handle'] not in prior_handles]
+    assert len(new_terms)==1, 'native launch did not identify one new terminal'
+    agent_handle=new_terms[0]['handle']
+    wait_issue=None
+    try: native('terminal','wait','--terminal',agent_handle,'--for','tui-idle','--timeout-ms','30000')
+    except (RuntimeError,subprocess.TimeoutExpired) as error: wait_issue=str(error)
+    # A wait timeout is observation, not non-launch proof or permission to launch again.
+    agent_screen=native('terminal','read','--terminal',agent_handle,'--screen')['terminal']
+    assert agent_screen['source']=='screen' and '← manage' in '\n'.join(agent_screen['tail']), json.dumps({
+        'reason':'native Prime Agent TUI is not ready','wrapperUsed':(base/'wrapper-used').exists(),
+        'sessionEvidencePresent':launch_file.exists(),'waitIssue':wait_issue,'screen':agent_screen.get('tail',[])})
+    assert (base/'wrapper-used').is_file(), 'Prime Agent launch bypassed the isolation wrapper'
+    agent_list=native('terminal','list','--worktree','id:'+created['id'],'--include-visual-layouts')
+    agent_terms=[t for t in agent_list['terminals'] if t['handle']==agent_handle]
+    assert len(agent_terms)==1 and agent_terms[0]['connected'] and agent_terms[0]['writable']
+    agent_visible=any(l.get('worktreeId')==created['id'] and agent_handle in json.dumps(l) for l in agent_list.get('visualLayouts',[]))
+    assert agent_visible, 'native Prime Agent terminal is not visible'
+    bound=json.loads(launch_file.read_text())
+    assert bound['cwd']==created['path']
+    saved=[json.loads(line) for line in pathlib.Path(bound['sessionFile']).read_text().splitlines() if line]
+    assert saved[0]['id']==bound['sessionId'] and saved[0]['cwd']==created['path']
+    assert not any(row.get('message',{}).get('role')=='user' for row in saved), 'readiness unexpectedly admitted an assignment'
+    native('terminal','close','--terminal',agent_handle)
+    node=pathlib.Path('/opt/orca/squashfs-root/resources/node-runtime/bin/node')
+    proof={'scope':'actual isolated packaged Orca runtime and terminal readiness only',
+           'distribution':'official v1.4.247 full Linux AppImage','runtime':'orcad',
+           'nodeVersion':subprocess.check_output([str(node),'--version'],text=True).strip(),
+           'nodeSha256':hashlib.file_digest(node.open('rb'),'sha256').hexdigest(),
+           'guideLoaded':True,'freshProfile':True,'exactReadyLocalSetup':True,
+           'nativeWorktreeAtOriginalBase':True,'sameShownWorktree':True,
+           'terminalConnected':actual[0]['connected'],'terminalWritable':actual[0]['writable'],
+           'terminalVisible':visible,'actualPtyNonceObserved':True,'screenSource':screen.get('source'),
+           'visualLayoutsCount':len(layouts),'commands':commands,
+           'primeAgentNativeLaunch':True,'primeAgentVisibleConnectedWritable':True,
+           'primeAgentManageScreen':True,'durableHeaderMatchesExactWorktree':True,'initialAssignments':0,
+           'notProven':['same-operation creation recovery','existing-operation native binding',
+                        'assignment reuse/ambiguity stop','canonical execute','LLM compliance','activation']}
+    print(json.dumps(proof),flush=True)
+finally:
+    if server.poll() is None:
+        server.terminate()
+        try: server.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            server.kill();server.wait(timeout=5)
+"""
+    result = tier1_container.run(
+        "runuser", "--user", "orca-fixture", "--", "python3", "-c", script,
+        timeout=150, workdir=None,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    proof = json.loads(result.stdout.strip().splitlines()[-1])
+    assert proof["runtime"] == "orcad" and proof["nodeVersion"] == "v24.22.1"
+    assert proof["exactReadyLocalSetup"] and proof["nativeWorktreeAtOriginalBase"]
+    assert proof["terminalConnected"] and proof["terminalWritable"] and proof["actualPtyNonceObserved"]
+    (tier1_container.share.parent / "creation-native-orca-readiness.json").write_text(json.dumps(proof, indent=2) + "\n")
+
 def test_episode_creation_uses_fresh_host_session_without_runtime_package_import() -> None:
     source = EPISODE_EXTENSION.read_text()
     assert 'import("@earendil-works/pi-coding-agent")' not in source

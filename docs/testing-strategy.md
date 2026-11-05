@@ -71,14 +71,45 @@ the tier-1 fixture verifies network absence and exact teardown.
 
 This is native session-component evidence, not an exercise of the complete
 owner-led creation procedure, canonical execute behavior, LLM compliance or
-ambiguous delivery. The current image does not install Orca; its native
-`CliOrcaAdapter` inventory reports a missing executable. A real Orca exercise
-needs a complete compatible Linux Orca/Orcad distribution, a fresh isolated
-profile and native terminal/launch readiness before testing. Headless
-`orca serve` is supported; the missing fixture is not a fundamental Linux or
-GUI limitation. Stage any required runtime artifacts before network cutoff.
-Do not copy the macOS launcher alone, expose a host profile/socket, use the
-production control plane, or silently replace Orca with the local engine.
+ambiguous delivery.
+
+`test_native_orca_packaged_runtime_and_terminal_boundary` establishes the next
+real fixture prerequisite. The tier-1 image stages the **whole official Orca
+v1.4.247 Linux AppImage** before network cutoff. It verifies the architecture's
+release SHA-256 and bundled **Node 24.22.1** executable hash, retaining all
+packaged assets. This private Node does not replace Prime Agent's Node22.
+Only ARM64 has been exercised here; the x64 release/hash path is not runtime
+validation. The published distribution is not claimed identical to the host's
+same-version local build.
+
+The test runs the packaged `orca-ide` launcher with fresh fixture-owned
+HOME/XDG/profile directories as an unprivileged container user. It loads that
+CLI's guide, requests `ORCA_SERVE_RUNTIME=orcad`, requires the actual Orcad
+selection diagnostic and rejects Electron fallback. Native setup/worktree
+reads prove the selected ready setup and original Git base. Cursor-based PTY
+reads must observe a complete split nonce as its own output line; echoed input
+cannot satisfy it. Native terminal inventory includes the actual visual layout.
+
+One no-prompt `agent launch --surface terminal` then starts the real installed
+Prime Agent through `scripts/run-prime-agent-probe.sh`, not a fake executable.
+Supported fixture-project settings mark onboarding shown and disable trace
+sharing/telemetry; an inert local model rejects unexpected work. Native reads
+require the exact visible, connected, writable Prime Agent tab and `← manage`
+screen. The real flushed session header matches that exact worktree and saved
+session ID, with **zero user assignments**. Only the inspected fixture terminal
+is closed; the ordinary tier-1 container teardown removes its runtime/profile.
+No host profile/socket, display, published port, production control plane,
+credential, dependency patch or engine substitution is used.
+
+This proves runtime/setup/terminal/launch readiness, **not** the two complete
+same-operation recovery exercises, existing-operation binding, assignment reuse,
+ambiguity-stop behavior, canonical execute, LLM compliance or activation. Those
+remain separate unfinished PRIMECLAW-56 evidence. Outside managed Linux terminals
+select `orca-ide`, not the unrelated GNOME `orca` command; the existing
+`CliOrcaAdapter` injectable runner can invoke this exact native CLI. The earlier
+component's bare-`orca` ENOENT is historical executable-selection evidence, not
+proof that the now-staged distribution is unavailable. Keep all exact tab and
+identity safeguards when building the remaining exercises.
 
 ## Fail-closed lifecycle control boundary
 

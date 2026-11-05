@@ -58,6 +58,19 @@ RUN apt-get update \
         python3 \
         python3-pytest \
         procps \
+        libasound2t64 \
+        libatk-bridge2.0-0 \
+        libatspi2.0-0 \
+        libdrm2 \
+        libgbm1 \
+        libgtk-3-0 \
+        libnss3 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxkbcommon0 \
+        libxrandr2 \
+        util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Node.js 22.x (prime-agent prerequisite: >= 22.8) via NodeSource. ---
@@ -94,6 +107,29 @@ RUN set -eux; \
     bd --version | grep -F "bd version ${BEADS_VERSION}"; \
     dolt version | grep -F "dolt version ${DOLT_VERSION}"; \
     rm -rf /tmp/beads.tar.gz /tmp/dolt.tar.gz /tmp/bd "/tmp/dolt-linux-${ARCH}"
+
+# Complete supported Orca distribution for isolated native terminal/recovery tests.
+# Keep its pinned Node private to Orca; Prime Agent still uses the Node22 above.
+# Full AppImage extraction needs no FUSE/display and retains every packaged asset.
+ARG ORCA_VERSION=1.4.247
+RUN set -eux; \
+    case "$(uname -m)" in \
+      aarch64|arm64) ORCA_ASSET=orca-linux-arm64.AppImage; ORCA_SHA=f0721401bb5095e2b78fd05ecd21b63556c216efa08d24dbf922f63c874601a8; NODE_SHA=c8c5721679d8d1a09e9987e345d5f9a64899bb85f7a384783ba8a93e6e62348a ;; \
+      x86_64|amd64) ORCA_ASSET=orca-linux.AppImage; ORCA_SHA=6d7dfa1292b9e2f71e84594746aa60bebe2816a73145a4d2015f28d2b9195b6f; NODE_SHA=e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb ;; \
+      *) exit 1 ;; \
+    esac; \
+    mkdir -p /opt/orca; \
+    curl --fail --location --max-time 240 "https://github.com/stablyai/orca/releases/download/v${ORCA_VERSION}/${ORCA_ASSET}" -o /opt/orca/release.AppImage; \
+    echo "$ORCA_SHA  /opt/orca/release.AppImage" | sha256sum -c -; \
+    chmod 0755 /opt/orca/release.AppImage; \
+    cd /opt/orca; \
+    ./release.AppImage --appimage-extract >/dev/null; \
+    echo "$NODE_SHA  /opt/orca/squashfs-root/resources/node-runtime/bin/node" | sha256sum -c -; \
+    test "$(/opt/orca/squashfs-root/resources/node-runtime/bin/node --version)" = v24.22.1; \
+    test -x /opt/orca/squashfs-root/resources/bin/orca-ide; \
+    ln -s /opt/orca/squashfs-root/resources/bin/orca-ide /usr/local/bin/orca-ide; \
+    useradd --create-home --shell /bin/bash orca-fixture; \
+    rm -f /opt/orca/release.AppImage
 
 # Build-time assertions: fail the build if the toolchain regresses below the
 # prime-agent prerequisite or Python/pytest are missing.
