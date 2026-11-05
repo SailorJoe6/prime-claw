@@ -160,11 +160,24 @@ succeed. Use ordinary fetch/fast-forward only when needed for the intended
 operation. Interpret any native Git conflict from the returned facts.
 
 A Backlog mutation uses the supported native exact-task edit and reread, an
-exact-path Git commit, and one non-force push. Use path-limited commit mechanics
-such as `git commit --only -m "..." -- <task-path>` so unrelated index entries
+exact-path Git commit, and one non-force push. For BOTH grandfathered code-DAG
+and independent task-clone Backlog, run Git in the selected task's history
+workspace: the code checkout or the nested task clone, respectively. Set
+`task_path` to the exact selected file path relative to that Git root. Inspect
+the task diff before committing. Use literal pathspec mode and keep
+`"$task_path"` shell-quoted for BOTH add and commit:
+
+```sh
+git --literal-pathspecs add -- "$task_path"
+git --literal-pathspecs commit --only -m "Update selected task" -- "$task_path"
+```
+
+Shell quoting prevents shell expansion; `--literal-pathspecs` also disables
+Git's own pathspec matching, including brackets in task filenames. Neither
+`--` nor `--only` makes a path literal. Unrelated index entries must
 remain staged and excluded. Never commit other paths, require the whole index
-to be clean, or absorb unreviewed selected-ticket edits. Inspect the task diff
-before committing. The publication helper does not classify remote changes,
+to be clean, or absorb unreviewed selected-ticket edits. The publication helper
+does not classify remote changes,
 merge/rebase them, or retry a rejected push. A successful push followed by a
 newer remote observation is history evidence, not automatic semantic rejection.
 

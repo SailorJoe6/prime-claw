@@ -986,7 +986,8 @@ def test_native_preparation_publication_guidance_keeps_decisions_in_markdown() -
         section = text.split("## Preparation and publication are native operations", 1)[1].split("## Create the Episode", 1)[0]
         for phrase in (
             "without preparing or synchronizing another",
-            "git commit --only",
+            'git --literal-pathspecs add -- "$task_path"',
+            'git --literal-pathspecs commit --only -m "Update selected task" -- "$task_path"',
             "remain staged and excluded",
             "does not classify remote changes",
             "merge/rebase them, or retry a rejected push",
@@ -1011,3 +1012,85 @@ def test_native_preparation_publication_guidance_keeps_decisions_in_markdown() -
         assert "not a cleanliness or frozen-revision approval" in text
         assert "reconcile a rejected push" in text
         assert "retry uncertain delivery" in text
+
+
+@pytest.mark.parametrize("policy", (
+    "src/prime-agent-plugin/workflows/implement-task.md",
+    ".prime-claw/workflows/implement-task.md",
+))
+@pytest.mark.parametrize("topology", ("grandfathered", "independent"))
+def test_documented_backlog_publication_commands_preserve_literal_task_isolation(
+    tmp_path: Path, policy: str, topology: str,
+) -> None:
+    # Execute the actual shell example, not the runtime helper or a mock.
+    text = (ROOT / policy).read_text()
+    section = text.split("## Preparation and publication are native operations", 1)[1].split("For Beads,", 1)[0]
+    assert "```sh\n" in section
+    commands = section.split("```sh\n", 1)[1].split("```", 1)[0]
+
+    project = tmp_path / "code workspace"
+    project.mkdir()
+    run(project, "git", "init", "-q", "-b", "main")
+    run(project, "git", "config", "user.name", "Fixture")
+    run(project, "git", "config", "user.email", "fixture@example.test")
+    (project / ".gitignore").write_text(".backlog/\n")
+    code = project / "code.txt"
+    code.write_text("code baseline\n")
+    run(project, "git", "add", "--", ".gitignore", "code.txt")
+    run(project, "git", "commit", "-q", "-m", "code baseline")
+
+    task_root = project
+    task_directory = "backlog/tasks"
+    if topology == "independent":
+        remote = tmp_path / "task-history.git"
+        run(tmp_path, "git", "init", "--bare", "-q", str(remote))
+        run(project, "git", "clone", "-q", str(remote), ".backlog")
+        task_root = project / ".backlog"
+        task_directory = "tasks"
+        run(task_root, "git", "checkout", "-q", "-b", "prime-claw/tasks")
+        run(task_root, "git", "config", "user.name", "Fixture")
+        run(task_root, "git", "config", "user.email", "fixture@example.test")
+
+    # Spaces test shell quoting; brackets also require literal Git pathspecs.
+    selected = f"{task_directory}/Task 1 - selected[1].md"
+    foreign = f"{task_directory}/Task 1 - selected1.md"
+    (task_root / task_directory).mkdir(parents=True)
+    (task_root / selected).write_text("selected baseline\n")
+    (task_root / foreign).write_text("foreign baseline\n")
+    run(task_root, "git", "--literal-pathspecs", "add", "--", selected, foreign)
+    run(task_root, "git", "commit", "-q", "-m", "task baseline")
+    task_head = run(task_root, "git", "rev-parse", "HEAD").stdout.strip()
+    code_head = run(project, "git", "rev-parse", "HEAD").stdout.strip()
+
+    code.write_text("foreign staged code\n")
+    run(project, "git", "add", "--", "code.txt")
+    code.write_text("foreign unstaged code\n")
+    (task_root / foreign).write_text("foreign staged task\n")
+    run(task_root, "git", "add", "--", foreign)
+    (task_root / foreign).write_text("foreign unstaged task\n")
+    (task_root / selected).write_text("selected update\n")
+    untracked = task_root / "untracked.txt"
+    untracked.write_text("foreign untracked bytes\n")
+    before_index = run(task_root, "git", "ls-files", "--stage", "-z").stdout
+    before_code_index = run(project, "git", "ls-files", "--stage", "-z").stdout
+    foreign_history = run(task_root, "git", "log", "-1", "--format=%H", "--", foreign).stdout
+
+    run(task_root, "sh", "-eu", "-c", "task_path=$1\n" + commands,
+        "documented-backlog-publication", selected)
+
+    assert run(task_root, "git", "rev-parse", "HEAD^").stdout.strip() == task_head
+    assert run(task_root, "git", "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "HEAD").stdout == selected + "\0"
+    assert run(task_root, "git", "show", f"HEAD:{selected}").stdout == "selected update\n"
+    assert run(task_root, "git", "show", f"HEAD:{foreign}").stdout == "foreign baseline\n"
+    assert run(task_root, "git", "log", "-1", "--format=%H", "--", foreign).stdout == foreign_history
+    after_index = run(task_root, "git", "ls-files", "--stage", "-z").stdout
+    assert [entry for entry in after_index.split("\0") if entry and entry.split("\t", 1)[1] != selected] == [
+        entry for entry in before_index.split("\0") if entry and entry.split("\t", 1)[1] != selected
+    ]
+    assert run(task_root, "git", "--literal-pathspecs", "diff", "--cached", "--", selected).stdout == ""
+    assert (task_root / foreign).read_text() == "foreign unstaged task\n"
+    assert code.read_text() == "foreign unstaged code\n"
+    assert untracked.read_text() == "foreign untracked bytes\n"
+    if topology == "independent":
+        assert run(project, "git", "rev-parse", "HEAD").stdout.strip() == code_head
+        assert run(project, "git", "ls-files", "--stage", "-z").stdout == before_code_index
