@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 01:38'
+updated_date: '2026-11-05 01:42'
 labels: []
 dependencies: []
 references:
@@ -658,4 +658,11 @@ OwnershipNode69/70passed/12181.980505ms. NEW R2 case "real Beads advancement car
 Manifest FAILED01:37:46UTC/failure_codesONLYtests-failed; network absent/disconnected01:33:47UTC. RuntimeIIDsha256:b381355834583066b89a91212cab0e980d5155516a0fa9179ddd3d80545fffef/CIDf19aa78b787ae9510e4f9e94b2e5f681a1a29de0701944e3e6bb93b30b8dc07c CLEAN/ABSENT01:37:46UTC; builderIIDsha256:0fe3d7841725903709356e0020d68256aa8c25bfeefda753acbd80aa104ff41b/CID512b77f9ebdbc2b2a4f6c7dab57816b83dcc41f44b0b57082ff48e3aab632cc5 CLEAN/ABSENT01:32:45UTC. Fresh native exact inspection of BOTH returned1/emptyarray/ordinary no-such-object01:38:14UTC. Source-build PASS/sourceidentitya1fa/checkoutinventoryequal/CAreadonlyTLSon/privacy/diagnostics unchanged. Captured repository407/hash3696ad1e7ec06a8206208f059e379d573a8e9eafc1321f4e14ff8123295a960f matched fresh passed probe exactly before the TEST-ONLY correction. Receipts/historyTAP and full ownership failure TAP remain in.test-results/20261105T013157Z-15031-1224b2c0/tier1 and/tmp/primeclaw55-r1r2-focused.log. New share/snapshot normally removed after exact clean teardown; original133753FAILEDmanifest/share/snapshot and other historical failures remain untouched.
 
 Capacity already returned01:34:04.345754UTC at immutable capture. No current actor/reservation; requested actual separate current capacity for the same normal expanded command, no old-slot reuse or standing authoring/approval hold. Normal diagnosed in-scope repair/validation continues under Joece2 without per-test permission or permanent historical attempt cap. Full original BOTH-provider deeper lifecycle/tool-prose extraction, COMPLETE managed-asset audit and bounded recorded45same-operation disposable-fixture recovery remain on THIS task/all9ACunchecked. No fullslice/taskacceptance/globalactivation/live45/mainmerge/dependency/retained redesign/abandonment/destructive live action.
+
+## Repaired R1/R2 fixture rerun captured — terminal regression result pending
+Same expanded normal command launched2026-11-05T01:39:33.614447+00:00, Bash32264/pytest32266, run20261105T013935Z-32266-099cc3ab; log/tmp/primeclaw55-r1r2-fixture-repair-focused.log. Only the diagnosed test fixture Git-add path changed after failed013157; production/guidance remain identical to fresh passed probe012812. No broad source repair or additional probe was substituted.
+
+Source-build PASS01:40:46UTC/empty failure_codes. BuilderIIDsha256:d9b8ce66fc348bcfe40622b5a36e34079dca1eec0d8287b364810adaee18bf4e/CID846260a93a97e2d9dbaee77b320d0997d97c0938b44bda40cb53539e9a88ed3d CLEAN/ABSENTreceipt01:40:29UTC. RuntimeIIDsha256:60c2e8b1a9b452afe7db9f1e91d30c6a9d9c81e365827add152bfc7043c838d9/CID6023bdb99793dd2e34620ba0ccf308b83c42e8e5b1c134c46a9d4774d6c74566 captured; fresh native exact inspect matched pair/running01:41:43UTC; network.json verified_absent:true. Actual separate current01:39:21–01:59:21UTC capture slot RETURNED2026-11-05T01:41:43.969075+00:00 before offline completion, no further hold/actor/reservation inferred. Existing sourcea1fa/lock/mode/CAreadonlyTLS-on/privacy/diagnostics/provenance unchanged. Peer57/58 primary-main landing is a separate resource; this Episode performs no primary index/main/status/terminal write, source integration/rebase or activation.
+
+The existing runtime is STILL executing offline expanded regressions; no final assertions/manifest/teardown or R1/R2 acceptance is claimed. Preserve failed013157/its exact repair and all older failed artifacts. Monitor only this handle. Normal diagnosed in-scope fixes/validation need no per-test operator permission. Full original remaining BOTH-provider lifecycle/tool-prose extraction, COMPLETE managed-asset durability audit and bounded recorded45same-operation disposable-fixture recovery remain on THIS task/all9ACunchecked; no full completion/merge/global/live45/dependency/destructive authority.
 <!-- SECTION:NOTES:END -->
