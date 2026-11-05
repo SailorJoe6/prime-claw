@@ -174,6 +174,23 @@ history need factual recovery, not automatic reconciliation or a dependency patc
 Independent task-only failure reporting does not require clean or pushed parent
 code. These source behaviors do not imply live activation.
 
+For incomplete version-2 creation, the exact owning Conversation follows
+**Owner-led creation recovery** in `.prime-claw/workflows/implement-task.md`
+before active-session or Episode-report checks. It inspects current task,
+resource, saved/live session and initial-assignment evidence, then makes only a
+justified targeted ownership update using the existing registry lock,
+selected-entry compare-before-edit and verification reread. All other owners
+and original bindings survive. This owner-only exception is not permission for
+an Episode or Expert to edit ownership. Keep truthful Blocked until clearance;
+restore/publish In Progress only if needed before initial execution. Failed
+publication must report local versus published state, not assumed rollback.
+The existing independent-Backlog/Orca `operationId`/`sessionId` seam completes
+only its supported missing preparation/launch or binds an already assigned
+session without sending again. Unsupported remaining shapes are reported as
+concrete interface limits; ambiguous delivery is inspected, never replayed.
+Branch/worktree deletion remains an exceptional separately operator-authorized
+workaround, not the recovery design.
+
 The global `plan` skill and `plan_task({"taskId":"TASK-ID"})` tool resolve
 one exact task through the live native provider and admit it only in canonical
 `In Design` or `In Planning`. They preload the project-customizable

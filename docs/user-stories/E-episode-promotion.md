@@ -165,8 +165,18 @@ is not proof of rollback to `In Planning`.
 
 Later partial or uncertain ownership/resource mutation retains exact evidence;
 public admission is never replayed as fresh allocation or delivery. Follow the
-existing bounded same-operation continuation guidance; these checks do not
-guarantee that later external operations will succeed.
+**Owner-led creation recovery** procedure in the canonical project
+`implement-task` workflow before active-session/report requirements. The exact
+owning Conversation may make a justified targeted ownership update with the
+existing registry lock, current selected-entry compare-before-edit and verification
+reread, preserving every other owner and original binding. No Episode or Expert
+inherits that exception. Inspect saved/live session and assignment evidence;
+never clear identities or mark active from session existence alone. Restore and
+publish In Progress only if needed after accepted clearance, and report local
+versus published status on failure. Use existing native operations for proven
+missing steps; report unsupported shapes or ambiguous delivery without replay.
+Deletion is only an exceptional separately operator-authorized workaround.
+These checks do not guarantee that later external operations will succeed.
 
 For retained version-1 compatibility, this Conversation's project-registry ownership entry can be
 `provisioning`, `active`, `uncertain`, or `inactive`. Partial provisioning or
@@ -181,7 +191,9 @@ customizable internal policies for the active exact-task admission path. They
 encode the `In Planning` structural and semantic readiness gates, the single
 `create_task_episode` call boundary, provider-native `In Progress` publication,
 a durable provisioning reservation before branch/worktree/session creation,
-clean rollback to `In Planning`, and uncertain/partial `Blocked` outcome.
+and owner-judged failure disposition from actual native facts rather than an
+automatic rollback or Blocked publication. Existing incomplete creation routes
+to owner-led reconciliation rather than repeating fresh In Planning admission.
 
 The deterministic admission helper now resolves placement before it
 queues either compact-first workflow message. It accepts one exact ready local

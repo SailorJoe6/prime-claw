@@ -104,7 +104,24 @@ resource facts. It revalidates carried stable placement and never silently
 substitutes it. A failed native status publication requires inspection of actual
 task/history state, not an assumed rollback. There is no approval store,
 consume/expiry guard, or required prior-entry sequence. For partial creation,
-follow the existing bounded same-operation continuation guidance below.
+follow **Owner-led creation recovery** in the canonical project
+`implement-task` workflow before active-session or Episode-report checks.
+An unstarted Episode cannot supply a completion/blocker report. The exact owner
+inspects current task/publication, resources, saved/live sessions and assignment
+evidence, preserves every original binding, then may make only the documented
+targeted ownership correction under the existing registry lock with a fresh
+selected-entry compare-before-edit and verification reread. Other owners retain
+their current raw entries; this is not an Episode/Expert edit permission.
+Known session identity is never cleared to pass a guard, and active requires
+both exact session and initial-assignment proof. Cleared incomplete creation can
+use existing provisioning; unresolved evidence stays uncertain. Restore native
+In Progress only when needed after accepted blocker clearance, publish it before
+execution, and distinguish local from published state after failure. Complete
+only proven-missing steps in the same resources through supported native
+interfaces; the existing independent-Backlog/Orca operation/session seam is not
+universal recovery support. Stop on foreign identity, conflicting sessions or
+ambiguous delivery. No new API/state/receipt/retry engine or resource deletion is
+part of this procedure; deletion is an exceptional operator-authorized workaround.
 
 ### Retained version-1 compatibility path
 

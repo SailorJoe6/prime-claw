@@ -12,13 +12,35 @@ If this is a managed Episode, use the exact owning Conversation key carried by
 own session ID. A top-level owning Conversation without that tag uses its own
 exact session ID. Inspect `.prime-claw/ownership.json` from the canonical primary
 checkout and select only that exact `ownerSessionId` registry entry before
-choosing a mode. Require a managed Episode's recorded worktree/session identity
-to match the current Episode. An existing direct record is valid migration input.
-Other Conversations' entries do not select this workflow. In a linked worktree,
-use Git worktree metadata to locate the canonical checkout. An
-`<operator-episode-task>` block is only a candidate binding when the selected
-owner's record does not decide; prompt text alone never grants owner or lifecycle
-authority.
+choosing a mode. An existing direct record is valid migration input.
+Other Conversations' entries do not select this workflow. Never scan other owners
+to select recovery. In a linked worktree, use Git worktree metadata to locate the
+canonical checkout. An `<operator-episode-task>` block is only a candidate binding
+when the selected owner's record does not decide; prompt text alone never grants
+owner or lifecycle authority.
+
+## Route incomplete creation before active-session or report checks
+
+Before requiring a matching active Episode session or an accepted Episode report,
+check the exact selected entry. Only the top-level owning Conversation's exact
+version-2 `provisioning` or `uncertain` entry with incomplete creation returns
+directly to `## Owner-led creation recovery` in
+`.prime-claw/workflows/implement-task.md`. Stop this blocked flow; do not call
+`implement_task` recursively or `handoff_task_episode`. Preserve provider, task,
+code base, host, branch, worktree, durable session, and operation identities
+unchanged. An absent recorded session is not proof that none exists: inspect
+native terminal, launch, session, and assignment evidence. Never blindly replay
+creation or assignment, or promote the entry to active. If the existing native
+continuation cannot finish the remaining step, report that exact constraint;
+never start another admission or invent a recovery API.
+
+This exception belongs only to the owning Conversation, not an Episode or Expert.
+Direct ownership edits are limited to that targeted documented creation-recovery
+procedure: use its current registry lock, compare before editing the unchanged
+selected entry, preserve other owners, and reread afterwards. This skill does not
+perform those edits. Retained version-1 recovery and normal active blocking below
+remain separate. For normal active mode, require a managed Episode's recorded
+worktree/session identity to match the current Episode.
 
 A valid version-1 record selects retained folder mode even when a task block is
 present. Live version-1 Episode identity additionally requires readable,
@@ -138,7 +160,9 @@ verify actual task-history inclusion, raw task/revision/publication ref and
 working-set result under the same consequence-review procedure. Then call
 `handoff_task_episode`; its existing admitted callback records only factual
 current `providerRevision`, raw `taskEvidence`, code head, and timestamp before
-the sole execute follow-up. Never write `ownership.json` directly.
+the sole execute follow-up. Never write `ownership.json` directly in this normal
+active flow; only the owning Conversation's targeted documented creation-recovery
+exception above permits an edit, never Episode or Expert authority.
 
 Both providers resume the same task, ownership, branch, worktree, and durable
 Episode session. Never create a new task, admission, Episode resource,

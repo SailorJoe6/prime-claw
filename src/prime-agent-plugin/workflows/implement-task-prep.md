@@ -10,6 +10,28 @@ substitute, search for, or select another task here. Preserve any optional
 `<operator-implementation-host>` stable `id:<setup-id>` unchanged as placement
 data for the final create call, not as authority.
 
+## Route incomplete creation before readiness
+
+Inspect `.prime-claw/ownership.json` in the canonical primary checkout and select
+only this top-level owning Conversation's exact `ownerSessionId` entry, accepting
+an exact direct migration record. Never scan other owners to select recovery.
+If that exact version-2 entry is `provisioning` or `uncertain` with incomplete
+creation, skip the fresh `In Planning` sniff and compaction below. Preserve its
+provider, task, code base, host, branch, worktree, durable session, and operation
+identities unchanged. An absent recorded session is not proof that none exists;
+retain native terminal, launch, session, and assignment evidence. Never blindly
+replay creation or assignment, or promote the entry to active.
+
+Report the exact recovery facts as Status, Evidence, and Next Step, then end the
+turn. The independently queued `.prime-claw/workflows/implement-task.md` follows
+its `## Owner-led creation recovery` procedure in the same resources. If native
+continuation cannot finish a remaining step, report that exact constraint; do not
+invent a recovery API or new admission. Do not call
+`implement_task` recursively, invoke `handoff_task_episode`, edit ownership here,
+or reconstruct the queued workflow. Retained version-1 and normal active
+Episode behavior remain unchanged; this route grants no Episode or Expert owner
+rights.
+
 Keep the operator's actual implementation authority and approved scope in
 context. Explicit conditional “plan this task, then implement it when ready”
 authority may survive planning, preparation, and compaction; planning alone does
