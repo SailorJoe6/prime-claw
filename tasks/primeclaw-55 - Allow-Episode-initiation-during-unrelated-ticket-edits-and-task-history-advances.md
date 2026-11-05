@@ -3,10 +3,10 @@ id: PRIMECLAW-55
 title: >-
   Allow Episode initiation during unrelated ticket edits and task-history
   advances
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 08:51'
+updated_date: '2026-11-05 14:30'
 labels: []
 dependencies: []
 references:
@@ -1574,6 +1574,16 @@ Readiness preflight COMPLETE: fresh supported native Prime Agent list/sessions r
 After verifiedidlecompletion/explicitdescendants/currentcleancodeandTaskproof, onlyownConversationmay publish ReadyforMerge through independentBacklog native exacttaskpath/normalnonforceTaskref push, leavingbothcodeHEADsunchanged andfast-forwardingintendedTaskclones. PreserveEpisodePlanNotesACSummaryunknownfields. Presentactual(taskId,mainHead,candidateHead) andproviderfacts forJoe separateMerge decision. No55intoMAINmerge/globalapplyactivationrestart/live45-foreignsessionresources/dependencyselector-version-trustchange/retainedtransition-redesign/abandonment/destructivelivecleanup authorized. Currenttaskfieldssolecontract/compatiblelivingplan-unrelateddescendantsnormal, originalJoece2normalin-scopefixvalidationauthority/no routinepermission-oldcaps/genuineScopeproductunsafeinfraoutcomeJoe.
 
 Ready tuple for separate operator Merge decision: (PRIMECLAW-55, a167747e7e40a614fd13407dc384c6a2c4c03591, 52f3227a11df500c3d4cd6b8b853bc1e37ccae4f). integrationBranch is main by old-record omitted-field fallback. No code merge/push, global activation/restart, abandonment, resource cleanup or new Episode/assignment is performed by this status publication. Delay is a strict no-op; actual Merge requires explicit authority for this tuple and fresh preflight.
+
+## Operator-authorized merge complete
+
+Joe explicitly instructed "Merge it" for the displayed tuple (PRIMECLAW-55, mainHead a167747e7e40a614fd13407dc384c6a2c4c03591, candidateHead 52f3227a11df500c3d4cd6b8b853bc1e37ccae4f). Fresh preflight re-read exact owner/resources, native Ready task in both clean directly published independent Backlog stores, operation-free clean canonical main and candidate with matching local/upstream/direct-remote heads, and successful ancestry.
+
+Fresh supported Prime Agent list/state observations showed the exact Episode saved/inactive/idle, no live route, nonactive/nonstreaming/noncompacting, unfinishedActionCount0 and empty queues. It is now unloaded, so runtime-only Bash/tools/child flags are absent, not fabricated false. Active-only provider inventory and family roster confirm no resident worker. The two previously proven explicit children remain saved idle/inactive/deleted/archived with zero pending work, matching parent edges and no further explicit descendants. The earlier exact live-state completed-pass proof and own-family terminal relay remain consistent; no session was woken or assigned work.
+
+Ordinary git merge --ff-only 52f3227a11df500c3d4cd6b8b853bc1e37ccae4f succeeded on canonical main. Normal non-force push HEAD:refs/heads/main succeeded. Fresh main/local-upstream-direct-remote all equal the approved candidate; checkout clean and up to date. This exact task alone is now marked Done on refs/heads/prime-claw/tasks with preserved Description, Plan, all nine checked ACs, Final Summary, unknown fields and unrelated work. Code HEAD remains 52f3227; the Episode nested task clone is fast-forwarded to the published terminal revision before cleanup.
+
+Automatic cleanup-only finalization follows this verified terminal publication for the exact owned Episode and explicit descendants/resources. No new Episode, execution assignment, foreign cleanup, global plugin apply/activation, Prime Agent restart, live PRIMECLAW-45 recovery, dependency change or retained lifecycle redesign is authorized or performed. Existing validation and review evidence and limits remain unchanged.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
