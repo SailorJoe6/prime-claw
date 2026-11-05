@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 02:01'
+updated_date: '2026-11-05 02:07'
 labels: []
 dependencies: []
 references:
@@ -713,4 +713,9 @@ Also complete the inventory-wide shipped/global/canonical-template/managed-proje
 Preserve the approved native Beads touched-table/staged-set multi-issue semantics, native pushed-versus-task-publication qualification and full raw views/absence; no per-issue isolation promise or replacement dirty gate. Preserve Backlog selected-file publication/unrelated Git bytes/staging/history/compatible native descendants, exact owner/operation/resources/one assignment, custom managed guidance, accepted CA read-only/TLS-on/privacy/source selection/provenance/cleanup and all historical pass/failure evidence. Peer57/58 source landings are separate operator decisions: preserve their durable-ID/read-only-startup behaviors and foreign owner entries; do not treat changing main/task metadata as approval locks or infer global activation/restart/55source merge. Ordinary own-branch integration when actually needed must be explicit, clean, supported and owned by this Episode, not a foreign resource action or whole-file overwrite.
 
 Task remains In Progress/all9ACunchecked/FinalSummary unfinished. No new Episode, global apply/activation/restart, dependency/version/selector/trust-settings change, live45 mutation, retained-folder redesign, MAIN merge/abandonment or destructive live cleanup is added. Genuine scope/product/unsafe unsupported infrastructure/outcome choices still go to Joe; routine approved implementation/validation does not.
+
+## Remaining creation/admission slice selected from accepted bdd
+Fresh prepare verified the same active owner/provider/task/session/worktree and current native owner6659 acceptance plus handoff99441. R1/R2 are accepted and completed, not pending repair. Select the next substantive BOTH-provider creation/admission/status/reservation/pre-session extraction: remove duplicated status/plan/code-base/cleanliness/frozen-content predicates and automatic exception-selected InPlanning/Blocked publications. Retain the explicitly requested one native InProgress operation, exact identity/resource targeting, actual command results, existing R2 mutation→tool/ONEinitial execute facts and truthful failure evidence. Relocate readiness and failure-disposition decisions into existing editable implementation guidance, not a new API/policy/evidence framework. Matching real default-path/ordinary-provider status tests and Docker validation are required before candidate claims.
+Independent read-only source audit agreed that the fixed requested InProgress operation is native mechanics, not the removed semantic readiness decision. Complete read-only asset audit covered all28shipped Markdown assets/17managed destinations plus project-only Backlog skill,46files: found residual authoring/index cleanliness, incomplete prompt durability/nativeBeads consequence guidance and incorrect independent-history Expert reads. Preserve this inventory/audit finding on THIS task; apply proportional affected guidance now and keep the entire remaining lifecycle/audit/recorded45scope here. No AC is fully satisfied yet.
+Fetched current main read-only to inspect available57/58 and earlier accepted changes; no integration has been made, and current creation-policy edits do not require it. Source remains acceptedbdd at this checkpoint. No test/Docker actor, resource reservation, host/global activation, live45/provider mutation, foreign ownership change, merge or cleanup occurred.
 <!-- SECTION:NOTES:END -->
