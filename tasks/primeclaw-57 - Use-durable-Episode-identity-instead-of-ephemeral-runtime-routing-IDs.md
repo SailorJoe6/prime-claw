@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-57
 title: Use durable Episode identity instead of ephemeral runtime routing IDs
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-11-04 14:05'
-updated_date: '2026-11-05 00:48'
+updated_date: '2026-11-05 01:50'
 labels: []
 dependencies: []
 references:
@@ -191,6 +191,14 @@ Owner review accepts PRIMECLAW-57 as Ready for Merge. Integration target: main a
 Acceptance evidence reviewed: AC1-2 durable identity/current-route cleanup and historical-route reuse; AC3 wrong/missing/ambiguous identity and busy/unknown-idle refusal; AC4 focused isolated regressions; AC5 both related bridge replay/migration route-only defects reproduced and corrected, with normal lookup/reopen/handoff audited. Two independent material reviews found no defect. Existing 356/356 related tests and 4/4 focused migration tests passed; required own scripts/test-tier1.sh --probe now PASSED on 575e5d393674c276f06951d0607eeefc61e0289b.
 Own native evidence proves source build, selected Prime Agent 0.9.8 install, network absence, isolated plugin apply/check/offline RPC and exact clean builder/runtime teardown. All 15 manifest evidence hashes were checked. Evidence: .test-results/primeclaw57-support-20261105T002815Z/20261105T003332Z-69482-f6f2a8b7/tier1/manifest.json in the Episode worktree. Only accepted isolated diagnostics/CA support was reused, with matching patch IDs; no 55 N3/product/test-typo changes. Routing bytes match reviewed 36de6686. Candidate adds only current main ownership metadata to the passed 575e5d3 source tree; no product/harness/test change from that integration.
 Exact provider-reported Episode identity is idle, no queued/unfinished work, running tools, Bash, RLM children or explicit descendants. Same owned resources remain. Full migration-suite completion and live activation/UAT are not claimed. This is Ready publication only: operator merge decision remains pending; no merge into main, global activation/restart, retained TASK-2 use or owned live Episode cleanup.
+---
+
+author: Prime Claw owning Conversation 01a1a6e7-da13-750e-ae8b-f6a6888c3b42
+created: 2026-11-05 01:50
+---
+Source merged under Joe's delegated 57-first/58-second landing decision. Refreshed main base 99462df8a5cffd953486d9785a9eaa2b583756a6 was fast-forwarded to candidate 2170bc8ede899f390b865bb217b3ff56f52db285 and normally pushed; local/upstream/direct Main all match. This includes reviewed routing plus only accepted isolated diagnostics/public-CA support, no 55 N3 product code. Metadata refresh preserved current foreign ownership and did not alter tested product/harness bytes.
+Own required Docker build/install/apply/check/offline RPC probe passed; existing reviewed 356/356 related and 4/4 focused migration regressions apply to unchanged routing. Independent reviews found no material defect. Complete own test evidence is preserved outside the Episode at .test-results/primeclaw57-evidence-20261105T014155Z.
+Publish Done for this merged source outcome. No global plugin activation/restart or live UAT is claimed, and retained TASK-2 resources were not used or touched. Exact idle 57 Episode cleanup follows automatically; foreign 55/58 ownership/resources and shared task history remain preserved.
 ---
 <!-- COMMENTS:END -->
 
