@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-05 16:04'
+updated_date: '2026-11-05 16:08'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -154,5 +154,13 @@ author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
 created: 2026-11-05 16:04
 ---
 Owner reviewed the first Episode report: before slice1, native Git SSH reads failed with publickey; no implementation changes or status edits occurred. The same approved SSH remote now succeeds without any credential, Keychain, SSH-config, Git-config or remote changes. Owner observed git -C .backlog ls-remote origin refs/heads/prime-claw/tasks exit0 and the identical read against the exact Episode .backlog clone exit0, both returning published55530cc9f572adad5f966d6ac00635fe65518fb9. GIT_TRACE confirms native /usr/bin/ssh targets git@github-sailorjoe6 and SailorJoe6/prime-claw.git for both. The earlier failures are real; their cause remains unknown. No alternate transport or credential extraction is needed from these current facts. Native task remains In Progress; no Blocked transition was published. This compatible execution observation does not change approved scope, plan, ownership or resources. Continue the same Episode under existing implementation authority through canonical handoff; do not replay initial creation/assignment, change remotes/credentials, or waive publication proof. A later failed or uncertain write requires actual-state inspection rather than blind retry.
+---
+
+author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-05 16:08
+---
+Owner transport follow-up (2026-11-05): read-only SSH ls-remote succeeds, but normal writes remain blocked. Initial task-note push and one separately reviewed non-force attempt after inspecting unchanged refs both received remote: fatal error in commit_refs_rules. Fresh direct reads after each refusal still show refs/heads/prime-claw/tasks at55530cc9f572adad5f966d6ac00635fe65518fb9. GitHub public status reported All Systems Operational with no incident; this does not explain the repository-specific failure. No rules, credentials, remotes or trust settings were changed.
+
+Local402073242017591e9928495853e2509c75665473 contains the exact45 transport note after other owner's reviewed59-only ee47f33981b02c8b2cae9b40309b90b813962a64. That owner explicitly confirmed its publication authority and observed the same server error. Preserve both commits unchanged; do not replay edits, force/reset or bypass repository rules. This blocker note is local-only until normal publication is restored. Published task status remains In Progress; no Blocked publication is claimed. The same Episode remains idle before implementation changes. Unblock condition: operator-cleared normal repository publication access, followed by inspection of current local/remote history and successful ordinary non-force publication/readback before canonical same-Episode continuation. No new Episode, initial assignment, credential extraction, deployment or activation is authorized.
 ---
 <!-- COMMENTS:END -->
