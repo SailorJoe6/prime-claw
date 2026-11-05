@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-05 16:41'
+updated_date: '2026-11-05 17:07'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -21,6 +21,7 @@ documentation:
   - docs/conversation-driven-episode-oversight.md
   - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/traceability.md
+  - docs/testing-strategy.md
 modified_files:
   - .agents/skills/blocked/SKILL.md
   - .prime-claw/templates.json
@@ -28,6 +29,7 @@ modified_files:
   - .prime-claw/workflows/implement-task.md
   - docs/backlog.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/testing-strategy.md
   - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/traceability.md
   - src/prime-agent-plugin/skills/implement-task/SKILL.md
@@ -38,6 +40,7 @@ modified_files:
   - tests/test_blocked_skill.py
   - tests/test_future_plan_skills.py
   - tests/test_oversee_episode_skill.py
+  - tests/test_reviewed_plan_extension.py
 priority: p1
 type: bug
 ordinal: 141000
@@ -186,4 +189,27 @@ Validation:
 Evidence limits and failed attempts: the exercise is native publication/registry smoke, not LLM compliance, real Orca/session recovery, complete creation or activation proof. The route writer's bounded Markdown contradiction check found no material mismatch; it ran no extra runtime tests and is not an independent full-candidate review. The first simultaneous focused Docker fixture failed before test bodies during builder-image inspection; its recorded image ID was subsequently absent and no test builder container remained. The independent probe passed. After inspecting those facts, the focused run was restarted alone and passed; no source-builder/provenance bypass was added. Failed setup evidence remains at .test-results/20261105T163515Z-96256-ec63b156/tier1. A broad host-safe policy selection also reached one unchanged old authoring fixture that assumes missing backlog/config.yml and failed before its native command (56 other tests passed); the relevant selected policy/routing suites above are green. That legacy fixture was not rewritten as unrelated work.
 
 Remaining approved work: representative Markdown-led allocated-worktree/pre-session and existing-session/assignment recovery exercises through actual supported native operations, including ambiguity-stop evidence; inspect any remaining concrete unsupported partial shapes and make only justified narrow enabling changes if needed. Existing adapter regressions and this native smoke do not close those outcomes. Keep the complete task unfinished, all seven AC unchecked, and status In Progress. This Episode made no live ownership/lifecycle change, new Episode/initial assignment, PRIMECLAW-45 recovery, dependency patch, merge, activation/restart, abandonment or destructive action. Await owner review of this bounded candidate before another execute slice.
+
+## Slice 2 accepted; native session component published, Orca fixture gap remains
+
+The owning Conversation accepted code 9795e575ad5737bf19ede021b30d8893c84a90bf and native task history 55f03064649dcc4b8ccb1954a074bfab5107a74f after reviewing all 15 files, the current native contract and direct publication, both passing Docker manifests with 15+16 valid listed hashes, the actual registry lock, and all three changed managed-copy hashes. GPT-6 Astra (openai-codex/gpt-6-astra, max) independently found no material defect and reran the 17 focused policy/routing tests successfully. Its first abbreviated-node command ran no tests before the corrected passing command. Reviewer did not rerun Docker; owner reran no tests. That reviewer is completed/deleted. This acceptance advances the same Episode within the approved plan; it does not claim task completion, LLM compliance, actual Orca recovery or activation.
+
+Published bounded component candidate: d45005dc9cf5139f7fc5926af476fe80b5e16c88 on JLanders/prime-claw-primeclaw-56-episode-b31eee86, directly verified at origin. Three files changed: tests/test_reviewed_plan_extension.py, docs/testing-strategy.md and docs/user-stories/traceability.md. The original base f5287c3647245a6a5e6d3baad64d9cecf1dab81b, integration target main and all live Episode identities remain unchanged. This slice adds one real native daemon/session component exercise and documents its exact limit, rather than another adapter matrix or a recovery framework. No plugin TypeScript, production workflow/source, ownership state/schema, retry planner, receipt/checkpoint protocol or dependency was changed.
+
+`test_native_creation_session_assignment_and_saved_session_reuse` creates one disposable Git worktree and uses the unmodified PrimeSessionPublisher and DaemonJsonlClient against a real isolated Prime Agent daemon, not a fake daemon/publisher/Orca adapter. A native-discovered inert provider returns a fixed harmless response without credentials or external service contact. Native SessionManager allocation is flushed before publication. The real daemon admits exactly one harmless fixture assignment through deliverExecute. Native wait_for_idle, get_state and get_messages establish its exact worktree/session and one user assignment. After stopping only that inspected idle fixture route, native reopen uses the same saved file, durable ID, CWD and session name; native messages still contain exactly one assignment and there is one session at that worktree. Git worktree inventory is unchanged. The probe runs only through scripts/run-prime-agent-probe.sh inside the network-disconnected tier-1 container, with isolated settings, sessions, socket/generation and verified teardown. The test-owned route stop/reopen is not an action on the live implementing Episode.
+
+Validation:
+- `python3 -m pytest tests/test_reviewed_plan_extension.py::test_native_creation_session_assignment_and_saved_session_reuse tests/test_reviewed_plan_extension.py::test_real_v098_fresh_session_is_flushed_before_daemon_publication -q -m container`: 2 passed in 105.82s. The older flush test still injects a fake daemon client; only the new test is actual daemon evidence.
+- Manifest: .test-results/20261105T170128Z-53344-451c7547/tier1/manifest.json; SHA-256 b9017b2d57233d41fcea84ed43742b1cee0d2ba872dcef101051ddf72d39cfbd. run.status passed, no failure codes, network verified absent, clean teardown verified absent, all 15 listed artifact hashes validated. Source mode used the same clean read-only Prime Agent cwd-fix-v0.9.8-r1 input at a1faacd53ac4473a75de1d434afaf50945c2f647; before/after source inventories match. No upstream changes.
+- Native component evidence: .test-results/20261105T170128Z-53344-451c7547/tier1/creation-native-session-component.json; SHA-256 af74f7618f3ce862725e6cf911321d33401177f47e19475595f97ee9c23c6b72.
+- Relevant policy/routing rerun: future-plan selected 3 passed/42 deselected; oversee plus blocked 14 passed. `git diff --check` passed. No plugin-source change occurred in this slice, so no separate new source-change probe was required; the container fixture still performed isolated apply/check. The preceding slice-2 probe and failed attempts remain recorded above. This native component run passed first attempt; it does not make the known unrelated legacy host fixture green.
+
+Concrete remaining fixture constraint and next action:
+The same native CliOrcaAdapter inventory call returned OrcaUnavailableError with ENOENT in this actual container. docker/test.Dockerfile installs task CLIs and Node22 but no Orca; tests/conftest.py mounts only the snapshot/share and disconnects all networks before product operations. Therefore this environment cannot perform the approved real Orca setup/worktree/automation/connected writable visible Prime Agent tab binding. Editable recovery instructions and existing native operations cannot invoke an absent control plane. This is not a claim that Linux/headless Orca is unsupported: the installed public `orca serve` specification explicitly supports headless serving. A read-only helper audit identified complete Linux Orca/Orcad package/runtime staging and isolated profile/readiness as the required fixture prerequisite, not a dependency patch or a new plugin API. It did not prove such an artifact operational here. Do not copy the host macOS launcher alone, mount a production profile/socket, contact the production control plane, silently switch engines, or call adapter success actual Orca evidence. To clear the gap, provide/stage a compatible supported Linux Orca/Orcad distribution in the disposable Docker fixture before network cutoff, isolate its profile, and prove the actual native setup/terminal/launch boundary before the two recovery exercises. No installation/control-plane change was attempted by this slice.
+
+Inspection of concrete remaining shapes confirms the current existing-operation seam accepts allocated independent-Backlog Orca only. Local/Beads/grandfathered/identity-incomplete partial shapes cannot pass that seam; generic fresh allocation refuses prior resource identity. An established launchAutomationName/ID/runID or candidate session collides with the no-session continuation; missing recorded session is not non-delivery proof. Existing-session binding requires one live exact route and its connected writable visible Orca tab; an inactive saved session is not directly bindable there. The public native create(sessionPath) interface can reopen a proven exact saved session without a new assignment (demonstrated at component level here); broader completion remains owner-led evidence judgment plus supported exact native operations, not fresh creation. No remaining TypeScript barrier was changed or assumed away, and this inspection does not claim every partial shape has been successfully recovered.
+
+Evidence limit: this is actual native session-component proof only. It does not exercise the complete owner-led same-operation creation procedure or canonical execute workflow, actual Orca allocation/automation/visible-tab recovery, genuine ambiguous-delivery stop, LLM policy compliance or activation. The two representative full allocated-pre-session/existing-session recovery exercises and ambiguity-stop evidence therefore remain unfinished, along with any narrow enabling work justified by concrete remaining obstacles. Keep all seven AC unchecked, Description and approved living Implementation Plan unchanged, and status In Progress. The owner alone decides lifecycle disposition of the reported fixture gap.
+
+No live PRIMECLAW-45 recovery, live ownership/status mutation, new live managed Episode/initial assignment, global apply/check/activation or restart, merge, dependency patch, abandonment or destructive live cleanup occurred. Main's compatible ad96ebf ownership-only advance was not merged. No primary task clone was synchronized or changed. Report this bounded published candidate and exact fixture gap to the owning Conversation, then stop for review.
 <!-- SECTION:NOTES:END -->
