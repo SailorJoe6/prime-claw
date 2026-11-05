@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:21'
-updated_date: '2026-11-05 08:08'
+updated_date: '2026-11-05 08:37'
 labels: []
 dependencies: []
 references:
@@ -14,21 +14,29 @@ references:
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - .backlog/tasks/primeclaw-45 - Migrate-prime-claw-to-Backlog.md-v1.55.3.md
 documentation:
-  - docs/prep-chain.md
+  - LONG_RANGE_PLAN.md
+  - README.md
+  - REQUIREMENTS.md
+  - VISION.md
   - docs/backlog.md
-  - docs/handoff-chain.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/future-specification-bundles.md
+  - docs/handoff-chain.md
+  - docs/prep-chain.md
+  - docs/project-initialization.md
+  - docs/user-stories/B-project-initialization.md
+  - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/I-episode-finalization.md
-  - docs/future-specification-bundles.md
-  - VISION.md
-  - LONG_RANGE_PLAN.md
+  - docs/user-stories/README.md
+  - docs/user-stories/traceability.md
 modified_files:
   - .agents/skills/backlog/SKILL.md
   - .agents/skills/blocked/SKILL.md
   - .agents/skills/design/SKILL.md
   - .agents/skills/execute/SKILL.md
   - .agents/skills/spec-it-out/SKILL.md
+  - .prime-claw/ownership.json
   - .prime-claw/templates.json
   - .prime-claw/workflows/handoff.md
   - .prime-claw/workflows/implement-task-prep.md
@@ -37,30 +45,46 @@ modified_files:
   - .prime-claw/workflows/plan-task.md
   - DEVELOPERS.md
   - LONG_RANGE_PLAN.md
+  - README.md
   - REQUIREMENTS.md
   - VISION.md
   - docs/backlog.md
   - docs/conversation-driven-episode-oversight.md
+  - docs/evidence/primeclaw-48-integration-target-foundation-20261103.md
+  - docs/evidence/primeclaw-48-target-aware-lifecycle-20261103.md
+  - docs/evidence/primeclaw53-independent-task-publication.md
   - docs/future-specification-bundles.md
   - docs/handoff-chain.md
   - docs/prep-chain.md
+  - docs/project-initialization.md
   - docs/testing-strategy.md
+  - docs/user-stories/B-project-initialization.md
+  - docs/user-stories/E-episode-promotion.md
   - docs/user-stories/H-handoff-and-continuation.md
   - docs/user-stories/I-episode-finalization.md
+  - docs/user-stories/README.md
+  - docs/user-stories/traceability.md
   - scripts/testing/provenance.py
   - scripts/testing/source_builder.py
   - scripts/testing/source_builder_payload.py
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
   - src/prime-agent-plugin/extension-support/prep-chain.ts
   - src/prime-agent-plugin/extension-support/project-initialization.ts
   - src/prime-agent-plugin/extension-support/reviewed-plan-support.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extension-support/task-episode-cleanup.ts
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
   - src/prime-agent-plugin/extension-support/task-providers.ts
   - src/prime-agent-plugin/extension-support/workflow-chain.ts
   - src/prime-agent-plugin/extensions/handoff-chain.ts
+  - src/prime-agent-plugin/extensions/project-initialization.ts
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
   - src/prime-agent-plugin/skills/implement-task/SKILL.md
+  - src/prime-agent-plugin/skills/initialize-prime-claw/SKILL.md
+  - src/prime-agent-plugin/skills/initialize-prime-claw/STARTUP.md
   - src/prime-agent-plugin/skills/plan/SKILL.md
   - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
@@ -75,6 +99,7 @@ modified_files:
   - src/prime-agent-plugin/workflows/plan-task.md
   - tests/beads_task_episode_admission_extension.test.mjs
   - tests/conftest.py
+  - tests/container/sandbox_plugin_install_probe.py
   - tests/handoff_chain_extension.test.mjs
   - tests/project_conversation_extension.test.mjs
   - tests/project_initialization_extension.test.mjs
@@ -83,6 +108,7 @@ modified_files:
   - tests/task_episode_admission_extension.test.mjs
   - tests/task_episode_ownership_extension.test.mjs
   - tests/task_history_workspace.test.mjs
+  - tests/task_provider_migration.test.mjs
   - tests/task_providers.test.mjs
   - tests/test_blocked_skill.py
   - tests/test_execute_skill.py
@@ -90,8 +116,11 @@ modified_files:
   - tests/test_future_plan_skills.py
   - tests/test_handoff_chain_extension.py
   - tests/test_oversee_episode_skill.py
+  - tests/test_prime_agent_plugin_install.py
+  - tests/test_project_initialization.py
   - tests/test_reviewed_plan_extension.py
   - tests/test_source_builder.py
+  - tests/test_task_provider_migration.py
   - tests/test_task_providers.py
   - tests/test_tier1_fixture.py
 priority: p1
@@ -539,6 +568,12 @@ This handoff makes ONLY this native ImplementationPlan+updatedAt checkpoint and 
 
 ## Current execution focus — validate the resolved combined source
 The observed-main merge is resolved/staged but uncommitted and runtime UNVALIDATED. Run the required fresh Docker source probe after current capacity coordination, then proportional existing combined-default/durable-route/read-only-startup regressions. Diagnose actual failures before in-scope repairs. Publish one tested integrated code/native candidate for normal owner review. Keep all9AC checked as accepted implementation evidence, status In Progress, historical FinalSummary and exact resources; no main merge or activation.
+
+## Current main integrated and validated — normal owner review next
+Published exact code52f3227a11df500c3d4cd6b8b853bc1e37ccae4f, ordinary merge parents ACCEPTED3ad8b5df4c5509139ad72f1d9b1211021ac4ddc7 + observed current clean/pushed canonical maina167747e7e40a614fd13407dc384c6a2c4c03591. Integration delta51files/+3200/-720; committed/tested binarypatchSHA6f8460006a7e5944bffab558926b29db2cca61034ae8e286ecf0ce6f7d119151. Code clean/upstream/direct-remote-equal. Native merge-base--is-ancestor a167747e7e40a614fd13407dc384c6a2c4c03591 52f3227a11df500c3d4cd6b8b853bc1e37ccae4f succeeds(exit0), verified on this observed tuple once; no frozen-main approval loop.
+Fresh mandatory corrected-source probe080451PASS96.078457s and actual corrected11body080901PASS11/1360.26s(shell1360.666847) cover exact same411/d1c617a3dd3a732a49e10f00ee87fa69c6fdc7f57ad51887a0698df4a3d97a99 source snapshot and exact committed delta. Migration rawTAP67total/55PASS/0FAIL/12SKIP(reverse-retired cases)/1095323.259208ms; not67green or native per-issue isolation/live45proof. Other successfulNodeTAP not retained/no counts invented. Actual static95PASS28deselected5.35s/parser/diffcheckPASS; three historical missing-config exclusions/containerdeselections NOT coverage. Priorfailed075126/075701 and initialpre-repairprobe074656 remain truthful version-qualified history.
+Preserved ALL main48target/52-53independentDAG/57durable-route-replay-migration-cleanup/58readonlystartup-globalgoals/sharedsupport AND Task55editablepolicy/rawfacts/R1R2/ONEinitial/BOTHcontinuation/boundedoriginaloperation/R3retained-onlystrict-defaultproof/relaxedordinarycleanup/custom4/historicalassetdecisions/nativeBacklogliteral-Beadsmultiissue boundaries. Fixed one actual integration leak: ordinary task-only publication no longer checks parentcodebranch; captured-target addressing remains at creation/resource operations. Matching tests now assert actual native effects/preservation rather than removed eligibility/automaticrollback/Blocked policy. No unrelated native work/resources absorbed. Main bookkeeping bytes preserved exactly, canonical exactowner key remains soleauthority. Historicalmetadata baselines-state-overrides-provenance/otherentries preserved/currentchangedhashesonly/pre-existingplan-task+2prep qualifications/no resetallhashgate. Historicalarchivepair retained, not active authority or deleted for tests.
+No identified integration work remains. Await NORMAL owning Conversation review of this full integrated candidate, not a new routine test-fix permission pause. All9implementationAC staymet+checked/FinalSummaryupdated/InProgress, notReady/Done/mergeReady by inference. Owner later establishes providerreportedidlecompletion/explicitdescendants/nativeReady and separate exact operatorMerge tuple. No MAINmerge/globalactivationrestart/live45/foreignresources/dependencyselector-version-mode-trustchange/retainedtransition-redesign/abandonment/destructivelivecleanup/newEpisode-allocation-initialassignment authority. All disposableactors/monitors/children/captureholds are gone. Joece2 normal diagnosedin-scope revision/requiredvalidation persists; genuine product/scope/unsafeunsupportedinfra/outcome choices remain Joe.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -1492,28 +1527,56 @@ Actual FAILEDmanifest07:59:50Z/tests-failedONLY/networkabsent07:59:07Z/runtimeCL
 ONE granted normal scripts/test-tier1.sh --probe launched2026-11-05T08:04:50.339541+00:00/Bash20785/driver20846/run20261105T080451Z-20846-34f0b053. Actual shell0/96.078457s; manifestPASSED08:06:25Z/emptyfailurecodes/offlineapply-check-RPC/networkabsent08:06:16Z. Log/tmp/primeclaw55-main-integration-publication-repair-source-probe.log; receipts.test-results/20261105T080451Z-20846-34f0b053/tier1. Actual repairedsource snapshot411/framed-sha256-v2/d1c617a3dd3a732a49e10f00ee87fa69c6fdc7f57ad51887a0698df4a3d97a99=3adHEAD+stageda167integration+diagnosedpublisherfix/tests. Current binarypatch6f8460006a7e5944bffab558926b29db2cca61034ae8e286ecf0ce6f7d119151 exactly equals captured inputs; no postcapture byteedit. Initial074656 remains pre-repair evidence, not substituted.
 RuntimeIIDsha256:f928c4146e4336e62d23979b1d6928b54855b5c636d4a46aa6792a3d65322b45/CIDe895108d35667bbc1e6de4fc20eff9901e59f280e68ce64ba65e34259a3c0b4b/normalCLEANABSENT08:06:25Z; builderIIDsha256:ebade20ddfbf949187929600076a122c7c2362fb23126a4b8976319b18273cfd/CIDde8c6d6188b3444b2f8e73f26167a5b4452ef5c2518ecb49f38484f69956aef7/normalCLEANABSENT08:05:38Z/sourcebuildPASS08:05:54Z. FreshBOTHexactDockerNoSuch/all15listedfilehashes verified; dependencycheckoutbeforeafterequal/sourcea1fa/tree-tag-lock-mode/publicCAreadonlyTLSprivacy/defaultnoCA/diagnostics/provenance retained. Resourcewindow08:04:38–08:14:38Z RETURNED2026-11-05T08:05:57.760954+00:00 on OBSERVEDmatchingRUNNINGimmutablecapture BEFOREofflinecompletion, no currentactor-monitor/futurehold. No oldfailure rewritten/new live action.
 Next proportional11body normal fixture repeats Backlog/Beads actualcallers because production status publication changed, then combined spec/ownership/R3/durable-route/recovery/startup/migration/oversight/handoff. Exact original11selector command will be recorded with launch/result. No allrepo/newmatrix/46audit/live45 proof; no unnecessary unchanged-history replay. SourceprobePASSisNOTfocusedgreen or integratedreadiness. KeepFAILED075126/075701/actual1+1separatepassingadmissionbodieshistorical; no fabricated11/10green. Same exactEpisode/merge stillstageduncommitted/AC9checkedasaccepted3ad/InProgress/FinalSummarypreserved/no MAINmerge-globalactivation-live45-dependencyforeignaction.
+
+## Main-integrated full Task55 candidate published — actual combined-source validation PASS
+
+### Exact candidate and integration
+Published ordinary merge commit `52f3227a11df500c3d4cd6b8b853bc1e37ccae4f` on `JLanders/prime-claw-primeclaw-55-episode-96306686`. Its exact parents are accepted complete-original-implementation3ad8b5df4c5509139ad72f1d9b1211021ac4ddc7 and actual observed clean/pushed canonical main`a167747e7e40a614fd13407dc384c6a2c4c03591` (not frozen historical2c65). No55intoMAIN merge occurred. Git exposed18 conflicted paths; each was resolved after base/ours/theirs/caller inspection. Net integration delta:51files/+3200/-720. Committed binarypatchSHA256`6f8460006a7e5944bffab558926b29db2cca61034ae8e286ecf0ce6f7d119151` equals BOTH final correctedsourceprobe and finalfocused captured inputs. No postcapture source/test/guidance/metadata edit occurred, and final code is clean/upstream/direct-remote-equal. `git merge-base --is-ancestor a167747e7e40a614fd13407dc384c6a2c4c03591 52f3227a11df500c3d4cd6b8b853bc1e37ccae4f` returned0 on the observed tuple once. All accepted history is preserved.
+Preserved main48 integrationBranch/baseRef/isolatedbranch separation, old omitted-target main fallback, current-target addressing and target/upstream nondeletion;52/53 independent task/code DAG publication;57 durable session route/replay/migration/cleanup;58 read-only startup/first-normal-turn Markdown timing and global goals placement; separately accepted diagnostics/publicCA support. Task55 lifecycle semantic decisions remain editableMD/LLM; raw facts/R1successfulstderr/R2fullcreate-ONEinitial-BOTHcontinuation-localRevision qualifications, bounded exact-operation/session reuse, strict retained R3defaultfirst-paired-final and relaxed ordinary cleanup remain. No workflow-status/design/code-dirt/upstream/frozen-head or exception-chosen InPlanning/Blocked policy was restored.
+One real combined-source defect was diagnosed and repaired: ordinary commitConversationTaskStatus initially consulted parent-code branch through48expectedIntegrationBranch. The independent-publication preservation regression caught it. The corrected ordinary publisher has no parent-code admission check/options; fresh creation checks its captured target before the requested native effect and exact resource operations retain addressing. Native exact ID/path/effect, collision/idle/explicitdescendants/uncommittedbytes/leases/comparedelete/atomicunchangedowner protections remain. No generalized framework/classifier/store/reconcile-retry/dependency patch.
+Managed current counterparts were updated proportionately; four substantive customizations and ALL historical baseline/state/acceptedOverride/provenance fields are preserved. Only actual changed current installed/available hashes refreshed. Pre-existing plan-task and two prep current-hash qualifications remain unchanged from3ad, explicitly nonblocking/not allhashescurrent or reset/override gates. The identical historical replace-beads archive pair exists in BOTH parents and remains unchanged; the old no-archive static assertion was corrected rather than deleting evidence. Main ownership.json bytes are EXACT observedmain bytes, no canonical registry hand-edit/identity invention; local merged snapshot never selects authority, only canonical primary exactowner key.
+
+### Actual fresh combined-source proof
+Required FINAL repaired-source `scripts/test-tier1.sh --probe`: run`20261105T080451Z-20846-34f0b053`, actual launch`2026-11-05T08:04:50.339541+00:00`, Bash20785/driver20846, shell0/96.078457s. ManifestPASSED08:06:25Z/emptycodes/offlineapply-check-RPC/networkabsent08:06:16Z. Log`/tmp/primeclaw55-main-integration-publication-repair-source-probe.log`; receipts`.test-results/20261105T080451Z-20846-34f0b053/tier1`. Repository411/framed-sha256-v2/`d1c617a3dd3a732a49e10f00ee87fa69c6fdc7f57ad51887a0698df4a3d97a99`. Initial074656PASS97.422419s remains PREpublisherrepair evidence, not substituted for this new source.
+FINAL proportional actual corrected command: `python3 -m pytest tests/test_task_providers.py::test_backlog_task_episode_admission_node_suite tests/test_task_providers.py::test_beads_task_episode_admission_node_suite tests/test_reviewed_plan_extension.py::test_spec_episode_node_suite tests/test_reviewed_plan_extension.py::test_task_episode_ownership_node_suite tests/test_project_initialization.py::test_project_initialization_node_suite tests/test_project_initialization.py::test_project_initialization_active_backlog_node_suite tests/test_project_initialization.py::test_first_native_session_does_not_initialize_or_discover_project_skills tests/test_task_provider_migration.py::test_task_provider_migration_node_suite tests/test_reviewed_plan_extension.py::test_reviewed_plan_node_suite tests/test_project_conversation_extension.py::test_project_conversation_node_suite tests/test_handoff_chain_extension.py::test_handoff_chain_node_suite -q -m container -x`. Run`20261105T080901Z-27441-53f41020`, launch`2026-11-05T08:08:59.924508+00:00`, Bash27439/pytest27441; actual PASS11bodies1360.26s(shell0/1360.666847s). Log`/tmp/primeclaw55-main-integration-publication-repair-focused.log`; receipts`.test-results/20261105T080901Z-27441-53f41020/tier1`. All selected bodies completed: actual default Backlog admission, Beads admission, SpecEpisode allocation/cleanup/blocked/recovery/durable routes, ownership including actual default R3/replay, project initialization, activeBacklog initialization, actual first-native-session read-only startup, task-provider migration, reviewed-plan, ordinary oversight injection and handoff. Backlog/Beads replay here is justified by changed PRODUCTIONstatus boundary, not another exhaustive matrix/history/46audit. No all-repository or liveactivation claim.
+BOTH final snapshots are IDENTICAL411/`d1c617a3dd3a732a49e10f00ee87fa69c6fdc7f57ad51887a0698df4a3d97a99` and exactcommittedpatch6f846...; oldf47/3adwhole-repo digests are not newbyte proof. Source `.env`/mode/version selection stays clean a1faacd53ac4473a75de1d434afaf50945c2f647/tree5301c70d9c9d74e474ccaf258fdd3c8de982c52f/annotatedcwd-fix-v0.9.8-r1/tag8ca4d5c39b7c738f71b5c86422ea46394c3d0558/package-lockSHA3e80422bb281cf9395937ef12bf43d038d92d92bf1f3f70596b63d5a3af2de74/source1258/c159dd4.../fullcheckout34038/b10e91... beforeafterequal. Existing publicCAhashb266ade9c48e556a9775b891873dfc0ba7fe64ac1cf459aa332d3f2ab4f8c7f8/269769bytes remains bounded/read-only/TLS-on/privacy/default-no-CA; no hostpath/contents/key/credentials exposed or trust/selector/dependency change. Accepted diagnostic/provenance/release protections retained.
+The retained raw migration TAP has67total/55PASS/0FAIL/12SKIP/1095323.259208ms, SHA256`59fd6117ce88ffd45bd5b0c0270ae06f68109a0d023e0b562f16c0e54f8f543c` in task-provider-migration-node.tap. All12 skipped cases explicitly concern retired REVERSEmigration; their named no-command refusal coverage remains separate. The post-switch route replacement activeBeads continuity case actually passed. Do not call this67green or native Beads perissueisolation/live45 proof. Other successfulNodeTAP is not separately retained by wrappers; no invented detailed counts. The long8thbody uses its EXISTING2400s bound, not a timeout increase. Bounded read-only process observations08:18/08:24 showed changingnativebd/Dolt activity/noD-state at those observations. The owner status inquiry raced actual terminal completion; no hang/infra cause, interruption/retry/newactor or settings repair is inferred.
+Final host-safe static/nativeGit selection95PASS28deselected5.35s(shell5.897932), /tmp/primeclaw55-main-integration-publication-repair-static.log. Initialstatic7FAIL88PASS28deselected5.40s and rerun1FAIL94PASS28deselected5.39s remain historical obsoletephrase/metadata/archive assumption results; final beforepublisherrepair95PASS28deselected5.16s is separate. Three historical missing-config exclusions pluscontainerdeselections remain NOT passing coverage; customized-asset/literal documented-shell nativeGit regression enabled. JS parser checks/gitdiff--checkPASS.
+
+### Exact capture return, cleanup and honest failed history
+FINALfocused manifestPASSED08:31:40Z/emptycodes/networkabsent08:10:41Z/runtime normalCLEANABSENT08:31:40Z. RuntimeIID`sha256:961d1534165e8e0eb0e365d6f23f8fc317b7e6acf7368a181e97d7532ba8dffc`/CID`8d91218d152223e33cb8e3d6bf98353bda4cc53062998f9541a43a2151a3242d`; builderIID`sha256:2f236c75861757369d5662fd06ddc18624fed56d3668043f4bd36fe9507fe284`/CID`ff9629a196c010931c523ee93bb9bee44150c0fc6f977a586e6d83a0125971f7`/normalCLEANABSENT08:09:49Z/sourcebuildPASS08:10:03Z. FreshBOTHexactDockerNoSuch and all17listedfilehashes verified. Newrunownedshare/snapshot normallyremoved; durable receipts/log/rawmigrationTAP remain. Actual08:08:47–08:18:47Zwindow RETURNED`2026-11-05T08:10:08.738633+00:00` on OBSERVEDmatchingRUNNINGimmutablecapture BEFOREofflineassertions, not held for the long migration suite. No current actor/monitor/child/reservation/futurehold.
+CorrectedPROBE runtimeIID`sha256:f928c4146e4336e62d23979b1d6928b54855b5c636d4a46aa6792a3d65322b45`/CID`e895108d35667bbc1e6de4fc20eff9901e59f280e68ce64ba65e34259a3c0b4b`/normalCLEANABSENT08:06:25Z; builderIID`sha256:ebade20ddfbf949187929600076a122c7c2362fb23126a4b8976319b18273cfd`/CID`de8c6d6188b3444b2f8e73f26167a5b4452ef5c2518ecb49f38484f69956aef7`/normalCLEANABSENT08:05:38Z/sourcebuildPASS08:05:54Z/freshBOTHDockerNoSuch/all15hashesverified. Window08:04:38–08:14:38Z RETURNED`2026-11-05T08:05:57.760954+00:00` on OBSERVEDmatchingRUNNINGcapture beforeofflinecompletion. Initial074656window returned after terminalexactabsence (no earlierRUNNING claim);075126/075701 windowsreturned on actualobservedRUNNINGcapture. Everywindow returned; no foreign/manual cleanup.
+075126 remains FAILED1PASS1FAIL142.99s/Beads20of22: main new allocator fixture missed disposable nativeBeads transport/rawreader; existingR2allocatorfake missed branch accessor. TESTONLYonefile repair then Beads passed075701.075701 remains FAILED1PASS1FAIL170.36s/Spec241PASS14FAIL(includesparent/subtests): one genuine publisher-parentbranch sourcecoupling plus old main eligibility/rollback/dirt/frozen-head tests, and recorded-operation runner that rejectedGit discovery before recovery. Source/test repairs are recorded above; actual full11GREEN080901 is a new correctcommand, not a fabricated aggregate. Strict raw task identity/native failures/unrelated bytes-index-history/exactresources/no duplicateassignment remained asserted. Bothfailedmanifests/logs remainFAILED with normal exactcleanup/freshabsence. Earlier original133753FAILEDmanifest/share/snapshot/R3RED and all previous truthful failure/aggregate limits are retained; no oldcause is inferred from latergreen.
+Two optional workers failed bootstrap before assistant work; realtasks deliveredONCE/nativeidle2CUSTOMmessages0queue/closed/noresend/no findings. No independent implementation review is claimed for this integration; normal owning Conversation review remains next.
+Git transport correction is also explicit: after committing the tested merge, repository generic `git pull --rebase` unexpectedly attempted to flatten44 importedmain commits despite unchanged feature upstream, and stopped on its first conflict. I verified its exact own rebase head-name/orig-head=`52f3227a11df500c3d4cd6b8b853bc1e37ccae4f`, used ordinary `git rebase --abort`, and proved the SAME merge HEAD/parents/clean bytes/exacttestedpatch restored before anypush. No rebaseconflict resolution/force/remote history rewrite occurred. The subsequent explicit non-force immutable-OID feature-branch push succeeded; directremote/upstream equal`52f3227a11df500c3d4cd6b8b853bc1e37ccae4f`. The accepted history and observedmain are preserved. This was an own-operation Git transport correction, not a source/test defect or reason to rerun unchanged captured bytes.
+
+### Review boundary
+The full ORIGINAL Task55 implementation at3ad remains owneraccepted/all9ACgenuinelychecked. Its previously missing main integration now has actual new combined-byte proof and a clean pushed candidate. FinalSummary/currentPlan are updated for NORMALownerreview, not Ready/Done/mergeReady by inference. Exact existing55owner/operation/Episode/resources remain. No source MAINmerge/userglobalapply-activationrestart/live45-currentforeignowner-task-session-resource mutation/dependencyversion-selector-trustchange/retainedtransition-redesign/abandonment/destructivelivecleanup/newEpisode-reservation-allocation-initialassignment. Product/scope/outcome/merge remain Joe; owner later proves idleexplicitdescendants/nativeReady and obtains separate exact operatorMerge tuple.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-## Full candidate
-Implemented the ORIGINAL complete Task55 contract for BOTH Backlog and Beads. Candidate code: `3ad8b5df4c5509139ad72f1d9b1211021ac4ddc7`, clean and published on `JLanders/prime-claw-primeclaw-55-episode-96306686`. All nine acceptance criteria are met and checked with the source/guidance/test/evidence map in the latest Implementation Notes. Task status remains **In Progress** for normal Conversation review; this summary does not publish Ready/Done, authorize merge or prove activation.
+## Integrated full candidate for normal owner review
+Current code: `52f3227a11df500c3d4cd6b8b853bc1e37ccae4f` on `JLanders/prime-claw-primeclaw-55-episode-96306686`, clean/pushed/upstream/direct-remote-equal. This ordinary merge preserves accepted ORIGINAL Task55 implementation3ad8b5df4c5509139ad72f1d9b1211021ac4ddc7 and observed clean/published main`a167747e7e40a614fd13407dc384c6a2c4c03591`. Main is an ancestor(exit0).51files/+3200/-720; exact tested committed binarypatchSHA`6f8460006a7e5944bffab558926b29db2cca61034ae8e286ecf0ce6f7d119151`. All nine implementation ACs remain met and checked. Status stays **In Progress**; this is not owner acceptance of the integrated candidate, Ready/Done, merge or activation authority.
 
-### Delivered behavior
-- Editable skills/workflows and LLM judgment own planning/readiness, initiation, execution, continuation, oversight/review, block/resume, merge/abandonment and terminal/finalization policy. Task-native tool/prompt/parameter metadata is mechanical. Code loads guidance, supplies stage-needed lossless native facts and performs requested native/resource operations; no second status/design/cleanliness/code-basis/frozen-history approval engine.
-- Unrelated staged/unstaged/untracked code/task work and compatible published history advances no longer cause plugin initiation/continuation refusals. Independent Backlog prepares only the intended Episode clone, not another writer's mutable primary. Native conflicts/failures remain truthful and are not reconciled or retried automatically.
-- Backlog publication is exact literal selected-file-only in BOTH layouts, excluding foreign staging/history. Beads retains the operator-approved touched-table/staged-set multi-issue semantics, pre-mutation/commit/push consequence review and actual native task-history/publication verification. Local task/revision/push success is not exact-task publication proof; no per-issue isolation is promised.
-- R1 preserves successful native stderr/warnings at the actual process runner. R2 carries complete native mutation/transport/task/code/session qualifications through create returns, ONE initial execute, BOTH continuation prompts and terminal text/details, including partial errors.
-- Complete46-asset ticket-durability corrections and G1 literal AND shell-quoted executable examples are delivered. Coherent ticket edits commit ASAP and publish promptly. Four project customizations and historical asset decisions remain intact; the pre-existing plan-task hash qualification remains nonblocking, with no all-hashes-current/reset/override claim.
-- Bounded owner-guided continuation addresses the ORIGINAL allocated independent Backlog/Orca operation via existing create_task_episode operationId/optional sessionId. No fresh status/reservation/placement/worktree allocation. Existing-session collision prevents a new launch; explicit selected-session binding returns raw native state/messages without prompt/run/assignment. Actual delivery ambiguity stays in editable guidance; absent stored ID is not no-delivery proof. Broader partial shapes/inactive routes remain explicit limits.
-- Ordinary cleanup leaves terminal/publication/code suitability to editable owner judgment while preserving exact resource identity/collisions, idle explicit descendants, uncommitted bytes, expected-head leases/compare-delete and atomic unchanged-owner removal. Strict retained transition publication proof remains ONLY in the retained first/paired/final default checks; ordinary cleanup stays relaxed.
+### Delivered and preserved
+- Editable Markdown/LLM judgment owns the full BOTH-provider task-native lifecycle. Code supplies stage-needed lossless native facts/loading/supported I/O/exact requested resources, not duplicate status/design/cleanliness/code-basis/frozen-history approval or automatic exception-selected InPlanning/Blocked.
+- Backlog keeps literal AND shell-quoted selected-file publication/unrelated bytes-index-history/compatible descendants/no mutablePRIMARYsync-reconcile-retry. Beads retains approved TABLE/stagedSET multi-issue consequences, pre-mutation/commit/push review/consultation and actual history/publication checks; local/task/revision/push success is not exact-task proof or per-issue isolation.
+- R1successfulstderr/R2fullrawcreate/ONEinitial/BOTHcontinuation/localRevisionqualifications, complete46/G1 durability guidance, custom4/historicalassetdecisions/nonblocking unchangedhashqualifications remain. Exact resource identity/collision/idleexplicitdescendants/uncommittedbytes/refleases/comparedelete/atomicunchangedowner protection stays.
+- Original-operation recovery retains exact allocated independentBacklogOrca operation/base/setup/worktree/branch. Session/launch collision prevents absence-based replay; selected existing-session binding returns native facts without prompt/run/assignment. Inactive routes/broader partials remain honest limits. Strict R3retained-defaultfirst-paired-final publishedEpisodeproof is separate; ordinary cleanup stays relaxed.
+- Integrated ALL operator-landed main48 recorded targets and target/upstream nondeletion,52/53 task/code DAG isolation,57 durable route/replay/migration/cleanup,58 read-only startup/first-normal-turn Markdown timing/globalgoals, and shared diagnostic/publicCA support. Main bookkeeping is preserved exactly; canonical exactownerkey remains sole authority, never the worktree-local snapshot.
+- Repaired one actual integration leak: ordinary task-only status publication no longer consults parentcodebranch. Target addressing remains in freshcreation/resource operations. Tests assert actual native effects/preservation, not obsolete workflow-policy refusals or automatic rollback.
 
-### Review basis and validation
-All production increments through f47 are owner-accepted, with precisely recorded independent reviews. The final incremental delta is seven DOCUMENTATION-ONLY paths(+70/-45), aligning stale current overview/hand-off/cleanup claims. No plugin/managed/harness/test/requirements bytes changed from accepted f47; no redundant Docker run was started for docs or checkboxes. Full cumulative candidate from original code base cb67b229 is70files/+6390/-4967.
-Required Docker-only source probes and focused lifecycle results are recorded in Notes and `.test-results/<run>/tier1/manifest.json`: R1/R2 013935=12PASS; creation023718=11PASS; continuation original11PASS from FAILED033430 + corrected034235=2PASS; terminal original5PASS from FAILED045003 + final050551=6PASS; R3 actual-default054410=4PASS/history89/89 with genuine RED053549 retained; role061330=3PASS; final recovery064407=3PASS143.13s with corrected-source064126probePASS85.943296s. Failed commands stay FAILED, aggregates are not fabricated green commands, and unretained successful Node TAP counts are not invented. Fresh closure static/native-Git selection:84PASS/16deselected4.46s, `/tmp/primeclaw55-contract-closure-static.log`; `git diff --check` PASS. Three historical missing-config exclusions remain explicit and are not passing coverage.
+### Fresh combined-source evidence
+- Mandatory corrected-source probe080451: PASS96.078457s/offlineapply-check-RPC/networkabsence/exactcleanup/freshBOTHNoSuch/all15hashes.
+- Corrected normal combined run080901: **11passed1360.26s**(shell1360.666847s), complete selected Backlog/Beads admission, spec/resource/recovery/blocked/durable route, ownership/R3/replay, initialization/activeBacklog/actualnative read-onlystartup, provider migration, reviewed-plan, ordinary oversight and handoff bridges. FinalmanifestPASSED08:31:40Z/emptycodes; exactbuilder-runtimecleanabsence and all17filehashes verified. Log`/tmp/primeclaw55-main-integration-publication-repair-focused.log`; receipts`.test-results/20261105T080901Z-27441-53f41020/tier1`.
+- Probe and focused snapshots IDENTICAL411/framed-sha256-v2/`d1c617a3dd3a732a49e10f00ee87fa69c6fdc7f57ad51887a0698df4a3d97a99` and exact committed patch; no postcapture byteedit. Old3ad/f47repo hashes are not newsourceproof.
+- SavedmigrationTAP67total/55PASS/0FAIL/12SKIP(only retiredREVERSE cases),1095323.259208ms/SHA`59fd6117ce88ffd45bd5b0c0270ae06f68109a0d023e0b562f16c0e54f8f543c`. ActiveBeads route replacement continuity actuallypassed. Other successfulNodeTAP not retained/no inventedcounts. Existing2400s migrationbound unchanged.
+- Static/nativeGit95PASS28deselected5.35s/parser/diffcheckPASS. Three historicalmissing-config exclusions/containerdeselections are NOT coverage. Exact commands, failures/repairs/limits are in Notes.
 
-### Limits and next disposition
-Tests use disposable native-Git/Backlog/process/default-caller/resource adapters and fake native session replies. They do NOT establish live Dolt per-issue isolation, live Orca-daemon recovery, historical Task45 assignment delivery, every repository test, or live activation. Historical failures—including original133753FAILEDmanifest/share/snapshot and R3RED—are retained. No dependency patch/version-selector-trust change, user-global apply/Prime Agent restart, live45 mutation, retained redesign/transition, main integration/merge, abandonment or destructive live cleanup occurred.
-The same owner/operation/Episode/resources remain. Normal full-contract Conversation review is next. The Conversation alone controls subsequent Ready/status publication and any exact operator-authorized merge/abandonment/cleanup or separately authorized activation. No implementation obligation is deferred to another task.
+### Honesty and next disposition
+Initial075126 genuinelyFAILED1PASS1FAIL on two Beads fixture omissions;075701 genuinelyFAILED1PASS1FAIL/Spec241of255 on the diagnosed publisher coupling and obsolete policy/fake-runner expectations. They remain FAILED;080901 is the separate actual11green command, not a fabricated aggregate. Original133753FAILEDmanifest/share/snapshot/R3RED/priorhonestaggregates preserved. Native fixtures/process/adapters do NOT establish liveDoltperissueisolation, liveOrca/historical45delivery, allrepo or activation. Optional workers supplied no findings/no independent integration review claimed.
+Sourcea1fa/tree-tag-lock/mode/version/.env, bounded publicCAread-only/TLS-on/privacy/default-no-CA/diagnostics/provenance/release/cleanup remain unchanged. Sharedcapacity returned on observedcapture beforelongofflineassertions; all disposableactors/monitors/children/holds gone. An incidental genericpull--rebase attempt was ordinarily aborted beforepush, restoring/verifying the exact tested merge; normal non-force push preserved allhistory.
+Normal owning Conversation review of this integrated candidate is next. The owner alone later proves idleexplicitdescendants/nativeReady and presents the separate exact operatorMerge tuple. No MAINmerge, globalapply/activationrestart, live45/foreignresource action, dependency/selector/trust change, retainedredesign/transition, abandonment/destructive livecleanup or new Episode/initialassignment occurred. No implementation obligation is deferred to another task.
 <!-- SECTION:FINAL_SUMMARY:END -->
