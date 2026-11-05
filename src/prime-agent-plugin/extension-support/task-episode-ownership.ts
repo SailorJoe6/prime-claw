@@ -701,13 +701,12 @@ export function transitionLegacyEpisodeOwnershipToTask(
   if (!initial) throw new Error("Exact Episode ownership is missing before ownership transition");
   if (initial.status !== "active") throw new Error(`Ownership transition requires active ownership; found ${initial.status}`);
   if (initial.ownerSessionId !== input.ownerSessionId) throw new Error("Ownership transition requires the exact owner Conversation");
+  if (initial.episodeActiveSessionId !== input.expectedPreviousEpisodeActiveSessionId) {
+    throw new Error("Ownership transition previous runtime route drifted before atomic replacement");
+  }
   if (isLegacyEpisodeOwnership(initial)) {
     if (initial.sourceLocation !== input.sourceLocation) throw new Error("Ownership transition source location does not match active ownership");
-    if (initial.episodeActiveSessionId !== input.expectedPreviousEpisodeActiveSessionId) {
-      throw new Error("Ownership transition previous runtime route drifted before atomic replacement");
-    }
-  } else if (initial.taskId !== input.taskId
-      || initial.episodeActiveSessionId !== input.verifiedCurrentEpisodeActiveSessionId) {
+  } else if (initial.taskId !== input.taskId) {
     throw new Error("Existing task-native ownership does not match the completed transition binding");
   }
 
@@ -812,34 +811,46 @@ export function transitionLegacyEpisodeOwnershipToTask(
   // A provider read may be slow or synchronize native state. Pair every replay
   // return with a fresh code-state proof rather than trusting the pre-read view.
   assertLegacyTransitionGitState(root, episodeRoot, initial, input, git);
-  if (isTaskEpisodeOwnership(initial)) {
+  if (isTaskEpisodeOwnership(initial)
+      && initial.episodeActiveSessionId === input.verifiedCurrentEpisodeActiveSessionId) {
     return { record: initial, reused: true, mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
   }
 
-  const { version: _version, sourceLocation: _sourceLocation, slug: _slug, bundleDigest: _bundleDigest, ...preserved } = initial;
-  const commonTarget = {
-    ...preserved,
-    version: 2 as const,
-    taskId: input.taskId,
-    episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
-    updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-  };
-  const target = parseEpisodeOwnership(providerTarget.provider === "beads" ? {
-    ...commonTarget,
-    provider: "beads",
-    providerRevision: providerTarget.providerRevision,
-    taskEvidence: providerTarget.taskEvidence,
-  } : providerTarget.history === "independent" ? {
-    ...commonTarget,
-    provider: "backlog",
-    taskPath,
-    providerRevision: providerTarget.providerRevision,
-    taskEvidence: providerTarget.taskEvidence,
-  } : {
-    ...commonTarget,
-    provider: "backlog",
-    taskPath,
-  });
+  // Replay keeps the same authority and resources, but may refresh its separately
+  // verified current address. The saved route above detects record drift only.
+  let target: EpisodeOwnershipRecord;
+  if (isTaskEpisodeOwnership(initial)) {
+    target = parseEpisodeOwnership({
+      ...initial,
+      episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
+      updatedAt: dependencies.now?.() ?? new Date().toISOString(),
+    });
+  } else {
+    const { version: _version, sourceLocation: _sourceLocation, slug: _slug, bundleDigest: _bundleDigest, ...preserved } = initial;
+    const commonTarget = {
+      ...preserved,
+      version: 2 as const,
+      taskId: input.taskId,
+      episodeActiveSessionId: input.verifiedCurrentEpisodeActiveSessionId,
+      updatedAt: dependencies.now?.() ?? new Date().toISOString(),
+    };
+    target = parseEpisodeOwnership(providerTarget.provider === "beads" ? {
+      ...commonTarget,
+      provider: "beads",
+      providerRevision: providerTarget.providerRevision,
+      taskEvidence: providerTarget.taskEvidence,
+    } : providerTarget.history === "independent" ? {
+      ...commonTarget,
+      provider: "backlog",
+      taskPath,
+      providerRevision: providerTarget.providerRevision,
+      taskEvidence: providerTarget.taskEvidence,
+    } : {
+      ...commonTarget,
+      provider: "backlog",
+      taskPath,
+    });
+  }
 
   const pairedProviderTarget = targetResolver(root, episodeRoot, input.taskId, runner);
   if (JSON.stringify(pairedProviderTarget) !== JSON.stringify(providerTarget)) {
@@ -862,7 +873,7 @@ export function transitionLegacyEpisodeOwnershipToTask(
   }
   const stored = ownership.read(root, input.ownerSessionId);
   if (!sameOwnership(stored, target)) throw new Error("Ownership transition could not verify the exact completed binding");
-  return { record: target as LegacyTaskOwnershipTransitionResult["record"], reused: false, mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
+  return { record: target as LegacyTaskOwnershipTransitionResult["record"], reused: isTaskEpisodeOwnership(initial), mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead, ...plans };
 }
 
 /**

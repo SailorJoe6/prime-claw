@@ -2789,14 +2789,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
         if (!record || record.version !== 2 || record.status !== "active") throw new Error(`switched ownership is absent for ${row.ownerSessionId}`);
         return { ...row, taskId: record.taskId, record };
       });
-      const postSwitchProofs = await proveActiveRuntimeContinuity(switchedRows, options.verifyActiveRuntime);
-      for (const row of switchedRows) {
-        const proof = postSwitchProofs[row.ownerSessionId];
-        if (proof.expectedPreviousEpisodeActiveSessionId !== row.record.episodeActiveSessionId
-            || proof.verifiedCurrentEpisodeActiveSessionId !== row.record.episodeActiveSessionId) {
-          throw new Error(`active runtime route changed after ownership switch for ${row.ownerSessionId}`);
-        }
-      }
+      await proveActiveRuntimeContinuity(switchedRows, options.verifyActiveRuntime);
       withCurrentTaskProviderOwnershipSwitch(project.root, ownershipSwitch, () => {
         candidate.verifyCodeProjection?.();
         const destinationBeforeDelete = candidate.refreshAfterReceipt();

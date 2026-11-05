@@ -2763,12 +2763,24 @@ def source_builder_share_teardown(value: Any) -> dict[str, Any]:
     _assert_sanitized(value, "source-build")
     if not isinstance(value, dict):
         raise ProvenanceError("source-build receipt must be an object")
-    _require_keys(value, {
+    required = {
         "schema_version", "status", "started_at", "finished_at",
         "failure_codes", "source", "source_rules",
         "checkout_inventory_before", "checkout_inventory_after",
         "builder_image", "builder_teardown", "release",
-    }, "source-build receipt")
+    }
+    if "public_ca_bundle" in value:
+        required.add("public_ca_bundle")
+        ca = value["public_ca_bundle"]
+        if not isinstance(ca, dict):
+            raise ProvenanceError("invalid public CA input identity")
+        _require_keys(ca, {"content_sha256", "size"}, "public CA input identity")
+        if (not isinstance(ca["content_sha256"], str)
+                or not _SHA256_RE.fullmatch(ca["content_sha256"])
+                or isinstance(ca["size"], bool) or not isinstance(ca["size"], int)
+                or not 0 < ca["size"] <= 1024 * 1024):
+            raise ProvenanceError("invalid public CA input identity")
+    _require_keys(value, required, "source-build receipt")
     if (not isinstance(value["schema_version"], int)
             or isinstance(value["schema_version"], bool)
             or value["schema_version"] != 1

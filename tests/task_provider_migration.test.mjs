@@ -937,6 +937,112 @@ test("Backlog destination remote advancement blocks before Beads source deletion
 });
 
 
+test("post-switch route replacement preserves active Beads migration continuity", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "post-switch-route-replacement");
+  const owner = addActiveBeadsOwner(fixture);
+  const runner = new AsIsBeadsRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const sourceBefore = sourceAuthorityFiles(fixture.root);
+  const sessionBefore = readFileSync(owner.record.episodeSessionFile, "utf8");
+  const replacementRoute = "route-beads-migration-fixture-replacement";
+  let proofs = 0;
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve complete native source evidence.",
+    async verifyActiveRuntime(records) {
+      proofs += 1;
+      assert.equal(records.length, 1);
+      const [record] = records;
+      for (const field of ["ownerSessionId", "operationId", "worktree", "branch", "head", "episodeId", "episodeSessionFile"]) {
+        assert.equal(record[field], owner.record[field], field);
+      }
+      assert.equal(record.episodeActiveSessionId, owner.record.episodeActiveSessionId);
+      assert.equal(readFileSync(record.episodeSessionFile, "utf8"), sessionBefore);
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore, "source must remain intact through the latest runtime proof");
+      if (proofs === 3) {
+        assert.equal(record.provider, "backlog");
+        const destination = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", record.taskId)).task;
+        assert.equal(destination.id, record.taskId);
+        const store = join(fixture.root, ".backlog");
+        assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], record.providerRevision,
+          "destination must already be published before retiring the source");
+        // Only the verified current route changes after cutover. The durable
+        // session, file, owner, worktree and mapped task stay the same.
+        return [{ ownerSessionId: record.ownerSessionId,
+          expectedPreviousEpisodeActiveSessionId: record.episodeActiveSessionId,
+          verifiedCurrentEpisodeActiveSessionId: replacementRoute }];
+      }
+      assert.equal(record.provider, "beads");
+      assert.equal(record.taskId, fixture.ids.parent);
+      return proveFixtureRuntime(records);
+    },
+  });
+  assert.equal(proofs, 3, "must reach the post-cutover runtime proof");
+  assert.equal(result.status, "completed", result.detail);
+  assert.equal(result.sourceAbsent, true);
+  assert.equal(result.selectedProvider, "backlog");
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  const current = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8")).owners[owner.ownerSessionId];
+  assert.equal(current.provider, "backlog");
+  assert.equal(current.taskId, result.receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId);
+  for (const field of ["ownerSessionId", "operationId", "engine", "baseRef", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile"]) {
+    assert.deepEqual(current[field], owner.record[field], field);
+  }
+  assert.equal(readFileSync(current.episodeSessionFile, "utf8"), sessionBefore);
+  assert.equal(git(owner.episode, "status", "--porcelain=v1"), "");
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+  assert.deepEqual(runner.sourcePublicationCommands, []);
+});
+
+test("post-switch continuity failure and persisted ownership drift still prevent source deletion", { timeout: 480_000 }, async (t) => {
+  for (const kind of ["runtime unavailable", "persisted ownership drift"]) {
+    await t.test(kind, async (t) => {
+      const fixture = embeddedBeadsSource(t, `post-switch-${kind.replaceAll(" ", "-")}`);
+      const owner = addActiveBeadsOwner(fixture);
+      const runner = new AsIsBeadsRunner();
+      const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+      assert.equal(inspection.status, "ready", inspection.detail);
+      const sourceBefore = sourceAuthorityFiles(fixture.root);
+      const registryPath = join(fixture.root, ".prime-claw", "ownership.json");
+      const ownershipBefore = readFileSync(registryPath, "utf8");
+      let proofs = 0, deletions = 0, driftedRegistry;
+      const result = await migrateTaskProvider({
+        cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+        confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve complete native source evidence.",
+        async verifyActiveRuntime(records) {
+          proofs += 1;
+          if (proofs === 3) {
+            assert.equal(records[0].provider, "backlog", "failure must occur after ownership cutover");
+            if (kind === "runtime unavailable") throw new Error("fixture runtime unavailable after ownership switch");
+            const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+            registry.owners[owner.ownerSessionId].episodeActiveSessionId = "persisted-route-drift";
+            driftedRegistry = `${JSON.stringify(registry, null, 2)}\n`;
+            writeFileSync(registryPath, driftedRegistry);
+          }
+          return proveFixtureRuntime(records);
+        },
+        deleteSource() { deletions += 1; },
+      });
+      assert.equal(proofs, 3);
+      assert.equal(result.status, "blocked", result.detail);
+      assert.equal(deletions, 0);
+      assert.equal(existsSync(join(fixture.root, ".beads")), true);
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
+      if (kind === "runtime unavailable") {
+        assert.equal(result.code, "pre-cutover-failed");
+        assert.match(result.detail, /fixture runtime unavailable after ownership switch/);
+        assert.equal(readFileSync(registryPath, "utf8"), ownershipBefore, "unchanged source ownership must be restored");
+      } else {
+        assert.equal(result.code, "cutover-incomplete");
+        assert.match(result.detail, /ownership rollback refused because the registry changed after the switch/);
+        assert.equal(readFileSync(registryPath, "utf8"), driftedRegistry, "a changed persisted owner record must not be overwritten");
+      }
+      assert.deepEqual(runner.sourcePublicationCommands, []);
+    });
+  }
+});
+
 test("post-switch runtime continuity loss rolls ownership back before source deletion", { skip: "Reverse migration retired; explicit no-command refusal is covered below", timeout: 180_000 }, async (t) => {
   const fixture = backlogSource(t, "backlog-post-switch-runtime-loss");
   const owner = addActiveBacklogOwner(fixture);

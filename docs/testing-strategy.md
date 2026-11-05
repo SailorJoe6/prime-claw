@@ -339,7 +339,19 @@ preparation container:
    Only `share/source-release` is writable. The controller inspects the exact
    container and requires precisely those two read-only mounts plus the fresh
    writable export; it passes no host home, socket, credentials, config, or
-   repository workspace.
+   repository workspace. The sole optional public-input exception is the
+   already-configured `NODE_EXTRA_CA_CERTS` bundle (or the canonical helper's
+   explicit `--public-ca-bundle`). The host validates a bounded regular PEM
+   certificate-only file and publishes a run-owned copy outside the build
+   context and export. Exactly one extra read-only file bind at
+   `/input/public-ca.pem` is required and attested, including its run-owned
+   source. Only its SHA-256 and size enter the existing source-build receipt.
+   The copy is removed through existing owned-directory cleanup after clean
+   exact-builder absence, and preserved on uncertain teardown. npm/node use
+   the container-local path as extra roots with TLS verification on; other host
+   trust/environment settings are not inherited. Without it the original
+   three-mount/default-trust path is unchanged. No CA input reaches the image,
+   release, or offline runtime, and no host/Docker trust is changed.
 5. Inside the builder, selected inputs are rehashed while copied to container-
    local `/work`. Dependency install, stale-output cleanup, build, and
    `release:pack` operate only on that local copy. Output is restricted to the

@@ -10,12 +10,14 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import signal
+import ssl
 import stat
 import sys
 from typing import Any
 
 from scripts.testing import bounded
 from scripts.testing import provenance
+from scripts.testing import source_builder_payload as payload
 
 SHA256 = re.compile(r"[0-9a-f]{64}")
 IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
@@ -24,7 +26,25 @@ SEMVER = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
 
 
 class BuilderError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, outcome: str = "error",
+                 returncode: int | None = None):
+        super().__init__(message)
+        self.outcome = outcome
+        self.returncode = returncode
+
+
+def failure_diagnostics(codes: Any) -> list[str]:
+    """Render only fixed failure codes or controlled builder metadata."""
+    if not isinstance(codes, list):
+        return []
+    fixed = {"builder-failed", "interrupted", "teardown-failed",
+             "source-inventory-changed", "source-inventory-unknown",
+             "output-validation-failed", "publication-failed",
+             "publication-invalidation-failed", "handler-restoration-failed",
+             "public-ca-cleanup-failed"}
+    return [code for code in codes[:16] if isinstance(code, str)
+            and len(code) <= 256
+            and (code in fixed or payload.FAILURE_DIAGNOSTIC.fullmatch(code))]
 
 
 class BuilderInterrupted(BaseException):
@@ -52,7 +72,8 @@ def _run(argv: list[str], *, timeout: float, policy: str = "capture"):
 
 def _require_success(result, stage: str) -> None:
     if result.outcome != "exited" or result.returncode != 0:
-        raise BuilderError(f"{stage} failed")
+        raise BuilderError(f"{stage} failed", outcome=result.outcome,
+                           returncode=result.returncode)
 
 
 def _read_regular(path: Path, *, maximum: int = 1024 * 1024) -> bytes:
@@ -82,6 +103,23 @@ def _read_regular(path: Path, *, maximum: int = 1024 * 1024) -> bytes:
         return b"".join(chunks)
     finally:
         os.close(fd)
+
+
+def _read_public_ca(path: Path) -> bytes:
+    """Accept only bounded public PEM certificates, never keys or other inputs."""
+    _safe_mount_source(path)
+    raw = _read_regular(path)
+    certificates = re.sub(rb"(?m)^#[^\r\n]*(?:\r?\n|$)", b"", raw)
+    certificate = (rb"-----BEGIN CERTIFICATE-----[\r\n]+"
+                   rb"[A-Za-z0-9+/=\r\n]+-----END CERTIFICATE-----")
+    if not re.fullmatch(rb"(?:\s*" + certificate + rb"\s*)+", certificates):
+        raise BuilderError("public CA input must contain only PEM certificates")
+    try:
+        ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT).load_verify_locations(
+            cadata=certificates.decode("ascii"))
+    except (ValueError, OSError) as exc:
+        raise BuilderError("public CA input is not a valid certificate bundle") from exc
+    return raw
 
 
 def _hash_regular(path: Path) -> tuple[str, int, int]:
@@ -236,7 +274,7 @@ def _image_identity(tier: provenance.OwnedDirectory, tier_dir: Path,
     return safe
 
 
-def _attest_builder_mounts(container_id: str) -> None:
+def _attest_builder_mounts(container_id: str, public_ca: Path | None = None) -> None:
     inspected = _run([
         "docker", "inspect", "--format", "{{json .Mounts}}", container_id,
     ], timeout=30)
@@ -245,19 +283,24 @@ def _attest_builder_mounts(container_id: str) -> None:
         rows = json.loads(inspected.stdout)
     except (json.JSONDecodeError, TypeError) as exc:
         raise BuilderError("builder mount inspection was invalid") from exc
-    if not isinstance(rows, list) or len(rows) != 3:
-        raise BuilderError("builder mount set is invalid")
     expected = {
         "/source": False,
         "/input/source-manifest.json": False,
         "/output": True,
     }
+    if public_ca is not None:
+        expected["/input/public-ca.pem"] = False
+    if not isinstance(rows, list) or len(rows) != len(expected):
+        raise BuilderError("builder mount set is invalid")
     observed = {}
     for row in rows:
         if not isinstance(row, dict) or row.get("Type") != "bind":
             raise BuilderError("builder mount type is invalid")
         destination = row.get("Destination")
         writable = row.get("RW")
+        if (destination == "/input/public-ca.pem"
+                and row.get("Source") != str(public_ca)):
+            raise BuilderError("public CA mount source is invalid")
         if destination in observed or not isinstance(writable, bool):
             raise BuilderError("builder mount identity is invalid")
         observed[destination] = writable
@@ -325,6 +368,9 @@ def execute(args: argparse.Namespace) -> int:
     source_mount = _safe_mount_source(source)
     context_cap = None
     output_cap = None
+    public_ca_cap = None
+    public_ca = None
+    public_ca_identity = None
     container_id = None
     container_attempted = False
     image = None
@@ -336,6 +382,7 @@ def execute(args: argparse.Namespace) -> int:
     source_manifest = None
     release = None
     failure_codes: list[str] = []
+    operation = "source-inventory"
     started = provenance.utc_now()
     pending_signal = None
     finalizing = False
@@ -372,9 +419,11 @@ def execute(args: argparse.Namespace) -> int:
     share_cap = provenance.open_owned_directory(share, args.share_binding)
     try:
         before = provenance.checkout_inventory(source)
+        operation = "source-manifest"
         source_manifest = provenance.repository_source_manifest(source)
         provenance.write_sanitized_json(
             tier, "source-manifest.json", source_manifest)
+        operation = "builder-context"
         context_cap = provenance._create_owned_directory_child(
             tier, "source-builder-context", mode=0o700)
         output_cap = provenance._create_owned_directory_child(
@@ -383,28 +432,44 @@ def execute(args: argparse.Namespace) -> int:
             ("docker/test-prime-agent-builder.Dockerfile", "Dockerfile"),
             ("scripts/testing/source_builder_payload.py", "source_builder_payload.py"),
         ):
-            payload = _read_regular(workspace / relative, maximum=2 * 1024 * 1024)
-            provenance._publish_owned_bytes(context_cap, target, payload)
+            payload_bytes = _read_regular(workspace / relative, maximum=2 * 1024 * 1024)
+            provenance._publish_owned_bytes(context_cap, target, payload_bytes)
         context = tier_dir / "source-builder-context"
         output = share / "source-release"
+        ca_selector = getattr(args, "public_ca_bundle", None)
+        if ca_selector:
+            ca_bytes = _read_public_ca(Path(ca_selector))
+            public_ca_cap = provenance._create_owned_directory_child(
+                tier, "source-builder-ca", mode=0o700)
+            provenance._publish_owned_bytes(public_ca_cap, "public-ca.pem", ca_bytes)
+            public_ca = public_ca_cap.path / "public-ca.pem"
+            public_ca_identity = {"content_sha256": hashlib.sha256(ca_bytes).hexdigest(),
+                                  "size": len(ca_bytes)}
         iidfile = tier_dir / "source-builder.iid"
         cidfile = tier_dir / "source-builder.cid"
         input_hash = provenance.hash_declared_inputs(
             context, ["Dockerfile", "source_builder_payload.py"])
         tag = f"prime-claw-test-prime-agent-builder:{input_hash[:12]}"
         image_started = provenance.utc_now()
+        operation = "builder-image-build"
         built = _run([
             "docker", "build", "--iidfile", str(iidfile), "-f",
             str(context / "Dockerfile"), "-t", tag, str(context),
         ], timeout=args.image_timeout)
         _require_success(built, "builder image build")
         image_finished = provenance.utc_now()
+        operation = "builder-image-inspection"
         image = _image_identity(
             tier, tier_dir, context, iidfile, image_started, image_finished)
         mount_manifest = tier_dir / "source-manifest.json"
         for raw in (str(mount_manifest), str(output)):
             if any(ch in raw for ch in (",", "\n", "\r", "\0")):
                 raise BuilderError("run-owned mount path is unsafe")
+        ca_mount = (["--mount", f"type=bind,src={_safe_mount_source(public_ca)},dst=/input/public-ca.pem,readonly"]
+                    if public_ca is not None else [])
+        ca_arguments = (["--public-ca-bundle", "/input/public-ca.pem"]
+                        if public_ca is not None else [])
+        operation = "builder-container-launch"
         container_attempted = True
         launched = _run([
             "docker", "run", "-d", "--cidfile", str(cidfile),
@@ -414,7 +479,7 @@ def execute(args: argparse.Namespace) -> int:
             "--mount", f"type=bind,src={source_mount},dst=/source,readonly",
             "--mount", f"type=bind,src={mount_manifest},dst=/input/source-manifest.json,readonly",
             "--mount", f"type=bind,src={output},dst=/output",
-            image["id"],
+            *ca_mount, image["id"], *ca_arguments,
         ], timeout=60)
         try:
             raw_cid = _read_regular(cidfile, maximum=256).decode("ascii").strip()
@@ -424,7 +489,9 @@ def execute(args: argparse.Namespace) -> int:
             raise BuilderError("builder cidfile identity is invalid")
         container_id = raw_cid
         _require_success(launched, "builder container launch")
-        _attest_builder_mounts(container_id)
+        operation = "builder-mount-inspection"
+        _attest_builder_mounts(container_id, public_ca)
+        operation = "builder-container-wait"
         waited = _run(["docker", "wait", container_id], timeout=args.build_timeout)
         _require_success(waited, "builder container wait")
         try:
@@ -432,12 +499,32 @@ def execute(args: argparse.Namespace) -> int:
         except ValueError as exc:
             raise BuilderError("builder wait result is invalid") from exc
         if exit_code != 0:
-            raise BuilderError("isolated source build failed")
+            # The payload suppresses raw command output. Read only its bounded
+            # tail and retain strictly allow-listed metadata, never raw logs.
+            try:
+                logs = _run(["docker", "logs", "--tail", "8", container_id], timeout=15)
+                if logs.outcome == "exited" and logs.returncode == 0:
+                    for stream in (logs.stdout, logs.stderr):
+                        if isinstance(stream, str):
+                            failure_codes.extend(failure_diagnostics(
+                                stream[:8192].splitlines()[-8:]))
+                else:
+                    failure_codes.append(payload.failure_diagnostic(
+                        "builder-log-read", "BuilderError", logs.outcome, logs.returncode))
+            except OSError:
+                failure_codes.append(payload.failure_diagnostic("builder-log-read", "OSError"))
+            raise BuilderError("isolated source build failed", outcome="exited",
+                               returncode=exit_code)
     except BuilderInterrupted as exc:
         pending_signal = exc.signum
         failure_codes.append("interrupted")
-    except (BuilderError, provenance.ProvenanceError, OSError, ValueError):
-        failure_codes.append("builder-failed")
+    except (BuilderError, provenance.ProvenanceError, OSError, ValueError) as exc:
+        category = ("BuilderError" if isinstance(exc, BuilderError) else
+                    "ProvenanceError" if isinstance(exc, provenance.ProvenanceError) else
+                    "OSError" if isinstance(exc, OSError) else "ValueError")
+        failure_codes.extend(["builder-failed", payload.failure_diagnostic(
+            operation, category, getattr(exc, "outcome", "error"),
+            getattr(exc, "returncode", None))])
     finally:
         finalizing = True
         terminal_sigmask(signal.SIG_BLOCK, watched)
@@ -475,6 +562,13 @@ def execute(args: argparse.Namespace) -> int:
                             "verified_at": provenance.utc_now()}
         if not teardown["clean"]:
             failure_codes.append("teardown-failed")
+        if public_ca_cap is not None and teardown["clean"]:
+            try:
+                provenance.remove_owned_directory(
+                    public_ca_cap.path, public_ca_cap.binding.encode(),
+                    quarantine_parent=tier.path, quarantine_binding=tier.binding)
+            except (provenance.ProvenanceError, OSError):
+                failure_codes.append("public-ca-cleanup-failed")
         try:
             after = provenance.checkout_inventory(source)
             if before is None or after != before:
@@ -513,6 +607,8 @@ def execute(args: argparse.Namespace) -> int:
             "builder_teardown": teardown,
             "release": release,
         }
+        if public_ca_identity is not None:
+            record["public_ca_bundle"] = public_ca_identity
         published_binding = None
         try:
             published_binding = provenance.write_sanitized_json(
@@ -571,6 +667,8 @@ def execute(args: argparse.Namespace) -> int:
             output_cap.close()
         if context_cap is not None:
             context_cap.close()
+        if public_ca_cap is not None:
+            public_ca_cap.close()
         share_cap.close()
         # Terminal evidence and handler state are now committed. Signals that
         # arrive after this point belong to the restored caller boundary.
@@ -590,6 +688,8 @@ def parser() -> argparse.ArgumentParser:
         description="build a Prime Agent source release without mutating its checkout")
     result.add_argument("--source", required=True)
     result.add_argument("--workspace", required=True)
+    result.add_argument("--public-ca-bundle", default=os.environ.get("NODE_EXTRA_CA_CERTS"),
+                        help="optional public PEM bundle; defaults to NODE_EXTRA_CA_CERTS")
     result.add_argument("--tier-dir", required=True)
     result.add_argument("--tier-binding", required=True)
     result.add_argument("--share", required=True)

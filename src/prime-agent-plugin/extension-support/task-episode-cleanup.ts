@@ -124,8 +124,7 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
     }
     const root = rootRows[0];
     if (!root) {
-      const collision = sessions.find((entry) => entry.activeSessionId === record.episodeActiveSessionId
-        || entry.sessionId === record.episodeId
+      const collision = sessions.find((entry) => entry.sessionId === record.episodeId
         || samePath(entry.sessionFile, record.episodeSessionFile!)
         || (Boolean(entry.activeSessionId) && samePath(entry.cwd, record.worktree!)));
       if (collision) throw new Error("Task Episode cleanup found a foreign or duplicate Prime Agent session identity");
@@ -139,9 +138,8 @@ export class CliTaskEpisodeCleanupAdapter implements TaskEpisodeCleanupAdapter {
       return null;
     }
     this.validateSessionIdentity(root, record, false);
-    if (root.activeSessionId !== undefined && root.activeSessionId !== record.episodeActiveSessionId) {
-      throw new Error("Task Episode cleanup found a changed Prime Agent routing identity");
-    }
+    // Ownership binds the durable session, not its historical runtime route.
+    // Inspect and remove only the current roster route after identity/state proof.
 
     const owned = new Set<SessionSummary>([root]);
     const nodes: OwnedEpisodeSession[] = [{ summary: root, depth: 0 }];

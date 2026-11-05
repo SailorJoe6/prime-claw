@@ -309,7 +309,60 @@ class TestSessionTeardown(unittest.TestCase):
         self.assertEqual(result.outcome,"interrupted")
         self.assertEqual(conftest._DEFERRED_SIGNAL,signal.SIGTERM)
 
+class TestSourceBuilderFailureReporting(unittest.TestCase):
+    def test_wrapper_surfaces_safe_receipt_detail_not_raw_helper_streams(self):
+        detail = conftest.source_builder.payload.failure_diagnostic(
+            "npm-ci", "BuildError", "exited", 1)
+        secret = "synthetic-private-value"
+        receipt = {"failure_codes": ["builder-failed", detail, secret]}
+        with mock.patch.object(conftest, "_host_command", return_value=cp(
+                [], rc=1, out=secret, err=secret)) as command, \
+                mock.patch.object(conftest.provenance, "read_sanitized_json",
+                                  return_value=receipt):
+            with self.assertRaises(RuntimeError) as error:
+                conftest._build_source_release(
+                    "/selected", object(), Path("/tier"), "binding",
+                    Path("/share"), "binding", Path("/snapshot"))
+        self.assertIn(detail, str(error.exception))
+        self.assertNotIn(secret, str(error.exception))
+        self.assertEqual(command.call_count, 1)
+
+    def test_unavailable_receipt_does_not_mask_native_failure_or_leak_exception(self):
+        for error in (OSError("private-path"),
+                      conftest.provenance.ProvenanceError("private-path"),
+                      ValueError("private-path")):
+            with self.subTest(error=type(error).__name__), \
+                    mock.patch.object(conftest, "_host_command", return_value=cp(
+                        [], rc=124, outcome="timed_out", err="private-stream")), \
+                    mock.patch.object(conftest.provenance, "read_sanitized_json",
+                                      side_effect=error):
+                with self.assertRaises(RuntimeError) as caught:
+                    conftest._build_source_release(
+                        "/selected", object(), Path("/tier"), "binding",
+                        Path("/share"), "binding", Path("/snapshot"))
+                message = str(caught.exception)
+                self.assertIn("outcome=timed_out, rc=124", message)
+                self.assertIn("diagnostics unavailable", message)
+                self.assertNotIn("private-", message)
+
+
 class TestSourceBuilderShareOwnership(unittest.TestCase):
+    def test_optional_public_ca_identity_is_strict_and_preserves_exact_teardown(self):
+        receipt = source_builder_receipt(state="absent", clean=True)
+        identity = {"content_sha256": "a" * 64, "size": 123}
+        receipt["public_ca_bundle"] = identity
+        self.assertEqual(conftest.provenance.source_builder_share_teardown(receipt),
+                         receipt["builder_teardown"])
+        for invalid in (None, [], {}, {**identity, "path": "private-input"},
+                        {**identity, "content_sha256": "invalid"},
+                        {**identity, "content_sha256": []},
+                        {**identity, "size": True}, {**identity, "size": 0},
+                        {**identity, "size": 1024 * 1024 + 1}, {**identity, "size": "123"}):
+            with self.subTest(identity=invalid):
+                receipt["public_ca_bundle"] = invalid
+                with self.assertRaises(conftest.provenance.ProvenanceError):
+                    conftest.provenance.source_builder_share_teardown(receipt)
+
     def _run_failed_builder(self, scenario):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name).resolve()

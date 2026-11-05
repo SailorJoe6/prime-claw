@@ -25,8 +25,34 @@ SEMVER = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
+# Only these fixed operation/category/outcome names and numeric results may
+# leave the builder. Never include argv, exception text, environment or output.
+FAILURE_DIAGNOSTIC = re.compile(
+    r"source builder failed during "
+    r"(?:initialization|build-and-pack|publication|npm-ci|npm-build|release-pack|"
+    r"source-inventory|source-manifest|builder-context|builder-image-build|"
+    r"builder-image-inspection|builder-container-launch|builder-mount-inspection|"
+    r"builder-container-wait|builder-log-read)"
+    r" \(category=(?:BuildError|BuilderError|ProvenanceError|OSError|ValueError), "
+    r"outcome=(?:error|exited|timed_out|signaled|launch_error|interrupted|reap_timeout), "
+    r"rc=(?:none|-?[0-9]{1,10})\)"
+)
+
+
+def failure_diagnostic(operation: str, category: str, outcome: str = "error",
+                       returncode: int | None = None) -> str:
+    detail = (f"source builder failed during {operation} (category={category}, "
+              f"outcome={outcome}, rc={returncode if returncode is not None else 'none'})")
+    return detail if FAILURE_DIAGNOSTIC.fullmatch(detail) else "builder-failed"
+
+
 class BuildError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, operation: str | None = None,
+                 outcome: str = "error", returncode: int | None = None):
+        super().__init__(message)
+        self.operation = operation
+        self.outcome = outcome
+        self.returncode = returncode
 
 
 def _canonical(value: Any) -> bytes:
@@ -180,16 +206,22 @@ def _remove_local_output(path: Path) -> None:
         path.unlink()
 
 
-def _run(argv: list[str], cwd: Path, env: dict[str, str]) -> None:
+def _run(argv: list[str], cwd: Path, env: dict[str, str], *, operation: str) -> None:
     try:
         result = subprocess.run(argv, cwd=cwd, env=env,
                                 stdin=subprocess.DEVNULL,
                                 stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL, timeout=540)
     except (OSError, subprocess.SubprocessError) as exc:
-        raise BuildError("isolated build command failed") from exc
+        outcome = ("timed_out" if isinstance(exc, subprocess.TimeoutExpired)
+                   else "launch_error" if isinstance(exc, OSError) else "error")
+        raise BuildError("isolated build command failed", operation=operation,
+                         outcome=outcome) from exc
     if result.returncode != 0:
-        raise BuildError("isolated build command returned nonzero")
+        raise BuildError("isolated build command returned nonzero",
+                         operation=operation, outcome=(
+                             "signaled" if result.returncode < 0 else "exited"),
+                         returncode=result.returncode)
 
 
 def _collect_outputs(release: Path, output: Path,
@@ -228,7 +260,8 @@ def _collect_outputs(release: Path, output: Path,
     return records, dict(mains[0])
 
 
-def build(source: Path, manifest_path: Path, output: Path, work: Path) -> dict[str, Any]:
+def build(source: Path, manifest_path: Path, output: Path, work: Path,
+          public_ca_bundle: Path | None = None) -> dict[str, Any]:
     manifest = _validate_manifest(json.loads(manifest_path.read_text(encoding="utf-8")))
     work.mkdir(parents=True, exist_ok=True)
     local = work / "source"
@@ -245,16 +278,18 @@ def build(source: Path, manifest_path: Path, output: Path, work: Path) -> dict[s
         "HUSKY": "0", "CI": "1", "npm_config_update_notifier": "false",
         "npm_config_audit": "false", "npm_config_fund": "false",
     }
+    if public_ca_bundle is not None:
+        env["NODE_EXTRA_CA_CERTS"] = str(public_ca_bundle)
     Path(env["HOME"]).mkdir(mode=0o700, exist_ok=True)
-    _run(["npm", "ci"], local, env)
+    _run(["npm", "ci"], local, env, operation="npm-ci")
     for relative in DIST_DIRS:
         _remove_local_output(local / relative)
-    _run(["npm", "run", "build"], local, env)
+    _run(["npm", "run", "build"], local, env, operation="npm-build")
     pack_command = [
         "node", "scripts/pack-prime-agent-release.mjs", "--base-url",
         "file:///stage", "--out-dir", "packages/coding-agent/release/tier1",
     ]
-    _run(pack_command, local, env)
+    _run(pack_command, local, env, operation="release-pack")
     records, main = _collect_outputs(
         local / "packages/coding-agent/release/tier1", output, version)
     return {
@@ -276,6 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", default="/input/source-manifest.json")
     parser.add_argument("--output", default="/output")
     parser.add_argument("--work", default="/work")
+    parser.add_argument("--public-ca-bundle", type=Path)
     args = parser.parse_args(argv)
     stage = "initialization"
     try:
@@ -286,7 +322,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             output.mkdir(mode=0o700)
         stage = "build-and-pack"
-        result = build(Path(args.source), Path(args.manifest), output, Path(args.work))
+        result = build(Path(args.source), Path(args.manifest), output, Path(args.work),
+                       public_ca_bundle=args.public_ca_bundle)
         stage = "publication"
         target = output / "builder-output.json"
         temporary = output / ".builder-output.tmp"
@@ -297,8 +334,13 @@ def main(argv: list[str] | None = None) -> int:
             os.fsync(handle.fileno())
         os.replace(temporary, target)
         return 0
-    except (BuildError, OSError, ValueError, json.JSONDecodeError):
-        print(f"source builder failed during {stage}", file=sys.stderr)
+    except (BuildError, OSError, ValueError, json.JSONDecodeError) as exc:
+        category = ("BuildError" if isinstance(exc, BuildError) else
+                    "OSError" if isinstance(exc, OSError) else "ValueError")
+        print(failure_diagnostic(
+            getattr(exc, "operation", None) or stage, category,
+            getattr(exc, "outcome", "error"), getattr(exc, "returncode", None)),
+            file=sys.stderr)
         return 1
 
 

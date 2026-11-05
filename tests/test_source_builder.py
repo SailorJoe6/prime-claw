@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
+from contextlib import redirect_stderr
 import json
 import os
 from pathlib import Path
@@ -21,6 +23,9 @@ from scripts.testing import source_builder_payload as payload
 
 IMAGE = "sha256:" + "a" * 64
 CID = "c" * 64
+
+# Synthetic self-signed public certificate, not an operator CA or private key.
+PUBLIC_CA = b'-----BEGIN CERTIFICATE-----\nMIIBqDCCAU2gAwIBAgIURcPZDX/TQrtv1yCu4PraKXKNzG0wCgYIKoZIzj0EAwIw\nKTEnMCUGA1UEAwwecHJpbWUtY2xhdy10ZXN0LW9ubHktcHVibGljLWNhMB4XDTI2\nMTEwNDIzNDgwNloXDTI2MTEwNTIzNDgwNlowKTEnMCUGA1UEAwwecHJpbWUtY2xh\ndy10ZXN0LW9ubHktcHVibGljLWNhMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE\nrsGDwXBtIZKmFsYZN4pWpfsrO/vy/6v0NseAaLAsBCHn6ijozDrhrqNyAib94MhE\nCB8QZy8ngRAEUXwnYf1of6NTMFEwHQYDVR0OBBYEFH5FUDPC0rEFshlX2cmQOYGU\nKHQ5MB8GA1UdIwQYMBaAFH5FUDPC0rEFshlX2cmQOYGUKHQ5MA8GA1UdEwEB/wQF\nMAMBAf8wCgYIKoZIzj0EAwIDSQAwRgIhAKfZT+Pyc6WUhLGKTFkINugqgXpeznZu\n2tYyj9aS++ABAiEAr6llrR26EbKaYmGvx7YaIBMap6JFbEpf6W+tENGIdXY=\n-----END CERTIFICATE-----\n'
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -145,7 +150,7 @@ class TestBuilderPayload(unittest.TestCase):
             repo = _source_repo(base)
             before = provenance.checkout_inventory(repo)
 
-            def fake_run(argv, cwd, env):
+            def fake_run(argv, cwd, env, *, operation):
                 if any(item.endswith("pack-prime-agent-release.mjs") for item in argv):
                     out = cwd / "packages/coding-agent/release/tier1/artifacts"
                     out.mkdir(parents=True)
@@ -195,7 +200,7 @@ class TestBuilderPayload(unittest.TestCase):
             before = provenance.checkout_inventory(repo)
             for index, failing_command in enumerate(("build", "pack")):
                 output = base / f"output-{index}"; output.mkdir()
-                def fail(argv, cwd, env, target=failing_command):
+                def fail(argv, cwd, env, *, operation, target=failing_command):
                     if (target == "build" and argv[:3] == ["npm", "run", "build"]) \
                             or (target == "pack" and any(item.endswith("pack-prime-agent-release.mjs") for item in argv)):
                         raise payload.BuildError("injected")
@@ -206,8 +211,110 @@ class TestBuilderPayload(unittest.TestCase):
                 self.assertEqual(before, provenance.checkout_inventory(repo))
 
 
+class TestPublicCAInput(unittest.TestCase):
+    def test_only_node_extra_ca_configuration_is_selected_or_explicitly_overridden(self):
+        required = ["--source", "/fixture/source", "--workspace", "/fixture/workspace",
+                    "--tier-dir", "/fixture/tier", "--tier-binding", "fixture",
+                    "--share", "/fixture/share", "--share-binding", "fixture"]
+        with mock.patch.dict(os.environ, {"NODE_EXTRA_CA_CERTS": "/fixture/public.pem",
+                                          "SSL_CERT_FILE": "/unrelated/private"}, clear=True):
+            self.assertEqual(source_builder.parser().parse_args(required).public_ca_bundle,
+                             "/fixture/public.pem")
+            self.assertEqual(source_builder.parser().parse_args(
+                required + ["--public-ca-bundle", "/fixture/explicit.pem"]).public_ca_bundle,
+                "/fixture/explicit.pem")
+        with mock.patch.dict(os.environ, {"SSL_CERT_FILE": "/unrelated/private"}, clear=True):
+            self.assertIsNone(source_builder.parser().parse_args(required).public_ca_bundle)
+
+    def test_public_bundle_reader_is_bounded_regular_and_certificate_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td).resolve()
+            public = root / "public.pem"
+            public.write_bytes(b"# synthetic public certificate\n" + PUBLIC_CA)
+            self.assertEqual(source_builder._read_public_ca(public), public.read_bytes())
+            link = root / "link.pem"; link.symlink_to(public)
+            large = root / "large.pem"; large.write_bytes(b"x" * (1024 * 1024 + 1))
+            for path in (link, root, root / "missing", Path("relative.pem"), large):
+                with self.subTest(kind=path.name), self.assertRaises((source_builder.BuilderError, OSError)):
+                    source_builder._read_public_ca(path)
+            with mock.patch.object(source_builder, "_read_regular", side_effect=PermissionError("private-path")):
+                with self.assertRaises(OSError):
+                    source_builder._read_public_ca(public)
+
+    def test_payload_forwards_only_explicit_container_ca_not_ambient_trust_or_credentials(self):
+        for configured in (False, True):
+            with self.subTest(configured=configured), tempfile.TemporaryDirectory() as td:
+                base = Path(td).resolve(); repo = _source_repo(base)
+                manifest = base / "manifest.json"
+                manifest.write_text(json.dumps(provenance.repository_source_manifest(repo)))
+                output = base / "output"; output.mkdir()
+                ca = Path("/input/public-ca.pem") if configured else None
+                with mock.patch.dict(os.environ, {
+                        "NODE_EXTRA_CA_CERTS": "/host/not-forwarded.pem",
+                        "SSL_CERT_FILE": "/host/not-forwarded.pem", "NODE_TLS_REJECT_UNAUTHORIZED": "0",
+                        "npm_config_strict_ssl": "false", "NPM_TOKEN": "synthetic-private-token",
+                        "HTTPS_PROXY": "synthetic-private-proxy", "NODE_OPTIONS": "--untrusted-option"}), \
+                        mock.patch.object(payload, "_run", side_effect=payload.BuildError("stop before execution")) as run:
+                    with self.assertRaises(payload.BuildError):
+                        payload.build(repo, manifest, output, base / "work", public_ca_bundle=ca)
+                self.assertEqual(run.call_count, 1)
+                env = run.call_args.args[2]
+                self.assertEqual(run.call_args.args[0], ["npm", "ci"])
+                if configured:
+                    self.assertEqual(env["NODE_EXTRA_CA_CERTS"], "/input/public-ca.pem")
+                else:
+                    self.assertNotIn("NODE_EXTRA_CA_CERTS", env)
+                for key in ("SSL_CERT_FILE", "NODE_TLS_REJECT_UNAUTHORIZED", "npm_config_strict_ssl",
+                            "NPM_TOKEN", "HTTPS_PROXY", "NODE_OPTIONS"):
+                    self.assertNotIn(key, env)
+                self.assertNotIn("/host/not-forwarded.pem", json.dumps(env))
+
+
+class TestBuilderFailureDiagnostics(unittest.TestCase):
+    def test_payload_command_metadata_excludes_output_argv_env_and_exception_text(self):
+        secret = "Authorization: Bearer synthetic-private-value"
+        for native, outcome, rc in (
+                (SimpleNamespace(returncode=17), "exited", 17),
+                (SimpleNamespace(returncode=-9), "signaled", -9),
+                (OSError(secret), "launch_error", None),
+                (subprocess.TimeoutExpired(secret, 540, output=secret,
+                                           stderr=secret), "timed_out", None)):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as td:
+                root = Path(td).resolve()
+                options = ({"side_effect": native} if isinstance(native, Exception)
+                           else {"return_value": native})
+                with mock.patch.object(payload.subprocess, "run", **options) as run:
+                    with self.assertRaises(payload.BuildError) as error:
+                        payload._run([secret], root, {"PRIVATE": secret},
+                                     operation="npm-ci")
+                self.assertIs(run.call_args.kwargs["stdout"], subprocess.DEVNULL)
+                self.assertIs(run.call_args.kwargs["stderr"], subprocess.DEVNULL)
+                captured = io.StringIO()
+                with mock.patch.object(payload, "build", side_effect=error.exception), \
+                        redirect_stderr(captured):
+                    result = payload.main(["--output", str(root / "output")])
+                expected = payload.failure_diagnostic("npm-ci", "BuildError", outcome, rc)
+                self.assertEqual(result, 1)
+                self.assertEqual(captured.getvalue(), expected + "\n")
+                self.assertNotIn(secret, captured.getvalue())
+
+    def test_untrusted_diagnostic_fields_and_raw_codes_are_not_rendered(self):
+        secret = "synthetic-private-value"
+        safe = payload.failure_diagnostic("release-pack", "BuildError", "exited", 2)
+        for fields in ((secret, "BuildError", "exited", 1),
+                       ("npm-ci", secret, "exited", 1),
+                       ("npm-ci", "BuildError", secret, 1),
+                       ("npm-ci", "BuildError", "exited", secret)):
+            self.assertEqual(payload.failure_diagnostic(*fields), "builder-failed")
+        codes = [safe, secret, safe + " " + secret, "builder-failed", None, {},
+                 "x" * 10000]
+        self.assertEqual(source_builder.failure_diagnostics(codes), [safe, "builder-failed"])
+        self.assertEqual(source_builder.failure_diagnostics(secret), [])
+
+
 class TestHostBuilderLifecycle(unittest.TestCase):
-    def _run(self, *, builder_exit: int = 0,
+    def _run(self, *, builder_exit: int = 0, builder_logs: str = "",
+             wait_outcome: str = "exited", wait_rc: int = 0,
              inspect_outcome: str = "exited", inspect_rc: int = 1,
              inspect_stdout: str | bytes = "",
              inspect_stderr: str | bytes = f"Error: No such object: {CID}",
@@ -215,7 +322,10 @@ class TestHostBuilderLifecycle(unittest.TestCase):
              signal_during_validation: bool = False,
              signal_after_publication: bool = False,
              fail_after_publication: bool = False,
-             fail_failed_replacement: bool = False):
+             fail_failed_replacement: bool = False,
+             public_ca_bytes: bytes | None = None,
+             ca_mount_change: str | None = None,
+             ca_cleanup_failure: bool = False):
         temporary = tempfile.TemporaryDirectory()
         base = Path(temporary.name).resolve()
         repo = _source_repo(base)
@@ -230,6 +340,9 @@ class TestHostBuilderLifecycle(unittest.TestCase):
         share = tier / "share"; share.mkdir(mode=0o700)
         share_binding = provenance.owned_directory_binding(share)
         calls = []
+        host_ca = base / "operator-public-ca.pem"
+        if public_ca_bytes is not None:
+            host_ca.write_bytes(public_ca_bytes)
 
         def fake_run(argv, *, timeout, policy="capture"):
             calls.append(list(argv))
@@ -252,14 +365,33 @@ class TestHostBuilderLifecycle(unittest.TestCase):
                     {"Type": "bind", "Destination": "/input/source-manifest.json", "RW": False},
                     {"Type": "bind", "Destination": "/output", "RW": True},
                 ]
+                if public_ca_bytes is not None:
+                    ca_mount = {"Type": "bind", "Destination": "/input/public-ca.pem",
+                                "RW": False,
+                                "Source": str(tier / "source-builder-ca/public-ca.pem")}
+                    if ca_mount_change == "writable":
+                        ca_mount["RW"] = True
+                    elif ca_mount_change == "wrong-source":
+                        ca_mount["Source"] = str(host_ca)
+                    elif ca_mount_change == "wrong-destination":
+                        ca_mount["Destination"] = "/other-ca.pem"
+                    if ca_mount_change != "missing":
+                        mounts.append(ca_mount)
+                    if ca_mount_change == "duplicate":
+                        mounts.append(dict(ca_mount))
+                    elif ca_mount_change == "extra":
+                        mounts.append({"Type": "bind", "Destination": "/extra", "RW": False})
                 return SimpleNamespace(outcome="exited", returncode=0,
                                        stdout=json.dumps(mounts), stderr="")
             if argv[1] == "wait":
                 if builder_exit == 0:
                     manifest = json.loads((tier / "source-manifest.json").read_text())
                     _write_release(share / "source-release", manifest["identity"])
-                return SimpleNamespace(outcome="exited", returncode=0,
+                return SimpleNamespace(outcome=wait_outcome, returncode=wait_rc,
                                        stdout=str(builder_exit) + "\n", stderr="")
+            if argv[1] == "logs":
+                return SimpleNamespace(outcome="exited", returncode=0,
+                                       stdout=builder_logs, stderr="")
             if argv[1:3] == ["rm", "-f"]:
                 return SimpleNamespace(outcome=remove_outcome,
                                        returncode=remove_rc,
@@ -274,7 +406,8 @@ class TestHostBuilderLifecycle(unittest.TestCase):
         args = argparse.Namespace(
             source=str(repo), workspace=str(workspace), tier_dir=str(tier),
             tier_binding=tier_binding, share=str(share),
-            share_binding=share_binding, image_timeout=60.0, build_timeout=60.0)
+            share_binding=share_binding, image_timeout=60.0, build_timeout=60.0,
+            public_ca_bundle=str(host_ca) if public_ca_bytes is not None else None)
         original_validate = source_builder._validate_release
         def validate_with_optional_signal(*validate_args, **validate_kwargs):
             if signal_during_validation:
@@ -299,7 +432,13 @@ class TestHostBuilderLifecycle(unittest.TestCase):
             if fail_failed_replacement else mock.patch.object(
                 provenance, "replace_sanitized_json",
                 wraps=provenance.replace_sanitized_json))
-        with (mock.patch.object(source_builder, "_run", fake_run),
+        original_remove_owned = provenance.remove_owned_directory
+        def remove_ca(path, *remove_args, **remove_kwargs):
+            if ca_cleanup_failure:
+                raise provenance.ProvenanceError("synthetic-private-cleanup-detail")
+            return original_remove_owned(path, *remove_args, **remove_kwargs)
+        with (mock.patch.object(provenance, "remove_owned_directory", side_effect=remove_ca),
+              mock.patch.object(source_builder, "_run", fake_run),
               mock.patch.object(source_builder, "_validate_release",
                                 side_effect=validate_with_optional_signal),
               mock.patch.object(provenance, "write_sanitized_json",
@@ -322,8 +461,101 @@ class TestHostBuilderLifecycle(unittest.TestCase):
             self.assertNotIn("docker.sock", joined)
             self.assertNotIn(str(Path.home()), joined)
             self.assertEqual(run[-1], IMAGE)
+            self.assertEqual(run.count("--mount"), 3)
+            self.assertNotIn("public_ca_bundle", receipt)
+            self.assertFalse((_tier / "source-builder-ca").exists())
             self.assertIn(["docker", "rm", "-f", CID], calls)
             self.assertIn(["docker", "inspect", CID], calls)
+
+    def test_public_ca_is_run_owned_read_only_identified_and_removed_after_exact_teardown(self):
+        temporary, repo, tier, calls, receipt, rc = self._run(public_ca_bytes=PUBLIC_CA)
+        with temporary:
+            self.assertEqual(rc, 0)
+            self.assertEqual(provenance.source_builder_share_teardown(receipt), receipt["builder_teardown"])
+            import conftest
+            with mock.patch.object(conftest, "_host_command", return_value=SimpleNamespace(
+                    outcome="exited", returncode=0)), mock.patch.object(
+                    provenance, "read_sanitized_json", return_value=receipt):
+                self.assertEqual(conftest._build_source_release(
+                    str(repo), object(), tier, "binding", tier / "share", "binding", repo.parent / "workspace"),
+                    receipt)
+            run = next(call for call in calls if call[1] == "run")
+            ca_path = tier / "source-builder-ca/public-ca.pem"
+            self.assertIn(f"type=bind,src={ca_path},dst=/input/public-ca.pem,readonly", run)
+            self.assertEqual(run[-3:], [IMAGE, "--public-ca-bundle", "/input/public-ca.pem"])
+            self.assertEqual(len([arg for arg in run if arg == "--mount"]), 4)
+            self.assertFalse(ca_path.parent.exists())
+            self.assertEqual((repo.parent / "operator-public-ca.pem").read_bytes(), PUBLIC_CA)
+            self.assertEqual(receipt["public_ca_bundle"], {
+                "content_sha256": hashlib.sha256(PUBLIC_CA).hexdigest(), "size": len(PUBLIC_CA)})
+            self.assertEqual(receipt["checkout_inventory_before"], receipt["checkout_inventory_after"])
+            serialized = json.dumps(receipt)
+            self.assertNotIn("operator-public-ca.pem", serialized)
+            self.assertNotIn("BEGIN CERTIFICATE", serialized)
+            self.assertNotIn("BEGIN CERTIFICATE", json.dumps(receipt["release"]))
+            context_files = [p for p in (tier / "source-builder-context").rglob("*") if p.is_file()]
+            self.assertEqual(sorted(p.name for p in context_files),
+                             ["Dockerfile", "source_builder_payload.py"])
+            self.assertTrue(all(PUBLIC_CA not in p.read_bytes() for p in context_files))
+            self.assertEqual([call for call in calls if call[1] == "logs"], [])
+            self.assertIn(["docker", "rm", "-f", CID], calls)
+            self.assertIn(["docker", "inspect", CID], calls)
+
+    def test_public_ca_mount_refusals_preserve_exact_cleanup_without_wait_or_retry(self):
+        for change in ("missing", "duplicate", "writable", "wrong-source", "wrong-destination", "extra"):
+            with self.subTest(change=change):
+                temporary, _repo, tier, calls, receipt, rc = self._run(
+                    public_ca_bytes=PUBLIC_CA, ca_mount_change=change)
+                with temporary:
+                    self.assertEqual(rc, 1)
+                    self.assertEqual(receipt["status"], "failed")
+                    self.assertTrue(receipt["builder_teardown"]["clean"])
+                    self.assertNotIn("wait", [call[1] for call in calls])
+                    self.assertEqual(len([call for call in calls if call[1] == "run"]), 1)
+                    self.assertIn(["docker", "rm", "-f", CID], calls)
+                    self.assertFalse((tier / "source-builder-ca").exists())
+
+    def test_public_ca_failure_diagnostics_and_uncertain_cleanup_keep_existing_contract(self):
+        diagnostic = payload.failure_diagnostic("npm-ci", "BuildError", "exited", 1)
+        for uncertain in (False, True):
+            with self.subTest(uncertain=uncertain):
+                temporary, _repo, tier, calls, receipt, rc = self._run(
+                    public_ca_bytes=PUBLIC_CA, builder_exit=1,
+                    builder_logs=diagnostic + "\nsynthetic-private-output\n",
+                    inspect_stderr="daemon unavailable" if uncertain else f"Error: No such object: {CID}")
+                with temporary:
+                    self.assertEqual(rc, 1)
+                    self.assertIn(diagnostic, receipt["failure_codes"])
+                    self.assertNotIn("synthetic-private-output", json.dumps(receipt))
+                    self.assertEqual((tier / "source-builder-ca").exists(), uncertain)
+                    self.assertEqual(receipt["builder_teardown"]["clean"], not uncertain)
+                    self.assertEqual(len([call for call in calls if call[1] == "run"]), 1)
+                    self.assertIn(["docker", "rm", "-f", CID], calls)
+                    self.assertIn(["docker", "inspect", CID], calls)
+
+    def test_public_ca_invalid_input_fails_before_any_docker_without_private_data(self):
+        for raw in (b"", b"synthetic-private-input", PUBLIC_CA + b"-----BEGIN PRIVATE KEY-----\nsecret\n",
+                    b"-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----\n"):
+            with self.subTest(raw_length=len(raw)):
+                temporary, _repo, tier, calls, receipt, rc = self._run(public_ca_bytes=raw)
+                with temporary:
+                    self.assertEqual(rc, 1)
+                    self.assertEqual(calls, [])
+                    self.assertNotIn("public_ca_bundle", receipt)
+                    self.assertNotIn("synthetic-private-input", json.dumps(receipt))
+                    self.assertNotIn("PRIVATE KEY", json.dumps(receipt))
+                    self.assertFalse((tier / "source-builder-ca").exists())
+
+    def test_public_ca_cleanup_failure_is_red_without_raw_error_or_foreign_removal(self):
+        temporary, repo, tier, calls, receipt, rc = self._run(
+            public_ca_bytes=PUBLIC_CA, ca_cleanup_failure=True)
+        with temporary:
+            self.assertEqual(rc, 1)
+            self.assertIn("public-ca-cleanup-failed", receipt["failure_codes"])
+            self.assertIn("public-ca-cleanup-failed", source_builder.failure_diagnostics(receipt["failure_codes"]))
+            self.assertNotIn("synthetic-private-cleanup-detail", json.dumps(receipt))
+            self.assertTrue((tier / "source-builder-ca").exists())
+            self.assertEqual((repo.parent / "operator-public-ca.pem").read_bytes(), PUBLIC_CA)
 
     def test_builder_absence_requires_exact_allowlisted_diagnostic(self):
         for diagnostic, stdout in (
@@ -405,6 +637,38 @@ class TestHostBuilderLifecycle(unittest.TestCase):
                              receipt["checkout_inventory_after"])
             self.assertIn(["docker", "rm", "-f", CID], calls)
             self.assertIn(["docker", "inspect", CID], calls)
+
+    def test_failed_builder_preserves_safe_payload_metadata_before_exact_cleanup(self):
+        detail = payload.failure_diagnostic("npm-build", "BuildError", "exited", 17)
+        secret = "Authorization: Bearer synthetic-private-value"
+        logs = secret + "\n" + detail + "\n" + detail + " " + secret + "\n"
+        temporary, _repo, tier, calls, receipt, rc = self._run(
+            builder_exit=1, builder_logs=logs)
+        with temporary:
+            self.assertEqual(rc, 1)
+            self.assertIn(detail, receipt["failure_codes"])
+            self.assertIn(payload.failure_diagnostic(
+                "builder-container-wait", "BuilderError", "exited", 1),
+                receipt["failure_codes"])
+            self.assertNotIn(secret, (tier / "source-build.json").read_text())
+            log_read = ["docker", "logs", "--tail", "8", CID]
+            self.assertEqual(calls.count(log_read), 1)
+            self.assertLess(calls.index(log_read), calls.index(["docker", "rm", "-f", CID]))
+            self.assertIsNone(receipt["release"])
+            self.assertTrue(receipt["builder_teardown"]["clean"])
+            provenance.source_builder_share_teardown(receipt)
+
+    def test_native_wait_failure_retains_operation_and_outcome_without_retry(self):
+        temporary, _repo, _tier, calls, receipt, rc = self._run(
+            builder_exit=1, wait_outcome="timed_out", wait_rc=124)
+        with temporary:
+            self.assertEqual(rc, 1)
+            self.assertIn(payload.failure_diagnostic(
+                "builder-container-wait", "BuilderError", "timed_out", 124),
+                receipt["failure_codes"])
+            self.assertEqual(calls.count(["docker", "wait", CID]), 1)
+            self.assertFalse(any(call[1] == "logs" for call in calls))
+            self.assertTrue(receipt["builder_teardown"]["clean"])
 
     def test_signal_during_validation_publishes_failed_interrupted_receipt(self):
         temporary, _repo, _tier, calls, receipt, rc = self._run(
