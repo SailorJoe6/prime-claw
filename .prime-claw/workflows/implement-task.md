@@ -189,9 +189,7 @@ compatible in-scope reconciliation from actual before/current content, or ask
 for a real semantic conflict, authority change or scope decision. Record each
 coherent authorized ticket edit promptly and publish it through its native
 history. Code reports the operation result; it does not choose a lifecycle
-rollback or Blocked disposition on the Agent's behalf. The remaining deeper
-create/reservation/failure-disposition paths are still pending extraction on
-PRIMECLAW-55; report their actual behavior without claiming it is this policy.
+rollback or Blocked disposition on the Agent's behalf.
 
 ## Create the Episode
 
@@ -208,69 +206,76 @@ stable `host` from `<operator-implementation-host>`. Pass that host unchanged as
 task path, project root, worktree, session name, prompt, command, or other
 resource identity.
 
-The capability independently re-resolves the live provider, exact task identity,
-project root, and placement. It requires no prior entry invocation, approval
-store, or turn receipt. The lower-level create/allocation path still contains
-native status, plan/design, code-base, and publication gates pending later
-PRIMECLAW-55 work; the entry/prep-chain policy extraction does not remove them.
-Report their actual failures without bypassing them or treating code acceptance
-as the semantic readiness decision. An explicit stable host must still be a
-ready local setup and never silently falls back. Without a host, native
-placement selection chooses the sole ready local setup or presents its picker;
-ambiguity, cancellation, remote placement, or invalid inventory blocks. Direct
-local fallback is allowed only when Orca is definitively unavailable and no
-explicit host was requested. Ownership and resource-safety checks still prevent
-duplicate creation; never retry an uncertain dispatch as fresh work.
+The capability independently resolves provider, exact task/root and placement.
+An explicit stable host never silently falls back. Native placement selection
+and exact resource bindings do not supply semantic implementation authority.
 
-### Backlog admission transaction
+## Code basis and requested creation
 
-For Backlog, the trusted capability changes only the exact task from `In
-Planning` to `In Progress` through Backlog. Grandfathered branch-local mode
-commits and verifies that exact task path on canonical main and creates the
-Episode from that recorded status-commit SHA. Independent mode first proves the
-clean pushed canonical code `baseRef`, publishes the exact task-path-only status
-commit on `refs/heads/prime-claw/tasks` without force, proves the direct task
-head and complete native reread, and leaves the code HEAD unchanged. Before any
-branch, worktree, or session, both modes persist one `provisioning` ownership
-record under this Conversation's exact registry key; independent mode also binds
-its published provider revision and complete task evidence. The Episode branch
-and worktree are then created from the recorded code base. Grandfathered prompt
-push is best-effort when a remote exists; independent task publication must be
-proved before resource creation.
+Before creation, inspect the intended repository root, current branch and Git
+HEAD, task history, `git status --porcelain=v1`, and the native upstream result
+when one exists. Decide code-base suitability here. A non-main branch, absent
+or divergent upstream, unrelated staged/unstaged/untracked Git work, or a newer
+compatible task-history observation is not an automatic refusal. Do not absorb,
+stash, reset, copy, or synchronize another writer's work to satisfy creation.
+Report a real conflict or unresolved placement/code-basis decision instead.
+Native operations may fail; their failure does not authorize another operation.
 
-A creation failure proven to have produced no Episode resource or ownership
-mutation returns the exact task to `In Planning` through the same selected
-Backlog authority and verifies its task-only publication. Any recorded, partial,
-or uncertain mutation publishes `Blocked` through that same authority with the
-exact recovery condition, preserves evidence and resources, and must never be
-retried as a new Episode.
+The create request performs one fixed native In Progress update, its supported
+publication, one exact ownership reservation and resource allocation. It does
+not repeat this workflow's status, plan/design, cleanliness or code-base
+eligibility decisions. Existing native task/provider/root, selected path,
+owner, operation, placement and allocated resource identities remain exact.
+Grandfathered Backlog commits only the selected task path and uses that status
+commit as the code base. Independent Backlog publishes only that path in its
+existing task history and leaves parent code HEAD and unrelated index/bytes
+alone. Ordinary status publication does not invoke project initialization,
+config validation or primary task-workspace synchronization. Perform needed
+workspace setup explicitly before authoring; native publication reports its own
+operation or targeting failure without a whole-store preparation gate. Its recorded task revision is separate from the chosen code base.
+Beads uses its approved native touched-table/staged-set operation; retain all
+command streams, working-set facts, local revisions and complete raw task views.
+A successful push or local task read is not exact-task committed/publication
+proof. Do not invent a task path, isolation promise or publication receipt.
 
-### Beads admission transaction
+Fresh creation sends ONE fixed initial execute assignment. A returned existing
+active Episode sends no new assignment. Keep the actual native result and
+current task observation, including a compatible refinement after mutation,
+for semantic judgment. Do not freeze the complete native view or repeat a
+status/plan predicate after allocation. Never add an initial handoff or another
+execute prompt. Creating resources does not authorize this Conversation to
+implement the Episode's code.
 
-For Beads, the trusted capability first proves the exact clean canonical code
-HEAD that will become `baseRef`. It changes only the exact native task from
-`in_planning`/`In Planning` to `in_progress`/`In Progress` through the supported
-provider mutation and publishes once through the configured non-force Dolt
-transport. It verifies the exact raw published task, provider revision,
-publication ref, and unchanged code HEAD. Before any branch, worktree, or
-session creation, it persists one `provisioning` ownership record under this
-Conversation's exact registry key bound to provider `beads`, the canonical task
-ID, published provider revision, complete raw task evidence, exact code
-`baseRef`, and preselected placement. No task path exists or may be invented.
-The Episode branch and worktree are created from that exact code base.
+## Decide failure disposition from current facts
 
-A creation failure proven to precede durable ownership or resource mutation
-publishes one exact native rollback to `in_planning`/`In Planning` and verifies
-it. A failure after durable or uncertain mutation publishes `blocked`/`Blocked`
-through the same native non-force path, preserves the ownership, task evidence,
-provider revision, code base, and resources, and reports the exact recovery
-condition. It must never retry, force, adopt, reset, use raw Dolt writes, or
-start a fresh Episode.
+Creation reports native results and exact retained ownership/resource facts.
+It does not automatically publish In Planning or Blocked, commit a recovery
+note, advance task evidence, or undo an earlier mutation because an exception
+occurred. An error can follow a successful task update, commit, push, resource
+allocation or assignment delivery; failure is not proof that none happened.
 
-Both provider paths create or return one durable worktree-isolated Episode.
-Fresh creation sends one fixed initial execute assignment; an exact active
-return sends no second assignment. They do not inherit this Conversation
-transcript. Never send an initial handoff or add a second daemon prompt.
+Inspect the exact current provider task, native history/command results,
+ownership entry, code base, worktree/branch, session and assignment-delivery
+facts before choosing a disposition. Preserve the same operation and resources.
+The owning Conversation applies the existing lifecycle guidance: if actual
+facts prove no owned resources or delivery exist, decide whether returning the
+selected task to In Planning is appropriate; if partial resources, uncertain
+delivery, or a real unresolved blocker remain, decide whether to publish Blocked
+with the actual cause, attempts and unblock condition. These are judgment, not
+an exception classifier or an automatic retry/rollback protocol. Do not infer
+no execution merely from a missing recorded session. Do not hand-edit ownership
+or retry uncertain creation as a fresh Episode.
+
+Publish an authorized status/note through the selected provider's supported CLI
+and native history, preserving all other task fields. Backlog uses an exact-path
+ordinary commit and non-force push, excluding unrelated staged work; independent
+task-only failure reporting needs no clean/pushed parent code checkout. Beads
+requires the pending/staged multi-issue consequence review above before native
+mutation/commit/push, with actual task-history inclusion/publication evidence
+rather than command success alone. Commit each coherent authorized update as
+soon as ready and publish promptly; do not wait for handoff or session end.
+Report actual remaining state and stop for a genuine unresolved decision. No
+merge, abandonment, activation or destructive authority is added here.
 
 The owning Conversation controls lifecycle status and disposition. The Episode
 maintains implementation, native task content, its living plan, and evidence
@@ -280,9 +285,10 @@ Episode to bypass owner review, merge, abandonment, or cleanup decisions.
 Report the selected provider, canonical task ID, project root, durable Episode
 and routing identities, lifecycle engine, exact Orca setup/worktree identity
 when applicable, actual branch and worktree, and current ownership state. For
-Backlog include the exact status commit and task path. For Beads include the raw
-pre/post/published task views, published provider revision and ref, exact code
-`baseRef`, and recovery evidence when present. State whether the capability
+Backlog include the exact status commit, task path and actual push result. For
+Beads include complete raw pre/post/current views, native command results,
+observed local revisions, publication qualifications and exact code `baseRef`;
+call a view published only when native history/publication evidence proves it. State whether the capability
 created the Episode or returned existing exact active ownership. `uncertain`,
 `provisioning`, or `Blocked` state requires inspection and must not be replayed
 as fresh creation. Inspect current ownership, provider, Git, runtime, and

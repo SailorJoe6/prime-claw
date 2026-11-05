@@ -10,6 +10,7 @@ import {
   CliOrcaAdapter,
   CliTaskEpisodeAdmissionGit,
   bundleContentDigest,
+  commitConversationTaskStatus,
   createSpecEpisode,
   createTaskEpisode,
   handoffTaskEpisode,
@@ -31,6 +32,8 @@ import {
   writeEpisodeOwnership,
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
+
+import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 
 const ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const RUNTIME_BACKLOG = "/usr/local/bin/backlog";
@@ -170,7 +173,22 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   git(root, "add", ".gitignore");
   git(root, "commit", "-qm", "ignore independent task store");
   git(root, "push", "-q");
+  writeFileSync(join(root, "local-base.txt"), "intentional unpublished code base\n");
+  git(root, "add", "local-base.txt");
+  git(root, "commit", "-qm", "selected local code base");
   const codeHead = git(root, "rev-parse", "HEAD");
+  assert.notEqual(git(root, "rev-parse", "@{upstream}"), codeHead);
+  writeFileSync(join(root, "code.txt"), "staged unrelated code\n");
+  git(root, "add", "code.txt");
+  writeFileSync(join(root, "code.txt"), "unstaged unrelated code\n");
+  writeFileSync(join(root, "untracked-code.txt"), "untracked code\n");
+  writeFileSync(join(prepared.storeDir, "admission-other.txt"), "staged unrelated ticket bytes\n");
+  git(prepared.storeDir, "add", "admission-other.txt");
+  writeFileSync(join(prepared.storeDir, "admission-other.txt"), "unstaged unrelated ticket bytes\n");
+  writeFileSync(join(prepared.storeDir, "untracked-admission.txt"), "untracked task bytes\n");
+  const unrelatedBefore = [git(root, "status", "--porcelain"), git(root, "diff", "--cached", "--binary"),
+    git(prepared.storeDir, "diff", "--cached", "--binary"), readFileSync(join(prepared.storeDir, "admission-other.txt")),
+    readFileSync(join(root, "code.txt")), readFileSync(join(root, "untracked-code.txt")), readFileSync(join(prepared.storeDir, "untracked-admission.txt"))];
   const records = new Map();
   const ownership = {
     read(_root, owner) { return owner ? records.get(owner) ?? null : [...records.values()][0] ?? null; },
@@ -222,7 +240,9 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   const publishedTaskHead = git(prepared.storeDir, "rev-parse", "HEAD");
   assert.notEqual(publishedTaskHead, plannedTaskHead);
   assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
-  assert.equal(git(root, "status", "--porcelain"), "");
+  assert.deepEqual([git(root, "status", "--porcelain"), git(root, "diff", "--cached", "--binary"),
+    git(prepared.storeDir, "diff", "--cached", "--binary"), readFileSync(join(prepared.storeDir, "admission-other.txt")),
+    readFileSync(join(root, "code.txt")), readFileSync(join(root, "untracked-code.txt")), readFileSync(join(prepared.storeDir, "untracked-admission.txt"))], unrelatedBefore);
   assert.equal(result.baseRef, codeHead);
   assert.equal(result.head, codeHead);
   assert.equal(result.providerRevision, publishedTaskHead);
@@ -351,8 +371,8 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
   assert.ok(secondTaskId);
   const secondTask = view(root, secondTaskId);
   assert.equal(secondTask.status, "In Planning");
-  git(prepared.storeDir, "add", ".");
-  git(prepared.storeDir, "commit", "-qm", "plan independent blocked task");
+  git(prepared.storeDir, "--literal-pathspecs", "add", "--", secondTask.path.replace(/^\.backlog\//, ""));
+  git(prepared.storeDir, "--literal-pathspecs", "commit", "--only", "-qm", "plan independent blocked task", "--", secondTask.path.replace(/^\.backlog\//, ""));
   git(prepared.storeDir, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
   const ctx2 = { ...ctx, sessionManager: {
     getSessionId: () => "independent-owner-2", getSessionFile: () => join(dir, "owner-2.jsonl"), getHeader: () => ({ rlmDepth: 0 }),
@@ -363,12 +383,25 @@ test("independent Backlog admission keeps code and task DAGs separate and prepar
       ownership, reservationOperationId: "independent-operation-2", now: () => "2026-10-26T20:02:00.000Z",
       allocateTaskEpisode: async () => { throw new Error("fixture allocation failure"); },
     }, { engine: "local" }),
-    /is Blocked and requires exact recovery/,
+    /fixture allocation failure.*Native admission result:.*Current ownership:/,
   );
+  assert.equal(view(root, secondTaskId).status, "In Progress");
+  const retainedOwner = structuredClone(records.get("independent-owner-2"));
+  const codeIndex = git(root, "diff", "--cached", "--binary");
+  const taskIndex = git(prepared.storeDir, "diff", "--cached", "--binary");
+  const blocked = commitConversationTaskStatus({
+    taskId: secondTaskId, projectRoot: root, taskPath: secondTask.path, status: "Blocked",
+    message: "owner-requested blocker publication", note: "owner chose Blocked from factual failure evidence",
+    runner, git: new CliTaskEpisodeAdmissionGit(), resolveTask: taskResolver,
+  });
+  assert.equal(blocked.taskHistory.status, "published");
+  assert.deepEqual(records.get("independent-owner-2"), retainedOwner, "requested status publication never rewrites ownership");
+  assert.equal(git(root, "diff", "--cached", "--binary"), codeIndex);
+  assert.equal(git(prepared.storeDir, "diff", "--cached", "--binary"), taskIndex);
   const blockedOwner = records.get("independent-owner-2");
   assert.equal(blockedOwner.provider, "backlog");
-  assert.equal(blockedOwner.providerRevision, git(prepared.storeDir, "rev-parse", "HEAD"));
-  assert.equal(blockedOwner.taskEvidence.task.status, "Blocked");
+  assert.notEqual(blockedOwner.providerRevision, git(prepared.storeDir, "rev-parse", "HEAD"));
+  assert.equal(blockedOwner.taskEvidence.task.status, "In Progress");
   assert.equal(view(root, secondTaskId).status, "Blocked");
   assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
 });
@@ -421,134 +454,81 @@ test("trusted task admission commits In Progress before reservation and allocati
   ]);
 });
 
-test("proven clean pre-reservation failure returns the exact task to In Planning", async () => {
+test("pre-reservation failure reports the one native admission without choosing a rollback", async () => {
   const f = fixture();
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, {
-      ...f.dependencies,
-      reserveTaskOwnership() { throw new Error("reservation rejected before write"); },
-      allocateTaskEpisode: async () => { throw new Error("must not allocate"); },
-    }, { engine: "local" }),
-    /returned to In Planning.*reservation rejected before write/,
-  );
-
-  assert.equal(view(f.root).status, "In Planning");
+  await assert.rejects(createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, {
+    ...f.dependencies,
+    reserveTaskOwnership() { throw new Error("reservation rejected before write"); },
+    allocateTaskEpisode: async () => { assert.fail("must not allocate"); },
+  }, { engine: "local" }), /reservation rejected before write.*Native admission result:.*Current ownership: null/);
+  assert.equal(view(f.root).status, "In Progress");
   assert.equal(f.record, null);
   assert.deepEqual(commitPaths(f.root), [f.task.path]);
-  assert.deepEqual(git(f.root, "log", "-2", "--pretty=%s").split(/\r?\n/), [
-    "chore: roll back PRIMECLAW-1 episode admission",
-    "chore: admit PRIMECLAW-1 episode",
-  ]);
+  assert.equal(git(f.root, "log", "-1", "--pretty=%s"), "chore: admit PRIMECLAW-1 episode");
   assert.equal(git(f.root, "status", "--short"), "M unrelated.txt");
 });
 
-test("post-reservation allocation failure publishes Blocked with exact recovery condition", async () => {
+
+test("post-reservation allocation failure retains exact uncertain resources without a second task mutation", async () => {
   const f = fixture();
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, {
-      ...f.dependencies,
-      allocateTaskEpisode: async () => {
-        f.ownership.write(f.root, {
-          ...f.record,
-          status: "uncertain",
-          uncertaintyReason: "session publication outcome unknown",
-        });
-        throw new Error("session publication outcome unknown");
-      },
-    }, { engine: "local" }),
-    /is Blocked and requires exact recovery.*session publication outcome unknown/,
-  );
-
+  await assert.rejects(createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, {
+    ...f.dependencies,
+    allocateTaskEpisode: async () => {
+      f.ownership.write(f.root, { ...f.record, status: "uncertain", uncertaintyReason: "session publication outcome unknown" });
+      throw new Error("session publication outcome unknown");
+    },
+  }, { engine: "local" }), /session publication outcome unknown.*Native admission result:.*Current ownership:.*operation-1234/);
   const task = view(f.root);
-  assert.equal(task.status, "Blocked");
-  assert.match(JSON.stringify(task), /inspect \.prime-claw\/ownership\.json/);
-  assert.match(JSON.stringify(task), /reconcile every recorded task, worktree, and session identity to PRIMECLAW-1/);
-  assert.match(JSON.stringify(task), /do not retry it as fresh creation/);
+  assert.equal(task.status, "In Progress");
+  assert.equal(task.implementationNotes, null);
   assert.equal(f.record.status, "uncertain");
-  assert.equal(view(f.root).implementationPlan.includes("Create the bounded resource"), true);
+  assert.equal(f.record.operationId, "operation-1234");
   assert.deepEqual(commitPaths(f.root), [f.task.path]);
-  assert.deepEqual(commitPaths(f.root, f.record.baseRef), [f.task.path]);
   assert.equal(git(f.root, "status", "--short"), "M unrelated.txt");
-
   const head = git(f.root, "rev-parse", "HEAD");
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call-2", f.ctx, f.dependencies, { engine: "local" }),
-    /requires the exact task to be In Planning/,
-  );
+  await assert.rejects(createTaskEpisode("PRIMECLAW-1", "again", f.ctx, f.dependencies, { engine: "local" }), /Non-terminal Episode ownership already exists/);
   assert.equal(git(f.root, "rev-parse", "HEAD"), head);
 });
 
-test("task admission rejects linked main and primary non-main checkouts before every mutation", async () => {
+
+test("task admission uses the selected code branch without a literal-main suitability gate", async () => {
   const f = fixture();
-  git(f.root, "branch", "keeper");
-  git(f.root, "checkout", "-q", "keeper");
-  const linkedParent = mkdtempSync(join(tmpdir(), "prime-claw-foreign-checkout-"));
-  const linked = join(linkedParent, "linked-main");
-  git(f.root, "worktree", "add", "-q", linked, "main");
-
-  const linkedTask = join(linked, f.task.path);
-  const before = {
-    linkedTask: readFileSync(linkedTask),
-    linkedHead: git(linked, "rev-parse", "HEAD"),
-    linkedStatus: git(linked, "status", "--short"),
-    primaryTask: readFileSync(join(f.root, f.task.path)),
-    primaryHead: git(f.root, "rev-parse", "HEAD"),
-    primaryStatus: git(f.root, "status", "--short"),
-  };
-  let reservationCalls = 0;
-  let allocatorCalls = 0;
-
-  const guardedDependencies = {
+  git(f.root, "checkout", "-qb", "selected-code-base");
+  let reached = false;
+  await assert.rejects(createTaskEpisode("PRIMECLAW-1", "non-main", f.ctx, {
     ...f.dependencies,
-    reserveTaskOwnership() { reservationCalls += 1; throw new Error("must not reserve"); },
-    allocateTaskEpisode: async () => { allocatorCalls += 1; throw new Error("must not allocate"); },
-  };
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", { ...f.ctx, cwd: linked }, guardedDependencies, { engine: "local" }),
-    /canonical primary main checkout/,
-  );
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, guardedDependencies, { engine: "local" }),
-    /canonical primary main checkout/,
-  );
-
-  assert.equal(git(linked, "branch", "--show-current"), "main");
-  assert.deepEqual(readFileSync(linkedTask), before.linkedTask);
-  assert.equal(git(linked, "rev-parse", "HEAD"), before.linkedHead);
-  assert.equal(git(linked, "status", "--short"), before.linkedStatus);
-  assert.deepEqual(readFileSync(join(f.root, f.task.path)), before.primaryTask);
-  assert.equal(git(f.root, "rev-parse", "HEAD"), before.primaryHead);
-  assert.equal(git(f.root, "status", "--short"), before.primaryStatus);
-  assert.equal(f.record, null);
-  assert.equal(existsSync(join(linked, ".prime-claw", "ownership.json")), false);
-  assert.equal(reservationCalls, 0);
-  assert.equal(allocatorCalls, 0);
-  assert.deepEqual(f.events, []);
+    reserveTaskOwnership(input) {
+      reached = true;
+      assert.equal(input.baseRef, git(f.root, "rev-parse", "HEAD"));
+      throw new Error("selected-base reservation observation");
+    },
+  }, { engine: "local" }), /selected-base reservation observation/);
+  assert.equal(reached, true);
+  assert.equal(git(f.root, "branch", "--show-current"), "selected-code-base");
+  assert.equal(view(f.root).status, "In Progress");
+  assert.deepEqual(commitPaths(f.root), [f.task.path]);
 });
 
-test("task admission preflight rejects unclean task and nonterminal ownership without mutation", async () => {
+
+test("authorized selected-ticket edits reach native exact-file commit while nonterminal ownership still prevents duplication", async () => {
   const dirty = fixture();
-  writeFileSync(join(dirty.root, dirty.task.path), `${readFileSync(join(dirty.root, dirty.task.path), "utf8")}\nlocal change\n`);
-  const dirtyHead = git(dirty.root, "rev-parse", "HEAD");
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", dirty.ctx, dirty.dependencies, { engine: "local" }),
-    /task path to be clean/,
-  );
-  assert.equal(git(dirty.root, "rev-parse", "HEAD"), dirtyHead);
-  assert.equal(view(dirty.root).status, "In Planning");
+  execFileSync(BACKLOG, ["task", "edit", "PRIMECLAW-1", "--append-notes", "authorized coherent selected edit"], { cwd: dirty.root });
+  git(dirty.root, "add", "--", dirty.task.path);
+  await assert.rejects(createTaskEpisode("PRIMECLAW-1", "dirty-selected", dirty.ctx, {
+    ...dirty.dependencies, reserveTaskOwnership() { throw new Error("selected edit committed"); },
+  }, { engine: "local" }), /selected edit committed/);
+  assert.equal(view(dirty.root).status, "In Progress");
+  assert.match(view(dirty.root).implementationNotes, /authorized coherent selected edit/);
+  assert.deepEqual(commitPaths(dirty.root), [dirty.task.path]);
 
   const owned = fixture();
   owned.ownership.write(owned.root, {
     version: 1, status: "provisioning", operationId: "other", engine: "local", ownerSessionId: "owner-session",
-    sourceLocation: ".ralph/plans/future/other", slug: "other", baseRef: "base", bundleDigest: "0".repeat(64),
-    createdAt: "x", updatedAt: "x",
+    sourceLocation: ".ralph/plans/future/other", slug: "other", baseRef: "base", bundleDigest: "0".repeat(64), createdAt: "x", updatedAt: "x",
   });
-  const ownedHead = git(owned.root, "rev-parse", "HEAD");
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", owned.ctx, owned.dependencies, { engine: "local" }),
-    /Non-terminal Episode ownership already exists/,
-  );
-  assert.equal(git(owned.root, "rev-parse", "HEAD"), ownedHead);
+  const head = git(owned.root, "rev-parse", "HEAD");
+  await assert.rejects(createTaskEpisode("PRIMECLAW-1", "owned", owned.ctx, owned.dependencies, { engine: "local" }), /Non-terminal Episode ownership already exists/);
+  assert.equal(git(owned.root, "rev-parse", "HEAD"), head);
   assert.equal(view(owned.root).status, "In Planning");
 });
 
@@ -745,177 +725,24 @@ try {
 });
 
 
-test("separate-process recovery waits for another owner's admission reservation boundary", async (t) => {
-  for (const recoveryMode of ["blocked", "rollback"]) {
-    await t.test(recoveryMode, async () => {
-      const f = fixture();
-      const created = execFileSync(BACKLOG, [
-        "task", "create", `Second ${recoveryMode} recovery-race task`,
-        "--status", "In Planning",
-        "--description", "Create an independently owned Episode",
-        "--plan", "1. Create the bounded resource.\n2. Verify exact identity.",
-        "--plain",
-      ], { cwd: f.root, encoding: "utf8" });
-      const secondId = created.match(/PRIMECLAW-[0-9.]+/)?.[0];
-      assert.ok(secondId);
-      const secondTask = view(f.root, secondId);
-      git(f.root, "add", "--", secondTask.path);
-      git(f.root, "commit", "-q", "--only", "-m", "plan recovery-race task", "--", secondTask.path);
-
-      const worker = join(f.root, `recovery-${recoveryMode}-worker.mjs`);
-      const specUrl = new URL("../src/prime-agent-plugin/extension-support/spec-episode.ts", import.meta.url).href;
-      const ownershipUrl = new URL("../src/prime-agent-plugin/extension-support/episode-ownership.ts", import.meta.url).href;
-      const resolverUrl = new URL("../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts", import.meta.url).href;
-      writeFileSync(worker, `
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { spawnSync } from "node:child_process";
-import { CliTaskEpisodeAdmissionGit, createTaskEpisode } from ${JSON.stringify(specUrl)};
-import { readEpisodeOwnership, writeEpisodeOwnership } from ${JSON.stringify(ownershipUrl)};
-import { resolveBacklogTask } from ${JSON.stringify(resolverUrl)};
-const [root, taskId, owner, recoveryMode, barrier, backlog] = process.argv.slice(2);
-const nativeAtomicsWait = Atomics.wait.bind(Atomics);
-let admissionWaitSignaled = false;
-Atomics.wait = (...args) => {
-  if (owner === "owner-a" && !admissionWaitSignaled) {
-    admissionWaitSignaled = true;
-    process.stdout.write("A_WAITING_ON_ADMISSION_LOCK\\n");
-  }
-  return nativeAtomicsWait(...args);
-};
-class Runner {
-  run(command, args, options = {}) {
-    const result = spawnSync(command === "backlog" ? backlog : command, args, { cwd: options.cwd, encoding: "utf8" });
-    if (result.status !== 0 && !options.allowFailure) throw new Error(result.stderr || result.stdout);
-    return { stdout: result.stdout || "", stderr: result.stderr || "", status: result.status ?? 1 };
-  }
-}
-class AdmissionGit extends CliTaskEpisodeAdmissionGit {
-  push() {}
-  commitOnlyPath(root, path, message) {
-    const commit = super.commitOnlyPath(root, path, message);
-    if (owner === "owner-b" && message.startsWith("chore: admit")) {
-      process.stdout.write("B_COMMITTED\\n");
-      readFileSync(barrier);
-    }
-    return commit;
-  }
-}
-const runner = new Runner();
-const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
-  getSessionId: () => owner,
-  getSessionFile: () => join(root, owner + ".jsonl"),
-  getHeader: () => ({ rlmDepth: 0 }),
-} };
-const dependencies = {
-  admissionGit: new AdmissionGit(),
-  admissionRunner: runner,
-  taskResolver: (cwd, id) => resolveBacklogTask(cwd, id, runner),
-  allocateTaskEpisode: async () => {
-    const reserved = readEpisodeOwnership(root, owner);
-    if (owner === "owner-a" && recoveryMode === "blocked") {
-      writeEpisodeOwnership(root, { ...reserved, status: "uncertain", uncertaintyReason: "simulated session publication failure" });
-      process.stdout.write("A_RECOVERY_READY\\n");
-      readFileSync(barrier);
-      throw new Error("simulated session publication failure");
-    }
-    const active = { ...reserved, status: "active", worktree: join(root, owner + "-worktree"), branch: "episode/" + owner,
-      head: reserved.baseRef, episodeId: "episode-" + owner, episodeSessionFile: join(root, "episode-" + owner + ".jsonl"), episodeActiveSessionId: "route-" + owner };
-    writeEpisodeOwnership(root, active);
-    return { ...active, reused: false };
-  },
-};
-if (owner === "owner-a" && recoveryMode === "rollback") {
-  dependencies.reserveTaskOwnership = () => {
-    throw { toString() {
-      process.stdout.write("A_RECOVERY_READY\\n");
-      readFileSync(barrier);
-      return "reservation rejected before write";
-    } };
-  };
-}
-try {
-  const result = await createTaskEpisode(taskId, "call-" + owner, ctx, dependencies, { engine: "local" });
-  process.stdout.write(JSON.stringify({ owner, outcome: "created", taskId: result.taskId }) + "\\n");
-} catch (error) {
-  process.stdout.write(JSON.stringify({ owner, outcome: "failed", error: String(error) }) + "\\n");
-}
-`);
-      const aBarrier = join(f.root, `a-${recoveryMode}.fifo`);
-      const bBarrier = join(f.root, `b-${recoveryMode}.fifo`);
-      execFileSync("mkfifo", [aBarrier, bBarrier]);
-      const run = (taskId, owner, barrier, readyText) => {
-        const child = spawn(process.execPath, [
-          "--experimental-strip-types", worker, f.root, taskId, owner, recoveryMode, barrier, BACKLOG,
-        ], { stdio: ["ignore", "pipe", "pipe"] });
-        let stdout = "", stderr = "", readyResolve, readyReject, contentionResolve, contentionReject;
-        const ready = new Promise((resolveReady, rejectReady) => { readyResolve = resolveReady; readyReject = rejectReady; });
-        const contention = new Promise((resolveContention, rejectContention) => {
-          contentionResolve = resolveContention;
-          contentionReject = rejectContention;
-        });
-        child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
-        child.stdout.on("data", (chunk) => {
-          stdout += chunk;
-          if (stdout.includes(readyText)) readyResolve();
-          if (stdout.includes("A_WAITING_ON_ADMISSION_LOCK")) contentionResolve();
-        });
-        child.stderr.on("data", (chunk) => { stderr += chunk; });
-        const done = new Promise((resolveDone, rejectDone) => {
-          child.on("error", (error) => { readyReject(error); contentionReject(error); rejectDone(error); });
-          child.on("close", (code) => {
-            if (!stdout.includes(readyText)) readyReject(new Error(stdout + stderr));
-            if (owner === "owner-a" && !stdout.includes("A_WAITING_ON_ADMISSION_LOCK")) {
-              contentionReject(new Error(`owner-a exited before contending on the admission lock: ${stdout}${stderr}`));
-            }
-            if (code === 0) resolveDone({ stdout, stderr });
-            else rejectDone(new Error(stdout + stderr));
-          });
-        });
-        return { child, ready, contention, done };
-      };
-
-      const first = run("PRIMECLAW-1", "owner-a", aBarrier, "A_RECOVERY_READY");
-      await first.ready;
-      const second = run(secondId, "owner-b", bBarrier, "B_COMMITTED");
-      await second.ready;
-      writeFileSync(aBarrier, "enter recovery");
-      let contentionFailure;
-      try {
-        await new Promise((resolveContention, rejectContention) => {
-          const timeout = setTimeout(
-            () => rejectContention(new Error("owner-a did not contend on the held admission lock")),
-            5_000,
-          );
-          first.contention.then(
-            () => { clearTimeout(timeout); resolveContention(); },
-            (error) => { clearTimeout(timeout); rejectContention(error); },
-          );
-        });
-      } catch (error) {
-        contentionFailure = error;
-      }
-      const recoveryExitedWhileAdmissionHeld = first.child.exitCode !== null;
-      writeFileSync(bBarrier, "finish reservation");
-      const [firstResult, secondResult] = await Promise.all([first.done, second.done]);
-
-      if (contentionFailure) throw contentionFailure;
-      assert.equal(recoveryExitedWhileAdmissionHeld, false, "recovery must wait for the other owner's reservation boundary");
-      assert.match(secondResult.stdout, /"outcome":"created"/);
-      assert.equal(view(f.root, secondId).status, "In Progress");
-      const records = readAllEpisodeOwnership(f.root);
-      assert.equal(records.find((record) => record.ownerSessionId === "owner-b")?.status, "active");
-      if (recoveryMode === "blocked") {
-        assert.match(firstResult.stdout, /is Blocked and requires exact recovery/);
-        assert.equal(view(f.root).status, "Blocked");
-        assert.equal(records.find((record) => record.ownerSessionId === "owner-a")?.status, "uncertain");
-      } else {
-        assert.match(firstResult.stdout, /was returned to In Planning.*reservation rejected before write/);
-        assert.equal(view(f.root).status, "In Planning");
-        assert.equal(records.some((record) => record.ownerSessionId === "owner-a"), false);
-      }
-    });
-  }
+test("registered Backlog create reports actual default status and reservation failure without selecting another lifecycle action", async () => {
+  const f = fixture(), tools = new Map();
+  const beforeIndex = git(f.root, "diff", "--cached", "--binary");
+  let allocations = 0;
+  createReviewedPlanExtension({
+    ...f.dependencies,
+    providerTaskResolver: (cwd, id) => ({ ...f.dependencies.taskResolver(cwd, id), provider: "backlog" }),
+    async placementResolver() { return { engine: "local" }; },
+    allocateTaskEpisode: async () => { allocations += 1; throw new Error("registered allocation failure"); },
+  })({ registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {}, sendUserMessage() { assert.fail("no extra assignment"); } });
+  const result = await tools.get("create_task_episode").execute("registered-default", { taskId: "PRIMECLAW-1" }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, true);
+  assert.match(result.details.error, /registered allocation failure.*Native admission result:.*Current ownership:.*operation-1234/);
+  assert.equal(allocations, 1);
+  assert.equal(view(f.root).status, "In Progress");
+  assert.equal(f.record.status, "provisioning");
+  assert.equal(git(f.root, "log", "-1", "--pretty=%s"), "chore: admit PRIMECLAW-1 episode");
+  assert.equal(git(f.root, "diff", "--cached", "--binary"), beforeIndex);
 });
 
 
@@ -1001,78 +828,47 @@ test("retained promotion tolerates an unrelated task admission while selecting i
 });
 
 
-test("task admission status and plan preflight reject before main mutation", async () => {
-  const wrongStatus = fixture();
-  execFileSync(BACKLOG, ["task", "edit", "--status", "In Design", "--plain", "--", "PRIMECLAW-1"], { cwd: wrongStatus.root });
-  git(wrongStatus.root, "add", "--", wrongStatus.task.path);
-  git(wrongStatus.root, "commit", "-q", "--only", "-m", "return to design", "--", wrongStatus.task.path);
-  const statusHead = git(wrongStatus.root, "rev-parse", "HEAD");
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", wrongStatus.ctx, wrongStatus.dependencies, { engine: "local" }),
-    /requires the exact task to be In Planning/,
-  );
-  assert.equal(git(wrongStatus.root, "rev-parse", "HEAD"), statusHead);
-  assert.equal(wrongStatus.record, null);
-
-  const placeholder = fixture();
-  execFileSync(BACKLOG, ["task", "edit", "--plan", "TODO: write the implementation plan", "--plain", "--", "PRIMECLAW-1"], { cwd: placeholder.root });
-  git(placeholder.root, "add", "--", placeholder.task.path);
-  git(placeholder.root, "commit", "-q", "--only", "-m", "placeholder plan", "--", placeholder.task.path);
-  const planHead = git(placeholder.root, "rev-parse", "HEAD");
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", placeholder.ctx, placeholder.dependencies, { engine: "local" }),
-    /requires a meaningful Implementation Plan/,
-  );
-  assert.equal(git(placeholder.root, "rev-parse", "HEAD"), planHead);
-  assert.equal(view(placeholder.root).status, "In Planning");
-  assert.equal(placeholder.record, null);
+test("task status and plan eligibility belong to Markdown rather than the requested native creation operation", async () => {
+  // These direct primitive calls prove policy removal, not semantic readiness.
+  for (const args of [["--status", "In Design"], ["--plan", "TODO: write the implementation plan"]]) {
+    const f = fixture();
+    execFileSync(BACKLOG, ["task", "edit", ...args, "--plain", "--", "PRIMECLAW-1"], { cwd: f.root });
+    await assert.rejects(createTaskEpisode("PRIMECLAW-1", "facts-only", f.ctx, {
+      ...f.dependencies, reserveTaskOwnership() { throw new Error("native creation reached reservation"); },
+    }, { engine: "local" }), /native creation reached reservation/);
+    assert.equal(view(f.root).status, "In Progress");
+    assert.equal(f.record, null);
+    assert.deepEqual(commitPaths(f.root), [f.task.path]);
+  }
 });
 
-test("failed In Progress commit is recovered by one exact In Planning commit", async () => {
-  const f = fixture();
-  const real = f.dependencies.admissionGit;
+
+test("failed In Progress commit leaves its actual native task state without another commit or status choice", async () => {
+  const f = fixture(), real = f.dependencies.admissionGit;
+  const head = git(f.root, "rev-parse", "HEAD");
   let commits = 0;
-  const admissionGit = {
-    repositoryRoot: (cwd) => real.repositoryRoot(cwd),
-    branch: (repo) => real.branch(repo),
-    head: (repo) => real.head(repo),
-    commitPaths: (repo, ref) => real.commitPaths(repo, ref),
-    pathStatus: (repo, path) => real.pathStatus(repo, path),
-    push: (repo) => real.push(repo),
-    commitOnlyPath(repo, path, message) {
-      commits += 1;
-      if (commits === 1) throw new Error("status commit rejected before write");
-      return real.commitOnlyPath(repo, path, message);
-    },
-  };
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, {
-      ...f.dependencies,
-      admissionGit,
-      allocateTaskEpisode: async () => { throw new Error("must not allocate"); },
-    }, { engine: "local" }),
-    /returned to In Planning.*status commit rejected before write/,
-  );
-  assert.equal(commits, 2);
-  assert.equal(view(f.root).status, "In Planning");
-  assert.equal(git(f.root, "log", "-1", "--pretty=%s"), "chore: roll back PRIMECLAW-1 episode admission");
-  assert.deepEqual(commitPaths(f.root), [f.task.path]);
+  const admissionGit = Object.assign(Object.create(real), {
+    commitOnlyPath() { commits += 1; throw new Error("status commit rejected before write"); },
+  });
+  await assert.rejects(createTaskEpisode("PRIMECLAW-1", "commit-failure", f.ctx, {
+    ...f.dependencies, admissionGit, allocateTaskEpisode: async () => { assert.fail("must not allocate"); },
+  }, { engine: "local" }), /status commit rejected before write/);
+  assert.equal(commits, 1);
+  assert.equal(view(f.root).status, "In Progress");
+  assert.equal(git(f.root, "rev-parse", "HEAD"), head);
+  assert.notEqual(git(f.root, "status", "--porcelain", "--", f.task.path), "");
   assert.equal(f.record, null);
 });
 
 
-test("allocator return without durable active identity is published as Blocked", async () => {
+test("allocator return without durable active identity reports the exact retained reservation without Blocked publication", async () => {
   const f = fixture();
-  await assert.rejects(
-    createTaskEpisode("PRIMECLAW-1", "tool-call", f.ctx, {
-      ...f.dependencies,
-      allocateTaskEpisode: async () => ({ ...f.record, status: "active", reused: false }),
-    }, { engine: "local" }),
-    /is Blocked and requires exact recovery.*exact active reservation identity/,
-  );
-  assert.equal(view(f.root).status, "Blocked");
+  await assert.rejects(createTaskEpisode("PRIMECLAW-1", "bad-result", f.ctx, {
+    ...f.dependencies, allocateTaskEpisode: async () => ({ ...f.record, status: "active", reused: false }),
+  }, { engine: "local" }), /exact active reservation identity.*Current ownership:.*provisioning/);
+  assert.equal(view(f.root).status, "In Progress");
   assert.equal(f.record.status, "provisioning");
-  assert.match(JSON.stringify(view(f.root)), /reconcile every recorded task, worktree, and session identity/);
+  assert.equal(view(f.root).implementationNotes, null);
 });
 
 
@@ -1167,4 +963,21 @@ test("production task placement falls back only when the Orca command is absent"
     resolveTaskEpisodePlacement("/project", undefined, ctx, { orca: rejected }),
     /inventory denied/,
   );
+});
+
+test("ordinary task status commit targets one literal path and preserves unrelated staged files", () => {
+  const f = fixture();
+  const selected = "backlog/tasks/selected[1].md", other = "backlog/tasks/selected1.md";
+  writeFileSync(join(f.root, selected), "selected baseline\n");
+  writeFileSync(join(f.root, other), "foreign baseline\n");
+  git(f.root, "--literal-pathspecs", "add", "--", selected, other);
+  git(f.root, "commit", "-qm", "literal path fixtures");
+  writeFileSync(join(f.root, selected), "authorized selected edit\n");
+  writeFileSync(join(f.root, other), "foreign staged edit\n");
+  git(f.root, "--literal-pathspecs", "add", "--", other);
+  const staged = git(f.root, "diff", "--cached", "--binary");
+  const head = new CliTaskEpisodeAdmissionGit().commitOnlyPath(f.root, selected, "literal selected ticket");
+  assert.deepEqual(commitPaths(f.root, head), [selected]);
+  assert.equal(git(f.root, "diff", "--cached", "--binary"), staged);
+  assert.equal(readFileSync(join(f.root, other), "utf8"), "foreign staged edit\n");
 });

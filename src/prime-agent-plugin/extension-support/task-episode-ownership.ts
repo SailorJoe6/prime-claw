@@ -873,8 +873,6 @@ export function reserveTaskEpisodeOwnership(
   const repositoryRoot = git.repositoryRoot(projectRoot);
   if (resolve(repositoryRoot) !== resolve(projectRoot)) throw new Error("Task-native Episode reservation must run from the repository root");
   if (!input.ownerSessionId) throw new Error("Task-native Episode reservation requires an exact owner session");
-  if (selection.status !== "In Progress") throw new Error("Task-native Episode reservation requires the exact task to be committed as In Progress");
-  if (!meaningfulTaskImplementationPlan(selection.implementationPlan)) throw new Error("Task-native Episode reservation requires a meaningful Implementation Plan");
 
   const selectedTaskPath = resolve(selection.taskPath);
   const stat = lstatSync(selectedTaskPath);
@@ -886,15 +884,9 @@ export function reserveTaskEpisodeOwnership(
 
   const baseRef = input.baseRef ?? git.head(projectRoot);
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(baseRef)) throw new Error("Task-native Episode reservation requires an exact Git status-commit SHA");
-  if (input.baseRef && git.head(projectRoot) !== baseRef) {
-    throw new Error("Canonical main changed before the exact task-native Episode reservation");
-  }
   const committedPaths = git.commitPaths(projectRoot, baseRef);
   if (committedPaths.length !== 1 || committedPaths[0] !== taskPathRelative) {
     throw new Error("Task-native Episode status commit must contain only the exact Backlog task path");
-  }
-  if (git.pathStatus(projectRoot, taskPathRelative) !== "") {
-    throw new Error("Task-native Episode task changed after its status commit");
   }
 
   const existing = ownership.read(projectRoot, input.ownerSessionId);
@@ -935,7 +927,7 @@ export function reserveTaskEpisodeOwnership(
 
 /**
  * Reserve one Backlog Episode whose task status was published on the disconnected
- * task-history branch while the code base remains the exact clean canonical HEAD.
+ * task-history branch separately from the selected Git code base.
  */
 export function reservePublishedBacklogTaskEpisodeOwnership(
   input: PublishedBacklogTaskEpisodeReservationInput,
@@ -962,19 +954,15 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
   const rawTask = taskEvidence.task;
   if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
       || (rawTask as Record<string, unknown>).id !== publication.taskId
-      || (rawTask as Record<string, unknown>).path !== publication.taskPath
-      || (rawTask as Record<string, unknown>).status !== "In Progress") {
-    throw new Error("Independent Backlog Episode reservation requires exact published In Progress task evidence");
+      || (rawTask as Record<string, unknown>).path !== publication.taskPath) {
+    throw new Error("Independent Backlog Episode reservation requires exact native task identity");
   }
 
   const root = realpathSync(input.projectRoot);
   const selection = (dependencies.taskResolver ?? defaultOwnershipTaskResolver)(root, publication.taskId);
   if (!selection || selection.taskId !== publication.taskId || realpathSync(selection.projectRoot) !== root
-      || selection.taskPathRelative !== publication.taskPath || selection.status !== "In Progress") {
+      || selection.taskPathRelative !== publication.taskPath) {
     throw new Error("Independent Backlog Episode reservation task no longer matches the published native evidence");
-  }
-  if (!meaningfulTaskImplementationPlan(selection.implementationPlan)) {
-    throw new Error("Independent Backlog Episode reservation requires a meaningful Implementation Plan");
   }
   if (input.engine === "orca" && !input.projectSetupId) {
     throw new Error("Independent Backlog Orca reservation requires an exact project setup");
@@ -984,8 +972,8 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
   }
 
   const git = dependencies.git ?? new CliBeadsTaskEpisodeReservationGit();
-  if (git.repositoryRoot(root) !== root || git.head(root) !== input.baseRef || git.status(root) !== "") {
-    throw new Error("Independent Backlog Episode reservation requires the exact clean Git code HEAD/baseRef");
+  if (git.repositoryRoot(root) !== root) {
+    throw new Error("Independent Backlog Episode reservation resolved a different Git root");
   }
   const ownership = dependencies.ownership ?? defaultOwnership;
   const initial = ownership.read(root, input.ownerSessionId);
@@ -1015,9 +1003,6 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
     ...(input.projectSetupId ? { projectSetupId: input.projectSetupId } : {}),
     ...(input.routingEnvironmentId ? { routingEnvironmentId: input.routingEnvironmentId } : {}),
   }) as PublishedBacklogTaskEpisodeOwnershipRecord;
-  if (git.head(root) !== input.baseRef || git.status(root) !== "") {
-    throw new Error("Git code state changed during independent Backlog reservation validation");
-  }
   const beforeWrite = ownership.read(root, input.ownerSessionId);
   if ((initial === null) !== (beforeWrite === null)
       || (initial !== null && beforeWrite !== null && JSON.stringify(initial) !== JSON.stringify(beforeWrite))) {

@@ -742,7 +742,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           return {
             content: [{
               type: "text",
-              text: `Task Episode created for ${result.taskId}. One fixed execute assignment was admitted to ${result.episodeId}. Exact provider-native result: ${JSON.stringify(result)}`,
+              text: `Task Episode ${result.reused ? "returned" : "created"} for ${result.taskId}. ${result.reused ? "No new execute assignment was sent." : `One fixed execute assignment was admitted to ${result.episodeId}.`} Exact provider-native result: ${JSON.stringify(result)}`,
             }],
             details: result,
           };

@@ -47,14 +47,19 @@ may be absent. The specification is frozen while the plan remains living.
 Missing active files are not reviewable live identity and require the exact
 version-1 blocked recovery path rather than task-native fallback.
 
-- For provider-absent or `provider: "backlog"` version-2 ownership, bind the
-  exact Backlog task ID and project-relative task path at the candidate commit.
-  The record must not carry Beads evidence. Reload it through the supported
-  structured interface. Treat its Description, Acceptance Criteria, constraints,
-  references, documentation, Implementation Plan, Implementation Notes,
-  modified files, and Final Summary as the sole review contract. Verify exact
-  ID, path, and parent identity, and do not consult `.ralph/plans` or copy task
-  content from another checkout.
+- For provider-absent or grandfathered `provider: "backlog"` version-2 ownership
+  without revision/evidence, bind the exact task ID/path in branch-local history
+  at the code candidate. For explicit independent Backlog with `providerRevision`
+  and complete `taskEvidence`, bind its exact ID/path and native task-history
+  revision separately from code base/head. Read the committed/published ticket
+  from that existing independent task history through the supported structured
+  interface; never assume it exists at the code candidate commit. Retain the
+  persisted and current complete native views and actual publication facts.
+  Do not synchronize another writer's dirty checkout, copy a task into the code
+  DAG, mutate content/status/ownership or create a store to review it. Treat the
+  native Description, Acceptance Criteria, constraints, references, documentation,
+  Implementation Plan, Notes, modified files and Final Summary as the contract.
+  Verify ID/path/parent identity; do not consult `.ralph/plans` or mix providers.
 - For `provider: "beads"` version-2 ownership, require no `taskPath`. Bind the
   exact canonical task ID, published `providerRevision`, complete raw
   `taskEvidence`, code `baseRef`, candidate head, recorded Episode worktree,
@@ -106,9 +111,10 @@ failure.
 ## Send a self-contained review task
 
 The one ordinary parent-to-child task must state the resolved repository,
-commit, relevant artifact paths or contents, evidence, and focus. For Beads it
-must include the exact persisted and current raw task values, recorded and
-current provider revisions and publication refs, code base/head, Episode
+commit, relevant artifact paths or contents, evidence, and focus. For independent
+Backlog and Beads include exact persisted/current complete native task values,
+recorded/current task-history revisions and actual publication facts separately
+from code base/head. Beads retains raw names/absence and native refs. Include Episode
 identity, tests, and documentation. An unrelated-task revision descendant alone
 is compatible. For a same-task change, the reviewer must show exact before and
 current fields and use semantic judgment: compatible in-scope clarification and

@@ -372,26 +372,26 @@ test("direct Beads admission publishes, reserves, allocates, and proves one exac
   assert.equal(git(f.root, "rev-parse", "HEAD"), codeHead);
 });
 
-test("Beads admission preflight rejects unsafe code or non-exact native planning evidence before mutation", async (t) => {
-  const cases = [
-    ["operation", (f) => { f.operationInProgress = true; }, /no Git operation/],
-    ["tracked dirt", (f) => { f.trackedStatus = " M code.txt"; }, /without staged or tracked changes/],
-    ["upstream drift", (f) => { f.upstreamHead = "f".repeat(40); }, /code HEAD to equal its upstream/],
-    ["canonical ID drift", (f) => { f.resolvedId = "BEADS-43-full"; }, /exact requested canonical ID/],
-    ["placeholder design", (f) => { Object.defineProperty(f.dependencies, "providerTaskResolver", { value: () => ({ provider: "beads", taskId: f.taskId, title: "Provider-native admission fixture", nativeStatus: "in_planning", status: "In Planning", projectRoot: f.root, nativeView: { id: f.taskId, title: "Provider-native admission fixture", status: "in_planning", design: "TODO: write the implementation plan" } }) }); }, /meaningful provider-native design/],
-  ];
-  for (const [name, arrange, message] of cases) {
-    await t.test(name, async () => {
-      const f = fixture();
-      arrange(f);
-      await assert.rejects(create(f), message);
-      assert.deepEqual(f.statusCalls, []);
-      assert.equal(f.reservationCalls.length, 0);
-      assert.equal(f.allocatorCalls, 0);
-      assert.equal(f.ownership.read(f.root, "owner-session"), null);
-    });
-  }
+test("Beads creation leaves status, design, code cleanliness and upstream suitability to editable policy", async (t) => {
+  for (const [name, arrange] of [
+    ["operation marker", f => { f.operationInProgress = true; }],
+    ["tracked dirt", f => { f.trackedStatus = "MM code.txt"; }],
+    ["upstream drift", f => { f.upstreamHead = "f".repeat(40); }],
+    ["unmapped status and absent design", f => { f.status = "custom-native"; f.liveDesign = undefined; }],
+    ["placeholder design", f => { f.liveDesign = "TODO: write the implementation plan"; }],
+  ]) await t.test(name, async () => {
+    const f = fixture(); arrange(f);
+    const result = await create(f);
+    assert.equal(result.status, "active");
+    assert.deepEqual(f.statusCalls, ["In Progress"]);
+    assert.equal(f.reservationCalls.length, 1);
+    assert.equal(f.allocatorCalls, 1);
+  });
+  const wrong = fixture(); wrong.resolvedId = "BEADS-43-full";
+  await assert.rejects(create(wrong), /exact requested canonical ID/);
+  assert.deepEqual(wrong.statusCalls, []);
 });
+
 
 test("Beads admission surfaces raw review-required publication evidence without recovery or retry", async () => {
   const f = fixture();
@@ -410,138 +410,96 @@ test("Beads admission surfaces raw review-required publication evidence without 
   assert.equal(f.status, "In Planning");
 });
 
-test("Beads admission rolls a published task back to In Planning before durable reservation or resources", async () => {
-  const f = fixture();
-  f.reservationFailure = new Error("reservation rejected before write");
-  await assert.rejects(create(f), /returned to In Planning.*reservation rejected before write/);
-  assert.deepEqual(f.statusCalls, ["In Progress", "In Planning"]);
-  assert.equal(f.status, "In Planning");
+test("Beads pre-reservation failure exposes native warnings and no automatic rollback", async () => {
+  const f = fixture(); f.reservationFailure = new Error("reservation rejected before write");
+  await assert.rejects(create(f), /reservation rejected before write.*Native admission result:.*auto-commit warning.*Current ownership: null/);
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(f.status, "In Progress");
   assert.equal(f.ownership.read(f.root, "owner-session"), null);
   assert.equal(f.allocatorCalls, 0);
 });
 
-test("Beads post-reservation failure publishes Blocked and advances only same-owner provider evidence", async () => {
+
+test("Beads post-reservation failure preserves exact uncertain resources and native facts without Blocked publication", async () => {
   const f = fixture();
-  f.allocationMutator = (reserved) => f.ownership.write(f.root, {
-    ...reserved,
-    status: "uncertain",
-    worktreeName: "retained-worktree",
-    worktree: join(f.root, "retained-worktree"),
-    branch: "episode/retained",
-    head: reserved.baseRef,
-    uncertaintyReason: "session allocation outcome unknown",
+  f.allocationMutator = reserved => f.ownership.write(f.root, {
+    ...reserved, status: "uncertain", worktreeName: "retained-worktree", worktree: join(f.root, "retained-worktree"),
+    branch: "episode/retained", head: reserved.baseRef, uncertaintyReason: "session allocation outcome unknown",
   });
   f.allocationFailure = new Error("session allocation outcome unknown");
-
-  await assert.rejects(create(f), /is Blocked with advanced ownership evidence.*session allocation outcome unknown/);
+  await assert.rejects(create(f), /session allocation outcome unknown.*Native admission result:.*native push warning.*Current ownership:.*retained-worktree/);
   const retained = f.ownership.read(f.root, "owner-session");
-  assert.deepEqual(f.statusCalls, ["In Progress", "Blocked"]);
-  assert.equal(f.status, "Blocked");
-  assert.equal(retained.provider, "beads");
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(f.status, "In Progress");
   assert.equal(retained.status, "uncertain");
   assert.equal(retained.operationId, "beads-operation");
   assert.equal(retained.baseRef, git(f.root, "rev-parse", "HEAD"));
-  assert.equal(retained.worktreeName, "retained-worktree");
   assert.equal(retained.worktree, join(f.root, "retained-worktree"));
   assert.equal(retained.branch, "episode/retained");
-  assert.equal(retained.providerRevision, revision.Blocked);
-  assert.equal(retained.taskEvidence.status, "blocked");
-  assert.equal(retained.taskEvidence.design, f.design);
+  assert.equal(retained.providerRevision, revision["In Progress"]);
+  assert.equal(retained.taskEvidence.status, "in_progress");
+  await assert.rejects(create(f), /Non-terminal Episode ownership already exists/);
+  assert.equal(f.allocatorCalls, 1);
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
 });
 
-test("Beads pre-reservation recovery rolls back despite tracked drift after In Progress publication", async () => {
+
+test("Beads compatible post-mutation code drift does not trigger a rollback", async () => {
   const f = fixture();
-  f.publicationMutator = (requested) => {
-    if (requested === "In Progress") f.trackedStatus = " M code.txt";
-  };
-
-  await assert.rejects(create(f), /returned to In Planning.*without staged or tracked changes/);
-  assert.deepEqual(f.statusCalls, ["In Progress", "In Planning"]);
-  assert.equal(f.status, "In Planning");
-  assert.equal(f.reservationCalls.length, 0);
-  assert.equal(f.ownership.read(f.root, "owner-session"), null);
-  assert.equal(f.allocatorCalls, 0);
-});
-
-test("Beads post-reservation recovery publishes Blocked despite later tracked drift", async () => {
-  const f = fixture();
-  const codeHead = git(f.root, "rev-parse", "HEAD");
-  f.allocationMutator = () => { f.trackedStatus = " M code.txt"; };
-  f.allocationFailure = new Error("allocation failed after tracked drift");
-
-  await assert.rejects(create(f), /is Blocked with advanced ownership evidence.*allocation failed after tracked drift/);
-  const retained = f.ownership.read(f.root, "owner-session");
-  assert.deepEqual(f.statusCalls, ["In Progress", "Blocked"]);
-  assert.equal(f.status, "Blocked");
-  assert.equal(f.reservationCalls.length, 1);
-  assert.equal(retained.provider, "beads");
-  assert.equal(retained.status, "provisioning");
-  assert.equal(retained.taskId, f.taskId);
-  assert.equal(retained.ownerSessionId, "owner-session");
-  assert.equal(retained.baseRef, codeHead);
-  assert.equal(retained.providerRevision, revision.Blocked);
-  assert.equal(retained.taskEvidence.status, "blocked");
+  f.publicationMutator = () => { f.trackedStatus = " M code.txt"; };
+  const result = await create(f);
+  assert.equal(result.status, "active");
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
   assert.equal(f.allocatorCalls, 1);
 });
 
-test("Beads raw same-task drift before reservation surfaces both views and rolls back once", async () => {
-  const f = fixture();
-  const changedDesign = `1. Outside writer changed the plan.\n2. ${"x".repeat(1200)} raw-live-tail-marker`;
-  const unrelatedAdvance = {
-    ...f.unrelatedTask,
-    revision: "unrelated-after",
-    comments: [{ id: 99, text: "outside unrelated advance" }],
-  };
-  f.publicationMutator = (requested) => {
-    if (requested === "In Progress") {
-      f.liveDesign = changedDesign;
-      f.unrelatedTask = unrelatedAdvance;
-    }
-  };
 
-  await assert.rejects(create(f), (error) => {
-    assert.match(error.message, /returned to In Planning/);
-    assert.match(error.message, /published native view/);
-    assert.match(error.message, /live native view/);
-    assert.ok(error.message.includes("Publish one exact task"));
-    assert.ok(error.message.includes("Outside writer changed the plan"));
-    assert.ok(error.message.includes("raw-live-tail-marker"));
-    return true;
-  });
-  assert.deepEqual(f.statusCalls, ["In Progress", "In Planning"]);
-  assert.equal(f.status, "In Planning");
-  assert.equal(f.reservationCalls.length, 0);
-  assert.equal(f.ownership.read(f.root, "owner-session"), null);
-  assert.equal(f.allocatorCalls, 0);
+test("Beads allocation failure after code drift makes no failure-selected status mutation", async () => {
+  const f = fixture();
+  f.allocationMutator = () => { f.trackedStatus = " M code.txt"; };
+  f.allocationFailure = new Error("allocation failed after tracked drift");
+  await assert.rejects(create(f), /allocation failed after tracked drift/);
+  const retained = f.ownership.read(f.root, "owner-session");
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(retained.status, "provisioning");
+  assert.equal(retained.providerRevision, revision["In Progress"]);
+  assert.equal(retained.taskEvidence.status, "in_progress");
+  assert.equal(f.allocatorCalls, 1);
+});
+
+
+test("Beads current raw refinements reach the caller without frozen native-view reapproval", async () => {
+  const f = fixture();
+  const changedDesign = `1. Compatible outside refinement.\n2. ${"x".repeat(1200)} raw-live-tail-marker`;
+  const unrelatedAdvance = { ...f.unrelatedTask, revision: "unrelated-after", comments: [{ id: 99, text: "outside advance" }] };
+  f.publicationMutator = () => { f.liveDesign = changedDesign; f.unrelatedTask = unrelatedAdvance; };
+  const result = await create(f);
+  assert.match(result.currentTask.nativeView.design, /raw-live-tail-marker/);
+  assert.equal(result.beadsTaskMutation.evidence.taskAfterPush.nativeView.design, f.design);
+  assert.deepEqual(f.statusCalls, ["In Progress"]);
+  assert.equal(f.reservationCalls.length, 1);
+  assert.equal(f.allocatorCalls, 1);
   assert.deepEqual(f.unrelatedTask, unrelatedAdvance);
 });
 
-test("Beads Blocked recovery preserves ownership and raw review evidence when publication is not proven", async () => {
-  const f = fixture();
-  f.allocationFailure = new Error("allocation failed after reservation");
-  let publications = 0;
-  f.publicationOverride = (requested) => {
-    publications += 1;
-    if (requested === "In Progress") {
-      f.status = "In Progress";
-      return published(f.root, f.taskId, "In Progress", f.design);
-    }
-    return {
-      status: "review-required",
-      code: "push-rejected",
-      phase: "push",
-      detail: "retain recovery evidence",
-      evidence: { provider: "beads", projectRoot: f.root, taskId: f.taskId, raw_marker: "blocked-recovery-raw" },
-    };
-  };
 
-  await assert.rejects(create(f), /blocked-recovery-raw/);
+test("Beads allocation failure does not invoke a second native publication or rewrite observed evidence", async () => {
+  const f = fixture(); let publications = 0;
+  f.allocationFailure = new Error("allocation failed after reservation");
+  f.publicationOverride = requested => {
+    publications += 1;
+    assert.equal(requested, "In Progress", "no automatic Blocked or In Planning mutation");
+    f.status = "In Progress";
+    return published(f.root, f.taskId, requested, f.design);
+  };
+  await assert.rejects(create(f), /allocation failed after reservation.*Native admission result:/);
+  assert.equal(publications, 1);
   const retained = f.ownership.read(f.root, "owner-session");
-  assert.equal(publications, 2);
   assert.equal(retained.providerRevision, revision["In Progress"]);
   assert.equal(retained.taskEvidence.status, "in_progress");
   assert.equal(retained.status, "provisioning");
 });
+
 
 test("registered Beads creation carries native mutation qualifications and fresh local reads to its one initial execute", async () => {
   const f = fixture();
@@ -576,7 +534,7 @@ test("registered Beads creation carries native mutation qualifications and fresh
     filesystem: { exists: () => false },
     git: {
       repositoryRoot: () => f.root, head: () => baseRef, worktrees: () => [],
-      assertCleanWorktree() {},
+      assertCleanWorktree() { assert.fail("task allocation must not reapply cleanliness eligibility"); },
       createWorktree(_repo, branch, path, head) {
         calls.push(["worktree", branch, path, head]); worktree = path; writeExecute(path);
       },

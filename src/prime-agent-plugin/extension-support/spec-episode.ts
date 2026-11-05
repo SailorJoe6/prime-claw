@@ -69,7 +69,6 @@ import {
   inspectEpisodeTaskHistoryStore,
   inspectPublishedPrimaryTaskHistory,
   prepareEpisodeTaskHistoryWorkspace,
-  prepareTaskHistoryWorkspace,
   publishTaskHistoryMutation,
   resolveSynchronizedProviderTask,
   type EpisodeTaskHistoryMutation,
@@ -287,6 +286,7 @@ export type TaskEpisodeCreationResult = TaskEpisodeResult & {
   admissionPushError?: string;
   /** Native mutation/push results; a successful push is not exact-task publication proof. */
   beadsTaskMutation?: PublishedBeadsTaskMutation;
+  currentTask?: ProviderTaskResolution | BacklogTaskSelection;
 };
 
 export interface TaskEpisodeAllocationDependencies extends EpisodeDependencies {
@@ -306,7 +306,6 @@ export interface TaskEpisodeCreationDependencies extends TaskEpisodeAllocationDe
   reserveTaskOwnership?: typeof reserveTaskEpisodeOwnership;
   reservePublishedBacklogTaskOwnership?: typeof reservePublishedBacklogTaskEpisodeOwnership;
   reserveBeadsTaskOwnership?: typeof reservePublishedBeadsTaskEpisodeOwnership;
-  prepareTaskHistory?: typeof prepareTaskHistoryWorkspace;
   publishTaskHistory?: typeof publishTaskHistoryMutation;
   allocateTaskEpisode?: typeof allocateReservedTaskEpisode;
   reservationOperationId?: string;
@@ -415,8 +414,8 @@ export class CliTaskEpisodeAdmissionGit implements TaskEpisodeAdmissionGit {
   }
   pathStatus(repo: string, path: string): string { return runGit(repo, ["status", "--porcelain", "--", path]); }
   commitOnlyPath(repo: string, path: string, message: string): string {
-    runGit(repo, ["add", "--", path]);
-    runGit(repo, ["commit", "--only", "-m", message, "--", path]);
+    runGit(repo, ["--literal-pathspecs", "add", "--", path]);
+    runGit(repo, ["--literal-pathspecs", "commit", "--only", "-m", message, "--", path]);
     return this.head(repo);
   }
   push(repo: string): void { runGit(repo, ["push"]); }
@@ -2067,7 +2066,6 @@ export async function allocateReservedTaskEpisode(
       record = updated(record, { worktreeName, worktree, branch, head: record.baseRef });
       store.write(repo, record);
       git.createWorktree(repo, branch, worktree, record.baseRef);
-      git.assertCleanWorktree(worktree);
       if (git.head(worktree) !== record.baseRef) throw new EpisodeStateUncertainError("Local task-native Episode did not start at the reserved code head");
       const preparedWorkspace = prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
       record = preparedWorkspace.record;
@@ -2114,7 +2112,6 @@ export async function allocateReservedTaskEpisode(
       head: worktree.head,
     });
     store.write(repo, record);
-    git.assertCleanWorktree(worktree.path);
     const preparedWorkspace = prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
     record = preparedWorkspace.record;
     let executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
@@ -2208,13 +2205,6 @@ function exactAdmissionTask(
 
 type PublishedBacklogTaskHistoryMutation = Extract<EpisodeTaskHistoryMutation, { status: "published" }>;
 
-class BacklogSourceStateError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BacklogSourceStateError";
-  }
-}
-
 class BacklogTaskHistoryPublicationError extends Error {
   readonly publication: EpisodeTaskHistoryMutation;
   constructor(action: string, publication: EpisodeTaskHistoryMutation) {
@@ -2239,9 +2229,6 @@ export function commitConversationTaskStatus(options: {
   git: TaskEpisodeAdmissionGit;
   resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   expectedProvider?: "backlog" | "beads";
-  expectedSourceStatus?: "In Planning" | "In Progress";
-  requireSourcePlan?: boolean;
-  prepareTaskHistory?: typeof prepareTaskHistoryWorkspace;
   publishTaskHistory?: typeof publishTaskHistoryMutation;
 }): ConversationTaskStatusCommitResult {
   const provider = detectTaskProvider(options.projectRoot, options.runner);
@@ -2259,19 +2246,10 @@ export function commitConversationTaskStatus(options: {
     });
   }
 
-  const requireExpectedBacklogSource = (): BacklogTaskSelection => {
-    const current = exactAdmissionTask(
-      options.resolveTask(options.projectRoot, options.taskId),
-      options.taskId, options.projectRoot, options.taskPath,
-    );
-    if (options.expectedSourceStatus && current.status !== options.expectedSourceStatus) {
-      throw new BacklogSourceStateError(`Backlog task ${options.taskId} must still be ${options.expectedSourceStatus} before ${options.status} publication; found ${current.status}`);
-    }
-    if (options.requireSourcePlan && !meaningfulTaskImplementationPlan(current.implementationPlan)) {
-      throw new BacklogSourceStateError(`Backlog task ${options.taskId} must still have a meaningful Implementation Plan before ${options.status} publication`);
-    }
-    return current;
-  };
+  const readExactBacklogTask = (): BacklogTaskSelection => exactAdmissionTask(
+    options.resolveTask(options.projectRoot, options.taskId),
+    options.taskId, options.projectRoot, options.taskPath,
+  );
 
   const trackedTask = options.runner.run(
     "git", ["ls-files", "--error-unmatch", "--", options.taskPath],
@@ -2295,18 +2273,7 @@ export function commitConversationTaskStatus(options: {
   }
   if (trackedTask.status === 1 && independentTaskHistory) {
     const codeHead = options.git.head(options.projectRoot);
-    if (options.git.operationInProgress(options.projectRoot)
-        || options.git.trackedStatus(options.projectRoot) !== ""
-        || options.git.upstreamHead(options.projectRoot) !== codeHead) {
-      throw new Error(`Independent Backlog ${options.status} publication requires exact clean upstream-equal code HEAD`);
-    }
-    const prepared = (options.prepareTaskHistory ?? prepareTaskHistoryWorkspace)({
-      primaryRoot: options.projectRoot, runner: options.runner,
-    });
-    if (prepared.status !== "prepared") {
-      throw new Error(`Independent Backlog task history is not prepared: ${prepared.code}: ${prepared.detail}`);
-    }
-    requireExpectedBacklogSource();
+    readExactBacklogTask();
     const publication = (options.publishTaskHistory ?? publishTaskHistoryMutation)({
       primaryRoot: options.projectRoot,
       targetWorktree: options.projectRoot,
@@ -2321,12 +2288,6 @@ export function commitConversationTaskStatus(options: {
     if (publication.status !== "published") {
       throw new BacklogTaskHistoryPublicationError(`Independent Backlog ${options.status} publication`, publication);
     }
-    if (options.git.head(options.projectRoot) !== codeHead
-        || options.git.operationInProgress(options.projectRoot)
-        || options.git.trackedStatus(options.projectRoot) !== ""
-        || options.git.upstreamHead(options.projectRoot) !== codeHead) {
-      throw new Error(`Independent Backlog ${options.status} publication changed or dirtied the code DAG`);
-    }
     const selection = exactAdmissionTask(
       options.resolveTask(options.projectRoot, options.taskId),
       options.taskId, options.projectRoot, options.taskPath,
@@ -2338,8 +2299,8 @@ export function commitConversationTaskStatus(options: {
   }
 
   // Preserve the ordinary Backlog task-file path exactly: native status edit,
-  // exact task re-read, one task-file-only Git commit, and cleanliness proof.
-  requireExpectedBacklogSource();
+  // exact task re-read and one task-file-only Git commit.
+  readExactBacklogTask();
   mutateProviderTaskStatus({
     projectRoot: options.projectRoot,
     taskId: options.taskId,
@@ -2360,9 +2321,6 @@ export function commitConversationTaskStatus(options: {
   const paths = options.git.commitPaths(options.projectRoot, commit);
   if (paths.length !== 1 || paths[0] !== options.taskPath) {
     throw new Error(`Task-native Episode status commit contains paths other than ${options.taskPath}`);
-  }
-  if (options.git.pathStatus(options.projectRoot, options.taskPath) !== "") {
-    throw new Error(`Backlog task ${options.taskId} changed after its ${options.status} commit`);
   }
   return { selection, commit };
 }
@@ -2717,18 +2675,9 @@ type PublishedBeadsTaskMutation = Extract<BeadsTaskMutationPublication, { status
 class BeadsPublicationEvidenceError extends Error {
   readonly publication: BeadsTaskMutationPublication;
   constructor(action: string, publication: BeadsTaskMutationPublication) {
-    super(`${action} did not return published provider evidence: ${JSON.stringify(publication)}`);
+    super(`${action} did not return a successful native push result: ${JSON.stringify(publication)}`);
     this.name = "BeadsPublicationEvidenceError";
     this.publication = publication;
-  }
-}
-
-class BeadsRawTaskViewDriftError extends Error {
-  constructor(taskId: string, publishedNativeView: Record<string, unknown>, liveNativeView: Record<string, unknown>) {
-    super(
-      `Beads task ${taskId} raw provider view changed after In Progress publication; published native view: ${JSON.stringify(publishedNativeView)}; live native view: ${JSON.stringify(liveNativeView)}`,
-    );
-    this.name = "BeadsRawTaskViewDriftError";
   }
 }
 
@@ -2736,8 +2685,6 @@ function exactBeadsAdmissionTask(
   selection: ProviderTaskResolution | null,
   taskId: string,
   projectRoot: string,
-  canonicalStatus: "In Planning" | "In Progress" | "Blocked",
-  nativeStatus: "in_planning" | "in_progress" | "blocked",
 ): BeadsProviderTaskResolution {
   if (!selection || selection.provider !== "beads" || selection.taskId !== taskId) {
     throw new Error(`Beads task ${taskId} could not be resolved to the exact requested canonical ID`);
@@ -2745,35 +2692,7 @@ function exactBeadsAdmissionTask(
   if (!samePath(selection.projectRoot, projectRoot)) {
     throw new Error(`Beads task ${taskId} changed project during Episode admission`);
   }
-  if (selection.status !== canonicalStatus || selection.nativeStatus !== nativeStatus) {
-    throw new Error(`Beads task ${taskId} must be ${canonicalStatus}/${nativeStatus} during Episode admission`);
-  }
-  const design = selection.nativeView.design;
-  if (typeof design !== "string" || !meaningfulTaskImplementationPlan(design)) {
-    throw new Error(`Beads task ${taskId} requires a meaningful provider-native design`);
-  }
   return selection;
-}
-
-function proveBeadsAdmissionCodeHead(
-  git: TaskEpisodeAdmissionGit,
-  projectRoot: string,
-  expectedHead?: string,
-): string {
-  if (git.operationInProgress(projectRoot)) {
-    throw new Error("Beads task Episode creation requires no Git operation in progress");
-  }
-  if (git.trackedStatus(projectRoot) !== "") {
-    throw new Error("Beads task Episode creation requires canonical main without staged or tracked changes");
-  }
-  const head = git.head(projectRoot);
-  if (expectedHead && head !== expectedHead) {
-    throw new Error("Canonical main code HEAD changed during Beads task Episode admission");
-  }
-  if (git.upstreamHead(projectRoot) !== head) {
-    throw new Error("Beads task Episode creation requires canonical main code HEAD to equal its upstream");
-  }
-  return head;
 }
 
 function requirePublishedBeadsTaskMutation(
@@ -2781,8 +2700,6 @@ function requirePublishedBeadsTaskMutation(
   action: string,
   taskId: string,
   projectRoot: string,
-  canonicalStatus: "In Planning" | "In Progress" | "Blocked",
-  nativeStatus: "in_planning" | "in_progress" | "blocked",
 ): PublishedBeadsTaskMutation {
   if (!("status" in result) || result.status !== "pushed") {
     if ("status" in result) throw new BeadsPublicationEvidenceError(action, result);
@@ -2793,11 +2710,9 @@ function requirePublishedBeadsTaskMutation(
   const raw = task.nativeView;
   if (evidence.provider !== "beads" || evidence.taskId !== taskId
       || !samePath(evidence.projectRoot, projectRoot)
-      || task.taskId !== taskId || task.canonicalStatus !== canonicalStatus
-      || task.nativeStatus !== nativeStatus || !raw || typeof raw !== "object" || Array.isArray(raw)
-      || raw.id !== taskId || raw.title !== task.title || raw.status !== nativeStatus
-      || typeof raw.design !== "string" || !meaningfulTaskImplementationPlan(raw.design)) {
-    throw new Error(`${action} returned mismatched published Beads evidence: ${JSON.stringify(result)}`);
+      || task.taskId !== taskId || !raw || typeof raw !== "object" || Array.isArray(raw)
+      || raw.id !== taskId) {
+    throw new Error(`${action} returned mismatched Beads task identity: ${JSON.stringify(result)}`);
   }
   return result;
 }
@@ -2815,38 +2730,6 @@ function exactBeadsResourceIdentity(
       throw new Error(`Beads task Episode allocation returned mismatched ${key} identity`);
     }
   }
-}
-
-function advanceBlockedBeadsOwnership(
-  store: EpisodeOwnershipStore,
-  projectRoot: string,
-  ownerSessionId: string,
-  taskId: string,
-  retained: EpisodeOwnershipRecord,
-  publication: PublishedBeadsTaskMutation,
-  now: () => string,
-): BeadsTaskEpisodeOwnershipRecord {
-  exactAllocatableTaskRecord(retained, taskId, ownerSessionId);
-  if (!isBeadsTaskEpisodeOwnership(retained)) {
-    throw new Error("Blocked Beads recovery found non-Beads task ownership");
-  }
-  const current = store.read(projectRoot, ownerSessionId);
-  if (!current || JSON.stringify(current) !== JSON.stringify(retained)) {
-    throw new Error("Beads task Episode ownership changed before Blocked evidence advancement");
-  }
-  const evidence = publication.evidence;
-  const advanced = parseEpisodeOwnership({
-    ...retained,
-    providerRevision: evidence.submittedRevision,
-    taskEvidence: evidence.taskAfterPush.nativeView,
-    updatedAt: now(),
-  }) as BeadsTaskEpisodeOwnershipRecord;
-  store.write(projectRoot, advanced);
-  const verified = store.read(projectRoot, ownerSessionId);
-  if (!verified || JSON.stringify(verified) !== JSON.stringify(advanced)) {
-    throw new Error("Blocked Beads recovery could not verify the exact advanced ownership evidence");
-  }
-  return advanced;
 }
 
 async function createBeadsTaskEpisode(
@@ -2868,7 +2751,6 @@ async function createBeadsTaskEpisode(
   let projectRoot = "";
   let codeHead = "";
   let inProgressPublication: PublishedBeadsTaskMutation | undefined;
-  let reservationWriteStarted = false;
 
   try {
     if (!taskId || taskId !== rawTaskId || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(taskId)) {
@@ -2879,10 +2761,8 @@ async function createBeadsTaskEpisode(
       throw new Error("Beads task Episode creation must run from the repository root");
     }
     const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
-    if (!samePath(project.root, projectRoot)
-        || project.kind === "linked-worktree"
-        || git.branch(projectRoot) !== "main") {
-      throw new Error("Beads task Episode creation must run from the canonical primary main checkout");
+    if (!samePath(project.root, projectRoot)) {
+      throw new Error("Beads task Episode creation resolved a different project root");
     }
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
@@ -2895,9 +2775,9 @@ async function createBeadsTaskEpisode(
       throw new Error("Task-native local admission cannot carry Orca placement identity");
     }
 
-    codeHead = proveBeadsAdmissionCodeHead(git, projectRoot);
+    codeHead = git.head(projectRoot);
     exactBeadsAdmissionTask(
-      resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Planning", "in_planning",
+      resolveProvider(projectRoot, taskId, runner), taskId, projectRoot,
     );
     const existing = store.read(projectRoot, ownerSessionId);
     if (existing && existing.status !== "inactive") {
@@ -2906,9 +2786,8 @@ async function createBeadsTaskEpisode(
     }
 
     const admission = withEpisodeAdmissionLock(projectRoot, () => {
-      proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
       exactBeadsAdmissionTask(
-        resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Planning", "in_planning",
+        resolveProvider(projectRoot, taskId, runner), taskId, projectRoot,
       );
       const lockedExisting = store.read(projectRoot, ownerSessionId);
       if (lockedExisting && lockedExisting.status !== "inactive") {
@@ -2928,16 +2807,8 @@ async function createBeadsTaskEpisode(
           resolveTask: () => null,
           expectedProvider: "beads",
         }),
-        "Beads In Progress admission publication", taskId, projectRoot, "In Progress", "in_progress",
+        "Beads In Progress admission publication", taskId, projectRoot,
       );
-      proveBeadsAdmissionCodeHead(git, projectRoot, codeHead);
-      const livePublishedTask = exactBeadsAdmissionTask(
-        resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
-      );
-      const publishedNativeView = inProgressPublication.evidence.taskAfterPush.nativeView;
-      if (JSON.stringify(livePublishedTask.nativeView) !== JSON.stringify(publishedNativeView)) {
-        throw new BeadsRawTaskViewDriftError(taskId, publishedNativeView, livePublishedTask.nativeView);
-      }
       const reservation = reserve({
         projectRoot,
         publication: inProgressPublication,
@@ -2948,20 +2819,14 @@ async function createBeadsTaskEpisode(
         ...(options.routingEnvironmentId ? { routingEnvironmentId: options.routingEnvironmentId } : {}),
         ...(dependencies.reservationOperationId ? { operationId: dependencies.reservationOperationId } : {}),
       }, {
-        ownership: {
-          read: (root, owner) => store.read(root, owner),
-          write: (root, record) => {
-            reservationWriteStarted = true;
-            store.write(root, record);
-          },
-        },
+        ownership: store,
         now,
       });
       if (reservation.provider !== "beads" || reservation.taskId !== taskId
           || reservation.baseRef !== codeHead
           || reservation.providerRevision !== inProgressPublication.evidence.submittedRevision
           || JSON.stringify(reservation.taskEvidence) !== JSON.stringify(inProgressPublication.evidence.taskAfterPush.nativeView)) {
-        throw new Error("Beads task Episode reservation did not bind the exact published task and clean code HEAD");
+        throw new Error("Beads task Episode reservation did not bind the exact task observation and code base");
       }
       return reservation;
     });
@@ -2973,105 +2838,20 @@ async function createBeadsTaskEpisode(
     exactAllocatableTaskRecord(active, taskId, ownerSessionId);
     if (!isBeadsTaskEpisodeOwnership(active) || active.status !== "active"
         || active.operationId !== admission.operationId || active.baseRef !== codeHead
-        || active.head !== codeHead
-        || active.providerRevision !== inProgressPublication.evidence.submittedRevision
-        || JSON.stringify(active.taskEvidence) !== JSON.stringify(inProgressPublication.evidence.taskAfterPush.nativeView)) {
+        || active.head !== codeHead) {
       throw new Error("Beads task Episode allocation returned without the exact active reservation identity");
     }
     exactBeadsResourceIdentity(active, result);
-    exactBeadsAdmissionTask(
-      resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
+    const currentTask = exactBeadsAdmissionTask(
+      resolveProvider(projectRoot, taskId, runner), taskId, projectRoot,
     );
-    return { ...active, reused: result.reused, beadsTaskMutation: inProgressPublication };
+    return { ...active, reused: result.reused, beadsTaskMutation: inProgressPublication, currentTask };
   } catch (error) {
-    if (error instanceof BeadsPublicationEvidenceError || !inProgressPublication || !projectRoot) throw error;
-    const cause = error instanceof BeadsRawTaskViewDriftError ? error.message : taskAdmissionError(error);
-    let retained: EpisodeOwnershipRecord | null;
-    try {
-      retained = store.read(projectRoot, ownerSessionId);
-    } catch (ownershipError) {
-      throw new Error(`Beads task Episode creation failed after published In Progress evidence, and ownership could not be proven. Preserve all evidence and do not retry. Cause: ${cause}. Ownership proof failure: ${taskAdmissionError(ownershipError)}`);
-    }
-
-    if ((!retained || retained.status === "inactive") && reservationWriteStarted) {
-      throw new Error(`Beads task Episode creation failed after an uncertain ownership write, but the exact owner could not be proven. Preserve all evidence and do not retry. Cause: ${cause}`);
-    }
-
-    if (retained && retained.status !== "inactive") {
-      let blockedPublication: PublishedBeadsTaskMutation | undefined;
-      try {
-        exactAllocatableTaskRecord(retained, taskId, ownerSessionId);
-        if (!isBeadsTaskEpisodeOwnership(retained) || retained.baseRef !== codeHead) {
-          throw new Error("durable ownership does not match the exact Beads task and code base");
-        }
-        blockedPublication = withEpisodeAdmissionLock(projectRoot, () => {
-          const current = store.read(projectRoot, ownerSessionId);
-          if (!current || JSON.stringify(current) !== JSON.stringify(retained)) {
-            throw new Error("Beads ownership changed before Blocked recovery publication");
-          }
-          exactBeadsAdmissionTask(
-            resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
-          );
-          return requirePublishedBeadsTaskMutation(
-            commitStatus({
-              taskId,
-              projectRoot,
-              taskPath: "",
-              status: "Blocked",
-              message: `chore: block ${taskId} episode admission`,
-              runner,
-              git,
-              resolveTask: () => null,
-              expectedProvider: "beads",
-            }),
-            "Beads Blocked admission recovery publication", taskId, projectRoot, "Blocked", "blocked",
-          );
-        });
-        advanceBlockedBeadsOwnership(store, projectRoot, ownerSessionId, taskId, retained, blockedPublication, now);
-      } catch (recoveryError) {
-        const publicationEvidence = blockedPublication
-          ? ` Blocked publication evidence: ${JSON.stringify(blockedPublication)}`
-          : "";
-        throw new Error(`Beads task Episode creation failed after durable mutation, and exact Blocked recovery failed. Preserve all evidence and do not retry. Cause: ${cause}. Recovery failure: ${recoveryError instanceof Error ? recoveryError.message : String(recoveryError)}${publicationEvidence}`);
-      }
-      throw new Error(`Beads task Episode creation failed after durable mutation; ${taskId} is Blocked with advanced ownership evidence and requires exact recovery before retry. Cause: ${cause}`);
-    }
-
-    try {
-      withEpisodeAdmissionLock(projectRoot, () => {
-        const current = store.read(projectRoot, ownerSessionId);
-        if (JSON.stringify(current) !== JSON.stringify(retained)) {
-          throw new Error("Episode ownership changed before Beads In Planning rollback");
-        }
-        exactBeadsAdmissionTask(
-          resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Progress", "in_progress",
-        );
-        requirePublishedBeadsTaskMutation(
-          commitStatus({
-            taskId,
-            projectRoot,
-            taskPath: "",
-            status: "In Planning",
-            message: `chore: roll back ${taskId} episode admission`,
-            runner,
-            git,
-            resolveTask: () => null,
-            expectedProvider: "beads",
-          }),
-          "Beads In Planning admission rollback publication", taskId, projectRoot, "In Planning", "in_planning",
-        );
-        exactBeadsAdmissionTask(
-          resolveProvider(projectRoot, taskId, runner), taskId, projectRoot, "In Planning", "in_planning",
-        );
-        const after = store.read(projectRoot, ownerSessionId);
-        if (JSON.stringify(after) !== JSON.stringify(retained)) {
-          throw new Error("Episode ownership changed during Beads In Planning rollback");
-        }
-      });
-    } catch (recoveryError) {
-      throw new Error(`Beads task Episode creation failed before durable reservation or resource mutation, and exact In Planning rollback failed. Preserve all evidence and do not retry. Cause: ${cause}. Recovery failure: ${recoveryError instanceof Error ? recoveryError.message : String(recoveryError)}`);
-    }
-    throw new Error(`Beads task Episode creation failed before durable reservation or resource mutation; ${taskId} was returned to In Planning. Cause: ${cause}`);
+    if (!inProgressPublication || !projectRoot) throw error;
+    let ownership: unknown;
+    try { ownership = store.read(projectRoot, ownerSessionId); }
+    catch (readError) { ownership = { readError: taskAdmissionError(readError) }; }
+    throw new Error(`Beads task Episode creation failed: ${taskAdmissionError(error)}. Native admission result: ${JSON.stringify(inProgressPublication)}. Current ownership: ${JSON.stringify(ownership)}`);
   }
 }
 
@@ -3097,9 +2877,7 @@ export async function createTaskEpisode(
   const taskId = rawTaskId.trim();
   let projectRoot = "";
   let taskPath = "";
-  let preAdmissionHead = "";
-  let statusMutationStarted = false;
-  let independentTaskHistory = false;
+  let admissionResult: ConversationTaskStatusCommitResult | undefined;
   let admissionPushError: string | undefined;
 
   try {
@@ -3111,10 +2889,8 @@ export async function createTaskEpisode(
       throw new Error("Task-native Episode creation must run from the repository root");
     }
     const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
-    if (!samePath(project.root, projectRoot)
-      || project.kind === "linked-worktree"
-      || git.branch(projectRoot) !== "main") {
-      throw new Error("Task-native Episode creation must run from the canonical primary main checkout");
+    if (!samePath(project.root, projectRoot)) {
+      throw new Error("Task-native Episode creation resolved a different project root");
     }
     if (!ctx.sessionManager.getSessionFile()) throw new Error("Episode creation requires a persisted owner session");
     if ((ctx.sessionManager.getHeader().rlmDepth ?? 0) !== 0) {
@@ -3133,52 +2909,32 @@ export async function createTaskEpisode(
     }
     if (!samePath(selected.projectRoot, projectRoot)) throw new Error("Task-native Episode task resolved in a different project");
     taskPath = selected.taskPathRelative;
-    if (selected.status !== "In Planning") throw new Error("Task-native Episode creation requires the exact task to be In Planning");
-    if (!meaningfulTaskImplementationPlan(selected.implementationPlan)) {
-      throw new Error("Task-native Episode creation requires a meaningful Implementation Plan");
-    }
-    if (git.pathStatus(projectRoot, taskPath) !== "") {
-      throw new Error("Task-native Episode creation requires the exact task path to be clean before status mutation");
-    }
     const existing = store.read(projectRoot, ctx.sessionManager.getSessionId());
     if (existing && existing.status !== "inactive") {
       const identity = isTaskEpisodeOwnership(existing) ? existing.taskId : existing.sourceLocation;
       throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
     }
-    preAdmissionHead = git.head(projectRoot);
 
     const admission = withEpisodeAdmissionLock(projectRoot, () => {
-      const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
-      if (lockedTask.status !== "In Planning") {
-        throw new Error("Task-native Episode creation requires the exact task to remain In Planning at the serialized admission boundary");
-      }
-      if (!meaningfulTaskImplementationPlan(lockedTask.implementationPlan)) {
-        throw new Error("Task-native Episode creation requires a meaningful Implementation Plan at the serialized admission boundary");
-      }
-      if (git.pathStatus(projectRoot, taskPath) !== "") {
-        throw new Error("Task-native Episode creation requires the exact task path to remain clean at the serialized admission boundary");
-      }
+      exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
       const lockedExisting = store.read(projectRoot, ctx.sessionManager.getSessionId());
       if (lockedExisting && lockedExisting.status !== "inactive") {
         const identity = isTaskEpisodeOwnership(lockedExisting) ? lockedExisting.taskId : lockedExisting.sourceLocation;
         throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
       }
-      statusMutationStarted = true;
       const admitted = commitConversationTaskStatus({
         taskId,
         projectRoot,
         taskPath,
         status: "In Progress",
-        expectedSourceStatus: "In Planning",
-        requireSourcePlan: true,
+        expectedProvider: "backlog",
         message: `chore: admit ${taskId} episode`,
         runner,
         git,
         resolveTask,
-        prepareTaskHistory: dependencies.prepareTaskHistory,
         publishTaskHistory: dependencies.publishTaskHistory,
       }) as Extract<ConversationTaskStatusCommitResult, { selection: BacklogTaskSelection }>;
-      independentTaskHistory = Boolean(admitted.taskHistory);
+      admissionResult = admitted;
       const reservationBase = {
         projectRoot,
         taskId,
@@ -3218,104 +2974,13 @@ export async function createTaskEpisode(
       throw new Error("Task-native Episode allocation returned without the exact active reservation identity");
     }
     const finalTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
-    if (finalTask.status !== "In Progress" || git.pathStatus(projectRoot, taskPath) !== "") {
-      throw new Error("Task-native Episode allocation did not preserve the exact committed In Progress task state");
-    }
-    return { ...active, reused: result.reused, ...(admissionPushError ? { admissionPushError } : {}) };
+    return { ...active, reused: result.reused, currentTask: finalTask, ...(admissionPushError ? { admissionPushError } : {}) };
   } catch (error) {
-    if (error instanceof BacklogTaskHistoryPublicationError || error instanceof BacklogSourceStateError) throw error;
-    if (!statusMutationStarted || !projectRoot || !taskPath) throw error;
-    const cause = taskAdmissionError(error);
-    let ownership: EpisodeOwnershipRecord | null = null;
-    let ownershipUncertain = false;
+    if (!admissionResult || !projectRoot) throw error;
+    let ownership: unknown;
     try { ownership = store.read(projectRoot, ctx.sessionManager.getSessionId()); }
-    catch { ownershipUncertain = true; }
-    const recordedMutation = ownershipUncertain || Boolean(ownership && ownership.status !== "inactive");
-
-    if (recordedMutation) {
-      const note = [
-        `Episode admission blocked after durable or uncertain mutation at ${dependencies.now?.() ?? new Date().toISOString()}.`,
-        `Recovery condition: inspect .prime-claw/ownership.json and reconcile every recorded task, worktree, and session identity to ${taskId} before continuing; do not retry it as fresh creation.`,
-        `Cause: ${cause}`,
-      ].join("\n");
-      try {
-        withEpisodeAdmissionLock(projectRoot, () => {
-          const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
-          if (lockedTask.status !== "In Progress") {
-            throw new Error(`Backlog task ${taskId} is not the In Progress admission being recovered`);
-          }
-          const blocked = commitConversationTaskStatus({
-            taskId,
-            projectRoot,
-            taskPath,
-            status: "Blocked",
-            expectedSourceStatus: "In Progress",
-            message: `chore: block ${taskId} episode admission`,
-            note,
-            runner,
-            git,
-            resolveTask,
-            prepareTaskHistory: dependencies.prepareTaskHistory,
-            publishTaskHistory: dependencies.publishTaskHistory,
-          }) as Extract<ConversationTaskStatusCommitResult, { selection: BacklogTaskSelection }>;
-          if (blocked.taskHistory) {
-            const current = store.read(projectRoot, ctx.sessionManager.getSessionId());
-            if (!current || !isTaskEpisodeOwnership(current) || !isPublishedBacklogTaskEpisodeOwnership(current)) {
-              throw new Error("Independent Backlog Blocked recovery lost its exact ownership binding");
-            }
-            const taskEvidence = JSON.parse(blocked.taskHistory.nativeAfter) as Record<string, unknown>;
-            const advanced = parseEpisodeOwnership({
-              ...current,
-              providerRevision: blocked.taskHistory.publishedHead,
-              taskEvidence,
-              updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-            });
-            store.write(projectRoot, advanced);
-            const verified = store.read(projectRoot, ctx.sessionManager.getSessionId());
-            if (!verified || JSON.stringify(verified) !== JSON.stringify(advanced)) {
-              throw new Error("Independent Backlog Blocked recovery could not verify current published task evidence");
-            }
-          }
-        });
-      } catch (recoveryError) {
-        throw new Error(`Task-native Episode creation failed after durable or uncertain mutation, and Blocked publication failed. Preserve all evidence and recover ${taskId} manually. Cause: ${cause}. Publication failure: ${taskAdmissionError(recoveryError)}`);
-      }
-      const recoveryPushError = independentTaskHistory ? undefined : bestEffortTaskPush(git, projectRoot);
-      throw new Error(`Task-native Episode creation failed after durable or uncertain mutation; ${taskId} is Blocked and requires exact recovery before retry. Cause: ${cause}${recoveryPushError ? ` Push also failed: ${recoveryPushError}` : ""}`);
-    }
-
-    let rollbackCommitted = false;
-    try {
-      rollbackCommitted = withEpisodeAdmissionLock(projectRoot, () => {
-        const lockedTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
-        const unchanged = lockedTask.status === "In Planning"
-          && git.head(projectRoot) === preAdmissionHead
-          && git.pathStatus(projectRoot, taskPath) === "";
-        if (unchanged) return false;
-        if (lockedTask.status !== "In Progress") {
-          throw new Error(`Backlog task ${taskId} is not the In Progress admission being rolled back`);
-        }
-        commitConversationTaskStatus({
-          taskId,
-          projectRoot,
-          taskPath,
-          status: "In Planning",
-          expectedSourceStatus: "In Progress",
-          message: `chore: roll back ${taskId} episode admission`,
-          runner,
-          git,
-          resolveTask,
-          prepareTaskHistory: dependencies.prepareTaskHistory,
-          publishTaskHistory: dependencies.publishTaskHistory,
-        });
-        return true;
-      });
-    } catch (recoveryError) {
-      throw new Error(`Task-native Episode creation failed before ownership or resource mutation, and clean rollback failed. Preserve the checkout and recover ${taskId} manually. Cause: ${cause}. Rollback failure: ${taskAdmissionError(recoveryError)}`);
-    }
-    if (!rollbackCommitted) throw error;
-    const recoveryPushError = independentTaskHistory ? undefined : bestEffortTaskPush(git, projectRoot);
-    throw new Error(`Task-native Episode creation failed before ownership or resource mutation; ${taskId} was returned to In Planning. Cause: ${cause}${recoveryPushError ? ` Push also failed: ${recoveryPushError}` : ""}`);
+    catch (readError) { ownership = { readError: taskAdmissionError(readError) }; }
+    throw new Error(`Backlog task Episode creation failed: ${taskAdmissionError(error)}. Native admission result: ${JSON.stringify(admissionResult)}. Current ownership: ${JSON.stringify(ownership)}.${admissionPushError ? ` Code push failure: ${admissionPushError}` : ""}`);
   }
 }
 

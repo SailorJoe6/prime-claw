@@ -2258,7 +2258,6 @@ export function mutateProviderTaskStatus(options: {
 }): ProviderTaskResolution {
   const runner = options.runner ?? new ProcessCommandRunner();
   const detection = requireLiveProvider(options.projectRoot, runner);
-  checkSelectedProviderCapabilities(detection, runner);
 
   // Identity proof before mutation: resolve natively and require the raw
   // requested ID to equal the provider canonical ID exactly.

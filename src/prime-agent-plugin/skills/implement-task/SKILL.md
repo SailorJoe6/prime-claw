@@ -84,8 +84,11 @@ report the actual result and inspect current delivery, ownership, provider, and
 resource facts; do not automatically retry, create another Episode, or send an
 initial handoff or second execute assignment. Carry the exact selected host
 unchanged through readiness and final creation. The workflows own lifecycle
-eligibility and readiness decisions; native operations and resource checks do
-not replace them or require proof of a particular earlier invocation sequence.
+eligibility, code-basis and failure-disposition decisions; native creation
+performs the one requested In Progress operation and exact resource mechanics,
+not an automatic In Planning rollback or Blocked publication. Inspect actual
+native/ownership/resource/assignment facts after failure before deciding any
+next status or continuation. No earlier invocation receipt supplies authority.
 
 Custom slash commands are not workflow prerequisites. Retained version-1
 workflows, ownership, plans, and resources remain supported. This skill grants

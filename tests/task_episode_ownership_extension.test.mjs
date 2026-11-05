@@ -1495,17 +1495,29 @@ test("legacy and task-native ownership schemas coexist without mixing authority"
   assert.throws(() => parseEpisodeOwnership({ ...activeOrca, terminalHandle: undefined }), /missing active Orca bindings/);
 });
 
-for (const [name, selection, pattern] of [
-  ["pre-admission status", { status: "In Planning" }, /committed as In Progress/],
-  ["blank plan", { implementationPlan: "   " }, /meaningful Implementation Plan/],
-  ["placeholder plan", { implementationPlan: "TBD" }, /meaningful Implementation Plan/],
-  ["TODO-prefixed placeholder plan", { implementationPlan: "TODO: write implementation plan" }, /meaningful Implementation Plan/],
-  ["multiline placeholder plan", { implementationPlan: "TBD\nTODO" }, /meaningful Implementation Plan/],
-  ["Markdown-framed placeholder plan", { implementationPlan: "# Implementation Plan\nTBD" }, /meaningful Implementation Plan/],
-  ["noncanonical task id", { taskId: "--bad" }, /canonical Backlog task ID/],
-]) test(`${name} cannot reserve ownership`, () => {
+for (const [name, selection] of [
+  ["pre-admission status", { status: "In Planning" }],
+  ["blank plan", { implementationPlan: "   " }],
+  ["placeholder plan", { implementationPlan: "TBD" }],
+  ["TODO-prefixed placeholder plan", { implementationPlan: "TODO: write implementation plan" }],
+  ["multiline placeholder plan", { implementationPlan: "TBD\nTODO" }],
+  ["Markdown-framed placeholder plan", { implementationPlan: "# Implementation Plan\nTBD" }],
+]) test(`${name} remains an editable-workflow decision, not a reservation predicate`, () => {
   const f = fixture();
-  assert.throws(() => reserve(f, { selection }), pattern);
+  const before = { bytes: readFileSync(f.taskPath), head: git(f.root, "rev-parse", "HEAD"), index: git(f.root, "diff", "--cached", "--binary") };
+  const record = reserve(f, { selection });
+  assert.equal(record.taskId, f.selection.taskId);
+  assert.equal(record.taskPath, f.relative);
+  assert.equal(record.baseRef, before.head);
+  assert.equal(record.status, "provisioning");
+  assert.deepEqual(readFileSync(f.taskPath), before.bytes);
+  assert.equal(git(f.root, "rev-parse", "HEAD"), before.head);
+  assert.equal(git(f.root, "diff", "--cached", "--binary"), before.index);
+});
+
+test("noncanonical task id cannot reserve ownership", () => {
+  const f = fixture();
+  assert.throws(() => reserve(f, { selection: { taskId: "--bad" } }), /canonical Backlog task ID/);
   assert.equal(readEpisodeOwnership(f.root), null);
 });
 
@@ -1515,12 +1527,16 @@ test("status commit containing another path cannot reserve ownership", () => {
   assert.equal(readEpisodeOwnership(f.root), null);
 });
 
-test("task mutation after status commit cannot reserve ownership", () => {
+test("reservation preserves current selected-task edits without a status-plan-dirt reapproval gate", () => {
   const f = fixture();
-  writeFileSync(f.taskPath, "status: Blocked\nplan: changed after commit\n");
-  assert.throws(() => reserve(f), /changed after its status commit/);
-  assert.equal(readEpisodeOwnership(f.root), null);
+  writeFileSync(f.taskPath, "status: custom\nplan: compatible edit after commit\n");
+  const bytes = readFileSync(f.taskPath);
+  const record = reserve(f, { selection: { status: "custom", implementationPlan: null } });
+  assert.equal(record.taskId, f.selection.taskId);
+  assert.deepEqual(readFileSync(f.taskPath), bytes);
+  assert.notEqual(git(f.root, "status", "--porcelain", "--", f.relative), "");
 });
+
 
 test("different Conversations reserve different tasks in one repository", () => {
   const f = fixture();

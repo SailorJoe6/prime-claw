@@ -638,50 +638,34 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "call `create_task_episode` exactly once",
         "exact canonical `taskId` and optional stable `host`",
         "<operator-implementation-host>",
-        "requires no prior entry invocation, approval store, or turn receipt",
+        "Do not require an earlier entry or manufacture missing receipt evidence",
         "planning-only request does not authorize implementation",
         "no separate phase-history receipt is required",
-        "from `In Planning` to `In Progress` through Backlog",
-        "Grandfathered branch-local mode commits and verifies that exact task path",
-        "publishes the exact task-path-only status commit on `refs/heads/prime-claw/tasks` without force",
-        "leaves the code HEAD unchanged",
-        "persist one `provisioning` ownership record",
-        "Before any branch, worktree, or session",
-        "independent mode also binds its published provider revision and complete task evidence",
-        "created from the recorded code base",
-        "Grandfathered prompt push is best-effort",
-        "returns the exact task to `In Planning`",
+        "Decide code-base suitability here",
+        "unrelated staged/unstaged/untracked Git work",
+        "one fixed native In Progress update",
+        "Grandfathered Backlog commits only the selected task path",
+        "Independent Backlog publishes only that path",
+        "task revision is separate from the chosen code base",
+        "Fresh creation sends ONE fixed initial execute assignment",
+        "existing active Episode sends no new assignment",
+        "does not automatically publish In Planning or Blocked",
+        "session and assignment-delivery facts before choosing a disposition",
+        "The owning Conversation applies the existing lifecycle guidance",
+        "task-only failure reporting needs no clean/pushed parent code checkout",
+        "as soon as ready and publish promptly",
+        "native touched-table/staged-set operation",
+        "successful push or local task read is not exact-task committed/publication proof",
+        "Beads include complete raw pre/post/current views",
+    ):
+        assert fragment in implement
+    for obsolete in (
+        "requires the clean pushed canonical code",
         "partial, or uncertain mutation publishes `Blocked`",
-        "must never be retried as a new Episode",
-        "one fixed initial execute assignment",
-        "Do not begin implementation in the owner Conversation",
-    ):
-        assert fragment in implement
-    for fragment in (
-        "perform `prepare`'s repository-orientation reads",
-        "skip its Backlog-only queue inventory",
-        "Resolve the live provider directly from its native project evidence",
-        "exact returned task path",
-        "bd context --json",
-        "bd show TASK-ID --json --long --include-comments",
-        "native status exactly `in_planning` mapped to canonical `In Planning`",
-        "complete raw native view",
-        "Do not invent a task path or translate it into a normalized task model",
         "native status, plan/design, code-base, and publication gates pending later PRIMECLAW-55 work",
-        "An explicit stable host must still be a ready local setup",
-        "never retry an uncertain dispatch as fresh work",
-        "published provider revision",
-        "complete raw task evidence",
-        "exact code `baseRef`",
-        "No task path exists or may be invented",
-        "one fixed initial execute assignment",
-        "must never retry, force, adopt, reset, use raw Dolt writes",
+        "publishes one exact native rollback",
     ):
-        assert fragment in implement
-    assert implement.index("publishes the exact task-path-only status commit") < implement.index("persist one `provisioning` ownership record")
-    assert implement.index("publishes the exact task-path-only status commit") < implement.index("Before any branch, worktree, or session")
-    assert implement.index("Before any branch, worktree, or session") < implement.index("persist one `provisioning` ownership record")
-    assert implement.index("persist one `provisioning` ownership record") < implement.index("created from the recorded code base")
+        assert obsolete not in implement
 
     # Installed prep policy may differ until deliberate candidate activation.
     for name in ("implement-task-prep", "implement-task"):

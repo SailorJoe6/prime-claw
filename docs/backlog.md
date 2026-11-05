@@ -4,6 +4,22 @@ Prime Claw vendors its long-lived Backlog.md fork as the Git submodule at
 `deps/backlog`. The fork is `SailorJoe6/Backlog.md`; its `upstream` lineage is
 `MrLesk/Backlog.md`.
 
+## Requested creation and failure decisions
+
+Task-native create performs the caller-requested In Progress native operation,
+then reserves and allocates the exact task resources. It does not independently
+judge lifecycle status, plan/design, code-base suitability, whole-checkout dirt,
+or compatible changing native views. Existing implementation Markdown owns those
+decisions. Native failures and exact resource/identity mismatches still report
+truthfully. On failure, native task state and existing ownership/resources remain;
+code no longer chooses In Planning rollback versus Blocked publication. The owning
+Conversation inspects current task/history/resource/session/assignment facts and
+chooses any supported status/note publication through editable guidance. Backlog
+remains selected-file-only; Beads retains approved multi-issue commit consequences
+and actual push/local-versus-task-publication limits. The one initial execute and
+both continuation observation channels remain unchanged. This is not a claim
+that the remaining terminal lifecycle or full guidance audit is complete.
+
 ## Current bounded release
 
 The managed fork remains based on the latest stable upstream release selected
