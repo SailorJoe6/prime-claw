@@ -3,10 +3,10 @@ id: PRIMECLAW-56
 title: >-
   Prevent premature Episode allocation and resume failed creation in existing
   resources
-status: Blocked
+status: In Planning
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-03 20:58'
+updated_date: '2026-11-05 15:45'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -107,4 +107,9 @@ The observed advance was unrelated PRIMECLAW-53 admission commit dd9296695b3bf2d
 This is an existing admission-tool defect tracked by PRIMECLAW-55, not a legitimate requirement to quiesce unrelated work and not a defect introduced by PRIMECLAW-55. The task-history advance does not establish any specification/readiness conflict in PRIMECLAW-56. The full semantic readiness review did not run.
 
 Unblock when the PRIMECLAW-55 fix is available in the running plugin generation and exact-task admission can proceed despite unrelated edits/compatible history advances. Activation/restart, if needed, require their separate operator-authorized lifecycle; task status or source merge alone is not proof of loaded-runtime behavior. After the owning Conversation accepts that clearance, re-read current native task/ownership/resource evidence, restore and publish In Planning for this not-yet-started task, and run the canonical implementation-readiness workflow for this same task within the operator's existing approved scope. Do not create a second Episode, force Git, remove another Conversation's work, or treat resource deletion as recovery. Preserve the approved specification, seven AC and Implementation Plan.
+
+## Admission blocker cleared; resume implementation readiness
+Joe confirmed that PRIMECLAW-55, PRIMECLAW-57 and PRIMECLAW-58 are finished, merged and installed. Fresh native task views confirm all three are Done; PRIMECLAW-56 has no remaining blocking dependency. Accept this clearance of the recorded PRIMECLAW-55 admission blocker and restore In Planning before the canonical implementation-readiness workflow.
+
+The approved Markdown-first specification, seven acceptance criteria, Implementation Plan and PRIMECLAW-55 dependency are preserved. Joe's explicit implementation approval remains in effect; the full current semantic readiness review is still required, including the effect of the now-landed work on this plan. Current code base is main at f5287c3647245a6a5e6d3baad64d9cecf1dab81b, matching direct origin/main. There is no existing Episode ownership entry for this Conversation and no PRIMECLAW-56 Episode was created by the earlier failed admission. Resume through implement_task for this exact task; do not implement in the owner Conversation or replay an initial execute assignment. No merge, activation, restart or cleanup action is performed or newly authorized by this note.
 <!-- SECTION:NOTES:END -->
