@@ -2218,6 +2218,130 @@ test("task-native local mutation failure preserves bound identity as uncertain",
 });
 
 
+
+function allocatedPreSessionFixture() {
+  const f = harness();
+  const original = taskReservation({
+    provider: "backlog", taskId: "PRIMECLAW-45", status: "uncertain", engine: "orca",
+    operationId: "f63a69a7-3e66-4b20-b258-2a599c4160e1", projectSetupId: "setup-local",
+    worktreeName: "prime-claw-primeclaw-45-episode-f63a69a7", worktreeId: f.wt.id,
+    worktreeIdentity: f.wt.identity, worktree: f.worktree, branch: f.wt.branch, head: TASK_BASE,
+    providerRevision: "b".repeat(40), taskEvidence: { schemaVersion: 1, task: {
+      id: "PRIMECLAW-45", path: "backlog/tasks/primeclaw-10.38.md", status: "In Progress", nativeExtra: { retained: true },
+    } }, uncertaintyReason: "Independent Backlog preparation failed before session start",
+  });
+  f.ownership.write(f.root, original);
+  f.ownership.write(f.root, taskReservation({ ownerSessionId: "foreign-owner", taskId: "PRIMECLAW-99" }));
+  f.deps.taskResolver = () => taskSelection(f, { taskId: original.taskId, nativeView: original.taskEvidence });
+  f.deps.admissionRunner = { run(command, args) {
+    assert.equal(command, "backlog"); assert.deepEqual(args, ["task", "view", "--json", "--", original.taskId]);
+    return { status: 0, stdout: JSON.stringify(original.taskEvidence), stderr: "" };
+  } };
+  f.deps.prepareEpisodeTaskHistory = ({ targetWorktree }) => {
+    assert.equal(targetWorktree, f.worktree); f.calls.push(["prepare-existing"]);
+    return { status: "prepared", head: "c".repeat(40) };
+  };
+  f.orca.showWorktree = async () => ({ ...f.wt, head: TASK_BASE });
+  const terminal = { handle: "terminal", connected: true, writable: true, agentIdentity: "prime-agent",
+    worktreeId: f.wt.id, worktreePath: f.worktree, tabId: "tab", leafId: "leaf", visible: true };
+  f.launched = false;
+  f.orca.runAutomation = async (id) => { f.calls.push(["auto-run", id]); f.launched = true; return "run"; };
+  f.orca.listTerminals = async () => f.launched ? [terminal]
+    : [{ ...terminal, handle: "shell", agentIdentity: undefined }];
+  const session = { sessionId: "original-episode", activeSessionId: "original-route", sessionFile: join(f.root, "original.jsonl"), cwd: f.worktree };
+  f.publisher.list = async () => f.launched ? [session] : [];
+  f.publisher.getState = async () => ({ ...session, sessionActions: { queuedCount: 0, followUps: [] } });
+  f.publisher.getMessages = async () => [{ role: "user", content: [{ type: "text", text: "ORIGINAL EXECUTE ASSIGNMENT" }], source: "extension" }];
+  const tools = new Map();
+  createReviewedPlanExtension({ ...f.deps, placementResolver: async () => assert.fail("no placement reselection"),
+    commitTaskStatus: () => assert.fail("no status publication"), reserveTaskOwnership: () => assert.fail("no reservation"),
+  })({ registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {},
+    sendUserMessage() { assert.fail("no second assignment"); } });
+  f.calls.length = 0;
+  return { ...f, original, session, terminal, tools, get current() { return f.ownership.read(f.root, "owner"); } };
+}
+
+test("registered existing-operation continuation reuses recorded allocated worktree and post-worktree launch once", async () => {
+  const f = allocatedPreSessionFixture();
+  const foreign = structuredClone(f.ownership.read(f.root, "foreign-owner"));
+  writeFileSync(join(f.worktree, "foreign.txt"), "preserved working bytes");
+  const result = await f.tools.get("create_task_episode").execute("continue-original", {
+    taskId: f.original.taskId, operationId: f.original.operationId,
+  }, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined, JSON.stringify(result));
+  assert.equal(result.details.status, "active");
+  for (const key of ["ownerSessionId", "taskId", "operationId", "baseRef", "engine", "projectSetupId", "worktreeName", "worktreeId", "worktreeIdentity", "worktree", "branch", "head"])
+    assert.equal(result.details[key], f.original[key], key);
+  assert.equal(result.details.episodeId, f.session.sessionId);
+  assert.equal(f.calls.filter(([name]) => name === "auto-run").length, 1);
+  assert.equal(f.calls.filter(([name]) => name === "prepare-existing").length, 1);
+  assert.equal(f.calls.some(([name]) => ["orca-create", "local-create", "fresh", "execute", "promote", "commit", "setups"].includes(name)), false);
+  assert.equal(readFileSync(join(f.worktree, "foreign.txt"), "utf8"), "preserved working bytes");
+  assert.deepEqual(f.ownership.read(f.root, "foreign-owner"), foreign);
+  assert.ok(f.calls.find(([name]) => name === "auto-create")[1].prompt.includes("PRIMECLAW-45"));
+  f.calls.length = 0;
+  const replay = await f.tools.get("create_task_episode").execute("same-binding", {
+    taskId: f.original.taskId, operationId: f.original.operationId,
+  }, undefined, undefined, f.ctx);
+  assert.equal(replay.details.reused, true);
+  assert.equal(f.calls.some(([name]) => ["auto-create", "auto-run", "execute", "fresh", "orca-create", "local-create"].includes(name)), false);
+});
+
+test("missing recorded session never permits launch over an actual session; explicit same-operation binding sends nothing", async () => {
+  const f = allocatedPreSessionFixture();
+  f.publisher.list = async () => [f.session];
+  f.orca.listTerminals = async () => [f.terminal];
+  const before = structuredClone(f.current);
+  const refused = await f.tools.get("create_task_episode").execute("no-absence-inference", {
+    taskId: f.original.taskId, operationId: f.original.operationId,
+  }, undefined, undefined, f.ctx);
+  assert.equal(refused.isError, true);
+  assert.match(refused.details.error, /collides.*original-episode/);
+  assert.deepEqual(f.current, before);
+  const bound = await f.tools.get("create_task_episode").execute("bind-delivered", {
+    taskId: f.original.taskId, operationId: f.original.operationId, sessionId: f.session.sessionId,
+  }, undefined, undefined, f.ctx);
+  assert.equal(bound.isError, undefined, JSON.stringify(bound));
+  assert.equal(bound.details.reused, true);
+  assert.equal(bound.details.episodeId, f.session.sessionId);
+  assert.equal(bound.details.sessionObservation.messages[0].content[0].text, "ORIGINAL EXECUTE ASSIGNMENT");
+  assert.match(bound.content[0].text, /No new execute assignment was sent.*ORIGINAL EXECUTE ASSIGNMENT/);
+  assert.equal(f.calls.some(([name]) => ["auto-create", "auto-run", "execute", "fresh", "orca-create", "local-create", "prepare-existing"].includes(name)), false);
+});
+
+test("existing-operation targeting and native launch uncertainty preserve original resources without replay", async () => {
+  const f = allocatedPreSessionFixture();
+  const before = structuredClone(f.current);
+  for (const params of [
+    { taskId: f.original.taskId, operationId: "foreign-operation" },
+    { taskId: f.original.taskId, operationId: f.original.operationId, host: "id:foreign" },
+    { taskId: f.original.taskId, operationId: f.original.operationId, sessionId: "foreign-session" },
+  ]) {
+    const result = await f.tools.get("create_task_episode").execute("foreign", params, undefined, undefined, f.ctx);
+    assert.equal(result.isError, true); assert.deepEqual(f.current, before);
+  }
+  f.orca.runAutomation = async () => { f.calls.push(["auto-run"]); throw new OrcaMutationUncertainError("run", "lost reply"); };
+  const failed = await f.tools.get("create_task_episode").execute("uncertain-run", {
+    taskId: f.original.taskId, operationId: f.original.operationId,
+  }, undefined, undefined, f.ctx);
+  assert.equal(failed.isError, true);
+  assert.equal(f.current.operationId, f.original.operationId);
+  assert.equal(f.current.launchAutomationId, "automation");
+  assert.equal(f.current.worktreeId, f.original.worktreeId);
+  const noRetry = await f.tools.get("create_task_episode").execute("inspect-only", {
+    taskId: f.original.taskId, operationId: f.original.operationId,
+  }, undefined, undefined, f.ctx);
+  assert.equal(noRetry.isError, true);
+  assert.equal(f.calls.filter(([name]) => name === "auto-run").length, 1);
+});
+
+test("production publisher returns native messages for exact session route without sending", async () => {
+  const calls = []; const messages = [{ role: "user", content: "original assignment", nativeExtra: null }];
+  const publisher = new PrimeSessionPublisher({ async request(request) { calls.push(request); return { success: true, data: { messages } }; }, close() {} });
+  assert.deepEqual(await publisher.getMessages("exact-route"), messages);
+  assert.deepEqual(calls, [{ type: "get_messages", activeSessionId: "exact-route" }]);
+});
+
 // Every cleanup Git fixture uses its own bare transport, never host remotes.
 function configureCleanupUpstream(root, branch, ref = `refs/heads/${branch}`, remote = "delivery") {
   const remotePath = mkdtempSync(join(tmpdir(), "prime-claw-cleanup-remote-"));

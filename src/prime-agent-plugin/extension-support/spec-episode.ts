@@ -137,7 +137,7 @@ function isUncertainMutation(error: unknown): boolean {
 }
 
 export type EpisodeResult = LegacyEpisodeOwnershipRecord & { reused: boolean };
-export type TaskEpisodeResult = TaskEpisodeOwnershipRecord & { reused: boolean };
+export type TaskEpisodeResult = TaskEpisodeOwnershipRecord & { reused: boolean; sessionObservation?: { session: SessionSummary; state: EpisodeSessionState; messages: unknown[] } };
 
 export interface SessionSummary {
   activeSessionId?: string; id?: string; sessionId?: string; sessionFile?: string;
@@ -205,6 +205,7 @@ export interface EpisodeOwnershipStore {
 export interface SessionPublisher {
   list(): Promise<SessionSummary[]>;
   getState(activeSessionId: string): Promise<EpisodeSessionState>;
+  getMessages?(activeSessionId: string): Promise<unknown[]>;
   kill?(activeSessionId: string): Promise<void>;
   deleteSaved?(sessionFile: string): Promise<void>;
   createFresh(options: { worktree: string; sessionName: string; model?: { provider: string; id: string }; onAllocated?: (identity: { sessionId: string; sessionFile: string }) => void | Promise<void> }): Promise<PublishedSession>;
@@ -279,6 +280,8 @@ export interface TaskEpisodeAdmissionOptions {
   engine: "orca" | "local";
   projectSetupId?: string;
   routingEnvironmentId?: string;
+  operationId?: string;
+  sessionId?: string;
 }
 
 export type TaskEpisodeCreationResult = TaskEpisodeResult & {
@@ -671,6 +674,12 @@ export class PrimeSessionPublisher implements SessionPublisher {
     const data = requireSuccess(await this.client.request({ type: "get_state", activeSessionId }), "episode state check");
     if (!data || typeof data !== "object") throw new Error("Episode state check returned no usable state");
     return data as EpisodeSessionState;
+  }
+  async getMessages(activeSessionId: string): Promise<unknown[]> {
+    const data = requireSuccess(await this.client.request({ type: "get_messages", activeSessionId }), "episode messages");
+    const messages = data && typeof data === "object" ? (data as { messages?: unknown }).messages : undefined;
+    if (!Array.isArray(messages)) throw new Error("Episode messages returned a malformed messages payload");
+    return messages;
   }
   async kill(activeSessionId: string): Promise<void> {
     requireSuccess(await this.client.request({ type: "kill", activeSessionId }), "episode session kill");
@@ -1967,12 +1976,91 @@ function prepareTaskEpisodeWorkspace(
   return { record: advanced, providerTaskObservation };
 }
 
+async function startTaskEpisodeInOrcaWorktree(
+  record: TaskEpisodeOwnershipRecord, worktree: OrcaWorktree, repo: string,
+  dependencies: TaskEpisodeAllocationDependencies, store: EpisodeOwnershipStore,
+  publisher: SessionPublisher, orca: OrcaAdapter, beadsTaskMutation?: PublishedBeadsTaskMutation,
+  priorSessions?: Set<string>,
+): Promise<TaskEpisodeResult> {
+  try {
+    const preparedWorkspace = prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
+    record = preparedWorkspace.record;
+    let executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
+      location: { tag: "operator-episode-task", value: record.taskId },
+      ownerSessionId: record.ownerSessionId,
+    });
+    if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
+    if (preparedWorkspace.providerTaskObservation) {
+      executePrompt += providerTaskObservationBlock(preparedWorkspace.providerTaskObservation);
+    }
+    const before = priorSessions ?? new Set((await publisher.list()).map((session) => session.sessionId).filter((value): value is string => Boolean(value)));
+    const launchAutomationName = `prime-claw-launch-${record.operationId}`;
+    record = updated(record, { launchAutomationName });
+    store.write(repo, record);
+    const automationId = await orca.createLaunchAutomation({
+      worktreeId: worktree.id,
+      name: launchAutomationName,
+      prompt: executePrompt,
+      routingEnvironmentId: record.routingEnvironmentId,
+    });
+    record = updated(record, { launchAutomationId: automationId });
+    store.write(repo, record);
+    const runId = await orca.runAutomation(automationId, record.routingEnvironmentId);
+    record = updated(record, { launchRunId: runId });
+    store.write(repo, record);
+    const binding = await waitForOrcaBinding({
+      before,
+      worktree,
+      publisher,
+      orca,
+      routingEnvironmentId: record.routingEnvironmentId,
+      wait: dependencies?.wait ?? ((ms) => new Promise((resolveWait) => setTimeout(resolveWait, ms))),
+      attempts: dependencies?.bindingAttempts ?? 240,
+    });
+    if (!binding.published.activeSessionId) throw new EpisodeStateUncertainError("Fresh Episode session has no active routing identity");
+    record = updated(record, {
+      episodeId: binding.published.sessionId,
+      episodeSessionFile: binding.published.sessionFile,
+      episodeActiveSessionId: binding.published.activeSessionId,
+      terminalHandle: binding.terminal.handle,
+    });
+    store.write(repo, record);
+    await orca.removeAutomation(automationId, record.routingEnvironmentId);
+    const retainedTerminals = await orca.listTerminals(worktree.id, record.routingEnvironmentId);
+    const retained = retainedTerminals
+      .find((terminal) => terminal.handle === binding.terminal.handle && terminal.connected && terminal.writable
+        && terminal.agentIdentity === "prime-agent" && terminal.visible
+        && samePath(terminal.worktreePath, worktree.path)
+        && terminal.tabId === binding.terminal.tabId && terminal.leafId === binding.terminal.leafId);
+    if (!retained) throw new EpisodeStateUncertainError("Prime Agent tab was not retained after launch automation removal");
+    if (retainedTerminals.some((terminal) => !terminal.handle
+      || terminal.worktreeId !== worktree.id
+      || (terminal.worktreePath !== undefined && !samePath(terminal.worktreePath, worktree.path)))) {
+      throw new EpisodeStateUncertainError("Orca terminal inventory is not bound to the exact task Episode worktree");
+    }
+    const terminalHandles = [...new Set(retainedTerminals.map((terminal) => terminal.handle))].sort();
+    record = updated(record, {
+      status: "active",
+      terminalHandles,
+      launchAutomationId: undefined,
+      launchRunId: undefined,
+      uncertaintyReason: undefined,
+    });
+    store.write(repo, record);
+    return { ...record, reused: false };
+  } catch (error) {
+    markUncertain(store, repo, record, error);
+    throw error;
+  }
+}
+
 export async function allocateReservedTaskEpisode(
   rawTaskId: string,
   ctx: ExtensionContext,
   dependencies: TaskEpisodeAllocationDependencies = {},
   /** Ephemeral native admission result for the one initial execute prompt. */
   beadsTaskMutation?: PublishedBeadsTaskMutation,
+  continuation?: { operationId: string; sessionId?: string },
 ): Promise<TaskEpisodeResult> {
   const git = dependencies?.git ?? new CliGitAdapter();
   const filesystem = dependencies?.filesystem ?? new NodeFilesystemAdapter();
@@ -1994,6 +2082,12 @@ export async function allocateReservedTaskEpisode(
     const existing = store.read(repo, ownerSessionId);
     if (!existing) throw new Error(`No durable task-native Episode reservation exists for ${rawTaskId}`);
     exactAllocatableTaskRecord(existing, rawTaskId, ownerSessionId);
+    if (continuation && existing.operationId !== continuation.operationId) {
+      throw new Error("Existing-operation request does not match the owned operation");
+    }
+    if (continuation?.sessionId && existing.episodeId && continuation.sessionId !== existing.episodeId) {
+      throw new Error("Existing-operation request selects a different durable session");
+    }
     if (existing.status === "active") {
       validateWorktreeRecord(existing, git, filesystem, repo);
       if (existing.engine === "orca") {
@@ -2008,6 +2102,69 @@ export async function allocateReservedTaskEpisode(
       }
       const route = await reopenIfNeeded(existing, session, ctx, publisher, store, repo);
       return { ...route.record, reused: true };
+    }
+    if (continuation) {
+      if (!isPublishedBacklogTaskEpisodeOwnership(existing) || existing.engine !== "orca"
+          || !existing.worktreeId || !existing.worktreeIdentity || !existing.worktree
+          || !existing.branch || !existing.head || !existing.projectSetupId
+          || !["provisioning", "uncertain"].includes(existing.status)) {
+        throw new Error("Existing-operation continuation requires the allocated independent Backlog Orca worktree");
+      }
+      validateWorktreeBinding(existing, git, filesystem, repo);
+      const worktree = await orca.showWorktree(existing.worktreeId, existing.routingEnvironmentId);
+      if (worktree.id !== existing.worktreeId || worktree.identity !== existing.worktreeIdentity
+          || !samePath(worktree.path, existing.worktree) || worktree.branch !== existing.branch
+          || worktree.projectSetupId !== existing.projectSetupId) {
+        throw new Error("Existing-operation Orca worktree does not match the exact owned resource");
+      }
+      const sessions = await publisher.list();
+      const candidates = sessions.filter((session) => samePath(session.cwd, existing.worktree!));
+      const terminals = await orca.listTerminals(existing.worktreeId, existing.routingEnvironmentId);
+      if (terminals.some((terminal) => !terminal.handle || terminal.worktreeId !== existing.worktreeId
+          || (terminal.worktreePath !== undefined && !samePath(terminal.worktreePath, existing.worktree!)))) {
+        throw new Error("Existing-operation terminals have a different worktree identity");
+      }
+      if (continuation.sessionId) {
+        const session = candidates.find((candidate) => candidate.sessionId === continuation.sessionId);
+        const route = session?.activeSessionId ?? session?.id;
+        if (!session?.sessionFile || !route || candidates.length !== 1
+            || (existing.episodeId && existing.episodeId !== session.sessionId)
+            || (existing.episodeSessionFile && !samePath(existing.episodeSessionFile, session.sessionFile))) {
+          throw new Error(`Existing-operation session binding is unavailable or collides: ${JSON.stringify({ candidates, terminals })}`);
+        }
+        if (!publisher.getMessages) throw new Error("Session message observation is unavailable");
+        const state = await publisher.getState(route);
+        if (state.sessionId !== session.sessionId || !samePath(state.sessionFile, session.sessionFile)
+            || !samePath(state.cwd, existing.worktree)) throw new Error("Existing-operation session state has a different identity");
+        const messages = await publisher.getMessages(route);
+        const binding = await waitForOrcaBinding({
+          before: new Set(sessions.map((item) => item.sessionId).filter((id): id is string => Boolean(id) && id !== session.sessionId)),
+          worktree, publisher, orca, routingEnvironmentId: existing.routingEnvironmentId,
+          wait: dependencies.wait ?? ((ms) => new Promise((done) => setTimeout(done, ms))),
+          attempts: dependencies.bindingAttempts ?? 240,
+        });
+        if (binding.published.sessionId !== session.sessionId || binding.published.activeSessionId !== route
+            || !samePath(binding.published.sessionFile, session.sessionFile)) {
+          throw new Error("Existing-operation session changed during binding");
+        }
+        const bound = updated(existing, {
+          episodeId: session.sessionId, episodeSessionFile: session.sessionFile, episodeActiveSessionId: route,
+          terminalHandle: binding.terminal.handle, terminalHandles: [...new Set(terminals.map((terminal) => terminal.handle))].sort(),
+          status: "active", uncertaintyReason: undefined,
+        });
+        store.write(repo, bound);
+        return { ...bound, reused: true, sessionObservation: { session, state, messages } };
+      }
+      if (candidates.length || existing.episodeId || existing.episodeSessionFile
+          || existing.episodeActiveSessionId || existing.launchAutomationName
+          || existing.launchAutomationId || existing.launchRunId
+          || terminals.some((terminal) => terminal.agentIdentity === "prime-agent")) {
+        throw new Error(`Existing-operation launch collides with session or launch resources: ${JSON.stringify({ ownership: existing, candidates, terminals })}`);
+      }
+      // The caller requests only the post-worktree operation after inspecting
+      // native delivery facts under editable guidance; no admission is repeated.
+      return await startTaskEpisodeInOrcaWorktree(existing, worktree, repo, dependencies, store, publisher, orca,
+        undefined, new Set(sessions.map((session) => session.sessionId).filter((id): id is string => Boolean(id))));
     }
     if (existing.status !== "provisioning") {
       throw new EpisodeStateUncertainError(`Existing task-native Episode ownership is ${existing.status}; inspect exact resources before continuing. No assignment was replayed.`);
@@ -2080,71 +2237,9 @@ export async function allocateReservedTaskEpisode(
       head: worktree.head,
     });
     store.write(repo, record);
-    const preparedWorkspace = prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
-    record = preparedWorkspace.record;
-    let executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
-      location: { tag: "operator-episode-task", value: record.taskId },
-      ownerSessionId: record.ownerSessionId,
-    });
-    if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
-    if (preparedWorkspace.providerTaskObservation) {
-      executePrompt += providerTaskObservationBlock(preparedWorkspace.providerTaskObservation);
-    }
-    const before = new Set((await publisher.list()).map((session) => session.sessionId).filter((value): value is string => Boolean(value)));
-    const launchAutomationName = `prime-claw-launch-${record.operationId}`;
-    record = updated(record, { launchAutomationName });
-    store.write(repo, record);
-    const automationId = await orca.createLaunchAutomation({
-      worktreeId: worktree.id,
-      name: launchAutomationName,
-      prompt: executePrompt,
-      routingEnvironmentId: setup.routingEnvironmentId,
-    });
-    record = updated(record, { launchAutomationId: automationId });
-    store.write(repo, record);
-    const runId = await orca.runAutomation(automationId, setup.routingEnvironmentId);
-    record = updated(record, { launchRunId: runId });
-    store.write(repo, record);
-    const binding = await waitForOrcaBinding({
-      before,
-      worktree,
-      publisher,
-      orca,
-      routingEnvironmentId: setup.routingEnvironmentId,
-      wait: dependencies?.wait ?? ((ms) => new Promise((resolveWait) => setTimeout(resolveWait, ms))),
-      attempts: dependencies?.bindingAttempts ?? 240,
-    });
-    if (!binding.published.activeSessionId) throw new EpisodeStateUncertainError("Fresh Episode session has no active routing identity");
-    record = updated(record, {
-      episodeId: binding.published.sessionId,
-      episodeSessionFile: binding.published.sessionFile,
-      episodeActiveSessionId: binding.published.activeSessionId,
-      terminalHandle: binding.terminal.handle,
-    });
-    store.write(repo, record);
-    await orca.removeAutomation(automationId, setup.routingEnvironmentId);
-    const retainedTerminals = await orca.listTerminals(worktree.id, setup.routingEnvironmentId);
-    const retained = retainedTerminals
-      .find((terminal) => terminal.handle === binding.terminal.handle && terminal.connected && terminal.writable
-        && terminal.agentIdentity === "prime-agent" && terminal.visible
-        && samePath(terminal.worktreePath, worktree.path)
-        && terminal.tabId === binding.terminal.tabId && terminal.leafId === binding.terminal.leafId);
-    if (!retained) throw new EpisodeStateUncertainError("Prime Agent tab was not retained after launch automation removal");
-    if (retainedTerminals.some((terminal) => !terminal.handle
-      || terminal.worktreeId !== worktree.id
-      || (terminal.worktreePath !== undefined && !samePath(terminal.worktreePath, worktree.path)))) {
-      throw new EpisodeStateUncertainError("Orca terminal inventory is not bound to the exact task Episode worktree");
-    }
-    const terminalHandles = [...new Set(retainedTerminals.map((terminal) => terminal.handle))].sort();
-    record = updated(record, {
-      status: "active",
-      terminalHandles,
-      launchAutomationId: undefined,
-      launchRunId: undefined,
-      uncertaintyReason: undefined,
-    });
-    store.write(repo, record);
-    return { ...record, reused: false };
+    const allocatedRecord = record;
+    record = undefined; // The post-worktree operation preserves its own latest identity on failure.
+    return await startTaskEpisodeInOrcaWorktree(allocatedRecord, worktree, repo, dependencies, store, publisher, orca, beadsTaskMutation);
   } catch (error) {
     if (record && repo) markUncertain(store, repo, record, error);
     throw error;
@@ -2686,6 +2781,14 @@ export async function createTaskEpisode(
   dependencies: TaskEpisodeCreationDependencies = {},
   options: TaskEpisodeAdmissionOptions,
 ): Promise<TaskEpisodeCreationResult> {
+  if (options.operationId !== undefined) {
+    if (!options.operationId || (options.sessionId !== undefined && !options.sessionId)) {
+      throw new Error("Existing-operation and session addresses cannot be empty");
+    }
+    return (dependencies.allocateTaskEpisode ?? allocateReservedTaskEpisode)(rawTaskId, ctx, dependencies, undefined,
+      { operationId: options.operationId, ...(options.sessionId ? { sessionId: options.sessionId } : {}) });
+  }
+  if (options.sessionId) throw new Error("A session binding requires an exact existing operation ID");
   const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
   const provider = (dependencies.providerDetector ?? detectTaskProvider)(ctx.cwd, runner);
   if (provider.kind === "selected" && provider.evidence.provider === "beads") {

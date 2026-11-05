@@ -267,6 +267,51 @@ status/plan predicate after allocation. Never add an initial handoff or another
 execute prompt. Creating resources does not authorize this Conversation to
 implement the Episode's code.
 
+## Continue an allocated pre-session operation
+
+This narrow path covers an independent Backlog Orca operation that already owns
+its exact worktree but failed before session binding. It does not resume other
+partial shapes, reserve ownership, publish a status or allocate another worktree.
+The owning Conversation, not the Episode or Expert, decides continuation under
+its existing implementation authority. Keep the recorded task, operation,
+provider, code base, setup, worktree and branch. Historical incident IDs are
+provenance, never permission to act on a foreign live operation.
+
+Before requesting a launch, inspect the exact ownership and native worktree,
+actual failure sequence, all native saved/live sessions at that worktree, their
+messages and pending actions, and the exact Orca terminals and automation/run
+history. Use supported native list/get_state/get_messages observations and
+`orca automations list --json`, `orca automations show --id <id> --json`,
+`orca automations runs --id <id> --json` for the operation's exact automation.
+A missing ownership session ID, empty current terminal screen or absent current
+run is NOT proof that an assignment was never delivered. Removal may retire
+automation history, and a saved session may be inactive. Retain raw results and
+warnings; do not classify delivery from an error string or absence alone.
+If delivery remains ambiguous, preserve resources and report the actual gap.
+Never replay an uncertain launch, choose another operation or hand-edit ownership.
+
+When actual evidence establishes that this same operation has no session or
+initial assignment, call `create_task_episode` with the exact canonical `taskId`
+and existing `operationId`. This requests only the existing post-worktree native
+preparation and launch steps, with ONE initial execute assignment. Omit `host`
+to retain persisted placement, or repeat only its exact stable host. It is NOT
+fresh admission; do not run implement-task readiness, reserve again, republish
+In Progress or create another worktree. Existing session/launch resource
+collisions are reported without guessing. A native failure can still follow
+successful effects; inspect rather than retry.
+
+If the original assignment already reached an exact existing session, inspect
+its complete native messages/state/actions first, then supply that immutable
+`sessionId` with the SAME task and operation. This binds the existing visible
+Orca Prime Agent session and returns its raw message/state observations without
+sending ANY prompt, automation run or second initial assignment. Judge the
+returned facts; binding alone does not prove implementation started or finished.
+An unavailable/inactive routing identity or ambiguous session/terminal binding
+needs factual recovery, not an inferred replacement launch. Broader failed-launch
+recovery remains outside this narrow path. On success continue normal ownership
+oversight; an already active replay sends no assignment. No merge, activation,
+abandonment or destructive cleanup authority is added.
+
 ## Decide failure disposition from current facts
 
 Creation reports native results and exact retained ownership/resource facts.

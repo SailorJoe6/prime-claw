@@ -1008,3 +1008,17 @@ automatic retry, dual write, mirror, universal task model, provider-selection
 file, sidecar receipt, persistent lock, coordinator, phase file, checkpoint, or
 resume state. The real `PRIMECLAW-43.1` repository migration remains separately
 operator-confirmed; this candidate and its tests use only disposable stores.
+
+### Allocated pre-session continuation
+
+For the recorded independent Backlog/Orca pre-session shape, the existing
+`create_task_episode` surface accepts `operationId` to address the original
+allocated operation, not to create another reservation or worktree. The editable
+implementation workflow requires actual session/message/action and Orca launch
+history inspection first. Missing ownership session identity is not proof of
+no assignment. The post-worktree preparation and launch mechanics are shared
+with fresh allocation. Supplying an exact existing `sessionId` binds that
+session without any new prompt or launch and returns its native state/messages.
+The request retains the persisted provider/setup/base/worktree/branch and exact
+owner. Collisions and unavailable routes remain factual errors. This narrow
+support is not general failed-allocation recovery or live Task45 authorization.

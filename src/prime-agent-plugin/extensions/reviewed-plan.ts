@@ -715,6 +715,8 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
         properties: {
           taskId: { type: "string", description: "Canonical provider-native task ID" },
           host: { type: "string", description: "Optional stable id:<project-host-setup-id> placement" },
+          operationId: { type: "string", description: "Exact existing allocated operation ID" },
+          sessionId: { type: "string", description: "Exact existing durable session ID to bind without an assignment" },
         },
         required: ["taskId"],
         additionalProperties: false,
@@ -734,7 +736,24 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
             throw new Error(`Task ${params.taskId} resolved to a different canonical ID ${task.taskId}`);
           }
           const resolvePlacement = dependencies?.placementResolver ?? resolveTaskEpisodePlacement;
-          const placement = await resolvePlacement(task.projectRoot, params.host, ctx, dependencies);
+          let placement: TaskEpisodeAdmissionOptions;
+          if (params.operationId !== undefined) {
+            if (params.sessionId !== undefined && !params.sessionId) throw new Error("An existing session ID cannot be empty");
+            const owned = dependencies?.ownership
+              ? dependencies.ownership.read(task.projectRoot, ctx.sessionManager.getSessionId())
+              : readEpisodeOwnership(task.projectRoot, ctx.sessionManager.getSessionId());
+            if (!params.operationId || !owned || owned.version !== 2 || owned.taskId !== task.taskId
+                || owned.operationId !== params.operationId || owned.provider !== task.provider
+                || (params.host !== undefined && params.host !== `id:${owned.projectSetupId}`)) {
+              throw new Error("Existing-operation request does not match exact task ownership and placement");
+            }
+            placement = { engine: owned.engine, projectSetupId: owned.projectSetupId,
+              routingEnvironmentId: owned.routingEnvironmentId, operationId: owned.operationId,
+              ...(params.sessionId ? { sessionId: params.sessionId } : {}) };
+          } else {
+            if (params.sessionId !== undefined) throw new Error("A session binding requires an exact existing operation ID");
+            placement = await resolvePlacement(task.projectRoot, params.host, ctx, dependencies);
+          }
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
           const result = await actions.create(task.taskId, toolCallId, ctx, dependencies, placement);
           return {
