@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-05 17:07'
+updated_date: '2026-11-05 17:24'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -212,4 +212,10 @@ Inspection of concrete remaining shapes confirms the current existing-operation 
 Evidence limit: this is actual native session-component proof only. It does not exercise the complete owner-led same-operation creation procedure or canonical execute workflow, actual Orca allocation/automation/visible-tab recovery, genuine ambiguous-delivery stop, LLM policy compliance or activation. The two representative full allocated-pre-session/existing-session recovery exercises and ambiguity-stop evidence therefore remain unfinished, along with any narrow enabling work justified by concrete remaining obstacles. Keep all seven AC unchecked, Description and approved living Implementation Plan unchanged, and status In Progress. The owner alone decides lifecycle disposition of the reported fixture gap.
 
 No live PRIMECLAW-45 recovery, live ownership/status mutation, new live managed Episode/initial assignment, global apply/check/activation or restart, merge, dependency patch, abandonment or destructive live cleanup occurred. Main's compatible ad96ebf ownership-only advance was not merged. No primary task clone was synchronized or changed. Report this bounded published candidate and exact fixture gap to the owning Conversation, then stop for review.
+
+## Slice 3 accepted; bounded Linux Orca fixture staging underway
+
+The owning Conversation accepted partial native-session component code d45005dc9cf5139f7fc5926af476fe80b5e16c88 and published task history 761500a4560468c3d20e3b3619d2ba601934b433 after reviewing the complete three-file delta, unchanged native contract and direct publication, passing Docker manifest and all 15 artifact hashes plus the component hash. GPT-6 Astra (openai-codex/gpt-6-astra, max) independently found no material defect; it verified fresh native views, hashes, isolation and pinned native wait_for_idle read-only and reran no tests/probes. The owner reran no tests; the reviewer completed and was deleted. The accepted evidence proves the real isolated daemon, durable flush, one harmless assignment and same-saved-session reopening only, not full Orca recovery, canonical execute, ambiguity handling, LLM compliance or activation.
+
+The owner explicitly advanced the already approved representative native recovery validation in this same Episode. Missing Orca is a disposable-fixture prerequisite, not a new product decision or permission stop. This bounded slice will try to stage a complete supported compatible Linux Orca/Orcad distribution and its exact pinned runtime before the existing Docker fixture disconnects networking, using a fresh isolated HOME/XDG/ORCA_USER_DATA. First establish actual native setup, terminal and launch readiness; then perform the approved same-operation allocated-pre-session/existing-session exercises where the exact supported interfaces permit, preserving all original identities and one assignment/reuse. If a supported artifact or safe native boundary cannot be established after a sincere bounded attempt, report the concrete constraint and remaining unproven outcomes. Do not weaken connected/writable/visible tab checks, silently change engines, use live resources as fixtures, clear known identities, replay uncertain delivery, patch dependencies, or add a general fixture/recovery framework. Routine in-scope fixture/test staging, repairs and validation need no repeated approval. Preserve Description, approved living Implementation Plan, all seven unchecked AC and In Progress. No merge, activation/restart, live status/ownership mutation, new live Episode/initial assignment, primary task checkout synchronization or destructive live cleanup is authorized or performed by this slice.
 <!-- SECTION:NOTES:END -->
