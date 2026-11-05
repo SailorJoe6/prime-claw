@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-05 15:59'
+updated_date: '2026-11-05 16:04'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -148,5 +148,11 @@ created: 2026-11-05 15:58
 Readiness preflight by owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec (2026-11-05): the operator explicitly requested implementation of PRIMECLAW-45. Native status is In Planning, dependency55 is Done, and the approved specification/plan are published. Historical failed45 resources were removed by the separately authorized workaround recorded in PRIMECLAW-56 and commit10e8f69871f770cd5956963eb49acddddb5657dd; current Git/Orca/ownership inspection shows no45 allocation to recover. Other owner's active56 resources and pending ownership bytes remain untouched.
 
 Nix prerequisite access is available through a disposable official container with no host mounts, credentials, privileged flags or caller trust-setting changes. Exact image: nixos/nix@sha256:f159a58f390677f41e8e900a74b6e2f9c7f27b364122ae6acf7a652ce6c551c0 (linux/arm64). Both commands exited0: docker run --rm IMAGE nix --extra-experimental-features "nix-command flakes" eval --raw --impure --expr builtins.currentSystem (aarch64-linux); docker run --rm IMAGE nix --extra-experimental-features "nix-command flakes" flake metadata --json github:MrLesk/Backlog.md/0cf4fdbc70020327f4366a29d3f405f83d180301 (exact revision resolved, source unpacked into native Nix store). This is access preflight ONLY, not package/build/persistence acceptance. The Episode must still run the approved native nix build, exact binary version/help, and fresh installCheck persistence/failed-write smoke and retain logs. Reuse native entry points; no new Nix framework or waived gate. No global activation, accepted artifact replacement, live migration, merge, restart or destructive cleanup is authorized by implementation. Selected placement remains id:afb6537c-e643-4a5f-b284-f0f627ddcbdf; starting code basis main at f5287c3647245a6a5e6d3baad64d9cecf1dab81b.
+---
+
+author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-05 16:04
+---
+Owner reviewed the first Episode report: before slice1, native Git SSH reads failed with publickey; no implementation changes or status edits occurred. The same approved SSH remote now succeeds without any credential, Keychain, SSH-config, Git-config or remote changes. Owner observed git -C .backlog ls-remote origin refs/heads/prime-claw/tasks exit0 and the identical read against the exact Episode .backlog clone exit0, both returning published55530cc9f572adad5f966d6ac00635fe65518fb9. GIT_TRACE confirms native /usr/bin/ssh targets git@github-sailorjoe6 and SailorJoe6/prime-claw.git for both. The earlier failures are real; their cause remains unknown. No alternate transport or credential extraction is needed from these current facts. Native task remains In Progress; no Blocked transition was published. This compatible execution observation does not change approved scope, plan, ownership or resources. Continue the same Episode under existing implementation authority through canonical handoff; do not replay initial creation/assignment, change remotes/credentials, or waive publication proof. A later failed or uncertain write requires actual-state inspection rather than blind retry.
 ---
 <!-- COMMENTS:END -->
