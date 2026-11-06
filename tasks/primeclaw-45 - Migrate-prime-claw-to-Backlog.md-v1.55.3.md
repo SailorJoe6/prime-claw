@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 15:16'
+updated_date: '2026-11-06 15:25'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -221,6 +221,12 @@ All repair build/test handles are finished. Read-only audit helper has been dele
 Owner acceptance and same-Episode slice2 handoff (2026-11-06). Accepted review artifact: /Users/jlanders/.prime/agent/session-artifacts/01a1a90b-0fba-7778-b1e5-0087bdaf8fec/primeclaw45-slice1-review/accepted-bun-isolation-repair.md. Owner reviewed exact four-file repair cd9193c against d4f8e79 and the complete native task updates; prior Expert Bun-isolation defect is resolved. Owner independently reran49focusedpytest, all pass; fresh offline/no-mount immutable fixture dc4621d1 passes gbraincompiled1.3.11, generalbun/bunx1.3.11, original BUN_INSTALL/symlinks, absent temporary source/tool and exactBacklog1.55.3/version/help/hash. Production sharedBun/Backlog/gbrain blocks match the executed fixture verbatim and raw hashes match committed evidence. No full real-gbrain/OpenShell or integrated acceptance is inferred.
 
 Handoff verified exact active version2 independent-Backlog owner and Episode session/root; primary remains main. Code cd9193cba4082229df973d4a557388dfb83e2b62 is clean/directly published and own upstream matches. Episode task clone is clean/directly published at1fad78986806e38f7bf3cb0194e0c5bcfd0f4dda; selected45 content matches the bound observation and is unchanged from the published repair report, while compatible unrelated task history is retained. Native45 stays In Progress, parentnull,AC0/9. This is content-only continuation context, not a status or ownership edit. No slice2 implementation code or additional initial/execute assignment is made in handoff; the owning Conversation already queues canonical execute independently.
+
+2026-11-06 — Approved slice2 implementation started in SAME Episode after accepted Bun-isolation repair. Production migration adaptation removes archivedBacklogViews clone/relocate behavior and task complete/closed-directory setup, reads native task archives at actual paths, classifies legacycompleted as archive, maps status normally before explicit archive, allows source relationships to archived targets and reuses the existing physical/native inventory before destination preparation to refuse contested IDs. Native draft File path is checked before evidence normalization. Transaction/publication/receipt/cutover/source-deletion order and active resources are unchanged. No upstream/toolchain/host artifact change.
+
+Independent test assistance is adapting representative real-candidate migration seams in tests/task_provider_migration.test.mjs and bridge. Required Docker Tier1 --probe was started through the supported driver with isolated container-local installation from the canonical Prime Agent source; no host/global candidate apply/check/probe. Raw commands/logs will remain under .test-results/primeclaw45-slice2-08450108/. No tests or slice2 acceptance claimed yet.
+
+Read-only native API audit identifies a concrete limit: v1.55.3 task view supports archived tasks in completed/ and archive/tasks/, while draft view supports active drafts only; there is no native archived-draft view. No clone/relocate fallback or synthetic active evidence will be retained to bypass that limit. An archived-draft baseline therefore needs a supported public native read surface before whole-upgrade acceptance can be claimed. This does not waive preservation or authorize an upstream/Prime Agent patch. Representative task-archive and active-draft seams remain in progress; full integrated lifecycle/guidance/acceptance gates still remain later. Status In Progress,AC0/9; acceptedv1.53.0 remains authoritative. No merge/activation/restart/live migration/cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
