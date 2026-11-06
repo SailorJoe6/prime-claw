@@ -125,7 +125,7 @@ function fakeRunner(responses) {
 }
 
 const BACKLOG_OK = {
-  ["backlog\0--version"]: { stdout: "1.53.0\n", stderr: "", status: 0 },
+  ["backlog\0--version"]: { stdout: "1.55.3\n", stderr: "", status: 0 },
   ["backlog\0config\0get\0statuses"]: { stdout: CANONICAL.join(", ") + "\n", stderr: "", status: 0 },
 };
 
@@ -958,7 +958,7 @@ test("backlog capabilities prove the executable and exact ordered lifecycle stat
   const runner = fakeRunner({ ...BACKLOG_OK });
   const caps = checkBacklogCapabilities(root, runner);
   assert.equal(caps.provider, "backlog");
-  assert.equal(caps.version, "1.53.0");
+  assert.equal(caps.version, "1.55.3");
   assert.deepEqual(runner.calls, [["backlog", "--version"], ["backlog", "config", "get", "statuses"]]);
 });
 
@@ -972,7 +972,7 @@ test("backlog capabilities reject a non-canonical or reordered status set", () =
   const root = fixtureRoot();
   const reordered = [...CANONICAL].reverse().join(", ") + "\n";
   const runner = fakeRunner({
-    ["backlog\0--version"]: { stdout: "1.53.0\n", stderr: "", status: 0 },
+    ["backlog\0--version"]: { stdout: "1.55.3\n", stderr: "", status: 0 },
     ["backlog\0config\0get\0statuses"]: { stdout: reordered, stderr: "", status: 0 },
   });
   assert.throws(() => checkBacklogCapabilities(root, runner), /do not match the exact ordered lifecycle/);

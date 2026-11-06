@@ -1,8 +1,9 @@
 # Backlog.md dependency and build
 
-Prime Claw vendors its long-lived Backlog.md fork as the Git submodule at
-`deps/backlog`. The fork is `SailorJoe6/Backlog.md`; its `upstream` lineage is
-`MrLesk/Backlog.md`.
+Prime Claw pins Backlog.md as the Git submodule at `deps/backlog`. The
+PRIMECLAW-45 implementation candidate uses the unmodified upstream release from
+`MrLesk/Backlog.md`. The accepted host artifact remains v1.53.0 until a separate
+reviewed cutover; a candidate source-pin update does not activate it.
 
 Ordinary continuation likewise uses editable handoff/execute/oversight policy,
 not status/design/code-clean/upstream/ancestry approval in code. Both prompts
@@ -43,32 +44,34 @@ selected `sessionId`; see the final section. Its disposable regression evidence
 does not prove live recovery or historical assignment delivery. Broader partial
 shapes and unavailable session routes remain explicit limits.
 
-## Current bounded release
+## Current bounded candidate release
 
-The managed fork remains based on the latest stable upstream release selected
-for the migration, with the exact reviewed managed source pin below:
+- release: `v1.55.3`
+- exact release-tag and source commit: `0cf4fdbc70020327f4366a29d3f405f83d180301`
+- source: `https://github.com/MrLesk/Backlog.md`
+- Backlog build/smoke tool: Bun `1.4.4`
 
-- base release: `v1.53.0`
-- base commit: `fd20f71493fb4eda44b021aa89f257956f17fb71`
-- managed source commit: `431e95612d6167e418c507ec206d95df43c38c54`
-- fork: `https://github.com/SailorJoe6/Backlog.md`
-- upstream: `https://github.com/MrLesk/Backlog.md`
+The candidate is unmodified upstream. Do not replay the three v1.53.0 downstream
+restore/dependency patches. Builds require exact HEAD and exact release-tag
+resolution/ancestry; tracked source changes refuse before compilation. Image
+labels and runtime build stamps bind the same version and commit.
 
-The managed source retains the accepted exact completed-task restore from
-`5d556c1954f7724abd180f6211cf528e9253ad4c` and adds PRIMECLAW-44's narrowly
-reviewed dependency eligibility correction. Only actual `tasks/` and `completed/`
-records are dependency targets, consistently in validation, cycle/defect checks,
-and reporting (including interactive draft details). Drafts and archives remain
-display/history records, not targets or fallback. Archive/live same-ID reuse is
-valid; archive-only targets refuse. Native allocation and archive bytes/history
-are unchanged. Builds require the submodule HEAD to equal this exact commit and
-require `v1.53.0` to be its Git ancestor; they do not accept an arbitrary branch
-head. The reviewed source is published on the managed fork's
-`fix/primeclaw-44-dependency-eligibility` branch. Native test results and retained
-full-suite failures are recorded in
-[`primeclaw44-integration-20261030.md`](evidence/primeclaw44-integration-20261030.md);
-this is not a full-suite-green or complete-builder acceptance claim. A later stable release or another fork change is adopted
-only through a separate validated source-pin update.
+PRIMECLAW-45 supersedes the prior fork-only dependency policy: native archived
+and draft dependency targets are supported, archived IDs remain reserved, and
+existing duplicate IDs must be resolved separately before migration. The old
+fork source `431e95612d6167e418c507ec206d95df43c38c54` and its results remain
+historical evidence in
+[`primeclaw44-integration-20261030.md`](evidence/primeclaw44-integration-20261030.md).
+They are not patches to port to this release.
+
+**Slice boundary:** this source/build candidate is not an accepted integrated
+upgrade. Provider migration, lifecycle guidance and the remaining compatibility
+and validation work in PRIMECLAW-45 must finish before activation. The lifecycle
+sections below have not yet all been converted from the accepted v1.53.0 flow.
+Do not use them to operate a v1.55.3 candidate on live task history. No required
+validation is waived by delivering a build-only slice. Source/build results and
+limits are recorded in
+[`primeclaw45-upstream-candidate-20261106.md`](evidence/primeclaw45-upstream-candidate-20261106.md).
 
 Clone this repository with `git clone --recurse-submodules`, or initialize an
 existing checkout with `git submodule update --init --recursive`.
@@ -81,9 +84,9 @@ Build and run upstream's compiled-binary smoke path:
 scripts/build-backlog.sh
 ```
 
-The script verifies the exact managed commit and its stable-release ancestry, runs
-`bun install --frozen-lockfile`, compiles the version-stamped standalone binary,
-and runs `scripts/smoke-compiled-build.ts`. The resulting candidate is
+The script requires Bun `1.4.4`, verifies the exact unmodified upstream commit
+and release tag, runs `bun install --frozen-lockfile`, compiles the
+version-stamped standalone binary, and runs `scripts/smoke-compiled-build.ts`. The resulting candidate is
 `deps/backlog/dist/backlog`. Bun is required to build and smoke-test it, but the
 compiled artifact does not require Bun at runtime.
 
@@ -95,13 +98,15 @@ The operator-owned cutover later copies the accepted host artifact to
 `bin/prime-claw build` supplies `deps/backlog` to `docker/runtime.Dockerfile` as
 the named `backlog_source` context. The image build verifies required source
 inputs, performs the same frozen install and upstream smoke path, and installs a
-separately targeted Linux standalone binary at `/usr/local/bin/backlog`. Image
+native-platform Linux standalone binary at `/usr/local/bin/backlog`. Image
 labels and the build stamp record the release and commit.
 
-The sandbox build pins Bun `1.3.11`, matching the accepted build toolchain, so a
-floating installer release cannot silently reuse or replace the compiled
-artifact. The build uses the vendored source. It does not install an npm
-package, download an upstream prebuilt binary, or require Bun to execute
+The Backlog builders pin Bun `1.4.4`, matching upstream's documented/CI-selected
+toolchain. They use its native-platform standalone build, without the unchecked
+cross-target runtime download rejected by upstream. The separate gbrain
+integration-test toolchain in `config/test-artifacts.lock.json` is unchanged.
+The build uses the vendored source. It does not install an npm package, download
+an upstream prebuilt binary, or require Bun to execute
 `backlog`. The Tier-1 image performs the same exact source/ancestry/smoke proof
 in an isolated build stage and copies only the standalone binary into its slim
 runtime stage; Bun is not retained in that image.

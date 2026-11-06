@@ -70,7 +70,7 @@ class Runner {
         this.providerInits = (this.providerInits ?? 0) + 1;
         return { stdout: "initialized\n", stderr: "", status: 0 };
       }
-      if (args[0] === "--version") return { stdout: "1.53.0\n", stderr: "", status: 0 };
+      if (args[0] === "--version") return { stdout: "1.55.3\n", stderr: "", status: 0 };
       if (args.join(" ") === "config get statuses") {
         try {
           const config = readFileSync(join(options.cwd, ".backlog", "config.yml"), "utf8");

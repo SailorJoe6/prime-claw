@@ -47,7 +47,7 @@ prime-claw builds on four prior projects. Read these before designing:
 - [prime-agent-installation.md](prime-agent-installation.md) — the only
   supported Prime Agent source, exact fork/tag/commit/tree/lockfile identity,
   Docker-only build contract, unsupported installer paths, and v0.10 boundary.
-- [backlog.md](backlog.md) — the Backlog.md fork and upstream provenance,
+- [backlog.md](backlog.md) — the Backlog.md candidate and upstream provenance,
   exact stable submodule pin, and reproducible host and sandbox build contracts.
 - [testing-strategy.md](testing-strategy.md) — isolation tiers, the current
   exact-image/offline tier-1 contract, provenance schema, source-mode safety

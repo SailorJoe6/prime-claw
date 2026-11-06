@@ -18,9 +18,9 @@
 
 FROM ubuntu:24.04 AS backlog_builder
 
-ARG BUN_VERSION=1.3.11
-ARG BACKLOG_VERSION=1.53.0
-ARG BACKLOG_COMMIT=431e95612d6167e418c507ec206d95df43c38c54
+ARG BUN_VERSION=1.4.4
+ARG BACKLOG_VERSION=1.55.3
+ARG BACKLOG_COMMIT=0cf4fdbc70020327f4366a29d3f405f83d180301
 ENV DEBIAN_FRONTEND=noninteractive
 ENV BUN_INSTALL=/usr/local/bun
 ENV PATH="/usr/local/bun/bin:${PATH}"
@@ -31,16 +31,15 @@ RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" \
     && test "$(bun --version)" = "$BUN_VERSION"
 RUN set -eux; \
     git init -q /tmp/backlog; \
-    git -C /tmp/backlog remote add origin https://github.com/SailorJoe6/Backlog.md.git; \
-    git -C /tmp/backlog fetch -q --depth 4 origin "$BACKLOG_COMMIT"; \
-    git -C /tmp/backlog checkout -q --detach FETCH_HEAD; \
+    git -C /tmp/backlog remote add origin https://github.com/MrLesk/Backlog.md.git; \
     git -C /tmp/backlog fetch -q --depth 1 origin "refs/tags/v${BACKLOG_VERSION}:refs/tags/v${BACKLOG_VERSION}"; \
+    git -C /tmp/backlog checkout -q --detach "refs/tags/v${BACKLOG_VERSION}"; \
     test "$(git -C /tmp/backlog rev-parse HEAD)" = "$BACKLOG_COMMIT"; \
+    test "$(git -C /tmp/backlog rev-parse "refs/tags/v${BACKLOG_VERSION}^{commit}")" = "$BACKLOG_COMMIT"; \
     git -C /tmp/backlog merge-base --is-ancestor "refs/tags/v${BACKLOG_VERSION}" "$BACKLOG_COMMIT"; \
     cd /tmp/backlog; \
     HUSKY=0 bun install --frozen-lockfile; \
-    TARGET=$(case "$(uname -m)" in aarch64|arm64) echo bun-linux-arm64 ;; *) echo bun-linux-x64 ;; esac); \
-    BACKLOG_BUILD_VERSION="$BACKLOG_VERSION" BACKLOG_BUILD_TARGET="$TARGET" BACKLOG_BUILD_OUTFILE=/out/backlog bun run build; \
+    BACKLOG_BUILD_VERSION="$BACKLOG_VERSION" BACKLOG_BUILD_OUTFILE=/out/backlog bun run build; \
     bun scripts/smoke-compiled-build.ts /out/backlog "$BACKLOG_VERSION"
 
 FROM ubuntu:24.04 AS tier1_runtime
@@ -66,8 +65,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Exact provider-native task tools used by Docker-only plugin validation ---
-ARG BACKLOG_VERSION=1.53.0
-ARG BACKLOG_COMMIT=431e95612d6167e418c507ec206d95df43c38c54
+ARG BACKLOG_VERSION=1.55.3
+ARG BACKLOG_COMMIT=0cf4fdbc70020327f4366a29d3f405f83d180301
 ARG BEADS_VERSION=1.3.1
 ARG DOLT_VERSION=2.5.0
 LABEL org.prime-claw.backlog-version="${BACKLOG_VERSION}" \

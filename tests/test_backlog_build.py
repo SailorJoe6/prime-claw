@@ -2,9 +2,9 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.53.0"
-COMMIT = "431e95612d6167e418c507ec206d95df43c38c54"
-BUN_VERSION = "1.3.11"
+VERSION = "1.55.3"
+COMMIT = "0cf4fdbc70020327f4366a29d3f405f83d180301"
+BUN_VERSION = "1.4.4"
 BEADS_VERSION = "1.3.1"
 DOLT_VERSION = "2.5.0"
 
@@ -12,11 +12,15 @@ DOLT_VERSION = "2.5.0"
 def test_backlog_submodule_pin_and_build_contract():
     gitmodules = (ROOT / ".gitmodules").read_text()
     assert "path = deps/backlog" in gitmodules
-    assert "SailorJoe6/Backlog.md.git" in gitmodules
+    assert "MrLesk/Backlog.md.git" in gitmodules
 
     script = (ROOT / "scripts/build-backlog.sh").read_text()
     assert f"VERSION={VERSION}" in script
     assert f"COMMIT={COMMIT}" in script
+    assert f"BUN_VERSION={BUN_VERSION}" in script
+    assert '[ "$(bun --version)" = "$BUN_VERSION" ]' in script
+    assert 'rev-parse "refs/tags/v$VERSION^{commit}"' in script
+    assert 'git -C "$SOURCE" diff --quiet HEAD --' in script
     assert 'merge-base --is-ancestor "refs/tags/v$VERSION" "$COMMIT"' in script
     assert "describe --tags --exact-match" not in script
     assert "bun install --frozen-lockfile" in script
@@ -52,9 +56,13 @@ def test_runtime_and_tier1_images_deliver_pinned_provider_native_tools():
         assert 'dolt version | grep -F "dolt version ${DOLT_VERSION}"' in dockerfile
         assert "sha256sum -c -" in dockerfile
     tier1 = (ROOT / "docker/test.Dockerfile").read_text()
-    assert "https://github.com/SailorJoe6/Backlog.md.git" in tier1
-    # The exact reviewed pin is three commits above v1.53.0; retain that path.
-    assert 'fetch -q --depth 4 origin "$BACKLOG_COMMIT"' in tier1
+    assert "https://github.com/MrLesk/Backlog.md.git" in tier1
+    # The candidate is the exact unmodified release, not a downstream patch stack.
+    assert 'fetch -q --depth 1 origin "refs/tags/v${BACKLOG_VERSION}:refs/tags/v${BACKLOG_VERSION}"' in tier1
+    assert 'rev-parse "refs/tags/v${BACKLOG_VERSION}^{commit}"' in tier1
+    assert 'fetch -q --depth 4' not in tier1
+    assert "BACKLOG_BUILD_TARGET=" not in tier1
+    assert "BACKLOG_BUILD_TARGET=" not in (ROOT / "docker/runtime.Dockerfile").read_text()
     assert 'git -C /tmp/backlog merge-base --is-ancestor "refs/tags/v${BACKLOG_VERSION}" "$BACKLOG_COMMIT"' in tier1
     assert "BACKLOG_BUILD_OUTFILE=/out/backlog bun run build" in tier1
     assert 'bun scripts/smoke-compiled-build.ts /out/backlog "$BACKLOG_VERSION"' in tier1

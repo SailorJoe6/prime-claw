@@ -63,7 +63,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV PATH="/usr/lib/postgresql/16/bin:$PATH"
 
 # --- Bun (pinned build tool for reproducible Backlog.md and gbrain binaries) ---
-ARG BUN_VERSION=1.3.11
+ARG BUN_VERSION=1.4.4
 ENV BUN_INSTALL=/usr/local/bun
 RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" \
     && ln -sf /usr/local/bun/bin/bun /usr/local/bin/bun \
@@ -94,9 +94,9 @@ RUN set -eux; \
     dolt version | grep -F "dolt version ${DOLT_VERSION}"; \
     rm -rf /tmp/beads.tar.gz /tmp/dolt.tar.gz /tmp/bd "/tmp/dolt-linux-${ARCH}"
 
-# --- Backlog.md: compile the exact vendored fork revision for this image ---
-ARG BACKLOG_VERSION=1.53.0
-ARG BACKLOG_COMMIT=431e95612d6167e418c507ec206d95df43c38c54
+# --- Backlog.md: compile the exact unmodified upstream release for this image ---
+ARG BACKLOG_VERSION=1.55.3
+ARG BACKLOG_COMMIT=0cf4fdbc70020327f4366a29d3f405f83d180301
 LABEL org.prime-claw.backlog-version="${BACKLOG_VERSION}" \
       org.prime-claw.backlog-commit="${BACKLOG_COMMIT}"
 COPY --from=backlog_source . /opt/backlog
@@ -104,9 +104,7 @@ WORKDIR /opt/backlog
 RUN test -f package.json && test -f bun.lock && test -f scripts/smoke-compiled-build.ts \
     && rm -rf node_modules dist \
     && HUSKY=0 bun install --frozen-lockfile \
-    && TARGET=$(case $(uname -m) in aarch64|arm64) echo "bun-linux-arm64";; *) echo "bun-linux-x64";; esac) \
     && BACKLOG_BUILD_VERSION="$BACKLOG_VERSION" \
-       BACKLOG_BUILD_TARGET="$TARGET" \
        BACKLOG_BUILD_OUTFILE=/usr/local/bin/backlog bun run build \
     && bun scripts/smoke-compiled-build.ts /usr/local/bin/backlog "$BACKLOG_VERSION" \
     && rm -rf /opt/backlog

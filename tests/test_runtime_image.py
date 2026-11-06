@@ -50,7 +50,9 @@ def test_runtime_dockerfile_exists_and_is_runtime():
     assert "runtime.Dockerfile" in body
     assert "COPY runtime/gbrain /opt/gbrain" in body
     assert "COPY --from=backlog_source . /opt/backlog" in body
-    assert 'BACKLOG_BUILD_TARGET="$TARGET"' in body
+    # Native-platform compilation uses the installed pinned Bun; no unchecked
+    # cross-target runtime download is requested from the upstream build script.
+    assert 'BACKLOG_BUILD_TARGET=' not in body
     assert "bun scripts/smoke-compiled-build.ts /usr/local/bin/backlog" in body
     assert "postgresql-16-pgvector" in body
     assert "bun build --compile" in body
@@ -141,6 +143,31 @@ def test_stage_dry_run_stages_nothing(tmp_path):
 def test_backlog_source_identity_matches_pin():
     ok, detail = pc._backlog_source_identity()
     assert ok, detail
+
+
+@pytest.mark.parametrize("failure", ["head", "tag", "missing-tag", "ancestry", "dirty"])
+def test_backlog_source_identity_rejects_nonrelease_or_modified_source(monkeypatch, failure):
+    calls = []
+
+    def fake_run(command, timeout=30):
+        args = command[3:]
+        calls.append(args)
+        if args == ["rev-parse", "HEAD"]:
+            return 0, ("0" * 40 if failure == "head" else pc.BACKLOG_COMMIT) + "\n"
+        if args == ["rev-parse", f"refs/tags/v{pc.BACKLOG_VERSION}^{{commit}}"]:
+            if failure == "missing-tag":
+                return 128, "missing tag"
+            return 0, ("0" * 40 if failure == "tag" else pc.BACKLOG_COMMIT) + "\n"
+        if args[0] == "merge-base":
+            return (1 if failure == "ancestry" else 0), ""
+        if args == ["diff", "--quiet", "HEAD", "--"]:
+            return (1 if failure == "dirty" else 0), ""
+        raise AssertionError(command)
+
+    monkeypatch.setattr(pc, "run", fake_run)
+    ok, detail = pc._backlog_source_identity()
+    assert not ok, calls
+    assert detail
 
 
 def test_fingerprint_changes_with_dockerfile(tmp_path, monkeypatch):
