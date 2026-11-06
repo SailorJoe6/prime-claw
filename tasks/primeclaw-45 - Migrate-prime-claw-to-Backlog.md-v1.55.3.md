@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 15:25'
+updated_date: '2026-11-06 15:34'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -227,6 +227,12 @@ Handoff verified exact active version2 independent-Backlog owner and Episode ses
 Independent test assistance is adapting representative real-candidate migration seams in tests/task_provider_migration.test.mjs and bridge. Required Docker Tier1 --probe was started through the supported driver with isolated container-local installation from the canonical Prime Agent source; no host/global candidate apply/check/probe. Raw commands/logs will remain under .test-results/primeclaw45-slice2-08450108/. No tests or slice2 acceptance claimed yet.
 
 Read-only native API audit identifies a concrete limit: v1.55.3 task view supports archived tasks in completed/ and archive/tasks/, while draft view supports active drafts only; there is no native archived-draft view. No clone/relocate fallback or synthetic active evidence will be retained to bypass that limit. An archived-draft baseline therefore needs a supported public native read surface before whole-upgrade acceptance can be claimed. This does not waive preservation or authorize an upstream/Prime Agent patch. Representative task-archive and active-draft seams remain in progress; full integrated lifecycle/guidance/acceptance gates still remain later. Status In Progress,AC0/9; acceptedv1.53.0 remains authoritative. No merge/activation/restart/live migration/cleanup.
+
+Slice2 native interface-limit proof is complete (2026-11-06), separate from migration acceptance. Disposable exact-candidate Docker1.55.3/native source0cf4fdbc, offline/no mounts, created and natively archived DRAFT-1. Then draft view --plain returned exit0 with empty stdout/not-found stderr, task view --json returned1/not-found, draft view --json refused unknown option, draft list JSON omitted the archived record, and draft view help exposed no archived-read option. The saved replay proves exact filename/Base64/SHA unchanged before/after reads; both containers were verified absent. Raw command/argv/results/image/source/cleanup receipts: .test-results/primeclaw45-slice2-08450108/native-archived-draft-probe/. This is a concrete unsupported native read surface, not missing data or permission to relocate/omit/patch upstream. Owner was notified; no full archived-draft or upgrade acceptance claimed.
+
+The read-only helper found one concrete local alias-helper defect: numeric suffixes of nonnumeric legacy IDs must not be collapsed. The production check was narrowed to native full numeric/dotted bodies with alphabetic prefix, without Number/parseInt, retaining original IDs and paths. Bounded delta re-review found no additional concrete defect; current source SHA2561fe53a06562e8dbf5eadd8892eefd2f1767d1e9ec587582338d811ecfc162155. This is assistance evidence, not independent owner acceptance.
+
+Host-safe migration bridge inventory/least-technology assertions pass2/2. Real-candidate native allocation/dependency smoke passes canonical+legacy archive reservation and archived-task/active-draft dependencies. Focused migration seam tests and required DockerTier1 driver remain in flight; an affected closed/archive rerun passes including mapped Blocked archive. An alias-test diagnostic overconstraint is being corrected to expect the preserved ORIGINAL ID rather than a rewritten canonical label; production correctly refused before writes. No whole-suite or final slice2 success is claimed. Code remains local/uncommitted pending required validation and one bounded candidate delivery; task remains In Progress,AC0/9, acceptedv1.53.0 authoritative.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
