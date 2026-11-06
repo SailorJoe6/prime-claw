@@ -3,10 +3,10 @@ id: PRIMECLAW-56
 title: >-
   Prevent premature Episode allocation and resume failed creation in existing
   resources
-status: Blocked
+status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-05 20:46'
+updated_date: '2026-11-06 14:30'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -282,5 +282,13 @@ created: 2026-11-05 20:46
 Owning Conversation accepts the Docker access blocker reported by this exact PRIMECLAW-56 Episode. Independent read-only docker ps failed with administrator-enforced Docker Desktop sign-in requiring zendesk organization membership. Failed tier-1 source-builder setup: .test-results/20261105T204153Z-62732-71da2792/tier1/manifest.json; all five listed evidence hashes verified. No test body, product test container, recovery launch or fixture assignment ran. Secondary builder teardown/receipt diagnostics are retained; full isolation/teardown verification is not claimed. The new native full-path fixture is an unvalidated draft, not accepted recovery proof.
 
 Unblock when the operator restores authorized Docker Desktop access/sign-in and a native read confirms access. Then the owning Conversation will restore/publish In Progress and continue the SAME Episode/operation/worktree/session on the pending named native test and remaining recovery/ambiguity evidence. Existing implementation authority remains; no new live allocation or initial assignment, credential/policy bypass, host candidate probe, merge, activation/restart, abandonment or destructive live cleanup. Specification, approved plan and seven unchecked AC remain unchanged.
+---
+
+author: PRIMECLAW-56 owning Conversation
+created: 2026-11-06 14:30
+---
+Docker access blocker cleared by the owning Conversation. Joe reported the sign-in/policy issue fixed. A fresh native read-only docker ps --format command now exits 0. The earlier unsuccessful clearance check left the task Blocked and dispatched no work; this successful check supplies the required access evidence.
+
+Restore In Progress and continue the SAME PRIMECLAW-56 Episode/operation/worktree/branch/session under the existing approved implementation scope. Published code draft 8c1f2c48bf2231e4dc3472538783c16fb8c9ee5e remains unvalidated; resume the pending Docker native same-operation recovery test, ordinary in-scope fixture repairs, and remaining genuine ambiguity-stop evidence. This is clearance of the external access condition, not a claim that recovery tests passed, permission for a new Episode/initial assignment, or merge/activation/restart/destructive authority. Preserve Description, approved plan, all seven unchecked AC, other owners and unrelated task history.
 ---
 <!-- COMMENTS:END -->
