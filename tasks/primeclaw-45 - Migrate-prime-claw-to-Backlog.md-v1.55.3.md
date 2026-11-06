@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 15:00'
+updated_date: '2026-11-06 15:06'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -185,6 +185,10 @@ Evidence: docs/evidence/primeclaw45-upstream-candidate-20261106.md; raw local co
 Accepted review and bounded revision handoff (2026-11-06). Owner reviewed exact published d4f8e79a4300ae03d0393f363eb463d114b2f76a and accepted the Bun-isolation defect described in the appended living-plan checkpoint. Source: /Users/jlanders/.prime/agent/session-artifacts/01a1a90b-0fba-7778-b1e5-0087bdaf8fec/primeclaw45-slice1-review/accepted-review.md. Existing upstream/tag cleanliness, raw-log hashes, compiled smokes/matching binaries, native Git trust and fresh Nix installCheck persistence/failed-write evidence were otherwise corroborated. Owner independently reran48focusedpytest and194Dockerfixture cases, all passed with0Docker skips. These results do not prove runtime tool isolation and do not waive the accepted repair or later full-upgrade gates.
 
 This handoff revalidated the exact active version2 independent-Backlog ownership and matching Episode session file. Canonical owner checkout remains on main. Code remains clean and directly published at d4f8e79a4300ae03d0393f363eb463d114b2f76a on the recorded Episode branch. Episode task clone is clean at directly published b1bac9f2b005532c01a652854c8a4c575d39dffd; this compatible history includes the original2b6d3d6 selected-task checkpoint plus unrelated56-only advances. Current native45 identity/path/parent/status and approved contract are unchanged. No lifecycle mutation, code implementation change, resource replacement, new initial assignment or extra execute delivery occurs in handoff. Next queued execute is the slice1 Bun-isolation revision only; stop for owner review before slice2.
+
+2026-11-06 — Accepted slice1 Bun-isolation repair is implemented locally in docker/runtime.Dockerfile, with narrow regression assertions and directly affected docs/evidence. General sandbox bun/bunx and gbrain install/compile retain1.3.11; only the Backlog build/smoke RUN installs/exports1.4.4 under /opt/backlog-bun and removes it before later layers. No image-wide Backlog PATH/BUN_INSTALL change, upstream patch, Prime Agent Node change or runtime/dependency upgrade.
+
+Regression proof: the new/adjusted assertions failed on reported d4f8e79 (2fail/2pass); after repair the focused build/runtime/Tier1-image pytest selection passes49 cases, with one existing import-loader warning. A disposable Docker fixture is running the exact changed production blocks with exact upstream Backlog source and a gbrain-version sentinel fixture. This verifies intended tool selection, not full real-gbrain/OpenShell acceptance. Read-only implementation assistance is checking the diff separately; no owner acceptance is claimed. Raw repair receipts: .test-results/primeclaw45-slice1-bun-isolation-08450108/. Unchanged prior nativeNix/Git-trust/source proof remains applicable without a redundant rerun. No code commit yet; waiting for repaired-surface validation before one bounded code commit/push and owner review, before slice2. Status remains In Progress,AC0/9; acceptedv1.53.0 remains authoritative.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
