@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 14:31'
+updated_date: '2026-11-06 14:38'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -129,6 +129,12 @@ Attempted native publication inspection: `git -C .backlog ls-remote origin refs/
 The owning Conversation was notified through the existing Episode channel and asked for an existing approved non-Keychain publication route. No reply was received by this checkpoint; roster remained visible but bounded owner observation returned Unknown active session. The accepted v1.53.0 artifact remains authoritative. No acceptance criterion is claimed.
 
 Unblock condition: restore supported authenticated SailorJoe6 Git transport or supply an existing approved transport/environment without credential extraction. Then inspect actual remote/task history, synchronize this same Episode task clone, preserve compatible concurrent edits, publish this exact local task update non-force, and continue the approved first implementation slice in the same Episode. Do not allocate a replacement Episode or replay an uncertain write. Task status remains In Progress for the owning Conversation to decide.
+
+2026-11-06 — Same Episode 08450108 resumed approved slice 1 after owner clearance in comments 7–8. Earlier SSH/server-publication and Docker sign-in notes are historical. Native task remains In Progress; no lifecycle mutation. Direct task publication was verified at 2183db12ee5d01b185c0fc1549ddbcfa9f29fcae, including original da6cdaa notes and 8b9468b clearance; Docker engine read exits 0.
+
+Upstream refs/tags/v1.55.3 and the isolated shallow source HEAD both resolve exactly to 0cf4fdbc70020327f4366a29d3f405f83d180301, with unmodified tracked source. Slice 1 aligns the upstream submodule URL/gitlink, build/runtime/test pins and current provenance; Backlog builder Bun is 1.4.4 and Prime Agent Node is unchanged. Upstream scripts/build.ts rejects the former BACKLOG_BUILD_TARGET setting without a verified executable path; native-platform compilation uses the pinned installed Bun instead, without a cross-target download or upstream patch.
+
+Validation is in progress, not acceptance. The approved disposable official Nix container is running the native exact-source package build with no host mounts, credentials, privileged flags or caller trust changes. Existing build/compiled persistence/failed-write smoke and Git trust checks must still pass. No AC is checked and no full upgrade claim is made. This execute pass will deliver only one bounded, tested, committed/pushed candidate slice for owner review. Accepted v1.53.0 remains authoritative; migration compatibility and other approved slices remain unfinished. No merge, activation/restart, live migration, resource replacement or destructive cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
