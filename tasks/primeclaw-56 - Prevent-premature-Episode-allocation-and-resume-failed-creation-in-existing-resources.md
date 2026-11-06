@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-06 14:38'
+updated_date: '2026-11-06 14:42'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -279,6 +279,14 @@ The owning Conversation cleared the exact external Docker organization-login blo
 Published code draft 8c1f2c48bf2231e4dc3472538783c16fb8c9ee5e remains UNVALIDATED. The current canonical execute closed the old handoff-only goal, reread prepare and established an implementation goal, then actually ran the pending named native Docker test. The first restored-access run reached the real isolated Orca/worktree and controller daemon, then failed a fixture assertion before target-clone recovery or an Episode launch/assignment: Orca's normal shell tab exists after worktree allocation, so total terminal count is one, not zero. A proportionate test-only repair now checks no Prime Agent tab/session and unchanged native terminal handles across the failed preparation; it does not weaken Episode tab binding. The repaired test is being run in a new disposable fixture, not replayed inside the prior fixture.
 
 Failed run: .test-results/20261106T143504Z-87153-77b0f151/tier1/manifest.json. All 14 listed artifact hashes verified; network verified absent, product and source-builder teardown clean/absent, source checkout inventory unchanged. This is a real test-body failure, unlike the earlier blocked source-builder setup. It is not full recovery success. Native Prime Agent processes remain behind scripts/run-prime-agent-probe.sh inside isolated source-mode Docker using the retained clean read-only a1faacd53ac4473a75de1d434afaf50945c2f647 source input. Continue the same approved recovery/reuse/ambiguity exercise, preserve known identities and native safeguards, and publish actual results. No live ownership/status mutation, new live Episode/assignment, dependency patch, global activation/restart, merge or destructive live cleanup occurs.
+
+## Full-path native same-operation recovery now passes; ambiguity evidence remains open
+
+After the proportionate shell-tab fixture repair, `python3 -m pytest tests/test_reviewed_plan_extension.py::test_native_same_operation_creation_recovery_and_session_binding -q -m container` passed: 1 passed in 134.19s. Manifest and `creation-native-same-operation-recovery.json`: .test-results/20261106T143829Z-96908-d3325cd9/tier1/. All 15 listed hashes verified, network absent and teardown clean/absent; source-mode checkout inventory unchanged. This validates the current repaired test source, not yet a newly published code commit.
+
+The actual native fixture demonstrates late target-clone transport failure, inspected fixture-owner locked reconciliation, missing clone preparation and completion in the same original allocated Backlog/Orca resources: one durable session and one harmless initial assignment, followed by explicit same-session binding and active replay with zero extra allocation, delivery or status publication. Native live/saved messages, state and exact visible/connected/writable Prime Agent tab agree. Original bindings, the other owner, selected task ref and unrelated bytes/index/history are preserved. The initial uncertain record and later owner-acknowledgement interruption are deliberately seeded fixture shapes; do not claim the allocator itself originally caused those interruptions.
+
+Genuine lost-assignment ambiguity-stop evidence is still open; the seeded after-success acknowledgement shape is NOT that proof. A bounded read-only native-interface audit is checking the smallest representative actual uncertainty exercise without a framework or dependency patch. Existing live identity/status, Description/approved plan and all seven unchecked AC remain unchanged. Docs are being updated to distinguish this new recovery result from the accepted earlier components/readiness. Canonical execute workflow, LLM policy compliance and activation are not proven by the scripted native fixture.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
