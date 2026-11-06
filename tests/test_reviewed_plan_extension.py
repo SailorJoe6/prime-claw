@@ -390,8 +390,18 @@ pi.on('session_start',async(_event,ctx)=>{
   const daemonCommands=[],request=client.request.bind(client);
   client.request=async(...args)=>{daemonCommands.push(args[0].type);return request(...args);};
   publisher=new PrimeSessionPublisher(client,runtimeSessionManagerClass(ctx.sessionManager));
-  const commands=[];
-  const orca=new CliOrcaAdapter(args=>{commands.push(args.slice(0,2));return run('/usr/local/bin/orca-ide',args);});
+  const commands=[];let discardedLaunchReceipts=0;
+  const orca=new CliOrcaAdapter(args=>{
+   commands.push(args.slice(0,2));
+   if(args[0]==='automations'&&args[1]==='run'){
+    assert.equal(discardedLaunchReceipts++,0,'never dispatch the launch again');
+    // REAL native dispatch, but its result is unavailable to the caller.
+    // Do not invent a reply or throw a fake adapter error.
+    execFileSync('/usr/local/bin/orca-ide',args,{cwd:repo,stdio:['ignore','ignore','pipe']});
+    return '';
+   }
+   return run('/usr/local/bin/orca-ide',args);
+  });
   const native=(...args)=>JSON.parse(run('/usr/local/bin/orca-ide',[...args,'--json']));
   const owner=ctx.sessionManager.getSessionId(),operation=randomUUID(),owners=repo+'/.prime-claw/ownership.json';
   const nativeTask=JSON.parse(run('backlog',['task','view','--json','--','RECOVERY-1']));
@@ -412,7 +422,9 @@ pi.on('session_start',async(_event,ctx)=>{
    bytes:readFileSync(cwd+'/unrelated.txt','utf8'),staged:git(cwd,'diff','--cached','--binary','--','unrelated.txt')}));
   const unrelatedBefore=unrelated();
   assert.equal((await publisher.list()).filter(s=>s.cwd===wt.path).length,0);
-  assert.equal((await orca.listTerminals(wt.id)).length,0);
+  // Orca creates its normal shell tab with the worktree; it is not an Episode.
+  const initialTerminals=await orca.listTerminals(wt.id);
+  assert.equal(initialTerminals.some(t=>t.agentIdentity==='prime-agent'),false);
   assert.equal(native('automations','list').ok,true);
   assert.equal(existsSync(wt.path+'/.backlog'),false);
   // Deliberate native transport failure AFTER the one real worktree allocation.
@@ -420,7 +432,7 @@ pi.on('session_start',async(_event,ctx)=>{
   assert.equal(failed.status,'blocked');assert.equal(failed.code,'remote-unavailable');
   assert.deepEqual(selected(),initial);
   assert.equal((await publisher.list()).filter(s=>s.cwd===wt.path).length,0);
-  assert.equal((await orca.listTerminals(wt.id)).length,0);
+  assert.deepEqual((await orca.listTerminals(wt.id)).map(t=>t.handle),initialTerminals.map(t=>t.handle));
   // Cleared only this disposable fixture's observed cause; no provider status write.
   renameSync(config.offlineOrigin,config.origin);
   assert.equal(git(repo+'/.backlog','ls-remote','origin','refs/heads/prime-claw/tasks').split(/\s/)[0],taskHead);
@@ -438,8 +450,43 @@ pi.on('session_start',async(_event,ctx)=>{
   }finally{rmdirSync(lock);}
   // Existing allocator, real Orca and real publisher: no admission/status/reservation mocks.
   const deps={orca,publisher,bindingAttempts:80};
-  const result=await allocateReservedTaskEpisode('RECOVERY-1',ctx,deps,undefined,{operationId:operation});
-  assert.equal(result.status,'active');assert.equal(result.reused,false);
+  await assert.rejects(
+   allocateReservedTaskEpisode('RECOVERY-1',ctx,deps,undefined,{operationId:operation}),
+   error=>error.name==='OrcaMutationUncertainError'&&error.message.includes('Orca launch automation run'));
+  const unresolved=selected();assert.equal(unresolved.status,'uncertain');
+  assert.ok(unresolved.launchAutomationName&&unresolved.launchAutomationId);
+  assert.equal(unresolved.launchRunId,undefined,'the discarded run identity is unknown, not non-delivery');
+  assert.deepEqual(Object.fromEntries(Object.keys(originalBindings).map(k=>[k,unresolved[k]])),originalBindings);
+  const mutationsAtStop=commands.filter(a=>['create','run','remove'].includes(a[1]));
+  const daemonAtStop=daemonCommands.length;
+  // STOP dispatch. The owner inspects only native evidence while completion is unresolved.
+  // This bounded read wait sends no prompt/run/create and does not reconcile ownership.
+  let observed;
+  for(let attempt=0;attempt<80;attempt++){
+   const candidates=(await publisher.list()).filter(s=>s.cwd===wt.path);
+   assert.ok(candidates.length<=1,'contradictory sessions require recovery, not selection');
+   const candidate=candidates[0],route=candidate?.activeSessionId;
+   if(candidate?.sessionFile&&route){
+    const idle=await client.request({type:'wait_for_idle',activeSessionId:route},30000);
+    assert.equal(idle.success,true);
+    const state=await publisher.getState(route),messages=await publisher.getMessages(route);
+    if(messages.some(m=>m.role==='user'&&JSON.stringify(m.content).includes('Native fixture initial execute assignment.'))){
+     assert.equal(state.sessionId,candidate.sessionId);assert.equal(state.cwd,wt.path);
+     assert.equal(messages.filter(m=>m.role==='user').length,1);observed=candidate;break;
+    }
+   }
+   await new Promise(resolve=>setTimeout(resolve,250));
+  }
+  assert.ok(observed,'native initial-assignment evidence remains unavailable; do not replay');
+  assert.deepEqual(selected(),unresolved);
+  assert.deepEqual(commands.filter(a=>['create','run','remove'].includes(a[1])),mutationsAtStop);
+  assert.equal(daemonCommands.slice(daemonAtStop).some(type=>['create','prompt'].includes(type)),false);
+  const countBeforeBind=commands.length,daemonBeforeBind=daemonCommands.length;
+  // Current native evidence now resolves the uncertainty; bind, never launch again.
+  const result=await allocateReservedTaskEpisode('RECOVERY-1',ctx,deps,undefined,{operationId:operation,sessionId:observed.sessionId});
+  assert.equal(result.status,'active');assert.equal(result.reused,true);
+  assert.equal(result.launchAutomationId,unresolved.launchAutomationId);
+  assert.equal(result.launchAutomationName,unresolved.launchAutomationName);
   assert.deepEqual(Object.fromEntries(Object.keys(originalBindings).map(k=>[k,result[k]])),originalBindings);
   const idle=await client.request({type:'wait_for_idle',activeSessionId:result.episodeActiveSessionId},30000);
   assert.equal(idle.success,true);
@@ -466,19 +513,10 @@ pi.on('session_start',async(_event,ctx)=>{
   const firstCommands=commands.slice();
   assert.equal(firstCommands.filter(a=>a.join(' ')==='automations run').length,1);
   assert.equal(firstCommands.some(a=>a.join(' ')==='worktree create'),false);
-  // Representative late owner-acknowledgement uncertainty: KEEP all known bindings.
-  // Complete native messages establish the assignment; the chosen bind sends nothing.
-  const established=selected();const late={...established,status:'uncertain',uncertaintyReason:'fixture owner acknowledgement interrupted after assignment'};
-  const lock2=owners+'.lock';mkdirSync(lock2);
-  try{const latest=JSON.parse(readFileSync(owners,'utf8'));assert.deepEqual(latest.owners[owner],established);
-   latest.owners[owner]=late;const temp=owners+'.'+randomUUID();writeFileSync(temp,JSON.stringify(latest),{flag:'wx',mode:statSync(owners).mode & 0o777});renameSync(temp,owners);
-   assert.deepEqual(selected(),late);
-  }finally{rmdirSync(lock2);}
-  const countBeforeBind=commands.length,daemonBeforeBind=daemonCommands.length;
-  const bound=await allocateReservedTaskEpisode('RECOVERY-1',ctx,deps,undefined,{operationId:operation,sessionId:result.episodeId});
-  assert.equal(bound.reused,true);assert.equal(bound.episodeId,result.episodeId);
-  assert.equal(bound.episodeActiveSessionId,result.episodeActiveSessionId);assert.equal(bound.episodeSessionFile,result.episodeSessionFile);
-  assert.equal(assignments(bound.sessionObservation.messages).length,1);
+  // The explicit bind above followed actual lost-launch-result uncertainty,
+  // not a synthetic status change after a previously acknowledged success.
+  assert.equal(assignments(result.sessionObservation.messages).length,1);
+  assert.equal(discardedLaunchReceipts,1);
   const replay=await allocateReservedTaskEpisode('RECOVERY-1',ctx,deps,undefined,{operationId:operation});
   assert.equal(replay.reused,true);assert.equal(replay.episodeId,result.episodeId);
   assert.equal(commands.slice(countBeforeBind).some(a=>['create','run','remove'].includes(a[1])),false);
@@ -500,7 +538,9 @@ pi.on('session_start',async(_event,ctx)=>{
    nativeLateFailure:failed.code,missingTargetClonePrepared:true,worktreeAllocations:1,sessionAllocations:1,
    initialAssignments:1,initialAutomationRuns:1,existingSessionBinding:true,activeReplay:true,extraDeliveryOnReuse:false,
    zeroStatusPublication:true,exactVisibleConnectedWritableTab:true,durableSavedAssignmentCount:1,
-   notProven:['canonical execute workflow','LLM policy compliance','lost-assignment ambiguity stop','activation']};
+   lostNativeLaunchReceipt:true,dispatchStoppedWhileCompletionUnresolved:true,nativeEvidenceResolvedCompletion:true,
+   knownLaunchIdentityPreserved:true,retainedDisabledAutomation:true,
+   notProven:['canonical execute workflow','LLM policy compliance','daemon prompt-ack loss','permanently unavailable evidence resolution','activation']};
   native('terminal','close','--terminal',tab.handle);
   writeFileSync(base+'/result.json',JSON.stringify(proof));
  }catch(error){writeFileSync(base+'/result.json',JSON.stringify({error:String(error),stack:error?.stack}));}

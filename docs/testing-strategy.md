@@ -101,32 +101,48 @@ is closed; the ordinary tier-1 container teardown removes its runtime/profile.
 No host profile/socket, display, published port, production control plane,
 credential, dependency patch or engine substitution is used.
 
-`test_native_same_operation_creation_recovery_and_session_binding` is an
-**unvalidated fixture draft**. Its first Docker attempt stopped in source-builder
-setup before any test body or native recovery operation: Docker Desktop required
-administrator-enforced organization sign-in. Collection passed; that is not
-runtime evidence. Restore Docker access and run the named test before claiming
-any of its intended outcomes below.
-
-This readiness test does not prove recovery. The separate
-`test_native_same_operation_creation_recovery_and_session_binding` is intended to exercise
+The readiness test above does not prove recovery. The separate
+`test_native_same_operation_creation_recovery_and_session_binding` now exercises
 an allocated independent-Backlog/Orca worktree through the existing allocator,
 real `CliOrcaAdapter` (selecting packaged `orca-ide`) and real daemon publisher.
 Its disposable owner inspects an actual late task-clone transport failure,
 clears only that fixture cause, and applies a locked selected-entry correction.
 The same worktree then receives one durable session and one harmless initial
-assignment. Native saved/live messages, state, Git and the exact visible tab
-establish the binding. A later explicit same-session bind and active replay
-must send nothing and preserve the original resources, other owner, task ref
-and unrelated staged bytes.
+assignment. The fixture executes the real native `automations run` once with
+its stdout deliberately discarded. The unmodified adapter cannot parse the
+missing run result and reports mutation uncertainty; persisted ownership keeps
+the known launch name/ID and all original bindings. The scripted owner stops
+mutation while completion is unresolved. Bounded native list/state/message reads
+then establish the one actual initial assignment. Explicit same-session binding
+and active replay send nothing and preserve the original resources, known launch
+identity, other owner, task ref and unrelated staged bytes. The disabled fixture
+automation is retained until ordinary container teardown.
+
+This is unavailable native launch-result evidence, not a fabricated adapter error
+or a status relabel after known success. It proves a stop while assignment
+completion is unresolved and native evidence-based continuation without replay.
+It does not prove daemon prompt-ack loss or resolution when native evidence stays
+permanently unavailable. Native saved/live messages, state, Git and the exact
+visible tab establish the final binding. Orca's normal pre-existing shell tab is retained;
+pre-session failure must leave its handles unchanged and no Prime Agent session
+or tab, rather than require an empty terminal inventory.
+
+The first attempt stopped in source-builder setup under the former external
+Docker organization-login blocker; no test body ran. After authorized clearance,
+the native test exposed and corrected that shell-tab fixture assumption, then
+passed in isolated source-mode Docker. The initial recovery/reuse pass is retained
+under `.test-results/20261106T143829Z-96908-d3325cd9/tier1/`. The subsequent real
+lost-launch-result exercise also passed; the native task records its exact
+manifest, recovery artifact, hashes and failed-attempt limits.
 
 Both native Prime Agent clients use the probe wrapper. The fixture's TUI
 explicitly joins the controller's exact isolated daemon with the public
 `--daemon-socket` argument; it never uses the host daemon or production profile.
 These are scripted applications of the reviewed Markdown decisions through
 actual native interfaces, not an autonomous recovery framework or proof that
-an LLM follows every instruction. Canonical execute, genuine lost-assignment
-ambiguity handling and activation remain separate evidence. Outside managed Linux terminals
+an LLM follows every instruction. Canonical execute, daemon prompt-ack loss,
+permanently unavailable evidence and activation remain separate evidence.
+Outside managed Linux terminals
 select `orca-ide`, not the unrelated GNOME `orca` command; the existing
 `CliOrcaAdapter` injectable runner can invoke this exact native CLI. The earlier
 component's bare-`orca` ENOENT is historical executable-selection evidence, not
