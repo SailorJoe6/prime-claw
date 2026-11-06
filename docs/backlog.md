@@ -72,6 +72,10 @@ Do not use them to operate a v1.55.3 candidate on live task history. No required
 validation is waived by delivering a build-only slice. Source/build results and
 limits are recorded in
 [`primeclaw45-upstream-candidate-20261106.md`](evidence/primeclaw45-upstream-candidate-20261106.md).
+The bounded migration lifecycle adaptation and its native archived-draft read
+limit are recorded separately in
+[`primeclaw45-migration-lifecycle-slice2-20261106.md`](evidence/primeclaw45-migration-lifecycle-slice2-20261106.md).
+Neither slice activates the candidate or replaces the remaining integrated gates.
 
 Clone this repository with `git clone --recurse-submodules`, or initialize an
 existing checkout with `git submodule update --init --recursive`.

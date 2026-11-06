@@ -398,8 +398,7 @@ function walkTaskFiles(storeDir: string): string[] {
 
 function backlogClassification(storeDir: string, path: string): "open" | "closed" | "archived" {
   const rel = relative(storeDir, path).replace(/\\/g, "/");
-  if (rel.startsWith("completed/")) return "closed";
-  if (rel.startsWith("archive/")) return "archived";
+  if (rel.startsWith("completed/") || rel.startsWith("archive/")) return "archived";
   return "open";
 }
 
@@ -423,6 +422,10 @@ function backlogTaskView(runner: CommandRunner, projectRoot: string, taskId: str
 
 function backlogDraftView(runner: CommandRunner, projectRoot: string, taskId: string, relativePath: string): JsonObject {
   const plain = runRequired(runner, "backlog", ["draft", "view", taskId, "--plain"], projectRoot, `backlog draft view ${taskId}`).stdout;
+  const reportedPath = /^File: (.+)$/m.exec(plain)?.[1];
+  if (!reportedPath || realpathSync(resolve(projectRoot, reportedPath)) !== realpathSync(resolve(projectRoot, relativePath))) {
+    throw new Error(`Backlog draft ${taskId} native path does not match its exact source file`);
+  }
   const normalizedPlain = plain.replace(/^File: .*$/m, `File: ${relativePath}`);
   const heading = normalizedPlain.split(/\r?\n/).find((line) => line.startsWith(`Task ${taskId} - `));
   const status = normalizedPlain.split(/\r?\n/).find((line) => line.startsWith("Status:"));
@@ -438,56 +441,6 @@ function backlogDraftView(runner: CommandRunner, projectRoot: string, taskId: st
       nativePlainViewBase64: Buffer.from(normalizedPlain).toString("base64"),
     },
   };
-}
-
-function archivedBacklogViews(
-  runner: CommandRunner,
-  repositoryRoot: string,
-  projectRoot: string,
-  revision: string,
-  archived: Array<{ taskId: string; path: string; entityKind: "task" | "draft" }>,
-): Map<string, JsonObject> {
-  const views = new Map<string, JsonObject>();
-  if (!archived.length) return views;
-  const temp = mkdtempSync(join(tmpdir(), "prime-claw-archived-backlog-read-"));
-  const nestedStore = repositoryRoot !== projectRoot;
-  const storeRelative = nestedStore ? relative(projectRoot, repositoryRoot) : "";
-  const clone = join(temp, nestedStore ? storeRelative : "source");
-  try {
-    mkdirSync(dirname(clone), { recursive: true });
-    runRequired(runner, "git", ["clone", "-q", "--no-hardlinks", repositoryRoot, clone], temp, "clone exact Backlog source for archived native reads");
-    runRequired(runner, "git", ["-C", clone, "checkout", "-q", "--detach", revision], clone, "checkout exact Backlog source revision");
-    const nativeRoot = nestedStore ? temp : clone;
-    if (nestedStore && existsSync(join(projectRoot, "backlog.config.yml"))) {
-      writeFileSync(join(nativeRoot, "backlog.config.yml"), readFileSync(join(projectRoot, "backlog.config.yml")));
-    }
-    // Read one original archived record at a time. Historical IDs may repeat
-    // both eligible live IDs and other archived IDs; none is a replacement.
-    const disposableStores = new Set(archived.map((item) => nestedStore ? clone
-      : join(clone, relative(projectRoot, dirname(dirname(dirname(item.path)))))));
-    for (const store of disposableStores) for (const path of walkTaskFiles(store)) {
-      if (!relative(store, path).replace(/\\/g, "/").startsWith("archive/")) unlinkSync(path);
-    }
-    for (const item of archived) {
-      const disposableSource = join(clone, relative(repositoryRoot, item.path));
-      const originalStore = dirname(dirname(dirname(item.path)));
-      const disposableStore = nestedStore ? clone : join(clone, relative(projectRoot, originalStore));
-      const disposableFolder = join(disposableStore, item.entityKind === "draft" ? "drafts" : "tasks");
-      if (!contained(clone, disposableFolder)) throw new Error(`archived Backlog ${item.entityKind} ${item.taskId} has unsafe disposable placement`);
-      mkdirSync(disposableFolder, { recursive: true });
-      const target = join(disposableFolder, `${item.taskId.toLowerCase()} - migration-archive-read.md`);
-      renameSync(disposableSource, target);
-      const view = item.entityKind === "draft"
-        ? backlogDraftView(runner, nativeRoot, item.taskId, relative(projectRoot, item.path).replace(/\\/g, "/"))
-        : backlogTaskView(runner, nativeRoot, item.taskId);
-      view.task.path = relative(projectRoot, item.path).replace(/\\/g, "/");
-      views.set(item.path, view);
-      renameSync(target, disposableSource);
-    }
-    return views;
-  } finally {
-    rmSync(temp, { recursive: true, force: true });
-  }
 }
 
 function captureBacklog(
@@ -523,21 +476,13 @@ function captureBacklog(
       classification: backlogClassification(storeDir, path),
     };
   });
-  const archivedViews = archivedBacklogViews(
-    runner, repositoryRoot, projectRoot, revision,
-    taskFiles.filter((item) => item.classification === "archived").map(({ taskId, path, entityKind }) => ({ taskId, path, entityKind })),
-  );
   const tasks = taskFiles.map(({ path, markdown, taskId, entityKind, classification: physicalClassification }): BacklogTaskPackage => {
     const relativePath = relative(projectRoot, path).replace(/\\/g, "/");
-    const nativeView = physicalClassification === "archived"
-      ? archivedViews.get(path)!
-      : entityKind === "draft"
-        ? backlogDraftView(runner, projectRoot, taskId, relativePath)
-        : backlogTaskView(runner, projectRoot, taskId);
-    if (physicalClassification !== "archived") {
-      const reported = resolve(projectRoot, nativeView.task.path);
-      if (realpathSync(reported) !== realpathSync(path)) throw new Error(`Backlog ${entityKind} ${taskId} native path does not match its exact source file`);
-    }
+    const nativeView = entityKind === "draft"
+      ? backlogDraftView(runner, projectRoot, taskId, relativePath)
+      : backlogTaskView(runner, projectRoot, taskId);
+    const reported = resolve(projectRoot, nativeView.task.path);
+    if (realpathSync(reported) !== realpathSync(path)) throw new Error(`Backlog ${entityKind} ${taskId} native path does not match its exact source file`);
     const classification = physicalClassification === "archived"
       ? "archived" as const
       : entityKind === "task" && String(nativeView.task.status) === "Done" ? "closed" as const : "open" as const;
@@ -698,10 +643,9 @@ function captureBeads(
   };
 }
 
-/** Validate the actual target corpus, never archived/deleted history. */
+/** Native Backlog relationships may target archived records as well as active work. */
 function validateBeadsRelationshipTargets(tasks: BeadsTaskPackage[]): void {
   const byId = new Map(tasks.map((task) => [task.sourceTaskId, task]));
-  const eligible = new Set(tasks.filter((task) => task.classification !== "archived").map((task) => task.sourceTaskId));
   const problems: string[] = [];
   for (const pkg of tasks) {
     const parent = typeof pkg.nativeView.parent === "string" ? pkg.nativeView.parent : pkg.exportRow.parent;
@@ -709,21 +653,18 @@ function validateBeadsRelationshipTargets(tasks: BeadsTaskPackage[]): void {
       ...(typeof parent === "string" && parent ? [{ id: parent, kind: "parent" }] : [])];
     for (const { id, kind } of targets) {
       if (id === pkg.sourceTaskId) problems.push(`${pkg.sourceTaskId} ${kind} ${id}: self target`);
-      else if (!eligible.has(id)) {
-        const target = byId.get(id);
-        problems.push(`${pkg.sourceTaskId} ${kind} ${id}: ${target ? `deleted/archive-only target (status=${JSON.stringify(target.nativeView.status ?? target.exportRow.status)}, classification=${target.classification})` : "missing from complete source inventory"}`);
-      }
+      else if (!byId.has(id)) problems.push(`${pkg.sourceTaskId} ${kind} ${id}: missing from complete source inventory`);
     }
   }
   const visiting = new Set<string>(), visited = new Set<string>();
   const visit = (id: string, chain: string[]) => {
     if (visiting.has(id)) { problems.push(`dependency cycle: ${[...chain, id].join(" -> ")}`); return; }
-    if (visited.has(id) || !eligible.has(id)) return;
+    if (visited.has(id) || !byId.has(id)) return;
     visiting.add(id);
     for (const target of dependencyIds(byId.get(id)!)) visit(target, [...chain, id]);
     visiting.delete(id); visited.add(id);
   };
-  for (const id of eligible) visit(id, []);
+  for (const id of byId.keys()) visit(id, []);
   // Existing parent sorter supplies the exact source hierarchy cycle diagnostic.
   topologicalBeadsPackages(tasks);
   if (problems.length) throw new Error(`Beads source relationship preflight failed: ${problems.join("; ")}`);
@@ -987,7 +928,6 @@ function validateBeadsTaskLifecycles(tasks: BeadsTaskPackage[]): void {
         else ambiguous = true;
       }
     }
-    if (archived && status !== "closed") ambiguous = true;
     if (ambiguous) problems.push(`${pkg.sourceTaskId} status=${JSON.stringify(status)}: ambiguous archive evidence`);
     pkg.classification = archived ? "archived" : projectedStatus === "Done" ? "closed" : "open";
   }
@@ -1735,34 +1675,23 @@ function topologicalBeadsPackages(tasks: BeadsTaskPackage[]): BeadsTaskPackage[]
 }
 
 function backlogDestinationViews(runner: CommandRunner, projectRoot: string, storeDir: string, phase: string): Map<string, JsonObject> {
-  const revision = cleanGitRevision(runner, storeDir);
-  const files = walkTaskFiles(storeDir).map((path) => {
-    const markdown = readFileSync(path);
-    return {
-      path,
-      taskId: backlogTaskId(markdown.toString("utf8"), path),
-      entityKind: backlogEntityKind(storeDir, path),
-      classification: backlogClassification(storeDir, path),
-    };
-  });
-  // Before ordinary/code-tracked adoption the selected store is a directory
-  // inside the code repository, not an independent clone. Bind disposable
-  // archive reads to the actual native Git root in either supported layout.
+  cleanGitRevision(runner, storeDir);
+  // The existing physical inventory spans tasks, drafts and both archive layouts.
+  // Refuse duplicate identities before any native read or destination preparation.
+  const paths = backlogPhysicalTaskPaths(storeDir);
   const repositoryRoot = realpathSync(runRequired(runner, "git", ["-C", storeDir, "rev-parse", "--show-toplevel"], storeDir, `Backlog destination ${phase} Git identity`).stdout.trim());
   if (repositoryRoot !== realpathSync(storeDir) && repositoryRoot !== realpathSync(projectRoot)) throw new Error(`Backlog destination ${phase} has a foreign Git root ${repositoryRoot}`);
-  const archived = archivedBacklogViews(
-    runner, repositoryRoot, projectRoot, revision,
-    files.filter((item) => item.classification === "archived").map(({ taskId, path, entityKind }) => ({ taskId, path, entityKind })),
-  );
   try {
-    return new Map(files.map((item) => [
-      relative(storeDir, item.path).replace(/\\/g, "/"),
-      item.classification === "archived"
-        ? archived.get(item.path)!
-        : item.entityKind === "draft"
-          ? backlogDraftView(runner, projectRoot, item.taskId, relative(projectRoot, item.path).replace(/\\/g, "/"))
-          : backlogTaskView(runner, projectRoot, item.taskId),
-    ]));
+    return new Map([...paths].map(([taskId, [path]]) => {
+      const relativePath = relative(projectRoot, path).replace(/\\/g, "/");
+      const view = backlogEntityKind(storeDir, path) === "draft"
+        ? backlogDraftView(runner, projectRoot, taskId, relativePath)
+        : backlogTaskView(runner, projectRoot, taskId);
+      if (realpathSync(resolve(projectRoot, view.task.path)) !== realpathSync(path)) {
+        throw new Error(`Backlog task ${taskId} native path does not match its exact destination file`);
+      }
+      return [relative(storeDir, path).replace(/\\/g, "/"), view];
+    }));
   } catch (error) {
     throw new Error(`Backlog destination ${phase} read failed (store=${existsSync(storeDir)}, config=${existsSync(join(storeDir, "config.yml"))}): ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -1790,9 +1719,18 @@ function backlogReceiptId(views: Map<string, JsonObject>): string | undefined {
 
 function backlogPhysicalTaskPaths(storeDir: string): Map<string, string[]> {
   const paths = new Map<string, string[]>();
+  // Match native canonical task identity, including case and dotted numeric
+  // padding, while retaining original IDs and paths in the migration evidence.
+  const identity = (id: string) => id.toUpperCase().replace(/^([A-Z]+)-([0-9]+(?:\.[0-9]+)*)$/, (_match, prefix: string, body: string) =>
+    `${prefix}-${body.split(".").map((segment) => segment.replace(/^0+(?=[0-9])/, "")).join(".")}`);
   for (const path of walkTaskFiles(storeDir)) {
     const id = backlogTaskId(readFileSync(path, "utf8"), path);
-    paths.set(id, [...(paths.get(id) ?? []), path]);
+    const existing = [...paths.keys()].find((key) => identity(key) === identity(id)) ?? id;
+    paths.set(existing, [...(paths.get(existing) ?? []), path]);
+  }
+  const conflicts = [...paths].filter(([, matches]) => matches.length > 1);
+  if (conflicts.length) {
+    throw new Error(`Backlog destination repeats canonical task IDs: ${conflicts.map(([id, matches]) => `${id}: ${matches.map((path) => relative(storeDir, path).replace(/\\/g, "/")).join(", ")}`).join("; ")}`);
   }
   return paths;
 }
@@ -1800,15 +1738,13 @@ function backlogPhysicalTaskPaths(storeDir: string): Map<string, string[]> {
 function assertBacklogLifecyclePlacement(
   pkg: BeadsTaskPackage, id: string, view: JsonObject, storeDir: string, paths: Map<string, string[]>,
 ): string {
-  const expectedStatus = pkg.classification === "archived" ? "In Progress" : statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
+  const expectedStatus = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
   if (view.task.status !== expectedStatus) throw new Error(`Backlog destination status projection mismatch for ${pkg.sourceTaskId}`);
   const matches = (paths.get(id) ?? []).filter((path) => String(view.task.path).replace(/\\/g, "/").endsWith(relative(storeDir, path).replace(/\\/g, "/")));
-  const folder = pkg.classification === "archived" ? "archive/tasks/" : pkg.classification === "closed" ? "completed/" : "tasks/";
+  const folder = pkg.classification === "archived" ? "archive/tasks/" : "tasks/";
   if (matches.length !== 1 || !relative(storeDir, matches[0]).replace(/\\/g, "/").startsWith(folder)) {
     throw new Error(`Backlog destination physical placement mismatch for ${pkg.sourceTaskId}: expected one ${folder} record for ${id}`);
   }
-  // Archived native views come from a relocated disposable clone. Only the
-  // actual walked destination file proves its archived physical placement.
   return matches[0];
 }
 
@@ -1979,10 +1915,6 @@ function prepareExplicitBacklogMigrationWorkspace(projectRoot: string, runner: C
     throw new Error(`Backlog destination preparation failed: ${prepared.status === "blocked" ? `${prepared.detail}; ${prepared.remediation}` : "destination publication remote is required"}`);
   }
   checkBacklogCapabilities(projectRoot, runner);
-  // Git does not materialize empty native directories. Native task complete
-  // moves into completed/ and requires it to exist; retain the original
-  // migration preparation's directory setup for fresh/cloned destinations.
-  for (const folder of ["tasks", "completed", "archive/tasks"]) mkdirSync(join(prepared.storeDir, folder), { recursive: true });
   ignoreMigrationBacklogStore(projectRoot, runner, relative(projectRoot, prepared.storeDir).replace(/\\/g, "/"));
   assertPublishedGitRef(runner, prepared.storeDir, prepared.head, prepared.remote, prepared.remoteUrl, TASK_HISTORY_REF, "Backlog destination preparation publication");
   return { storeDir: prepared.storeDir, remoteName: prepared.remote, remoteUrl: prepared.remoteUrl, head: prepared.head, codePaths: prepared.codePaths ?? [] };
@@ -2083,6 +2015,9 @@ function originalBacklogLayout(projectRoot: string, runner: CommandRunner) {
   const selected = detectExplicitTaskProvider(projectRoot, "backlog", runner);
   if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || !selected.evidence.storeDir) return null;
   const store = selected.evidence.storeDir;
+  // Read and resolve the complete existing corpus before layout adoption, task
+  // allocation or publication can change any original destination bytes/history.
+  backlogDestinationViews(runner, projectRoot, store, "preparation preflight");
   const originalFiles: Array<{ path: string; bytesBase64: string; mode: number }> = [];
   const walk = (folder: string) => {
     for (const entry of readdirSync(folder, { withFileTypes: true })) {
@@ -2247,16 +2182,10 @@ function migrateBeadsToBacklog(
     if (reusedDestinationIds.has(id)) continue;
     const deps = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId);
     if (deps.length) runRequired(runner, "backlog", ["task", "edit", "--depends-on", deps.join(","), "--plain", "--", id], source.projectRoot, `migrate dependencies for ${pkg.sourceTaskId}`);
+    const status = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
+    runRequired(runner, "backlog", ["task", "edit", "--status", status, "--plain", "--", id], source.projectRoot, `migrate status for ${pkg.sourceTaskId}`);
     if (pkg.classification === "archived") {
-      // Native Backlog refuses archiving Done tasks. Preserve the existing
-      // importer archive operation and its created In Progress status instead
-      // of bypassing that rule or inventing a completed-archive projection.
       runRequired(runner, "backlog", ["task", "archive", id], source.projectRoot, `archive evidenced Backlog task ${id}`);
-    } else {
-      const status = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
-      runRequired(runner, "backlog", ["task", "edit", "--status", status, "--plain", "--", id], source.projectRoot, `migrate status for ${pkg.sourceTaskId}`);
-      if (pkg.classification === "closed") runRequired(runner, "backlog", ["task", "complete", id], source.projectRoot,
-        `complete migrated Backlog task ${id} (source=${pkg.sourceTaskId}, store=${storeDir}, completedDir=${existsSync(join(storeDir, "completed"))})`);
     }
   }
   const memoryOutputs = reusedMemoryOutputs ?? importBeadsMemoryDocuments(source, runner);

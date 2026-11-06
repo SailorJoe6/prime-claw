@@ -99,7 +99,6 @@ function backlogSource(t, name = "backlog-source") {
   backlog(fixture.root, "task", "edit", parent, "--comment", "native source comment", "--comment-author", "source-author", "--plain");
   const closedOut = backlog(fixture.root, "task", "create", "Closed child", "--status", "Done", "--parent", parent, "--depends-on", parent, "--description", "closed description", "--final-summary", "closed summary", "--no-dod-defaults", "--plain");
   const closed = closedOut.match(/\b[A-Z][A-Z0-9_-]*-\d+(?:\.\d+)*\b/)[0];
-  backlog(fixture.root, "task", "complete", closed);
   const archivedOut = backlog(fixture.root, "task", "create", "Archived task", "--status", "In Design", "--description", "archived description", "--no-dod-defaults", "--plain");
   const archived = archivedOut.match(/\b[A-Z][A-Z0-9_-]*-\d+(?:\.\d+)*\b/)[0];
   backlog(fixture.root, "task", "archive", archived);
@@ -644,14 +643,9 @@ test("confirmed Beads to Backlog migration preserves active Episode identity and
   const receipt = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", result.receiptTaskId)).task;
   assert.ok(receipt.comments.some((comment) => String(comment.text ?? comment.content ?? comment.body).includes("prime-claw-task-provider-migration-receipt-v1")));
   for (const mapping of result.receipt.mappings) {
-    if (mapping.sourceTaskId === fixture.ids.archived) {
-      const archiveDir = join(fixture.root, ".backlog", "archive", "tasks");
-      const archivedFile = command(archiveDir, "find", [archiveDir, "-type", "f", "-name", `*${mapping.destinationTaskId.toLowerCase()}*`]).trim();
-      assert.ok(archivedFile);
-      assert.match(readFileSync(archivedFile, "utf8"), /prime-claw-task-provider-migration-source-v1/);
-      continue;
-    }
     const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
+    assert.equal(task.status, mapping.sourceTaskId === fixture.ids.parent ? "In Progress" : "Done");
+    assert.ok(task.path.startsWith(mapping.sourceTaskId === fixture.ids.archived ? ".backlog/archive/tasks/" : ".backlog/tasks/"));
     const text = task.comments.map((comment) => String(comment.text ?? comment.content ?? comment.body)).join("\n");
     assert.match(text, /prime-claw-task-provider-migration-source-v1/);
     const sourcePackage = sourcePackageFromBacklogComments(task);
@@ -1530,7 +1524,11 @@ test("Beads closed reasons and categories complete normally while exact archive 
     const id = JSON.parse(bd(fixture.root, "create", `Retained prior Backlog ${entityKind} archive`, "--metadata", JSON.stringify({
       prime_claw_migration: retainedBacklogArchivePackage(entityKind),
     }), "--json")).id;
-    bd(fixture.root, "close", id, "--reason", "Original archive lifecycle is retained in the exact prior source package", "--json");
+    if (entityKind === "draft") {
+      bd(fixture.root, "update", id, "--status", "blocked", "--json");
+    } else {
+      bd(fixture.root, "close", id, "--reason", "Original archive lifecycle is retained in the exact prior source package", "--json");
+    }
     expectedClass[id] = "archived";
   }
   const before = sourceAuthorityFiles(fixture.root);
@@ -1549,6 +1547,11 @@ test("Beads closed reasons and categories complete normally while exact archive 
   class ArchivePublicationRunner extends AsIsBeadsRunner {
     constructor() { super(); this.destinationPublications = 0; }
     run(commandName, args, options = {}) {
+      if (commandName === "backlog" && args[0] === "task" && args[1] === "view") {
+        assert.equal(options.cwd, fixture.root, "native archive reads must use the real project, never a relocated clone");
+      }
+      assert.equal(commandName === "backlog" && args[0] === "task" && args[1] === "complete", false,
+        "Done imports must not invoke the removed task complete command");
       const publishingDestination = commandName === "git" && args.includes("push") && options.cwd === join(fixture.root, ".backlog");
       if (publishingDestination) assert.deepEqual(sourceAuthorityFiles(fixture.root), before, "source retired before destination publication");
       const result = super.run(commandName, args, options);
@@ -1580,26 +1583,17 @@ test("Beads closed reasons and categories complete normally while exact archive 
   const receipt = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", result.receiptTaskId)).task;
   assert.ok(receipt.comments.some((comment) => String(comment.text ?? comment.content ?? comment.body).includes("prime-claw-task-provider-migration-receipt-v1")));
   const paths = git(store, "ls-files").split(/\r?\n/).filter((path) => path.endsWith(".md"));
-  // Archived tasks need a disposable native view. The live destination stays untouched.
-  const archiveReadRoot = join(fixture.outer, "archive-native-read");
-  mkdirSync(archiveReadRoot);
-  const archiveReadStore = join(archiveReadRoot, ".backlog");
-  command(archiveReadRoot, "git", ["clone", "-q", "--no-hardlinks", store, archiveReadStore]);
+  const originalRecords = physicalDestinationRecords(store);
   for (const mapping of result.receipt.mappings) {
     const classification = expectedClass[mapping.sourceTaskId];
     const matching = paths.filter((path) => new RegExp(`^id:\\s*${mapping.destinationTaskId}\\s*$`, "m").test(readFileSync(join(store, path), "utf8")));
     assert.equal(matching.length, 1, `one physical destination task required for ${mapping.sourceTaskId}`);
     const physicalPath = matching[0];
-    assert.ok(physicalPath.startsWith(classification === "archived" ? "archive/tasks/" : classification === "closed" ? "completed/" : "tasks/"), physicalPath);
-    let task;
-    if (classification === "archived") {
-      renameSync(join(archiveReadStore, physicalPath), join(archiveReadStore, "tasks", physicalPath.split("/").at(-1)));
-      task = JSON.parse(backlog(archiveReadRoot, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
-    } else {
-      task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
-    }
+    assert.ok(physicalPath.startsWith(classification === "archived" ? "archive/tasks/" : "tasks/"), physicalPath);
+    const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
     const expected = native[mapping.sourceTaskId];
-    assert.equal(task.status, classification === "archived" ? "In Progress" : classification === "open" ? ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked" })[expected.view.status] : "Done");
+    assert.equal(task.path, `.backlog/${physicalPath}`, "native archived read must use the original path");
+    assert.equal(task.status, ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked", closed: "Done" })[expected.view.status]);
     const pkg = sourcePackageFromBacklogComments(task);
     assert.equal(pkg.sourceVersion, sourceVersion);
     assert.deepEqual(pkg.statusCatalog, statusCatalog);
@@ -1610,6 +1604,8 @@ test("Beads closed reasons and categories complete normally while exact archive 
     assert.deepEqual(pkg.events, expected.events);
     assert.deepEqual(pkg.provenance, expected.provenance);
   }
+  assert.deepEqual(physicalDestinationRecords(store), originalRecords, "native readback must not relocate or rewrite archives");
+  assert.equal(existsSync(join(store, "completed")), false, "ordinary closed imports stay active Done tasks");
   assert.equal(git(store, "status", "--porcelain=v1"), "");
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
   assert.deepEqual(runner.sourcePublicationCommands, []);
@@ -2145,12 +2141,38 @@ test("native Beads memory outputs preserve exact records and link one USER task"
   verifyBacklogMemoryOutputs(nulOutputs, fixture.root, runner);
 });
 
-// PRIMECLAW-44 Slice 1g: inspection coexistence is NOT populated import permission.
+// Populated-destination admission preserves both stores until exact confirmation.
 function admissionTree(path) {
   return Object.fromEntries(readdirSync(path, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
     .flatMap((item) => item.isDirectory()
       ? Object.entries(admissionTree(join(path, item.name))).map(([key, value]) => [`${item.name}/${key}`, value])
       : [[item.name, readFileSync(join(path, item.name)).toString("base64")]]));
+}
+
+// Native Done stays in tasks/. Only this fixture seeds a retained legacy archive
+// by moving an already archived record, preserving its status and bytes.
+function seedBacklogBaseline(root, store) {
+  const create = (title, ...args) => backlog(root, "task", "create", title, ...args,
+    "--no-dod-defaults", "--plain").match(/(?:BASE|DRAFT)-\d+(?:\.\d+)*/)[0];
+  const active = create("Existing active", "--status", "In Progress", "--description", "existing description",
+    "--plan", "existing plan", "--notes", "original notes");
+  backlog(root, "task", "edit", active, "--comment", "existing native comment", "--comment-author", "baseline-author", "--plain");
+  const completed = create("Existing completed", "--status", "Done", "--description", "ordinary closed baseline");
+  const archived = create("Existing canonical archive", "--status", "In Planning", "--description", "original archive content",
+    "--depends-on", completed);
+  backlog(root, "task", "edit", archived, "--comment", "canonical archive comment", "--comment-author", "baseline-author", "--plain");
+  backlog(root, "task", "archive", archived);
+  const legacy = create("Existing legacy archive", "--status", "Done", "--description", "retained legacy archive content",
+    "--depends-on", archived);
+  backlog(root, "task", "edit", legacy, "--comment", "legacy archive comment", "--comment-author", "baseline-author", "--plain");
+  backlog(root, "task", "archive", legacy);
+  const legacyPath = JSON.parse(backlog(root, "task", "view", "--json", "--", legacy)).task.path;
+  mkdirSync(join(root, store, "completed"), { recursive: true });
+  renameSync(join(root, legacyPath), join(root, store, "completed", legacyPath.split("/").at(-1)));
+  const draft = create("Existing draft", "--draft", "--description", "retained native draft content");
+  backlog(root, "task", "edit", active, "--depends-on", `${archived},${draft}`, "--plain");
+  const activePath = JSON.parse(backlog(root, "task", "view", "--json", "--", active)).task.path;
+  return { active, completed, archived, legacy, draft, activePath };
 }
 
 function coexistenceDestination(fixture, store) {
@@ -2163,16 +2185,7 @@ function coexistenceDestination(fixture, store) {
     .replace(/^default_status:.*$/m, 'default_status: "In Design"')
     .replace(/^auto_commit:.*$/m, 'auto_commit: false')
     .replace(/^backlog_directory:/m, "backlogDirectory:"));
-  const active = backlog(fixture.root, "task", "create", "Existing active", "--status", "In Progress",
-    "--description", "existing description", "--plan", "existing plan", "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
-  const completed = backlog(fixture.root, "task", "create", "Existing completed", "--status", "Done",
-    "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
-  backlog(fixture.root, "task", "complete", completed);
-  const archived = backlog(fixture.root, "task", "create", "Existing archive", "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
-  backlog(fixture.root, "task", "archive", archived);
-  const activePath = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", active)).task.path;
-  writeFileSync(join(fixture.root, store, "archive", "tasks", `${active} - historical-prefix-probe.md`),
-    readFileSync(join(fixture.root, activePath), "utf8") + "\nDistinct same-ID historical archive probe.\n");
+  const { active, completed, archived, legacy, draft, activePath } = seedBacklogBaseline(fixture.root, store);
   git(fixture.root, "add", "-A");
   git(fixture.root, "commit", "-qm", "seed existing Backlog alongside Beads");
   const first = git(fixture.root, "rev-parse", "HEAD");
@@ -2180,7 +2193,7 @@ function coexistenceDestination(fixture, store) {
   git(fixture.root, "add", "-A");
   git(fixture.root, "commit", "-qm", "existing Backlog history");
   git(fixture.root, "push", "-q");
-  return { store, configPath, active, completed, archived, activePath, first };
+  return { store, configPath, active, completed, archived, legacy, draft, activePath, first };
 }
 
 class AdmissionRunner extends AsIsBeadsRunner {
@@ -2271,6 +2284,62 @@ for (const store of ["backlog", ".backlog", "planning/task store"]) {
   });
 }
 
+
+test("migration admission refuses contested Backlog IDs across active archive legacy and draft records before writes", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "contested-backlog-admission");
+  const destination = coexistenceDestination(fixture, "backlog");
+  const initial = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+  assert.equal(initial.status, "ready", initial.detail);
+  const activeBytes = readFileSync(join(fixture.root, destination.activePath));
+  const source = { authority: sourceAuthorityFiles(fixture.root),
+    export: bd(fixture.root, "--readonly", "export", "--all"),
+    history: bd(fixture.root, "--readonly", "history", fixture.ids.parent, "--json", "--limit", "0") };
+  for (const [folder, taskId] of [["tasks", destination.active], ["archive/tasks", destination.active],
+    ["completed", destination.active], ["drafts", destination.active], ["archive/tasks", "BASE-01"]]) {
+    await t.test(`${folder} ${taskId}`, async () => {
+      const relativePath = `backlog/${folder}/${taskId.toLowerCase()} - contested-copy.md`;
+      const collisionPath = join(fixture.root, relativePath);
+      writeFileSync(collisionPath, activeBytes.toString("utf8").replace(/^id:.*$/m, `id: ${taskId}`));
+      git(fixture.root, "add", relativePath);
+      git(fixture.root, "commit", "-qm", `seed contested ${folder} identity`);
+      git(fixture.root, "push", "-q");
+      const runner = new AdmissionRunner();
+      const before = admissionTree(join(fixture.root, "backlog"));
+      const head = git(fixture.root, "rev-parse", "HEAD"), index = git(fixture.root, "ls-files", "--stage");
+      const refs = git(fixture.root, "ls-remote", "--refs", fixture.remote);
+      const excludes = readFileSync(join(fixture.root, ".git", "info", "exclude"), "utf8");
+      const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+      const confirmation = await migrateTaskProvider({ cwd: fixture.root, targetProvider: "backlog", runner,
+        expectedSourceRevision: initial.sourceRevision, confirmedSwitch: true, actor: "collision-operator",
+        semanticPlacement: "Preserve all source and destination records; do not repair contested identity." });
+      assert.equal(inspection.status, "ready", inspection.detail);
+      assert.equal(inspection.sourceRevision, initial.sourceRevision, "inspection captures the outgoing Beads source as-is");
+      assert.equal(confirmation.status, "blocked");
+      const conflictPaths = [relativePath, destination.activePath].map((path) => path.slice("backlog/".length)).sort();
+      const firstClaimId = conflictPaths[0] === relativePath.slice("backlog/".length) ? taskId : destination.active;
+      assert.equal(confirmation.detail,
+        `Backlog destination repeats canonical task IDs: ${firstClaimId}: ${conflictPaths.join(", ")}`);
+      assertNoAdmissionWrites(runner);
+      assert.deepEqual(admissionTree(join(fixture.root, "backlog")), before);
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), source.authority);
+      assert.equal(bd(fixture.root, "--readonly", "export", "--all"), source.export);
+      assert.equal(bd(fixture.root, "--readonly", "history", fixture.ids.parent, "--json", "--limit", "0"), source.history);
+      assert.equal(git(fixture.root, "rev-parse", "HEAD"), head);
+      assert.equal(git(fixture.root, "ls-files", "--stage"), index);
+      assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote), refs);
+      assert.equal(readFileSync(join(fixture.root, ".git", "info", "exclude"), "utf8"), excludes);
+      assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+      assert.equal(existsSync(join(fixture.root, ".beads")), true);
+      assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+      rmSync(collisionPath);
+      git(fixture.root, "add", relativePath);
+      git(fixture.root, "commit", "-qm", "restore distinct-ID baseline after refusal");
+      git(fixture.root, "push", "-q");
+    });
+  }
+});
+
+
 test("migration admission keeps malformed coexistence and unreadable source refusals before writes", { timeout: 180_000 }, (t) => {
   const fixture = embeddedBeadsSource(t, "admission-invalid");
   const destination = coexistenceDestination(fixture, "backlog");
@@ -2332,9 +2401,8 @@ test("migration admission refuses absent Beads even when Backlog is selected", {
 });
 
 
-// Independent native destination published before any migration attempt. Keep
-// its archived highest ID: native allocation intentionally considers only the
-// active/completed corpus and can reuse that ID.
+// Independent native destination published before any migration attempt. Native
+// allocation reserves IDs across active, canonical archive, legacy archive and drafts.
 function publishedPopulatedBacklogDestination(fixture) {
   const seed = join(fixture.outer, "native-allocation-seed");
   mkdirSync(seed);
@@ -2350,18 +2418,7 @@ function publishedPopulatedBacklogDestination(fixture) {
   const configPath = join(seed, "backlog", "config.yml");
   writeFileSync(configPath, readFileSync(configPath, "utf8")
     .replace(/^default_port:.*$/m, "default_port: 6459") + "\n# Preserve the complete operator configuration.\n");
-  const active = backlog(seed, "task", "create", "Existing active", "--status", "In Progress",
-    "--description", "existing description", "--notes", "original notes", "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
-  backlog(seed, "task", "edit", active, "--comment", "existing native comment", "--comment-author", "baseline-author", "--plain");
-  const completed = backlog(seed, "task", "create", "Existing completed", "--status", "Done",
-    "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
-  backlog(seed, "task", "complete", completed);
-  const archived = backlog(seed, "task", "create", "Existing archived", "--description", "original archive content",
-    "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
-  backlog(seed, "task", "archive", archived);
-  const activePath = JSON.parse(backlog(seed, "task", "view", "--json", "--", active)).task.path;
-  writeFileSync(join(seed, "backlog", "archive", "tasks", `${active} - historical-prefix-probe.md`),
-    readFileSync(join(seed, activePath), "utf8") + "\nDistinct same-ID historical archive probe.\n");
+  const { active, completed, archived, legacy, draft } = seedBacklogBaseline(seed, "backlog");
   const history = join(seed, "backlog");
   command(history, "git", ["init", "-q", "-b", "prime-claw/tasks"]);
   git(history, "config", "user.name", "Existing Task Author");
@@ -2381,65 +2438,48 @@ function publishedPopulatedBacklogDestination(fixture) {
     bytes: readFileSync(join(store, path)).toString("base64"),
     history: git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path),
   }]));
-  return { store, active, completed, archived, baseline };
+  return { store, active, completed, archived, legacy, draft, baseline };
 }
 
-test("native populated Backlog allocation reuses an archived ID; eligible live dependency succeeds and archive-only refuses", { timeout: 180_000 }, (t) => {
-  const fixture = embeddedBeadsSource(t, "native-populated-allocation-blocker");
+test("native populated Backlog allocation reserves archived IDs and accepts archived and draft dependencies", { timeout: 180_000 }, (t) => {
+  const fixture = repository(t, "native-populated-allocation");
   const destination = publishedPopulatedBacklogDestination(fixture);
   const { store } = destination;
   console.info(`native Backlog version: ${backlog(fixture.root, "--version")}`);
-  assert.deepEqual([destination.active, destination.completed, destination.archived], ["BASE-1", "BASE-2", "BASE-3"]);
-  const source = () => ({ authority: sourceAuthorityFiles(fixture.root),
-    inventory: bd(fixture.root, ...BEADS_INVENTORY),
-    exported: bd(fixture.root, "--readonly", "export", "--all"),
-    history: bd(fixture.root, "--readonly", "history", fixture.ids.parent, "--json", "--limit", "0"),
-  });
-  const sourceBefore = source();
+  assert.deepEqual([destination.active, destination.completed, destination.archived, destination.legacy, destination.draft],
+    ["BASE-1", "BASE-2", "BASE-3", "BASE-4", "DRAFT-1"]);
   const rootHead = git(fixture.root, "rev-parse", "HEAD"), rootIndex = git(fixture.root, "ls-files", "--stage");
   const storeHead = git(store, "rev-parse", "HEAD"), storeIndex = git(store, "ls-files", "--stage");
   const identity = { gitDir: realpathSync(join(store, ".git")), config: readFileSync(join(store, ".git", "config"), "utf8"),
     branch: git(store, "symbolic-ref", "HEAD") };
   const refs = git(fixture.root, "ls-remote", "--refs", fixture.remote);
   const exclude = readFileSync(join(fixture.root, ".git", "info", "exclude"), "utf8");
+  const originalRecords = physicalDestinationRecords(store);
+  for (const [id, status, folder] of [
+    [destination.completed, "Done", "tasks/"],
+    [destination.archived, "In Planning", "archive/tasks/"],
+    [destination.legacy, "Done", "completed/"],
+  ]) {
+    const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id)).task;
+    assert.equal(task.status, status);
+    assert.ok(task.path.startsWith(`.backlog/${folder}`), task.path);
+  }
+  assert.match(backlog(fixture.root, "draft", "view", destination.draft, "--plain"), /retained native draft content/);
+  assert.deepEqual(physicalDestinationRecords(store), originalRecords, "native in-place readback leaves every baseline record unchanged");
   const beforeOverride = admissionTree(store);
   const override = RUNNER.run("backlog", ["task", "create", "Unsupported literal ID", "--id", "BASE-99", "--plain"],
     { cwd: fixture.root, allowFailure: true });
   assert.notEqual(override.status, 0);
   assert.match(`${override.stdout}\n${override.stderr}`, /unknown option.*--id/i);
   assert.deepEqual(admissionTree(store), beforeOverride, "unsupported --id must refuse before destination writes");
-
-  // These are the existing importer's native allocation/relationship operations,
-  // not a canonical migration or an alternative ID-allocation policy.
-  const parent = backlog(fixture.root, "task", "create", "Prospective imported parent", "--status", "In Progress",
+  const imported = backlog(fixture.root, "task", "create", "Prospective imported task", "--status", "In Progress",
     "--no-dod-defaults", "--plain").match(/BASE-\d+/)[0];
-  assert.equal(parent, destination.archived, "native allocator intentionally reuses the archived highest ID");
-  const child = backlog(fixture.root, "task", "create", "Prospective imported child", "--status", "In Progress",
-    "--parent", parent, "--no-dod-defaults", "--plain").match(/BASE-\d+(?:\.\d+)*/)[0];
-  const childBefore = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", child)).task;
-  assert.equal(childBefore.parentTaskId, parent);
-  const beforeDependency = admissionTree(store);
-  const dependency = RUNNER.run("backlog", ["task", "edit", child, "--depends-on", parent, "--plain"],
+  assert.equal(imported, "BASE-5", "native allocation must reserve both archive IDs");
+  const targets = [destination.archived, destination.legacy, destination.draft];
+  const dependency = RUNNER.run("backlog", ["task", "edit", imported, "--depends-on", targets.join(","), "--plain"],
     { cwd: fixture.root, allowFailure: true });
-  console.info("native populated Backlog allocation evidence:", JSON.stringify({
-    originalOccupiedIds: [destination.active, destination.completed],
-    originalArchivedIds: [destination.archived, destination.active],
-    allocatedParent: parent, allocatedChild: child,
-    dependencyWriteStatus: dependency.status,
-    dependencyWriteDiagnostic: `${dependency.stdout}\n${dependency.stderr}`.trim(),
-  }));
-  assert.equal(dependency.status, 0, "archive history never makes an eligible reused live target ambiguous");
-  assert.deepEqual(JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", child)).task.dependencies, [parent]);
-  // Remove only the disposable newly-created live parent to expose archive-only history.
-  const liveParent = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", parent)).task.path;
-  const parentBytes = readFileSync(join(fixture.root, liveParent));
-  rmSync(join(fixture.root, liveParent));
-  const archiveOnlyBefore = admissionTree(store);
-  const archiveOnly = RUNNER.run("backlog", ["task", "edit", child, "--depends-on", parent, "--plain"], { cwd: fixture.root, allowFailure: true });
-  assert.notEqual(archiveOnly.status, 0);
-  assert.match(`${archiveOnly.stdout}\n${archiveOnly.stderr}`, /missing|not found|do(?:es)? not exist|deleted/i);
-  assert.deepEqual(admissionTree(store), archiveOnlyBefore);
-  writeFileSync(join(fixture.root, liveParent), parentBytes);
+  assert.equal(dependency.status, 0, `${dependency.stdout}\n${dependency.stderr}`);
+  assert.deepEqual(JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", imported)).task.dependencies, targets);
   for (const [path, expected] of Object.entries(destination.baseline)) {
     assert.equal(readFileSync(join(store, path)).toString("base64"), expected.bytes, `original bytes and placement: ${path}`);
     assert.equal(git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path), expected.history, `original history: ${path}`);
@@ -2453,8 +2493,6 @@ test("native populated Backlog allocation reuses an archived ID; eligible live d
   assert.equal(git(fixture.root, "ls-files", "--stage"), rootIndex);
   assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote), refs);
   assert.equal(readFileSync(join(fixture.root, ".git", "info", "exclude"), "utf8"), exclude);
-  assert.deepEqual(source(), sourceBefore, "retiring source was neither configured, changed, published nor deleted");
-  assert.equal(existsSync(join(fixture.root, ".beads")), true);
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
 });
 
@@ -2506,6 +2544,13 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
     const originalEpisodeHead = owner ? git(owner.episode, "rev-parse", "HEAD") : null;
     const originalReadmeIndex = owner ? git(owner.episode, "ls-files", "--stage", "--", "README.md") : null;
     const records = physicalDestinationRecords(destination.store);
+    const nativeBaseline = Object.fromEntries([destination.active, destination.completed, destination.archived, destination.legacy].map((id) => {
+      const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id)).task;
+      return [id, { ...task, path: task.path.slice(selected.length + 1) }];
+    }));
+    const draftBaseline = backlog(fixture.root, "draft", "view", destination.draft, "--plain");
+    const originalHistory = kind.startsWith("independent") ? Object.fromEntries(Object.keys(records).map((path) =>
+      [path, git(destination.store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path)])) : {};
     const originalHead = git(destination.store, "rev-parse", "HEAD");
     const nativeDestination = detectExplicitTaskProvider(fixture.root, "backlog", RUNNER);
     assert.equal(nativeDestination.kind, "selected");
@@ -2542,7 +2587,26 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
     assert.equal(result.status, "completed", result.detail);
     assert.equal(runner.publishedBeforeRetirement, true, "verified receipt publication must precede source deletion");
     const store = join(fixture.root, selected === "backlog" ? ".backlog" : selected);
-    for (const [path, bytes] of Object.entries(records)) assert.equal(readFileSync(join(store, path)).toString("base64"), bytes, path);
+    for (const [path, bytes] of Object.entries(records)) {
+      assert.equal(readFileSync(join(store, path)).toString("base64"), bytes, path);
+      if (originalHistory[path]) assert.equal(git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path), originalHistory[path], path);
+    }
+    const finalStore = selected === "backlog" ? ".backlog" : selected;
+    for (const [id, expected] of Object.entries(nativeBaseline)) {
+      const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id)).task;
+      assert.deepEqual({ ...task, path: task.path.slice(finalStore.length + 1) }, expected, `preserved native baseline ${id}`);
+    }
+    const finalDraftView = backlog(fixture.root, "draft", "view", destination.draft, "--plain");
+    assert.equal(selected === "backlog"
+      ? finalDraftView.replace(`File: ${store}/`, `File: ${join(fixture.root, "backlog")}/`)
+      : finalDraftView, draftBaseline, "only the allowed default-store File path translation may differ");
+    assert.equal(nativeBaseline[destination.completed].status, "Done");
+    assert.ok(nativeBaseline[destination.completed].path.startsWith("tasks/"));
+    assert.equal(nativeBaseline[destination.archived].status, "In Planning");
+    assert.ok(nativeBaseline[destination.archived].path.startsWith("archive/tasks/"));
+    assert.equal(nativeBaseline[destination.legacy].status, "Done");
+    assert.ok(nativeBaseline[destination.legacy].path.startsWith("completed/"));
+    assert.deepEqual(nativeBaseline[destination.active].dependencies, [destination.archived, destination.draft]);
     assert.equal(Object.keys(physicalDestinationRecords(store)).length, Object.keys(records).length + inspection.taskCounts.total + 1 + (hasMemories ? 1 : 0));
     if (hasMemories) {
       assert.equal(result.receipt.backlogMemoryOutputs.documents.length, 1);
@@ -2597,29 +2661,42 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
   });
 }
 
-test("invalid deleted-target source graph refuses exact evidence before any destination mutation", { timeout: 180_000 }, async (t) => {
-  const fixture = embeddedBeadsSource(t, "deleted-target-preflight");
+test("native archived-target source graph preserves mapped dependencies through migration", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "archived-target-migration");
   const destination = publishedPopulatedBacklogDestination(fixture);
   bd(fixture.root, "close", fixture.ids.child, "--reason",
     `Prime Claw abandonment: task ${fixture.ids.child}; pushed Episode head ${git(fixture.root, "rev-parse", "HEAD")}; code was not merged.`, "--force", "--json");
-  const before = admissionTree(destination.store), source = sourceAuthorityFiles(fixture.root);
-  const refs = git(fixture.root, "ls-remote", "--refs", fixture.remote);
-  const runner = new AdmissionRunner();
+  const records = physicalDestinationRecords(destination.store);
+  const before = sourceAuthorityFiles(fixture.root);
+  class ArchivedDependencyRunner extends AsIsBeadsRunner {
+    run(name, args, options = {}) {
+      if (name === "git" && args.includes("push") && options.cwd === destination.store) assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
+      return super.run(name, args, options);
+    }
+  }
+  const runner = new ArchivedDependencyRunner();
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
-  assert.equal(inspection.status, "blocked");
-  assert.match(inspection.detail, /source relationship preflight/);
-  assert.ok(inspection.detail.includes(fixture.ids.blocked));
-  assert.ok(inspection.detail.includes(fixture.ids.child));
-  assert.match(inspection.detail, /deleted\/archive-only target.*closed.*archived/);
-  const confirmation = await migrateTaskProvider({ cwd: fixture.root, targetProvider: "backlog", runner,
-    expectedSourceRevision: "capture-sha256:" + "0".repeat(64), confirmedSwitch: true, actor: "operator", semanticPlacement: "No repair" });
-  assert.equal(confirmation.status, "blocked");
-  assert.match(confirmation.detail, /source relationship preflight/);
-  assertNoAdmissionWrites(runner);
-  assert.deepEqual(admissionTree(destination.store), before);
-  assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
-  assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote), refs);
-  assert.equal(existsSync(join(fixture.root, ".beads")), true);
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.deepEqual(inspection.taskCounts, { open: 2, closed: 0, archived: 1, total: 3 });
+  const result = await migrateTaskProvider({ cwd: fixture.root, targetProvider: "backlog", runner,
+    expectedSourceRevision: inspection.sourceRevision, confirmedSwitch: true, actor: "operator",
+    semanticPlacement: "Preserve the native archived dependency and exact closure evidence." });
+  assert.equal(result.status, "completed", result.detail);
+  assert.deepEqual(result.receipt.taskCounts, inspection.taskCounts);
+  const mappings = Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId]));
+  const child = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mappings[fixture.ids.child])).task;
+  const blocked = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mappings[fixture.ids.blocked])).task;
+  assert.equal(child.status, "Done");
+  assert.ok(child.path.startsWith(".backlog/archive/tasks/"));
+  assert.equal(child.parentTaskId, mappings[fixture.ids.parent]);
+  assert.deepEqual(blocked.dependencies, [mappings[fixture.ids.child]]);
+  const pkg = sourcePackageFromBacklogComments(child);
+  assert.equal(pkg.nativeView.status, "closed");
+  assert.match(pkg.nativeView.close_reason, /^Prime Claw abandonment:/);
+  assert.ok(pkg.history.length > 0);
+  for (const [path, bytes] of Object.entries(records)) assert.equal(readFileSync(join(destination.store, path)).toString("base64"), bytes, path);
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  assert.equal(git(destination.store, "status", "--porcelain=v1"), "");
 });
 
 
