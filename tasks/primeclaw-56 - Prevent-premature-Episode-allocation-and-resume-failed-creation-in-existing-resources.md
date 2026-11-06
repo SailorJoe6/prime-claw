@@ -3,10 +3,10 @@ id: PRIMECLAW-56
 title: >-
   Prevent premature Episode allocation and resume failed creation in existing
   resources
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-06 15:08'
+updated_date: '2026-11-06 15:12'
 labels: []
 dependencies:
   - PRIMECLAW-55
