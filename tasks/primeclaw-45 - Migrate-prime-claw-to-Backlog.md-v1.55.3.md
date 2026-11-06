@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 14:43'
+updated_date: '2026-11-06 14:51'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -13,6 +13,22 @@ references:
   - 'https://github.com/MrLesk/Backlog.md/compare/v1.53.0...v1.55.3'
 documentation:
   - docs/backlog.md
+  - docs/evidence/primeclaw45-upstream-candidate-20261106.md
+modified_files:
+  - .gitmodules
+  - bin/prime-claw
+  - deps/backlog
+  - docker/runtime.Dockerfile
+  - docker/test.Dockerfile
+  - docs/README.md
+  - docs/backlog.md
+  - docs/evidence/primeclaw45-upstream-candidate-20261106.md
+  - scripts/build-backlog.sh
+  - tests/project_initialization_extension.test.mjs
+  - tests/task_providers.test.mjs
+  - tests/template_review.test.mjs
+  - tests/test_backlog_build.py
+  - tests/test_runtime_image.py
 priority: p1
 type: task
 ordinal: 130000
@@ -115,6 +131,14 @@ Record exact source, build/toolchain and image identities, commands, pass/fail c
 ## Completion boundary
 
 Deliver a reviewable, committed/pushed prime-claw candidate with complete compatibility/provenance/validation evidence; no additional planning follow-up task. A later explicit operator decision owns merge, accepted host-artifact deployment, user-global refresh, coordinated restart/UAT, and any real data migration or repair. This planning request itself authorizes none of those actions and creates no Episode.
+
+## Execution checkpoint — slice 1 candidate (2026-11-06)
+
+The exact upstream source/build slice is implemented and published at code d4f8e79a4300ae03d0393f363eb463d114b2f76a on the existing Episode branch. Upstream tag, gitlink/source URL, Backlog Bun1.4.4, host/runtime/Tier-1 pins, runtime source identity, fixtures and current provenance align. Native compiler defaults replace the obsolete target override without an upstream patch or Prime Agent Node change.
+
+Verified evidence: 48 focused pytest cases; 194 Docker fixture cases with the real candidate available (0 failures/skips in the final run); standalone builder and repository build-script compiled smoke; native Git trust/private-proxy regression (1 pass, 4 assertions); supported Tier-1 image smoke; fresh native aarch64-linux Nix package build plus installCheck persistence/failed-write smoke, exact1.55.3 version/help and derivation log. Details/limits: docs/evidence/primeclaw45-upstream-candidate-20261106.md.
+
+This is one slice for owning-Conversation review, not complete PRIMECLAW-45 acceptance. Next implementation remains approved slice2, then lifecycle/migration tests and normative assets, followed by full integrated Tier0/Tier1 acceptance. No AC has been checked. Accepted v1.53.0 remains authoritative; no merge, activation/restart, live migration or resource cleanup is included.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -139,6 +163,14 @@ Validation is in progress, not acceptance. The approved disposable official Nix 
 Slice-1 completed build checks (2026-11-06): 48 focused pytest cases passed (one existing import-loader warning). Exact upstream Docker builder image sha256:453a366de89900503aaa2c4a27659c824e71e117fd024434d5bb639160b4531c built successfully on linux/arm64 with Bun1.4.4. Frozen standalone build and upstream compiled smoke passed. The repository scripts/build-backlog.sh then passed in that immutable image with network disabled and only the script mounted read-only; both compiled outputs had SHA-256 7b7392ce39def4fc96edc1903109ed9564dc25eb8bd79d3924378cb568ed590d. Native Git certificate/private HTTPS proxy regression passed: 1 test, 4 assertions, exactly one loopback request and expected HTTP502/nonzero Git exit. No live/private proxy or credentials used. Read-only diff audit found no concrete slice-1 defect, with no test/acceptance claim of its own.
 
 Bounded evidence and commands are being recorded in docs/evidence/primeclaw45-upstream-candidate-20261106.md; completed raw logs are retained locally under .test-results/primeclaw45-slice1-08450108/. Fresh Nix package build/installCheck and the supported Tier-1 image smoke are still running. This is not full migration, full Tier-0/Tier-1, host activation, or AC completion. Code remains uncommitted pending final slice validation/evidence; accepted v1.53.0 stays authoritative. The initial notes push encountered a concurrent PRIMECLAW-56-only commit; exact remote diff was inspected, the unchanged selected ticket was verified, and an explicit ordinary merge preserved both commits before non-force publication f3c4bb62c67e2bc48a32663baaf43dba21083ce9. No same-task conflict, reset, force, or discarded history.
+
+Slice-1 delivery: code d4f8e79a4300ae03d0393f363eb463d114b2f76a was committed once and pushed non-force to refs/heads/JLanders/prime-claw-primeclaw-45-episode-08450108; direct remote read matched, and the code worktree/index are clean and tracking that branch. Same owner/operation/host/worktree/session and original code basis preserved. No primary-main switch/rebase or live asset update.
+
+Fresh Nix result is now PASS, not access preflight: official disposable image nixos/nix@sha256:f159a58f390677f41e8e900a74b6e2f9c7f27b364122ae6acf7a652ce6c551c0 ran nix build .#backlog-md --print-build-logs from exact0cf4fdbc70020327f4366a29d3f405f83d180301. Log shows fresh local /nix/store/bpk502glsl0y3bb585w0rgbi71w60ahj-backlog-1.55.3.drv, package build, installCheckPhase and compiled smoke pass; output /nix/store/gxz1m712a3b6rlw8dibmazcxpngv17k6-backlog-1.55.3. Version exactly1.55.3 and help succeeded. Existing smoke asserts persisted task create/read/list/edit/reread and a failed filesystem write exits nonzero, plus browser/MCP. Full log SHA256 89a59234a446e230c682a33c94623c589a4abbb9d962e8e63790e0797c344a62; native derivation log retained. No host mounts, credentials, privileges, caller-trust changes, update-nix or new framework.
+
+Supported scripts/test-tier1.sh --smoke also passed with immutable image sha256:13b357723400a656eb48c8fb94712f252193f95f6412ca949a3d8e304e304ced, network absent, verified teardown and native manifest. This is image/toolchain smoke, not full plugin acceptance. Final changed-fixture run in that Docker image passed all194 cases with0 skipped after supplying the image candidate at the existing test's expected disposable path; the earlier run's single missing-artifact skip is explicitly retained as historical evidence, not treated as passed. The48 focused pytest checks, standalone/repository compiled smokes and1-test/4-assertion Git trust proof were already published above.
+
+Evidence: docs/evidence/primeclaw45-upstream-candidate-20261106.md; raw local command/log receipts under .test-results/primeclaw45-slice1-08450108/. The independent read-only slice audit found no concrete defect and is not owner acceptance. Full migration/lifecycle behavior, normative guidance/asset conversion and complete Tier0/Tier1 suites remain unfinished; no AC or whole-upgrade success claim. Stop here for owner review of this one bounded slice. Task lifecycle remains In Progress and accepted v1.53.0 stays authoritative.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -208,3 +240,13 @@ The selected native task, approved specification/Implementation Plan, owner01a1a
 The disposable Nix access preflight is not acceptance: full native package build/installCheck persistence and failed-write smoke, Git trust coverage, and required Docker Tier0/Tier1 validation still must pass as specified. Accepted v1.53.0 stays authoritative. No scope expansion, upstream patches, merge, deployment/global activation/restart, live migration or destructive cleanup is authorized.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PRIMECLAW-45 slice1 candidate delivered for review at code d4f8e79a4300ae03d0393f363eb463d114b2f76a (published refs/heads/JLanders/prime-claw-primeclaw-45-episode-08450108). Pins the unmodified upstream v1.55.3 commit0cf4fdbc70020327f4366a29d3f405f83d180301 and Backlog Bun1.4.4 across source/build/runtime/test/provenance; native-platform build avoids the new cross-target guard. No upstream patch, Prime Agent Node upgrade or live activation.
+
+Evidence:48 focused pytest cases;194 Docker fixture cases,0 fail/skip in the final run; standalone and repository build-script compiled smoke; native Git trust regression1 pass/4 assertions; Tier-1 image smoke; fresh native Nix package/installCheck persistence and failed-write smoke with exact1.55.3 version/help. See docs/evidence/primeclaw45-upstream-candidate-20261106.md for exact source/image/derivation/log identities and limits.
+
+Only slice1 is delivered. Migration/lifecycle implementation, remaining guidance/assets and full integrated Tier0/Tier1 acceptance remain required. All full-upgrade ACs stay unchecked; task remains In Progress for the owner. No merge, global artifact refresh, restart, live migration or cleanup. Accepted v1.53.0 remains authoritative.
+<!-- SECTION:FINAL_SUMMARY:END -->
