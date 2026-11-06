@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-06 14:30'
+updated_date: '2026-11-06 14:38'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -271,6 +271,14 @@ Independent bounded diagnosis: a read-only docker ps --format command also faile
 Collection passed for the new named test, and its embedded Python program compiled. That establishes syntax/collection only, not its TypeScript/native behavior. The docs explicitly label the fixture draft unvalidated. The read-only seam auditor identified no new production-code/API barrier; its findings are source inspection, not runtime or full-candidate validation. Existing accepted slice-4 evidence remains unchanged and proves readiness only.
 
 Unblock condition: the operator restores authorized Docker Desktop access/sign-in. Then continue this SAME Episode with the pending named native test and ordinary in-scope fixture repairs, inspect actual supported results and finish the representative same-operation recovery/ambiguity evidence. No new live Episode, allocation, initial assignment, transport replay, provider-status transition or permission gate is needed to continue approved work. No merge, activation/restart, abandonment or destructive live cleanup is authorized. No primary task clone was synchronized. Publish the safely resumable code draft separately from this exact-task checkpoint and report both exact heads. Full task remains unfinished; the owner decides blocker status and external coordination.
+
+## Docker clearance accepted; native full-path draft now executing
+
+The owning Conversation cleared the exact external Docker organization-login blocker and published In Progress plus its truthful clearance comment at abf40fea0b1a7b50870a3c0bfdb8122c089d4ad1. This Episode reread its exact active version-2 owner/operation/worktree/branch/durable session binding and current native In Progress task with the unchanged approved Description/Implementation Plan and seven unchecked AC. A fresh read-only docker ps also exits 0. No lifecycle edit was repeated. Compatible unrelated PRIMECLAW-45/59 task-history descendants are retained only in this Episode's own clone; the primary task clone is untouched.
+
+Published code draft 8c1f2c48bf2231e4dc3472538783c16fb8c9ee5e remains UNVALIDATED. The current canonical execute closed the old handoff-only goal, reread prepare and established an implementation goal, then actually ran the pending named native Docker test. The first restored-access run reached the real isolated Orca/worktree and controller daemon, then failed a fixture assertion before target-clone recovery or an Episode launch/assignment: Orca's normal shell tab exists after worktree allocation, so total terminal count is one, not zero. A proportionate test-only repair now checks no Prime Agent tab/session and unchanged native terminal handles across the failed preparation; it does not weaken Episode tab binding. The repaired test is being run in a new disposable fixture, not replayed inside the prior fixture.
+
+Failed run: .test-results/20261106T143504Z-87153-77b0f151/tier1/manifest.json. All 14 listed artifact hashes verified; network verified absent, product and source-builder teardown clean/absent, source checkout inventory unchanged. This is a real test-body failure, unlike the earlier blocked source-builder setup. It is not full recovery success. Native Prime Agent processes remain behind scripts/run-prime-agent-probe.sh inside isolated source-mode Docker using the retained clean read-only a1faacd53ac4473a75de1d434afaf50945c2f647 source input. Continue the same approved recovery/reuse/ambiguity exercise, preserve known identities and native safeguards, and publish actual results. No live ownership/status mutation, new live Episode/assignment, dependency patch, global activation/restart, merge or destructive live cleanup occurs.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
