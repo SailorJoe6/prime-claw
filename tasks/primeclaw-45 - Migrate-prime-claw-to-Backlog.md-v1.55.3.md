@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 15:11'
+updated_date: '2026-11-06 15:16'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -157,6 +157,16 @@ Implemented and directly published code cd9193cba4082229df973d4a557388dfb83e2b62
 Fresh repaired-surface validation: regression assertions fail on the reported candidate, then49focusedpytest pass; nativeDocker production-block fixture passes exactBacklog compiled smoke, gbrain sentinel install/compile1.3.11 and generalbun/bunx1.3.11; a fresh offline no-mount container verifies final tools/symlinks/env and temporary-directory absence. Details/limits and raw hashes: docs/evidence/primeclaw45-upstream-candidate-20261106.md. Prior unchanged source/Gittrust/freshNix/194fixture results are reused rather than reasserted as new repair proof. No full real-gbrain/OpenShell-image acceptance claim.
 
 STOP here for owner review of this tested committed/pushed slice1 repair before starting slice2. No AC checked; task stays In Progress. Same resources/original basis and acceptedv1.53.0 authority remain. Full migration/lifecycle/guidance and integrated Tier0/Tier1 gates still remain later. No merge, activation/global refresh/restart, live migration or cleanup.
+
+## Slice1 accepted; advance to approved slice2 (2026-11-06)
+
+The owning Conversation accepted the exact four-path Bun-isolation repair cd9193cba4082229df973d4a557388dfb83e2b62. Its review resolves the prior Expert finding and supersedes the preceding stop-for-slice1-review checkpoint. Continue this SAME Episode into approved slice2, preserving global/gbrainBun1.3.11 and Backlog-only build/smokeBun1.4.4.
+
+Implement the existing slice2 provider-history lifecycle/read/write adaptation and representative changed-seam tests: activeDone is closed; both legacycompleted/ and canonicalarchive/tasks/ records are archived regardless of status; read archived tasks natively in place; remove taskcomplete/closed-directory placement; map source status truthfully and archive only explicit source archive evidence; adopt native archived/draft dependency eligibility; refuse contested identities before mutation through existing inventory/native checks without repair or a parallel graph/index policy. Preserve complete native evidence/history/baseline bytes and source-authoritative one-way Beads-to-Backlog verification/publication/cutover/deletion ordering and resources. Do not revive reverse migration or patch upstream.
+
+Deliver one tested committed/pushed bounded slice2 candidate for owner review, with prompt separate native task publication. Routine in-scope implementation/test repairs need no fresh permission. Required Docker validation applies after plugin-source changes. Full normative assets and integrated migration/lifecycle/Tier0/Tier1 acceptance remain required later; reuse unchanged exact-source/compiled/Nix/Gittrust/194fixture evidence only within its stated limits. All ACs remain unchecked until their complete behavior is proven.
+
+Same owner/operation/host/worktree/branch/session/original basis. Acceptedv1.53.0 stays authoritative. No merge, activation/global refresh/restart, live migration, cleanup, scope expansion, semantic reconciliation framework or new approval store.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -207,6 +217,10 @@ Ready to publish one bounded four-path code repair for owner review: docker/runt
 Slice1 repair publication (2026-11-06): code cd9193cba4082229df973d4a557388dfb83e2b62 is one four-path commit directly published non-force to refs/heads/JLanders/prime-claw-primeclaw-45-episode-08450108; fresh ls-remote and own upstream match and code/index are clean. Task-only evidence checkpoints9feb0f6 and8b4bdb1 were promptly and separately published during execution. Compatible unrelated56-only descendants were inspected and fast-forwarded; selected45 had no outside change. Original d4f8e79 and all historical source/build evidence remain intact. Same owner/operation/host/worktree/branch/session and original base retained; no branch switch/rebase or ownership mutation.
 
 All repair build/test handles are finished. Read-only audit helper has been deleted and the bounded build heartbeat cancelled. No queued next implementation or slice2 is requested. This content-only task checkpoint is the review handoff; the owning Conversation controls lifecycle and later continuation. No acceptance status, live activation or cleanup has occurred.
+
+Owner acceptance and same-Episode slice2 handoff (2026-11-06). Accepted review artifact: /Users/jlanders/.prime/agent/session-artifacts/01a1a90b-0fba-7778-b1e5-0087bdaf8fec/primeclaw45-slice1-review/accepted-bun-isolation-repair.md. Owner reviewed exact four-file repair cd9193c against d4f8e79 and the complete native task updates; prior Expert Bun-isolation defect is resolved. Owner independently reran49focusedpytest, all pass; fresh offline/no-mount immutable fixture dc4621d1 passes gbraincompiled1.3.11, generalbun/bunx1.3.11, original BUN_INSTALL/symlinks, absent temporary source/tool and exactBacklog1.55.3/version/help/hash. Production sharedBun/Backlog/gbrain blocks match the executed fixture verbatim and raw hashes match committed evidence. No full real-gbrain/OpenShell or integrated acceptance is inferred.
+
+Handoff verified exact active version2 independent-Backlog owner and Episode session/root; primary remains main. Code cd9193cba4082229df973d4a557388dfb83e2b62 is clean/directly published and own upstream matches. Episode task clone is clean/directly published at1fad78986806e38f7bf3cb0194e0c5bcfd0f4dda; selected45 content matches the bound observation and is unchanged from the published repair report, while compatible unrelated task history is retained. Native45 stays In Progress, parentnull,AC0/9. This is content-only continuation context, not a status or ownership edit. No slice2 implementation code or additional initial/execute assignment is made in handoff; the owning Conversation already queues canonical execute independently.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -280,9 +294,9 @@ The disposable Nix access preflight is not acceptance: full native package build
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-PRIMECLAW-45 slice1 Bun-isolation repair is tested, committed and directly published at code cd9193cba4082229df973d4a557388dfb83e2b62, on the same Episode branch. Restores global/gbrain Bun1.3.11; scopes Bun1.4.4 to Backlog install/build/smoke RUN and removes its temporary tool/source tree. Prime Agent Node, unmodified upstream0cf4fdbc70020327f4366a29d3f405f83d180301, host/Tier1 builders and unrelated dependencies remain unchanged.
+Owner accepted slice1 Bun-isolation repair cd9193cba4082229df973d4a557388dfb83e2b62 after exact-delta/native-contract review and independent49pytest plus offline immutable Docker fixture checks. The prior Expert finding is resolved; preserve global/gbrainBun1.3.11 and isolated Backlog build/smokeBun1.4.4. Evidence: docs/evidence/primeclaw45-upstream-candidate-20261106.md. No full real-gbrain/OpenShell or integrated acceptance claim.
 
-Fresh evidence: regression-red2fail/2pass, then49focusedpytest pass; verbatim production-block Docker build and exactBacklog upstream compiled smoke pass; gbrain sentinel postinstall/compiled CLI and generalbun/bunx prove1.3.11; fresh offline/no-mount container confirms versions, original symlinks/BUN_INSTALL and absent temporary Backlog directories. Evidence: docs/evidence/primeclaw45-upstream-candidate-20261106.md. This is not a full real-gbrain/OpenShell-image claim. Prior source/Gittrust/freshNix/194fixture evidence is retained/reused within its limits.
+Next: SAME Episode executes the approved slice2 native provider-history lifecycle/read/write adaptation with representative seam tests and required Docker validation, then publishes one bounded tested code/task candidate for owner review. The preceding stop-for-slice1-review is superseded. Native In Progress,AC0/9; remaining normative assets/full integrated migration/lifecycle/Tier0/Tier1 gates still required. Prior unchanged source/compiled/Nix/Gittrust/194fixture evidence reused within its limits.
 
-Stopped for owner review BEFORE slice2. Task remains In Progress,AC0/9. Remaining migration/lifecycle/guidance and full integrated Tier0/Tier1 acceptance are not complete. Acceptedv1.53.0 remains authoritative. No merge, global artifact refresh/restart, live migration or cleanup.
+Acceptedv1.53.0 remains authoritative. No merge, activation/global refresh/restart, live migration, cleanup, upstream patch, scope expansion, semantic framework or new approval store.
 <!-- SECTION:FINAL_SUMMARY:END -->
