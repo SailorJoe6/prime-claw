@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 14:38'
+updated_date: '2026-11-06 14:43'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -135,6 +135,10 @@ Unblock condition: restore supported authenticated SailorJoe6 Git transport or s
 Upstream refs/tags/v1.55.3 and the isolated shallow source HEAD both resolve exactly to 0cf4fdbc70020327f4366a29d3f405f83d180301, with unmodified tracked source. Slice 1 aligns the upstream submodule URL/gitlink, build/runtime/test pins and current provenance; Backlog builder Bun is 1.4.4 and Prime Agent Node is unchanged. Upstream scripts/build.ts rejects the former BACKLOG_BUILD_TARGET setting without a verified executable path; native-platform compilation uses the pinned installed Bun instead, without a cross-target download or upstream patch.
 
 Validation is in progress, not acceptance. The approved disposable official Nix container is running the native exact-source package build with no host mounts, credentials, privileged flags or caller trust changes. Existing build/compiled persistence/failed-write smoke and Git trust checks must still pass. No AC is checked and no full upgrade claim is made. This execute pass will deliver only one bounded, tested, committed/pushed candidate slice for owner review. Accepted v1.53.0 remains authoritative; migration compatibility and other approved slices remain unfinished. No merge, activation/restart, live migration, resource replacement or destructive cleanup.
+
+Slice-1 completed build checks (2026-11-06): 48 focused pytest cases passed (one existing import-loader warning). Exact upstream Docker builder image sha256:453a366de89900503aaa2c4a27659c824e71e117fd024434d5bb639160b4531c built successfully on linux/arm64 with Bun1.4.4. Frozen standalone build and upstream compiled smoke passed. The repository scripts/build-backlog.sh then passed in that immutable image with network disabled and only the script mounted read-only; both compiled outputs had SHA-256 7b7392ce39def4fc96edc1903109ed9564dc25eb8bd79d3924378cb568ed590d. Native Git certificate/private HTTPS proxy regression passed: 1 test, 4 assertions, exactly one loopback request and expected HTTP502/nonzero Git exit. No live/private proxy or credentials used. Read-only diff audit found no concrete slice-1 defect, with no test/acceptance claim of its own.
+
+Bounded evidence and commands are being recorded in docs/evidence/primeclaw45-upstream-candidate-20261106.md; completed raw logs are retained locally under .test-results/primeclaw45-slice1-08450108/. Fresh Nix package build/installCheck and the supported Tier-1 image smoke are still running. This is not full migration, full Tier-0/Tier-1, host activation, or AC completion. Code remains uncommitted pending final slice validation/evidence; accepted v1.53.0 stays authoritative. The initial notes push encountered a concurrent PRIMECLAW-56-only commit; exact remote diff was inspected, the unchanged selected ticket was verified, and an explicit ordinary merge preserved both commits before non-force publication f3c4bb62c67e2bc48a32663baaf43dba21083ce9. No same-task conflict, reset, force, or discarded history.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
