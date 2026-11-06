@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-03 18:47'
-updated_date: '2026-11-06 14:42'
+updated_date: '2026-11-06 14:50'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -287,6 +287,14 @@ After the proportionate shell-tab fixture repair, `python3 -m pytest tests/test_
 The actual native fixture demonstrates late target-clone transport failure, inspected fixture-owner locked reconciliation, missing clone preparation and completion in the same original allocated Backlog/Orca resources: one durable session and one harmless initial assignment, followed by explicit same-session binding and active replay with zero extra allocation, delivery or status publication. Native live/saved messages, state and exact visible/connected/writable Prime Agent tab agree. Original bindings, the other owner, selected task ref and unrelated bytes/index/history are preserved. The initial uncertain record and later owner-acknowledgement interruption are deliberately seeded fixture shapes; do not claim the allocator itself originally caused those interruptions.
 
 Genuine lost-assignment ambiguity-stop evidence is still open; the seeded after-success acknowledgement shape is NOT that proof. A bounded read-only native-interface audit is checking the smallest representative actual uncertainty exercise without a framework or dependency patch. Existing live identity/status, Description/approved plan and all seven unchecked AC remain unchanged. Docs are being updated to distinguish this new recovery result from the accepted earlier components/readiness. Canonical execute workflow, LLM policy compliance and activation are not proven by the scripted native fixture.
+
+## Native launch-result uncertainty stops before evidence-based same-session binding
+
+The final full-path fixture variant passed: 1 passed in 125.90s. It executes the REAL packaged Orca automations run exactly once, discards only its stdout, and returns the literal empty string to the unmodified adapter. Missing native result parsing raises OrcaMutationUncertainError and the allocator persists uncertain ownership with the original operation/resources and known launch name/ID. No fake daemon, fabricated success envelope, thrown adapter failure or after-success status relabel supplies this uncertainty. The owner performs no further mutation while initial completion is unresolved. Bounded native session/state/message observations then establish one actual harmless initial assignment, after which explicit existing-session binding and active replay send nothing. Known launch identities remain; the disabled disposable automation stays until ordinary container teardown. This is lost native launch-result evidence, NOT daemon prompt-ack loss or resolution when evidence stays permanently unavailable.
+
+Evidence: .test-results/20261106T144630Z-21856-9efa61c2/tier1/manifest.json; SHA-256 5404fd455ba9019ad0221c75bb343b208feab3468fa4db0f46c72df1b3415a9e. Native artifact creation-native-same-operation-recovery.json in that directory; SHA-256 f7dd2c5ec98f40b21fee816aed528b918b4b59534a57f500d22c56488391ed22. All 15 listed hashes verified; source inventory unchanged, network verified absent and teardown clean/absent. Original owner/operation/task/provider/base/host/branch/worktree, exact tab, other owner, selected task history and unrelated bytes/staging remain intact. The only discarded field was a result never made available to the owner; no known identity was cleared.
+
+The source-only helper identified that Orca initial delivery uses automation, not PrimeSessionPublisher.deliverExecute. Its narrower review supported the final native fault injection, changed no files and ran no tests/probes; it is completed/deleted. Docs now describe actual recovery and initial-completion uncertainty separately from historical readiness. The 17 relevant policy/routing and 10 host-safe bridge tests pass. The complete final three-file candidate is receiving a focused native regression before its separate code commit. No plugin production source/TypeScript, API/schema/state, framework, retry planner or dependency changed. Description, approved living plan, seven unchecked AC and native In Progress remain unchanged pending owner review. Canonical execute/LLM compliance/activation are not inferred from this scripted fixture. No live lifecycle/ownership edit, merge, global refresh/restart or destructive cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
