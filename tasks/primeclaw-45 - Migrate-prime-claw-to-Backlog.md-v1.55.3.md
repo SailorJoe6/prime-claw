@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 15:42'
+updated_date: '2026-11-06 15:43'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -180,6 +180,10 @@ The approved provider-history lifecycle/read/write adaptation and representative
 Bounded Docker validation and exact per-run limits are recorded in the appended notes and docs/evidence/primeclaw45-migration-lifecycle-slice2-20261106.md. Required isolated Tier1 --probe passed; corrected final collision6/6 and code-default1/1 pass, with prior unchanged representative seam successes retained and failed/launch-refusal evidence preserved truthfully. Archived-draft native read remains an unresolved public-CLI capability limit; do not synthesize an active view or silently omit records to claim acceptance.
 
 Publish this ONE tested committed/pushed slice2 candidate and stop for owning-Conversation review. No next slice is authorized by completion alone. Full normative guidance/assets, remaining lifecycle seams and full integrated Tier0/Tier1 acceptance remain later; all full-task ACs remain unchecked. Acceptedv1.53.0 and same resources remain authoritative; no merge, activation/restart, live migration or cleanup.
+
+## Slice2 publication checkpoint (2026-11-06)
+
+Published code 619676b21d5feef0c5b941d42c6d8b0378432b89 contains exactly the five-path bounded migration lifecycle candidate and evidence above. Direct remote/upstream proof and clean code/index are recorded. The preceding publish step is complete. STOP for owner review; do not begin another slice from this checkpoint. Archived-draft native read and remaining full normative/lifecycle/integrated acceptance are unresolved, all ACs unchecked, acceptedv1.53.0 unchanged. Same resources and original basis; no activation, merge, live migration or cleanup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -256,6 +260,10 @@ Representative migration evidence is separated by actual run. First selected run
 Exact commands, per-run counts, images/source/native identities and retained raw hashes: docs/evidence/primeclaw45-migration-lifecycle-slice2-20261106.md and .test-results/primeclaw45-slice2-08450108/. Native archived-draft read limit remains concrete/unresolved, documented with offline no-mount command/unchanged-byte proof; no relocation fallback, omission, upstream patch or waived preservation. Final read-limit manifest7461ca0bea5a67f90a77fab4f9aabede4fa1f8e303fd2218bc4589580e1d44b7 matches saved artifact bytes.
 
 This is one bounded slice2 candidate, not complete PRIMECLAW-45 acceptance. Remaining normative assets/lifecycle seams/full integrated migration/Tier0/Tier1 gates and archived-draft capability resolution remain required later. All AC0/9, taskInProgress, acceptedv1.53.0 authoritative. Same Episode/owner/operation/host/worktree/branch/session/original base; no merge/activation/global refresh/restart/live migration/cleanup.
+
+Slice2 code publication (2026-11-06): 619676b21d5feef0c5b941d42c6d8b0378432b89 is one five-path commit directly published non-force to refs/heads/JLanders/prime-claw-primeclaw-45-episode-08450108. Fresh remote read and own upstream match; code worktree/index are clean. Exact paths: src/prime-agent-plugin/extension-support/task-provider-migration.ts, tests/task_provider_migration.test.mjs, tests/test_task_provider_migration.py, docs/backlog.md, docs/evidence/primeclaw45-migration-lifecycle-slice2-20261106.md. No task store/gitlink, ownership or unrelated asset bytes are included. Production source SHA remains1fe53a06562e8dbf5eadd8892eefd2f1767d1e9ec587582338d811ecfc162155, the final audited/Docker-validated delta. Same owner/operation/host/worktree/branch/session/originalbasis and primarymain integration target were revalidated; no rebase/switch/resource replacement.
+
+Six representative top-level migration seams have passing evidence across truthful retained runs, including5collision subcases. Required supported DockerTier1 --probe and host-safe2pytest pass. Earlier failed assertions and two image125 no-test launches are retained with their limits, not silently relabeled; final approved-replacement collision6/6 and code-default1/1 pass. The test helper has finished; no new whole-suite gate or next slice is requested. Native archived-draft read remains an unresolved public-CLI limit, not a waived requirement. Remaining normative/lifecycle/full integrated acceptance stays later. STOP now for owner review of this bounded committed/pushed slice2 candidate. In Progress,AC0/9; acceptedv1.53.0 authoritative. No merge, activation/global refresh/restart, live migration or cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -329,9 +337,9 @@ The disposable Nix access preflight is not acceptance: full native package build
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-PRIMECLAW-45 slice2 bounded migration lifecycle candidate is implemented and validated, pending one code publication. It reads native task archives in place, preserves status and archive meaning, leaves ordinary closed imports activeDone, accepts native archived/draft dependency eligibility, and refuses contested IDs before writes without a new index/allocator or transaction redesign. Exact raw source packages and baseline/publication/cutover/source-deletion ordering are preserved.
+PRIMECLAW-45 slice2 delivered for owner review at code 619676b21d5feef0c5b941d42c6d8b0378432b89, directly published on the SAME Episode branch. Five-path candidate: migration adapter, migration tests/bridge, docs/backlog link and bounded evidence note. Native task archives read in place; legacycompleted is archive; normalclosed staysactiveDone; explicitarchive preserves mappedDone/Blocked; native archived/draft dependency eligibility; contested-ID refusal before preparation via existing inventory/native checks. Exact packages, baseline bytes/history and one-way source-authoritative verification/publication/receipt/cutover/deletion-last ordering preserved.
 
-Evidence: docs/evidence/primeclaw45-migration-lifecycle-slice2-20261106.md. Required DockerTier1 --probe PASS; host-safe bridge2/2 PASS; representative allocation/archive/status/dependency/independent-baseline seams pass; final corrected collision6/6 and code-default1/1 PASS. Earlier failed tests and image125 launch refusals are retained with exact limits, not counted as a full passing suite. Native archived-draft read is unavailable and remains explicitly unresolved; no synthetic/relocated evidence or acceptance waiver.
+Evidence: docs/evidence/primeclaw45-migration-lifecycle-slice2-20261106.md. Required DockerTier1 --probe PASS, host-safe bridge2/2 PASS. Six representative top-level seams have passing evidence across retained runs; final collision6/6 and code-default1/1 PASS with0fail/skip. Failed intermediate tests and image125 launch refusals remain truthful separate receipts, not a passing full suite. Native archived-draft CLI read remains unavailable and unresolved; no synthetic/relocated evidence, upstream patch or waived requirement.
 
-Stop for owner review after this one committed/pushed candidate. TaskInProgress,AC0/9; acceptedv1.53.0 authoritative. Remaining normative assets/lifecycle/full integrated gates are not complete. No merge/global refresh/restart/live migration/cleanup.
+STOPPED for owner review. TaskInProgress,AC0/9. Acceptedv1.53.0 remains authoritative; remaining normative assets/lifecycle/full integrated gates are NOT complete. No merge/global refresh/restart/live migration/cleanup. Same owner/operation/host/worktree/branch/session/originalbasis preserved.
 <!-- SECTION:FINAL_SUMMARY:END -->
