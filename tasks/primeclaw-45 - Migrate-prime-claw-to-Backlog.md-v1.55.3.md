@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 15:06'
+updated_date: '2026-11-06 15:09'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -189,6 +189,12 @@ This handoff revalidated the exact active version2 independent-Backlog ownership
 2026-11-06 — Accepted slice1 Bun-isolation repair is implemented locally in docker/runtime.Dockerfile, with narrow regression assertions and directly affected docs/evidence. General sandbox bun/bunx and gbrain install/compile retain1.3.11; only the Backlog build/smoke RUN installs/exports1.4.4 under /opt/backlog-bun and removes it before later layers. No image-wide Backlog PATH/BUN_INSTALL change, upstream patch, Prime Agent Node change or runtime/dependency upgrade.
 
 Regression proof: the new/adjusted assertions failed on reported d4f8e79 (2fail/2pass); after repair the focused build/runtime/Tier1-image pytest selection passes49 cases, with one existing import-loader warning. A disposable Docker fixture is running the exact changed production blocks with exact upstream Backlog source and a gbrain-version sentinel fixture. This verifies intended tool selection, not full real-gbrain/OpenShell acceptance. Read-only implementation assistance is checking the diff separately; no owner acceptance is claimed. Raw repair receipts: .test-results/primeclaw45-slice1-bun-isolation-08450108/. Unchanged prior nativeNix/Git-trust/source proof remains applicable without a redundant rerun. No code commit yet; waiting for repaired-surface validation before one bounded code commit/push and owner review, before slice2. Status remains In Progress,AC0/9; acceptedv1.53.0 remains authoritative.
+
+2026-11-06 — Slice1 Bun-isolation repair validation PASS.49focusedpytest cases passed after regression-red2fail/2pass. Disposable native linux/arm64 Docker execution of verbatim production shared-Bun, Backlog and gbrain blocks passed; exact Backlog1.55.3 frozen install/native compile/upstream compiled smoke ran with1.4.4. A sentinel gbrain package postinstall and compiled CLI both proved1.3.11, and a later layer plus fresh --network none/no-mount container proved general bun/bunx1.3.11, original global symlinks/BUN_INSTALL, absent /opt/backlog-bun and /opt/backlog, exactBacklog1.55.3/help. This is changed-block/sentinel execution proof, not full real-gbrain/OpenShell image acceptance.
+
+Fixture image sha256:dc4621d1da3a86a91eab16636ba9edc48f503b8077135e3c807935b177d49e39; base verifiedsha256:453a366de89900503aaa2c4a27659c824e71e117fd024434d5bb639160b4531c; new fixture Backlog SHA25625fb5ca6a447331345407e4489b4153ffd7d7c722d62d0fd09ae3aaf934f9020. Read-only helper audit found no concrete defect, static-only. Initial fixture FROM rawsha invocation refused before any build step; retained failure, then inspected exact local base tag and corrected only fixture FROM. No product failure or credential/dependency change inferred. Exact commands, raw logs, fixture source and hashes: docs/evidence/primeclaw45-upstream-candidate-20261106.md and .test-results/primeclaw45-slice1-bun-isolation-08450108/. Prior unchanged freshNix/Git-trust/source and194Dockerfixture evidence is reused truthfully, not rerun or treated as proof of the original candidate's isolation. Backlog's source-local Bun peer is also1.4.4; no claim that a nested build must use one absolute executable path.
+
+Ready to publish one bounded four-path code repair for owner review: docker/runtime.Dockerfile, tests/test_backlog_build.py, docs/backlog.md, docs/evidence/primeclaw45-upstream-candidate-20261106.md. No plugin-source change; no slice2 or additional whole-suite gate at this boundary. Full integrated migration/lifecycle/Tier0/Tier1 gates remain later. Status stays In Progress,AC0/9; acceptedv1.53.0 remains authoritative. No merge, activation/global refresh/restart, live migration or cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
