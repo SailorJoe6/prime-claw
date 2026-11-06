@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Design
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-05 16:04'
+updated_date: '2026-11-06 14:29'
 labels: []
 dependencies: []
 references:
@@ -40,6 +40,8 @@ The unnecessary encoding is implemented by `backlogSourcePackage` (current data 
 ## Existing destination preservation and layout
 The project also has three original `backlog/` records (RPVA-1, RPVA-2, and a distinct archived RPVA-2) plus `backlog/config.yml.pre-migration`, parked under an earlier authorized workaround. Fresh preparation treats that parked store as absent: the records remain physically preserved but are not consolidated into selected `.backlog/`. Restoring its config alone hits the exact lifecycle capability gate. Preserve existing records/configuration and distinct same-ID archive/live records without renumbering or omission.
 
+Migration may add statuses needed by imported tickets when they are missing from the existing Backlog destination configuration. Retain existing statuses and unrelated settings; do not replace customization or demand one exact status list/order. This permission applies to Backlog only, not the retiring Beads source. Preserve and reconcile the known parked configuration under the same rule.
+
 Native Backlog discovers `.backlog/config.yml` without a root link. Prime Claw creates `backlog.config.yml -> .backlog/config.yml` and adds `/.backlog/` to .gitignore; it does not ignore the root link. The published task-history bootstrap e48f9069d1c074b20129443a4df8371b5ac80951 has only TASKS.md/config.yml, and a disposable fixture proved it reusable after local rollback.
 
 ## Evidence and authority
@@ -56,7 +58,7 @@ Joe previously requested logging this bug without blocking the recovery attempt 
 - [ ] #2 The migration neither requires nor imports Dolt/git-like revision history, old task snapshots, or database event history; no base64 export/history packages or equivalent archive blobs are embedded in tasks/comments or relocated to a newly created archive destination.
 - [ ] #3 Source/history completeness checks and destination verification are scoped to current ticket state, including relationships and actual comments, rather than historical revisions; a small current ticket with a long Dolt history does not trigger full-history capture or history-sized output.
 - [ ] #4 An operator-authorized interrupted import can recover through the exact existing destination or a bounded proven-disposable reset. Generated, unfinished records with no user changes may be recreated without preserving their allocated IDs; original records/IDs/configuration/history and user-modified records remain protected. Recovery leaves one complete verified import per source ticket, with no premature source retirement.
-- [ ] #5 Existing Backlog records/configuration are preserved and reconciled, including a known parked legacy config and distinct live/archive records sharing an ID; existing destination history is not needlessly rewritten or deleted.
+- [ ] #5 Existing Backlog records/configuration are preserved and reconciled, including a known parked legacy config and distinct live/archive records sharing an ID; existing destination history is not needlessly rewritten or deleted. Missing statuses needed by imported tickets may be added to Backlog while retaining existing statuses and unrelated settings; no exact status list/order or Beads configuration change is required.
 - [ ] #6 Ordinary supported cancellation promptly stops provider writes without force-shutting down the Prime Agent runtime and reports the stopped state with safe recovery evidence.
 - [ ] #7 Representative current-state migration performance is measured, progress/elapsed time are visible, and the importer avoids thousands of sequential CLI edits caused by unnecessary encoded revision chunks.
 - [ ] #8 Disposable tests cover readable current-state content, actual comments versus historical events, current relationship/status mapping, long-history sources without historical import, interruption/cancellation, same-destination recovery, and original Backlog coexistence.
