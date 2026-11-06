@@ -103,8 +103,13 @@ labels and the build stamp record the release and commit.
 
 The Backlog builders pin Bun `1.4.4`, matching upstream's documented/CI-selected
 toolchain. They use its native-platform standalone build, without the unchecked
-cross-target runtime download rejected by upstream. The separate gbrain
-integration-test toolchain in `config/test-artifacts.lock.json` is unchanged.
+cross-target runtime download rejected by upstream. In the sandbox image,
+`BACKLOG_BUN_VERSION=1.4.4` is installed under `/opt/backlog-bun` and added to
+`PATH` only inside the Backlog install/build/smoke `RUN`; that tool is removed
+before later layers. Global `bun`/`bunx` and gbrain install/standalone compilation
+retain `BUN_VERSION=1.3.11`. The gbrain build checks that version again. The
+separate gbrain integration-test toolchain in `config/test-artifacts.lock.json`
+is also unchanged; that lock alone does not establish runtime tool isolation.
 The build uses the vendored source. It does not install an npm package, download
 an upstream prebuilt binary, or require Bun to execute
 `backlog`. The Tier-1 image performs the same exact source/ancestry/smoke proof

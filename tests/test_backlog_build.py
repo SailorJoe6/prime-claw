@@ -33,15 +33,39 @@ def test_backlog_runtime_build_is_source_compiled_and_smoke_checked():
     dockerfile = (ROOT / "docker/runtime.Dockerfile").read_text()
     assert f"ARG BACKLOG_VERSION={VERSION}" in dockerfile
     assert f"ARG BACKLOG_COMMIT={COMMIT}" in dockerfile
-    assert f"ARG BUN_VERSION={BUN_VERSION}" in dockerfile
-    assert 'bash -s "bun-v${BUN_VERSION}"' in dockerfile
-    assert 'test "$(bun --version)" = "$BUN_VERSION"' in dockerfile
+    assert f"ARG BACKLOG_BUN_VERSION={BUN_VERSION}" in dockerfile
+    assert 'bash -s "bun-v${BACKLOG_BUN_VERSION}"' in dockerfile
+    assert 'test "$(bun --version)" = "$BACKLOG_BUN_VERSION"' in dockerfile
     assert "COPY --from=backlog_source . /opt/backlog" in dockerfile
     assert "rm -rf node_modules dist" in dockerfile
     assert "bun install --frozen-lockfile" in dockerfile
     assert "BACKLOG_BUILD_OUTFILE=/usr/local/bin/backlog bun run build" in dockerfile
     assert "bun scripts/smoke-compiled-build.ts /usr/local/bin/backlog" in dockerfile
     assert not re.search(r"npm (?:i|install).*backlog", dockerfile)
+
+
+def test_backlog_bun_is_scoped_away_from_gbrain_and_general_runtime():
+    dockerfile = (ROOT / "docker/runtime.Dockerfile").read_text()
+    shared_bun, backlog_and_after = dockerfile.split("# --- Backlog.md:", 1)
+    backlog, after_backlog = backlog_and_after.split("# --- Immutable downstream", 1)
+    gbrain = after_backlog.split("WORKDIR /opt/gbrain", 1)[1].split("# --- Postgres", 1)[0]
+
+    assert "ARG BUN_VERSION=1.3.11" in shared_bun
+    assert "ENV BUN_INSTALL=/usr/local/bun" in shared_bun
+    assert 'bash -s "bun-v${BUN_VERSION}"' in shared_bun
+    for tool in ("bun", "bunx"):
+        assert f"ln -sf /usr/local/bun/bin/{tool} /usr/local/bin/{tool}" in shared_bun
+    # This export lasts for one RUN only, including bun run's nested build command.
+    assert f"ARG BACKLOG_BUN_VERSION={BUN_VERSION}" in backlog
+    assert 'RUN export BUN_INSTALL=/opt/backlog-bun PATH="/opt/backlog-bun/bin:$PATH"' in backlog
+    assert "ENV " not in backlog
+    assert 'test "$(bun --version)" = "$BACKLOG_BUN_VERSION"' in backlog
+    assert "rm -rf /opt/backlog /opt/backlog-bun" in backlog
+    assert 'RUN test "$(bun --version)" = "$BUN_VERSION"' in gbrain
+    assert "&& bun install --frozen-lockfile" in gbrain
+    assert "&& bun build --compile" in gbrain
+    assert "/opt/backlog-bun" not in after_backlog
+
 
 def test_runtime_and_tier1_images_deliver_pinned_provider_native_tools():
     for relative in ("docker/runtime.Dockerfile", "docker/test.Dockerfile"):
@@ -56,6 +80,7 @@ def test_runtime_and_tier1_images_deliver_pinned_provider_native_tools():
         assert 'dolt version | grep -F "dolt version ${DOLT_VERSION}"' in dockerfile
         assert "sha256sum -c -" in dockerfile
     tier1 = (ROOT / "docker/test.Dockerfile").read_text()
+    assert f"ARG BUN_VERSION={BUN_VERSION}" in tier1.split("AS tier1_runtime", 1)[0]
     assert "https://github.com/MrLesk/Backlog.md.git" in tier1
     # The candidate is the exact unmodified release, not a downstream patch stack.
     assert 'fetch -q --depth 1 origin "refs/tags/v${BACKLOG_VERSION}:refs/tags/v${BACKLOG_VERSION}"' in tier1

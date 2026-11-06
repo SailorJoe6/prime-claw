@@ -194,3 +194,107 @@ full plugin Tier-1 validation remain for the integrated candidate. No skipped
 or unavailable required test is being treated as acceptance. The task remains
 In Progress with all full-upgrade ACs unchecked. Continue only the same approved
 Episode after owner review; no merge/activation is authorized by these results.
+
+## Accepted slice-1 review correction — Bun isolation
+
+Owner review of published code `d4f8e79a4300ae03d0393f363eb463d114b2f76a`
+accepted one concrete finding from independent Expert
+`openai-codex/gpt-6-astra`: the runtime Dockerfile globally installed Bun 1.4.4,
+so gbrain install/compilation and general sandbox `bun`/`bunx` also used it.
+The approved plan limits that advance to Backlog build/tests and preserves
+unrelated runtime/dependency versions. The unchanged gbrain test lock did not
+isolate actual runtime tools. No gbrain crash was observed or alleged.
+This finding supersedes the earlier read-only audit's no-defect conclusion;
+the prior source/build, Git-trust, Nix and fixture results remain historical
+proof of their stated checks, not proof of toolchain isolation. The owner also
+independently corroborated the prior 48 focused pytest and 194 Docker fixture
+passes, with no Docker skips.
+
+The bounded repair restores general sandbox/gbrain Bun 1.3.11. Only the Backlog
+`RUN` exports a temporary `/opt/backlog-bun` install and PATH for Bun 1.4.4,
+including the nested `bun run build` command and upstream compiled smoke. It
+removes that temporary tool afterward. Later gbrain install/compilation checks
+and uses the unchanged global pin. No new image-wide PATH or BUN_INSTALL is
+introduced for Backlog. Upstream source, host/Tier-1 builders, Prime Agent Node,
+source identities, gbrain dependencies and test artifact lock are unchanged.
+
+Narrow assertions in `tests/test_backlog_build.py` failed on the reported
+candidate (2 failed, 2 passed), then all 49 focused build/runtime/Tier-1-image
+pytest cases passed after the repair (one existing import-loader warning).
+A disposable Docker fixture now executes the verbatim production Bun,
+Backlog and gbrain build blocks, with exact Backlog source and a sentinel
+stand-in for gbrain; final execution evidence is recorded below. This is not
+a full OpenShell runtime image or real-gbrain integration acceptance claim.
+The unmodified upstream Nix/Git-trust and standalone build evidence above is
+reused; it is not rerun or represented as fresh repair evidence.
+
+### Executed repair checks
+
+The Docker fixture build passed on native `linux/arm64` (**exit 0**, 66.7s).
+The fixture uses the three production blocks verbatim, not rewritten shell
+commands. Its base tag `primeclaw45-backlog-builder:08450108` was inspected to
+resolve to the prior immutable builder ID
+`sha256:453a366de89900503aaa2c4a27659c824e71e117fd024434d5bb639160b4531c`. It supplies `deps/backlog` as the
+named `backlog_source` context after exact HEAD/clean-source checks. Its only
+other source is a tiny, dependency-free sentinel gbrain package. That sentinel
+asserts `process.versions.bun === "1.3.11"` in its postinstall and compiled CLI.
+It is not the real gbrain source or a substitute for its integration suite.
+
+Observed build log:
+
+- Global install: `/usr/local/bun/bin/bun`, Bun 1.3.11.
+- Backlog-only install: `/opt/backlog-bun/bin/bun`, Bun 1.4.4; frozen install,
+  native compilation and upstream compiled-binary smoke passed.
+- Backlog's lock also resolves a Bun peer to 1.4.4; `bun run build` may select
+  that source-local `.bin/bun`. Both possible build tools have the intended
+  pin, and the production RUN removes the whole source/node_modules tree plus
+  `/opt/backlog-bun`. No exact nested executable-path claim is made.
+- Next production gbrain RUN: `bun install v1.3.11`,
+  `gbrain_install_bun=1.3.11`, standalone compilation passed.
+- Later layer: `gbrain_compiled_bun=1.3.11`, `general_bun=1.3.11`,
+  `general_bunx=1.3.11`, `image_BUN_INSTALL=/usr/local/bun`, temporary tool absent.
+
+Resulting disposable fixture image:
+`sha256:dc4621d1da3a86a91eab16636ba9edc48f503b8077135e3c807935b177d49e39`.
+A fresh container ran with `--rm --network none` and **no mounts**, and passed
+version checks for `bun`, `bunx` and Backlog, the original global symlink targets,
+unchanged image BUN_INSTALL, absent Backlog source/tool directories, the compiled
+sentinel and Backlog help (**exit 0**). The new fixture's Backlog binary SHA-256
+is `25fb5ca6a447331345407e4489b4153ffd7d7c722d62d0fd09ae3aaf934f9020`. This is its own build receipt,
+not a claim of equality with the earlier `/tmp/backlog` outputs above.
+
+Commands are in the retained local `commands.json`; the generated disposable
+`docker-fixture/Dockerfile` and sentinel inputs remain alongside it under
+`.test-results/primeclaw45-slice1-bun-isolation-08450108/`.
+For reproduction: generate the same fixture from the shared Bun block through
+`# --- Beads`, Backlog block through `# --- Immutable downstream`, and gbrain
+block through `# --- Postgres data dir` in `docker/runtime.Dockerfile`; use the
+recorded builder base and exact clean source context. Generate the sentinel's
+empty lockfile with Bun 1.3.11 before executing the gbrain block, as recorded
+in the fixture. No host task store, dependency tree, credentials or live plugin
+is mounted or activated.
+
+The initial fixture build failed before executing any build step: Docker treated
+`FROM sha256:...` as an unresolvable registry repository. It is retained as a
+failed fixture invocation, not a failed production build or passed check.
+The successful run uses the inspected existing local tag for that exact base;
+no dependency, credential, remote or production-code change addressed it.
+A read-only RLM audit found no concrete repair defect; it ran no tests and is
+not owner acceptance.
+
+| Repair receipt | SHA-256 |
+| --- | --- |
+| `regression-red.log` | `7260cabcef41a5c1b788d3c0dc33eef56aa5e1d154e234651cb55817cdd67b20` |
+| `focused-pytest.log` | `c3a38e69459bc6c88e3bc2982a901b92d4792740194e8b3471c866749556cb8d` |
+| `docker-fixture-build.log` | `62b0978a1f75be04ad93751e97a547be1e53306f39c6ba0ba2467487ee8cc4c1` |
+| `docker-fixture-build-with-local-tag.log` | `2d43f65d54ca0b39e5a325ced7e765edf1a9e40e4ceb287775a7f80ce007bdd2` |
+| `offline-image-smoke.log` | `d68a20d29e33b76c6a774f97a42ffa9910c70244cbe867ba92c68b3f5ce64e9f` |
+| `commands.json` | `d215494ace72e539cc52ae183ba513c2fd090e2af30f0f3479bb4d3ca213deb8` |
+| `docker-fixture/Dockerfile` | `0694e6fda53a40be1464d7d0e0bad376fe019981fd97466299edf77ccf328914` |
+
+Only this slice-1 repair is delivered for owner review. There is no slice-2
+implementation, full real-gbrain/OpenShell image claim, merged/activated
+upgrade, live migration, or cleanup. Unchanged native Nix/Git-trust and prior
+194-case fixture evidence is reused within its stated limits. Full integrated
+migration/lifecycle and Tier-0/Tier-1 acceptance remains required later; task
+status stays In Progress with all full-upgrade criteria unchecked.

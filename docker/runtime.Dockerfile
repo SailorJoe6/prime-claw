@@ -62,8 +62,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && pg_dropcluster --stop 16 main 2>/dev/null || true
 ENV PATH="/usr/lib/postgresql/16/bin:$PATH"
 
-# --- Bun (pinned build tool for reproducible Backlog.md and gbrain binaries) ---
-ARG BUN_VERSION=1.4.4
+# --- Bun (unchanged gbrain build tool and general sandbox bun/bunx) ---
+ARG BUN_VERSION=1.3.11
 ENV BUN_INSTALL=/usr/local/bun
 RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" \
     && ln -sf /usr/local/bun/bin/bun /usr/local/bin/bun \
@@ -97,17 +97,22 @@ RUN set -eux; \
 # --- Backlog.md: compile the exact unmodified upstream release for this image ---
 ARG BACKLOG_VERSION=1.55.3
 ARG BACKLOG_COMMIT=0cf4fdbc70020327f4366a29d3f405f83d180301
+ARG BACKLOG_BUN_VERSION=1.4.4
 LABEL org.prime-claw.backlog-version="${BACKLOG_VERSION}" \
       org.prime-claw.backlog-commit="${BACKLOG_COMMIT}"
 COPY --from=backlog_source . /opt/backlog
 WORKDIR /opt/backlog
-RUN test -f package.json && test -f bun.lock && test -f scripts/smoke-compiled-build.ts \
+# Keep Bun 1.4.4 off the image PATH and remove it after this build/smoke RUN.
+RUN export BUN_INSTALL=/opt/backlog-bun PATH="/opt/backlog-bun/bin:$PATH" \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v${BACKLOG_BUN_VERSION}" \
+    && test "$(bun --version)" = "$BACKLOG_BUN_VERSION" \
+    && test -f package.json && test -f bun.lock && test -f scripts/smoke-compiled-build.ts \
     && rm -rf node_modules dist \
     && HUSKY=0 bun install --frozen-lockfile \
     && BACKLOG_BUILD_VERSION="$BACKLOG_VERSION" \
        BACKLOG_BUILD_OUTFILE=/usr/local/bin/backlog bun run build \
     && bun scripts/smoke-compiled-build.ts /usr/local/bin/backlog "$BACKLOG_VERSION" \
-    && rm -rf /opt/backlog
+    && rm -rf /opt/backlog /opt/backlog-bun
 
 # --- Immutable downstream Prime Agent TypeScript source + lockfile deps ---
 # This public clone is an upstream dependency input, not a source patch/vendor
@@ -140,7 +145,8 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec /opt/prime-agent/prime-agent.sh "$
 # operator's local zbrain checkout (PRIME_CLAW_ZBRAIN_SRC).
 COPY runtime/gbrain /opt/gbrain
 WORKDIR /opt/gbrain
-RUN bun install --frozen-lockfile \
+RUN test "$(bun --version)" = "$BUN_VERSION" \
+    && bun install --frozen-lockfile \
     && TARGET=$(case $(uname -m) in aarch64|arm64) echo "bun-linux-arm64";; *) echo "bun-linux-x64";; esac) \
     && bun build --compile --target=$TARGET --outfile /usr/local/bin/gbrain src/cli.ts \
     && rm -rf /opt/gbrain
