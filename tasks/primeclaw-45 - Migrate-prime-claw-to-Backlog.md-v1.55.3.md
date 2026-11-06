@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-06 14:51'
+updated_date: '2026-11-06 15:00'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -139,6 +139,16 @@ The exact upstream source/build slice is implemented and published at code d4f8e
 Verified evidence: 48 focused pytest cases; 194 Docker fixture cases with the real candidate available (0 failures/skips in the final run); standalone builder and repository build-script compiled smoke; native Git trust/private-proxy regression (1 pass, 4 assertions); supported Tier-1 image smoke; fresh native aarch64-linux Nix package build plus installCheck persistence/failed-write smoke, exact1.55.3 version/help and derivation log. Details/limits: docs/evidence/primeclaw45-upstream-candidate-20261106.md.
 
 This is one slice for owning-Conversation review, not complete PRIMECLAW-45 acceptance. Next implementation remains approved slice2, then lifecycle/migration tests and normative assets, followed by full integrated Tier0/Tier1 acceptance. No AC has been checked. Accepted v1.53.0 remains authoritative; no merge, activation/restart, live migration or resource cleanup is included.
+
+## Accepted slice-1 revision — Bun isolation (2026-11-06)
+
+This checkpoint supersedes the preceding instruction to advance directly to slice2. Revise the reported slice1 code d4f8e79a4300ae03d0393f363eb463d114b2f76a in this same Episode first, then stop for owner review of the tested committed/pushed repair.
+
+Owner accepted one concrete finding from independent Expert openai-codex/gpt-6-astra: docker/runtime.Dockerfile globally upgrades Bun1.3.11 to1.4.4, so gbrain install/standalone compilation and general sandbox bun/bunx use1.4.4 too. The approved plan limits1.4.4 to Backlog build/tests and preserves other runtime/dependency versions. Keeping config/test-artifacts.lock.json at1.3.11 did not isolate the actual gbrain/runtime toolchain. No crash is alleged.
+
+Make the smallest repair that isolates Bun1.4.4 to Backlog build/smoke while preserving Bun1.3.11 for gbrain and general runtime. Add narrow regression assertions that both build paths use their intended pinned tools. Update directly affected docs, evidence, fixtures and native living task content truthfully. Reuse unchanged exact-source/build/Git-trust/fresh-Nix proof where applicable; run checks needed for the repaired surfaces, without inventing a new whole-suite gate at this slice boundary. Full integrated migration/lifecycle/Tier0/Tier1 acceptance remains required later. No new framework, upstream patch, Prime Agent Node change, Expert-branch movement or activation.
+
+Same owner/operation/host/worktree/branch/session and original code basis remain bound. Acceptedv1.53.0 stays authoritative. No slice2, merge, global artifact refresh/restart, live migration or cleanup in this revision pass.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -171,6 +181,10 @@ Fresh Nix result is now PASS, not access preflight: official disposable image ni
 Supported scripts/test-tier1.sh --smoke also passed with immutable image sha256:13b357723400a656eb48c8fb94712f252193f95f6412ca949a3d8e304e304ced, network absent, verified teardown and native manifest. This is image/toolchain smoke, not full plugin acceptance. Final changed-fixture run in that Docker image passed all194 cases with0 skipped after supplying the image candidate at the existing test's expected disposable path; the earlier run's single missing-artifact skip is explicitly retained as historical evidence, not treated as passed. The48 focused pytest checks, standalone/repository compiled smokes and1-test/4-assertion Git trust proof were already published above.
 
 Evidence: docs/evidence/primeclaw45-upstream-candidate-20261106.md; raw local command/log receipts under .test-results/primeclaw45-slice1-08450108/. The independent read-only slice audit found no concrete defect and is not owner acceptance. Full migration/lifecycle behavior, normative guidance/asset conversion and complete Tier0/Tier1 suites remain unfinished; no AC or whole-upgrade success claim. Stop here for owner review of this one bounded slice. Task lifecycle remains In Progress and accepted v1.53.0 stays authoritative.
+
+Accepted review and bounded revision handoff (2026-11-06). Owner reviewed exact published d4f8e79a4300ae03d0393f363eb463d114b2f76a and accepted the Bun-isolation defect described in the appended living-plan checkpoint. Source: /Users/jlanders/.prime/agent/session-artifacts/01a1a90b-0fba-7778-b1e5-0087bdaf8fec/primeclaw45-slice1-review/accepted-review.md. Existing upstream/tag cleanliness, raw-log hashes, compiled smokes/matching binaries, native Git trust and fresh Nix installCheck persistence/failed-write evidence were otherwise corroborated. Owner independently reran48focusedpytest and194Dockerfixture cases, all passed with0Docker skips. These results do not prove runtime tool isolation and do not waive the accepted repair or later full-upgrade gates.
+
+This handoff revalidated the exact active version2 independent-Backlog ownership and matching Episode session file. Canonical owner checkout remains on main. Code remains clean and directly published at d4f8e79a4300ae03d0393f363eb463d114b2f76a on the recorded Episode branch. Episode task clone is clean at directly published b1bac9f2b005532c01a652854c8a4c575d39dffd; this compatible history includes the original2b6d3d6 selected-task checkpoint plus unrelated56-only advances. Current native45 identity/path/parent/status and approved contract are unchanged. No lifecycle mutation, code implementation change, resource replacement, new initial assignment or extra execute delivery occurs in handoff. Next queued execute is the slice1 Bun-isolation revision only; stop for owner review before slice2.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -244,9 +258,9 @@ The disposable Nix access preflight is not acceptance: full native package build
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-PRIMECLAW-45 slice1 candidate delivered for review at code d4f8e79a4300ae03d0393f363eb463d114b2f76a (published refs/heads/JLanders/prime-claw-primeclaw-45-episode-08450108). Pins the unmodified upstream v1.55.3 commit0cf4fdbc70020327f4366a29d3f405f83d180301 and Backlog Bun1.4.4 across source/build/runtime/test/provenance; native-platform build avoids the new cross-target guard. No upstream patch, Prime Agent Node upgrade or live activation.
+Slice1 candidate d4f8e79a4300ae03d0393f363eb463d114b2f76a is published, but owner review requires one in-scope repair before slice2: isolate Backlog build/smoke Bun1.4.4 from gbrain and general runtime Bun1.3.11. The first candidate inadvertently upgraded their shared executable; retaining the separate gbrain test lock did not isolate runtime use. No crash is alleged.
 
-Evidence:48 focused pytest cases;194 Docker fixture cases,0 fail/skip in the final run; standalone and repository build-script compiled smoke; native Git trust regression1 pass/4 assertions; Tier-1 image smoke; fresh native Nix package/installCheck persistence and failed-write smoke with exact1.55.3 version/help. See docs/evidence/primeclaw45-upstream-candidate-20261106.md for exact source/image/derivation/log identities and limits.
+Existing exact-upstream/build/Git-trust/fresh-Nix evidence is retained and otherwise corroborated, including owner48focusedpytest and194Dockerfixture passes. It is not proof of the required tool separation. Next pass will make the smallest repair, add narrow assertions, update affected evidence/task content, and deliver a tested committed/pushed revision for owner review.
 
-Only slice1 is delivered. Migration/lifecycle implementation, remaining guidance/assets and full integrated Tier0/Tier1 acceptance remain required. All full-upgrade ACs stay unchecked; task remains In Progress for the owner. No merge, global artifact refresh, restart, live migration or cleanup. Accepted v1.53.0 remains authoritative.
+No slice2 or full-upgrade acceptance yet. Task remains In Progress withAC0/9. Same Episode/resources and original code basis continue; acceptedv1.53.0 stays authoritative. No merge, activation/restart, live migration or cleanup.
 <!-- SECTION:FINAL_SUMMARY:END -->
