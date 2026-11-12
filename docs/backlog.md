@@ -18,13 +18,30 @@ cleanliness and rollback details below are historical, not instructions to resto
 
 ## Requested creation and failure decisions
 
+Before fresh `create_task_episode`, the invoking LLM follows editable implementation
+guidance to finish native prerequisite checks that need no Episode resources:
+
+- selected-ticket history and publication through the selected native provider;
+- the chosen code base's execute workflow and task-store configuration;
+- selected placement and runtime availability; and
+- provider remote/store configuration and transport that can be checked without
+  an allocated worktree.
+
+Use supported native operations and inspect their actual results, not a new code
+preflight gate or approval protocol. A known failure stops before creation with
+no new reservation or Episode resources; report the actual native task status.
+Target-worktree clone materialization, durable-session creation and the initial
+assignment remain after allocation, not prerequisite checks.
+
 Task-native create performs the caller-requested In Progress native operation,
 then reserves and allocates the exact task resources. It does not independently
 judge lifecycle status, plan/design, code-base suitability, whole-checkout dirt,
 or compatible changing native views. Existing implementation Markdown owns those
 decisions. Native failures and exact resource/identity mismatches still report
-truthfully. On failure, native task state and existing ownership/resources remain;
-code no longer chooses In Planning rollback versus Blocked publication. The owning
+truthfully. A failed native status publication must be inspected: the task may
+have changed locally or reached history, and failure is not proof of rollback.
+On failure, native task state and existing ownership/resources remain; code no
+longer chooses In Planning rollback versus Blocked publication. The owning
 Conversation inspects current task/history/resource/session/assignment facts and
 chooses any supported status/note publication through editable guidance. Backlog
 remains selected-file-only; Beads retains approved multi-issue commit consequences
@@ -176,6 +193,23 @@ history need factual recovery, not automatic reconciliation or a dependency patc
 Independent task-only failure reporting does not require clean or pushed parent
 code. These source behaviors do not imply live activation.
 
+For incomplete version-2 creation, the exact owning Conversation follows
+**Owner-led creation recovery** in `.prime-claw/workflows/implement-task.md`
+before active-session or Episode-report checks. It inspects current task,
+resource, saved/live session and initial-assignment evidence, then makes only a
+justified targeted ownership update using the existing registry lock,
+selected-entry compare-before-edit and verification reread. All other owners
+and original bindings survive. This owner-only exception is not permission for
+an Episode or Expert to edit ownership. Keep truthful Blocked until clearance;
+restore/publish In Progress only if needed before initial execution. Failed
+publication must report local versus published state, not assumed rollback.
+The existing independent-Backlog/Orca `operationId`/`sessionId` seam completes
+only its supported missing preparation/launch or binds an already assigned
+session without sending again. Unsupported remaining shapes are reported as
+concrete interface limits; ambiguous delivery is inspected, never replayed.
+Branch/worktree deletion remains an exceptional separately operator-authorized
+workaround, not the recovery design.
+
 The global `plan` skill and `plan_task({"taskId":"TASK-ID"})` tool resolve
 one exact task through the live native provider and admit it only in canonical
 `In Design` or `In Planning`. They preload the project-customizable
@@ -207,6 +241,7 @@ in the managed `implement-task` workflow. Backlog runs ordinary `prepare`;
 Beads performs the same repository-orientation reads while skipping the
 Backlog-only queue inventory so preparation cannot select or mix providers.
 
+After the [pre-allocation native checks](#requested-creation-and-failure-decisions),
 `create_task_episode` performs the caller-requested native In Progress mutation,
 then reserves and allocates exact selected resources. Existing editable readiness
 guidance owns lifecycle, plan/design, selected-ticket publication and code-basis

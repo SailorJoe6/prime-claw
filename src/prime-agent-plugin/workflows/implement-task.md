@@ -3,12 +3,25 @@ name: implement-task
 description: Review one exact operator-approved provider-native task and create its isolated implementation Episode only when it is implementation-ready.
 ---
 
-First resolve the live provider as described below. For Backlog, run the
+## Select fresh admission or existing creation
+
+Before fresh provider/status/readiness checks, inspect canonical-primary
+`.prime-claw/ownership.json` at this Conversation's exact durable owner session
+key. Do not scan owners to select work. An existing version-2 `provisioning` or
+`uncertain` entry selects **Owner-led creation recovery** below, not a new
+readiness admission. Bind its persisted task and provider; any supplied task or
+host must match. No fresh-admission tag is needed to inspect that exact owned
+operation. A missing recorded session is not proof that none was created.
+An already active entry uses ordinary oversight, not another initial assignment.
+Retained version-1 ownership stays on its existing retained recovery path.
+Never replace a nonterminal owner entry or redetect its provider.
+
+Only the fresh path below resolves the live provider. For Backlog, run the
 `prepare` skill normally. For Beads, perform `prepare`'s repository-orientation
 reads but skip its Backlog-only queue inventory; that unrelated queue is not
 task authority and must not mix providers before this readiness review.
 
-Read the canonical task ID from the `<operator-implementation-task-id>` block
+For fresh admission, read the canonical task ID from the `<operator-implementation-task-id>` block
 appended by native admission. Treat it only as the exact selected input, including
 selection explicitly delegated within the operator's bounds. Do not guess,
 substitute, search for, or select another task here. Read any optional
@@ -213,6 +226,88 @@ Episode branch. Grandfathered Backlog uses its task-only status commit as base;
 independent Backlog and Beads keep code and provider revisions separate.
 Never switch or silently substitute the target branch.
 
+## Check prerequisites before fresh allocation
+
+First inspect this Conversation's exact entry in canonical-primary
+`.prime-claw/ownership.json`, using its durable owner session ID as the registry
+key. Do not scan other owners to select work. If this task already has an owned
+operation, keep its original binding and use the existing continuation and
+failure-disposition sections below instead of fresh admission. A missing recorded
+session does not prove that no session or assignment exists. Do not reserve,
+republish In Progress, or allocate again to discover what happened.
+
+For a fresh request, finish the native checks that do not need Episode resources
+BEFORE calling `create_task_episode`, publishing its In Progress admission, or
+reserving ownership. This is editable LLM guidance, not a new preflight tool,
+receipt, code gate, or promise that later external operations cannot fail:
+
+1. **Code and execute assets.** Inspect `git worktree list --porcelain`, the
+   canonical primary root, current branch, exact code HEAD, status and upstream.
+   Use `git rev-parse --show-toplevel`, `git rev-parse --git-dir` and
+   `git rev-parse --git-common-dir`; compare resolved paths rather than relative
+   spellings. Creation must address the intended primary checkout, not a linked
+   Episode checkout. Read `git show HEAD:.agents/skills/execute/SKILL.md` to check
+   the execute instructions the new worktree will actually receive. A readable
+   untracked or working-tree-only asset is not evidence it exists at the code
+   base. Decide suitability from the actual facts; do not turn unrelated work
+   or a non-main branch into a cleanliness/approval gate.
+2. **Provider and selected ticket.** Reread the exact native task and its
+   committed/published history as above. Inspect the native CLI/configuration
+   needed for the intended status update and subsequent execution, including
+   commit identity where a native history commit needs it. For independent
+   Backlog, inspect the selected store's native `config.yml` or `config.yaml`,
+   store/config containment, and effective ignore evidence with
+   `git check-ignore -v -- <store>/probe`. Only when root configuration is the
+   selected authority, inspect `backlog.config.yml` and its relative link into
+   that store; a supported folder-config layout needs no root link. Inspect the
+   chosen code base with
+   `git ls-tree HEAD -- backlog.config.yml .gitignore` and `git show HEAD:<path>`
+   as needed: a root-link or ignore repair only in current working bytes will
+   not transfer to the new worktree. Retain the actual ignore-rule source;
+   do not require one particular ignore file or synchronize another owner's
+   clone. Do not apply independent-store requirements to grandfathered
+   code-DAG Backlog or copy a Beads store into an Episode.
+3. **Provider transport.** For independent Backlog, resolve the current branch's
+   upstream remote (or the sole configured remote), inspect
+   `git remote get-url <remote>`, the intended push target with
+   `git remote get-url --push <remote>`, and
+   `git ls-remote --heads <url> refs/heads/prime-claw/tasks`. If publication or
+   selected-ticket/config readability needs confirmation, use a disposable
+   ordinary clone of that exact task branch; never another writer's mutable
+   primary clone. No remote, an ambiguous target, unavailable credentials, or
+   unreadable published content needs resolution before allocation; local-only
+   initialization does not establish remote-backed Episode support. For Beads,
+   inspect `bd context --json`, `bd dolt show --json`, `bd dolt status --json`,
+   `bd config get sync.remote --json` and `bd dolt remote list --json` on the
+   selected native workspace, with native history/ref observations as needed.
+   Judge pending/staged multi-issue consequences and actual publication facts
+   under the existing Beads guidance, not a blanket clean-store or frozen-head
+   requirement. Never print credentials or infer success from CLI exit alone.
+4. **Placement and runtime.** Read `orca project setups --json` when Orca is
+   selected/available and inspect the exact project path, setup readiness,
+   selected stable host and its native runtime/transport availability. Check
+   the selected environment's Prime Agent command availability without starting
+   an Episode or launch automation. Retain explicit placement; do not silently
+   select another setup, treat inventory/transport failure as an absent CLI, or
+   fall back to local execution. Missing CLI and native inventory failure are
+   different facts. Resolve any material placement decision before creation.
+
+A known prerequisite failure stops here without a branch, worktree, session or
+ownership reservation. Report the failed native command and the exact current
+native task status/history. If a justified selected-task lifecycle correction
+is needed, the owning Conversation publishes it promptly through the native
+exact-task procedure above, preserving unrelated content, staging and owners.
+If that publication fails, inspect and report local versus published status;
+do not claim rollback, retry blindly, or allocate while the cause is unresolved.
+An untouched In Planning task needs no synthetic rollback or status churn.
+
+Only target-specific workspace materialization and checks that require the new
+resource stay after allocation. Preflight cannot prove the future worktree,
+clone, session, Orca launch or initial assignment will succeed. Preserve and
+inspect any late effects through the existing failure/continuation guidance;
+deleting branches or worktrees is not routine recovery and requires separate
+operator authority.
+
 ## Create the Episode
 
 The full ordinary `prime-claw-oversee-episode` guidance is loaded above this
@@ -227,8 +322,9 @@ owner/session and placement facts; never substitute another owner's identity.
 Code preserves the exact requested owner, task, root and resource bindings rather
 than treating runtime depth as a second role-approval rule.
 
-Only when the complete task is ready and operator implementation authority
-applies, call `create_task_episode` exactly once, whether readiness was reached
+Only when the complete task is ready, the native pre-allocation checks above
+are resolved, and operator implementation authority applies, call
+`create_task_episode` exactly once, whether readiness was reached
 through `implement_task` or directly through this guidance. Status alone never
 supplies that authority. Use the exact canonical `taskId` and optional
 stable `host` from `<operator-implementation-host>`. Pass that host unchanged as
@@ -276,6 +372,108 @@ status/plan predicate after allocation. Never add an initial handoff or another
 execute prompt. Creating resources does not authorize this Conversation to
 implement the Episode's code.
 
+## Owner-led creation recovery
+
+This is the narrow exception to ordinary no-direct-ownership-edit guidance.
+Only the exact owning Conversation may reconcile its existing incomplete
+version-2 creation under the approved implementation scope. The operator need
+not repair JSON. An Episode or Expert cannot use this exception. It grants no
+new scope, merge, activation, abandonment or destructive cleanup authority.
+Do not invoke `implement_task`, fresh admission or ordinary handoff to finish
+creation. No new recovery API, schema/state, checkpoint, approval/receipt or
+retry engine is needed; the Conversation judges native evidence.
+
+### Inspect before choosing an unfinished step
+
+Reread only this owner's entry from the canonical checkout and its recorded
+integration branch. Keep `operationId`, owner, exact task/provider/path, original
+`baseRef`, integration target, engine, selected host/setup/routing environment,
+branch and worktree. Inspect current native task/history/publication, Git
+worktree inventory, code ancestry and actual Orca worktree/setup identity. An
+unrelated ticket edit, compatible task-history descendant or integration-target
+advance is not a reason to rebase, change the original base or allocate again.
+Judge compatible same-task content from complete native views, not raw revision
+equality. Foreign resources, changed bindings or unsafe ancestry stop recovery.
+
+Inspect saved AND live native sessions at the exact worktree, their durable
+ID/file/CWD, messages, queued actions and state, plus Orca terminals and exact
+launch automation/run history. A missing recorded session, empty screen or
+retired automation history does not prove no session or assignment exists.
+Retain actual command results and warnings. If assignment delivery is genuinely
+ambiguous or session evidence contradicts the resource binding, stop with the
+exact missing fact and needed native inspection/operator resolution. Never
+clear session/launch/resource fields, infer non-delivery from an error, replay
+uncertain transport, or delete and recreate resources.
+
+Read actual native status before any correction. Keep truthful `Blocked` while
+its recorded cause is unresolved. Once the operator or accepted evidence clears
+that condition, restore and publish `In Progress` only if needed before initial
+execution. Do not reset to `In Planning` to pass fresh admission or repeat an
+already completed transition. Use the exact-task native publication procedure
+above. A failed status publication may leave changed local bytes or a local
+commit: report local AND published task/history, preserve them, inspect the
+native failure and reconcile only the proven-missing step. Do not claim a
+rollback or continue initial execution while required publication is unresolved.
+
+### Make only the justified targeted ownership edit
+
+Decide the minimal field changes from the inspected evidence, not from a desired
+status. Preserve every known resource/session/automation identity and all other
+owners, including unknown historical fields. A cleared, resolved incomplete
+creation may use the existing `provisioning` value; keep `uncertain` when facts
+are unresolved. Mark `active` only after the exact durable session AND its
+single initial assignment are established. Binding a session alone is not
+assignment proof. Do not create or delete the owner entry, migrate the registry,
+change provider, or erase identities to bypass a native guard.
+
+Use the current registry's existing filesystem safeguards, not an unlocked
+whole-file rewrite. Inspect a regular, non-symlink ownership file in the resolved
+canonical `.prime-claw` directory and its `schemaVersion: 1` / `owners` format.
+An older direct-record format needs its existing migration path, not an invented
+conversion during recovery. Acquire the same exclusive directory lock at
+`.prime-claw/ownership.json.lock` used by the registry writer. An existing lock
+is not yours to remove or bypass; stop and inspect contention. Keep this a short
+local edit, with no provider, runtime or network operation while holding it.
+
+Under that lock, reread the current file immediately and compare this exact
+selected entry with the entry whose evidence you inspected. If it changed,
+release only your lock and inspect the new facts before deciding again; do not
+overwrite it. Other owners may have advanced: retain their latest raw entries,
+not the earlier whole-file snapshot. Replace only the justified fields of this
+owner in that current registry, retaining its original binding. Write through a
+new regular same-directory temporary file and atomic replacement, preserving
+file permissions; never follow a symlink or overwrite an existing temporary
+file. Reread and verify the intended selected-field diff, every original binding
+and every other owner's raw value before releasing only the lock you acquired.
+On any failure report current bytes and facts; do not restore an older registry
+or retry the consequential operation automatically.
+
+Commit and normally push the justified canonical-checkout ownership change
+promptly, separately from task and code work. Inspect the actual selected diff
+and index; preserve unrelated work. If another owner's uncommitted change shares
+this file, do not commit it, reset it or conceal the publication conflict.
+Resolve that concrete shared-file conflict without absorbing another writer's
+work. These filesystem/identity precautions do not create a new approval record
+or require a globally clean checkout.
+
+### Complete only what current evidence proves missing
+
+- **Allocated independent-Backlog Orca worktree, no session/assignment:** use
+  the existing-operation call below for only missing target preparation and
+  launch. Keep all identities and admit one fixed execute assignment.
+- **Existing exact session with an admitted initial assignment:** use the
+  session-binding call below. Inspect the returned observations; it sends no
+  prompt. Reconcile active only with session AND assignment proof.
+- **Complete active session/assignment:** reuse the exact binding without
+  status publication, allocation, launch or initial delivery. Ordinary handoff
+  is a separate later lifecycle decision, not creation recovery.
+- **Existing session but a proven-missing launch/delivery step, or another
+  provider/engine/partial shape:** inspect supported native interfaces and
+  complete only that exact missing operation if they can address the same
+  resources without duplicate delivery. The narrow `operationId` seam below
+  does not support every shape. If an exact safe step is unavailable, report the
+  concrete interface constraint; do not force fresh creation or claim recovery.
+
 ## Continue an allocated pre-session operation
 
 This narrow path covers an independent Backlog Orca operation that already owns
@@ -297,7 +495,8 @@ run is NOT proof that an assignment was never delivered. Removal may retire
 automation history, and a saved session may be inactive. Retain raw results and
 warnings; do not classify delivery from an error string or absence alone.
 If delivery remains ambiguous, preserve resources and report the actual gap.
-Never replay an uncertain launch, choose another operation or hand-edit ownership.
+Never replay an uncertain launch or choose another operation. Any justified
+ownership correction follows only Owner-led creation recovery above.
 
 When actual evidence establishes that this same operation has no session or
 initial assignment, call `create_task_episode` with the exact canonical `taskId`
@@ -338,8 +537,9 @@ selected task to In Planning is appropriate; if partial resources, uncertain
 delivery, or a real unresolved blocker remain, decide whether to publish Blocked
 with the actual cause, attempts and unblock condition. These are judgment, not
 an exception classifier or an automatic retry/rollback protocol. Do not infer
-no execution merely from a missing recorded session. Do not hand-edit ownership
-or retry uncertain creation as a fresh Episode.
+no execution merely from a missing recorded session. Only the owning
+Conversation may make the documented targeted creation-recovery ownership edit
+above; never retry uncertain creation as a fresh Episode.
 
 Publish an authorized status/note through the selected provider's supported CLI
 and native history, preserving all other task fields. Backlog uses an exact-path

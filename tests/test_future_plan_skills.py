@@ -698,6 +698,20 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
     ):
         assert obsolete not in implement
 
+    # Prerequisite ordering is editable guidance, not a second code gate.
+    assert implement.index("## Check prerequisites before fresh allocation") < implement.index("## Create the Episode")
+    for fragment in (
+        "BEFORE calling `create_task_episode`",
+        "git show HEAD:.agents/skills/execute/SKILL.md",
+        "git ls-remote --heads <url> refs/heads/prime-claw/tasks",
+        "orca project setups --json",
+        "without a branch, worktree, session or ownership reservation",
+        "inspect and report local versus published status",
+        "Only target-specific workspace materialization",
+        "use the existing continuation and failure-disposition sections",
+    ):
+        assert fragment in implement
+
     # Installed prep policy may differ until deliberate candidate activation.
     for name in ("implement-task-prep", "implement-task"):
         source = workflow(name)
@@ -1113,3 +1127,251 @@ def test_documented_backlog_publication_commands_preserve_literal_task_isolation
     if topology == "independent":
         assert run(project, "git", "rev-parse", "HEAD").stdout.strip() == code_head
         assert run(project, "git", "ls-files", "--stage", "-z").stdout == before_code_index
+
+
+def test_creation_recovery_is_owner_led_before_fresh_admission() -> None:
+    text = " ".join(workflow("implement-task").read_text().split())
+    assert text.index("## Select fresh admission or existing creation") < text.index("## Reload and review implementation readiness")
+    recovery = text.split("## Owner-led creation recovery", 1)[1].split("## Continue an allocated pre-session operation", 1)[0]
+    for fragment in (
+        "Only the exact owning Conversation",
+        "An Episode or Expert cannot use this exception",
+        "saved AND live native sessions",
+        "report local AND published task/history",
+        "Mark `active` only after the exact durable session AND its single initial assignment are established",
+        "`.prime-claw/ownership.json.lock`",
+        "Other owners may have advanced: retain their latest raw entries",
+        "new regular same-directory temporary file and atomic replacement",
+        "before releasing only the lock you acquired",
+        "do not commit it, reset it or conceal the publication conflict",
+        "The narrow `operationId` seam below does not support every shape",
+    ):
+        assert fragment in recovery
+    assert "Never replay an uncertain launch, choose another operation or hand-edit ownership" not in text
+    assert "Do not hand-edit ownership or retry uncertain creation" not in text
+    assert (ROOT / ".prime-claw/workflows/implement-task.md").read_bytes() == workflow("implement-task").read_bytes()
+
+
+def test_documented_creation_preflight_native_failure(tier1_container, ctmp) -> None:
+    """Exercise the documented reads; this is not an automated LLM recovery test."""
+    repo = ctmp / "preflight-code"
+    store = repo / ".backlog"
+    store.mkdir(parents=True)
+    origin = ctmp / "tasks.git"
+    evidence = []
+
+    def native(cwd, *args, check=True):
+        result = tier1_container.run(*args, workdir=str(cwd))
+        evidence.append({"command": list(args), "exit": result.returncode,
+                         "stdout": result.stdout, "stderr": result.stderr})
+        if check:
+            assert result.returncode == 0, result.stdout + result.stderr
+        return result.stdout.strip()
+
+    native(repo, "git", "init", "-q", "-b", "main")
+    native(store, "git", "init", "-q", "-b", "prime-claw/tasks")
+    for cwd in (repo, store):
+        native(cwd, "git", "config", "user.name", "Preflight fixture")
+        native(cwd, "git", "config", "user.email", "preflight@example.test")
+    (store / "config.yml").write_text(
+        'project_name: "preflight"\n'
+        'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\n'
+        'default_status: "In Design"\nauto_commit: false\n'
+        'remote_operations: false\ntask_prefix: "preflight"\n'
+    )
+    native(repo, "backlog", "task", "create", "Preflight fixture", "--status", "In Planning",
+           "--description", "Read published task before allocating", "--plan", "Run native prerequisite reads", "--plain")
+    task = json.loads(native(repo, "backlog", "task", "view", "--json", "--", "PREFLIGHT-1"))["task"]
+    native(store, "git", "add", ".")
+    native(store, "git", "commit", "-q", "-m", "Published fixture task")
+    native(ctmp, "git", "init", "-q", "--bare", str(origin))
+    native(store, "git", "remote", "add", "origin", str(origin))
+    native(store, "git", "push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks")
+    task_head = native(store, "git", "rev-parse", "HEAD")
+    (repo / ".gitignore").write_text(".backlog/\n")
+    owners = repo / ".prime-claw" / "ownership.json"
+    owners.parent.mkdir()
+    owners.write_text('{"schemaVersion":1,"owners":{"other-owner":{"fixture":"unchanged"}}}\n')
+    (repo / "unrelated.txt").write_text("baseline\n")
+    native(repo, "git", "add", ".")
+    native(repo, "git", "commit", "-q", "-m", "Code fixture without committed execute")
+    # A working-tree-only execute file must not hide a missing code-base asset.
+    execute = repo / ".agents" / "skills" / "execute" / "SKILL.md"
+    execute.parent.mkdir(parents=True)
+    execute.write_text("Working-tree-only execute instructions\n")
+    (repo / "unrelated.txt").write_text("staged unrelated work\n")
+    native(repo, "git", "add", "unrelated.txt")
+    (store / "unrelated.txt").write_text("staged unrelated task work\n")
+    native(store, "git", "add", "unrelated.txt")
+    code_head = native(repo, "git", "rev-parse", "HEAD")
+    before_code = native(repo, "git", "status", "--porcelain=v1")
+    before_store = native(store, "git", "status", "--porcelain=v1")
+    before_worktrees = native(repo, "git", "worktree", "list", "--porcelain")
+    before_owners = owners.read_bytes()
+
+    native(store, "git", "remote", "get-url", "origin")
+    assert task_head in native(store, "git", "ls-remote", "--heads", str(origin), "refs/heads/prime-claw/tasks")
+    native(repo, "git", "check-ignore", "-v", "--", ".backlog/probe")
+    native(repo, "git", "show", "HEAD:.agents/skills/execute/SKILL.md", check=False)
+    assert evidence[-1]["exit"] != 0
+    # The Conversation stops here. No creation, status mutation or reservation is requested.
+    assert json.loads(native(repo, "backlog", "task", "view", "--json", "--", "PREFLIGHT-1"))["task"] == task
+    assert task["status"] == "In Planning"
+    assert native(repo, "git", "rev-parse", "HEAD") == code_head
+    assert native(store, "git", "rev-parse", "HEAD") == task_head
+    assert native(repo, "git", "status", "--porcelain=v1") == before_code
+    assert native(store, "git", "status", "--porcelain=v1") == before_store
+    assert native(repo, "git", "worktree", "list", "--porcelain") == before_worktrees
+    assert native(repo, "git", "branch", "--format=%(refname:short)") == "main"
+    assert owners.read_bytes() == before_owners
+    (tier1_container.share.parent / "preflight-native-read-exercise.json").write_text(
+        json.dumps({"scope": "native command exercise, not LLM compliance proof",
+                    "taskStatus": task["status"], "allocationRequested": False,
+                    "commands": [
+                        {"command": [arg.replace(str(ctmp), "<fixture>") for arg in row["command"]],
+                         "exit": row["exit"]}
+                        for row in evidence
+                    ]}, indent=2) + "\n"
+    )
+
+
+def test_documented_creation_recovery_native_publication_and_registry(tier1_container, ctmp) -> None:
+    """Native command smoke for the owner edit/publication steps, not Orca/LLM recovery proof."""
+    repo = ctmp / "recovery-code"
+    store = repo / ".backlog"
+    store.mkdir(parents=True)
+    origin = ctmp / "recovery-tasks.git"
+    evidence = []
+
+    def native(cwd, *args, check=True):
+        result = tier1_container.run(*args, workdir=str(cwd))
+        evidence.append({"command": [arg.replace(str(ctmp), "<fixture>") for arg in args],
+                         "exit": result.returncode})
+        if check:
+            assert result.returncode == 0, result.stdout + result.stderr
+        return result
+
+    def output(cwd, *args):
+        return native(cwd, *args).stdout.strip()
+
+    native(repo, "git", "init", "-q", "-b", "main")
+    native(store, "git", "init", "-q", "-b", "prime-claw/tasks")
+    for cwd in (repo, store):
+        native(cwd, "git", "config", "user.name", "Recovery fixture")
+        native(cwd, "git", "config", "user.email", "recovery@example.test")
+        (cwd / "unrelated.txt").write_text("baseline\n")
+    (store / "config.yml").write_text(
+        'project_name: "recovery"\n'
+        'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\n'
+        'default_status: "In Design"\nauto_commit: false\n'
+        'remote_operations: false\ntask_prefix: "recovery"\n'
+    )
+    for title in ("Recovery selected task", "Other owner task"):
+        native(repo, "backlog", "task", "create", title, "--status", "Blocked",
+               "--description", "Isolated fixture only", "--plan", "Inspect native evidence", "--plain")
+    old_view = json.loads(output(repo, "backlog", "task", "view", "--json", "--", "RECOVERY-1"))
+    other_view = json.loads(output(repo, "backlog", "task", "view", "--json", "--", "RECOVERY-2"))
+    task_path = str(Path(old_view["task"]["path"]).relative_to(".backlog"))
+    native(store, "git", "add", ".")
+    native(store, "git", "commit", "-q", "-m", "Fixture task baseline")
+    native(ctmp, "git", "init", "-q", "--bare", str(origin))
+    native(store, "git", "remote", "add", "origin", str(origin))
+    native(store, "git", "push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks")
+    published_before = output(store, "git", "rev-parse", "HEAD")
+    (repo / ".gitignore").write_text(".backlog/\n")
+    native(repo, "git", "add", ".")
+    native(repo, "git", "commit", "-q", "-m", "Fixture code base")
+    base = output(repo, "git", "rev-parse", "HEAD")
+    worktree = ctmp / "existing-episode"
+    native(repo, "git", "worktree", "add", "-q", "-b", "episode/recovery", str(worktree), base)
+    owners = repo / ".prime-claw" / "ownership.json"
+    owners.parent.mkdir()
+    selected = {"version": 2, "status": "uncertain", "engine": "orca",
+                "ownerSessionId": "selected-owner", "operationId": "original-operation",
+                "taskId": "RECOVERY-1", "taskPath": old_view["task"]["path"], "provider": "backlog",
+                "providerRevision": published_before, "taskEvidence": old_view,
+                "baseRef": base, "head": base, "integrationBranch": "main",
+                "projectSetupId": "original-setup", "routingEnvironmentId": "original-host",
+                "worktreeId": "original-worktree", "worktreeIdentity": "original-identity",
+                "worktree": str(worktree), "branch": "episode/recovery",
+                "createdAt": "2026-11-05T00:00:00Z", "updatedAt": "2026-11-05T00:00:00Z",
+                "uncertaintyReason": "fixture task publication unresolved"}
+    foreign = {**selected, "ownerSessionId": "foreign-owner", "operationId": "foreign-operation",
+               "taskId": "RECOVERY-2", "taskPath": other_view["task"]["path"], "taskEvidence": other_view}
+    for field in ("worktreeId", "worktreeIdentity", "worktree", "branch", "head"):
+        foreign.pop(field)
+    registry = {"schemaVersion": 1, "owners": {"selected-owner": selected, "foreign-owner": foreign}}
+    owners.write_text(json.dumps(registry) + "\n")
+    # A different owner's compatible observation advances after selected evidence was captured.
+    foreign["uncertaintyReason"] = "latest foreign observation, not the older snapshot"
+    owners.write_text(json.dumps(registry) + "\n")
+    before_worktrees = output(repo, "git", "worktree", "list", "--porcelain")
+    for cwd in (repo, store):
+        (cwd / "unrelated.txt").write_text("preserve staged unrelated bytes\n")
+        native(cwd, "git", "add", "unrelated.txt")
+    staged = {str(cwd): output(cwd, "git", "diff", "--cached", "--binary", "--", "unrelated.txt")
+              for cwd in (repo, store)}
+    # Known cause cleared; publish only the selected status. The isolated remote rejects once.
+    hook = origin / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    native(repo, "backlog", "task", "edit", "RECOVERY-1", "--status", "In Progress", "--plain")
+    current_view = json.loads(output(repo, "backlog", "task", "view", "--json", "--", "RECOVERY-1"))
+    assert current_view["task"]["status"] == "In Progress"
+    native(store, "git", "--literal-pathspecs", "add", "--", task_path)
+    native(store, "git", "--literal-pathspecs", "commit", "--only", "-qm", "Fixture selected clearance", "--", task_path)
+    local_commit = output(store, "git", "rev-parse", "HEAD")
+    failed = native(store, "git", "push", "origin", "HEAD:refs/heads/prime-claw/tasks", check=False)
+    assert failed.returncode != 0
+    assert published_before in output(store, "git", "ls-remote", "origin", "refs/heads/prime-claw/tasks")
+    published_task = output(store, "git", "show", f"{published_before}:{task_path}")
+    assert "status: Blocked" in published_task
+    assert json.loads(owners.read_text())["owners"]["selected-owner"] == selected
+    # Explicitly inspected and removed only this fixture's known remote rejection cause.
+    # Finish the proven-missing publication, not another task mutation/admission.
+    hook.write_text("#!/bin/sh\nexit 0\n")
+    native(store, "git", "push", "origin", "HEAD:refs/heads/prime-claw/tasks")
+    assert local_commit in output(store, "git", "ls-remote", "origin", "refs/heads/prime-claw/tasks")
+    assert output(store, "git", "rev-parse", "HEAD") == local_commit
+    # Execute the documented short locked, selected-entry compare-before-edit via native Python.
+    patch = {"status": "provisioning", "providerRevision": local_commit, "taskEvidence": current_view}
+    script = r"""import json, os, pathlib, stat, sys, tempfile
+p=pathlib.Path(sys.argv[1]); expected=json.loads(sys.argv[2]); patch=json.loads(sys.argv[3])
+assert not p.is_symlink() and p.is_file()
+lock=pathlib.Path(str(p)+'.lock'); lock.mkdir()
+try:
+    raw=json.loads(p.read_text()); assert raw['schemaVersion']==1
+    assert raw['owners']['selected-owner']==expected
+    before=json.loads(json.dumps(raw)); next_entry={**expected, **patch}; next_entry.pop('uncertaintyReason')
+    raw['owners']['selected-owner']=next_entry
+    fd,name=tempfile.mkstemp(prefix='.ownership-',dir=p.parent)
+    with os.fdopen(fd,'w') as stream:
+        os.fchmod(stream.fileno(), stat.S_IMODE(p.stat().st_mode)); stream.write(json.dumps(raw)+'\n')
+    os.replace(name,p)
+    after=json.loads(p.read_text()); assert after==raw
+    assert after['owners']['foreign-owner']==before['owners']['foreign-owner']
+finally:
+    lock.rmdir()
+"""
+    # Keep the inline program and private fixture values out of durable argv evidence.
+    result = tier1_container.run("python3", "-c", script, str(owners), json.dumps(selected), json.dumps(patch), workdir=str(repo))
+    assert result.returncode == 0, result.stdout + result.stderr
+    reconciled = json.loads(owners.read_text())
+    expected = {**selected, **patch}
+    expected.pop("uncertaintyReason")
+    assert reconciled["owners"]["selected-owner"] == expected
+    assert reconciled["owners"]["foreign-owner"] == foreign
+    assert not Path(str(owners) + ".lock").exists()
+    assert output(repo, "git", "worktree", "list", "--porcelain") == before_worktrees
+    assert output(repo, "git", "rev-parse", "HEAD") == base
+    for cwd in (repo, store):
+        assert output(cwd, "git", "diff", "--cached", "--binary", "--", "unrelated.txt") == staged[str(cwd)]
+        assert (cwd / "unrelated.txt").read_text() == "preserve staged unrelated bytes\n"
+    assert json.loads(output(repo, "backlog", "task", "view", "--json", "--", "RECOVERY-2")) == other_view
+    (tier1_container.share.parent / "creation-recovery-native-exercise.json").write_text(
+        json.dumps({"scope": "native publication/registry smoke, not LLM or Orca/session recovery proof",
+                    "localStatusAfterFailure": "In Progress", "publishedStatusAfterFailure": "Blocked",
+                    "finalPublishedStatus": "In Progress", "statusEdits": 1,
+                    "ownershipStatus": "provisioning", "sameBindingsAndOtherOwnerPreserved": True,
+                    "newAllocationOrAssignmentRequested": False, "commands": evidence}, indent=2) + "\n"
+    )

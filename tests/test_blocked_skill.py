@@ -75,6 +75,31 @@ def test_blocked_skill_supports_disjoint_task_and_retained_folder_authority() ->
         assert fragment in normalized
 
 
+def test_incomplete_creation_routes_before_active_identity_and_report_checks() -> None:
+    text = " ".join(SOURCE.read_text().split())
+    route = text.split("## Route incomplete creation before active-session or report checks", 1)[1].split("A valid version-1 record", 1)[0]
+    for phrase in (
+        "Before requiring a matching active Episode session or an accepted Episode report",
+        "Only the top-level owning Conversation's exact version-2 `provisioning` or `uncertain` entry with incomplete creation",
+        "`## Owner-led creation recovery` in `.prime-claw/workflows/implement-task.md`",
+        "do not call `implement_task` recursively or `handoff_task_episode`",
+        "provider, task, code base, host, branch, worktree, durable session, and operation identities unchanged",
+        "An absent recorded session is not proof that none exists",
+        "native terminal, launch, session, and assignment evidence",
+        "Never blindly replay creation or assignment, or promote the entry to active",
+        "never start another admission or invent a recovery API",
+        "only to the owning Conversation, not an Episode or Expert",
+        "current registry lock, compare before editing the unchanged selected entry, preserve other owners, and reread afterwards",
+        "This skill does not perform those edits",
+    ):
+        assert phrase in route
+    assert text.index("Never scan other owners to select recovery") < text.index("Owner-led creation recovery")
+    assert text.index("Owner-led creation recovery") < text.index("For normal active mode, require a managed Episode's recorded worktree/session identity")
+    assert text.index("Owner-led creation recovery") < text.index("In either version-2 branch, use the accepted Episode-to-Conversation report")
+    assert "Never write `ownership.json` directly in this normal active flow" in text
+    assert "only the owning Conversation's targeted documented creation-recovery exception above permits an edit, never Episode or Expert authority" in text
+
+
 def test_blocked_skill_tracked_copy_and_manifest_hash_match_source() -> None:
     source = SOURCE.read_bytes()
     assert TRACKED.read_bytes() == source

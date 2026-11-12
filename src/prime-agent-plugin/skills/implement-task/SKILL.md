@@ -10,6 +10,9 @@ This global entry skill routes to the project's customizable
 `.prime-claw/workflows/implement-task-prep.md` and `implement-task.md` policies.
 Do not copy their detailed procedures here or implement in the Conversation.
 Read `/skill:goals-and-heartbeats` unless it is already in context.
+Before fresh resource creation, follow that workflow's native pre-allocation
+checks. An already owned operation follows its continuation/failure guidance;
+entry admission is not a request to reserve or allocate replacement resources.
 
 ## Bind scope and authority
 

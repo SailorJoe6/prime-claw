@@ -18,7 +18,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     for phrase in [
         "name: prime-claw-oversee-episode",
         "this Conversation's active Episode",
-        "select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`",
+        "Select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`",
         "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
         "Version 2 selects its persisted provider only",
         "binds grandfathered task ID/path",
@@ -144,7 +144,7 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "with truthful clearance evidence",
         "then `handoff_task_episode`",
         "record only native/code observations",
-        "Never write `ownership.json` directly or keep an artificial `in_progress` snapshot",
+        "Never write `ownership.json` directly in ordinary oversight or keep an artificial `in_progress` snapshot",
         "Custom `done` means completion; never map `closed` to canonical `Done`",
         "guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`",
         "guarded `--if-status ready_for_merge` update to `in_progress`",
@@ -154,9 +154,49 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "independent task history",
     ):
         assert phrase in text
-    assert text.index("select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`") < text.index("selects its persisted provider only")
+    assert text.index("Select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`") < text.index("selects its persisted provider only")
     assert text.index("For retained version 1 folder ownership") < text.index("Review one reported slice at a time")
     assert text.index("push the integration branch normally and prove its local/upstream/direct remote equal `candidateHead`") < text.index("guarded `--if-status ready_for_merge` update to `done`")
+
+def test_incomplete_creation_routes_before_normal_oversight_and_prep_checks():
+    guide = " ".join(GUIDE.read_text().split())
+    route = guide.split("Before active-session or Episode-report checks", 1)[1].split("Otherwise use only", 1)[0]
+    for phrase in (
+        "top-level owning Conversation's version-2 `provisioning` or `uncertain` entry with incomplete creation",
+        "`## Owner-led creation recovery` in `.prime-claw/workflows/implement-task.md`",
+        "do not call `implement_task` recursively or `handoff_task_episode`",
+        "provider, task, code base, host, branch, worktree, durable session, and operation identities unchanged",
+        "An absent recorded session is not proof that none exists",
+        "native terminal, launch, session, and assignment evidence",
+        "never invent a recovery API",
+        "No blind replay or active promotion",
+    ):
+        assert phrase in route
+    assert guide.index("Never scan other owners to select recovery") < guide.index("Before active-session or Episode-report checks")
+    assert guide.index("Owner-led creation recovery") < guide.index("Review one reported slice at a time")
+    assert "Only the owning Conversation's targeted documented creation-recovery exception permits an edit" in guide
+    assert "current registry lock, compare before editing the unchanged selected entry, preserve other owners, and reread afterwards" in guide
+    assert "Episode/Expert roles gain no exception" in guide
+
+    source = REPO / "src/prime-agent-plugin/workflows/implement-task-prep.md"
+    tracked = REPO / ".prime-claw/workflows/implement-task-prep.md"
+    assert source.read_bytes() == tracked.read_bytes()
+    prep = " ".join(source.read_text().split())
+    recovery = prep.split("## Route incomplete creation before readiness", 1)[1].split("Keep the operator's actual implementation authority", 1)[0]
+    for phrase in (
+        "only this top-level owning Conversation's exact `ownerSessionId` entry",
+        "Never scan other owners to select recovery",
+        "version-2 entry is `provisioning` or `uncertain` with incomplete creation",
+        "skip the fresh `In Planning` sniff and compaction below",
+        "An absent recorded session is not proof that none exists",
+        "native terminal, launch, session, and assignment evidence",
+        "The independently queued `.prime-claw/workflows/implement-task.md` follows its `## Owner-led creation recovery` procedure",
+        "Do not call `implement_task` recursively, invoke `handoff_task_episode`, edit ownership here, or reconstruct the queued workflow",
+    ):
+        assert phrase in recovery
+    assert prep.index("Owner-led creation recovery") < prep.index("Implementation selection requires `In Planning`")
+    assert prep.index("Owner-led creation recovery") < prep.index("## Light readiness sniff")
+
 
 def test_managed_conversation_guide_has_no_authentication_metadata_or_policy_copy():
     assert not (REPO / "src/prime-agent-plugin/extension-support/conversation-guide-metadata.ts").exists()
