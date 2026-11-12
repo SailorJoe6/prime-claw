@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-12 15:56'
+updated_date: '2026-11-12 16:08'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -353,6 +353,12 @@ Implementation is split across disjoint bounded helpers: current docs/requiremen
 Completed changed-basis finalization regression: offline disposable inspected exactTier1image2749bf9aa8cf193c27da3f3aa840d7a40a94a30ee736ead4ff83fb5349ed19f3, `node --experimental-strip-types --test --test-name-pattern 'cleanup|abandonment|merged' /workspace/tests/spec_episode_extension.test.mjs`:148testsPASS,0fail/skip,54top-level. This exercises existing cleanup/merged/abandonment seams and is not a host cleanup or full-suite acceptance. Native worker reports existing upstream focused archive/dependency suites155PASS0fail,698assertions on exact source/Bun1.4.4; final raw receipts still under review. Artifact commands/TAP/image identity: .test-results/primeclaw45-integrated-08450108/ and native-worker/.
 
 Full Tier0/Tier1 and remaining asset/lifecycle validation have NOT passed yet. No AC checked or whole-upgrade acceptance. Native identity/path/parent/status remain; acceptedv1.53.0 authoritative. Same originalbasis/mainintegration/resources, no45merge-to-primary/globalactivation/refresh/restart/live data migration/abandonment/Episode cleanup.
+
+2026-11-12 — Integrated remaining candidate: published main c0b42f08b686feab9716b597129283fda45c77c2 was ordinarily merged INTO this same Episode at fd082830832abd31f6194efab7dbf157f5ef0f57 under the accepted continuation. PRIMECLAW-56 recovery/cleanup behavior and original ownership/resources remain intact. Settled lifecycle guidance/docs/native seam edits are combined; active Done through cleanup, archived non-Done exact abandonment summary, restore-before-edit, archived-only delete, native dependency/collision policy and archived-draft physical-preservation exception are explicit. Representative native allocation/lifecycle3PASS, exact upstream archive/dependency155PASS/698expectations, and focused finalization148PASS/0fail/skip are retained under .test-results/primeclaw45-integrated-08450108/.
+
+Fresh Docker-isolated native reconciliation generated17 source-matching assets with0conflicts; a separate baseline-customization fixture preserved all reported customized bytes. The initial diagnostic falsely assumed that existing customizations produce zero conflicts; its failure is retained, not product acceptance. Actual registry update changes only execute installed/available digests; historical baseline cc0453ff3aad661c78e550997fd9ea6359fa7f76b1b87d552c69dfb5d9c52a6c and all unrelated customization remain unchanged.
+
+First full Tier0 is FAILED:731passed,6failed,103environment-gated skips,140subtests passed. Failures are stale current-main inventory entries, a string scan misreading container-embedded code as host execution, and tests coupled to removed live task storage. Narrow test repairs preserve exact inventory/host-isolation/atomic-native/evidence assertions, using existing disposable Docker fixtures and immutable historical evidence; no runtime policy or new framework. Full Tier1 is running, not accepted; final full suites must include the repaired native bodies. No required coverage is waived. Status In Progress,AC0/9; acceptedv1.53.0 remains authoritative. No merge into primary/global activation/restart/live migration/cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
