@@ -72,9 +72,14 @@ Do not use them to operate a v1.55.3 candidate on live task history. No required
 validation is waived by delivering a build-only slice. Source/build results and
 limits are recorded in
 [`primeclaw45-upstream-candidate-20261106.md`](evidence/primeclaw45-upstream-candidate-20261106.md).
-The bounded migration lifecycle adaptation and its native archived-draft read
-limit are recorded separately in
+The bounded migration lifecycle adaptation, historical archived-draft CLI limit,
+and 2026-11-12 operator-directed adaptation are recorded in
 [`primeclaw45-migration-lifecycle-slice2-20261106.md`](evidence/primeclaw45-migration-lifecycle-slice2-20261106.md).
+Existing archived drafts retain exact files, bytes, paths, history and physical
+identity/collision checks. Their unavailable native CLI view alone does not block
+migration. Active drafts and active/archived tasks still require native evidence;
+actual identity, integrity and transport failures still refuse. Do not relocate,
+promote, restore, discard or manufacture an active view of an archived draft.
 Neither slice activates the candidate or replaces the remaining integrated gates.
 
 Clone this repository with `git clone --recurse-submodules`, or initialize an

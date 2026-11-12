@@ -2295,10 +2295,11 @@ test("migration admission refuses contested Backlog IDs across active archive le
     export: bd(fixture.root, "--readonly", "export", "--all"),
     history: bd(fixture.root, "--readonly", "history", fixture.ids.parent, "--json", "--limit", "0") };
   for (const [folder, taskId] of [["tasks", destination.active], ["archive/tasks", destination.active],
-    ["completed", destination.active], ["drafts", destination.active], ["archive/tasks", "BASE-01"]]) {
+    ["completed", destination.active], ["drafts", destination.active], ["archive/drafts", destination.active], ["archive/tasks", "BASE-01"]]) {
     await t.test(`${folder} ${taskId}`, async () => {
       const relativePath = `backlog/${folder}/${taskId.toLowerCase()} - contested-copy.md`;
       const collisionPath = join(fixture.root, relativePath);
+      mkdirSync(join(fixture.root, "backlog", folder), { recursive: true });
       writeFileSync(collisionPath, activeBytes.toString("utf8").replace(/^id:.*$/m, `id: ${taskId}`));
       git(fixture.root, "add", relativePath);
       git(fixture.root, "commit", "-qm", `seed contested ${folder} identity`);
@@ -2506,6 +2507,56 @@ function physicalDestinationRecords(store) {
   }
   return records;
 }
+
+test("confirmed populated Backlog migration preserves archived draft bytes paths and history without native archived-draft readback", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "populated-archived-draft");
+  const destination = publishedPopulatedBacklogDestination(fixture);
+  const { store } = destination;
+  const output = backlog(fixture.root, "task", "create", "Existing archived draft", "--draft",
+    "--description", "Preserve archived draft bytes λ\nnever promote or discard", "--no-dod-defaults", "--plain");
+  const archivedDraft = output.match(/\bDRAFT-\d+(?:\.\d+)*\b/)[0];
+  git(store, "add", "drafts");
+  command(store, "git", ["-c", "user.name=Existing Task Author", "-c", "user.email=existing@example.invalid",
+    "commit", "-qm", "existing draft before native archive"]);
+  backlog(fixture.root, "draft", "archive", archivedDraft);
+  git(store, "add", "drafts", "archive/drafts");
+  command(store, "git", ["-c", "user.name=Existing Task Author", "-c", "user.email=existing@example.invalid",
+    "commit", "-qm", "preserved archived draft baseline"]);
+  git(store, "push", "-q");
+  const records = physicalDestinationRecords(store);
+  const archivedPaths = Object.keys(records).filter((path) => path.startsWith("archive/drafts/"));
+  assert.equal(archivedPaths.length, 1);
+  const archivedPath = archivedPaths[0];
+  const history = git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", archivedPath);
+  const originalHead = git(store, "rev-parse", "HEAD");
+  const runner = new AdmissionRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const result = await migrateTaskProvider({ cwd: fixture.root, targetProvider: "backlog", runner,
+    expectedSourceRevision: inspection.sourceRevision, confirmedSwitch: true, actor: "archived-draft-operator",
+    semanticPlacement: "Preserve exact source packages and existing archived draft files/history; no synthetic native view." });
+  assert.equal(result.status, "completed", result.detail);
+  for (const [path, bytes] of Object.entries(records)) {
+    assert.equal(readFileSync(join(store, path)).toString("base64"), bytes, `preserved baseline bytes/path: ${path}`);
+  }
+  assert.equal(git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", archivedPath), history);
+  assert.equal(Buffer.from(command(store, "git", ["show", `${result.receipt.destinationReceiptRevision}:${archivedPath}`])).toString("base64"), records[archivedPath]);
+  git(store, "merge-base", "--is-ancestor", originalHead, "HEAD");
+  assert.equal(runner.calls.some(({ commandName, args }) => commandName === "backlog"
+    && ["task", "draft"].includes(args[0]) && args[1] === "view" && args.includes(archivedDraft)), false,
+    "unsupported archived-draft view is not required or synthesized");
+  assert.ok(runner.calls.some(({ commandName, args }) => commandName === "backlog"
+    && args[0] === "draft" && args[1] === "view" && args.includes(destination.draft)), "active draft still needs native evidence");
+  for (const id of [destination.active, destination.completed, destination.archived, destination.legacy]) {
+    assert.ok(runner.calls.some(({ commandName, args }) => commandName === "backlog"
+      && args[0] === "task" && args[1] === "view" && args.includes(id)), `native task evidence remains required: ${id}`);
+  }
+  assert.equal(Object.keys(physicalDestinationRecords(store)).length, Object.keys(records).length + inspection.taskCounts.total + 1);
+  assert.equal(result.receipt.mappings.length, inspection.taskCounts.total);
+  assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], result.receipt.destinationReceiptRevision);
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  assert.equal(detectTaskProvider(fixture.root, RUNNER).evidence.provider, "backlog");
+});
 
 for (const kind of ["independent-hidden", "independent-default", "independent-custom", "independent-custom-root-override", "code-default", "code-hidden", "code-custom"]) {
   test(`confirmed populated Backlog migration preserves baseline/imports/receipt for ${kind}`, { timeout: 300_000 }, async (t) => {

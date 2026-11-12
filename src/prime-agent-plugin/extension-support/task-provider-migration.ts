@@ -1682,7 +1682,11 @@ function backlogDestinationViews(runner: CommandRunner, projectRoot: string, sto
   const repositoryRoot = realpathSync(runRequired(runner, "git", ["-C", storeDir, "rev-parse", "--show-toplevel"], storeDir, `Backlog destination ${phase} Git identity`).stdout.trim());
   if (repositoryRoot !== realpathSync(storeDir) && repositoryRoot !== realpathSync(projectRoot)) throw new Error(`Backlog destination ${phase} has a foreign Git root ${repositoryRoot}`);
   try {
-    return new Map([...paths].map(([taskId, [path]]) => {
+    // Archived drafts stay in the physical inventory and exact file/history
+    // baseline. The native CLI has no archived-draft view; its absence alone
+    // must not block migration or lead to a manufactured active view.
+    return new Map([...paths].filter(([, [path]]) =>
+      !relative(storeDir, path).replace(/\\/g, "/").startsWith("archive/drafts/")).map(([taskId, [path]]) => {
       const relativePath = relative(projectRoot, path).replace(/\\/g, "/");
       const view = backlogEntityKind(storeDir, path) === "draft"
         ? backlogDraftView(runner, projectRoot, taskId, relativePath)
@@ -2015,8 +2019,8 @@ function originalBacklogLayout(projectRoot: string, runner: CommandRunner) {
   const selected = detectExplicitTaskProvider(projectRoot, "backlog", runner);
   if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || !selected.evidence.storeDir) return null;
   const store = selected.evidence.storeDir;
-  // Read and resolve the complete existing corpus before layout adoption, task
-  // allocation or publication can change any original destination bytes/history.
+  // Inventory all IDs and read available native views before layout adoption,
+  // task allocation or publication can change original destination bytes/history.
   backlogDestinationViews(runner, projectRoot, store, "preparation preflight");
   const originalFiles: Array<{ path: string; bytesBase64: string; mode: number }> = [];
   const walk = (folder: string) => {
