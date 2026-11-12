@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-12 23:15'
+updated_date: '2026-11-12 23:18'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -15,6 +15,10 @@ documentation:
   - docs/backlog.md
   - docs/evidence/primeclaw45-upstream-candidate-20261106.md
   - docs/evidence/primeclaw45-migration-lifecycle-slice2-20261106.md
+  - docs/project-initialization.md
+  - docs/user-stories/B-project-initialization.md
+  - docs/user-stories/I-episode-finalization.md
+  - docs/user-stories/traceability.md
 modified_files:
   - .gitmodules
   - bin/prime-claw
@@ -34,6 +38,25 @@ modified_files:
   - tests/task_provider_migration.test.mjs
   - tests/test_task_provider_migration.py
   - docs/evidence/primeclaw45-migration-lifecycle-slice2-20261106.md
+  - .agents/skills/backlog/SKILL.md
+  - .agents/skills/execute/SKILL.md
+  - .prime-claw/templates.json
+  - REQUIREMENTS.md
+  - docs/project-initialization.md
+  - docs/user-stories/B-project-initialization.md
+  - docs/user-stories/I-episode-finalization.md
+  - docs/user-stories/traceability.md
+  - src/prime-agent-plugin/skills/initialize-prime-claw/SKILL.md
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - tests/test_backlog_workflow.py
+  - tests/test_container_helpers_static.py
+  - tests/test_execute_skill.py
+  - tests/test_future_plan_skills.py
+  - tests/test_global_asset_drift.py
+  - tests/test_inventory_integrity.py
+  - tests/test_managed_session_protocol.py
+  - tests/test_oversee_episode_skill.py
 priority: p1
 type: task
 ordinal: 130000
@@ -237,6 +260,14 @@ Remaining guidance/assets/native-seam implementation and routine Tier0 fixture r
 After operator-approved capacity restoration, inspect Docker and exact owned test-container/current evidence before safe standard fixture cleanup/rerun; never blind prune or delete unrelated data. Diagnose/repair remaining in-scope failures, including obsolete task-complete layout fixtures, archive/live duplicate-ID fixture assumptions, native bodies/required skipped smokes, and one actual Beads-diagnostic assertion mismatch. Later EROFS/transport failures are resource-contaminated and need a healthy rerun, not inferred code changes. Run fresh COMPLETE Tier0 and Tier1 after the final edits, including all three moved native Python bodies; preserve retired reverse-migration exclusions only. Record bounded final evidence and publish separate tested code/task candidate, then stop for owner review. No automatic execute/handoff replay, new Episode/resources or lifecycle edit.
 
 Task remains In Progress,AC0/9; acceptedv1.53.0 stays authoritative. Same owner/operation/session/worktree/branch/originalbasis. No45merge into primary/global refresh/restart/live migration/abandonment/destructive Episode cleanup. Source changes are not yet committed/published as a final candidate.
+
+## Host-capacity blocker cleared; resume same integrated candidate — 2026-11-12
+
+The operator explicitly cleared the recorded capacity blocker after cleaning the hard drive. Published owner comments10–11 at nativec31c4bb33520b9b9ec1be1775def0d84c723fdf3 restore In Progress; comment11 CORRECTS the provisional absence statement: interrupted Tier1 container5650767ad7cc023e716e8a42cc12cd93380817883ea1989663b484679acf04df /prime-claw-tier1-20261112T160357Z-17549-d060d5ce remains EXITED. Fresh Episode handoff reads corroborate53GiB available/Data88%, Docker29.9.3/linux/aarch64 and the exact exited container. Preserve its identity/raw logs/hashes; use supported standard fixture inspection/handling only, no blind prune or unrelated deletion.
+
+The preceding storage pause is superseded, not its failed evidence. Continue the SAME existing uncommitted compatibility candidate at codefd082830832abd31f6194efab7dbf157f5ef0f57. Preserve pending source/test/docs and customization bytes; no manufactured clean checkout. Complete already-recorded routine in-scope fixture/native repairs: removed task-complete layout fixture, active/archive duplicate-ID fixture, Beads diagnostic assertion, all3moved native Python bodies/required smokes. Separate actual early fixture defects from later resource-contaminated ENOSPC/EROFS/transport errors. After final edits run fresh COMPLETE Tier0 and Tier1; prior736PASS+140subtests/104default skips is bounded Tier0 only, and interrupted Tier1 lacks acceptance/teardown/terminal manifest. No required coverage waiver.
+
+Remaining approved lifecycle/normative guidance/skills/inert templates/isolated managed generation/customization/traceability scope is unchanged. Published primary main16a97f542b1d13690b2df1f8e05fc676ad913aac includes compatible documentation follow-through; ordinary integration of published main INTO this Episode remains authorized if needed, with Git reporting real conflicts and pending bytes preserved. Never rebase/reset/force/retarget or write primary. Deliver coherent tested committed/pushed code and separate native evidence for owner review, not self-acceptance. Same exact owner/operation/Episode/host/worktree/branch/originalbasis/mainintegration. Acceptedv1.53.0 remains authoritative; AC0/9 pending complete proof. No new resources/queue reconstruction/uncertain dispatch replay, primary merge, activation/globalrefresh/restart/secondhostAgent/candidate hostprobe/upstream patch/live migration/abandonment/destructive Episode cleanup. Canonical execute is already queued independently; handoff requests compaction once, not another execute invocation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -373,6 +404,12 @@ First full Tier0 is FAILED:731passed,6failed,103environment-gated skips,140subte
 Full repaired Tier0 passed736tests,140subtests with104default-tier skips/13warnings (94.59s), not Tier1 acceptance. Raw .test-results/primeclaw45-integrated-08450108/tier0-final.log and tier1.log plus .test-results/20261112T160357Z-17549-d060d5ce/tier1/ are retained. Early concrete failures include backlog_destination_layout.test.mjs using removed task complete, task_history_workspace.test.mjs constructing active/archive TASK-1 duplicates now correctly refused, and a source Beads diagnostic assertion expecting an open record to be rejected. Later native failures include EROFS /tmp and Docker transport errors; do not treat them as product diagnoses or successes. Existing finalization/native/upstream focused passing evidence remains bounded, not full acceptance.
 
 Operator-approved host capacity restoration and Docker recovery are required before remaining diagnosis/repair and fresh full suites. The test container may remain; no absent-state or teardown claim. Same Episode and settled uncommitted candidate edits are preserved at codefd082830; no final code publication, AC/lifecycle mutation or activation. Accepted1.53.0 remains authoritative.
+
+2026-11-12 — Same-Episode handoff after explicit operator capacity clearance, not a new assignment. Exact active version2 owner01a1a90b-0fba-7778-b1e5-0087bdaf8fec/operation08450108-16d7-4655-9ea3-aefb6c8ac1c4/Episode01a1ac6f-be96-76eb-aaf7-0ec75a7a4d05 and readable matching session header/cwd revalidated through canonical Git metadata. Primary remains integrationmain at16a97f542b1d13690b2df1f8e05fc676ad913aac. Episode codefd082830 and all22pending paths/index were left unchanged; own upstream1bc5d45 is expected before final integrated publication, not a gate to discard local edits.
+
+Current published nativec31c4bb includes compatible accepted-adaptation/remaining-work/blocker/owner-clearance history; exact ID/path/nullparent/InProgress/AC0of9 preserved. Owner comment11 explicitly corrects comment10: exact interrupted container5650767ad7cc023e716e8a42cc12cd93380817883ea1989663b484679acf04df remains exited. Fresh read-only Episode df and docker info/container inspect confirm53GiB/Data88%,29.9.3/linux/aarch64 and that exact exited identity. No delete/prune/recreation or primary task checkout synchronization occurred. Failed first full Tier1 and incomplete terminal teardown/manifest remain failed/unverified; raw receipt .test-results/primeclaw45-integrated-08450108/blocked-validation-receipt.json and prior raw hashes stay retained.
+
+The appended living-plan checkpoint carries the supplied operator guidance into already-queued canonical execute. It requires remaining routine native-fixture repairs and fresh full Tier0/Tier1 after final edits, then separate tested code/native publication for owner review. Handoff runs no tests/implementation/host probes and sends no extra execute/handoff. Existing idle roster reports no running bash/children or unfinished actions before admission. Compaction is best effort, not continuation or acceptance proof. Same resources/originalbasis/accepted1.53.0 and all no-activation/primary-write/live-migration/cleanup constraints remain.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -464,9 +501,9 @@ Correction to the immediately preceding clearance comment: the interrupted conta
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-PRIMECLAW-45: owner ACCEPTS archived-draft adaptation code1bc5d45c9281173bb7e99c6d9e5c44e0b90e3b70 and complete native2afe0168f447acb8975213d813fe26b0ac3918b0. All4paths reviewed; owner independent affected13PASS0fail/skip in inspected freshTier1image2749bf9a; raw/source/test/all15required-run artifact hashes corroborated. Supported fresh DockerTier1--probe20261112T152225Z-74778-86d469d0 passed offline checks/nativeRPC/networkabsence/teardown. Exact file/bytes/paths/history/identity safeguards and required native active-draft/task evidence remain. Archived-draft absent-native-view question is RESOLVED, not another gate.
+PRIMECLAW-45 integrated candidate is RESUMING in the SAME Episode after explicit operator host-capacity clearance and native owner comments10–11 atc31c4bb33520b9b9ec1be1775def0d84c723fdf3. Fresh handoff reads:53GiB available/Data88%, Docker29.9.3/linux/aarch64; exact interrupted Tier1 container5650767ad7cc023e716e8a42cc12cd93380817883ea1989663b484679acf04df remains EXITED, not absent. Preserve evidence/identity; standard supported fixture handling only, no blind prune or unrelated deletion.
 
-The independently delivered execute continues SAME Episode through remaining APPROVED representative lifecycle/migration seams, normative guidance/skills/inert canonical templates/managed mirrors/traceability and integrated required focused native plus full Tier0/Tier1 validation. Preserve activeDone-through-finalization/optionalarchive-afterward, restore-before-edit, archived-onlydelete identity cleanup, legacycompleted archive input and exact archivednonDone abandonment summary. Retain native archived/draft dependencies, collision refusal, complete unwindowed JSON identity sets and noninteractive init. Supersede actionable old guidance without rewriting history. Account for publishedmain/PRIMECLAW-56; ordinary integration of publishedmain INTO existingEpisode is authorized if needed, never rebase/reset/force/retarget or primary merge. Routine in-scope repairs need no new approval. Reuse unchanged Nix/Gittrust/Bun-isolation/source proof within its limits; no waived required checks, new framework or upstream patch.
+Codefd082830832abd31f6194efab7dbf157f5ef0f57 includes authorized published-main integration. Remaining compatibility source/test/docs/assets edits are preserved UNCOMMITTED, not a tested/published final candidate. Full repaired priorTier0:736PASS+140subtests,104default skips; first fullTier1 FAILED/ENOSPC with no trustworthy terminal manifest/teardown. Complete recorded removed-completion/duplicate-ID/Beads-diagnostic fixture repairs and3native Python bodies/required smokes, then fresh COMPLETE Tier0/Tier1 after final edits. Prior exact-source/build/freshNix/Gittrust/Bun-isolation and bounded native/finalization evidence retain only recorded limits. No skipped/unavailable/failing required coverage is acceptance.
 
-The prior stop-for-review is superseded. Deliver remaining tested committed/pushed candidate for owner review, no self-advance into merge/activation. TaskInProgress,AC0/9 until fully proven; acceptedv1.53.0 authoritative. Same owner/operation/host/worktree/branch/session/originalbasis/mainintegration. No new resources, follow-up task, host/global candidate apply/check/probe/refresh/secondhostAgent,45merge/restart/live data migration/abandonment/Episode cleanup.
+The owner accepted earlier archived-draft adaptation1bc5d45 and remaining approved lifecycle/normative skills/templates/isolated managed generation/customization/traceability work; that resolved product decision stays resolved. Compatible published main16a97f5 may be ordinarily integrated INTO this existing Episode if needed, preserving pending bytes and real Git conflicts; no reset/rebase/force/retarget/primary writes. Canonical execute is already queued independently. Deliver coherent tested committed/pushed candidate and separate native content for owner review, not self-acceptance. InProgress,AC0/9; same owner/operation/host/worktree/branch/session/originalbasis/mainintegration. Acceptedv1.53.0 authoritative. No replacement resources, primary merge, activation/globalrefresh/restart/secondhostAgent/hostcandidateprobe/upstream patch/live migration/abandonment/destructive Episode cleanup.
 <!-- SECTION:FINAL_SUMMARY:END -->
