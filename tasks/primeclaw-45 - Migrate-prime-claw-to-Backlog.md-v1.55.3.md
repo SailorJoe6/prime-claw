@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-12 15:14'
+updated_date: '2026-11-12 15:23'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -286,6 +286,12 @@ Six representative top-level migration seams have passing evidence across truthf
 Operator: "archived drafts don't matter. the fact that it was a draft means it was never worked on, and never important in the first place. we should not fail closed over this." An archived-draft baseline must not block migration merely because native archived-draft CLI view is unavailable. Preserve its exact files/bytes/paths/history and existing physical ID/conflict safeguards; do not fabricate a native view, parse it into a custom task model, relocate/promote/restore/delete/discard it, patch upstream, or build support machinery. Native views still apply to active drafts and all active/archived tasks. Concrete identity/integrity/transport failures still refuse. Exact source packages and baseline/publication/receipt/cutover/deletion-last/resource guarantees remain intact. The appended living-plan checkpoint governs one bounded adaptation with representative realcandidate proof, directly affected docs and required Docker validation, then one tested committed/pushed delivery for owner review.
 
 Handoff revalidated the exact active version2 independent-Backlog owner and readable matching durable Episode session/root. Primary remains on integrationmain; code619676b is clean/published and own upstream matches. Current task981046da59b2022187f537c79642a3324ed5b761 is the compatible unrelated56-only descendant of reviewed075f52f; selected45 native content and identity/path/parent/status are unchanged. No primary task synchronization or copying, ownership edit, task lifecycle mutation, source implementation change, new initial assignment or extra execute invocation occurs in handoff. Canonical execute is already queued independently; compaction is best effort. Full taskAC0/9, acceptedv1.53.0 authoritative; all remaining normative/lifecycle/integrated gates remain later. No merge/globalactivation/restart/live migration/resource replacement/abandonment/cleanup.
+
+2026-11-12 — Operator-directed archived-draft adaptation implemented locally in the SAME Episode. The existing physical inventory still resolves all task/draft/archive IDs and refuses collisions before preparation. Only unsupported archive/drafts native views are excluded from destination native-view collection; exact physical file/byte/path/history baseline capture and verification remain unchanged. Native evidence for active drafts and active/archived tasks is unchanged. No upstream patch, synthetic active view, relocation/promotion/restore/discard, new index/parser/allocator/framework or transaction/resource change.
+
+One representative real-candidate migration regression creates a draft, commits its history, archives it natively, publishes that baseline, and proves successful migration with exact archived-draft bytes/path/history and committed publication preserved, plus required native reads for active drafts and all task categories. Before the production change this regression FAILED at unavailable DRAFT-2 native archived-draft view (blocked instead of completed); after the narrow change it PASSES1/1 with0fail/skip in the inspected exact-candidate offline Docker image77f4185253d80f6e1e03c8f229e38609b0aeef06161a5f5405d51e85e957eccb. Raw red/green commands and TAP: .test-results/primeclaw45-archived-draft-08450108/.
+
+Required fresh Docker scripts/test-tier1.sh --probe is running from the unchanged canonical Prime Agent94589ebb source, isolated by the supported driver. A read-only helper is checking the bounded implementation, not providing owner acceptance. Directly affected docs record the decision and label the old archived-draft refusal as historical; native CLI-limit proof remains truthful and is not repeated. Affected preservation/collision checks and final evidence/publication remain before one bounded delivery. Code not yet committed; taskInProgress,AC0/9; acceptedv1.53.0 remains authoritative. No later slice, merge/globalactivation/restart/live migration/cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
