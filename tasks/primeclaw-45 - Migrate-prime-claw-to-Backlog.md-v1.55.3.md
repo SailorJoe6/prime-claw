@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-45
 title: Migrate prime-claw to Backlog.md v1.55.3
-status: Blocked
+status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-12 16:37'
+updated_date: '2026-11-12 23:15'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -446,6 +446,18 @@ author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
 created: 2026-11-12 16:37
 ---
 Owning Conversation accepts host-capacity/Docker blocker, 2026-11-12. First integrated Tier1 did not pass; pytest capture/terminal evidence ended with OSError ENOSPC (No space left on device), and container teardown evidence is incomplete. Episode reported host Data volume100%/~117MiB at failure and Docker500. Owner fresh check shows7.6GiB available but Data99% and docker info fails: Docker Desktop is unable to start. This partial capacity change does not establish healthy validation capacity. Full Tier0 rerun passed736tests+140subtests with104default environment-gated skips; this is not Tier1 acceptance. Same operation08450108, Episode01a1ac6f-be96-76eb-aaf7-0ec75a7a4d05, codefd082830832abd31f6194efab7dbf157f5ef0f57 and all pending source/test/resource bytes preserved. Accepted1.53.0 remains authoritative. No prune, deletion, resource replacement, merge, activation or live migration authorized. Unblock condition: operator confirms host capacity restoration and Docker health; then verify actual disk/Docker facts, inspect exact interrupted test resources safely, restore In Progress and canonically continue this same Episode for required full Tier1 and affected validation. No waived checks or whole-candidate acceptance.
+---
+
+author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-12 23:15
+---
+Operator cleared the recorded host-capacity blocker: "Docker issues were caused by my hard-drive filling up. I cleaned it up." Owner verification now shows53GiB available on host Data (88% used); docker info succeeds (Server29.9.3/linux/aarch64), and docker ps succeeds. Exact interrupted Tier1 container5650767ad7cc023e716e8a42cc12cd93380817883ea1989663b484679acf04df is absent by fresh Docker inspect; no container deletion/prune/recreation was performed by this Conversation. Host capacity/Docker unblock condition is satisfied. Restore In Progress and continue SAME operation08450108/Episode01a1ac6f-be96-76eb-aaf7-0ec75a7a4d05 with existing uncommitted compatibility edits preserved at codefd082830832abd31f6194efab7dbf157f5ef0f57. Failed Tier1/ENOSPC evidence stays failed and unverified, not acceptance. Remaining fixture/native repairs and complete fresh required Tier0/Tier1 must pass before delivering a tested committed/pushed candidate for owner review. No merge to primary, global activation/refresh/restart, live migration, abandonment or destructive Episode cleanup.
+---
+
+author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-12 23:15
+---
+Correction to the immediately preceding clearance comment: the interrupted container is NOT absent. Fresh docker container inspect succeeded and reports exact5650767ad7cc023e716e8a42cc12cd93380817883ea1989663b484679acf04df /prime-claw-tier1-20261112T160357Z-17549-d060d5ce in exited state. The provisional absence statement was incorrect and is superseded by this observed result. Preserve the exited container/evidence for exact supported fixture inspection and safe standard test-resource handling in the same Episode; this Conversation performed no deletion. Host capacity and Docker API health are verified; all other continuation scope and validation limits remain.
 ---
 <!-- COMMENTS:END -->
 
