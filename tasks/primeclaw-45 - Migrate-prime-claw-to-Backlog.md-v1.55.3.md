@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-45
 title: Migrate prime-claw to Backlog.md v1.55.3
-status: In Progress
+status: Blocked
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-12 16:08'
+updated_date: '2026-11-12 16:37'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -426,6 +426,12 @@ Operator cleared the recorded Docker prerequisite with "Docker is signed in now"
 The selected native task, approved specification/Implementation Plan, owner01a1a90b-0fba-7778-b1e5-0087bdaf8fec, operation08450108-16d7-4655-9ea3-aefb6c8ac1c4, Episode01a1ac6f-be96-76eb-aaf7-0ec75a7a4d05, original code basef5287c3647245a6a5e6d3baad64d9cecf1dab81b, main integration target, branch/worktree and selected host id:afb6537c-e643-4a5f-b284-f0f627ddcbdf are preserved. Native runtime roster shows this Episode idle with no pending queue; code/task workspaces have no Episode implementation changes. Prior GitHub publication and all preserved checkpoint history were already proven restored at8d69c26a22747b64894e73811897903170dd74f6. This exact-task status/clearance update resumes In Progress under the existing implementation authority, followed by canonical handoff into the same Episode, not creation or a replayed initial assignment.
 
 The disposable Nix access preflight is not acceptance: full native package build/installCheck persistence and failed-write smoke, Git trust coverage, and required Docker Tier0/Tier1 validation still must pass as specified. Accepted v1.53.0 stays authoritative. No scope expansion, upstream patches, merge, deployment/global activation/restart, live migration or destructive cleanup is authorized.
+---
+
+author: Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-12 16:37
+---
+Owning Conversation accepts host-capacity/Docker blocker, 2026-11-12. First integrated Tier1 did not pass; pytest capture/terminal evidence ended with OSError ENOSPC (No space left on device), and container teardown evidence is incomplete. Episode reported host Data volume100%/~117MiB at failure and Docker500. Owner fresh check shows7.6GiB available but Data99% and docker info fails: Docker Desktop is unable to start. This partial capacity change does not establish healthy validation capacity. Full Tier0 rerun passed736tests+140subtests with104default environment-gated skips; this is not Tier1 acceptance. Same operation08450108, Episode01a1ac6f-be96-76eb-aaf7-0ec75a7a4d05, codefd082830832abd31f6194efab7dbf157f5ef0f57 and all pending source/test/resource bytes preserved. Accepted1.53.0 remains authoritative. No prune, deletion, resource replacement, merge, activation or live migration authorized. Unblock condition: operator confirms host capacity restoration and Docker health; then verify actual disk/Docker facts, inspect exact interrupted test resources safely, restore In Progress and canonically continue this same Episode for required full Tier1 and affected validation. No waived checks or whole-candidate acceptance.
 ---
 <!-- COMMENTS:END -->
 
