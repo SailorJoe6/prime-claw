@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-12 15:49'
+updated_date: '2026-11-12 15:56'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -345,6 +345,14 @@ Owner independent affected rerun13PASS0fail/skip across7top-level scenarios in e
 The appended living-plan checkpoint governs remaining approved lifecycle/normative-assets/integrated validation and supersedes the old review stop. Full implementation authority already exists; routine in-scope tests/repairs need no new permission, and current publishedmain/PRIMECLAW-56 behavior must be included as needed by an ordinary merge INTO this same Episode, never rebase/retarget/force/reset or merge into primary. No implementation or Git integration preceded this checkpoint. Preserve unrelated primary customization/index and independent task history; no hand-edited ownership or new resources.
 
 Handoff revalidated exact active version2 independent-Backlog owner, matching durable session header/root, nativeInProgress,parentnull,AC0/9, clean directly published code1bc5d45/ownupstream and selected native2afe016. Canonical primary is main at735622d1aea140ee854fc1156f6bfb85d6146356; same originalbasis/mainintegration/resources remain. Current complete native view matches the bound observation, with compatible living changes; primary own-clone fast-forward was performed explicitly by the owner, not this Episode. Only Episode native content is edited/published in this checkpoint; no primary task sync/copy/status edit, source change, extra initial assignment or execute/handoff invocation. All prior machine/helper work finished, children/heartbeats empty. The independently queued canonical execute arrived before the pending handoff content write/compaction. No new execute/handoff is invoked or queue reconstructed. This checkpoint carries the accepted scope into that delivered execute; no compaction-completion claim is made. Acceptedv1.53.0 authoritative; no45merge/globalactivation/refresh/restart/live migration/abandonment/Episode cleanup.
+
+2026-11-12 — Same-Episode remaining compatibility candidate started. Published canonical main c0b42f08b686feab9716b597129283fda45c77c2 was fetched and ordinarily merged INTO this existing branch at code fd082830832abd31f6194efab7dbf157f5ef0f57, without conflicts. This incorporates current PRIMECLAW-56 recovery/cleanup and Docker Orca support while preserving accepted45 source/build/Bun-isolation/migration/archived-draft behavior. No rebase/reset/force/retarget, primary worktree/index write, hand-edited ownership, new resources or task-store/code coupling. The earlier accepted-review native checkpoint02c167b is published; the independently delivered execute was not replayed.
+
+Implementation is split across disjoint bounded helpers: current docs/requirements/traceability; shipped editable guidance plus managed Markdown mirrors and directly affected static tests; representative native lifecycle tests and existing upstream focused suites. Parent owns native task publication, template metadata diagnostics, integration/evidence/full validation and code commit. No host/global candidate apply/check/probe, second host PrimeAgent, upstream patch, runtime/toolchain change or live migration.
+
+Completed changed-basis finalization regression: offline disposable inspected exactTier1image2749bf9aa8cf193c27da3f3aa840d7a40a94a30ee736ead4ff83fb5349ed19f3, `node --experimental-strip-types --test --test-name-pattern 'cleanup|abandonment|merged' /workspace/tests/spec_episode_extension.test.mjs`:148testsPASS,0fail/skip,54top-level. This exercises existing cleanup/merged/abandonment seams and is not a host cleanup or full-suite acceptance. Native worker reports existing upstream focused archive/dependency suites155PASS0fail,698assertions on exact source/Bun1.4.4; final raw receipts still under review. Artifact commands/TAP/image identity: .test-results/primeclaw45-integrated-08450108/ and native-worker/.
+
+Full Tier0/Tier1 and remaining asset/lifecycle validation have NOT passed yet. No AC checked or whole-upgrade acceptance. Native identity/path/parent/status remain; acceptedv1.53.0 authoritative. Same originalbasis/mainintegration/resources, no45merge-to-primary/globalactivation/refresh/restart/live data migration/abandonment/Episode cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
