@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-12 16:08'
+updated_date: '2026-11-12 16:37'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -229,6 +229,14 @@ Continue the SAME Episode under the existing full implementation authority throu
 6. Record precise commands/counts/images/source/native identities and truthful pass/fail limits in bounded evidence and Episode-owned living native content. Publish coherent task-only updates promptly and separately from code. Deliver the remaining tested committed/pushed candidate for owner review, with implemented requirements and limitations stated truthfully; do not self-advance into merge/activation.
 
 Same owner01a1a90b-0fba-7778-b1e5-0087bdaf8fec/operation08450108-16d7-4655-9ea3-aefb6c8ac1c4/durableEpisode01a1ac6f-be96-76eb-aaf7-0ec75a7a4d05/host/worktree/branch/session/originalbasisf5287c3647245a6a5e6d3baad64d9cecf1dab81b/mainintegration remain. Acceptedv1.53.0 stays authoritative until separate operator cutover. TaskInProgress,AC0/9 until complete behavior proven. No45merge, globalactivation/refresh/restart, live data migration, abandonment or destructive Episode cleanup. Canonical execute has now been independently delivered in the same session. No extra execute/handoff invocation is needed; this accepted continuation is the current work contract.
+
+## Integrated validation blocked by host storage — 2026-11-12
+
+Remaining guidance/assets/native-seam implementation and routine Tier0 fixture repairs are local on existing code fd082830832abd31f6194efab7dbf157f5ef0f57 after authorized main integration. Full repaired Tier0 PASSED736tests+140subtests,104default-tier skips. Full Tier1 did NOT pass: its terminal capture crashed with ENOSPC, the host Data volume is100% (~117MiB free), Docker returns500, and no complete terminal teardown/manifest proof exists. Retain all logs and the exact test-container identity. This is a host-capacity blocker, not owner-review readiness or permission to waive tests.
+
+After operator-approved capacity restoration, inspect Docker and exact owned test-container/current evidence before safe standard fixture cleanup/rerun; never blind prune or delete unrelated data. Diagnose/repair remaining in-scope failures, including obsolete task-complete layout fixtures, archive/live duplicate-ID fixture assumptions, native bodies/required skipped smokes, and one actual Beads-diagnostic assertion mismatch. Later EROFS/transport failures are resource-contaminated and need a healthy rerun, not inferred code changes. Run fresh COMPLETE Tier0 and Tier1 after the final edits, including all three moved native Python bodies; preserve retired reverse-migration exclusions only. Record bounded final evidence and publish separate tested code/task candidate, then stop for owner review. No automatic execute/handoff replay, new Episode/resources or lifecycle edit.
+
+Task remains In Progress,AC0/9; acceptedv1.53.0 stays authoritative. Same owner/operation/session/worktree/branch/originalbasis. No45merge into primary/global refresh/restart/live migration/abandonment/destructive Episode cleanup. Source changes are not yet committed/published as a final candidate.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -359,6 +367,12 @@ Full Tier0/Tier1 and remaining asset/lifecycle validation have NOT passed yet. N
 Fresh Docker-isolated native reconciliation generated17 source-matching assets with0conflicts; a separate baseline-customization fixture preserved all reported customized bytes. The initial diagnostic falsely assumed that existing customizations produce zero conflicts; its failure is retained, not product acceptance. Actual registry update changes only execute installed/available digests; historical baseline cc0453ff3aad661c78e550997fd9ea6359fa7f76b1b87d552c69dfb5d9c52a6c and all unrelated customization remain unchanged.
 
 First full Tier0 is FAILED:731passed,6failed,103environment-gated skips,140subtests passed. Failures are stale current-main inventory entries, a string scan misreading container-embedded code as host execution, and tests coupled to removed live task storage. Narrow test repairs preserve exact inventory/host-isolation/atomic-native/evidence assertions, using existing disposable Docker fixtures and immutable historical evidence; no runtime policy or new framework. Full Tier1 is running, not accepted; final full suites must include the repaired native bodies. No required coverage is waived. Status In Progress,AC0/9; acceptedv1.53.0 remains authoritative. No merge into primary/global activation/restart/live migration/cleanup.
+
+2026-11-12 — Host-storage blocker during first integrated full Tier1. Command: TIER1_ENV_FILE=.test-results/primeclaw45-integrated-08450108/tier1.env uv run --no-project --python python3.13 --with pytest --with pyyaml python3 -m pytest tests/ -q -m container. It exited1, but pytest capture itself ended OSError[Errno28] No space left on device before a trustworthy final count/terminal manifest. Host Data filesystem reports100% and~117MiB free; Docker ps returnsHTTP500. Even goal creation initially returned ENOSPC; actual goal state was reread and closed. No prune/unrelated deletion or host/global candidate operation was attempted.
+
+Full repaired Tier0 passed736tests,140subtests with104default-tier skips/13warnings (94.59s), not Tier1 acceptance. Raw .test-results/primeclaw45-integrated-08450108/tier0-final.log and tier1.log plus .test-results/20261112T160357Z-17549-d060d5ce/tier1/ are retained. Early concrete failures include backlog_destination_layout.test.mjs using removed task complete, task_history_workspace.test.mjs constructing active/archive TASK-1 duplicates now correctly refused, and a source Beads diagnostic assertion expecting an open record to be rejected. Later native failures include EROFS /tmp and Docker transport errors; do not treat them as product diagnoses or successes. Existing finalization/native/upstream focused passing evidence remains bounded, not full acceptance.
+
+Operator-approved host capacity restoration and Docker recovery are required before remaining diagnosis/repair and fresh full suites. The test container may remain; no absent-state or teardown claim. Same Episode and settled uncommitted candidate edits are preserved at codefd082830; no final code publication, AC/lifecycle mutation or activation. Accepted1.53.0 remains authoritative.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
