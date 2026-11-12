@@ -61,93 +61,114 @@ second execution of these named behaviors.
 
 ## Native session evidence versus Orca recovery
 
-`tests/test_reviewed_plan_extension.py::test_native_creation_session_assignment_and_saved_session_reuse`
-uses the real isolated Prime Agent daemon, `PrimeSessionPublisher`, and a
-native-discovered inert provider at a disposable Git worktree. It admits one
-harmless fixture assignment, reads native messages/state, stops only that idle
-fixture route, and reopens the same saved session without another assignment.
-The public probe wrapper isolates settings, sessions and daemon generation;
-the tier-1 fixture verifies network absence and exact teardown.
+For the product behavior, see the
+[operator overview](conversation-driven-episode-oversight.md#episode-creation-and-recovery-operator-overview).
+The results below describe the accepted PRIMECLAW-56 implementation snapshot,
+not the active host generation or a new test run.
 
-This is native session-component evidence, not an exercise of the complete
-owner-led creation procedure, canonical execute behavior, LLM compliance or
-ambiguous delivery.
+### PRIMECLAW-56 final acceptance
 
-`test_native_orca_packaged_runtime_and_terminal_boundary` establishes the next
-real fixture prerequisite. The tier-1 image stages the **whole official Orca
-v1.4.247 Linux AppImage** before network cutoff. It verifies the architecture's
-release SHA-256 and bundled **Node 24.22.1** executable hash, retaining all
-packaged assets. This private Node does not replace Prime Agent's Node22.
-Only ARM64 has been exercised here; the x64 release/hash path is not runtime
-validation. The published distribution is not claimed identical to the host's
-same-version local build.
+The owner and independent GPT-6 Astra review accepted the cumulative
+implementation at `1ec69441563dc4e463928bdb47d3c75002c0ac32`. It was merged to
+main and the native task was published as Done with seven checked criteria on
+2026-11-12. The [published task record][task56-done] preserves the detailed
+commands, results, acceptance mapping, hashes, failed attempts, and limits.
 
-The test runs the packaged `orca-ide` launcher with fresh fixture-owned
-HOME/XDG/profile directories as an unprivileged container user. It loads that
-CLI's guide, requests `ORCA_SERVE_RUNTIME=orcad`, requires the actual Orcad
-selection diagnostic and rejects Electron fallback. Native setup/worktree
-reads prove the selected ready setup and original Git base. Cursor-based PTY
-reads must observe a complete split nonce as its own output line; echoed input
-cannot satisfy it. Native terminal inventory includes the actual visual layout.
+| Accepted evidence | Demonstrated outcome |
+|---|---|
+| Preflight exercise and required source-change Docker probes | A representative known prerequisite failure stops before ownership reservation or resource allocation and reports truthful native status. |
+| Native failed-publication/registry exercise | Local versus published task state is inspected; a short locked selected-owner correction preserves original bindings, latest other-owner values, and unrelated bytes/staging/history. |
+| Final focused Docker regression: **3 passed in 160.65s** | Actual same-operation Backlog/Orca recovery and native saved-session reuse, plus the older fake-daemon flush regression. These three tests do not all provide the same kind of evidence. |
+| Focused policy/routing and host-safe bridge checks: **17 + 10 passed** | Narrow policy and bridge assertions; not LLM-compliance or live activation proof. |
 
-One no-prompt `agent launch --surface terminal` then starts the real installed
-Prime Agent through `scripts/run-prime-agent-probe.sh`, not a fake executable.
-Supported fixture-project settings mark onboarding shown and disable trace
-sharing/telemetry; an inert local model rejects unexpected work. Native reads
-require the exact visible, connected, writable Prime Agent tab and `← manage`
-screen. The real flushed session header matches that exact worktree and saved
-session ID, with **zero user assignments**. Only the inspected fixture terminal
-is closed; the ordinary tier-1 container teardown removes its runtime/profile.
-No host profile/socket, display, published port, production control plane,
-credential, dependency patch or engine substitution is used.
+At acceptance, the owner/reviewer verified all 16 final manifest artifact hashes,
+absent network, clean product/source-builder teardown, and unchanged read-only
+Prime Agent source inventory. The final three-file tested content hash was
+`12feb3597c387595e2291038bcdf33a5c026a4393b85fc12c743f42a5251c441`.
+These are recorded verification results, not a claim that the raw artifacts are
+still available in this checkout.
 
-The readiness test above does not prove recovery. The separate
-`test_native_same_operation_creation_recovery_and_session_binding` now exercises
-an allocated independent-Backlog/Orca worktree through the existing allocator,
-real `CliOrcaAdapter` (selecting packaged `orca-ide`) and real daemon publisher.
-Its disposable owner inspects an actual late task-clone transport failure,
-clears only that fixture cause, and applies a locked selected-entry correction.
-The same worktree then receives one durable session and one harmless initial
-assignment. The fixture executes the real native `automations run` once with
-its stdout deliberately discarded. The unmodified adapter cannot parse the
-missing run result and reports mutation uncertainty; persisted ownership keeps
-the known launch name/ID and all original bindings. The scripted owner stops
-mutation while completion is unresolved. Bounded native list/state/message reads
-then establish the one actual initial assignment. Explicit same-session binding
-and active replay send nothing and preserve the original resources, known launch
-identity, other owner, task ref and unrelated staged bytes. The disabled fixture
-automation is retained until ordinary container teardown.
+### What the native exercises prove
 
-This is unavailable native launch-result evidence, not a fabricated adapter error
-or a status relabel after known success. It proves a stop while assignment
-completion is unresolved and native evidence-based continuation without replay.
-It does not prove daemon prompt-ack loss or resolution when native evidence stays
-permanently unavailable. Native saved/live messages, state, Git and the exact
-visible tab establish the final binding. Orca's normal pre-existing shell tab is retained;
-pre-session failure must leave its handles unchanged and no Prime Agent session
-or tab, rather than require an empty terminal inventory.
+- **Session component:**
+  `test_native_creation_session_assignment_and_saved_session_reuse` uses the
+  real isolated Prime Agent daemon and unmodified publisher at a disposable Git
+  worktree. It admits one harmless assignment, observes native state/messages,
+  and reopens the same saved session without another assignment. The separate
+  older `test_real_v098_fresh_session_is_flushed_before_daemon_publication` uses
+  a fake daemon client; do not conflate their coverage.
+- **Orca runtime/launch prerequisite:**
+  `test_native_orca_packaged_runtime_and_terminal_boundary` uses the whole
+  verified official Orca v1.4.247 Linux AppImage and its private Node 24.22.1,
+  without replacing Prime Agent's Node22. An unprivileged isolated profile runs
+  actual Orcad, setup/worktree reads, split-nonce PTY execution, and one real
+  no-prompt Prime Agent launch. The exact tab is visible, connected, and writable;
+  its flushed durable session header matches the worktree, with zero assignments.
+  ARM64 was exercised; the x64 artifact path and the host's same-version local
+  build were not established by that run.
+- **Same-operation recovery and uncertainty:**
+  `test_native_same_operation_creation_recovery_and_session_binding` uses real
+  Backlog/Orca operations, the existing allocator/adapter, and real daemon
+  clients. After an actual late target-clone transport failure, the scripted
+  fixture owner inspects and corrects its selected record under the registry
+  lock. Missing preparation finishes in the original worktree, with one durable
+  session and one harmless initial assignment. One real native launch runs with
+  its stdout deliberately discarded. The unmodified adapter reports uncertainty
+  and preserves the known launch name/ID. Mutation stops until bounded native
+  session/state/message reads establish the assignment. Explicit same-session
+  binding and active replay then send nothing and add no resources or status
+  publication. Original bindings, the other owner, task history, unrelated
+  staging, and Orca's normal shell-tab handles are preserved.
 
-The first attempt stopped in source-builder setup under the former external
-Docker organization-login blocker; no test body ran. After authorized clearance,
-the native test exposed and corrected that shell-tab fixture assumption, then
-passed in isolated source-mode Docker. The initial recovery/reuse pass is retained
-under `.test-results/20261106T143829Z-96908-d3325cd9/tier1/`. The subsequent real
-lost-launch-result exercise also passed; the native task records its exact
-manifest, recovery artifact, hashes and failed-attempt limits.
+Native Prime Agent clients run through `scripts/run-prime-agent-probe.sh` inside
+Docker. The TUI joins the fixture controller's exact isolated daemon using the
+public `--daemon-socket` argument. The fixture uses an inert local model and
+fresh HOME/XDG/profile/settings/session roots, not host credentials, profiles,
+sockets, display, or production control planes. Linux outside managed terminals
+uses packaged `orca-ide`, not the unrelated GNOME `orca` command. Keep the exact
+visible/connected/writable-tab and identity safeguards in future test changes.
 
-Both native Prime Agent clients use the probe wrapper. The fixture's TUI
-explicitly joins the controller's exact isolated daemon with the public
-`--daemon-socket` argument; it never uses the host daemon or production profile.
-These are scripted applications of the reviewed Markdown decisions through
-actual native interfaces, not an autonomous recovery framework or proof that
-an LLM follows every instruction. Canonical execute, daemon prompt-ack loss,
-permanently unavailable evidence and activation remain separate evidence.
-Outside managed Linux terminals
-select `orca-ide`, not the unrelated GNOME `orca` command; the existing
-`CliOrcaAdapter` injectable runner can invoke this exact native CLI. The earlier
-component's bare-`orca` ENOENT is historical executable-selection evidence, not
-proof that the now-staged distribution is unavailable. Keep all exact tab and
-identity safeguards when building the remaining exercises.
+These are scripted native procedure outcomes, not proof that an LLM follows
+every instruction or completes canonical execute correctly. The initial uncertain
+ownership shape is seeded after real worktree allocation; the launch-result loss
+and subsequent stop/bind/replay observations are real. The tests do not prove
+daemon prompt-ack loss, resolution when evidence stays permanently unavailable,
+every unsupported provider/engine/partial shape, or global activation. Those
+limits are not new requirements or unfinished approved representative exercises.
+
+### Historical attempts and artifact availability
+
+The original run directories were local `.test-results/` artifacts in the now
+removed PRIMECLAW-56 Episode worktree. The paths below are **historical
+identifiers, not working links or retained files in the primary checkout**.
+Their absence is not permission to regenerate a receipt or claim a new run
+reproduced the original evidence. The pinned native task retains the recorded
+summary and hashes; this documentation update does not restore the raw files.
+
+| Historical identifier | Recorded meaning |
+|---|---|
+| `20261105T204153Z-62732-71da2792/tier1/` | Docker organization-login failure in source-builder setup; no test body or recovery assignment ran. Unavailable teardown observations were not successful isolation proof. |
+| `20261106T143504Z-87153-77b0f151/tier1/` | After access was restored, a fixture assertion incorrectly required zero terminals. It failed before recovery/assignment; repaired to preserve Orca's normal shell tab. |
+| `20261106T143829Z-96908-d3325cd9/tier1/` | First passing full-path recovery/reuse exercise, 134.19s; not yet the final lost-launch-result variant. |
+| `20261106T144630Z-21856-9efa61c2/tier1/` | Passing actual lost-launch-result stop/bind/replay variant, 125.90s. |
+| `20261106T145027Z-32986-2c96f326/tier1/` | Final three-test regression, 160.65s; all 16 listed artifact hashes were checked at acceptance. |
+
+Recorded final `manifest.json` SHA-256:
+`5ea9b0f69781a94a91e62e66043c6b3f60f5ab45414387b9c265c0d5dfe86ec9`.
+Recorded `creation-native-same-operation-recovery.json` SHA-256:
+`f7dd2c5ec98f40b21fee816aed528b918b4b59534a57f500d22c56488391ed22`.
+A recorded hash identifies the reviewed bytes; it does not supply those bytes or
+prove their current availability. Earlier preflight, registry, component,
+runtime, and source-probe paths in the native task are historical local run
+identifiers under the same availability boundary.
+
+For new validation, use the existing Docker tier-1 fixture and the named tests in
+`tests/test_reviewed_plan_extension.py`, or the earlier selected exercises in
+`tests/test_future_plan_skills.py`. The published task records the original exact
+commands and source-mode inputs. A new run must record its own snapshot, inputs,
+results, and evidence; never use live Episode resources to recreate a fixture.
+
+[task56-done]: https://github.com/SailorJoe6/prime-claw/blob/981046da59b2022187f537c79642a3324ed5b761/tasks/primeclaw-56%20-%20Prevent-premature-Episode-allocation-and-resume-failed-creation-in-existing-resources.md
 
 ## Fail-closed lifecycle control boundary
 

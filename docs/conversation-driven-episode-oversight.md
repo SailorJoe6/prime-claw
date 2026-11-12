@@ -1,5 +1,79 @@
 # Conversation-driven Episode oversight
 
+## Episode creation and recovery: operator overview
+
+PRIMECLAW-56 improves the existing Conversation → Episode workflow: **check
+available prerequisites before allocating resources, then recover late failures
+in the same resources when native evidence makes that safe.** It is a
+reliability correction, not a new orchestrator, retry service, or user command.
+The product intent remains [REQUIREMENTS.md, P12](../REQUIREMENTS.md#p12-create-one-isolated-episode-and-recover-in-the-same-resources).
+
+### What changes for the operator
+
+Previously, creation could allocate a branch/worktree and then fail while
+preparing task history, before recording a session. Fresh admission could not
+finish that partial operation, while normal handoff required an active Episode.
+The original PRIMECLAW-45 incident used explicitly authorized deletion as a
+workaround. Deletion and recreation are not the normal recovery design.
+
+The owning Conversation now follows this sequence:
+
+1. **Check before fresh admission.** Inspect the selected published task,
+   committed execute/configuration assets, provider transport, and intended
+   placement/runtime using native reads. A known unresolved prerequisite stops
+   before fresh In Progress publication, reservation, or allocation. A file that
+   exists only in the current working directory is not proof it will exist in
+   the new worktree's commit.
+2. **Inspect a partial operation before acting.** Preserve the original owner,
+   operation, task/provider, code base, host, branch/worktree, and known
+   session/launch identities. Read native task history, saved/live sessions,
+   messages, queues, terminals, and launch evidence. A failed response or missing
+   recorded session does not prove that nothing ran.
+3. **Complete only a proven-missing step.** Reuse the same allocated resources
+   and any established session/assignment. If delivery remains ambiguous, stop
+   with the exact missing fact instead of resending or starting another Episode.
+
+| Observed situation | Expected response |
+|---|---|
+| A discoverable prerequisite is unavailable before creation | Report the actual failure and task status; allocate nothing. |
+| An allocated independent-Backlog/Orca worktree has no session or assignment, established by native inspection | Complete only missing preparation/launch in that worktree, with one initial assignment. |
+| The exact session and initial assignment already exist | Bind/reuse them without another initial assignment. |
+| Delivery, identity, or a supported continuation step cannot be established | Preserve resources and report the concrete evidence gap or interface limit; do not guess or delete/recreate. |
+
+Only the owning Conversation may make the documented targeted correction to its
+incomplete-creation ownership entry. It uses the existing lock, compares current
+selected evidence before editing, preserves other owners, and verifies the
+result. The operator need not hand-repair JSON; Episodes and Experts gain no
+ownership-edit permission. Failed status publication is reported as actual local
+versus published state, never assumed rollback.
+
+### Scope, validation, and activation
+
+This task reuses PRIMECLAW-55/58 mechanics. It adds editable workflow guidance,
+aligned docs and tests, but no production TypeScript, recovery API, ownership
+state/schema, checkpoint/receipt protocol, or automatic retry engine. The
+representative integrated recovery exercise uses independent Backlog with Orca;
+it is not universal recovery support for every provider, engine, or partial
+failure. Foreign resources and genuinely ambiguous delivery still require a stop.
+
+PRIMECLAW-56's implementation was accepted by the owner and independent review,
+merged to main, published as Done with all seven criteria checked, and its
+Episode resources/ownership were removed on 2026-11-12. The
+[testing summary](testing-strategy.md#native-session-evidence-versus-orca-recovery)
+separates demonstrated outcomes, historical attempts, and unavailable raw
+artifacts. Scripted native tests are not proof of LLM-policy compliance or live
+activation.
+
+**Merged source is not global activation.** The merge/cleanup did not perform a
+user-global plugin refresh or coordinated restart. Establish the active generation
+through the separately authorized refresh/restart/UAT procedure; copy success or
+`/reload` alone is not proof. Product/scope changes, merge, abandonment, activation,
+and destructive recovery remain operator decisions.
+
+For exact actions, use the existing editable
+[pre-allocation checks](../.prime-claw/workflows/implement-task.md#check-prerequisites-before-fresh-allocation)
+and [owner-led recovery procedure](../.prime-claw/workflows/implement-task.md#owner-led-creation-recovery).
+
 ## Task55 continuation and ticket-durability boundary
 
 Ordinary task-native continuation now follows editable handoff/execute/oversight

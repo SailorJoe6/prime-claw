@@ -38,6 +38,9 @@ review candidate, not proof of live activation or full Phase 4 acceptance.
 
 ## Phase 4 operator workflows
 
+- [Episode creation and recovery: operator overview](docs/conversation-driven-episode-oversight.md#episode-creation-and-recovery-operator-overview)
+  — check prerequisites before allocation, recover in the same resources, and
+  stop on ambiguous delivery. Includes the merged-versus-activated boundary.
 - [Project initialization and updates](docs/project-initialization.md) — startup
   only inspects Git projects, without requiring Orca. Needed setup or updates
   add editable background guidance on the first normal turn, not a separate

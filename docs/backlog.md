@@ -17,6 +17,10 @@ cleanliness and rollback details below are historical, not instructions to resto
 
 ## Requested creation and failure decisions
 
+For the operator-facing explanation, start with
+[Episode creation and recovery](conversation-driven-episode-oversight.md#episode-creation-and-recovery-operator-overview).
+The detailed native procedure remains in the editable project workflow.
+
 Before fresh `create_task_episode`, the invoking LLM follows editable implementation
 guidance to finish native prerequisite checks that need no Episode resources:
 
