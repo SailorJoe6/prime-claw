@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-15 07:35'
+updated_date: '2026-11-15 07:44'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -19,6 +19,7 @@ documentation:
   - docs/user-stories/B-project-initialization.md
   - docs/user-stories/I-episode-finalization.md
   - docs/user-stories/traceability.md
+  - docs/evidence/primeclaw45-integrated-compatibility-20261115.md
 modified_files:
   - .gitmodules
   - bin/prime-claw
@@ -61,6 +62,7 @@ modified_files:
   - tests/task_history_workspace.test.mjs
   - tests/test_source_builder_real_install.py
   - tests/unit_env_tier1_driver_body.py
+  - docs/evidence/primeclaw45-integrated-compatibility-20261115.md
 priority: p1
 type: task
 ordinal: 130000
@@ -434,6 +436,12 @@ Recorded defects repaired earlier now have passing real native evidence: layout1
 Four remaining failures are isolated to test fixtures/assertions, without relaxing required coverage: execute-content and atomic-authoring native tests report native first-use config normalization as an unexpected dirty backlog/config.yml alongside correctly preserved unrelated MM bytes/index; synthetic two-real-source-generations fixture lacks the isolated prep-kernel skill setup required by current supported fixture; launcher-meta fake-driver assertion still expects unwrapped prime-agent although production correctly uses /workspace/scripts/run-prime-agent-probe.sh. Parent fixed the exact wrapper assertion and added a negative unwrapped assertion; bounded helpers own only affected synthetic/native fixture files. No production/upstream change or host probe is authorized/needed. Preserve all identity/status/task-only/index/source-generation changed-behavior/nonreplay/source-inventory/teardown assertions. Exact root causes and final repaired runs remain to verify, not waived by prior successful subsets.
 
 The lone top-level skip is tests/container/test_source_generation_probe.py child-contract inactive in outer suite; its actual A/B nested source-generation body is REQUIRED and presently FAILED, not satisfied by that skip. Fix and execute it under the existing source-mode interface. Fresh COMPLETE Tier0 AND Tier1 after settled final repairs are still required. No candidate is ready for owner review yet; no AC/lifecycle/ownership edits, code publication, primary merge/globalactivation/restart/live migration/Episode cleanup. Accepted1.53.0 remains authoritative; old exited5650767 container/evidence untouched.
+
+2026-11-15 — Four original healthy-Tier1 failure repairs settled. Two sparse native configs now run supported `backlog config set autoCommit false` before baseline commits; native ensureConfigMigrated fills defaultPort/autoOpenBrowser before unrelated work is staged. All exact status/task-only/index/working-byte assertions unchanged. Synthetic generation package now carries exactly one editable compact marker plus minimal postinstall honoring existing bootstrap env/uv/isolated venv. Actual PrimeAgent, production fixture and A/B proof assertions unchanged. Exact native probe wrapper assertion updated and unwrapped command explicitly rejected.
+
+Combined affected Docker run completed1FAIL/3PASS,300.28s, not acceptance. Both native task-only tests and launcher-meta bridge PASS. A/B generation executes BOTH native installs and passes every existing behavior/source/artifact/executable/changed-generation/stale-replay/source-inventory/network/teardown assertion, but final summary publication rejects the uv environment's absolute sys.executable path through existing provenance sanitizer. Correct only the public receipt command to Path(sys.executable).name; keep exact argv/raw failure history private in retained logs and do not weaken sanitizer or A/B proof. A new targeted source-generation receipt check is running on one saved handle, not a full-suite substitute. Raw commands/logs/XML under .test-results/primeclaw45-resumed-08450108/fixture-repairs.* and generation-receipt-repair.*. Every failed run stays failed.
+
+Bounded repository evidence draft docs/evidence/primeclaw45-integrated-compatibility-20261115.md records remaining scope, prior bounded-proof limits, original ENOSPC history, healthy full98PASS/4FAIL and required final gates. No final candidate acceptance/publication or changed AC is claimed. After the receipt check passes and edits settle, fresh COMPLETE Tier0/Tier1 remain required before code/native delivery for owner review. Same resources/originalbasis/accepted1.53.0, no lifecycle/ownership/primary/global/activation/cleanup changes.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
