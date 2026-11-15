@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-15 08:39'
+updated_date: '2026-11-15 08:40'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -490,6 +490,8 @@ NEW COMPLETE Tier0 and source-selected Tier1 now RUNNING after all latest edits 
 2026-11-15 — New complete Tier0 onfc787154bbd16647a23b6a49be4fd9467ea8afc1 failed3/733PASS/104tier skips/140subtests/13warnings,86.53s. Three existing recorded-cleanup unit tests stopped before expected assertions because tests/lifecycle/support.py `_SENSITIVE` treats generated ISO timestamp `2026-11-15T08:36:10.305505+00:00` as private endpoint material (exact regex match`:10.`). Native project-environment diagnostic reproduces refusal for that harmless timestamp and acceptance for otherwise identical second11. This pre-existing time-dependent test-helper false positive is unrelated to the Backlog/native-init change; no source/test/filter/clock edits and no assertion weakening. Failed log/XML/receipt and deterministic diagnostic remain under .test-results/primeclaw45-final-native-init-08450108/: full-tier0.*, tier0-timestamp-failed-receipt.json, tier0-timestamp-diagnostic.txt. Prior passing full Tier0 results remain distinct, not substituted.
 
 Rerunning COMPLETE Tier0 once on exactly unchanged28-path input hashes, with full-tier0-timestamp-rerun command/log/XML. Required lifecycle cases must actually pass; no subset or skip waiver. Existing new COMPLETE Tier1 continues on its original final_complete_tier1_handle and unchanged source inputs; do not restart it. The timestamp helper limitation will be reported explicitly at delivery rather than hidden or broadened into unrelated lifecycle/filter work. No final code publication/acceptance yet; same Episode/resources/status/nullparent/AC0of9 and accepted1.53.0.
+
+2026-11-15 — Unchanged-code COMPLETE Tier0 rerun PASSED:736tests+140subtests,104expected tier/environment skips,13warnings,92.81s,exit0. All three previously timestamp-blocked cleanup tests actually execute and pass (delete-exact-order, policy-drift refusal before mutation, production-drift refusal before reads). Same sourcefc787154bbd16647a23b6a49be4fd9467ea8afc1; all28final input hashes unchanged. No code/test/clock/sanitizer edits. First failed run and deterministic :10. false-positive diagnostic remain distinct; pre-existing helper limitation is unresolved and must be disclosed, not hidden as a fixed defect. Exact command/log/XML/hashes/full-tier0-passed-receipt.json under .test-results/primeclaw45-final-native-init-08450108/. Existing COMPLETE Tier1 remains running on its original handle; no duplicate dispatch. Still no code publication/owner acceptance/activation. Next full Tier1 native no-skip/terminal proof, final report-only receipts, separate code/native publication, STOP OWNER REVIEW.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
