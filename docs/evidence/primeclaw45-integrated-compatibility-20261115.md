@@ -192,3 +192,97 @@ Fresh complete Tier0/Tier1 after the final initialization fixture edit remain
 required. The next subsection records their terminal results only after native
 coverage and artifact verification. The preceding partial-coverage success is
 not acceptance, activation, or a reason to publish an incomplete candidate.
+
+## Final complete validation — passed, awaiting owner review
+
+The settled tested code is `fc787154bbd16647a23b6a49be4fd9467ea8afc1`:
+ordinary integration of published main `5ab4eb6e8a3c718fd850c73501e765f37b08639d`
+plus the required native initialization fixture repair. It contains original
+basis `f5287c3647245a6a5e6d3baad64d9cecf1dab81b`. All28selected input-path
+hashes matched `full-input-hashes.json` before this report-only addition.
+No implementation/test input changed after these full runs.
+
+| Complete suite | Final inspected result |
+| --- | --- |
+| Tier0 | 736 passed,140 subtests passed,104 expected tier/environment skips,13 warnings,92.81s |
+| Source-selected Docker Tier1 | 102 passed,1 inactive outer child-probe skip,737 deselected,12 warnings,2544.24s |
+
+Exact uv/Python3.13/pytest/PyYAML commands, selector use, logs, JUnit and hashed
+receipts are retained under `.test-results/primeclaw45-final-native-init-08450108/`:
+`full-tier0-timestamp-rerun-command.txt`, `full-tier1-command.txt`, their logs/XML,
+`full-tier0-passed-receipt.json`, `full-integrated-passed-receipt.json`,
+`full-terminal-manifest-verification.txt`, and
+`full-generation-terminal-verification.txt`. The top-level source child marker
+is inactive outside its parent; its real nested A/B body **did execute** below.
+Tier0's exclusions do not replace Docker or registered live-environment proof.
+
+### Preserved timestamp-dependent Tier0 failure
+
+The first unchanged-code final Tier0 returned733 passed/3failed/104skipped/
+140subtests,86.53s. The existing lifecycle evidence helper's private-address
+regex matches `:10.` in a harmless ISO timestamp with fractional second10,
+refusing `event.recorded_at` before three cleanup assertions. A native diagnostic
+reproduced refusal for `2026-11-15T08:36:10.305505+00:00` and acceptance for the
+otherwise identical second11. No source, test, clock, sanitizer, or guard changed.
+The complete rerun above executed all three cleanup cases successfully.
+`full-tier0.log/XML`, `tier0-timestamp-failed-receipt.json` and
+`tier0-timestamp-diagnostic.txt` preserve this real failure. This pre-existing
+helper limitation remains unresolved; it is not a claimed fix or a waived test.
+
+### Native coverage and terminal proof
+
+Source-selected run `20261115T083555Z-21347-20180638` is terminal `passed`.
+Its manifest SHA256 is
+`f58068d9cfdfe7d73e082a918b5fd02c02ea11bca8a9a92521ee971a71d5fc54`.
+Every declared evidence hash verified through the existing provenance API.
+
+- Docker runtime image: `sha256:b9791c06670d8a0aacf41d1b58d70d3243512ad53cd349c100128fbc10c73b1f`;
+  declared input `940e20e0de02c56394d4e8c80fd718b528e9cfa71512056af6b6a4b4ecb032af`.
+  Different runtime image IDs are not claimed equal merely because inputs match.
+- Tested repository content:
+  `80e56d4a18d6d13898dcd44e419ceb0d87d8bfd2960c9b69ae07f84ac3b144c1` (414entries,
+  clean snapshot at the exact tested code HEAD).
+- Canonical Prime Agent source: `94589ebb002679a028435759ce3bfffdc7ff6127`,
+  content `fb9e671813b7f94c6d4d2d2e1e0191a250e15dee7808fffd8046d7281df8c8a6`,
+  unmodified. Full checkout inventories before/after both equal
+  `6f6e8195fc1a4a1a3c0df2e9613aed3ce78fcaf3b733b9f93eed67f32a28aef8`.
+- Runtime and source builder are cleanly torn down and absent; network absence
+  verified. No candidate host/global apply, check, probe, activation or restart.
+- Initializer **88/88, zero skips**; active-Backlog initializer12/12;
+  layout13/13; task-history89/89; full migration65passed/zero failed with only
+  twelve explicitly retired reverse cases; forward retirement1/1; admission15/15;
+  retiring-source boundary19/19; status/archive3/3; populated migration19/19;
+  native allocation/lifecycle3/3. These wrappers overlap; do not sum as unique
+  tests. No required native initialization body is omitted.
+- Both native task-only authoring tests and launcher-meta bridge pass in the
+  complete JUnit, not only their earlier repaired selections.
+
+The final required synthetic A/B summary is
+`.test-results/20261115T084528Z-21347-89a1d397/source-generations/two-generation-summary.json` (SHA256
+`a08b12451a880a735f3c9acaf185fa71de98107c1010725586e7e89b8e6bbd37`). Its child runs are
+`20261115T084529Z-61424-f1882c22` and
+`20261115T084547Z-62519-55bc24f7`. Both manifests and every
+artifact hash verify. `A|none` becomes `B|extra-B`; source/release inventory/
+artifact/installed-executable digests differ and stale replay is refused.
+Each source checkout inventory remains unchanged; child builder/runtime teardown
+is clean/absent and network absent. This is synthetic-generation contract proof,
+not a claim of a second actual upstream Prime Agent release or live cutover.
+
+| Retained final artifact | SHA256 |
+| --- | --- |
+| Tier0 log | `f1a1d1147f733d3c05f7dec84c7cbe7b99a6646c43d323b25b001637eabb94d9` |
+| Tier0 JUnit | `672b6f2602695d7e96d54e0e0e55b50cfa71a5359b79e21489897a112824bea2` |
+| Tier1 log | `67db6c24d5f4afe54fa4b28a6cf8671c322ee9991e937843b8b69e31549b24b6` |
+| Tier1 JUnit | `53648d1facb1bae997f6ca43c4656d95b179091d05358e8fbd8e7003dc35c56a` |
+|28-path tested-input manifest | `25b00b8175924984453ba9e1d077e3ab3857f19aec78224020313e99e6303895` |
+
+The earlier source/build, Backlog-only Bun, private-proxy/Git-trust, Nix native
+installCheck/persistence, focused finalization and customization-preservation
+proof above remains reused only within its stated unchanged-surface limits.
+There is no full real-gbrain/OpenShell acceptance claim. All interrupted,
+failed, incomplete-coverage and focused histories remain distinct.
+
+Implementation is ready to present as one coherent candidate for the owning
+Conversation's review, not self-accepted, merged, activated, or cleaned up.
+Task content and code publish independently. The task remains In Progress;
+owner controls review/lifecycle/status/merge. Accepted v1.53.0 stays authoritative.
