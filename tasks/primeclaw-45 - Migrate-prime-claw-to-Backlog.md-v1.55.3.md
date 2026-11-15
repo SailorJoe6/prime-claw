@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-12 23:18'
+updated_date: '2026-11-15 06:50'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -57,6 +57,8 @@ modified_files:
   - tests/test_inventory_integrity.py
   - tests/test_managed_session_protocol.py
   - tests/test_oversee_episode_skill.py
+  - tests/backlog_destination_layout.test.mjs
+  - tests/task_history_workspace.test.mjs
 priority: p1
 type: task
 ordinal: 130000
@@ -410,6 +412,14 @@ Operator-approved host capacity restoration and Docker recovery are required bef
 Current published nativec31c4bb includes compatible accepted-adaptation/remaining-work/blocker/owner-clearance history; exact ID/path/nullparent/InProgress/AC0of9 preserved. Owner comment11 explicitly corrects comment10: exact interrupted container5650767ad7cc023e716e8a42cc12cd93380817883ea1989663b484679acf04df remains exited. Fresh read-only Episode df and docker info/container inspect confirm53GiB/Data88%,29.9.3/linux/aarch64 and that exact exited identity. No delete/prune/recreation or primary task checkout synchronization occurred. Failed first full Tier1 and incomplete terminal teardown/manifest remain failed/unverified; raw receipt .test-results/primeclaw45-integrated-08450108/blocked-validation-receipt.json and prior raw hashes stay retained.
 
 The appended living-plan checkpoint carries the supplied operator guidance into already-queued canonical execute. It requires remaining routine native-fixture repairs and fresh full Tier0/Tier1 after final edits, then separate tested code/native publication for owner review. Handoff runs no tests/implementation/host probes and sends no extra execute/handoff. Existing idle roster reports no running bash/children or unfinished actions before admission. Compaction is best effort, not continuation or acceptance proof. Same resources/originalbasis/accepted1.53.0 and all no-activation/primary-write/live-migration/cleanup constraints remain.
+
+2026-11-15 — Canonical execute delivered in SAME existing Episode; no new execute/handoff dispatched. Exact tagged active version2 independent-Backlog binding, task identity/path/nullparent/InProgress/meaningfulplan and originalresources revalidated. Fresh host check:47GiB available/Data89%, Docker29.9.3/linux/aarch64. Exact interrupted container5650767ad7cc023e716e8a42cc12cd93380817883ea1989663b484679acf04df remains exited255, not OOM, networkempty, original image89ed66f and read-only workspace/release mounts preserved. Read-only inspection retained under .test-results/primeclaw45-resumed-08450108/. No start/delete/prune/recreation or rewritten old manifest/teardown.
+
+Investigation confirms genuine fixture defects before the later ENOSPC: removed task-complete calls; duplicate active/archive IDs in layout/history fixtures; and Beads test incorrectly demanding an offender diagnostic for a valid open record with exact retained archive metadata. Parent narrowly corrected the latter expectation while retaining exact history/source/remote/no-write assertions for ALL records. Disjoint helper repairs only two layout/history fixture files. Production lifecycle/transaction policy is unchanged. Validation not yet run; final complete suites remain mandatory.
+
+Correction to prior handoff shorthand: the three named earlier failure files do not contain three newly moved native bodies. Actual diff shows tests/test_future_plan_skills.py atomic authoring body moved to existing Docker fixture, while tests/test_global_asset_drift.py and tests/test_managed_session_protocol.py update exact current-source inventories. Their existing bodies remain fully collected; final Tier0/Tier1 must include all three files with no omitted required native body. Script-only global-asset tests use explicit isolated scratch roots, not host-global/plugin probes.
+
+Published main5ab4eb6e8a3c718fd850c73501e765f37b08639d inspected: since already integrated c0b42f0 only compatible operator docs/testing-evidence clarification and exact owner observation updates, no new production implementation. Existing fd082830 already contains current PRIMECLAW-56 mechanics. Preserve pending compatible docs/customizations; no extra merge is required solely for documentation/observation advances. Canonical unchanged read-only PrimeAgent source remains94589ebb002679a028435759ce3bfffdc7ff6127 for supported fresh Docker fixture. Prior source/Nix/Gittrust/Bun-isolation proof retains recorded limits. After settled final edits run fresh FULL Tier0/Tier1, preserve every failed run and required skip reason, then separate committed/pushed code/native delivery for owner review. Accepted1.53.0 authoritative; no lifecycle/ownership/primary writes, activation, secondhostAgent, live migration or Episode cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
