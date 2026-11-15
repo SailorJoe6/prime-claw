@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-15 06:53'
+updated_date: '2026-11-15 07:35'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -59,6 +59,8 @@ modified_files:
   - tests/test_oversee_episode_skill.py
   - tests/backlog_destination_layout.test.mjs
   - tests/task_history_workspace.test.mjs
+  - tests/test_source_builder_real_install.py
+  - tests/unit_env_tier1_driver_body.py
 priority: p1
 type: task
 ordinal: 130000
@@ -424,6 +426,14 @@ Published main5ab4eb6e8a3c718fd850c73501e765f37b08639d inspected: since already 
 2026-11-15 — Fresh COMPLETE Tier0 after all recorded fixture repairs PASSED:736tests+140subtests,104default-tier/environment skips,13warnings,86.23s pytest (88.18s command). Command: uv run --no-project --python python3.13 --with pytest --with pyyaml python3 -m pytest tests/ -q -ra --junitxml=.test-results/primeclaw45-resumed-08450108/tier0.xml. Raw log .test-results/primeclaw45-resumed-08450108/tier0.log SHA25644ff4942c81632a4dd953e1492c1e7c09a131ccfca7ff9b5a4f559e95916f26a; JUnit tier0.xml SHA25675e35b9747d845570d4b98d3db54b988f04f09d68b7162fb655bbb96a3e05a0e; exact command/input-hash/receipt files retained beside it. All pending candidate bytes still match the pre-full-validation hash manifest. The104skips are explicit default-tier admission/environment separation, not Tier1 success; final full Tier1 must run the required container bodies.
 
 The fresh COMPLETE Tier1 command is already running on its existing handle with supported TIER1_ENV_FILE and .test-results/primeclaw45-resumed-08450108/tier1.log plus planned tier1.xml. It has no terminal result yet; do not relaunch, accept, infer teardown or call this owner-review-ready. Earlier failed/resource-contaminated Tier1 histories remain unchanged. Exact old exited container was only inspected, not restarted/deleted. Final native skip/coverage and runtime/builder teardown/manifests remain to inspect before tested code/native delivery. No source/plugin changes since starting these final full suites; no AC/lifecycle/ownership or activation claim.
+
+2026-11-15 — Fresh COMPLETE Tier1 finished FAILED:4failed,98passed,1inactive child-probe contract skip,737deselected,12warnings,2568.92s. Raw command/log/XML/receipt under .test-results/primeclaw45-resumed-08450108/; tier1.log SHA256a88d7a6fb3090803f19b3ddcebc8a4aaa11e5aa6d8b82075509b2d9d121f27fb, tier1.xml SHA256e75bd6be6050c8a0862855bd841c79fe6517d4a66fdfd6203e9fb3556cfbd00c. Supported run20261115T065058Z-14737-d879a874 terminal FAILED manifest and EVERY evidence hash verified natively; runtime and builder absence/clean teardown proven; canonical source before/after full inventories unchanged. Distinct exact imagee1f56f2241227b463c569c5f8048b7b6d303bbe6c23f8d9f3396ad5ed9302ddd used same declared input940e20e0; not equated to earlier image89ed66f. Networkabsence verified. This healthy run is not the old ENOSPC run and is NOT full acceptance.
+
+Recorded defects repaired earlier now have passing real native evidence: layout13/13, history89/89, full migration65PASS0fail with12explicit RETIRED reverse cases only; forward1, admission15, source-boundary19, Beadsstatus/archive3, populatedmigration19 and nativeallocation/lifecycle3 allPASS0fail/skip in their respective wrappers. Existing initializer suite87PASS/1skip retains its retired native reverse-conversion exclusion; activeBacklog initializer12PASS. Do not sum overlapping wrapper counts as unique coverage.
+
+Four remaining failures are isolated to test fixtures/assertions, without relaxing required coverage: execute-content and atomic-authoring native tests report native first-use config normalization as an unexpected dirty backlog/config.yml alongside correctly preserved unrelated MM bytes/index; synthetic two-real-source-generations fixture lacks the isolated prep-kernel skill setup required by current supported fixture; launcher-meta fake-driver assertion still expects unwrapped prime-agent although production correctly uses /workspace/scripts/run-prime-agent-probe.sh. Parent fixed the exact wrapper assertion and added a negative unwrapped assertion; bounded helpers own only affected synthetic/native fixture files. No production/upstream change or host probe is authorized/needed. Preserve all identity/status/task-only/index/source-generation changed-behavior/nonreplay/source-inventory/teardown assertions. Exact root causes and final repaired runs remain to verify, not waived by prior successful subsets.
+
+The lone top-level skip is tests/container/test_source_generation_probe.py child-contract inactive in outer suite; its actual A/B nested source-generation body is REQUIRED and presently FAILED, not satisfied by that skip. Fix and execute it under the existing source-mode interface. Fresh COMPLETE Tier0 AND Tier1 after settled final repairs are still required. No candidate is ready for owner review yet; no AC/lifecycle/ownership edits, code publication, primary merge/globalactivation/restart/live migration/Episode cleanup. Accepted1.53.0 remains authoritative; old exited5650767 container/evidence untouched.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
