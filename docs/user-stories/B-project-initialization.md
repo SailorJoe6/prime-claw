@@ -129,17 +129,28 @@ A valid existing default `backlog/`, hidden `.backlog/`, or native root-config
 selected custom store is preserved, not treated as a collision. Normalize only
 the default `backlog/` into `.backlog/` with the standard native root symlink in
 both installation/initialization and migration; hidden/custom stores stay in
-place. Existing IDs, physical records (including same-ID archives), configuration,
-Git history, and clone/publication identity remain protected. Counts include
-preserved records, imports, and the single destination-native receipt.
+place. Existing IDs, physical records, configuration, Git history, and
+clone/publication identity remain protected. Counts include preserved records,
+imports, and the single destination-native receipt.
 
 Native ID allocation and the existing importer mapping/provenance/relationships
-are reused. Archives are deleted/history, never dependency targets or fallback;
-only actual `tasks/` and `completed/` records are eligible. A reused live ID is
-not ambiguous because history retains it. Archive-only targets refuse as
-missing/deleted, as do true live/completed ambiguity, self references, and
-cycles. A genuine source relationship to a deleted task is reported before any
-destination mutation, not dropped or automatically repaired.
+are reused. PRIMECLAW-45 supersedes PRIMECLAW-44's archive-ID reuse and
+archived/draft dependency exclusions. Archive is reversible, read-only history
+that reserves identity and preserves status and relationships; restore before
+editing. Both legacy `completed/` and canonical `archive/tasks/` are archived
+regardless of status. Native archived and draft dependency targets are allowed.
+Physical ID conflicts across source/destination live, draft and archive records
+refuse before writes, preserving both baselines; no renumbering, automatic repair,
+parallel index or graph policy. Genuine native identity/relationship failures
+still refuse, never dropping relationships. Only explicit archived-only native
+`task delete` vacates identity and cleans relationships.
+
+Read archived tasks natively at their actual paths without clone/relocation or
+an artificial active view. Archived drafts keep exact bytes, paths, history and
+physical identity checks; their unavailable native view alone does not block.
+Do not discard, promote, restore or relocate them. Native evidence remains
+required for active drafts and active/archived tasks. Identity-set reads stay
+complete, unwindowed native JSON reads without row-order assumptions.
 
 Read retiring Beads as-is, including embedded/local-only stores without custom
 statuses or a Dolt remote. Complete native inventory/export, raw source version,
@@ -147,8 +158,10 @@ status catalog, views/comments/history/events/provenance and stable identity are
 required; source setup, SQL, server conversion, or source publication are not.
 Unused catalog values do not block. Unsupported used statuses and ambiguous
 archive evidence report exact source IDs/statuses before writes. Legacy open
-maps to In Design; ordinary closed maps to Done/completed. Archive needs exact
-positive prior-archive/Prime Claw abandonment evidence, not keywords/categories.
+maps to In Design; ordinary closed maps to active Done without moving it.
+Archive needs exact positive prior-archive/Prime Claw abandonment evidence, not
+keywords/categories. Explicit archives retain their normally mapped status and
+raw source history/reason, not a forced In Progress or inferred pre-close status.
 
 Confirmation, quiescence, source recapture, code/runtime/ownership continuity,
 verified destination content and publication all precede source retirement. The

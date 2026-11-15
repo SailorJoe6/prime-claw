@@ -20,6 +20,7 @@ EXPECTED_TYPESCRIPT = {
     "extensions/project-initialization.ts",
     "extensions/reviewed-plan.ts",
     "extension-support/project-initialization.ts",
+    "extension-support/prime-claw-directory.ts",
     "extension-support/template-review.ts",
     "extension-support/episode-ownership.ts",
     "extension-support/legacy-workflow.ts",

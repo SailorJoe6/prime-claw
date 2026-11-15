@@ -201,7 +201,18 @@ model. Ambiguous provider selection requires clarification, not a guess.
 The managed task lifecycle remains visible as In Design, In Planning,
 In Progress, Blocked, Ready for Merge, and Done, using native provider mappings.
 
-Sources: [PRIMECLAW-35][T35], [43][T43], [44][T44]; US-28.
+For Backlog, an active task in final status `Done` is closed without moving it.
+Archive is reversible, read-only history that reserves identity and preserves
+status and relationships; restore before editing. Canonical `archive/tasks/`
+and legacy `completed/` are both archived history regardless of status. Only an
+explicit archived-only native delete vacates identity and cleans relationships.
+Use native archived/draft dependency eligibility. Physical identity conflicts
+across source/destination live, draft and archive records refuse before writes, without
+repair or a parallel index/graph policy. Read archived tasks natively in place.
+Unavailable archived-draft native views alone do not block migration; preserve
+their exact bytes, paths, history and physical identity checks instead.
+
+Sources: [PRIMECLAW-35][T35], [43][T43], [44][T44], [45][T45]; US-28.
 
 ### P6. Save coherent ticket edits promptly through native history
 
@@ -381,7 +392,10 @@ returns the same task/Episode to In Progress. Merge and abandonment require
 explicit authority; an ordinary conversational decision is sufficient. Perform context-sensitive Git and native task transitions through
 the owner, not a second plugin transaction/approval engine. Preserve history
 and distinguish successful completion from abandonment; abandoned code must
-not enter the integration target.
+not enter the integration target. A merged Backlog task stays active `Done`
+through `finalize_task_episode`; optional archive follows cleanup. Abandonment
+keeps its archived non-`Done` status and exact task/Episode-head/no-merge Final
+Summary contract.
 
 Before readiness and destructive cleanup, establish that the exact Episode and
 its proven children have finished and are idle. After an authorized task-native
@@ -391,8 +405,8 @@ unrelated work, shared task storage, and other owners. Close ownership only
 after the owned resources are gone. On failure inspect current facts and
 continue safely; do not add cleanup-progress state or blindly retry commands.
 
-Sources: [PRIMECLAW-10.26][T10_26], [10.40][T10_40], [10.41][T10_41], [43][T43];
-US-24. Retained version-1 bookkeeping is distinct; see P18.
+Sources: [PRIMECLAW-10.26][T10_26], [10.40][T10_40], [10.41][T10_41], [43][T43],
+[45][T45]; US-24. Retained version-1 bookkeeping is distinct; see P18.
 
 ### P18. Finish grandfathered legacy work without reviving its machinery
 
@@ -448,8 +462,12 @@ Preserve active Episode identity and resources. Use supported native destination
 authoring and LLM judgment for non-equivalent
 fields; do not omit them or build a general mapping framework.
 
-Legacy open work becomes In Design; ordinary closed work becomes completed Done,
-not automatically archived. Recognize true deleted/archive evidence separately.
+Legacy open work becomes In Design; ordinary closed work becomes active `Done`,
+not automatically archived or moved to legacy `completed/`. Archive only from
+explicit source archive/abandonment evidence, preserving the normally mapped
+status and raw source history rather than forcing `In Progress`. Preserve both
+legacy `completed/` and canonical `archive/tasks/` as archived history, never as
+an implicit permanent delete.
 Native Beads memories become readable Backlog documents, an origin index, and
 exactly one USER task to curate them; no memories means no empty curation work.
 Do not curate or delete memories automatically.
@@ -458,7 +476,7 @@ Do not curate or delete memories automatically.
 deferral-only fields, but preserve ordinary prose and historical raw evidence;
 do not add a snooze, freeze, scheduling, or special annotation feature.
 
-Sources: [PRIMECLAW-44][T44], [49][T49], [50][T50], [52][T52].
+Sources: [PRIMECLAW-44][T44], [45][T45], [49][T49], [50][T50], [52][T52].
 
 ### M3. Verify the destination before retiring the source
 
@@ -586,13 +604,15 @@ hypothesis, not a requirement to replace Prime Agent.
 | Every review concern needs mandatory threat/recovery/complexity formalism | Proportional contract review, G4; final PRIMECLAW-22 correction. |
 | Authenticated role profiles, private Expert protocols, transcript forks, or approval receipts are enduring product needs | Skill-based roles, native review, bounded fresh Episode context; P12–18. |
 | Template review must overwrite the real file and prove a viewer opened | Non-mutating text comparison, P3; PRIMECLAW-44. |
+| Backlog archives vacate IDs or exclude archived/draft dependency targets; closure moves tasks to `completed/` | Native reserved-identity archive/restore, archived-only delete and active final-status closure, P5/P17/M2; PRIMECLAW-45 supersedes the conflicting PRIMECLAW-44 policy. |
 | Migration must support both directions, normalize Beads first, or preserve active deferral | One-way read-as-is migration; M1–2; PRIMECLAW-44/46/52. |
 | The home Qwen rebuild is still a required Phase 3a gate | PRIMECLAW-7.5 records Joe's 2026-10-08 withdrawal and gateway/1536 choice. Older home-profile docs are dated history, not a reinstated requirement. |
 | Done metadata, checked criteria, old PASS reports, or candidate tests prove live completion | Preserve the exact evidence limits; implementation, deployment and current-runtime proof are distinct. |
 
 Task links cite the independent task-history snapshot
-`68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2`, not the code branch. They are
-source citations, not frozen approval revisions or lifecycle gates.
+`68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2`, except PRIMECLAW-45's approved
+clarifications at `02c167b08bf8c36fed5df549b2fc6ee44673c585`, not the code branch.
+They are source citations, not frozen approval revisions or lifecycle gates.
 
 ### Brain sources and limitations
 
@@ -651,6 +671,7 @@ not a claim of an exhaustive transcript audit.
 [T37]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/completed/primeclaw-37%20-%20Historical-Reviewed-future-plans-and-worktree-isolated-specification-episodes.md
 [T43]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/tasks/primeclaw-43%20-%20Support-selectable-task-providers-with-grandfathered-legacy-execution.md
 [T44]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/tasks/primeclaw-44%20-%20Make-initialization-skill-led-and-support-existing-Backlog-destinations.md
+[T45]: https://github.com/SailorJoe6/prime-claw/blob/02c167b08bf8c36fed5df549b2fc6ee44673c585/tasks/primeclaw-45%20-%20Migrate-prime-claw-to-Backlog.md-v1.55.3.md
 [T46]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/tasks/primeclaw-46%20-%20Allow-legacy-Beads-export-without-unused-Prime-Claw-lifecycle-statuses.md
 [T47]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/tasks/primeclaw-47%20-%20Fresh-.prime-claw-creation-dirties-clean-repositories-and-blocks-automations.md
 [T48]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/tasks/primeclaw-48%20-%20Allow-task-Episodes-from-published-non-main-bases-for-stacked-PRs.md

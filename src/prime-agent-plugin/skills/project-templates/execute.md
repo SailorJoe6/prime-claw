@@ -126,10 +126,10 @@ path, parent identity, and lifecycle status are unchanged.
 
 The owning Conversation exclusively owns lifecycle status: on the recorded
 integration branch in the primary checkout for grandfathered Backlog, or in the
-primary nested task clone for independent Backlog. The Episode must not pass `--status`, call `backlog task complete` or `backlog task archive`,
-mark the task `Done`, publish `Blocked` or `Ready for Merge`, or write task
-content in another checkout. Ordinary execution performs no cross-checkout
-copy, mirroring, or dual write.
+primary nested task clone for independent Backlog. The Episode must not pass
+`--status`, archive, restore, or delete the task, mark it `Done`, publish
+`Blocked` or `Ready for Merge`, or write task content in another checkout.
+Ordinary execution performs no cross-checkout copy, mirroring, or dual write.
 
 For independent Backlog, prepare and read only this Episode's intended task
 workspace when needed, not another writer's mutable primary clone. Inspect the

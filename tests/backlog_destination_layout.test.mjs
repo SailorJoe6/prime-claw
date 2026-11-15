@@ -5,9 +5,9 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync,
-  realpathSync, existsSync, lstatSync, readlinkSync, symlinkSync, rmSync } from "node:fs";
+  realpathSync, existsSync, lstatSync, readlinkSync, symlinkSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname, relative } from "node:path";
+import { join, dirname, relative, basename } from "node:path";
 import test from "node:test";
 import { prepareExistingBacklogTaskHistoryWorkspace, prepareExistingBacklogEpisodeProjection } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 
@@ -71,14 +71,22 @@ function fixture(t, { store, location, key = "backlog_directory" }) {
   backlog(root, "task", "edit", active, "--comment", "preserved native comment", "--comment-author", "layout-author");
   const completed = create(root, "Existing completed task", "--status", "Done", "--parent", active,
     "--depends-on", active, "--final-summary", "preserved completion summary");
-  backlog(root, "task", "complete", completed);
+  // Seed legacy completed/ history explicitly. The removed `task complete`
+  // command is not a closure API; ordinary Done tasks stay in tasks/.
+  const completedPath = view(root, completed).path;
+  mkdirSync(join(root, store, "completed"), { recursive: true });
+  renameSync(join(root, completedPath), join(root, store, "completed", basename(completedPath)));
   const archived = create(root, "Existing archived task", "--status", "In Design", "--description", "preserved archive");
   backlog(root, "task", "archive", archived);
   const activeView = view(root, active);
-  // Historical prefix-probe fixture repeats a live ID but is a DISTINCT archive record.
-  // It must stay byte-for-byte, not be deduplicated by the live ID.
-  const probe = join(root, store, "archive", "tasks", `${active} - historical-prefix-probe.md`);
-  writeFileSync(probe, readFileSync(join(root, activeView.path), "utf8") + "\nHistorical prefix probe, not the live task.\n");
+  // A distinct archived ID shares the live ID's text prefix (LAY-10 vs LAY-1).
+  // It must stay byte-for-byte, not be mistaken for the live task or discarded.
+  const probeId = `${active}0`;
+  const probe = join(root, store, "archive", "tasks", `${probeId} - historical-prefix-probe.md`);
+  const probeBytes = readFileSync(join(root, activeView.path), "utf8")
+    .replace(`id: ${active}\n`, `id: ${probeId}\n`);
+  assert.match(probeBytes, new RegExp(`^id: ${probeId}$`, "m"));
+  writeFileSync(probe, probeBytes + "\nHistorical prefix probe, not the live task.\n");
   git(root, "add", store, ...(location === "root" ? ["backlog.config.yml"] : []));
   git(root, "commit", "-qm", "seed existing active completed and archived records");
   const seedHead = git(root, "rev-parse", "HEAD");

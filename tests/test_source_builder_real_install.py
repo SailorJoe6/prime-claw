@@ -40,7 +40,18 @@ def _source_mode_selected() -> bool:
 def _make_source_fixture(root: Path) -> Path:
     source = root / "source"
     (source / "scripts").mkdir(parents=True)
-    (source / "packages/coding-agent").mkdir(parents=True)
+    compact = source / "packages/coding-agent/skills/compact"
+    compact.mkdir(parents=True)
+    # The shared installer discovers one real editable compact package before
+    # running any probe, even when this fixture only exercises generation output.
+    (compact / "pyproject.toml").write_text(
+        '[build-system]\nrequires = ["setuptools>=64"]\n'
+        'build-backend = "setuptools.build_meta"\n\n'
+        '[project]\nname = "prime-agent-source-fixture-compact"\n'
+        'version = "0.9.8"\n\n'
+        '[tool.setuptools]\npy-modules = ["compact"]\n')
+    (compact / "compact.py").write_text(
+        '# Package marker for the source-generation install fixture.\n')
     (source / ".gitignore").write_text(
         "node_modules/\n.fixture-pack/\npackages/*/dist/\n"
         "packages/coding-agent/release/\n")
@@ -57,6 +68,26 @@ def _make_source_fixture(root: Path) -> Path:
     }
     (source / "package-lock.json").write_text(json.dumps(lock) + "\n")
     (source / "generation.txt").write_text("A\n")
+    (source / "scripts/postinstall.mjs").write_text(r"""import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {spawnSync} from "node:child_process";
+if (process.env.PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL === "1") {
+  const run = (command, args, options = {}) => {
+    const result = spawnSync(command, args, {stdio: "inherit", ...options});
+    if (result.error || result.status !== 0) throw new Error(`fixture bootstrap failed: ${command}`);
+  };
+  fs.mkdirSync(path.join(os.homedir(), ".local/share/prime-agent"), {recursive: true});
+  const uvDir = path.join(os.homedir(), ".local/bin");
+  const uv = path.join(uvDir, "uv");
+  if (process.env.PRIME_AGENT_INSTALL_UV === "1" && !fs.existsSync(uv)) {
+    run("bash", ["-lc", "set -euo pipefail; curl -fsSL https://astral.sh/uv/install.sh | sh"],
+        {env: {...process.env, UV_INSTALL_DIR: uvDir, UV_NO_MODIFY_PATH: "1"}});
+  }
+  if (!process.env.PRIME_AGENT_KERNEL_VENV) throw new Error("missing fixture kernel venv");
+  run(uv, ["venv", "--python", "python3", process.env.PRIME_AGENT_KERNEL_VENV]);
+}
+""")
     (source / "scripts/build.mjs").write_text(r"""import fs from "node:fs";
 import path from "node:path";
 const generation = fs.readFileSync("generation.txt", "utf8").trim();
@@ -92,6 +123,10 @@ for (const name of names) {
   const manifest = {name, version: "0.9.8"};
   if (name === "prime-agent") {
     manifest.bin = {"prime-agent": "bin/prime-agent.js"};
+    manifest.scripts = {postinstall: "node scripts/postinstall.mjs"};
+    fs.mkdirSync(path.join(directory, "scripts"), {recursive: true});
+    fs.copyFileSync("scripts/postinstall.mjs", path.join(directory, "scripts/postinstall.mjs"));
+    fs.cpSync("packages/coding-agent/skills", path.join(directory, "skills"), {recursive: true});
     fs.mkdirSync(path.join(directory, "bin"), {recursive: true});
     fs.copyFileSync("packages/coding-agent/dist/prime-agent.js",
                     path.join(directory, "bin/prime-agent.js"));
@@ -209,7 +244,7 @@ def test_two_real_source_generations_install_changed_behavior_without_replay(tmp
     summary = {
         "schema_version": 1,
         "contract": "source-two-generation-real-install-v1",
-        "command": f"{sys.executable} -m pytest {PROBE} -q -m container",
+        "command": f"{Path(sys.executable).name} -m pytest {PROBE} -q -m container",
         "generation_a": generation_a,
         "generation_b": generation_b,
         "manifest_sha256": {"a": manifest_a_sha, "b": manifest_b_sha},

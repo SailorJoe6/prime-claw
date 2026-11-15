@@ -55,11 +55,29 @@ def _walk_strings(value, location="inventory"):
 
 
 def _assert_task_ids_resolve(task_ids):
-    backlog_root = Path(REPO_ROOT, "backlog")
+    # Resolve historical proof owners at the immutable cutover boundary, not
+    # through today's live provider layout or an independently maintained index.
+    receipt = json.loads(Path(
+        REPO_ROOT,
+        "docs/evidence/task-native-backlog-cutover/2026-10-17-step-7-plan-tree-deletion.json",
+    ).read_text())
+    commit = receipt["preDeletionCommit"]
+    assert commit == "cbd7b4f0b794f0b9520deb8f5d8b32f775559318"
+    tree = subprocess.run(
+        ["git", "-C", REPO_ROOT, "ls-tree", "-r", "--name-only", "-z", commit, "--", "backlog"],
+        capture_output=True, text=True, check=True,
+    ).stdout.split("\0")
     for task_id in task_ids:
-        task_files = list(backlog_root.rglob(f"{task_id.lower()} - *.md"))
-        assert len(task_files) == 1, f"{task_id} resolved to {task_files}"
-        assert f"id: {task_id}\n" in task_files[0].read_text()
+        task_files = [
+            path for path in tree
+            if Path(path).name.startswith(f"{task_id.lower()} - ") and path.endswith(".md")
+        ]
+        assert len(task_files) == 1, f"{task_id} resolved to {task_files} @ {commit}"
+        task = subprocess.run(
+            ["git", "-C", REPO_ROOT, "show", f"{commit}:{task_files[0]}"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+        assert f"id: {task_id}\n" in task
 
 
 def test_inventory_referenced_files_exist():

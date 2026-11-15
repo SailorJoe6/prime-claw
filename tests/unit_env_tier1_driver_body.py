@@ -507,7 +507,8 @@ class TestPinnedLifecycle(unittest.TestCase):
                 self.assertLess(di,next(i for i,c in enumerate(calls) if needle in " ".join(c)))
             self.assertEqual(verbs[-2:],["rm","inspect"])
             probe=next(" ".join(c) for c in calls if "get_commands" in " ".join(c))
-            self.assertIn("timeout --kill-after=2 7 prime-agent --mode rpc",probe)
+            self.assertIn("timeout --kill-after=2 7 /workspace/scripts/run-prime-agent-probe.sh prime-agent --mode rpc",probe)
+            self.assertNotIn("timeout --kill-after=2 7 prime-agent --mode rpc",probe)
 
             manifests=list((tmp/"results").glob("*/tier1/manifest.json"))
             self.assertEqual(len(manifests),2); self.assertEqual(failed_path.read_bytes(),failed_bytes)

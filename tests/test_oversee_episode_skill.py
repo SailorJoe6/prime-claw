@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 2000
+    assert 300 <= len(words) <= 2200
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -55,7 +55,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Independent Backlog publishes `Done` only on `refs/heads/prime-claw/tasks`",
         "fast-forwards the Episode nested task clone to that exact terminal revision before cleanup",
         "creates the exact built-in `archive/tasks/` directory inside the nested store when absent",
-        "Both push without force and verify exact task-history publication/identity/status",
+        "Both use `backlog task edit TASK-ID --status Done`, push without force and verify exact task-history publication/identity/status",
         "Beads first records current clean pushed canonical code `targetHead` (not a task-status commit)",
         "proves exact branch/upstream/remote `candidateHead` and ancestry",
         "guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`",
@@ -76,7 +76,8 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "never force, replay, or a fresh transaction",
         "Apply **Abandon** only after explicit operator confirmation",
         "selects only the bound task file from that Episode head",
-        "reapplies its non-`Done` status and truthful Final Summary through the supported CLI",
+        "reapplies its non-`Done` status and truthful Final Summary containing the exact line",
+        '"Prime Claw abandonment: task TASK-ID; pushed Episode head EPISODE-HEAD; code was not merged." through the supported CLI',
         "verifies only the active/archive task move and no Episode code, commits, and pushes",
         "cleanup-only `finalize_task_episode`",
         "atomically removes only the unchanged owner entry",
@@ -98,6 +99,15 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     ]:
         assert forbidden not in raw
 
+
+def test_backlog_done_stays_active_through_cleanup_and_abandonment_stays_distinct():
+    text = " ".join(GUIDE.read_text().split())
+    assert "Keep the Done task active through `finalize_task_episode`" in text
+    assert "optional archive is only after merged cleanup" in text
+    assert "Backlog needs active Done for merged work or archived non-`Done` with the exact abandonment Final Summary" in text
+    assert "Backlog archive is reversible/read-only, reserves the ID, and preserves status/relationships; restore before any edit" in text
+    assert "Only separately authorized native `backlog task delete TASK-ID` on an archived task permanently deletes it and vacates its identity" in text
+    assert "it is not archive or ordinary merged cleanup" in text
 
 
 def test_managed_conversation_guide_qualifies_version2_review_by_provider():

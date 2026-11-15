@@ -356,23 +356,32 @@ active Episode as well as canonical primary. While canonical primary still
 contains both stores, ordinary task lifecycle mutation remains blocked as an
 incomplete migration.
 
-Existing Backlog physical records are preserved individually, including archives
-that share an ID with a live task or another historical record. Archived native
-views are read only in disposable exact-revision clones; the real records never
-move merely to inspect them. Preservation checks cover authored native fields,
-exact files/configuration, Git history and clone identity. Corpus-derived native
-readiness, graphs and subtasks may change as imports add records; authored
-content must not. Destination counts include preserved baseline records plus
-all imports and the single receipt.
+Existing Backlog physical records are preserved individually. Both legacy
+`completed/` and canonical `archive/tasks/` are archived history regardless of
+status. Read archived tasks through native `backlog task view --json -- ID` at
+their actual committed paths, without cloning or relocating them for an active
+view. Preservation checks cover authored native fields, exact files/configuration,
+Git history and clone identity. Existing archived drafts retain exact files,
+bytes, paths and history plus physical identity/collision checks; their unavailable
+native view alone is not a blocker. Do not delete, promote, restore, relocate or
+fabricate an active view of them. Active drafts and active/archived tasks still
+require native evidence. Corpus-derived native readiness, graphs and subtasks
+may change as imports add records; authored content must not. Destination counts
+include preserved baseline records plus all imports and the single receipt.
 
-Archived means deleted/history. Only actual `tasks/` and `completed/` records
-are eligible dependency targets. A reused live ID is not ambiguous because an
-archive retains it; archive-only targets refuse as missing/deleted. Genuine
-live/completed ambiguity, unknown/self references and direct/transitive cycles
-still refuse. Archive enumeration/history and native ID allocation/reuse do not
-change. A real source relationship to a deleted task is reported with exact IDs
-before mutation, never omitted or automatically repaired. No allocation flag,
-reservation, prefix change, archive renumber, or new importer mapping is used.
+PRIMECLAW-45 supersedes PRIMECLAW-44's dependency exclusions and archive-ID-reuse
+policy. Archive is reversible, read-only history that preserves status and
+relationships and reserves identity; restore before editing. Native archived
+and draft dependency targets are supported. Physical ID conflicts across source
+and destination live tasks, drafts and both archive layouts refuse before any
+preparation/write, with exact diagnostics and unchanged original baselines.
+Use the existing migration inventory and native identity/relationship checks,
+not a parallel index, graph policy, allocator or automatic repair. Genuine
+missing/ambiguous IDs and native relationship failures remain blockers; never
+omit or repair a relationship to make migration pass. Native archived-only
+`task delete` is the explicit permanent identity-vacating/relationship-cleanup
+operation, not archive or a migration default. Identity-set reads remain complete,
+unwindowed native JSON reads without assumptions about default row order.
 
 Before destination creation, every active Episode is re-proved as the exact
 clean, directly published linked code worktree and branch. The ownership head is
@@ -448,26 +457,28 @@ state, not ordinary text: titles (including `DEFERRED:`), descriptions, notes
 deferral fields remain only in the existing raw source/history evidence; no
 active deferral fields, extra annotations or scheduling behavior are created,
 and migration never normalizes the retiring source. Ordinary `closed` maps to
-`Done` and native `completed/` placement.
+active `Done` in `tasks/`, without a completion move.
 A nonempty `close_reason`, keyword or status category does not mean archive.
 Archive requires a coherent retained marked Backlog archive source package or
 the exact task-specific Prime Claw abandonment reason. Ambiguous exact evidence
 stops for agent/operator judgment without adding a mapping or approval framework.
-Native Backlog refuses archiving `Done` tasks. Exact-positive archives retain
-the existing importer archive operation and its created `In Progress` status;
-ordinary completion uses `Done` plus `task complete`. The importer verifies the
-native status and actual `tasks/`, `completed/` or `archive/tasks/` placement for
-all records, including archives.
+Explicitly archived imports receive their normally mapped status before native
+archive, including `closed` → `Done`; do not force `In Progress` or infer a lost
+pre-close status. Preserve raw status, closure reason and abandonment provenance.
+The importer verifies native status and actual active or archive placement;
+legacy `completed/` remains preserved archive input, while new archives use
+`archive/tasks/`. No removed completion command or automatic permanent delete
+is used.
 Raw catalog/category, reason and complete history remain in source provenance.
 
 After destination publication and ownership/runtime/source rechecks, retirement
 removes the exact local `.beads` store. Embedded mode makes no server-stop call;
 a server-mode source must identify a non-shared server before the native stop.
 Any outgoing remote history is retained untouched; it is not local live provider
-authority. Backlog completion counts come
-from exact native lifecycle status;
-physical archive placement remains separate abandonment evidence. A Backlog
-destination is repeatedly proved against the originally selected remote URL and
+authority. Backlog closed counts come only from active tasks in final status
+`Done`; every record in either archive layout counts as archived regardless of
+status. Archive placement is not by itself proof of abandonment or deletion.
+A Backlog destination is repeatedly proved against the originally selected remote URL and
 `refs/heads/prime-claw/tasks`, not a mutable local upstream alias.
 
 A pre-cutover failure restores an ownership change only after a complete native
@@ -590,13 +601,13 @@ retains its existing exact-retry/destination guards; populated imports and layou
 normalization remain unfinished, not bypassed by inspection permission.
 
 [The populated hidden-store attempt](evidence/populated-hidden-backlog-import-20261030.md)
-retains the failed historical runs and rolled-back patch. Joe explicitly resolved
-the old blocker: archive/live same-ID dependency ambiguity was incorrect native
-eligibility semantics, not an allocator defect or permission to alter IDs. The
-managed Backlog correction uses tasks/completed-only dependency targets while
-preserving archive history and ordinary allocation. Historical passing tests
-prove their old bounded behavior only; current complete-candidate validation
-must explicitly prove the superseding semantics and remaining requirements.
+retains the failed historical runs and rolled-back patch. Its PRIMECLAW-44
+correction used tasks/completed-only dependency targets and allowed archive/live
+ID reuse. Those recorded semantics are superseded by PRIMECLAW-45's unmodified
+v1.55.3 native archived/draft targets, reserved archived identities and physical
+collision refusal above. The historical evidence remains intact and proves only
+its recorded bounded behavior, not the current candidate or live activation.
+Current source/build and migration evidence is linked in [Backlog guidance](backlog.md).
 
 Plugin-source changes are validated only in Docker Tier 1. The deterministic
 core is separate from the thin Prime Agent v0.9.8 adapter (`registerCommand`,

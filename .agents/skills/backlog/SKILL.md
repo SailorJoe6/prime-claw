@@ -55,9 +55,26 @@ auditable.
 - Later `Blocked`, resumed `In Progress`, `Ready for Merge`, and terminal `Done`
   transitions belong to the owning Conversation under the reviewed lifecycle.
 
-There is no generic claim edit that may bypass planning or admission. Do not
-mark a task `Done`, call `backlog task complete`, or archive it unless the exact
-reviewed lifecycle and operator authority permit that action.
+There is no generic claim edit that may bypass planning or admission. Only the
+owning Conversation closes a task through `backlog task edit <id> --status Done`.
+The task stays active through `finalize_task_episode`; optional archive follows
+only after merged cleanup. Do not change status or archive without the exact
+reviewed lifecycle and operator authority.
+
+Archive is reversible, read-only, reserves the ID, and preserves the original
+status and relationships. Restore with `backlog task restore <id>` before any
+edit. Canonical archives live under `archive/tasks/`; `completed/` is legacy
+archive input only, not a completion destination. Native dependencies may target
+archived tasks and active drafts; add no extra graph policy. Native collision
+refusal applies before writes, including archived drafts. Do not overwrite or
+renumber preserved records. An archived draft's absence from native task view is
+not a blocker: preserve its physical bytes, path, history, and inventory without
+building a synthetic view or parser.
+
+Only an explicitly authorized `backlog task delete <id>` on an already archived
+task permanently deletes it and vacates its identity. Delete is not archive and
+is not part of ordinary merged cleanup. Abandonment preserves the exact archived
+non-`Done` task and Final Summary contract in `prime-claw-oversee-episode`.
 
 ## What belongs in Backlog.md
 
@@ -69,7 +86,8 @@ tracker-specific memory command.
 
 ## Rules
 
-- Do not edit files under `backlog/tasks/` or `backlog/completed/` directly.
+- Do not edit provider storage directly, including `tasks/`, `drafts/`,
+  `archive/tasks/`, archived drafts, or legacy `completed/`. Use the native CLI.
 - Do not create Markdown TODO files as a parallel source of truth.
 - Prefer `--json` when parsing CLI output programmatically.
 - Do not change or complete tasks unless the work and authority support it.

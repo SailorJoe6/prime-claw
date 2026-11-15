@@ -91,67 +91,97 @@ def run(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProces
     return result
 
 
-def test_documented_task_authoring_cli_sequence_is_atomic_and_task_only(tmp_path: Path) -> None:
-    backlog = ROOT / "deps" / "backlog" / "dist" / "backlog"
-    (tmp_path / "backlog").mkdir()
-    (tmp_path / "backlog" / "config.yml").write_text(
-        (ROOT / "backlog" / "config.yml").read_text()
+def test_documented_task_authoring_cli_sequence_is_atomic_and_task_only(tier1_container, ctmp) -> None:
+    backlog = "/usr/local/bin/backlog"
+    (ctmp / "backlog").mkdir()
+    (ctmp / "backlog/config.yml").write_text(
+        'project_name: "Authoring fixture"\n'
+        'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\n'
+        'default_status: "In Design"\n'
+        'auto_commit: false\n'
+        'remote_operations: false\n'
+        'check_active_branches: false\n'
+        'task_prefix: "PRIMECLAW"\n'
     )
-    run(tmp_path, "git", "init", "-q")
-    run(tmp_path, "git", "config", "user.name", "Fixture")
-    run(tmp_path, "git", "config", "user.email", "fixture@example.test")
-    (tmp_path / "unrelated.txt").write_text("baseline\n")
-    run(tmp_path, "git", "add", "backlog/config.yml", "unrelated.txt")
-    run(tmp_path, "git", "commit", "-q", "-m", "fixture baseline")
-    (tmp_path / "unrelated.txt").write_text("unrelated working change\n")
 
-    created = run(
-        tmp_path, str(backlog), "task", "create", "Fixture work",
+    def native(*args: str, check: bool = True):
+        result = tier1_container.run(*args, workdir=str(ctmp))
+        if check:
+            assert result.returncode == 0, result.stdout + result.stderr
+        return result
+
+    native("git", "init", "-q")
+    native("git", "config", "user.name", "Fixture")
+    native("git", "config", "user.email", "fixture@example.test")
+    # Materialize native config defaults before the task-only baseline.
+    native(backlog, "config", "set", "autoCommit", "false")
+    (ctmp / "unrelated.txt").write_text("baseline\n")
+    native("git", "add", "backlog/config.yml", "unrelated.txt")
+    native("git", "commit", "-q", "-m", "fixture baseline")
+    (ctmp / "unrelated.txt").write_text("unrelated staged change\n")
+    native("git", "add", "--", "unrelated.txt")
+    (ctmp / "unrelated.txt").write_text("unrelated working change\n")
+    unrelated_index = native("git", "diff", "--cached", "--binary").stdout
+
+    created = native(
+        backlog, "task", "create", "Fixture work",
         "--status", "In Design", "--description", "Initial outcome",
         "--ac", "Observable result", "--ref", "PRIMECLAW-OTHER",
         "--doc", "docs/example.md", "--plain",
     )
     assert "Task PRIMECLAW-1 - Fixture work" in created.stdout
-    task = json.loads(run(
-        tmp_path, str(backlog), "task", "view", "--json", "--", "PRIMECLAW-1",
+    listing = json.loads(native(backlog, "task", "list", "--json").stdout)
+    assert listing["kind"] == "task-list" and listing["schemaVersion"] == 1
+    # Select one canonical identity from the complete, unwindowed native list.
+    (selected,) = listing["tasks"]
+    task_id = selected["id"]
+    assert task_id == "PRIMECLAW-1"
+    task = json.loads(native(
+        backlog, "task", "view", "--json", "--", task_id,
     ).stdout)["task"]
-    task_path = tmp_path / task["path"]
+    task_path = ctmp / task["path"]
+    assert task["id"] == task_id
     assert task["status"] == "In Design"
     assert task["description"] == "Initial outcome"
     assert [item["text"] for item in task["acceptanceCriteria"]] == ["Observable result"]
     assert task["references"] == ["PRIMECLAW-OTHER"]
     assert task["documentation"] == ["docs/example.md"]
     assert task["implementationPlan"] is None
-    assert task_path.is_file() and task_path.parent == tmp_path / "backlog" / "tasks"
+    assert task_path.is_file() and task_path.parent == ctmp / "backlog" / "tasks"
 
-    run(tmp_path, "git", "add", "--", task["path"])
-    run(tmp_path, "git", "commit", "-q", "--only", "-m", "author task", "--", task["path"])
-    assert run(tmp_path, "git", "show", "--pretty=", "--name-only", "HEAD").stdout.strip() == task["path"]
-    committed_head = run(tmp_path, "git", "rev-parse", "HEAD").stdout.strip()
-    assert run(tmp_path, "git", "push", check=False).returncode != 0
-    assert run(tmp_path, "git", "rev-parse", "HEAD").stdout.strip() == committed_head
-    assert run(tmp_path, "git", "status", "--short").stdout.strip() == "M unrelated.txt"
+    native("git", "--literal-pathspecs", "add", "--", task["path"])
+    native("git", "--literal-pathspecs", "commit", "-q", "--only", "-m", "author task", "--", task["path"])
+    assert native("git", "show", "--pretty=", "--name-only", "HEAD").stdout.strip() == task["path"]
+    committed_head = native("git", "rev-parse", "HEAD").stdout.strip()
+    assert native("git", "push", check=False).returncode != 0
+    assert native("git", "rev-parse", "HEAD").stdout.strip() == committed_head
+    assert native("git", "diff", "--cached", "--binary").stdout == unrelated_index
+    assert native("git", "status", "--short").stdout.strip() == "MM unrelated.txt"
+    assert (ctmp / "unrelated.txt").read_text() == "unrelated working change\n"
 
-    run(
-        tmp_path, str(backlog), "task", "edit",
+    native(
+        backlog, "task", "edit",
         "--description", "Revised outcome", "--acceptance-criteria", "Revised result",
         "--ref", "PRIMECLAW-OTHER", "--ref", "PRIMECLAW-SECOND",
         "--doc", "docs/example.md", "--doc", "docs/revised.md",
-        "--", "PRIMECLAW-1",
+        "--", task_id,
     )
-    revised = json.loads(run(
-        tmp_path, str(backlog), "task", "view", "--json", "--", "PRIMECLAW-1",
+    revised = json.loads(native(
+        backlog, "task", "view", "--json", "--", task_id,
     ).stdout)["task"]
+    assert revised["id"] == task_id and revised["path"] == task["path"]
     assert revised["status"] == "In Design"
     assert revised["description"] == "Revised outcome"
     assert [item["text"] for item in revised["acceptanceCriteria"]] == ["Revised result"]
     assert revised["references"] == ["PRIMECLAW-OTHER", "PRIMECLAW-SECOND"]
     assert revised["documentation"] == ["docs/example.md", "docs/revised.md"]
     assert revised["implementationPlan"] is None
-    run(tmp_path, "git", "add", "--", task["path"])
-    run(tmp_path, "git", "commit", "-q", "--only", "-m", "revise task", "--", task["path"])
-    assert run(tmp_path, "git", "show", "--pretty=", "--name-only", "HEAD").stdout.strip() == task["path"]
-    assert run(tmp_path, "git", "status", "--short").stdout.strip() == "M unrelated.txt"
+    native("git", "--literal-pathspecs", "add", "--", task["path"])
+    native("git", "--literal-pathspecs", "commit", "-q", "--only", "-m", "revise task", "--", task["path"])
+    assert native("git", "show", "--pretty=", "--name-only", "HEAD").stdout.strip() == task["path"]
+    assert native("git", "diff", "--cached", "--binary").stdout == unrelated_index
+    assert native("git", "status", "--short").stdout.strip() == "MM unrelated.txt"
+    assert (ctmp / "unrelated.txt").read_text() == "unrelated working change\n"
 
 
 @pytest.mark.parametrize("skill_name", SKILLS)

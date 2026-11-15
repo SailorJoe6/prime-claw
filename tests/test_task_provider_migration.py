@@ -118,7 +118,7 @@ def test_task_provider_migration_stays_pair_specific_and_receipt_only() -> None:
 def test_native_populated_backlog_allocation_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", "--test-name-pattern",
-        "native populated Backlog allocation", WS_NODE_SUITE, timeout=300,
+        "native populated Backlog allocation|native populated Backlog lifecycle", WS_NODE_SUITE, timeout=300,
     )
     (tier1_container.share.parent / "native-populated-backlog-allocation-node.tap").write_text(
         result.stdout + result.stderr
@@ -129,7 +129,7 @@ def test_native_populated_backlog_allocation_node_suite(tier1_container) -> None
 def test_populated_backlog_migration_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", "--test-name-pattern",
-        "confirmed populated Backlog|native archived-target source graph|native populated Backlog allocation|migration admission refuses contested Backlog IDs",
+        "confirmed populated Backlog|native archived-target source graph|native populated Backlog allocation|native populated Backlog lifecycle|migration admission refuses contested Backlog IDs",
         WS_NODE_SUITE, timeout=2400,
     )
     (tier1_container.share.parent / "populated-backlog-migration-node.tap").write_text(

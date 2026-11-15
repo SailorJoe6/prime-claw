@@ -73,20 +73,21 @@ restore/dependency patches. Builds require exact HEAD and exact release-tag
 resolution/ancestry; tracked source changes refuse before compilation. Image
 labels and runtime build stamps bind the same version and commit.
 
-PRIMECLAW-45 supersedes the prior fork-only dependency policy: native archived
-and draft dependency targets are supported, archived IDs remain reserved, and
-existing duplicate IDs must be resolved separately before migration. The old
-fork source `431e95612d6167e418c507ec206d95df43c38c54` and its results remain
+PRIMECLAW-45 supersedes PRIMECLAW-44's archived/draft dependency exclusions and
+archive-ID-reuse policy: native archived and draft dependency targets are
+supported, archived IDs remain reserved, and physical conflicts across source
+and destination live, draft and archive records refuse before writes. Resolve
+existing duplicates separately; migration does not repair or renumber them.
+The old fork source `431e95612d6167e418c507ec206d95df43c38c54` and its results remain
 historical evidence in
 [`primeclaw44-integration-20261030.md`](evidence/primeclaw44-integration-20261030.md).
 They are not patches to port to this release.
 
-**Slice boundary:** this source/build candidate is not an accepted integrated
-upgrade. Provider migration, lifecycle guidance and the remaining compatibility
-and validation work in PRIMECLAW-45 must finish before activation. The lifecycle
-sections below have not yet all been converted from the accepted v1.53.0 flow.
-Do not use them to operate a v1.55.3 candidate on live task history. No required
-validation is waived by delivering a build-only slice. Source/build results and
+**Candidate boundary:** current guidance describes the approved v1.55.3
+lifecycle, not an accepted or activated integrated upgrade. Required integrated
+compatibility and validation work in PRIMECLAW-45 must finish before a separate
+operator-authorized cutover. The accepted v1.53.0 host remains authoritative;
+do not operate the candidate on live task history. Source/build results and
 limits are recorded in
 [`primeclaw45-upstream-candidate-20261106.md`](evidence/primeclaw45-upstream-candidate-20261106.md).
 The bounded migration lifecycle adaptation, historical archived-draft CLI limit,
@@ -97,7 +98,10 @@ identity/collision checks. Their unavailable native CLI view alone does not bloc
 migration. Active drafts and active/archived tasks still require native evidence;
 actual identity, integrity and transport failures still refuse. Do not relocate,
 promote, restore, discard or manufacture an active view of an archived draft.
-Neither slice activates the candidate or replaces the remaining integrated gates.
+Those bounded results do not activate the candidate or replace required
+integrated validation. The remaining compatibility changes, preserved failed runs,
+fixture repairs and final validation receipts are tracked in
+[`primeclaw45-integrated-compatibility-20261115.md`](evidence/primeclaw45-integrated-compatibility-20261115.md).
 
 Clone this repository with `git clone --recurse-submodules`, or initialize an
 existing checkout with `git submodule update --init --recursive`.
@@ -511,15 +515,38 @@ skill with `plan_task` for native planning, and `implement-task` with
 removed; Prime Agent built-ins and native `/skill:` remain. There is
 no generic claim edit: implementation admission and later `Blocked`, resumed
 `In Progress`, and terminal `Done` transitions remain explicit Conversation
-work through the supported Backlog CLI. `backlog task complete` is reserved for
-explicit one-time history cleanup, not ordinary Episode completion.
+work through the supported Backlog CLI.
 
-For an explicitly approved history migration, `backlog task restore TASK-ID`
-moves that exact record from `backlog/completed/` back to active task storage
-without changing its ID, parent, content, filename, or terminal status. It does
-not reopen the task: apply intended changes through normal `task edit`, validate
-them, and only then use `task complete` to return the record to completed
-storage.
+### Closure, archive, restore and delete
+
+An active task is closed by its configured final status, `Done`, without moving
+it out of `tasks/`. The owner uses `backlog task edit TASK-ID --status Done`
+after the authorized merge. Keep that merged task active through
+`finalize_task_episode`; archive is optional afterward, not a finalizer
+prerequisite. Abandonment remains an explicitly authorized archived non-`Done`
+outcome with the [exact Final Summary contract](user-stories/I-episode-finalization.md).
+
+`backlog task archive TASK-ID` moves a task to canonical `archive/tasks/`.
+Archive is reversible, read-only history, preserves status, dependencies,
+parents, documentation and references, and reserves its identity. Legacy
+`completed/` records are archived history too, regardless of status, not active
+closed tasks. Read either kind with `backlog task view --json -- TASK-ID` at its
+actual path; do not clone or relocate it to manufacture an active view.
+
+Use `backlog task restore TASK-ID` before editing an archived task. Restore
+preserves status and relationships; it does not itself reopen a `Done` task.
+Apply intended changes with native `task edit`, and archive again only if wanted.
+Only an explicitly authorized `backlog task delete TASK-ID` on an archived task
+permanently deletes it, vacates its identity and performs native relationship
+cleanup. Archive alone never does that. Migration preserves old archives rather
+than silently treating them as permanent deletes.
+
+Native dependency targets include archived tasks and drafts. Existing physical
+ID conflicts across live, draft and archive records refuse before migration
+writes, without an automatic repair, custom allocator, index or graph policy.
+Task-list consumers use complete, unwindowed native JSON identity sets, never
+implicit row order. Initialization remains fully noninteractive with its
+explicit native options.
 
 Use the CLI for every task mutation. Do not edit task Markdown directly. The
 tracked `backlog/` directory is canonical task state, while normal repository
@@ -650,9 +677,10 @@ Cleanup-only finalization returns full current native task/code/history/resource
 observations for the owner; it does not approve terminal status/design, code
 ancestry/publication, primary cleanliness or stable provider heads. The editable
 oversight skill requires the operator-authorized merged/abandoned outcome and
-native Done/archive or Beads done/closed history/publication evidence before the
-call. Ordinary primary dirt and compatible descendants remain facts, not gates.
-Backlog archives are returned as complete native Git command results, not a
+native active-Done merge or archived non-Done abandonment evidence (including
+the exact Final Summary), or Beads done/closed history/publication evidence,
+before the call. Ordinary primary dirt and compatible descendants remain facts,
+not gates. Backlog archives are returned as complete native Git command results, not a
 reparsed normalized summary or exact-phrase classifier. Beads uses one native
 transport/task observation, not paired publication/ancestry approval.
 

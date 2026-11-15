@@ -1,9 +1,6 @@
 from collections import Counter
 import json
 from pathlib import Path
-import subprocess
-
-import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,13 +119,56 @@ def test_project_backlog_skill_teaches_supported_task_native_lifecycle() -> None
         'Planning alone does not authorize implementation',
         'explicit conditional plan-then-implement instruction may remain valid within approved scope.',
         'There is no generic claim edit that may bypass planning or admission.',
-        'Do not edit files under `backlog/tasks/` or `backlog/completed/` directly.',
+        'Do not edit provider storage directly',
+        'Only the owning Conversation closes a task through `backlog task edit <id> --status Done`.',
+        'The task stays active through `finalize_task_episode`',
+        'optional archive follows only after merged cleanup.',
     ):
         assert fragment in text
 
     assert '`/plan TASK-ID`' not in text and '`/implement-task TASK-ID`' not in text
     assert 'backlog task edit <id> --status "In Progress"' not in text
-    assert 'backlog task edit <id> --status "Done"' not in text
+    assert 'backlog task complete' not in text
+    assert 'task_complete' not in text
+
+
+def test_backlog_guidance_distinguishes_archive_restore_and_permanent_delete() -> None:
+    text = normalized(BACKLOG_SKILL)
+    for fragment in (
+        "Archive is reversible, read-only, reserves the ID",
+        "preserves the original status and relationships",
+        "Restore with `backlog task restore <id>` before any edit",
+        "`archive/tasks/`; `completed/` is legacy archive input only",
+        "Native dependencies may target archived tasks and active drafts",
+        "Native collision refusal applies before writes, including archived drafts",
+        "archived draft's absence from native task view is not a blocker",
+        "preserve its physical bytes, path, history, and inventory",
+        "without building a synthetic view or parser",
+        "`backlog task delete <id>` on an already archived task permanently deletes it and vacates its identity",
+        "Delete is not archive and is not part of ordinary merged cleanup",
+    ):
+        assert fragment in text
+
+    initialize = normalized(ROOT / "src/prime-agent-plugin/skills/initialize-prime-claw/SKILL.md")
+    assert "ordinary closed maps to active Done, not archive" in initialize
+    assert "Native dependencies may target archived tasks and active drafts" in initialize
+    assert "Deleted/archive-only tasks are not dependency targets" not in initialize
+    assert "Refuse collisions before writes, including archived drafts" in initialize
+    assert "absence from native task view is not a blocker" in initialize
+    assert "no synthetic view, parser, index, or framework" in initialize
+
+
+def test_active_skill_and_workflow_guidance_has_no_removed_completion_invocation() -> None:
+    for directory in (
+        ROOT / "src/prime-agent-plugin/skills",
+        ROOT / "src/prime-agent-plugin/workflows",
+        ROOT / ".agents/skills",
+        ROOT / ".prime-claw/workflows",
+    ):
+        for path in directory.rglob("*.md"):
+            text = path.read_text()
+            assert "backlog task complete" not in text, path
+            assert "task_complete" not in text, path
 
 
 def test_operator_guidance_creates_new_work_explicitly_in_design() -> None:
@@ -152,14 +192,6 @@ def test_execute_and_handoff_keep_backlog_authority_while_prepare_discovers_nati
     assert "Use only the commands and tracker the project actually provides" in prepare
     assert "Backlog.md" not in prepare
     assert "Related Backlog tasks are references only" in handoff
-
-def _task_frontmatter(path: Path) -> dict | None:
-    text = path.read_text()
-    if not text.startswith("---\n"):
-        return None
-    _, raw, _ = text.split("---", 2)
-    value = yaml.safe_load(raw)
-    return value if isinstance(value, dict) else None
 
 
 def test_synthetic_status_migration_classifies_to_do_and_preserves_stronger_states() -> None:
@@ -215,16 +247,11 @@ def test_plan_tree_deletion_receipt_proves_durable_task_owners() -> None:
         row["presentInReferences"] or row["presentInTaskBody"]
         for row in receipt["paths"]
     )
-    tracked_plans = subprocess.run(
-        ["git", "-C", ROOT, "ls-files", "--", ".ralph/plans"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
-    assert tracked_plans == []
+    # These immutable checks describe the recorded deletion boundary, not current
+    # whole-tree absence. Preserved legacy archive bundles may remain tracked.
 
 
-def test_repository_status_migration_receipt_and_live_data_are_consistent() -> None:
+def test_repository_status_migration_receipt_preserves_historical_identity() -> None:
     receipt = json.loads((
         ROOT / "docs/evidence/task-native-backlog-cutover/2026-10-14-step-6-status-migration.json"
     ).read_text())
@@ -262,50 +289,53 @@ def test_repository_status_migration_receipt_and_live_data_are_consistent() -> N
     assert receipt["afterMigrationBeforeConfigRemoval"]["toDoCount"] == 0
     assert receipt["afterMigrationBeforeConfigRemoval"]["identityOrParentDriftCount"] == 0
 
-    records = {}
-    physical_records = []
-    for directory in (ROOT / "backlog/tasks", ROOT / "backlog/completed", ROOT / "backlog/archive"):
-        if not directory.exists():
-            continue
-        for path in directory.rglob("*.md"):
-            record = _task_frontmatter(path)
-            if record and record.get("id"):
-                physical_records.append(record)
-                # Archives are deleted/history, not live identities or a fallback.
-                # Native allocation may reuse their IDs; keep every physical record.
-                if directory.name != "archive":
-                    assert record["id"] not in records
-                    records[record["id"]] = record
-    assert records
-    assert all(record.get("status") != "To Do" for record in records.values())
-    for row in receipt["migrations"] + receipt["preserved"]:
-        # This historical receipt survives later archive/deletion and ID reuse.
-        assert any(record["id"] == row["id"]
-                   and record.get("parent_task_id") == row["parentTaskId"]
-                   for record in physical_records)
+    # The immutable receipt describes the historical cutover, not today's storage
+    # layout or task identity allocation. Native archive/restore coverage checks
+    # the current lifecycle without a second task-file parser here.
 
 
-def test_prompt_led_merge_uses_ff_only_then_exact_backlog_done_commit(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    remote = tmp_path / "remote.git"
-    episode = tmp_path / "episode"
-    stale = tmp_path / "stale"
-    cli = ROOT / "deps/backlog/dist/backlog"
+def test_prompt_led_merge_uses_ff_only_then_exact_backlog_done_commit(tier1_container, ctmp) -> None:
+    repo = ctmp / "repo"
+    remote = ctmp / "remote.git"
+    episode = ctmp / "episode"
+    stale = ctmp / "stale"
+    cli = "/usr/local/bin/backlog"
 
-    def run(*args: str, cwd: Path = repo, check: bool = True) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(args, cwd=cwd, check=check, capture_output=True, text=True)
+    def run(*args: str, cwd: Path = repo, check: bool = True):
+        result = tier1_container.run(*args, workdir=str(cwd))
+        if check:
+            assert result.returncode == 0, result.stdout + result.stderr
+        return result
 
-    run("git", "init", "-q", "--bare", str(remote), cwd=tmp_path)
-    run("git", "init", "-q", "-b", "main", str(repo), cwd=tmp_path)
+    run("git", "init", "-q", "--bare", str(remote), cwd=ctmp)
+    run("git", "init", "-q", "-b", "main", str(repo), cwd=ctmp)
     run("git", "config", "user.name", "Prime Claw Test")
     run("git", "config", "user.email", "test@example.invalid")
     run("git", "remote", "add", "origin", str(remote))
     (repo / "backlog").mkdir()
-    (repo / "backlog/config.yml").write_text((ROOT / "backlog/config.yml").read_text())
-    run(str(cli), "task", "create", "Prompt led lifecycle", "--status", "In Progress",
+    (repo / "backlog/config.yml").write_text(
+        'project_name: "Merge fixture"\n'
+        'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\n'
+        'default_status: "In Design"\n'
+        'types: ["task"]\n'
+        'priorities: ["P1", "P2", "P3"]\n'
+        'auto_commit: false\n'
+        'remote_operations: false\n'
+        'check_active_branches: false\n'
+        'task_prefix: "MERGE"\n'
+    )
+    run(cli, "task", "create", "Prompt led lifecycle", "--status", "In Progress",
         "--description", "Prove ordinary Git and Backlog.", "--type", "task", "--priority", "P2", "--plain")
-    task = json.loads(run(str(cli), "task", "view", "--json", "--", "PRIMECLAW-1").stdout)["task"]
+    listing = json.loads(run(cli, "task", "list", "--json").stdout)
+    assert listing["kind"] == "task-list" and listing["schemaVersion"] == 1
+    # An unfiltered, unbounded list contains exactly this fixture's one identity.
+    (created,) = listing["tasks"]
+    task_id = created["id"]
+    assert task_id == "MERGE-1"
+    task = json.loads(run(cli, "task", "view", "--json", "--", task_id).stdout)["task"]
+    assert task["id"] == task_id and task["status"] == "In Progress"
     task_path = task["path"]
+    assert Path(task_path).parent == Path("backlog/tasks")
     run("git", "add", "--", "backlog")
     run("git", "commit", "-qm", "admit task")
     base = run("git", "rev-parse", "HEAD").stdout.strip()
@@ -314,7 +344,7 @@ def test_prompt_led_merge_uses_ff_only_then_exact_backlog_done_commit(tmp_path: 
     run("git", "worktree", "add", "-q", "-b", "episode", str(episode), "main")
     run("git", "config", "user.name", "Prime Claw Test", cwd=episode)
     run("git", "config", "user.email", "test@example.invalid", cwd=episode)
-    run(str(cli), "task", "edit", "PRIMECLAW-1", "--append-notes", "Candidate evidence.", "--plain", cwd=episode)
+    run(cli, "task", "edit", task_id, "--append-notes", "Candidate evidence.", "--plain", cwd=episode)
     (episode / "feature.txt").write_text("candidate\n")
     run("git", "add", "--", task_path, "feature.txt", cwd=episode)
     run("git", "commit", "-qm", "candidate", cwd=episode)
@@ -326,14 +356,17 @@ def test_prompt_led_merge_uses_ff_only_then_exact_backlog_done_commit(tmp_path: 
     run("git", "merge-base", "--is-ancestor", "main", candidate)
     run("git", "merge", "--ff-only", candidate)
 
-    run(str(cli), "task", "edit", "PRIMECLAW-1", "--status", "Done", "--plain")
+    run(cli, "task", "edit", task_id, "--status", "Done", "--plain")
     changed = [entry for entry in run("git", "status", "--porcelain=v1", "-z").stdout.split("\0") if entry]
     assert changed == [f" M {task_path}"]
-    run("git", "add", "--", task_path)
-    run("git", "commit", "--only", "-qm", "complete exact task", "--", task_path)
+    run("git", "--literal-pathspecs", "add", "--", task_path)
+    run("git", "--literal-pathspecs", "commit", "--only", "-qm", "complete exact task", "--", task_path)
+    assert run("git", "show", "--pretty=", "--name-only", "HEAD").stdout.strip() == task_path
     run("git", "push")
-    done = json.loads(run(str(cli), "task", "view", "--json", "--", "PRIMECLAW-1").stdout)["task"]
-    assert done["status"] == "Done"
+    done = json.loads(run(cli, "task", "view", "--json", "--", task_id).stdout)["task"]
+    assert done["id"] == task_id and done["status"] == "Done"
+    assert done["path"] == task_path and (repo / task_path).is_file()
+    assert done["parentTaskId"] == task["parentTaskId"]
     assert run("git", "rev-parse", "HEAD").stdout.strip() == run("git", "rev-parse", "@{upstream}").stdout.strip()
     run("git", "merge-base", "--is-ancestor", candidate, "HEAD")
 

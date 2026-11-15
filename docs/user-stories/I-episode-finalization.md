@@ -20,6 +20,26 @@ Before merge readiness, the Conversation verifies provider-reported idle complet
 
 Review and terminal provider/Git work are Conversation instructions, not a plugin state machine. Backlog keeps its exact Ready, Delay, Request Changes, ff-only Merge plus task-only `Done`, and separately confirmed non-`Done` archive flows. Beads keeps guarded readiness/revision/custom-`done` completion. Its separately confirmed abandonment proves the exact task and pushed Episode head, code/resources, and current publication; invokes supported `bd close` once with the exact task/head/no-merge reason; pushes once without force; and proves built-in native `closed`, `closed_at`, `close_reason`, preserved task/comments/history, revision, and publication ref. Prime Claw does not map `closed` to canonical `Done`; completed work is custom `done`, and abandoned code never merges. After either authorized terminal outcome is committed, pushed, and verified, the Conversation continues automatically and immediately to cleanup without separate cleanup confirmation.
 
+For Backlog, final-status `Done` closes an active task without a storage move.
+A merged task stays active `Done` through `finalize_task_episode`; optional
+native archive follows cleanup. Canonical `archive/tasks/` and legacy
+`completed/` are archived history regardless of status, not active closed tasks.
+Archive is reversible and read-only, preserves identity/status/relationships,
+and reserves the ID. Restore before editing; only explicit archived-only native
+delete vacates identity and cleans relationships.
+
+Abandonment retains its archived non-`Done` contract. Its native Final Summary
+must include this exact task/head evidence, with the actual canonical ID and
+pushed Episode head substituted:
+
+```text
+Prime Claw abandonment: task TASK-ID; pushed Episode head EPISODE-HEAD; code was not merged.
+```
+
+Preserve any additional truthful operator context. Read archived tasks natively
+at their actual paths without moving or manufacturing an active view. This does
+not broaden finalization to archived-`Done` merged tasks or add a cleanup decision.
+
 For independent Backlog, task evidence lives in native task history, not the
 code DAG. The Conversation judges the exact Done/archive publication, local
 commits and compatible descendants before requesting removal. Code returns

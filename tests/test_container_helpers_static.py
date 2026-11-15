@@ -59,11 +59,17 @@ def test_tier1_test_code_never_resolves_host_binaries():
     for test_file in sorted((REPO / "tests").glob("test_*.py")):
         if test_file.name == Path(__file__).name:
             continue  # this guard file names the needles it scans for
-        text = test_file.read_text()
-        for needle in ('shutil.which("prime-agent")', "shutil.which('prime-agent')",
-                       'shutil.which("node")', "shutil.which('node')"):
-            if needle in text:
-                offenders.append(f"{test_file.name}: {needle}")
+        # Inspect executable Python calls, not container-side programs embedded
+        # in string literals and passed through tier1_container.run.
+        tree = ast.parse(test_file.read_text(), filename=str(test_file))
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "shutil" and node.func.attr == "which"
+                    and node.args and isinstance(node.args[0], ast.Constant)
+                    and node.args[0].value in {"prime-agent", "node"}):
+                offenders.append(f"{test_file.name}:{node.lineno}: {ast.unparse(node)}")
     assert not offenders, "\n".join(offenders)
 
 

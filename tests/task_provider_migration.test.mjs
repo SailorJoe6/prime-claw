@@ -1322,16 +1322,18 @@ test("used unsupported Beads statuses and ambiguous archive records aggregate be
   }), "--json")).id;
   bd(fixture.root, "close", malformed, "--reason", "ordinary closed task with malformed archive claim", "--json");
   offenders.push({ id: malformed, status: "closed" });
-  const contradictory = JSON.parse(bd(fixture.root, "create", "Open task with retained archive evidence", "--metadata", JSON.stringify({
+  const retainedArchive = JSON.parse(bd(fixture.root, "create", "Open task with retained archive evidence", "--metadata", JSON.stringify({
     prime_claw_migration: retainedBacklogArchivePackage("task"),
   }), "--json")).id;
-  offenders.push({ id: contradictory, status: "open" });
+  // Exact retained archive evidence is valid independently of the mapped status;
+  // an ordinary open source record is not an unsupported or ambiguous offender.
   const wrongAbandonment = JSON.parse(bd(fixture.root, "create", "Abandonment reason names another task", "--json")).id;
   bd(fixture.root, "close", wrongAbandonment, "--reason", `Prime Claw abandonment: task OTHER-1; pushed Episode head ${git(fixture.root, "rev-parse", "HEAD")}; code was not merged.`, "--json");
   offenders.push({ id: wrongAbandonment, status: "closed" });
   const before = sourceAuthorityFiles(fixture.root);
   const exportBefore = bd(fixture.root, "--readonly", "export", "--all");
-  const historyBefore = Object.fromEntries(offenders.map(({ id }) => [id, bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")]));
+  const sourceRecords = [...offenders, { id: retainedArchive, status: "open" }];
+  const historyBefore = Object.fromEntries(sourceRecords.map(({ id }) => [id, bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")]));
   const sourceHead = git(fixture.root, "rev-parse", "HEAD");
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
   let deletions = 0;
@@ -1345,12 +1347,14 @@ test("used unsupported Beads statuses and ambiguous archive records aggregate be
     for (const { id, status } of offenders) {
       assert.ok(result.detail.includes(`${id} status=${JSON.stringify(status)}`), `diagnostic omitted exact task/status ${id}/${status}: ${result.detail}`);
     }
+    assert.equal(result.detail.includes(`${retainedArchive} status="open"`), false,
+      "valid retained archive evidence with an open status must not be reported as an offender");
     assert.equal(result.detail.includes('status="unused"'), false, "unused catalog entries must not be status offenders");
   }
   assert.equal(deletions, 0);
   assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
   assert.equal(bd(fixture.root, "--readonly", "export", "--all"), exportBefore);
-  for (const { id } of offenders) assert.equal(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0"), historyBefore[id]);
+  for (const { id } of sourceRecords) assert.equal(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0"), historyBefore[id]);
   assert.equal(git(fixture.root, "rev-parse", "HEAD"), sourceHead);
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
   assert.equal(existsSync(join(fixture.root, ".backlog")), false);
@@ -2497,6 +2501,132 @@ test("native populated Backlog allocation reserves archived IDs and accepts arch
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
 });
 
+
+test("native populated Backlog lifecycle archives and restores Done and non-Done records in place", { timeout: 180_000 }, (t) => {
+  const fixture = repository(t, "native-populated-lifecycle");
+  const destination = publishedPopulatedBacklogDestination(fixture);
+  const { store } = destination;
+  const view = (id) => JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id)).task;
+  const create = (title, ...args) => backlog(fixture.root, "task", "create", title, ...args,
+    "--no-dod-defaults", "--plain").match(/BASE-\d+(?:\.\d+)*/)[0];
+  const commit = (message) => {
+    git(store, "add", "tasks", "archive/tasks");
+    command(store, "git", ["-c", "user.name=Lifecycle Fixture", "-c", "user.email=lifecycle@example.invalid",
+      "commit", "-qm", message]);
+  };
+  const rootHead = git(fixture.root, "rev-parse", "HEAD");
+  const publishedRefs = git(store, "ls-remote", "--refs", "origin");
+  for (const status of ["Done", "In Planning"]) {
+    const id = create(`Lifecycle ${status}`, "--status", status, "--parent", destination.active,
+      "--depends-on", destination.archived, "--ref", destination.completed,
+      "--ref", "https://example.invalid/native-reference", "--doc", "https://example.invalid/native-guide",
+      "--description", "Preserved description λ", "--plan", "Preserved living plan", "--notes", "First native notes");
+    backlog(fixture.root, "task", "edit", id, "--comment", "Preserved native comment", "--comment-author", "fixture-author", "--plain");
+    const dependent = create("Relation survives archive", "--parent", destination.active, "--depends-on", id, "--ref", id);
+    commit(`Seed ${id} native content`);
+    backlog(fixture.root, "task", "edit", id, "--append-notes", "Second native revision", "--plain");
+    commit(`Revise ${id} native notes`);
+    const before = view(id);
+    assert.equal(before.status, status);
+    assert.equal(before.parentTaskId, destination.active);
+    assert.deepEqual(before.dependencies, [destination.archived]);
+    assert.deepEqual(before.references, [destination.completed, "https://example.invalid/native-reference"]);
+    assert.deepEqual(before.documentation, ["https://example.invalid/native-guide"]);
+    const beforeBytes = readFileSync(join(fixture.root, before.path));
+    const beforeHead = git(store, "rev-parse", "HEAD");
+    const relativePath = before.path.slice(".backlog/".length);
+    const history = git(store, "log", "--follow", "--format=%H", "--", relativePath).split(/\r?\n/);
+    assert.ok(history.length >= 2);
+    assert.equal(git(store, "log", "--follow", "-2", "--format=%s", "--", relativePath),
+      `Revise ${id} native notes\nSeed ${id} native content`);
+    const records = physicalDestinationRecords(store);
+    backlog(fixture.root, "task", "archive", id);
+    const archived = view(id);
+    assert.equal(archived.path, before.path.replace(".backlog/tasks/", ".backlog/archive/tasks/"));
+    assert.equal(existsSync(join(fixture.root, before.path)), false);
+    assert.deepEqual(readFileSync(join(fixture.root, archived.path)), beforeBytes);
+    assert.equal(archived.archived, true);
+    for (const field of ["id", "status", "parentTaskId", "dependencies", "references", "documentation", "implementationPlan", "implementationNotes", "comments"]) {
+      assert.deepEqual(archived[field], before[field], `preserved native archive content: ${field}`);
+    }
+    const afterArchive = physicalDestinationRecords(store);
+    delete records[relativePath];
+    assert.deepEqual(afterArchive, { ...records, [archived.path.slice(".backlog/".length)]: beforeBytes.toString("base64") });
+    const beforeRead = admissionTree(store);
+    assert.match(backlog(fixture.root, "task", "view", id, "--plain"), /\(archived\)/);
+    const refused = RUNNER.run("backlog", ["task", "edit", id, "--append-notes", "Must not be written", "--plain"],
+      { cwd: fixture.root, allowFailure: true });
+    assert.notEqual(refused.status, 0);
+    assert.match(`${refused.stdout}\n${refused.stderr}`, /archived.*read-only[\s\S]*backlog task restore/i);
+    assert.deepEqual(admissionTree(store), beforeRead, "archive readback and refused edit change nothing");
+    assert.equal(git(store, "rev-parse", "HEAD"), beforeHead, "native operations do not invent task history");
+    const sibling = create("Allocated while archived", "--parent", destination.active);
+    assert.equal(sibling, `${destination.active}.${Number(dependent.split(".").at(-1)) + 1}`);
+    assert.deepEqual(view(dependent).dependencies, [id], "archiving does not remove incoming dependencies");
+    assert.deepEqual(view(dependent).references, [id]);
+    commit(`Archive ${id} without changing its content`);
+    assert.deepEqual(git(store, "log", "--follow", "--format=%H", "--", archived.path.slice(".backlog/".length)).split(/\r?\n/).slice(1), history);
+    backlog(fixture.root, "task", "restore", id);
+    assert.deepEqual(view(id), before);
+    assert.deepEqual(readFileSync(join(fixture.root, before.path)), beforeBytes);
+    assert.equal(existsSync(join(fixture.root, archived.path)), false);
+    const next = create("Allocated after restore", "--parent", destination.active);
+    assert.equal(next, `${destination.active}.${Number(sibling.split(".").at(-1)) + 1}`);
+    commit(`Restore ${id} with its original identity`);
+    assert.deepEqual(git(store, "log", "--follow", "--format=%H", "--", relativePath).split(/\r?\n/).slice(2), history);
+    assert.deepEqual(Buffer.from(command(store, "git", ["show", `${beforeHead}:${relativePath}`])), beforeBytes);
+    backlog(fixture.root, "task", "edit", id, "--append-notes", "Editable after native restore", "--plain");
+    assert.match(view(id).implementationNotes, /Editable after native restore/);
+  }
+  for (const [path, expected] of Object.entries(destination.baseline)) {
+    assert.equal(readFileSync(join(store, path)).toString("base64"), expected.bytes, `unrelated baseline bytes: ${path}`);
+    assert.equal(git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path), expected.history, `unrelated baseline history: ${path}`);
+  }
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), rootHead);
+  assert.equal(git(store, "ls-remote", "--refs", "origin"), publishedRefs, "local lifecycle operations do not publish");
+});
+
+test("native populated Backlog lifecycle deletes only archived records and cleans relations before ID reuse", { timeout: 120_000 }, (t) => {
+  const fixture = repository(t, "native-populated-delete");
+  const destination = publishedPopulatedBacklogDestination(fixture);
+  const { store } = destination;
+  const view = (id) => JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id)).task;
+  const create = (title, ...args) => backlog(fixture.root, "task", "create", title, ...args,
+    "--no-dod-defaults", "--plain").match(/BASE-\d+(?:\.\d+)*/)[0];
+  const target = create("Explicit delete target", "--status", "Done");
+  assert.equal(target, "BASE-5");
+  const url = `https://example.invalid/${target}`;
+  const dependent = create("Active dependent", "--parent", destination.active,
+    "--depends-on", target, "--ref", target, "--ref", url);
+  const archivedDependent = create("Archived dependent", "--parent", destination.active,
+    "--depends-on", `${target},${destination.completed}`, "--ref", target, "--ref", url);
+  backlog(fixture.root, "task", "archive", archivedDependent);
+  const original = admissionTree(store);
+  const refused = RUNNER.run("backlog", ["task", "delete", target], { cwd: fixture.root, allowFailure: true });
+  assert.notEqual(refused.status, 0);
+  assert.match(`${refused.stdout}\n${refused.stderr}`, /must be archived before it can be deleted/i);
+  assert.deepEqual(admissionTree(store), original);
+  backlog(fixture.root, "task", "archive", target);
+  const archivedPath = view(target).path;
+  const removed = backlog(fixture.root, "task", "delete", target);
+  assert.match(removed, new RegExp(`Deleted task ${target}`));
+  assert.ok(removed.includes(dependent) && removed.includes(archivedDependent), "native delete reports cleaned records");
+  assert.equal(existsSync(join(fixture.root, archivedPath)), false);
+  const missing = RUNNER.run("backlog", ["task", "view", "--json", "--", target], { cwd: fixture.root, allowFailure: true });
+  assert.notEqual(missing.status, 0);
+  assert.match(`${missing.stdout}\n${missing.stderr}`, /not found/i);
+  assert.deepEqual(view(dependent).dependencies, []);
+  assert.deepEqual(view(archivedDependent).dependencies, [destination.completed]);
+  for (const id of [dependent, archivedDependent]) {
+    assert.deepEqual(view(id).references, [url], "delete cleans exact native task links, not URLs containing its ID");
+    assert.equal(view(id).parentTaskId, destination.active);
+  }
+  assert.equal(create("Replacement after explicit delete"), target, "only permanent deletion vacates native identity");
+  assert.deepEqual(view(dependent).dependencies, [], "ID reuse must not reattach a removed relation");
+  for (const [path, expected] of Object.entries(destination.baseline)) {
+    assert.equal(readFileSync(join(store, path)).toString("base64"), expected.bytes, `unrelated baseline bytes: ${path}`);
+  }
+});
 
 function physicalDestinationRecords(store) {
   const records = {};

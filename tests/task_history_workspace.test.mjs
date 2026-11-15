@@ -569,7 +569,8 @@ for (const storeName of ["backlog", ".backlog", "planning/task store"]) {
         "tasks/task-1 - Active.md": taskMarkdown("TASK-1", "Active"),
         "completed/task-2 - Complete.md": taskMarkdown("TASK-2", "Complete").replace("status: In Progress", "status: Done"),
         "archive/tasks/task-3 - Archive.md": taskMarkdown("TASK-3", "Archive"),
-        "archive/tasks/task-1 - historical-prefix-probe.md": taskMarkdown("TASK-1", "Distinct archived prefix probe"),
+        // Distinct reserved identity with the same text prefix, not a duplicate TASK-1.
+        "archive/tasks/task-10 - historical-prefix-probe.md": taskMarkdown("TASK-10", "Distinct archived prefix probe"),
       };
       const seed = publishTaskBranch(remote, { [configName]: bytes, ".gitignore": "*.attachment\n", ...records });
       records["tasks/task-1 - Active.md"] = taskMarkdown("TASK-1", "Active", "second preserved revision");

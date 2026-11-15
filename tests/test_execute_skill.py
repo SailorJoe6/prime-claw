@@ -1,11 +1,9 @@
 import hashlib
 import json
 from pathlib import Path
-import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKLOG = ROOT / "deps" / "backlog" / "dist" / "backlog"
 EXECUTE_SKILL = ROOT / "src" / "prime-agent-plugin" / "skills" / "project-templates" / "execute.md"
 AGENT_SKILL = ROOT / ".agents" / "skills" / "execute"
 
@@ -202,7 +200,7 @@ def test_task_native_execute_binds_exact_task_and_preserves_status_authority() -
         "The owning Conversation exclusively owns lifecycle status",
         "primary nested task clone for independent Backlog",
         "must not pass `--status`",
-        "call `backlog task complete` or `backlog task archive`",
+        "must not pass `--status`, archive, restore, or delete the task",
         "no cross-checkout copy, mirroring, or dual write",
         "task-path-only code-branch commit",
         "one task-path-only commit in the nested clone",
@@ -213,6 +211,8 @@ def test_task_native_execute_binds_exact_task_and_preserves_status_authority() -
         "Do not merge, mark `Ready for Merge` or `Done`",
     ):
         assert fragment in text
+    assert "backlog task complete" not in text
+    assert "task_complete" not in text
 
 
 def test_task_native_execute_retains_folder_episode_compatibility() -> None:
@@ -263,46 +263,63 @@ def test_task_native_execute_retains_folder_episode_compatibility() -> None:
         assert forbidden not in legacy.lower()
 
 
-def test_supported_task_content_edits_leave_status_and_unrelated_work_unchanged(tmp_path: Path) -> None:
-    (tmp_path / "backlog").mkdir()
-    (tmp_path / "backlog" / "config.yml").write_bytes(
-        (ROOT / "backlog" / "config.yml").read_bytes()
+def test_supported_task_content_edits_leave_status_and_unrelated_work_unchanged(tier1_container, ctmp) -> None:
+    cli = "/usr/local/bin/backlog"
+    (ctmp / "backlog").mkdir()
+    (ctmp / "backlog/config.yml").write_text(
+        'project_name: "Execute fixture"\n'
+        'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]\n'
+        'default_status: "In Design"\n'
+        'auto_commit: false\n'
+        'remote_operations: false\n'
+        'check_active_branches: false\n'
+        'task_prefix: "EXEC"\n'
     )
 
-    def run(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-        result = subprocess.run(args, cwd=tmp_path, text=True, capture_output=True)
-        if check and result.returncode != 0:
-            raise AssertionError(result.stdout + result.stderr)
+    def run(*args: str, check: bool = True):
+        result = tier1_container.run(*args, workdir=str(ctmp))
+        if check:
+            assert result.returncode == 0, result.stdout + result.stderr
         return result
 
     run("git", "init", "-q")
     run("git", "config", "user.name", "Fixture")
     run("git", "config", "user.email", "fixture@example.test")
-    (tmp_path / "unrelated.txt").write_text("baseline\n")
+    # Materialize native config defaults before the task-only baseline.
+    run(cli, "config", "set", "autoCommit", "false")
+    (ctmp / "unrelated.txt").write_text("baseline\n")
     run("git", "add", "backlog/config.yml", "unrelated.txt")
     run("git", "commit", "-q", "-m", "fixture baseline")
     run(
-        str(BACKLOG), "task", "create", "Task-bound execution fixture",
+        cli, "task", "create", "Task-bound execution fixture",
         "--status", "In Progress", "--description", "Approved outcome",
         "--ac", "Observable result", "--plan", "Implement one bounded result",
         "--plain",
     )
-    before = json.loads(run(
-        str(BACKLOG), "task", "view", "--json", "--", "PRIMECLAW-1",
-    ).stdout)["task"]
-    run("git", "add", "--", before["path"])
-    run("git", "commit", "-q", "--only", "-m", "admit fixture", "--", before["path"])
-    (tmp_path / "unrelated.txt").write_text("unrelated work\n")
+    listing = json.loads(run(cli, "task", "list", "--json").stdout)
+    assert listing["kind"] == "task-list" and listing["schemaVersion"] == 1
+    # Select from the complete native identity set, with explicit single-record proof.
+    (created,) = listing["tasks"]
+    task_id = created["id"]
+    assert task_id == "EXEC-1"
+    before = json.loads(run(cli, "task", "view", "--json", "--", task_id).stdout)["task"]
+    assert before["id"] == task_id
+    assert Path(before["path"]).parent == Path("backlog/tasks")
+    run("git", "--literal-pathspecs", "add", "--", before["path"])
+    run("git", "--literal-pathspecs", "commit", "-q", "--only", "-m", "admit fixture", "--", before["path"])
+    (ctmp / "unrelated.txt").write_text("unrelated staged work\n")
+    run("git", "add", "--", "unrelated.txt")
+    (ctmp / "unrelated.txt").write_text("unrelated work\n")
+    unrelated_index = run("git", "diff", "--cached", "--binary").stdout
+    unrelated_bytes = (ctmp / "unrelated.txt").read_bytes()
 
     run(
-        str(BACKLOG), "task", "edit", "PRIMECLAW-1",
+        cli, "task", "edit", task_id,
         "--append-plan", "Record the verified follow-up",
         "--append-notes", "Focused check passed",
         "--check-ac", "1", "--modified-file", "src/example.ts",
     )
-    after = json.loads(run(
-        str(BACKLOG), "task", "view", "--json", "--", "PRIMECLAW-1",
-    ).stdout)["task"]
+    after = json.loads(run(cli, "task", "view", "--json", "--", task_id).stdout)["task"]
 
     assert after["id"] == before["id"]
     assert after["path"] == before["path"]
@@ -313,7 +330,9 @@ def test_supported_task_content_edits_leave_status_and_unrelated_work_unchanged(
     assert "Record the verified follow-up" in after["implementationPlan"]
     assert after["modifiedFiles"] == ["src/example.ts"]
 
-    run("git", "add", "--", after["path"])
-    run("git", "commit", "-q", "--only", "-m", "record episode evidence", "--", after["path"])
+    run("git", "--literal-pathspecs", "add", "--", after["path"])
+    run("git", "--literal-pathspecs", "commit", "-q", "--only", "-m", "record episode evidence", "--", after["path"])
     assert run("git", "show", "--pretty=", "--name-only", "HEAD").stdout.strip() == after["path"]
-    assert run("git", "status", "--short").stdout.strip() == "M unrelated.txt"
+    assert run("git", "diff", "--cached", "--binary").stdout == unrelated_index
+    assert (ctmp / "unrelated.txt").read_bytes() == unrelated_bytes
+    assert run("git", "status", "--short").stdout.strip() == "MM unrelated.txt"

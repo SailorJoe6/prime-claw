@@ -50,9 +50,9 @@
       "source": "skills/project-templates/execute.md",
       "destination": ".agents/skills/execute/SKILL.md",
       "baselineSha256": "cc0453ff3aad661c78e550997fd9ea6359fa7f76b1b87d552c69dfb5d9c52a6c",
-      "installedSha256": "a7fb496c5a0472cb7e93e828408e26b378ae00193336b8bb86564a7c515a0a8d",
+      "installedSha256": "c82723a3714c4a5da8865066312cbe22ecbc9641d137cb20f431154102c8a606",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "a7fb496c5a0472cb7e93e828408e26b378ae00193336b8bb86564a7c515a0a8d",
+      "availableUpstreamSha256": "c82723a3714c4a5da8865066312cbe22ecbc9641d137cb20f431154102c8a606",
       "state": "managed",
       "provenance": {
         "scope": "project",
