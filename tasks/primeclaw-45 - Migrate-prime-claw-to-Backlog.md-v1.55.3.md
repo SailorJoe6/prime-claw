@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-15 06:50'
+updated_date: '2026-11-15 06:53'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -420,6 +420,10 @@ Investigation confirms genuine fixture defects before the later ENOSPC: removed 
 Correction to prior handoff shorthand: the three named earlier failure files do not contain three newly moved native bodies. Actual diff shows tests/test_future_plan_skills.py atomic authoring body moved to existing Docker fixture, while tests/test_global_asset_drift.py and tests/test_managed_session_protocol.py update exact current-source inventories. Their existing bodies remain fully collected; final Tier0/Tier1 must include all three files with no omitted required native body. Script-only global-asset tests use explicit isolated scratch roots, not host-global/plugin probes.
 
 Published main5ab4eb6e8a3c718fd850c73501e765f37b08639d inspected: since already integrated c0b42f0 only compatible operator docs/testing-evidence clarification and exact owner observation updates, no new production implementation. Existing fd082830 already contains current PRIMECLAW-56 mechanics. Preserve pending compatible docs/customizations; no extra merge is required solely for documentation/observation advances. Canonical unchanged read-only PrimeAgent source remains94589ebb002679a028435759ce3bfffdc7ff6127 for supported fresh Docker fixture. Prior source/Nix/Gittrust/Bun-isolation proof retains recorded limits. After settled final edits run fresh FULL Tier0/Tier1, preserve every failed run and required skip reason, then separate committed/pushed code/native delivery for owner review. Accepted1.53.0 authoritative; no lifecycle/ownership/primary writes, activation, secondhostAgent, live migration or Episode cleanup.
+
+2026-11-15 — Fresh COMPLETE Tier0 after all recorded fixture repairs PASSED:736tests+140subtests,104default-tier/environment skips,13warnings,86.23s pytest (88.18s command). Command: uv run --no-project --python python3.13 --with pytest --with pyyaml python3 -m pytest tests/ -q -ra --junitxml=.test-results/primeclaw45-resumed-08450108/tier0.xml. Raw log .test-results/primeclaw45-resumed-08450108/tier0.log SHA25644ff4942c81632a4dd953e1492c1e7c09a131ccfca7ff9b5a4f559e95916f26a; JUnit tier0.xml SHA25675e35b9747d845570d4b98d3db54b988f04f09d68b7162fb655bbb96a3e05a0e; exact command/input-hash/receipt files retained beside it. All pending candidate bytes still match the pre-full-validation hash manifest. The104skips are explicit default-tier admission/environment separation, not Tier1 success; final full Tier1 must run the required container bodies.
+
+The fresh COMPLETE Tier1 command is already running on its existing handle with supported TIER1_ENV_FILE and .test-results/primeclaw45-resumed-08450108/tier1.log plus planned tier1.xml. It has no terminal result yet; do not relaunch, accept, infer teardown or call this owner-review-ready. Earlier failed/resource-contaminated Tier1 histories remain unchanged. Exact old exited container was only inspected, not restarted/deleted. Final native skip/coverage and runtime/builder teardown/manifests remain to inspect before tested code/native delivery. No source/plugin changes since starting these final full suites; no AC/lifecycle/ownership or activation claim.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
