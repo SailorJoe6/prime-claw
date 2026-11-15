@@ -71,8 +71,10 @@ prime-claw builds on four prior projects. Read these before designing:
   selected-global-context ownership, manifest-authoritative delivery,
   sandbox deployment, and accepted-refresh safety.
 - [conversation-driven-episode-oversight.md](conversation-driven-episode-oversight.md)
-  — the lean managed session protocol, deterministic lifecycle mechanics,
-  historical-package filtering, and managed global role guides.
+  — start with the [operator overview of Episode creation and recovery](conversation-driven-episode-oversight.md#episode-creation-and-recovery-operator-overview):
+  early prerequisite checks, same-resource recovery, evidence limits, and source
+  merge versus activation. The detailed guide covers owner judgment, native
+  lifecycle/resource mechanics, and retained compatibility.
 - [goal-heartbeat-work-control.md](goal-heartbeat-work-control.md) — the
   neutral-kernel/managed-guide work-control split, retired-extension migration,
   and accepted final-refresh boundary.
