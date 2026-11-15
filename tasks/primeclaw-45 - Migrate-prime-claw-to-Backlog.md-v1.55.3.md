@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-15 08:36'
+updated_date: '2026-11-15 08:39'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -486,6 +486,10 @@ Bounded fixture-only repair in tests/project_initialization_extension.test.mjs n
 Preserved settled test+receipt changes in local commitfc787154bbd16647a23b6a49be4fd9467ea8afc1, descendant of integratedfd5e8e99/currentpublishedmain5ab4eb6 and originalbasis. Total selected changed-scope input manifest now28paths including tests/project_initialization_extension.test.mjs. No production/upstream change after preceding full run; no skip waiver. Coherent repository receipt explicitly corrects prior initializer single-skip shorthand and preserves preceding runner102PASS/coverage-incomplete history.
 
 NEW COMPLETE Tier0 and source-selected Tier1 now RUNNING after all latest edits onfc787154bbd16647a23b6a49be4fd9467ea8afc1; exact full-tier0/full-tier1 commands/logs/XML and full-input-hashes.json under .test-results/primeclaw45-final-native-init-08450108/. Reuse only final_complete_tier0_handle/final_complete_tier1_handle; all resume_final_* handles finished. Required final initializer88/88zeroSKIP, full migration/native lifecycle/archived-draft/collision/history/read-only/activeDone proof, actual nestedA/B body, main/child terminal manifests/all hashes/source inventories/network/teardown must be checked. Then finish report-only terminal receipts, publish tested code and separate native content, report exact heads and STOP OWNER REVIEW. Code still unpublished; same original resources/owner/status/nullparent/AC0of9; accepted1.53.0 authoritative; no activation/primarymerge/globalrefresh/live conversion/Episodecleanup.
+
+2026-11-15 — New complete Tier0 onfc787154bbd16647a23b6a49be4fd9467ea8afc1 failed3/733PASS/104tier skips/140subtests/13warnings,86.53s. Three existing recorded-cleanup unit tests stopped before expected assertions because tests/lifecycle/support.py `_SENSITIVE` treats generated ISO timestamp `2026-11-15T08:36:10.305505+00:00` as private endpoint material (exact regex match`:10.`). Native project-environment diagnostic reproduces refusal for that harmless timestamp and acceptance for otherwise identical second11. This pre-existing time-dependent test-helper false positive is unrelated to the Backlog/native-init change; no source/test/filter/clock edits and no assertion weakening. Failed log/XML/receipt and deterministic diagnostic remain under .test-results/primeclaw45-final-native-init-08450108/: full-tier0.*, tier0-timestamp-failed-receipt.json, tier0-timestamp-diagnostic.txt. Prior passing full Tier0 results remain distinct, not substituted.
+
+Rerunning COMPLETE Tier0 once on exactly unchanged28-path input hashes, with full-tier0-timestamp-rerun command/log/XML. Required lifecycle cases must actually pass; no subset or skip waiver. Existing new COMPLETE Tier1 continues on its original final_complete_tier1_handle and unchanged source inputs; do not restart it. The timestamp helper limitation will be reported explicitly at delivery rather than hidden or broadened into unrelated lifecycle/filter work. No final code publication/acceptance yet; same Episode/resources/status/nullparent/AC0of9 and accepted1.53.0.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
