@@ -1231,8 +1231,10 @@ test("production initialization prepares and reuses an independent published .ba
   execFileSync("git", ["init", "-q", "--bare", remote]);
   git(root, "remote", "add", "origin", remote);
   git(root, "push", "-qu", "origin", "main");
-  const backlog = resolve("deps/backlog/dist/backlog");
-  if (!existsSync(backlog)) { t.skip("managed backlog executable unavailable"); return; }
+  const distBacklog = resolve("deps/backlog/dist/backlog");
+  const backlog = existsSync(distBacklog) ? distBacklog
+    : execFileSync("which", ["backlog"], { encoding: "utf8" }).trim().split("\n")[0];
+  assert.ok(backlog && existsSync(backlog), "managed Backlog is required for production initialization proof");
   const runner = { run(command, args, options = {}) {
     const executable = command === "backlog" ? backlog : command;
     try { return { stdout: execFileSync(executable, args, { cwd: options.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }), stderr: "", status: 0 }; }

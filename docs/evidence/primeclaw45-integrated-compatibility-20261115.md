@@ -151,3 +151,44 @@ The coherent local candidate may be committed to preserve its exact pending
 bytes before ordinary published-main integration. This intermediate local commit
 is not a pushed or fully validated delivery. Final complete suites run after
 integration and settled edits; their inspected terminal receipts follow below.
+
+## Complete-run coverage correction and required initialization proof
+
+After ordinary conflict-free integration of published main
+`5ab4eb6e8a3c718fd850c73501e765f37b08639d`, the local tested basis was
+`fd5e8e99c407776a58145e443a77b5ef745bc963`. Complete Tier0 passed736 tests and
+140 subtests,104 expected tier/environment skips,13 warnings,84.23s. Complete
+source Tier1 returned102 passed,1 inactive outer child-probe skip,737 deselected,
+12 warnings,2545.03s. Artifacts/commands/JUnit/hashes are under
+`.test-results/primeclaw45-final-08450108/`.
+
+That Tier1 runner passed, but required coverage was incomplete. Its initializer
+TAP case71, `production initialization prepares and reuses an independent
+published .backlog workspace`, skipped because it looked only for a repository
+`deps/backlog/dist/backlog` binary absent in the Docker snapshot. The managed
+binary is available on native PATH; the adjacent native initialization case used
+that fallback and passed. Any earlier checkpoint shorthand calling the
+initializer's single skip retired reverse migration was wrong. Only the twelve
+explicitly named migration reverse cases are retired. The old manifests/logs stay
+unchanged; `tier1-coverage-incomplete-receipt.json` records this qualification.
+
+The bounded test-only repair uses the existing dist-or-native-PATH lookup and
+requires the binary instead of skipping. All original initialization, direct
+remote publication, reuse, unchanged code HEAD and no-gitlink assertions remain.
+No production or upstream source changed. Focused required initialization now
+passes **88/88, zero skipped**, through the existing Docker driver. Raw command,
+log, JUnit and `focused-terminal-verification.txt` are under
+`.test-results/primeclaw45-final-native-init-08450108/`; run
+`20261115T083104Z-1758-f4b836bc`. Native manifest and every evidence hash verify;
+source inventories equal, network absent, builder/runtime clean and absent.
+
+The earlier complete runner's required synthetic A/B body did execute and pass:
+summary `.test-results/20261115T075611Z-32660-1ab564d9/source-generations/two-generation-summary.json`,
+children `20261115T075613Z-71262-74c01139` and
+`20261115T075631Z-72452-a2ea4359`. Both manifests/hashes/source inventories/
+network/teardown verified. It does not waive another required body.
+
+Fresh complete Tier0/Tier1 after the final initialization fixture edit remain
+required. The next subsection records their terminal results only after native
+coverage and artifact verification. The preceding partial-coverage success is
+not acceptance, activation, or a reason to publish an incomplete candidate.
