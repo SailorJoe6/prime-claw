@@ -4,7 +4,7 @@ title: Migrate prime-claw to Backlog.md v1.55.3
 status: In Progress
 assignee: []
 created_date: '2026-10-28 02:59'
-updated_date: '2026-11-15 07:47'
+updated_date: '2026-11-15 07:52'
 labels: []
 dependencies:
   - PRIMECLAW-55
@@ -456,6 +456,8 @@ Bounded repository evidence draft docs/evidence/primeclaw45-integrated-compatibi
 Preserved coherent pending candidate in local code3349d498bf06a29da9d2761c972ab49620be9f09 (27selected paths); then ordinarily merged exact directly publishedmain5ab4eb6e8a3c718fd850c73501e765f37b08639d INTO this existing Episode without conflicts at localfd5e8e99c407776a58145e443a77b5ef745bc963. Current-main and originalbasis ancestry proven; code/index clean. This is local preservation/integration, NOT final code publication or acceptance. Primary checkout/registry unchanged, customized templates bytes unchanged and task history stays separate.
 
 Fresh COMPLETE Tier0 and Tier1 have now started after settled repairs/integration onfd5e8e99c407776a58145e443a77b5ef745bc963, logs/commands/XML/input hashes .test-results/primeclaw45-final-08450108/. Existing source env uses canonical unchanged94589ebb. Monitor those existing saved handles; never replay dispatch or substitute prior subsets. Inspect all required bodies/skip reasons, terminal manifest/every evidence hash/networkabsence/sourceinventory equality/native runtime+builder teardown. If further edits are needed, fresh complete suites remain required. Once proven, finish bounded repository evidence, publish tested coherent code and separate native content, then STOP for owner review. All scope/resources/originalbasis/noactivation/nomerge-to-primary/noupstreampatch/nohostprobe/noliveconversion/noEpisodecleanup constraints remain; accepted1.53.0 authoritative.
+
+2026-11-15 — Final complete Tier0 after every settled functional/test repair and the ordinary published-main integration PASSED: 736 tests +140 subtests,104 expected default-tier/environment skips,13 warnings,84.23s (exit0). Tested code basisfd5e8e99c407776a58145e443a77b5ef745bc963. Exact command/log/JUnit/input hashes and tier0-receipt.json are retained under .test-results/primeclaw45-final-08450108/. LogSHA256=ac891d9b2fc467957df7774743f0bf30253391e59a74581cb741d302ec61353e; JUnitSHA256=9bedfd341f6652a1fcee9e3831839cd807d19fe6f9c0d554d5028376b35894ab. All27selected source-path hashes still match the final-run input manifest; code/index clean and exact canonical ownership/resources unchanged. This is not Tier1 acceptance: fresh COMPLETE source-selected Tier1 is still running on its existing saved handle; do not duplicate it, replace required bodies with earlier subsets, or waive skips. No code push yet; native evidence remains separate. Same Episode, statusInProgress/nullparent/AC0of9; accepted1.53.0 authoritative. Next: inspect full Tier1 and terminal/nested proofs, then publish the coherent tested code and final native content for OWNER REVIEW only.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
