@@ -4,7 +4,7 @@ title: Queue task handoffs across busy heartbeat races and define refusal recove
 status: In Progress
 assignee: []
 created_date: '2026-11-16 03:00'
-updated_date: '2026-11-16 03:15'
+updated_date: '2026-11-16 03:18'
 labels: []
 dependencies: []
 references:
@@ -14,7 +14,20 @@ references:
     /Users/jlanders/.prime/agent/session-artifacts/01a1d792-ed7e-7333-a01e-c9ca5e1a6922/task-2-offline-consumer-review/handoff-refusal-investigation/accepted-diagnosis-published-blocker.md
 documentation:
   - REQUIREMENTS.md
+  - docs/conversation-driven-episode-oversight.md
   - docs/handoff-chain.md
+  - docs/user-stories/H-handoff-and-continuation.md
+modified_files:
+  - .prime-claw/workflows/handoff.md
+  - REQUIREMENTS.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/handoff-chain.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/workflows/handoff.md
+  - tests/spec_episode_extension.test.mjs
+  - tests/test_oversee_episode_skill.py
 priority: p1
 type: bug
 ordinal: 146000
@@ -50,12 +63,12 @@ Deliver native task/code publication evidence, own Episode identity, actual test
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The real task-native handoff caller forwards the existing busy-safe option: a heartbeat that starts after idle observation permits one initial canonical followUp/queueIfBusy:true handoff request, one admitted observation callback, then one execute follow-up; version-1 retains idle-only behavior.
-- [ ] #2 Focused disposable-fixture regressions prove first refusal/uncertainty causes no callback, execute or resend; callback failure causes no execute; second refusal/uncertainty preserves first admission/evidence without replay. Claims remain per-invocation, not atomic/global exactly-once.
-- [ ] #3 Editable governing recovery guidance explicitly permits only a separately operator-authorized canonical re-invocation after an evidence-supported definite first-stage refusal on the same exact resources; no absence-only proof, inferred authority, relabeled advance, automatic retry, new recovery endpoint/store or chat steering.
-- [ ] #4 Uncertain first admission, callback failure, and partial/uncertain second delivery remain distinct stopped cases with precise native-evidence limits and operator choices, not generic replay permission. Historical TASK-2 remains untouched and unresumed by this change.
-- [ ] #5 Required Docker Tier-1/probe/container checks and warranted focused regressions pass; one proportional independent new-delta review covers code, governing policy and failure ordering, with actual evidence limits reported.
-- [ ] #6 The task and code are separately committed/published through their native histories; the exact own Episode and reviewed merge tuple plus proposed explicit activation/recovery sequence are reported without merge, user-global activation, restart or live recovery.
+- [x] #1 The real task-native handoff caller forwards the existing busy-safe option: a heartbeat that starts after idle observation permits one initial canonical followUp/queueIfBusy:true handoff request, one admitted observation callback, then one execute follow-up; version-1 retains idle-only behavior.
+- [x] #2 Focused disposable-fixture regressions prove first refusal/uncertainty causes no callback, execute or resend; callback failure causes no execute; second refusal/uncertainty preserves first admission/evidence without replay. Claims remain per-invocation, not atomic/global exactly-once.
+- [x] #3 Editable governing recovery guidance explicitly permits only a separately operator-authorized canonical re-invocation after an evidence-supported definite first-stage refusal on the same exact resources; no absence-only proof, inferred authority, relabeled advance, automatic retry, new recovery endpoint/store or chat steering.
+- [x] #4 Uncertain first admission, callback failure, and partial/uncertain second delivery remain distinct stopped cases with precise native-evidence limits and operator choices, not generic replay permission. Historical TASK-2 remains untouched and unresumed by this change.
+- [x] #5 Required Docker Tier-1/probe/container checks and warranted focused regressions pass; one proportional independent new-delta review covers code, governing policy and failure ordering, with actual evidence limits reported.
+- [x] #6 The task and code are separately committed/published through their native histories; the exact own Episode and reviewed merge tuple plus proposed explicit activation/recovery sequence are reported without merge, user-global activation, restart or live recovery.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -77,4 +90,22 @@ Execution started in own Episode 01a1e250-8ede-7076-9822-3c436c32b3df, operation
 Static focused checks passed (64 passed, 4 skipped). One independent openai-codex/gpt-6-astra max review is in progress against b41602e. Reviewer found a concrete fixture-only defect: new Beads advanced.head retained base instead of current harness Episode head, preventing the intended delivery assertions. Repaired to f.git.head(f.worktree); no plugin behavior change. Docker source identity verified: cwd-fix-v0.9.8-r1 tag 8ca4d5c39b7c738f71b5c86422ea46394c3d0558, commit a1faacd53ac4473a75de1d434afaf50945c2f647, tree 5301c70d9c9d74e474ccaf258fdd3c8de982c52f and expected lock SHA256. Source cloned inside disposable Docker, no upstream checkout edit. Probe/focused container checks still running; no success claim yet.
 
 Tier1 scripts/test-tier1.sh --probe PASSED (199s); manifest .test-results/20261116T031007Z-72140-ee32ed92/tier1/manifest.json proves network absent, offline apply/check/probe and teardown. Initial focused Docker run completed 1 failed/1 passed: all 13 added cases failed before their intended assertions because taskRunner supplied fake Git discovery output and v1 creation advertised a session in the baseline list. Those fixture-only defects are repaired by delegating non-Backlog commands to native ProcessCommandRunner on disposable repos and using default v1 creation list sequence. Prior Beads head mismatch also repaired. Container rerun in progress. One review continues over these same concrete repairs; no production code change. Provisional code 8d99b0b97f392951d11551ed449038d5ea2b42ab is published but not an accepted/test-complete candidate. Target main advanced only by owner-record commit bc78c7927eda5d7c6e519a4e75042e6c89b782cd, incorporated into own branch without changing integration main or ownership content.
+
+Candidate complete for owner review; status remains In Progress.
+Code published non-force: a7b407fce5877db5153dc8c0c8ad07bc8e6bd549 on JLanders/prime-claw-primeclaw-61-episode-e8b80069, direct remote/upstream/local verified equal; clean code worktree. Two coherent same-slice commits preserve already-published history (8d99b0b behavior/guidance plus a7b407f fixture-only correction). Exact merge tuple: (PRIMECLAW-61, main, bc78c7927eda5d7c6e519a4e75042e6c89b782cd, a7b407fce5877db5153dc8c0c8ad07bc8e6bd549); target is an ancestor. Starting admission base remains 4540df72e4fb2f3aa8b1dca9de89c942930f4762, not a provider revision. Own Episode 01a1e250-8ede-7076-9822-3c436c32b3df; operation e8b80069-aebf-449d-8dee-13dd965d3226; owner 01a1e249-9e18-7718-9d75-61150bf012ac; unchanged worktree /Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-61-episode-e8b80069.
+Implementation: real task caller forwards Boolean(promptIdentity.taskId) to existing busy-safe native first request; retained v1 stays false. Real Backlog and Beads callers plus PrimeSessionPublisher and workflow chain exercised in disposable fixtures across success and first-refused/uncertain, callback failure, second-refused/uncertain. Tests assert request count, callback/execute order, evidence retention and unchanged resource identity. Retained-v1 actual caller/publisher still sends idle-only false. No retry/resend/new endpoint/store/classifier. Editable policy permits only separately informed operator-authorized one later canonical same-resource re-invocation after evidence-supported definite first-stage refusal; uncertainty/partial cases remain stopped with concrete choices and evidence limits.
+Validation commands/results:
+- TIER1_ENV_FILE=.test-results/primeclaw61/tier1.env scripts/test-tier1.sh --probe: PASS, 199s; .test-results/primeclaw61/tier1-probe.log and .test-results/20261116T031007Z-72140-ee32ed92/tier1/manifest.json. Docker-only candidate apply/check, offline probe, network absent, teardown verified.
+- TIER1_ENV_FILE=.test-results/primeclaw61/tier1.env .venv/bin/python -m pytest tests/test_reviewed_plan_extension.py::test_spec_episode_node_suite tests/test_reviewed_plan_extension.py::test_task_episode_ownership_node_suite -q -m container: final rerun 2 passed in 133.27s. Log .test-results/primeclaw61/focused-container-rerun.log; manifest .test-results/20261116T031454Z-95651-ccb3e27d/tier1/manifest.json. Covers all changed fixtures and adjacent ownership suite. Initial run failed 13 new fixtures before assertions; actual failures and repairs recorded above, not hidden.
+- .venv/bin/python -m pytest tests/test_oversee_episode_skill.py tests/test_backlog_workflow.py tests/test_future_plan_skills.py -q: 64 passed, 4 skipped; .test-results/primeclaw61/static-final.log. Existing stale blanket-no-retry assertion and size ceiling updated for approved guidance, no new prose-policy framework.
+- git diff --check and clean/published branch checks passed. Supported native semantics verified read-only at immutable cwd-fix-v0.9.8-r1: daemon forwards queueIfBusy/streamingBehavior and returns admission results; native busy prompt creates queued followUp action with these options. No upstream changes or real-Episode experiments.
+ONE independent read-only review: openai-codex/gpt-6-astra, max, child expert-review-handoff61. Final reviewed tuple bc78c7927eda5d7c6e519a4e75042e6c89b782cd -> a7b407fce5877db5153dc8c0c8ad07bc8e6bd549. All three concrete fixture findings repaired and inspected; no remaining material defect in production/options, ordering or recovery guidance. Reviewer did not independently rerun tests. Summary .test-results/primeclaw61/review-summary.txt and normal child/session transcript.
+Limits: no full all-tier suite, live-daemon/real-Episode experiment, wire-level attestation of historical incident, host/global apply/check/probe, merge, restart, AWS or historical recovery. Personal brain remained 503. Two sends/callback are per-invocation, not atomic/global exactly-once. Candidate tests are not activation proof.
+Proposed sequence, NOT current authority: owner reviews exact published tuple and current native task evidence, then obtains normal explicit merge decision. After authorized merge/push, obtain separate accepted-generation activation authority for primary-main user-global refresh; quiesce affected work and perform one coordinated full restart, retaining loaded-generation resources through resumed owner/Episode/designated ordinary-session UAT. Historical TASK-2 remains Blocked and untouched; any later recovery first reviews available refusal evidence and its running-build/wire gaps. Only if definite first-stage non-admission is sufficiently established and the operator separately gives an informed explicit decision may the owner invoke ONE canonical handoff on unchanged exact historical resources and original scope/focus with current facts. Otherwise keep uncertain, inspect missing supported evidence without sending work, pause, or seek separate normal terminal disposition. This repair never grants that historical authority.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Published review candidate a7b407fce5877db5153dc8c0c8ad07bc8e6bd549 on JLanders/prime-claw-primeclaw-61-episode-e8b80069 for PRIMECLAW-61. Narrow busy-safe first task handoff forwarding plus bounded editable definite-refusal recovery guidance; v1 idle-only and uncertain/partial no-replay boundary preserved. Docker Tier1/probe passed; focused container suites 2 passed; static checks 64 passed/4 skipped. One gpt-6-astra max read-only review; three fixture-only findings fixed, no remaining material defect. Exact tuple: (PRIMECLAW-61, main, bc78c7927eda5d7c6e519a4e75042e6c89b782cd, a7b407fce5877db5153dc8c0c8ad07bc8e6bd549). Task and code histories published separately, resources unchanged, lifecycle status In Progress. No merge, global activation, restart, AWS or TASK-2 recovery. See Implementation Notes for reproducible commands, failures, evidence limits and separately authorized activation/recovery proposal.
+<!-- SECTION:FINAL_SUMMARY:END -->
