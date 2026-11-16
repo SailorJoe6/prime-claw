@@ -4,7 +4,7 @@ title: Queue task handoffs across busy heartbeat races and define refusal recove
 status: In Progress
 assignee: []
 created_date: '2026-11-16 03:00'
-updated_date: '2026-11-16 03:08'
+updated_date: '2026-11-16 03:13'
 labels: []
 dependencies: []
 references:
@@ -73,4 +73,6 @@ Deliver native task/code publication evidence, own Episode identity, actual test
 
 <!-- SECTION:NOTES:BEGIN -->
 Execution started in own Episode 01a1e250-8ede-7076-9822-3c436c32b3df, operation e8b80069-aebf-449d-8dee-13dd965d3226, owner 01a1e249-9e18-7718-9d75-61150bf012ac. Base 4540df72e4fb2f3aa8b1dca9de89c942930f4762; integration main. Confirmed real deliverOwnedEpisodeHandoff omits the fifth busy-safe publisher argument; applying the planned Boolean(promptIdentity.taskId) forwarding only. Personal brain search again returned 503 upstream_unavailable; using published contract and repository evidence. Historical TASK-2 and all live/global resources remain untouched. Preparing disposable caller/publisher ordering/failure regressions and bounded editable guidance delta.
+
+Static focused checks passed (64 passed, 4 skipped). One independent openai-codex/gpt-6-astra max review is in progress against b41602e. Reviewer found a concrete fixture-only defect: new Beads advanced.head retained base instead of current harness Episode head, preventing the intended delivery assertions. Repaired to f.git.head(f.worktree); no plugin behavior change. Docker source identity verified: cwd-fix-v0.9.8-r1 tag 8ca4d5c39b7c738f71b5c86422ea46394c3d0558, commit a1faacd53ac4473a75de1d434afaf50945c2f647, tree 5301c70d9c9d74e474ccaf258fdd3c8de982c52f and expected lock SHA256. Source cloned inside disposable Docker, no upstream checkout edit. Probe/focused container checks still running; no success claim yet.
 <!-- SECTION:NOTES:END -->
