@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-61
 title: Queue task handoffs across busy heartbeat races and define refusal recovery
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-16 03:00'
-updated_date: '2026-11-16 03:02'
+updated_date: '2026-11-16 03:04'
 labels: []
 dependencies: []
 references:
