@@ -129,10 +129,36 @@ native views and code observations. `<episode-session-observation>` carries the
 native list/state flags. Check idle completion, children/queues and publication
 facts before ordinary continuation; these are LLM decisions under this policy,
 not duplicate status/design/code-dirt/upstream/ancestry or role-depth predicates.
+The first task-native request uses `followUp` with `queueIfBusy: true`, allowing
+a heartbeat to win the observation/admission gap without a busy-only refusal.
+First admission precedes the factual callback, then one execute follow-up;
+these operations are not atomic or globally exactly-once.
 Never use ordinary handoff for Blocked, merge, abandonment, cleanup, consultation,
-pause or scope expansion. Inspect uncertain native delivery; do not replay it or
-claim execute/compaction completion from admission. Code retains exact existing
-owner/task/worktree/branch/session/route targeting and the native send result.
+pause or scope expansion. Do not claim execute/compaction completion from
+admission. Code retains exact existing owner/task/worktree/branch/session/route
+targeting and the native send result.
+
+Task-native failure disposition belongs to the exact owning Conversation under
+`prime-claw-oversee-episode`. Stop without automatic retry. Only reviewed evidence
+of definite first-stage refusal before prompt admission plus a later explicit
+informed operator decision permits ONE canonical `handoff_task_episode`
+re-invocation on the unchanged exact owner/provider/task/operation/durable
+session/worktree/branch, original accepted scope/focus and current native facts.
+Refusal alone is not authority or a new advance. Empty queues or missing observed
+actions alone do not prove non-admission. Preserve evidence gaps and preparation
+or task-history effects; first refusal does not mean preparation had no effects.
+Uncertain first admission, callback failure after admission, and refused or
+uncertain second-stage delivery remain separate stopped cases, with no generic
+replay, direct execute, ordinary handoff or chat steering. The first request may
+have been admitted even when execute was not queued; the compaction instructions
+below never authorize reconstructing that missing or uncertain follow-up. Record
+findings and operator disposition in existing native task fields/history, not a
+new recovery store, endpoint or classifier. If public evidence cannot establish
+definite refusal, state the precise limit and offer evidence inspection without
+sending work, continued pause or a separately authorized normal terminal
+disposition. This exception changes neither retained version-1 behavior nor
+routine successful future handoff authority, and authorizes no historical
+recovery or live activation.
 
 In either task-native branch, guidance is bounded compaction focus only. It
 never accepts task content or supplies provider revision or raw evidence. Never pass `--status`, complete or archive the task, select replacement work,
@@ -152,6 +178,10 @@ finalization, or cleanup state. Never mix the two modes or copy content between
 their authorities.
 
 ## Request compaction once
+
+For task-native handoff, the queued-execute statements below describe successful
+two-stage delivery, not proof from first admission alone. A callback or second-send
+failure remains the owner's stopped case above; never synthesize its follow-up.
 
 Compaction is a best-effort context improvement, not the continuation trigger.
 The `ralph_handoff` operation or owning Conversation has already queued

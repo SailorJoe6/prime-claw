@@ -360,6 +360,25 @@ compaction must not strand an otherwise admitted continuation. Compaction by
 itself does not start execution. Cancellation remains cancellation; uncertain
 delivery is not permission to reconstruct or replay an assignment.
 
+Task-native handoff uses one busy-safe initial canonical request, so a heartbeat
+winning the idle-observation/admission gap can queue it. Preserve first admission,
+then factual observation callback, then one canonical execute follow-up. These
+steps are not atomic or globally exactly-once; never retry automatically.
+Only reviewed evidence establishing definite first-stage refusal before prompt
+admission, followed by a later explicit informed operator decision, permits ONE
+canonical re-invocation with unchanged exact owner/provider/task/operation/durable
+session/worktree/branch, original accepted scope/focus and current native facts.
+Refusal alone grants no authority; empty queues or missing observed actions alone
+are not proof of non-admission. Preserve preparation effects and evidence gaps.
+Uncertain first admission, callback failure after admission, and refused or
+uncertain second delivery remain distinct stopped cases without generic replay,
+direct execute or chat steering. When public evidence cannot establish definite
+refusal, state the precise limit and concrete operator choices, not a safe resend.
+Record findings and disposition in existing native task fields/history, not a
+new recovery framework, store, endpoint or classifier. Retained version-1 behavior
+is unchanged; this exception authorizes no historical recovery and adds no routine
+permission gate for successful future handoffs.
+
 Preserve role, scope, placement, task identity, and operator authority across
 compaction and resume. High-utilization owner compaction is configurable and
 best effort, not a reason to fail or repeat a successful Episode handoff.

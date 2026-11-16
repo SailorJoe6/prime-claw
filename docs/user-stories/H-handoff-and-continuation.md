@@ -41,8 +41,26 @@ targeting and native delivery. Editable Markdown decides lifecycle eligibility,
 meaningful plan/design, code publication, idle completion and compatible changes.
 No duplicate literal-main/role-depth/code-dirt/upstream/ancestry/old-design gate
 selects continuation. Both canonical prompts receive current native task and
-code facts plus session list/state observations; native first-message refusal
-is truthful and never retried.
+code facts plus session list/state observations. ONE task-native initial
+`followUp` request with `queueIfBusy: true` tolerates a heartbeat winning the
+idle-observation/admission gap. First admission precedes the factual callback,
+then one execute follow-up, not an atomic or globally exactly-once transaction.
+Failure is truthful and never retried automatically.
+
+Only reviewed evidence establishing definite first-stage refusal before prompt
+admission, followed by a later explicit informed operator decision, permits ONE
+canonical re-invocation on the unchanged exact owner/provider/task/operation/
+durable session/worktree/branch with the original accepted scope/focus and current
+native facts. Refusal alone is not authority or a new advance; missing actions or
+empty queues alone do not prove non-admission. Preserve preparation effects and
+evidence gaps in existing native task fields/history. Uncertain first admission,
+callback failure, and refused/uncertain second delivery remain distinct stopped
+cases with no generic replay, direct execute or chat steering. If public evidence
+cannot establish definite refusal, state the precise limit and offer evidence
+inspection without sending work, pause, or a separately authorized normal
+terminal disposition. See the [failure disposition](../handoff-chain.md#task-native-refusal-and-delivery-uncertainty)
+and governing oversight skill. No new store, endpoint or classifier, historical
+recovery authority, or routine permission gate is added; retained v1 is unchanged.
 
 Grandfathered Backlog carries both complete current task views. Independent
 Backlog prepares only the Episode clone and retains prior/current native facts,

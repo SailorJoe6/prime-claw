@@ -3742,3 +3742,95 @@ test("active task Episode continuity proves exact idle durable route and rejects
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// The native client is disposable. It models the documented busy queue boundary;
+// no live daemon/session is contacted. The real task caller and publisher run.
+for (const provider of ["backlog", "beads"]) {
+  for (const failure of [null, "first-refused", "first-uncertain", "callback", "second-refused", "second-uncertain"]) {
+    test(`task handoff busy race via real ${provider} caller/publisher: ${failure ?? "admitted"}`, async () => {
+      const f = harness({ list: (_count, session) => [session] });
+      const taskId = provider === "beads" ? BEADS_TASK_ID : "PRIMECLAW-10.38";
+      const initial = provider === "beads" ? activeBeadsTaskRecord(f) : activeTaskRecord(f, {
+        provider: "backlog", providerRevision: "c".repeat(40),
+        taskEvidence: { task: { id: taskId, path: "backlog/tasks/primeclaw-10.38.md", status: "In Progress" } },
+      });
+      f.ownership.write(f.root, initial);
+      const events = [], requests = [];
+      const currentRevision = provider === "beads" ? "d".repeat(32) : "d".repeat(40);
+      let callbacks = 0, observedIdle = false;
+      const originalWrite = f.ownership.write;
+      f.ownership.write = (repo, record) => {
+        callbacks += 1; events.push("evidence");
+        if (failure === "callback") throw new Error("fixture callback failed");
+        originalWrite(repo, record);
+      };
+      const publisher = new PrimeSessionPublisher({
+        async request(request) {
+          assert.equal(request.type, "prompt");
+          assert.equal(request.activeSessionId, "route");
+          assert.equal(observedIdle, true);
+          requests.push(request);
+          const stage = requests.length === 1 ? "first" : "second";
+          events.push(stage);
+          // A scheduled heartbeat won the gap AFTER the idle observation.
+          // Idle observation is not a reservation; native busy admission needs both options.
+          assert.equal(request.queueIfBusy, true);
+          assert.equal(request.streamingBehavior, "followUp");
+          assert.equal(request.expandPromptTemplates, false);
+          assert.equal(request.source, "extension");
+          if (failure === `${stage}-refused`) return { success: false, error: `${stage} refused` };
+          if (failure === `${stage}-uncertain`) return {
+            success: false, error: `${stage} reply lost`, errorInfo: { code: "command_result_uncertain" },
+          };
+          return { success: true, data: {} };
+        }, close() {},
+      });
+      publisher.list = f.publisher.list;
+      publisher.getState = async () => { observedIdle = true; return f.publisher.getState(); };
+      const advanced = parseEpisodeOwnership({ ...initial, head: f.git.head(f.worktree), providerRevision: currentRevision, updatedAt: "2026-11-16T03:00:00Z" });
+      const deps = { ...f.deps, publisher,
+        taskResolver: boundTaskResolver(f),
+        taskRunner: { run(command, args) {
+          if (command === "backlog") return { stdout: JSON.stringify(initial.taskEvidence), stderr: "", status: 0 };
+          return { stdout: "fixture native observation", stderr: "", status: 0 };
+        } },
+        prepareEpisodeTaskHistory: () => ({ status: "prepared", head: currentRevision }),
+        advanceBeadsEvidence: () => ({
+          record: advanced, previousProviderRevision: initial.providerRevision,
+          currentProviderRevision: currentRevision, previousTaskEvidence: initial.taskEvidence,
+          currentTaskEvidence: initial.taskEvidence,
+          commit() { f.ownership.write(f.root, advanced); return advanced; },
+        }),
+      };
+      const run = () => handoffTaskEpisode(taskId, "accepted focus", f.ctx, deps);
+      if (failure) await assert.rejects(run(), failure.includes("uncertain") ? EpisodeStateUncertainError : /refused|callback failed/);
+      else assert.equal((await run()).admitted, true);
+      const firstFailed = failure?.startsWith("first-");
+      assert.deepEqual(events, firstFailed ? ["first"] : failure === "callback" ? ["first", "evidence"] : ["first", "evidence", "second"]);
+      assert.equal(callbacks, firstFailed ? 0 : 1);
+      assert.equal(requests.length, firstFailed || failure === "callback" ? 1 : 2);
+      assert.equal(f.record.providerRevision, firstFailed || failure === "callback" ? initial.providerRevision : currentRevision);
+      assert.match(requests[0].message, /HANDOFF POLICY/);
+      if (requests[1]) assert.match(requests[1].message, /EXECUTE POLICY/);
+      for (const key of ["ownerSessionId", "taskId", "operationId", "episodeId", "episodeSessionFile", "worktree", "branch"]) {
+        assert.deepEqual(f.record[key], initial[key], key);
+      }
+    });
+  }
+}
+
+test("retained version-1 real caller/publisher remains idle-only", async () => {
+  const f = harness({ list: (_count, session) => [session] });
+  await createRetained(f);
+  const requests = [];
+  const publisher = new PrimeSessionPublisher({ async request(request) {
+    requests.push(request);
+    return { success: false, error: "heartbeat made retained Episode busy" };
+  }, close() {} });
+  publisher.list = f.publisher.list;
+  publisher.getState = f.publisher.getState;
+  await assert.rejects(handoffSpecEpisode(LOCATION, "accepted focus", f.ctx, { ...f.deps, publisher }), /heartbeat made retained Episode busy/);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].queueIfBusy, false);
+  assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
+});

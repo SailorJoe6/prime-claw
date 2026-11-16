@@ -56,8 +56,54 @@ Handoff supplies complete native/code and session list/state observations to bot
 prompts. Judge status, meaningful plan/design, code publication and idle
 completion/children/queues here, not in code-level dirt/upstream/ancestry/role-depth
 checks. Beads prior may be `blocked`; local revisions/success are not publication
-proof. After admission record only native/code observations. Native refusal or
-uncertain delivery never permits retry.
+proof. Task-native first delivery uses one `followUp` request with
+`queueIfBusy: true` so a heartbeat winning the observation/admission gap can
+queue that same request. First admission precedes the factual observation
+callback, then one canonical execute follow-up. These two sends and the callback
+are not atomic or globally exactly-once. After admission record only native/code
+observations; no catch/resend or automatic retry.
+
+### Task-native handoff refusal disposition
+
+This exception applies only to version 2, not retained version-1 handoff or
+creation/initial-assignment recovery. Stop after a failed or uncertain result.
+Review the exact attempted request, native result, available session/action
+observations and relevant supported runtime behavior. Preserve evidence gaps,
+including source-versus-running-build limits and any preparation/task-history
+effects; first-message refusal does not mean preparation had no effects.
+Missing observed actions or empty queues alone do not prove non-admission.
+
+- **Definite first-stage refusal before prompt admission:** reviewed evidence
+  must support that conclusion, not merely an error label. Refusal alone grants
+  no retry authority. Explain the findings and limits to the operator. Only a
+  later explicit informed operator decision may permit ONE canonical
+  `handoff_task_episode` re-invocation, by the same exact owner for the unchanged
+  provider/task/operation/durable session/worktree/branch, with the original
+  accepted scope and focus plus current native task/code/session facts. Re-read
+  those facts and bindings before acting. This is an explicit exception to the
+  blanket refusal boundary, not a new advance or an inferred approval. Report
+  its actual result once; it grants no further retry.
+- **Uncertain first admission:** keep delivery uncertain. Do not infer refusal
+  from silence, an error, missing actions or empty queues. State exactly which
+  available evidence cannot establish admission or non-admission.
+- **Callback failure after first admission:** preserve that admitted first
+  request and any actual observation effects. Execute was not sent by this
+  invocation; do not rerun handoff or invoke execute directly.
+- **Second-stage refusal or uncertainty:** preserve the first admission and
+  completed factual callback. Report whether execute was definitely refused or
+  remains uncertain; do not replay either stage.
+
+The last three cases have no generic replay permission, even on operator
+request under this exception. Offer concrete choices: inspect the missing
+supported native evidence without sending work, remain paused with the named
+evidence limit, or seek a separate normal operator terminal disposition. Do not
+invent a safe resend when public evidence cannot establish definite first-stage
+refusal. No direct execute, ordinary handoff, chat steering, replacement Episode,
+new recovery endpoint, classifier, receipt store or replay protocol is allowed.
+Record exact findings, gaps and the operator's disposition in existing native
+task fields/history and publish through the selected provider's normal procedure.
+This repair does not authorize any historical refused intent. Ordinary successful
+future handoffs need no new routine operator permission.
 
 Only the owning Conversation publishes accepted blockers. Grandfathered Backlog uses exact-task code-DAG commits/pushes. Independent Backlog commits/pushes only the task path to `HEAD:refs/heads/prime-claw/tasks`, leaving code HEAD unchanged; synchronize the Conversation's own clone for publication, while handoff prepares only the Episode clone. Preserve unrelated bytes/index/history. Restore `In Progress` before continuation. Judge native prior/current views, code-head/upstream observations, eligibility and compatibility in editable guidance, not equality or frozen-head gates. Record observations after admission.
 

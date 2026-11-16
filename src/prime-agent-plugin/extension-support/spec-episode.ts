@@ -1448,7 +1448,7 @@ async function deliverOwnedEpisodeHandoff(
   );
   if (isTaskEpisodeOwnership(prepared.record)) taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(prepared.record));
   await publisher.deliverHandoff(
-    prepared.activeSessionId, prepared.handoffPrompt, prepared.executePrompt, onHandoffAdmitted,
+    prepared.activeSessionId, prepared.handoffPrompt, prepared.executePrompt, onHandoffAdmitted, Boolean(promptIdentity.taskId),
   );
   return prepared.activeSessionId;
 }

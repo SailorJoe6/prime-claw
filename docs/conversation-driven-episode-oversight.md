@@ -80,10 +80,31 @@ Ordinary task-native continuation now follows editable handoff/execute/oversight
 policy rather than duplicated code status/design/branch/role-depth/dirt/upstream/
 ancestry checks. Exact owner/task/worktree/branch/session/route addressing stays
 mechanical. Current raw task/code and native session observations reach both
-prompts and the caller; the first native prompt uses queueIfBusy:false and actual
-failure/uncertainty never causes automatic replay. Independent Backlog prepares
+prompts and the caller. Task-native delivery uses ONE first `followUp` request
+with `queueIfBusy: true`, so a heartbeat winning the observation/admission gap
+can queue that request. First admission precedes the factual callback, then one
+execute follow-up; these steps are not atomic or globally exactly-once.
+Failure/uncertainty never causes automatic replay. Independent Backlog prepares
 only the Episode task workspace, not the mutable primary. Beads old design and
 successful native commands are not approval or exact-task publication proof.
+
+The version-2-only refusal exception is governed by editable
+`prime-claw-oversee-episode` guidance and [handoff failure disposition](handoff-chain.md#task-native-refusal-and-delivery-uncertainty).
+Only reviewed evidence of definite first-stage refusal before admission followed
+by a later explicit informed operator decision permits ONE canonical re-invocation
+with the unchanged exact owner/provider/task/operation/durable session/worktree/
+branch, original accepted scope/focus and current native facts. Refusal alone
+is not authority or a new advance. Empty queues or missing observed actions alone
+do not prove non-admission. Preserve preparation effects and evidence gaps;
+source/runtime localization is not wire-level proof of every event. Uncertain
+first admission, callback failure, and refused/uncertain second delivery remain
+distinct stopped cases with no generic replay, direct execute or chat steering.
+Record findings and disposition through existing native task fields/history.
+When available public evidence is insufficient, explain the exact limit and offer
+missing-evidence inspection without sending work, pause, or separately authorized
+normal terminal disposition—not a safe resend claim. Retained version-1 behavior
+and routine successful future handoff authority are unchanged. This guidance
+authorizes no historical recovery or live activation.
 
 The complete46file durability correction uses the existing asset inventory,
 not another policy registry. Coherent ticket updates are committed ASAP and

@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 2200
+    assert 300 <= len(words) <= 2700
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -143,7 +143,7 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "local revisions/success are not publication proof",
         "record only native/code observations",
         "no equality gate or classifier replaces judgment",
-        "Native refusal or uncertain delivery never permits retry",
+        "no catch/resend or automatic retry",
         "current synchronized native status—not the older ownership observation—governs",
         "Only current `in_progress` may receive one guarded `--if-status in_progress` status-plus-note update",
         "--if-status in_progress",

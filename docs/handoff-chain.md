@@ -74,10 +74,51 @@ Editable handoff/oversight guidance owns status, meaningful plan/design, code
 publication, idle completion/children/queues, scope and semantic compatibility.
 Code does not repeat those decisions as literal-main, role-depth, task-byte,
 whole-code-cleanliness, upstream equality, ancestry or old-design approval.
-Native prompt delivery still uses `queueIfBusy: false` for the first message;
-its refusal or uncertainty is reported once, without retry or a duplicate
-assignment. Retained version-1 identity, frozen plans and quiescence behavior
-are unchanged.
+Task-native first delivery uses the supported `followUp` plus
+`queueIfBusy: true` option for ONE canonical handoff request. A heartbeat that
+starts after idle observation can queue that request instead of causing a busy
+refusal. Retained version-1 first delivery remains idle-only with
+`queueIfBusy: false`; identity, frozen plans and quiescence behavior are unchanged.
+First admission precedes the factual ownership-observation callback, then ONE
+canonical execute follow-up. The two sends and local callback are not atomic or
+globally exactly-once. Failure is reported once without catch/resend or automatic
+retry.
+
+### Task-native refusal and delivery uncertainty
+
+The editable `prime-claw-oversee-episode` skill governs this version-2-only
+exception. Review the exact request, native result, available session/action
+observations and relevant runtime behavior. Preserve source/running-build gaps
+and preparation effects: a first-message refusal does not prove that preceding
+task-history preparation had no effects. Missing observed actions or empty queues
+alone are not proof of non-admission.
+
+Only reviewed evidence supporting a **definite first-stage refusal before prompt
+admission**, followed by a later explicit informed operator decision, permits
+ONE canonical `handoff_task_episode` re-invocation. Refusal alone is not authority.
+Keep the exact owner/provider/task/operation/durable session/worktree/branch and
+original accepted scope/focus unchanged; re-read current native task/code/session
+facts. This is an explicit exception to the blanket refusal boundary, not a new
+advance, inferred approval or automatic recovery.
+
+Keep the other cases distinct and stopped:
+
+- **Uncertain first admission:** preserve uncertainty and name the evidence
+  that cannot establish admission or non-admission. Do not infer refusal.
+- **Callback failure after first admission:** preserve the first admission and
+  actual observation effects; this invocation sends no execute.
+- **Second-stage refusal or uncertainty:** preserve the first admission and
+  completed callback; report execute's definite refusal or uncertain delivery.
+
+Those cases receive no generic replay permission, direct execute or ordinary
+handoff/chat-steering workaround. If public evidence cannot establish definite
+first-stage refusal, explain the precise limit and offer inspection of missing
+supported native evidence without sending work, continued pause, or a separately
+authorized normal terminal disposition—not an invented safe resend. Record the
+findings, gaps and operator disposition in existing native task fields/history;
+use normal provider publication, not a new endpoint, store, classifier or replay
+protocol. This change authorizes no historical recovery or live activation.
+Ordinary successful future handoffs need no new routine permission.
 
 Grandfathered Backlog carries complete current primary and Episode native task
 views to both prompts and the caller. Independent Backlog prepares only the
