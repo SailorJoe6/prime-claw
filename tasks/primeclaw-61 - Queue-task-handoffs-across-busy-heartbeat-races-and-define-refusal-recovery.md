@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-61
 title: Queue task handoffs across busy heartbeat races and define refusal recovery
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-11-16 03:00'
-updated_date: '2026-11-16 03:21'
+updated_date: '2026-11-16 13:22'
 labels: []
 dependencies: []
 references:
@@ -108,4 +108,6 @@ Proposed sequence, NOT current authority: owner reviews exact published tuple an
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Published review candidate a7b407fce5877db5153dc8c0c8ad07bc8e6bd549 on JLanders/prime-claw-primeclaw-61-episode-e8b80069 for PRIMECLAW-61. Narrow busy-safe first task handoff forwarding plus bounded editable definite-refusal recovery guidance; v1 idle-only and uncertain/partial no-replay boundary preserved. Docker Tier1/probe passed; focused container suites 2 passed; static checks 64 passed/4 skipped. One gpt-6-astra max read-only review; three fixture-only findings fixed, no remaining material defect. Exact tuple: (PRIMECLAW-61, main, bc78c7927eda5d7c6e519a4e75042e6c89b782cd, a7b407fce5877db5153dc8c0c8ad07bc8e6bd549). Task and code histories published separately, resources unchanged, lifecycle status In Progress. No merge, global activation, restart, AWS or TASK-2 recovery. See Implementation Notes for reproducible commands, failures, evidence limits and separately authorized activation/recovery proposal.
+
+Owner terminal update (supersedes the pre-merge status/no-merge snapshot above): Joe explicitly approved exact tuple (PRIMECLAW-61, main, bc78c7927eda5d7c6e519a4e75042e6c89b782cd, a7b407fce5877db5153dc8c0c8ad07bc8e6bd549). Fresh owner/provider/task/code/ancestry and native idle/queue/descendant evidence passed. Canonical primary main was fast-forwarded with git merge --ff-only a7b407fce5877db5153dc8c0c8ad07bc8e6bd549 and pushed normally; primary local/upstream/direct remote all equal a7b407fce5877db5153dc8c0c8ad07bc8e6bd549. Native task status is now Done in independent history. Task-only status/evidence publication leaves code HEAD unchanged; the intended Episode task clone will be fast-forwarded to the exact published terminal revision and verified. The repair Episode/worktree/branch/session/ownership and all loaded-generation resources are deliberately retained for separately authorized global activation, coordinated full restart and resumed owner/Episode/designated ordinary-session UAT. No finalize_task_episode, resource cleanup, plugin install/global apply/check/probe, reload/restart/kill, AWS or historical TASK-2 action occurred. Merge approval grants no activation or historical recovery authority.
 <!-- SECTION:FINAL_SUMMARY:END -->
