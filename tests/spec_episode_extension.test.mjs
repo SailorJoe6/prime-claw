@@ -3790,9 +3790,9 @@ for (const provider of ["backlog", "beads"]) {
       const advanced = parseEpisodeOwnership({ ...initial, head: f.git.head(f.worktree), providerRevision: currentRevision, updatedAt: "2026-11-16T03:00:00Z" });
       const deps = { ...f.deps, publisher,
         taskResolver: boundTaskResolver(f),
-        taskRunner: { run(command, args) {
+        taskRunner: { run(command, args, options) {
           if (command === "backlog") return { stdout: JSON.stringify(initial.taskEvidence), stderr: "", status: 0 };
-          return { stdout: "fixture native observation", stderr: "", status: 0 };
+          return new ProcessCommandRunner().run(command, args, options);
         } },
         prepareEpisodeTaskHistory: () => ({ status: "prepared", head: currentRevision }),
         advanceBeadsEvidence: () => ({
@@ -3820,7 +3820,7 @@ for (const provider of ["backlog", "beads"]) {
 }
 
 test("retained version-1 real caller/publisher remains idle-only", async () => {
-  const f = harness({ list: (_count, session) => [session] });
+  const f = harness();
   await createRetained(f);
   const requests = [];
   const publisher = new PrimeSessionPublisher({ async request(request) {
