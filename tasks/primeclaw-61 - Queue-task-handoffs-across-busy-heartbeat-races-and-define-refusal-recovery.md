@@ -4,7 +4,7 @@ title: Queue task handoffs across busy heartbeat races and define refusal recove
 status: In Progress
 assignee: []
 created_date: '2026-11-16 03:00'
-updated_date: '2026-11-16 03:04'
+updated_date: '2026-11-16 03:08'
 labels: []
 dependencies: []
 references:
@@ -68,3 +68,9 @@ Deliver native task/code publication evidence, own Episode identity, actual test
 5. Run scripts/test-tier1.sh --probe (Docker-only) after every plugin-source change, plus warranted focused regression commands through the repository’s isolated test environment. Preserve actual logs and limitations. Perform one proportional independent read-only new-delta review covering code/options, ordering/failure tests, and definite/uncertain/partial recovery language. Repair concrete in-scope defects and revalidate; do not add speculative formalism or review loops.
 6. Keep the living plan/notes and truthful completed criteria in this native task; the Episode owns content and this Conversation owns lifecycle status. Commit/push task edits selected-file-only on refs/heads/prime-claw/tasks, code separately on the own Episode branch, preserving unrelated state. Report reviewed exact code/task publication, own Episode identity, tests/review and limits, and exact merge tuple plus bounded activation/recovery proposal. Stop for the supervising operator’s merge/activation/recovery decision: no merge, global apply/check/probe, host asset edit, restart/kill, AWS or live recovery. Keep loaded-generation resources until separately authorized coordinated restart and resumed owner/Episode/ordinary-session UAT prove cutover.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Execution started in own Episode 01a1e250-8ede-7076-9822-3c436c32b3df, operation e8b80069-aebf-449d-8dee-13dd965d3226, owner 01a1e249-9e18-7718-9d75-61150bf012ac. Base 4540df72e4fb2f3aa8b1dca9de89c942930f4762; integration main. Confirmed real deliverOwnedEpisodeHandoff omits the fifth busy-safe publisher argument; applying the planned Boolean(promptIdentity.taskId) forwarding only. Personal brain search again returned 503 upstream_unavailable; using published contract and repository evidence. Historical TASK-2 and all live/global resources remain untouched. Preparing disposable caller/publisher ordering/failure regressions and bounded editable guidance delta.
+<!-- SECTION:NOTES:END -->
