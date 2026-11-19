@@ -4,7 +4,7 @@ title: Bound task handoff evidence and retain truthful delivery outcomes
 status: In Progress
 assignee: []
 created_date: '2026-11-18 21:05'
-updated_date: '2026-11-19 02:17'
+updated_date: '2026-11-19 02:24'
 labels: []
 dependencies: []
 references:
@@ -64,3 +64,11 @@ No new API, durable receipt/command-history/evidence store, replay protocol/stat
 ## Required limits
 A passing fixture is mechanical evidence, not real-model semantic review or proof of loaded live code. The historical first handoff remains delivered with execute admission unproved; a future fix cannot restore missing historical IDs/results. Timeout changes, idle queues and handoff prose cannot establish nonadmission or authorize resend. If the public persistence/access proof fails, report the concrete constraint and consult rather than expand architecture.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Slice 1 underway in the exact bound Episode (operation 94468e68-68b7-49ae-993a-467cbd304db7; code base f2268207fb27609659ebb6e53e70edd7985fc53d). Scope is only the public native-entry feasibility proof, not adoption or the production handoff repair. The Episode-local Backlog binary is absent, so native CLI commands use the primary checkout's already-built deps/backlog/dist/backlog while running in this Episode; task writes remain only in this Episode's independent .backlog clone.
+
+Read-only dependency review confirmed the exact supported tag a1faacd53ac4473a75de1d434afaf50945c2f647: pi.appendEntry returns void and can defer pre-assistant custom entries in memory; its read-only sessionManager API has no flush operation. The local maintainer checkout HEAD is not the supported tag and is not used as a candidate. Extended the existing verified source-loader Docker fixture with an image-owned prewarmed native kernel and a synthetic exact-entry/second-linked-worktree ipython proof. No upstream or production plugin source changed. Validation is currently running. The first default python3 pytest launch failed before collection (pytest missing); the isolated uv pytest launch is the active test. Owner-journal SDK compaction is tested here, not Episode compact.run/canonical follow-up behavior. Documentation records these limits in docs/evidence/primeclaw-62-native-entry-proof.md. No acceptance criteria are checked yet; no status, activation, external Episode or lifecycle action is authorized or performed.
+<!-- SECTION:NOTES:END -->
