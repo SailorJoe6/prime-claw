@@ -6,9 +6,10 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createHash } from "node:crypto";
+import { createServer } from "node:net";
 
 import {
-  CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, CliTaskEpisodeCleanupGit, PrimeSessionPublisher,
+  CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, CliTaskEpisodeCleanupGit, DaemonJsonlClient, PrimeSessionPublisher,
   EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, commitConversationTaskStatus, createSpecEpisode, createTaskEpisode, handoffSpecEpisode,
   restoreBlockedSpecEpisode, transitionSpecEpisodeToTaskOwnership,
@@ -4118,7 +4119,7 @@ for (const provider of ["backlog", "beads"]) {
         }),
       };
       const run = () => handoffTaskEpisode(taskId, "accepted focus", f.ctx, deps);
-      if (failure) await assert.rejects(run(), failure.includes("uncertain") ? EpisodeStateUncertainError : /refused|callback failed/);
+      if (failure) await assert.rejects(run(), failure.includes("uncertain") ? EpisodeStateUncertainError : /refused|callback.*failed/);
       else assert.equal((await run()).admitted, true);
       const firstFailed = failure?.startsWith("first-");
       assert.deepEqual(events, firstFailed ? ["first"] : failure === "callback" ? ["first", "evidence"] : ["first", "evidence", "second"]);
@@ -4156,3 +4157,283 @@ test("retained version-1 real caller/publisher remains idle-only", async () => {
   assert.equal(requests[0].queueIfBusy, false);
   assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
 });
+
+
+// This is a test-owned Unix socket, not a daemon probe. Exercise real JSONL
+// framing/correlation/ACK writes through the normal registered tool wrapper.
+async function fakeHandoffDaemon(t, onCommand) {
+  const socketRoot = mkdtempSync(join(tmpdir(), "pc-wire-"));
+  const socketPath = join(socketRoot, "daemon.sock");
+  const frames = [], sockets = new Set(), timers = new Set(), waiters = [];
+  let connections = 0;
+  const later = (callback, milliseconds) => {
+    const timer = setTimeout(() => { timers.delete(timer); callback(); }, milliseconds);
+    timers.add(timer);
+  };
+  const reply = (socket, frame, result = {}, fragmented = false) => {
+    const line = `${JSON.stringify({ type: "command_result", id: frame.id, success: true, data: {}, ...result })}\n`;
+    if (!fragmented) { socket.write(line); return; }
+    // The newline and remainder arrive later, not in the first partial frame.
+    socket.write(line.slice(0, 11));
+    later(() => socket.write(line.slice(11)), 10);
+  };
+  const server = createServer((socket) => {
+    connections += 1; sockets.add(socket); socket.setEncoding("utf8");
+    socket.on("error", () => {}); // A client timeout/close is deliberate in these tests.
+    socket.on("close", () => sockets.delete(socket));
+    socket.write(`${JSON.stringify({ type: "daemon_hello", protocol: { name: "prime-agent.daemon", version: 7 } })}\n`);
+    let buffer = "";
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+      let newline;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
+        const frame = JSON.parse(line);
+        frames.push({ frame, receivedAt: Date.now() });
+        // ACK writes are observed, but the fixture sends no ack_result receipt.
+        if (frame.command.type !== "ack_result") onCommand(socket, frame, { reply, later });
+        for (const waiter of [...waiters]) if (waiter.predicate(frames)) {
+          waiters.splice(waiters.indexOf(waiter), 1); waiter.resolve();
+        }
+      }
+    });
+  });
+  t.after(async () => {
+    for (const timer of timers) clearTimeout(timer);
+    for (const socket of sockets) socket.destroy();
+    await new Promise((done) => server.close(done));
+    rmSync(socketRoot, { recursive: true, force: true });
+  });
+  await new Promise((done, fail) => { server.once("error", fail); server.listen(socketPath, done); });
+  return {
+    socketPath, frames, reply,
+    get connections() { return connections; },
+    seen(predicate) {
+      if (predicate(frames)) return Promise.resolve();
+      return new Promise((resolve) => waiters.push({ predicate, resolve }));
+    },
+  };
+}
+
+const HANDOFF_WIRE_SENTINELS = {
+  prompt: "SYNTHETIC_PRIVATE_HANDOFF_FOCUS_BODY",
+  task: "SYNTHETIC_PRIVATE_TASK_HISTORY_BODY",
+  credential: "SYNTHETIC_NOT_A_REAL_CREDENTIAL_BODY",
+  exception: "SYNTHETIC_RAW_CALLBACK_EXCEPTION_BODY",
+};
+function assertPrivateSafeHandoffOutput(value) {
+  const text = JSON.stringify(value);
+  for (const sentinel of Object.values(HANDOFF_WIRE_SENTINELS)) assert.equal(text.includes(sentinel), false, sentinel);
+}
+function assertWireTransport(observation, received, expected, invocationStarted, returnedAt) {
+  const { frame, receivedAt } = received;
+  assert.equal(observation.clientId, frame.clientId, "retain the original on-wire client ID");
+  assert.equal(observation.commandId, frame.id, "retain the original on-wire command ID");
+  assert.equal(frame.command.id, frame.id);
+  assert.match(frame.clientId, /^spec-episode:.+/);
+  assert.match(frame.id, /^spec_episode_.+/);
+  assert.deepEqual(frame.protocol, { name: "prime-agent.daemon", version: 7 });
+  assert.equal(frame.type, "command");
+  assert.equal(observation.commandType, frame.command.type);
+  assert.equal(observation.activeSessionId, frame.command.activeSessionId);
+  assert.equal(observation.writeAttempted, true);
+  assert.equal(observation.resultReceived, expected.cause === "result");
+  assert.equal(observation.cause, expected.cause);
+  assert.equal(observation.timeoutMs, 150);
+  assert.equal(new Date(observation.startedAt).toISOString(), observation.startedAt);
+  const started = Date.parse(observation.startedAt);
+  assert.ok(started >= invocationStarted && started <= receivedAt);
+  assert.ok(Number.isFinite(observation.elapsedMs) && observation.elapsedMs >= 0);
+  assert.ok(observation.elapsedMs <= returnedAt - invocationStarted + 50);
+  if (expected.cause === "timeout") assert.ok(observation.elapsedMs >= observation.timeoutMs - 10);
+  if (expected.delay) assert.ok(observation.elapsedMs >= expected.delay - 5);
+  if (expected.cause === "result") {
+    assert.equal(observation.nativeSuccess, expected.success);
+    if (expected.ack === false) assert.equal(Object.hasOwn(observation, "ack"), false);
+    else {
+      assert.match(observation.ack.commandId, /^spec_episode_ack_/);
+      assert.equal(observation.ack.writeAttempted, true);
+      assert.equal(observation.ack.writeReturned, true);
+    }
+  } else {
+    assert.equal(Object.hasOwn(observation, "nativeSuccess"), false);
+    assert.equal(Object.hasOwn(observation, "ack"), false);
+  }
+  if (expected.code) assert.equal(observation.nativeCode, expected.code);
+  else assert.equal(Object.hasOwn(observation, "nativeCode"), false);
+  assertPrivateSafeHandoffOutput(observation);
+}
+
+for (const scenario of [
+  "fragmented-success", "delayed-first-success", "lost-first", "late-first", "closed-first",
+  "callback-throw", "followUp-refused", "followUp-lost", "preparation-refused",
+]) {
+  test(`task handoff real JSONL transport/tool diagnostics: ${scenario}`, { timeout: 5000 }, async (t) => {
+    const f = harness();
+    t.after(() => rmSync(f.root, { recursive: true, force: true }));
+    const taskId = "PRIMECLAW-10.38";
+    const evidence = { task: { id: taskId, path: "backlog/tasks/primeclaw-10.38.md", status: "In Progress",
+      description: HANDOFF_WIRE_SENTINELS.task, comments: [{ body: HANDOFF_WIRE_SENTINELS.credential }] } };
+    const initial = activeTaskRecord(f, { provider: "backlog", providerRevision: "c".repeat(40), taskEvidence: evidence });
+    f.ownership.write(f.root, initial);
+    const events = [];
+    let callbacks = 0, pendingLate;
+    const originalWrite = f.ownership.write;
+    f.ownership.write = (repo, record) => {
+      callbacks += 1; events.push("callback");
+      if (scenario === "callback-throw") throw new Error(HANDOFF_WIRE_SENTINELS.exception);
+      originalWrite(repo, record);
+    };
+    const summary = transitionSession(f);
+    const state = { ...summary, isBashRunning: false, isRunningTools: false,
+      hasRunningRlmChildren: false, unfinishedActionCount: 0,
+      sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null } };
+    let prompts = 0;
+    const wire = await fakeHandoffDaemon(t, (socket, frame, { reply, later }) => {
+      const command = frame.command;
+      if (command.type === "list") {
+        if (scenario === "preparation-refused") reply(socket, frame, { success: false,
+          error: `${HANDOFF_WIRE_SENTINELS.task} ${HANDOFF_WIRE_SENTINELS.credential}`,
+          errorInfo: { code: "not_ready", message: HANDOFF_WIRE_SENTINELS.exception } });
+        else reply(socket, frame, { data: { sessions: [summary] } });
+        return;
+      }
+      if (command.type === "get_state") { reply(socket, frame, { data: state }); return; }
+      assert.equal(command.type, "prompt", "no alternate command or resend path");
+      prompts += 1;
+      const first = prompts === 1;
+      events.push(first ? "first" : "followUp");
+      assert.equal(command.activeSessionId, "route");
+      assert.equal(command.queueIfBusy, true);
+      assert.equal(command.streamingBehavior, "followUp");
+      assert.equal(command.expandPromptTemplates, false);
+      assert.equal(command.source, "extension");
+      if (first && scenario === "lost-first") return;
+      if (first && scenario === "late-first") { pendingLate = { socket, frame }; return; }
+      if (first && scenario === "closed-first") { socket.end(); return; }
+      if (!first && scenario === "followUp-lost") return;
+      if (!first && scenario === "followUp-refused") {
+        reply(socket, frame, { success: false, error: `${HANDOFF_WIRE_SENTINELS.task} ${HANDOFF_WIRE_SENTINELS.credential}`,
+          errorInfo: { code: "busy", message: HANDOFF_WIRE_SENTINELS.exception } });
+        return;
+      }
+      if (first && scenario === "delayed-first-success") { later(() => reply(socket, frame), 35); return; }
+      reply(socket, frame, {}, scenario === "fragmented-success");
+    });
+    const client = new DaemonJsonlClient(wire.socketPath, { requestTimeoutMs: 150 });
+    const publisher = new PrimeSessionPublisher(client);
+    const realClose = publisher.close.bind(publisher);
+    t.after(realClose);
+    // Preserve only this test-owned connection long enough to deliver a result
+    // AFTER the tool returns. No production lifecycle path is changed.
+    if (scenario === "late-first") publisher.close = () => {};
+    const deliver = publisher.deliverHandoff.bind(publisher);
+    let publisherError;
+    publisher.deliverHandoff = async (...args) => {
+      try { return await deliver(...args); }
+      catch (error) { publisherError = error; throw error; }
+    };
+    const tools = new Map();
+    createReviewedPlanExtension({ ...f.deps, publisher,
+      conversationAfterHandoff: async () => ({ outcome: "skipped", reason: "disabled" }),
+      taskResolver: boundTaskResolver(f),
+      taskRunner: { run(command, args, options) {
+        if (command === "backlog") return { stdout: JSON.stringify(evidence), stderr: "", status: 0 };
+        return new ProcessCommandRunner().run(command, args, options);
+      } },
+      prepareEpisodeTaskHistory: () => ({ status: "prepared", head: "d".repeat(40) }),
+    })({ registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
+      sendUserMessage() {}, async sendMessage() {} });
+    const invocationStarted = Date.now();
+    const result = await tools.get("handoff_task_episode").execute(
+      "socket-handoff", { taskId, guidance: HANDOFF_WIRE_SENTINELS.prompt }, undefined, undefined, f.ctx,
+    );
+    const returnedAt = Date.now();
+    if (scenario === "preparation-refused") {
+      assert.equal(result.isError, true);
+      assert.equal(Object.hasOwn(result.details, "delivery"), false, "the chain did not start");
+      assert.equal(wire.frames.length, 1);
+      assert.equal(wire.frames[0].frame.command.type, "list");
+      assertWireTransport(result.details.transport, wire.frames[0], { cause: "result", success: false,
+        code: "not_ready", ack: false }, invocationStarted, returnedAt);
+      assert.ok(result.content[0].text.includes(JSON.stringify(result.details.transport)));
+      assertPrivateSafeHandoffOutput(result);
+      assert.equal(callbacks, 0);
+      assert.deepEqual(events, []);
+      assert.equal(f.nativeEntries.length, 0);
+      assert.deepEqual(f.record, initial);
+      return;
+    }
+    const success = scenario.endsWith("success");
+    assert.equal(result.isError, success ? undefined : true);
+    const delivery = result.details.delivery;
+    assert.ok(delivery, "normal tool details retain the publisher delivery facts");
+    assert.equal(delivery.activeSessionId, "route");
+    assert.ok(result.content[0].text.includes(JSON.stringify(delivery)), "normal model-visible tool text includes the same bounded facts");
+    assertPrivateSafeHandoffOutput(result);
+    assert.ok(JSON.stringify(result).length < 16000, "bounded diagnostic output, not raw task/prompt/error bodies");
+    const firstStopped = ["lost-first", "late-first", "closed-first"].includes(scenario);
+    assert.deepEqual(events, firstStopped ? ["first"] : scenario === "callback-throw" ? ["first", "callback"] : ["first", "callback", "followUp"]);
+    assert.equal(callbacks, firstStopped ? 0 : 1);
+    assert.equal(delivery.first.outcome, firstStopped ? "uncertain" : "admitted");
+    assert.equal(delivery.callback, firstStopped ? "not_attempted" : scenario === "callback-throw" ? "failed" : "completed");
+    assert.equal(delivery.followUp.outcome, firstStopped || scenario === "callback-throw" ? "not_attempted"
+      : scenario === "followUp-refused" ? "refused" : scenario === "followUp-lost" ? "uncertain" : "admitted");
+    if (!success) {
+      assert.deepEqual(publisherError.delivery, delivery, "safe wrapper preserves the actual stopped chain");
+      if (firstStopped || scenario === "followUp-lost") assert.ok(publisherError instanceof EpisodeStateUncertainError);
+      assertPrivateSafeHandoffOutput({ message: publisherError.message, delivery: publisherError.delivery });
+      assert.match(result.details.error, /(?:handoff|callback|follow.up).*(?:uncertain|failed|refused)/i);
+    } else {
+      assert.equal(result.details.admitted, true);
+      assert.equal(result.details.taskId, taskId);
+      assert.equal(result.details.episodeId, initial.episodeId);
+      assert.equal(result.details.episodeActiveSessionId, initial.episodeActiveSessionId);
+    }
+    const promptFrames = wire.frames.filter(({ frame }) => frame.command.type === "prompt");
+    assert.equal(promptFrames.length, firstStopped || scenario === "callback-throw" ? 1 : 2);
+    assert.equal(new Set(promptFrames.map(({ frame }) => frame.id)).size, promptFrames.length);
+    assert.equal(new Set(wire.frames.map(({ frame }) => frame.clientId)).size, 1, "one original client ID across all commands");
+    assertWireTransport(delivery.first.transport, promptFrames[0], {
+      cause: scenario === "closed-first" ? "socket_closed" : firstStopped ? "timeout" : "result",
+      success: true, ...(scenario === "delayed-first-success" ? { delay: 35 } : {}),
+    }, invocationStarted, returnedAt);
+    if (promptFrames[1]) assertWireTransport(delivery.followUp.transport, promptFrames[1], {
+      cause: scenario === "followUp-lost" ? "timeout" : "result",
+      success: scenario !== "followUp-refused", ...(scenario === "followUp-refused" ? { code: "busy" } : {}),
+    }, invocationStarted, returnedAt);
+    else assert.equal(Object.hasOwn(delivery.followUp, "transport"), false);
+    const returnedSnapshot = structuredClone(delivery);
+    if (pendingLate) {
+      wire.reply(pendingLate.socket, pendingLate.frame);
+      // The get_state response is a same-socket read barrier after the late
+      // result. The connection works, but no old continuation may resume.
+      await publisher.getState("route");
+      assert.deepEqual(delivery, returnedSnapshot);
+      assert.deepEqual(events, ["first"]);
+    }
+    const expectedAcknowledged = promptFrames.filter((_frame, index) => index === 0 ? !firstStopped : scenario !== "followUp-lost");
+    if (expectedAcknowledged.length) await wire.seen((frames) => frames.filter(({ frame }) => frame.command.type === "ack_result").length >= expectedAcknowledged.length);
+    const acknowledgements = wire.frames.filter(({ frame }) => frame.command.type === "ack_result");
+    assert.deepEqual(acknowledgements.map(({ frame }) => frame.command.commandId), expectedAcknowledged.map(({ frame }) => frame.id));
+    for (const { frame } of acknowledgements) {
+      assert.equal(frame.clientId, delivery.first.transport.clientId);
+      assert.equal(frame.command.id, frame.id);
+      assert.match(frame.id, /^spec_episode_ack_/);
+      const stage = frame.command.commandId === delivery.first.transport.commandId ? delivery.first : delivery.followUp;
+      assert.equal(stage.transport.ack.commandId, frame.id, "retain the original ACK command ID, not a regenerated one");
+    }
+    assert.equal(wire.frames.filter(({ frame }) => frame.command.type === "prompt").length, promptFrames.length, "no extra prompt, direct execute, resend, or late-reply restart");
+    assert.equal(wire.connections, 1, "no reconnect or replacement client");
+    assert.equal(f.record.providerRevision, firstStopped || scenario === "callback-throw" ? initial.providerRevision : "d".repeat(40));
+    for (const key of ["ownerSessionId", "taskId", "operationId", "episodeId", "episodeSessionFile", "worktree", "branch"]) assert.deepEqual(f.record[key], initial[key], key);
+    assert.equal(f.nativeEntries.length, 1, "one pre-dispatch native observation, never retried");
+    assert.ok(promptFrames[0].frame.command.message.includes(HANDOFF_WIRE_SENTINELS.prompt));
+    const reference = handoffReferenceFromPrompt(promptFrames[0].frame.command.message);
+    readHandoffObservation(f, reference, promptFrames.map(({ frame }) => frame.command.message));
+    if (promptFrames[1]) {
+      assert.match(promptFrames[1].frame.command.message, /EXECUTE POLICY/);
+      assert.equal(promptFrames[1].frame.command.message.includes(HANDOFF_WIRE_SENTINELS.prompt), false);
+    }
+  });
+}

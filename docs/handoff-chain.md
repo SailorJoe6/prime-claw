@@ -144,6 +144,42 @@ The first message's callback records only existing task/provider/code observatio
 execute is its sole follow-up. R1 preserves successful stderr; R2 preserves full
 create mutation results through one initial execute. No new mirror or assignment.
 
+### Bounded task-native transport observations
+
+The existing JSONL client attaches ephemeral `transport` facts to its local
+response or error. These retain the **original** generated `clientId` and
+`commandId`, command type and selected runtime route, request start, result-wait
+timeout and elapsed time, write attempt, result presence, native success/code when
+available, and timeout/socket/write/connect cause. Only bounded machine-code
+tokens cross this boundary; native error text, callback exceptions, prompt/task
+bodies, credentials and arbitrary response data do not.
+
+The task-native publisher returns `delivery` in the normal handoff tool text
+and details, including on stopped chains. Its three factual parts are:
+
+- `first`: actual admission, refusal, failure or uncertainty, with available
+  original request facts;
+- `callback`: not required/not attempted, completed or failed; failure can have
+  partial native effects, so it is not a rollback claim;
+- `followUp`: not attempted, admitted, refused, failed or uncertain, with its
+  own original request facts when attempted.
+
+A first success precedes the factual callback and then **one** canonical execute
+follow-up through the existing workflow chain. A callback failure stops before
+that follow-up. A missing result after a write remains uncertain, even if the
+socket closes or a reply arrives after the request has returned. No late reply
+restarts the chain. No retry, replay, lookup API, command-history store or durable
+receipt is added. These observations supply facts for editable workflow/LLM
+judgment; they do not authorize another transition or establish global
+exactly-once execution.
+
+For mutation results, `transport.ack.commandId` identifies the original local
+`ack_result` frame. `writeReturned` means only that its socket write returned,
+not that the daemon received or persisted the acknowledgement. Native result
+success establishes prompt admission, not compaction or execute completion.
+An absent transport record from an injected test adapter is not fabricated.
+Retained version-1 handoff stays on its existing idle-only publisher path.
+
 ### Exact native task observation reference
 
 Task-native handoff and execute carry the same bounded

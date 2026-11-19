@@ -918,12 +918,16 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           return {
             content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.${conversationCompactionWarning(conversationCompaction)}${result.observationReference ? `
 
-${JSON.stringify(result.observationReference)}` : ""}` }],
+${JSON.stringify(result.observationReference)}` : ""}${result.delivery ? `\n\n${JSON.stringify(result.delivery)}` : ""}` }],
             details: { ...result, conversationCompaction },
           };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return { content: [{ type: "text", text: `Task Episode handoff failed: ${message}` }], details: { error: message }, isError: true };
+          const delivery = error && typeof error === "object" && "delivery" in error ? error.delivery : undefined;
+          const transport = !delivery && error && typeof error === "object" && "transport" in error ? error.transport : undefined;
+          const message = transport ? "Daemon preparation stopped before the handoff delivery chain."
+            : error instanceof Error ? error.message : "Task Episode handoff stopped.";
+          const details = { error: message, ...(delivery ? { delivery } : {}), ...(transport ? { transport } : {}) };
+          return { content: [{ type: "text", text: `Task Episode handoff failed: ${message}\n${JSON.stringify(details)}` }], details, isError: true };
         }
       },
     });

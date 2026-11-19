@@ -115,7 +115,11 @@ export class DaemonMutationUncertainError extends Error {
   }
 }
 export class EpisodeStateUncertainError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) { super(message, options); this.name = "EpisodeStateUncertainError"; }
+  readonly transport?: DaemonCommandObservation;
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options); this.name = "EpisodeStateUncertainError";
+    this.transport = errorTransport(options?.cause);
+  }
 }
 export class HandoffFollowUpRejectedError extends Error {
   constructor(message: string, options?: { cause?: unknown }) { super(message, options); this.name = "HandoffFollowUpRejectedError"; }
@@ -168,6 +172,7 @@ export type TaskEpisodeHandoffResult = {
   admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
   handoffDelivery: "prompt"; executeDelivery: "followUp";
   observationReference?: TaskHandoffObservationReference;
+  delivery?: HandoffDeliveryObservation;
 };
 export interface PublishedSession { activeSessionId: string; sessionId: string; sessionFile: string }
 
@@ -213,7 +218,7 @@ export interface SessionPublisher {
   createFresh(options: { worktree: string; sessionName: string; model?: { provider: string; id: string }; onAllocated?: (identity: { sessionId: string; sessionFile: string }) => void | Promise<void> }): Promise<PublishedSession>;
   reopen(options: { sessionFile: string; sessionId: string; worktree: string; sessionName: string; model?: { provider: string; id: string } }): Promise<PublishedSession>;
   deliverExecute(activeSessionId: string, prompt: string): Promise<void>;
-  deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string, onHandoffAdmitted?: () => void | Promise<void>, queueHandoffIfBusy?: boolean): Promise<void>;
+  deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string, onHandoffAdmitted?: () => void | Promise<void>, queueHandoffIfBusy?: boolean): Promise<void | HandoffDeliveryObservation>;
   close(): void;
 }
 export interface OrcaProjectSetup {
@@ -495,6 +500,35 @@ export class NodeFilesystemAdapter implements FilesystemAdapter {
 }
 const defaultOwnershipStore: EpisodeOwnershipStore = { read: readEpisodeOwnership, write: writeEpisodeOwnership };
 
+/** Ephemeral facts from one original JSONL request, never a receipt or retry key. */
+export interface DaemonCommandObservation {
+  clientId: string; commandId: string; commandType: string; activeSessionId?: string;
+  startedAt: string; elapsedMs: number; timeoutMs: number;
+  writeAttempted: boolean; resultReceived: boolean;
+  nativeSuccess?: boolean; nativeCode?: string; causeCode?: string;
+  cause: "result" | "timeout" | "socket_error" | "socket_closed" | "write_error" | "connect_error";
+  /** Local ack_result write only; not confirmation of native acknowledgement. */
+  ack?: { commandId: string; writeAttempted: true; writeReturned: boolean };
+}
+export interface HandoffDeliveryObservation {
+  activeSessionId: string;
+  first: HandoffDeliveryStage;
+  callback: "not_required" | "not_attempted" | "completed" | "failed";
+  followUp: HandoffDeliveryStage;
+}
+interface HandoffDeliveryStage {
+  outcome: "not_attempted" | "admitted" | "refused" | "failed" | "uncertain";
+  transport?: DaemonCommandObservation;
+}
+// Only bounded machine tokens, never native error text, prompt bodies or paths.
+function diagnosticToken(value: unknown): string | undefined {
+  return typeof value === "string" && /^[A-Za-z0-9_.:-]{1,128}$/.test(value) ? value : undefined;
+}
+function errorTransport(error: unknown): DaemonCommandObservation | undefined {
+  return error && typeof error === "object" && "transport" in error
+    ? error.transport as DaemonCommandObservation | undefined : undefined;
+}
+
 interface DaemonResponse {
   id?: string;
   success?: boolean;
@@ -503,6 +537,7 @@ interface DaemonResponse {
   data?: unknown;
   type?: string;
   protocol?: { name?: string; version?: number };
+  transport?: DaemonCommandObservation;
 }
 
 export class DaemonJsonlClient {
@@ -516,14 +551,16 @@ export class DaemonJsonlClient {
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
     acknowledge: boolean;
-    commandType: string;
+    started: number;
+    observation: DaemonCommandObservation;
   }>();
   private readonly clientId = `spec-episode:${randomUUID()}`;
 
   private readonly socketPath: string;
-
-  constructor(socketPath: string) {
+  private readonly options: { requestTimeoutMs?: number };
+  constructor(socketPath: string, options: { requestTimeoutMs?: number } = {}) {
     this.socketPath = socketPath;
+    this.options = options;
   }
 
   async connect(timeoutMs = 3000): Promise<void> {
@@ -532,8 +569,8 @@ export class DaemonJsonlClient {
     this.socket = socket;
     socket.setEncoding("utf8");
     socket.on("data", (chunk) => this.onData(chunk));
-    socket.on("error", (error) => this.failAll(error));
-    socket.on("close", () => this.failAll(new Error("Prime Agent daemon connection closed")));
+    socket.on("error", (error) => this.failAll("socket_error", error));
+    socket.on("close", () => this.failAll("socket_closed"));
 
     await new Promise<void>((resolveConnect, rejectConnect) => {
       const timer = setTimeout(() => rejectConnect(new Error("Timed out connecting to Prime Agent daemon")), timeoutMs);
@@ -550,35 +587,47 @@ export class DaemonJsonlClient {
     }
   }
 
-  async request(command: Record<string, unknown>, timeoutMs = 30_000): Promise<DaemonResponse> {
-    await this.connect();
+  async request(command: Record<string, unknown>, timeoutMs = this.options.requestTimeoutMs ?? 30_000): Promise<DaemonResponse> {
+    const started = Date.now();
     const id = `spec_episode_${randomUUID()}`;
-    const commandWithId = { ...command, id };
+    const observation: DaemonCommandObservation = {
+      clientId: this.clientId, commandId: id, commandType: diagnosticToken(command.type) ?? "unknown",
+      ...(diagnosticToken(command.activeSessionId) ? { activeSessionId: command.activeSessionId as string } : {}),
+      startedAt: new Date(started).toISOString(), elapsedMs: 0, timeoutMs,
+      writeAttempted: false, resultReceived: false, cause: "connect_error",
+    };
+    try { await this.connect(); }
+    catch (error) {
+      observation.elapsedMs = Math.max(0, Date.now() - started);
+      const code = error && typeof error === "object" && "code" in error ? diagnosticToken(error.code) : undefined;
+      if (code) observation.causeCode = code;
+      throw Object.assign(new Error("Prime Agent daemon connection failed before command write"), { transport: observation });
+    }
     const wire = {
-      type: "command",
-      id,
+      type: "command", id,
       protocol: { name: PROTOCOL_NAME, version: this.protocolVersion },
-      clientId: this.clientId,
-      command: commandWithId,
+      clientId: this.clientId, command: { ...command, id },
     };
     return new Promise<DaemonResponse>((resolveResponse, rejectResponse) => {
-      const commandType = String(command.type);
-      const acknowledge = ["create", "prompt", "kill", "delete_saved_session"].includes(commandType);
+      const acknowledge = ["create", "prompt", "kill", "delete_saved_session"].includes(observation.commandType);
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        rejectResponse(acknowledge
-          ? new DaemonMutationUncertainError(commandType, `timed out after ${timeoutMs}ms`)
-          : new Error(`Timed out waiting for daemon command ${commandType}`));
+        observation.cause = "timeout";
+        observation.elapsedMs = Math.max(0, Date.now() - started);
+        rejectResponse(this.requestFailure(observation, acknowledge));
       }, timeoutMs);
-      this.pending.set(id, { resolve: resolveResponse, reject: rejectResponse, timer, acknowledge, commandType });
+      this.pending.set(id, { resolve: resolveResponse, reject: rejectResponse, timer, acknowledge, started, observation });
       try {
+        observation.writeAttempted = true;
         this.socket!.write(`${JSON.stringify(wire)}\n`);
       } catch (error) {
         clearTimeout(timer);
         this.pending.delete(id);
-        rejectResponse(acknowledge
-          ? new DaemonMutationUncertainError(commandType, String(error))
-          : error);
+        observation.cause = "write_error";
+        observation.elapsedMs = Math.max(0, Date.now() - started);
+        const code = error && typeof error === "object" && "code" in error ? diagnosticToken(error.code) : undefined;
+        if (code) observation.causeCode = code;
+        rejectResponse(this.requestFailure(observation, acknowledge));
       }
     });
   }
@@ -587,6 +636,14 @@ export class DaemonJsonlClient {
     this.socket?.end();
     this.socket?.destroy();
     this.socket = undefined;
+  }
+
+  private requestFailure(observation: DaemonCommandObservation, acknowledge: boolean): Error {
+    const message = `Prime Agent daemon command stopped: ${observation.cause}`;
+    const error = acknowledge
+      ? new DaemonMutationUncertainError(observation.commandType, message)
+      : new Error(message);
+    return Object.assign(error, { transport: observation });
   }
 
   private onData(chunk: string): void {
@@ -612,36 +669,48 @@ export class DaemonJsonlClient {
       }
       if (!message.id) continue;
       const pending = this.pending.get(message.id);
-      if (!pending) continue;
+      if (!pending) continue; // A late result cannot restart a returned request or chain.
       clearTimeout(pending.timer);
       this.pending.delete(message.id);
-      pending.resolve(message);
-      if (pending.acknowledge) this.acknowledge(message.id);
+      const observation = pending.observation;
+      observation.elapsedMs = Math.max(0, Date.now() - pending.started);
+      observation.resultReceived = true;
+      observation.cause = "result";
+      if (typeof message.success === "boolean") observation.nativeSuccess = message.success;
+      const code = diagnosticToken(message.errorInfo?.code);
+      if (code) observation.nativeCode = code;
+      if (pending.acknowledge) observation.ack = this.acknowledge(message.id);
+      pending.resolve({ ...message, transport: observation });
     }
   }
 
-  private acknowledge(commandId: string): void {
-    if (!this.socket || !this.protocolVersion) return;
+  private acknowledge(commandId: string): DaemonCommandObservation["ack"] {
+    if (!this.socket || !this.protocolVersion) return undefined;
     const id = `spec_episode_ack_${randomUUID()}`;
-    const command = { id, type: "ack_result", commandId };
-    this.socket.write(`${JSON.stringify({
-      type: "command",
-      id,
-      protocol: { name: PROTOCOL_NAME, version: this.protocolVersion },
-      clientId: this.clientId,
-      command,
-    })}\n`);
+    const ack = { commandId: id, writeAttempted: true as const, writeReturned: false };
+    try {
+      this.socket.write(`${JSON.stringify({
+        type: "command", id,
+        protocol: { name: PROTOCOL_NAME, version: this.protocolVersion },
+        clientId: this.clientId, command: { id, type: "ack_result", commandId },
+      })}\n`);
+      ack.writeReturned = true;
+    } catch { /* Local ACK failure does not erase the already-received result. */ }
+    return ack;
   }
 
-  private failAll(error: Error): void {
-    this.helloReject?.(error);
+  private failAll(cause: "socket_error" | "socket_closed", error?: Error): void {
+    this.helloReject?.(new Error(`Prime Agent daemon connection stopped: ${cause}`));
     this.helloResolve = undefined;
     this.helloReject = undefined;
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
-      pending.reject(pending.acknowledge
-        ? new DaemonMutationUncertainError(pending.commandType, error.message)
-        : error);
+      const observation = pending.observation;
+      observation.cause = cause;
+      observation.elapsedMs = Math.max(0, Date.now() - pending.started);
+      const code = error && "code" in error ? diagnosticToken(error.code) : undefined;
+      if (code) observation.causeCode = code;
+      pending.reject(this.requestFailure(observation, pending.acknowledge));
     }
     this.pending.clear();
   }
@@ -657,10 +726,11 @@ function daemonSocketPath(): string {
 
 function requireSuccess(response: DaemonResponse, operation: string): unknown {
   if (response.success !== true) {
-    if (response.errorInfo?.code === "command_result_uncertain") {
-      throw new DaemonMutationUncertainError(operation, response.error ?? "daemon reported an uncertain mutation");
-    }
-    throw new Error(`${operation} failed: ${response.error ?? "unknown daemon error"}`);
+    const error = response.errorInfo?.code === "command_result_uncertain"
+      ? new DaemonMutationUncertainError(operation, response.error ?? "daemon reported an uncertain mutation")
+      : new Error(`${operation} failed: ${response.error ?? "unknown daemon error"}`);
+    // Keep native failure correlation through wrappers without copying raw data.
+    throw Object.assign(error, { transport: response.transport });
   }
   return response.data;
 }
@@ -751,7 +821,58 @@ export class PrimeSessionPublisher implements SessionPublisher {
       throw error;
     }
   }
-  async deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string, onHandoffAdmitted?: () => void | Promise<void>, queueHandoffIfBusy = false): Promise<void> {
+  async deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string, onHandoffAdmitted?: () => void | Promise<void>, queueHandoffIfBusy = false): Promise<void | HandoffDeliveryObservation> {
+    if (queueHandoffIfBusy) {
+      const delivery: HandoffDeliveryObservation = {
+        activeSessionId, first: { outcome: "not_attempted" },
+        callback: onHandoffAdmitted ? "not_attempted" : "not_required",
+        followUp: { outcome: "not_attempted" },
+      };
+      const deliver = async (stage: "first" | "followUp", message: string): Promise<void> => {
+        let response: DaemonResponse | undefined;
+        try {
+          response = await this.client.request({ type: "prompt", activeSessionId, message,
+            streamingBehavior: "followUp", queueIfBusy: true, expandPromptTemplates: false, source: "extension" });
+          requireSuccess(response, stage === "first" ? "handoff delivery" : "execute follow-up delivery");
+          delivery[stage] = { outcome: "admitted", ...(response.transport ? { transport: response.transport } : {}) };
+        } catch (error) {
+          const transport = errorTransport(error);
+          delivery[stage] = {
+            outcome: isUncertainMutation(error) ? "uncertain" : response?.success === false ? "refused" : "failed",
+            ...(transport ? { transport } : {}),
+          };
+          throw error;
+        }
+      };
+      let failure: unknown;
+      let failedStage: "first" | "callback" | "followUp";
+      try {
+        const admission = await admitWorkflowChain({
+          deliverFirst: () => deliver("first", handoffPrompt),
+          ...(onHandoffAdmitted ? { afterFirst: async () => {
+            try { await onHandoffAdmitted(); delivery.callback = "completed"; }
+            catch (error) { delivery.callback = "failed"; throw error; }
+          } } : {}),
+          deliverFollowUp: () => deliver("followUp", executePrompt),
+        });
+        if (admission.ok) return delivery;
+        failure = admission.error;
+        failedStage = admission.stage;
+      } catch (error) {
+        // admitWorkflowChain deliberately leaves the factual callback outside
+        // delivery catches. It may have partial effects; never queue or retry.
+        failure = error;
+        failedStage = "callback";
+      }
+      const message = failedStage === "callback"
+        ? "Handoff was admitted, but factual callback failed; execute follow-up was not attempted."
+        : `${failedStage === "first" ? "Handoff" : "Execute follow-up"} delivery ${delivery[failedStage].outcome}; inspect before another transition.`;
+      const error = isUncertainMutation(failure)
+        ? new EpisodeStateUncertainError(message, { cause: failure })
+        : failedStage === "followUp" ? new HandoffFollowUpRejectedError(message, { cause: failure })
+        : new Error(message, { cause: failure });
+      throw Object.assign(error, { delivery });
+    }
     const admission = await admitWorkflowChain({
       deliverFirst: async () => requireSuccess(await this.client.request({ type: "prompt", activeSessionId, message: handoffPrompt, ...(queueHandoffIfBusy ? { streamingBehavior: "followUp", queueIfBusy: true } : { queueIfBusy: false }), expandPromptTemplates: false, source: "extension" }), "handoff delivery"),
       afterFirst: onHandoffAdmitted,
@@ -1447,15 +1568,16 @@ async function deliverOwnedEpisodeHandoff(
   store: EpisodeOwnershipStore,
   promptIdentity: EpisodeHandoffPromptIdentity,
   onHandoffAdmitted?: () => void | Promise<void>,
-): Promise<{ activeSessionId: string; observationReference?: TaskHandoffObservationReference }> {
+): Promise<{ activeSessionId: string; observationReference?: TaskHandoffObservationReference; delivery?: HandoffDeliveryObservation }> {
   const prepared = await prepareOwnedEpisodeHandoff(
     record, guidance, repo, ctx, git, filesystem, orca, publisher, store, promptIdentity,
   );
   if (isTaskEpisodeOwnership(prepared.record)) taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(prepared.record));
-  await publisher.deliverHandoff(
+  const delivery = await publisher.deliverHandoff(
     prepared.activeSessionId, prepared.handoffPrompt, prepared.executePrompt, onHandoffAdmitted, Boolean(promptIdentity.taskId),
   );
-  return { activeSessionId: prepared.activeSessionId, observationReference: prepared.observationReference };
+  return { activeSessionId: prepared.activeSessionId, observationReference: prepared.observationReference,
+    ...(delivery ? { delivery } : {}) };
 }
 
 export async function restoreBlockedSpecEpisode(
@@ -1818,7 +1940,7 @@ export async function handoffTaskEpisode(
       const { record: _advancedRecord, commit: _commit, ...observations } = advancement;
       const providerTaskObservation = JSON.stringify({ ...observations, episodeCode });
       let committedRecord: BeadsTaskEpisodeOwnershipRecord | undefined;
-      const { activeSessionId, observationReference } = await deliverOwnedEpisodeHandoff(
+      const { activeSessionId, observationReference, delivery } = await deliverOwnedEpisodeHandoff(
         preparedRecord, guidance, repo, ctx, git, filesystem, orca, publisher, store,
         { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation, appendEntry: dependencies.appendEntry },
         () => {
@@ -1842,6 +1964,7 @@ export async function handoffTaskEpisode(
         handoffDelivery: "prompt",
         executeDelivery: "followUp",
         observationReference,
+        ...(delivery ? { delivery } : {}),
       };
     }
 
@@ -1863,7 +1986,7 @@ export async function handoffTaskEpisode(
       );
       const providerTaskObservation = JSON.stringify({ ...JSON.parse(prepared.observation), episodeCode });
       let committed = false;
-      const { activeSessionId, observationReference } = await deliverOwnedEpisodeHandoff(
+      const { activeSessionId, observationReference, delivery } = await deliverOwnedEpisodeHandoff(
         preparedRecord, guidance, repo, ctx, git, filesystem, orca, publisher, store,
         { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation, appendEntry: dependencies.appendEntry },
         () => {
@@ -1888,6 +2011,7 @@ export async function handoffTaskEpisode(
         handoffDelivery: "prompt",
         executeDelivery: "followUp",
         observationReference,
+        ...(delivery ? { delivery } : {}),
       };
     }
 
@@ -1912,7 +2036,7 @@ export async function handoffTaskEpisode(
       episodeCode,
     };
     publisher ??= new PrimeSessionPublisher();
-    const { activeSessionId, observationReference } = await deliverOwnedEpisodeHandoff(
+    const { activeSessionId, observationReference, delivery } = await deliverOwnedEpisodeHandoff(
       record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
       { taskId: record.taskId, requireExactCwd: true, providerTaskObservation: JSON.stringify(providerTaskObservation), appendEntry: dependencies.appendEntry },
     );
@@ -1924,6 +2048,7 @@ export async function handoffTaskEpisode(
       handoffDelivery: "prompt",
       executeDelivery: "followUp",
       observationReference,
+      ...(delivery ? { delivery } : {}),
     };
   } finally { try { publisher?.close(); } catch { /* do not mask lifecycle result */ } }
 }
