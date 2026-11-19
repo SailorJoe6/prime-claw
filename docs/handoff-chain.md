@@ -335,9 +335,14 @@ Slice 2 adopts that exact-reference shape in the task-native handoff candidate;
 it does not claim host activation or real-model UAT. Pre-assistant append can
 be deferred in memory, so in-memory entry access alone is not evidence that
 another session can read it. Dispatch needs actual exact-row persistence.
-Native compaction and the sole existing execute follow-up remain in place;
-deep transport-correlation tests and historical delivery recovery are not part
-of this slice.
+Native compaction and the sole existing execute follow-up remain in place.
+Slice 3 adds bounded transport observations and real-client/fake-socket tests.
+Slice 4 extends the linked proof with actual candidate-generated handoff/execute
+inputs, real Episode REPL `compact.run`, completed native compaction and one
+substantive post-compaction marker. That scripted native execution uses a
+request adapter into the public SDK entry used by the daemon; it is not a real
+daemon/socket transport test, real-model semantic proof or live activation.
+Historical uncertain delivery remains unrecovered.
 
 Goals stay bounded to the admitted phase, report or wait boundary. Continuation
 and post-compaction reminders are advisory background guidance, not assignments

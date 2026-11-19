@@ -41,6 +41,6 @@ USER node
 ENV PRIME_AGENT_KERNEL_VENV=/home/node/fixture-kernel-venv
 RUN cd /opt/prime-agent \
     && PRIME_AGENT_INSTALL_UV=1 node_modules/.bin/tsx -e \
-       'import { ensureKernelPython } from "./packages/coding-agent/src/core/kernel/bootstrap.ts"; ensureKernelPython().catch((error) => { console.error(error); process.exit(1); });' \
+       'import { ensureKernelPython } from "./packages/coding-agent/src/core/kernel/bootstrap.ts"; ensureKernelPython({ pythonSkills: [{ importName: "compact", packagePath: "/opt/prime-agent/packages/coding-agent/skills/compact", pyprojectPath: "/opt/prime-agent/packages/coding-agent/skills/compact/pyproject.toml" }] }).catch((error) => { console.error(error); process.exit(1); });' \
     && test -x /home/node/fixture-kernel-venv/bin/python
 WORKDIR /tmp

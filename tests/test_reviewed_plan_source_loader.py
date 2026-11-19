@@ -152,7 +152,7 @@ def test_reviewed_plan_loads_with_default_source_loader(tmp_path):
 
 @pytest.mark.container
 def test_native_observation_entry_durable_cross_worktree_repl(tmp_path):
-    """Public append/read proof only; not production handoff or model judgment."""
+    """Public entry proof plus SDK-adapted canonical task chain; not live UAT/model judgment."""
     stdout = _run_source_loader_fixture(tmp_path, native_entry=True)
     lines = [line.removeprefix("NATIVE_ENTRY_RESULT=") for line in stdout.splitlines()
              if line.startswith("NATIVE_ENTRY_RESULT=")]
@@ -169,3 +169,22 @@ def test_native_observation_entry_durable_cross_worktree_repl(tmp_path):
     assert proof["reopenedExactEntry"] is True
     assert proof["productionHelperExactRead"] is True
     assert proof["queuedPromptCharacters"] >= 900_000
+
+    lines = [line.removeprefix("NATIVE_CHAIN_RESULT=") for line in stdout.splitlines()
+             if line.startswith("NATIVE_CHAIN_RESULT=")]
+    assert len(lines) == 1, stdout
+    chain = json.loads(lines[0])
+    (tmp_path / "native-chain-result.json").write_text(json.dumps(chain, indent=2))
+    assert chain["adapter"] == "public-promptUntilAccepted"
+    assert chain["handoffToolCalls"] == 1
+    assert chain["canonicalPromptRequests"] == 2
+    assert chain["compactRunRequests"] == 1
+    assert chain["completed"] == [{"reason": "requested", "hasResult": True, "aborted": False, "error": None}]
+    assert chain["persistedCompactions"] == 1
+    assert chain["substantiveMarkers"] == 1
+    assert chain["nativeQueueDrained"] is True
+    assert chain["sameIdentity"] is True
+    assert chain["sameKernelObject"] is True
+    assert chain["completeEvidenceAfterCompaction"] is True
+    assert chain["contextLeak"] is False
+    assert chain["phases"] == ["first-admitted", "factual-callback", "followUp-admitted"]
