@@ -4,13 +4,21 @@ title: Bound task handoff evidence and retain truthful delivery outcomes
 status: In Progress
 assignee: []
 created_date: '2026-11-18 21:05'
-updated_date: '2026-11-19 02:27'
+updated_date: '2026-11-19 02:31'
 labels: []
 dependencies: []
 references:
   - REQUIREMENTS.md
 documentation:
   - docs/handoff-chain.md
+  - docs/evidence/primeclaw-62-native-entry-proof.md
+modified_files:
+  - docker/test-prime-agent-source-loader.Dockerfile
+  - tests/test_reviewed_plan_source_loader.py
+  - tests/container/reviewed_plan_source_loader.mts
+  - tests/container/native_observation_entry.mts
+  - docs/handoff-chain.md
+  - docs/evidence/primeclaw-62-native-entry-proof.md
 priority: p1
 type: bug
 ordinal: 147000
@@ -80,4 +88,8 @@ Slice 1 proof passed and code is published: 98b7b101164ca4f06f5bd05e6c5e5cee00a1
 Observed: 1,803,056 characters of complete synthetic prior/current Backlog evidence plus a small raw Beads shape; public append returned void; controlled pre-assistant custom write was absent on disk; after a genuine assistant response the main exact entry was durable before reader dispatch. A real ipython tool in a second actual linked worktree read the full object twice with exact-entry/header/type/parent and digest checks, explicit null/absence/unknown fields and <=4096-character piece reconstruction. Writer dispose/reopen plus one completed writer SDK compaction preserved the selected entry. No payload sentinel appeared in captured model/compaction contexts. A disposable negative-control snapshot with a nonexistent selected ID failed at exact-entry disk validation (1 failed in 13.21s), as intended. Local evidence under primeclaw62-proof-9cyw9_8f/pytest/test_native_observation_entry_0/ includes native-entry-result.json, identity.json and Docker output/status. Reproduction and supported limits are committed in docs/evidence/primeclaw-62-native-entry-proof.md.
 
 This proves same-user/shared-absolute-filesystem feasibility only. No cross-host access, fsync/transaction guarantee, production bounded handoff, transport outcome repair, canonical execute follow-up, Episode compact.run, Episode REPL survival across its own compaction, or real-model semantics is claimed. No production plugin source changed, so the focused existing Tier 1 Docker source-loader suite is this slice's candidate validation; broader production regressions remain for later slices. Independent read-only published-candidate review is next. Full-task acceptance criteria remain unchecked and status remains In Progress. Stop after this proof slice; do not adopt the mechanism or begin the production repair in this pass.
+
+Independent published-candidate review complete: native RLM EXPERT native-entry-proof-expert, actual model openai-codex/gpt-6-astra (thinking max), reviewed exact code 98b7b101164ca4f06f5bd05e6c5e5cee00a1db13 against requested base f2268207fb27609659ebb6e53e70edd7985fc53d and native task 985efa80ff6ecd27ae83912712fbf759b8ebe209. Conclusion: no material defects in this first-slice feasibility candidate; not full-task acceptance. Reviewer inspected the saved Docker artifacts and matched fixture/driver/Dockerfile/probe/plugin inputs to the candidate; it did not rerun tests. It confirmed exact ownership and compatible same-task plan/notes/timestamp changes only, complete-object/native REPL/exact-entry/negative-control assertions, and truthful limits for writer SDK compaction, shared-filesystem placement and scripted semantics.
+
+Non-blocking integration observation: primary main is now 3f3afbd432230a2d77437ad881d778fd9f4863cf; the additional commit records .prime-claw/ownership.json only, with no overlap in the six candidate files. Review comparison remains the requested f2268207 base; no merge/rebase/retargeting was performed. Candidate code remains 98b7b101164ca4f06f5bd05e6c5e5cee00a1db13, published/up to date. The six modified paths and the proof documentation are recorded natively. This is the end of exactly one implementation slice. Full production repair and its acceptance tests remain in steps 2–6. Leave task In Progress, all full-task criteria unchecked, and the same Episode intact for owning Conversation review/continuation. No historical delivery recovery, activation, restart, merge, terminal disposition, or paused external Episode action.
 <!-- SECTION:NOTES:END -->
