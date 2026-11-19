@@ -60,6 +60,7 @@ import {
   type CommandRunner,
 } from "./project-initialization.ts";
 import { activeLegacyPlanFiles, restoreBlockedLegacyPlanFiles } from "./legacy-workflow.ts";
+import { retainTaskHandoffObservation, type TaskHandoffObservationReference } from "./task-handoff-observation.ts";
 import {
   assertGrandfatheredLegacySpecification,
   assertGrandfatheredLegacySpecificationFile,
@@ -166,7 +167,7 @@ export interface BlockedLegacyRestoreResult {
 export type TaskEpisodeHandoffResult = {
   admitted: true; taskId: string; episodeId: string; episodeActiveSessionId: string;
   handoffDelivery: "prompt"; executeDelivery: "followUp";
-  providerTaskObservation?: Record<string, unknown>;
+  observationReference?: TaskHandoffObservationReference;
 };
 export interface PublishedSession { activeSessionId: string; sessionId: string; sessionFile: string }
 
@@ -247,6 +248,7 @@ export interface EpisodeDependencies {
   bindingAttempts?: number;
 }
 export interface TaskEpisodeHandoffDependencies extends EpisodeDependencies {
+  appendEntry?: (customType: string, data: unknown) => void;
   taskRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   prepareEpisodeTaskHistory?: typeof prepareEpisodeTaskHistoryWorkspace;
@@ -1346,6 +1348,7 @@ type PreparedEpisodeHandoff = {
   activeSessionId: string;
   handoffPrompt: string;
   executePrompt: string;
+  observationReference?: TaskHandoffObservationReference;
 };
 
 interface EpisodeHandoffPromptIdentity {
@@ -1354,6 +1357,7 @@ interface EpisodeHandoffPromptIdentity {
   requireExactCwd?: boolean;
   /** Exact factual provider observations for the existing Episode LLM. */
   providerTaskObservation?: string;
+  appendEntry?: (customType: string, data: unknown) => void;
 }
 
 function providerTaskObservationBlock(observation: string): string {
@@ -1407,27 +1411,28 @@ async function prepareOwnedEpisodeHandoff(
     ownerSessionId: record.ownerSessionId,
   });
   if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
-  if (promptIdentity.providerTaskObservation) {
-    const observation = providerTaskObservationBlock(promptIdentity.providerTaskObservation);
-    handoffPrompt += observation;
-    executePrompt += observation;
-  }
   if (isTaskEpisodeOwnership(record)) taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
   const route = await reopenIfNeeded(record, session, ctx, publisher, store, repo);
   const state = await publisher.getState(route.activeSessionId);
+  let observationReference: TaskHandoffObservationReference | undefined;
   if (promptIdentity.taskId) {
     assertEpisodeStateIdentity(state, route.record, route.activeSessionId);
-    const observation = `
-
-<episode-session-observation>
-${JSON.stringify({ session, state })}
-</episode-session-observation>`;
-    handoffPrompt += observation;
-    executePrompt += observation;
+    // The first preflight gathers identity only. Capture once, after complete
+    // provider facts are ready, before either canonical prompt is dispatched.
+    if (promptIdentity.providerTaskObservation && isTaskEpisodeOwnership(route.record)) {
+      if (route.record.engine === "orca") await reservedTaskSetup(route.record, repo, orca);
+      observationReference = retainTaskHandoffObservation(
+        ctx, route.record, route.activeSessionId,
+        JSON.parse(promptIdentity.providerTaskObservation), { session, state }, promptIdentity.appendEntry,
+      );
+      const observation = `\n\n<task-handoff-observation-reference>\n${JSON.stringify(observationReference)}\n</task-handoff-observation-reference>`;
+      handoffPrompt += observation;
+      executePrompt += observation;
+    }
   } else {
     assertIdleEpisodeState(state, route.record, route.activeSessionId);
   }
-  return { record: route.record, activeSessionId: route.activeSessionId, handoffPrompt, executePrompt };
+  return { record: route.record, activeSessionId: route.activeSessionId, handoffPrompt, executePrompt, observationReference };
 }
 
 async function deliverOwnedEpisodeHandoff(
@@ -1442,7 +1447,7 @@ async function deliverOwnedEpisodeHandoff(
   store: EpisodeOwnershipStore,
   promptIdentity: EpisodeHandoffPromptIdentity,
   onHandoffAdmitted?: () => void | Promise<void>,
-): Promise<string> {
+): Promise<{ activeSessionId: string; observationReference?: TaskHandoffObservationReference }> {
   const prepared = await prepareOwnedEpisodeHandoff(
     record, guidance, repo, ctx, git, filesystem, orca, publisher, store, promptIdentity,
   );
@@ -1450,7 +1455,7 @@ async function deliverOwnedEpisodeHandoff(
   await publisher.deliverHandoff(
     prepared.activeSessionId, prepared.handoffPrompt, prepared.executePrompt, onHandoffAdmitted, Boolean(promptIdentity.taskId),
   );
-  return prepared.activeSessionId;
+  return { activeSessionId: prepared.activeSessionId, observationReference: prepared.observationReference };
 }
 
 export async function restoreBlockedSpecEpisode(
@@ -1538,7 +1543,7 @@ export async function handoffSpecEpisode(
     if (!record) throw new Error(`No durable episode ownership exists for ${selected.location}`);
     exactOwnedRecord(record, selected.location, ctx.sessionManager.getSessionId());
     publisher ??= new PrimeSessionPublisher();
-    const activeSessionId = await deliverOwnedEpisodeHandoff(
+    const { activeSessionId } = await deliverOwnedEpisodeHandoff(
       record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
       { legacySnapshot: true },
     );
@@ -1813,9 +1818,9 @@ export async function handoffTaskEpisode(
       const { record: _advancedRecord, commit: _commit, ...observations } = advancement;
       const providerTaskObservation = JSON.stringify({ ...observations, episodeCode });
       let committedRecord: BeadsTaskEpisodeOwnershipRecord | undefined;
-      const activeSessionId = await deliverOwnedEpisodeHandoff(
+      const { activeSessionId, observationReference } = await deliverOwnedEpisodeHandoff(
         preparedRecord, guidance, repo, ctx, git, filesystem, orca, publisher, store,
-        { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation },
+        { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation, appendEntry: dependencies.appendEntry },
         () => {
           const committed = advancement.commit();
           if (!samePublishedHandoffIdentity(preparedRecord, committed)
@@ -1836,7 +1841,7 @@ export async function handoffTaskEpisode(
         episodeActiveSessionId: activeSessionId,
         handoffDelivery: "prompt",
         executeDelivery: "followUp",
-        providerTaskObservation: JSON.parse(providerTaskObservation),
+        observationReference,
       };
     }
 
@@ -1858,9 +1863,9 @@ export async function handoffTaskEpisode(
       );
       const providerTaskObservation = JSON.stringify({ ...JSON.parse(prepared.observation), episodeCode });
       let committed = false;
-      const activeSessionId = await deliverOwnedEpisodeHandoff(
+      const { activeSessionId, observationReference } = await deliverOwnedEpisodeHandoff(
         preparedRecord, guidance, repo, ctx, git, filesystem, orca, publisher, store,
-        { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation },
+        { taskId: preparedRecord.taskId, requireExactCwd: true, providerTaskObservation, appendEntry: dependencies.appendEntry },
         () => {
           const current = store.read(repo, ownerSessionId);
           if (!current || JSON.stringify(current) !== JSON.stringify(preparedRecord)) {
@@ -1882,7 +1887,7 @@ export async function handoffTaskEpisode(
         episodeActiveSessionId: activeSessionId,
         handoffDelivery: "prompt",
         executeDelivery: "followUp",
-        providerTaskObservation: JSON.parse(providerTaskObservation),
+        observationReference,
       };
     }
 
@@ -1907,9 +1912,9 @@ export async function handoffTaskEpisode(
       episodeCode,
     };
     publisher ??= new PrimeSessionPublisher();
-    const activeSessionId = await deliverOwnedEpisodeHandoff(
+    const { activeSessionId, observationReference } = await deliverOwnedEpisodeHandoff(
       record, guidance, repo, ctx, git, filesystem, orca, publisher, store,
-      { taskId: record.taskId, requireExactCwd: true, providerTaskObservation: JSON.stringify(providerTaskObservation) },
+      { taskId: record.taskId, requireExactCwd: true, providerTaskObservation: JSON.stringify(providerTaskObservation), appendEntry: dependencies.appendEntry },
     );
     return {
       admitted: true,
@@ -1918,7 +1923,7 @@ export async function handoffTaskEpisode(
       episodeActiveSessionId: activeSessionId,
       handoffDelivery: "prompt",
       executeDelivery: "followUp",
-      providerTaskObservation,
+      observationReference,
     };
   } finally { try { publisher?.close(); } catch { /* do not mask lifecycle result */ } }
 }

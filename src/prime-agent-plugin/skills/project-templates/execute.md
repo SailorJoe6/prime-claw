@@ -80,6 +80,51 @@ branch), and provider revisions. A switched owner checkout is a recovery
 blocker, not permission to retarget or switch branches. Continue the same
 owner/task/worktree/session binding.
 
+### Read the exact handoff observation
+
+For a task-native continuation, `<task-handoff-observation-reference>` contains
+JSON with `schemaVersion: 1`, `sessionId`, an absolute `sessionFile`, `entryId`,
+`parentId`, `customType: "prime-claw-task-handoff-observation"`, `entrySha256`,
+and `bindings`. This is factual context, not task authority or acceptance.
+Load it before judging continuation:
+
+1. Read only that exact native `sessionFile` through the Episode's Python REPL.
+   Verify its session header has `type: "session"` and the exact `sessionId`.
+   Select exactly one row whose `id` equals `entryId`; verify `type: "custom"`,
+   `customType` and `parentId`. Hash its exact UTF-8 JSONL bytes, excluding the newline,
+   with SHA-256 and require `entrySha256`. Do not hash reserialized JSON, choose
+   the latest entry, search other sessions, or print the journal/history.
+2. Require schema version 1 in the reference and entry data. Require the entry's
+   `bindings` to equal the reference's `bindings` and match this exact selected
+   owner/registry Episode: `ownerSessionId`, `provider`, `taskId`, `operationId`,
+   `episodeId`, `episodeSessionFile`, `episodeActiveSessionId`, `worktree`,
+   `branch`, `baseRef`, `integrationBranch`, `engine`, and optional
+   `projectSetupId`/`routingEnvironmentId`. Apply the existing provider and
+   integration-branch defaults above for older records. Require the reference's
+   `sessionId` to equal `bindings.ownerSessionId`. That source Conversation
+   session is not a replacement for the Episode's durable session binding.
+3. Keep the full parsed entry data in named REPL variables. Its structure is
+   `{schemaVersion: 1, bindings, providerTaskObservation,
+   episodeSessionObservation: {session, state}}`. Retain the full unchanged
+   provider observation and native session/state facts. Preserve provider-native
+   envelopes, arrays, keys, unknown fields, nulls, and absent fields; never
+   normalize, flatten, truncate, or replace them with a summary.
+4. Enumerate the native structure, then inspect the entire current task contract
+   and all relevant prior/current differences, including fields and comments.
+   Read large collections and individual huge values in bounded chunks of about
+   4096 characters per output, with paths and offsets so no remainder is skipped.
+   A key list, length/digest check, preview or summary is not semantic inspection.
+   Do not dump one giant JSON value into model context.
+
+A missing, unreadable, ambiguous, mismatched or inaccessible exact session/entry
+stops continuation with a bounded explanation. Same-filesystem access must be
+real; a remote/host label does not establish it. Do not fall back to another
+entry, ownership evidence, a copied journal, a new store or giant inline data.
+Previously loaded generations may still supply `<provider-task-observation>`
+and `<episode-session-observation>` inline. Read those complete native values
+when no reference was supplied; they never repair a failed reference. Retained
+version-1 folder-plan handling is unchanged.
+
 ### Provider-absent or Backlog task authority
 
 First retain the ownership-selected Backlog topology. Provider-absent and
@@ -345,4 +390,7 @@ all changed behavior. Update the active durable authority as work proceeds; do
 not defer every task or plan update until the end.
 
 That is the execute workflow. Complete exactly one task or plan slice, then
-report and await further instructions.
+report and await further instructions. In task-native mode, complete the
+phase-bounded goal at that report or an earlier wait boundary. Goal and
+post-compaction reminders are advisory, not authority for another slice or an
+extra acknowledgement turn.

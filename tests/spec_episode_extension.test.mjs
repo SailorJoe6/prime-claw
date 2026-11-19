@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createHash } from "node:crypto";
 
 import {
   CliGitAdapter, CliOrcaAdapter, CliTaskEpisodeAdmissionGit, CliTaskEpisodeCleanupGit, PrimeSessionPublisher,
@@ -64,6 +65,20 @@ function setup(id = "setup-local", hostId = "local", route) {
 }
 function harness(options = {}) {
   const disk = diskFixture(); const calls = []; const records = new Map();
+  // Model the public native journal API, including the synchronous disk row.
+  // A public append alone is not proof: failure tests can defer or hide it.
+  const ownerSessionFile = join(disk.root, "owner.jsonl");
+  const nativeEntries = [];
+  writeFileSync(ownerSessionFile, `${JSON.stringify({ type: "session", version: 3, id: "owner", cwd: disk.root })}\n`);
+  writeFileSync(join(disk.root, "episode.jsonl"), `${JSON.stringify({ type: "session", version: 3, id: "episode", cwd: disk.worktree })}\n`);
+  const appendEntry = (customType, data) => {
+    const entry = { type: "custom", id: `observation-${nativeEntries.length + 1}`,
+      parentId: nativeEntries.at(-1)?.id ?? null, timestamp: "2026-11-18T00:00:00.000Z", customType,
+      data: structuredClone(data) };
+    nativeEntries.push(entry);
+    appendFileSync(ownerSessionFile, `${JSON.stringify(entry)}\n`);
+    calls.push(["append", entry.id]);
+  };
   if (options.record) records.set(options.record.ownerSessionId, structuredClone(options.record));
   const wt = { id: `repo::${disk.worktree}`, identity: "wt2:local:one", path: disk.worktree, branch: "JLanders/generated", head: "base", projectSetupId: "setup-local" };
   const git = {
@@ -120,13 +135,64 @@ function harness(options = {}) {
   const ctx = {
     cwd: disk.root, hasUI: options.hasUI ?? true,
     ui: { async select(_title, labels) { calls.push(["picker", labels]); return options.pick?.(labels); } },
-    sessionManager: { getSessionId: () => "owner", getSessionFile: () => join(disk.root, "owner.jsonl"), getHeader: () => ({ rlmDepth: 0 }) },
+    sessionManager: {
+      getSessionId: () => "owner", getSessionFile: () => ownerSessionFile, getHeader: () => ({ rlmDepth: 0 }),
+      getLeafEntry: () => nativeEntries.at(-1), getEntry: (id) => nativeEntries.find((entry) => entry.id === id),
+    },
     model: { provider: "provider", id: "model" },
   };
-  return { ...disk, wt, calls, git, filesystem, ownership, publisher, orca, ctx, deps: { git, filesystem, ownership, publisher, orca, wait: async () => {}, bindingAttempts: 1 }, get record() { return records.get("owner") ?? null; } };
+  return { ...disk, wt, calls, nativeEntries, git, filesystem, ownership, publisher, orca, ctx, deps: { git, filesystem, ownership, publisher, orca, appendEntry, wait: async () => {}, bindingAttempts: 1 }, get record() { return records.get("owner") ?? null; } };
 }
 function createRetained(f, options = {}) {
   return createSpecEpisode(LOCATION, "tool", f.ctx, f.deps, options);
+}
+
+function handoffReferenceFromPrompt(prompt) {
+  const matches = [...prompt.matchAll(/<task-handoff-observation-reference>\s*([^]*?)\s*<\/task-handoff-observation-reference>/g)];
+  assert.equal(matches.length, 1, "one exact reference per canonical prompt");
+  assert.doesNotMatch(prompt, /<(?:provider-task|episode-session)-observation>/);
+  return JSON.parse(matches[0][1]);
+}
+
+function readHandoffObservation(f, reference, prompts = []) {
+  assert.deepEqual(Object.keys(reference).sort(), [
+    "schemaVersion", "sessionId", "sessionFile", "entryId", "parentId", "customType", "entrySha256", "bindings",
+  ].sort());
+  assert.equal(reference.schemaVersion, 1);
+  assert.equal(reference.sessionId, "owner");
+  assert.equal(reference.sessionFile, f.ctx.sessionManager.getSessionFile());
+  assert.equal(reference.customType, "prime-claw-task-handoff-observation");
+  const lines = readFileSync(reference.sessionFile, "utf8").trimEnd().split("\n");
+  assert.equal(JSON.parse(lines[0]).id, reference.sessionId);
+  const matches = lines.filter((line) => JSON.parse(line).id === reference.entryId);
+  assert.equal(matches.length, 1, "reference selects one persisted native row, not the latest entry");
+  assert.equal(createHash("sha256").update(matches[0], "utf8").digest("hex"), reference.entrySha256);
+  const entry = JSON.parse(matches[0]);
+  assert.equal(entry.type, "custom");
+  assert.equal(entry.customType, reference.customType);
+  assert.equal(entry.parentId, reference.parentId);
+  assert.deepEqual(entry, f.ctx.sessionManager.getEntry(reference.entryId));
+  const record = f.record;
+  assert.deepEqual(reference.bindings, {
+    ownerSessionId: record.ownerSessionId,
+    provider: record.provider ?? "backlog",
+    taskId: record.taskId,
+    operationId: record.operationId,
+    episodeId: record.episodeId,
+    episodeSessionFile: record.episodeSessionFile,
+    episodeActiveSessionId: record.episodeActiveSessionId,
+    worktree: record.worktree,
+    branch: record.branch,
+    baseRef: record.baseRef,
+    integrationBranch: record.integrationBranch ?? "main",
+    engine: record.engine,
+    ...(record.projectSetupId ? { projectSetupId: record.projectSetupId } : {}),
+    ...(record.routingEnvironmentId ? { routingEnvironmentId: record.routingEnvironmentId } : {}),
+  });
+  assert.equal(entry.data.schemaVersion, 1);
+  assert.deepEqual(entry.data.bindings, reference.bindings);
+  for (const prompt of prompts) assert.deepEqual(handoffReferenceFromPrompt(prompt), reference);
+  return entry.data;
 }
 
 const TASK_BASE = "a".repeat(40);
@@ -728,6 +794,9 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
   assert.match(call[2], /<operator-episode-owner-session>\s*owner\s*<\/operator-episode-owner-session>/);
   assert.match(call[2], /EXECUTE POLICY/);
   assert.doesNotMatch(call[2], /resume the accepted in-scope revision/);
+  const observation = readHandoffObservation(f, result.observationReference, call.slice(1));
+  assert.equal(observation.episodeSessionObservation.session.sessionId, "episode");
+  assert.equal(f.nativeEntries.length, 1);
   assert.equal(f.calls.some((value) => ["fresh", "execute", "promote", "local-create", "orca-create"].includes(value[0])), false);
 });
 
@@ -825,11 +894,18 @@ test("registered active Beads handoff delivers owner-authored published design a
   assert.match(deliveries[0][1], /<operator-episode-task>\s*BEADS-42\s*<\/operator-episode-task>/);
   assert.match(deliveries[0][2], /<operator-episode-task>\s*BEADS-42\s*<\/operator-episode-task>/);
   assert.doesNotMatch(deliveries[0][2], /bounded continuation focus/);
-  for (const prompt of [deliveries[0][1], deliveries[0][2]]) {
-    assert.match(prompt, /<provider-task-observation>/);
-    assert.ok(prompt.includes(JSON.stringify(BEADS_TASK_EVIDENCE)));
-    assert.ok(prompt.includes(JSON.stringify(currentEvidence)));
-    assert.match(prompt, /<episode-session-observation>/);
+  const observation = readHandoffObservation(f, result.observationReference, deliveries[0].slice(1));
+  assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence, BEADS_TASK_EVIDENCE);
+  assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, currentEvidence);
+  assert.equal(observation.episodeSessionObservation.session.sessionId, initial.episodeId);
+  assert.equal(observation.episodeSessionObservation.state.activeSessionId, initial.episodeActiveSessionId);
+  assert.equal(f.nativeEntries.length, 1, "identity-only preflight must not capture an observation");
+  assert.equal(Object.hasOwn(result, "providerTaskObservation"), false);
+  assert.equal(f.calls.filter(([kind]) => kind === "append").length, 1);
+  assert.ok(f.calls.findIndex(([kind]) => kind === "append") < f.calls.findIndex(([kind]) => kind === "handoff"));
+  for (const prompt of deliveries[0].slice(1)) {
+    assert.equal(prompt.includes(JSON.stringify(currentEvidence)), false);
+    assert.equal(prompt.includes(JSON.stringify(BEADS_TASK_EVIDENCE)), false);
     assert.doesNotMatch(prompt, /records observations, not semantic acceptance or a new authority/);
   }
   assert.equal(f.calls.some((call) => ["fresh", "execute", "orca-create"].includes(call[0])), false);
@@ -897,14 +973,247 @@ test("registered active Beads handoff delivers compatible outside same-task nati
   assert.deepEqual(f.record.taskEvidence, current);
   const deliveries = f.calls.filter((call) => call[0] === "handoff");
   assert.equal(deliveries.length, 1);
-  for (const prompt of [deliveries[0][1], deliveries[0][2]]) {
-    assert.ok(prompt.includes(JSON.stringify(previous)));
-    assert.ok(prompt.includes(JSON.stringify(current)));
-    assert.match(prompt, new RegExp(longTailMarker));
-    assert.match(prompt, new RegExp(BEADS_REVISION));
-    assert.match(prompt, new RegExp(currentProviderRevision));
-  }
+  const observation = readHandoffObservation(f, result.observationReference, deliveries[0].slice(1));
+  assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence, previous);
+  assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, current);
+  assert.equal(observation.providerTaskObservation.previousProviderRevision, BEADS_REVISION);
+  assert.equal(observation.providerTaskObservation.currentProviderRevision, currentProviderRevision);
+  assert.equal(observation.providerTaskObservation.currentTaskEvidence.provider_native_tail.marker, longTailMarker);
+  assert.equal(f.nativeEntries.length, 1);
+  for (const prompt of deliveries[0].slice(1)) assert.equal(prompt.includes(longTailMarker), false);
   assert.equal(f.calls.some((call) => ["execute", "reopen"].includes(call[0])), false);
+});
+
+// These are complete native objects, not the selected fields of a normalized task.
+// Keep this one large case proportional to the observed multi-megabyte failure.
+test("registered Backlog handoff retains complete large native facts once and keeps prompts/results bounded", async () => {
+  const sizes = [];
+  for (const large of [false, true]) {
+    const f = harness();
+    const text = (phase) => `early-${phase}-原文🙂\n${"x".repeat(large ? 850_000 : 8)}middle-${phase}-é-漢字\n${"y".repeat(large ? 850_000 : 8)}late-${phase}-終端🚀`;
+    const previousBody = text("previous"), currentBody = text("current"), queueBody = text("queued");
+    const taskId = "PRIMECLAW-10.38", taskPath = "backlog/tasks/primeclaw-10.38.md";
+    const native = (body, phase) => ({
+      schemaVersion: 1, kind: "task-view", unknownEnvelope: { phase, empty: [], nullable: null },
+      task: {
+        id: taskId, path: taskPath, title: `Native ${phase}`, status: "In Progress", archived: false, type: "task",
+        priority: "p1", project: null, assignees: ["@operator"], reporter: null,
+        createdAt: "2026-11-17T08:00:00Z", updatedAt: "2026-11-18T09:00:00Z", dueDate: null,
+        labels: ["handoff", "原文"], dependencies: ["PRIMECLAW-1"], references: ["docs/reference.md"],
+        modifiedFiles: ["src/implementation.ts"], milestone: null, parentTaskId: null, ordinal: 1,
+        acceptanceCriteriaCompleted: 0, acceptanceCriteriaCount: 1, isReady: true,
+        dependencyGraph: { root: taskId, nodes: [
+          { id: taskId, title: `Native ${phase}`, status: "In Progress", state: "resolved", completed: false,
+            dependencyDepth: 0, dependentDepth: 0 },
+          { id: "PRIMECLAW-1", title: "Published dependency", status: "Done", state: "resolved", completed: true,
+            dependencyDepth: 1, dependentDepth: null },
+        ], edges: [{ from: taskId, to: "PRIMECLAW-1" }] },
+        readiness: { isReady: true, isBlocked: false, blockingDependencies: [], missingDependencies: [] },
+        documentation: ["docs/design.md"], subtasks: [{ id: "PRIMECLAW-10.38.1", title: "Native child" }],
+        description: body, implementationPlan: "One bounded plan.", implementationNotes: "Exact implementation notes.",
+        finalSummary: null, acceptanceCriteria: [{ index: 1, text: "Preserve every field.", checked: false }],
+        definitionOfDone: [{ index: 1, text: "Retain the exact native view.", checked: true }],
+        comments: [{ index: 1, author: "operator", createdAt: "2026-11-18T09:00:00Z", body: `comment-${phase}-終` }],
+        unknownNative: { phase, explicitNull: null, nested: [null, false, 0, "", { Unicode: "𝄞\u0301" }] },
+        ...(phase === "previous" ? { previousOnly: null } : { currentOnly: { value: null } }),
+      },
+      unknownTail: { phase, explicitNull: null, retained: "not a normalized projection" },
+    });
+    const previous = native(previousBody, "previous"), current = native(currentBody, "current");
+    if (large) {
+      assert.ok(JSON.stringify(previous).length >= 1_700_000);
+      assert.ok(JSON.stringify(current).length >= 1_700_000);
+    }
+    const initial = activeTaskRecord(f, { provider: "backlog", providerRevision: "c".repeat(40), taskEvidence: previous });
+    f.ownership.write(f.root, initial);
+    const summary = { ...transitionSession(f), queuedCount: 1,
+      queuedPrompts: [{ prompt: queueBody, unknown: null }], unknownSummary: { raw: ["原文", null] } };
+    const state = { ...summary, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
+      unfinishedActionCount: 1, sessionActions: { queuedCount: 1, steering: [],
+        followUps: [{ prompt: queueBody, source: "native", unknownQueuedField: { keep: null } }], active: null },
+      unknownState: [null, "終端"] };
+    f.publisher.list = async () => [summary];
+    let stateReads = 0;
+    f.publisher.getState = async () => { stateReads += 1; return state; };
+    // A prior native row can be huge too. It is not the handoff capture.
+    f.deps.appendEntry("unrelated-native-history", { body: queueBody });
+    f.calls.length = 0;
+    const events = [];
+    const originalWrite = f.ownership.write;
+    f.ownership.write = (repo, record) => { events.push("evidence"); originalWrite(repo, record); };
+    f.publisher.deliverHandoff = async (_route, handoff, execute, onHandoffAdmitted) => {
+      assert.equal(f.nativeEntries.filter((entry) => entry.customType === "prime-claw-task-handoff-observation").length, 1);
+      assert.equal(f.record.providerRevision, initial.providerRevision);
+      events.push("first-admitted");
+      await onHandoffAdmitted();
+      assert.deepEqual(f.record.taskEvidence, current);
+      events.push("sole-follow-up");
+      f.calls.push(["handoff", handoff, execute]);
+    };
+    const tools = new Map();
+    createReviewedPlanExtension({ ...f.deps,
+      prepareEpisodeTaskHistory: () => ({ status: "prepared", head: "d".repeat(40) }),
+      taskRunner: { run(command, args, options) {
+        if (command === "backlog") {
+          assert.deepEqual(args, ["task", "view", "--json", "--", taskId]);
+          assert.equal(options.cwd, f.worktree);
+          return { status: 0, stdout: JSON.stringify(current), stderr: "" };
+        }
+        return new ProcessCommandRunner().run(command, args, options);
+      } },
+    })({ registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
+      sendUserMessage() {}, async sendMessage() {} });
+    const toolResult = await tools.get("handoff_task_episode").execute(
+      "large-handoff", { taskId, guidance: "accepted bounded focus" }, undefined, undefined, f.ctx,
+    );
+    assert.equal(toolResult.isError, undefined);
+    assert.equal(toolResult.details.admitted, true);
+    assert.deepEqual(events, ["first-admitted", "evidence", "sole-follow-up"]);
+    assert.equal(stateReads, 2, "preflight inspects identity but captures no journal entry");
+    assert.equal(f.calls.filter(([kind]) => kind === "append").length, 1);
+    const deliveries = f.calls.filter(([kind]) => kind === "handoff");
+    assert.equal(deliveries.length, 1);
+    const prompts = deliveries[0].slice(1), reference = toolResult.details.observationReference;
+    assert.ok(toolResult.content[0].text.includes(JSON.stringify(reference)), "normal tool text exposes the same exact reference");
+    const observation = readHandoffObservation(f, reference, prompts);
+    assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence, previous);
+    assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, current);
+    assert.equal(observation.providerTaskObservation.previousProviderRevision, initial.providerRevision);
+    assert.equal(observation.providerTaskObservation.publishedProviderRevision, "d".repeat(40));
+    assert.deepEqual(observation.episodeSessionObservation, { session: summary, state });
+    assert.equal(Object.hasOwn(observation.providerTaskObservation.previousTaskEvidence.task, "currentOnly"), false);
+    assert.equal(Object.hasOwn(observation.providerTaskObservation.currentTaskEvidence.task, "previousOnly"), false);
+    assert.equal(Object.hasOwn(observation.providerTaskObservation.currentTaskEvidence.task, "neverPresent"), false);
+    assert.equal(Object.hasOwn(toolResult.details, "providerTaskObservation"), false);
+    assert.equal(Object.hasOwn(toolResult.details, "episodeSessionObservation"), false);
+    // Reconstruct exact UTF-8 bytes in bounded pieces, including split Unicode.
+    const row = readFileSync(reference.sessionFile, "utf8").split("\n")
+      .find((line) => line && JSON.parse(line).id === reference.entryId);
+    const bytes = Buffer.from(row, "utf8");
+    const unicodeSplit = bytes.indexOf(Buffer.from("🙂", "utf8")) + 1;
+    assert.ok(unicodeSplit > 0, "fixture includes a multi-byte character");
+    const pieces = [];
+    for (let offset = 0; offset < bytes.length;) {
+      let end = Math.min(offset + 4096, bytes.length);
+      if (offset < unicodeSplit && unicodeSplit < end) end = unicodeSplit;
+      pieces.push(bytes.subarray(offset, end));
+      offset = end;
+    }
+    assert.ok(pieces.every((piece) => piece.byteLength <= 4096));
+    if (large) assert.ok(pieces.length > 1000);
+    const reconstructed = Buffer.concat(pieces);
+    assert.equal(createHash("sha256").update(reconstructed).digest("hex"), reference.entrySha256);
+    assert.deepEqual(JSON.parse(reconstructed.toString("utf8")).data, observation);
+    // Later appends cannot change which retained native entry these prompts name.
+    f.deps.appendEntry("later-unrelated-entry", { marker: "not-the-observation" });
+    assert.deepEqual(readHandoffObservation(f, reference), observation);
+    const visible = [...prompts, JSON.stringify(toolResult.content), JSON.stringify(toolResult.details)];
+    for (const output of visible) {
+      assert.ok(Buffer.byteLength(output, "utf8") < 16_384, "normal output must not scale with native evidence");
+      assert.doesNotMatch(output, /early-(?:previous|current|queued)|middle-(?:previous|current|queued)|late-(?:previous|current|queued)/);
+    }
+    sizes.push(visible.map((output) => Buffer.byteLength(output, "utf8")));
+    assert.equal(f.calls.some(([kind]) => ["fresh", "reopen", "execute", "orca-create", "local-create"].includes(kind)), false);
+  }
+  for (let index = 0; index < sizes[0].length; index += 1) {
+    assert.ok(Math.abs(sizes[1][index] - sizes[0][index]) < 256, "raw native history does not inflate prompts or normal registered-tool returns");
+  }
+});
+
+test("task handoff stops before delivery and factual commit when native observation evidence is unavailable", async (t) => {
+  const marker = "native-body-must-not-leak-原文";
+  const body = `${marker}${"z".repeat(96_000)}`;
+  for (const [name, mutate, pattern, overrides = {}] of [
+    ["public append unavailable", (f) => { f.deps.appendEntry = undefined; }, /public append or supported local placement missing/],
+    ["public append throws body-bearing error", (f) => { f.deps.appendEntry = () => { throw new Error(body); }; }, /public native append failed/],
+    ["public append is visible but its disk row is deferred", (f) => {
+      const append = f.deps.appendEntry;
+      f.deps.appendEntry = (type, data) => {
+        const prior = readFileSync(f.ctx.sessionManager.getSessionFile());
+        append(type, data);
+        writeFileSync(f.ctx.sessionManager.getSessionFile(), prior);
+      };
+    }, /exact native entry is not persisted/],
+    ["persisted selected row has a different parent", (f) => {
+      const append = f.deps.appendEntry;
+      f.deps.appendEntry = (type, data) => {
+        append(type, data);
+        const file = f.ctx.sessionManager.getSessionFile(), lines = readFileSync(file, "utf8").trimEnd().split("\n");
+        const row = JSON.parse(lines.at(-1)); row.parentId = "foreign-parent";
+        lines[lines.length - 1] = JSON.stringify(row); writeFileSync(file, `${lines.join("\n")}\n`);
+      };
+    }, /exact native entry is not persisted/],
+    ["persisted selected row has different data", (f) => {
+      const append = f.deps.appendEntry;
+      f.deps.appendEntry = (type, data) => {
+        append(type, data);
+        const file = f.ctx.sessionManager.getSessionFile(), lines = readFileSync(file, "utf8").trimEnd().split("\n");
+        const row = JSON.parse(lines.at(-1)); row.data.providerTaskObservation.currentTaskEvidence.notes = "different-native-data";
+        lines[lines.length - 1] = JSON.stringify(row); writeFileSync(file, `${lines.join("\n")}\n`);
+      };
+    }, /exact native entry is not persisted/],
+    ["persisted exact entry ID is duplicated", (f) => {
+      const append = f.deps.appendEntry;
+      f.deps.appendEntry = (type, data) => {
+        append(type, data);
+        appendFileSync(f.ctx.sessionManager.getSessionFile(), `${JSON.stringify(f.ctx.sessionManager.getLeafEntry())}\n`);
+      };
+    }, /exact native entry is not persisted/],
+    ["public leaf entry missing", (f) => { f.ctx.sessionManager.getLeafEntry = () => undefined; }, /public exact entry selection failed/],
+    ["public entry lookup missing", (f) => { f.ctx.sessionManager.getEntry = () => undefined; }, /public exact entry selection failed/],
+    ["owner header names another session", (f) => {
+      writeFileSync(f.ctx.sessionManager.getSessionFile(), `${JSON.stringify({ type: "session", id: "foreign-owner", cwd: f.root })}\n`);
+    }, /invoking native session header does not match/],
+    ["owner journal parse error cannot leak raw evidence", (f) => {
+      writeFileSync(f.ctx.sessionManager.getSessionFile(), `{${body}\n`);
+    }, /native session journal is not readable/],
+    ["Episode header names another durable session", (f) => {
+      writeFileSync(f.record.episodeSessionFile, `${JSON.stringify({ type: "session", id: "foreign-episode", cwd: f.worktree })}\n`);
+    }, /selected Episode journal identity does not match/],
+    ["Episode header names another CWD", (f) => {
+      writeFileSync(f.record.episodeSessionFile, `${JSON.stringify({ type: "session", id: "episode", cwd: f.root })}\n`);
+    }, /selected Episode journal identity does not match/],
+    ["Episode journal absent", (f) => { unlinkSync(f.record.episodeSessionFile); }, /native session journal is not readable/],
+    ["recorded remote route", () => {}, /public append or supported local placement missing/, { routingEnvironmentId: "remote-env" }],
+    ["current Orca setup is remote", (f) => {
+      f.orca.listReadySetups = async () => [setup("setup-local", "remote-host", "remote-env")];
+    }, /placement is no longer an approved local setup/, { engine: "orca" }],
+    ["current Orca setup unavailable", (f) => { f.orca.listReadySetups = async () => []; }, /setup is no longer ready/, { engine: "orca" }],
+  ]) await t.test(name, async () => {
+    const f = harness({ list: (_count, session) => [session] });
+    const initial = activeBeadsTaskRecord(f, {
+      taskEvidence: { ...BEADS_TASK_EVIDENCE, notes: body },
+      ...(overrides.engine === "orca" ? {
+        projectSetupId: f.wt.projectSetupId, worktreeId: f.wt.id, worktreeIdentity: f.wt.identity,
+        terminalHandle: "terminal",
+      } : {}),
+      ...overrides,
+    });
+    f.ownership.write(f.root, initial);
+    f.calls.length = 0;
+    mutate(f);
+    let commits = 0;
+    const current = { ...initial.taskEvidence, notes: `${body}current` };
+    const advanced = parseEpisodeOwnership({ ...initial, providerRevision: "d".repeat(32),
+      taskEvidence: current, head: f.git.head(f.worktree) });
+    await assert.rejects(handoffTaskEpisode(BEADS_TASK_ID, "accepted focus", f.ctx, {
+      ...f.deps, advanceBeadsEvidence: () => ({
+        record: advanced, previousProviderRevision: initial.providerRevision,
+        currentProviderRevision: advanced.providerRevision, previousTaskEvidence: initial.taskEvidence,
+        currentTaskEvidence: current, commit() { commits += 1; f.ownership.write(f.root, advanced); return advanced; },
+      }),
+    }), (error) => {
+      assert.match(error.message, pattern);
+      assert.ok(Buffer.byteLength(error.message, "utf8") < 2048);
+      assert.equal(error.message.includes(marker), false);
+      return true;
+    });
+    assert.equal(commits, 0, "no factual admission callback on evidence failure");
+    assert.deepEqual(f.record, initial);
+    assert.equal(f.calls.some(([kind]) => ["handoff", "execute", "fresh", "reopen", "orca-create", "local-create"].includes(kind)), false);
+    assert.ok(f.nativeEntries.length <= 1, "no retry, second capture, or copy fallback");
+    assert.equal(JSON.stringify(f.calls).includes(marker), false);
+  });
 });
 
 test("active Beads handoff resumes from a factual blocked observation when current native state is in progress", async () => {
@@ -1006,8 +1315,11 @@ test("active Beads handoff commits factual observations only after the first can
     assert.deepEqual(f.record.taskEvidence, current);
     const deliveries = f.calls.filter((call) => call[0] === "handoff");
     assert.equal(deliveries.length, 1);
-    assert.ok(deliveries[0][1].includes(JSON.stringify(BEADS_TASK_EVIDENCE)));
-    assert.ok(deliveries[0][1].includes(JSON.stringify(current)));
+    const reference = handoffReferenceFromPrompt(deliveries[0][1]);
+    const observation = readHandoffObservation(f, reference, deliveries[0].slice(1));
+    assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence, BEADS_TASK_EVIDENCE);
+    assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, current);
+    assert.equal(f.nativeEntries.length, 1);
   });
 });
 
@@ -1899,13 +2211,15 @@ test("branch-local handoff delivers current raw task and code facts without task
   assert.equal(deliveries.length, 1);
   assert.match(deliveries[0][1], /EDITED CONTINUATION POLICY/);
   assert.match(deliveries[0][2], /EDITED EXECUTION POLICY/);
+  const observation = readHandoffObservation(f, result.observationReference, deliveries[0].slice(1));
+  assert.deepEqual(observation.providerTaskObservation.mainTaskEvidence, mainView);
+  assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, episodeView);
+  assert.equal(typeof observation.providerTaskObservation.episodeCode.head, "string");
+  assert.equal(Object.hasOwn(result, "providerTaskObservation"), false);
   for (const prompt of deliveries[0].slice(1)) {
-    assert.ok(prompt.includes(JSON.stringify(mainView)));
-    assert.ok(prompt.includes(JSON.stringify(episodeView)));
-    assert.match(prompt, /episodeCode/);
+    assert.equal(prompt.includes(JSON.stringify(mainView)), false);
+    assert.equal(prompt.includes(JSON.stringify(episodeView)), false);
   }
-  assert.deepEqual(result.providerTaskObservation.mainTaskEvidence, mainView);
-  assert.deepEqual(result.providerTaskObservation.currentTaskEvidence, episodeView);
   assert.equal(readFileSync(taskPath, "utf8"), bytes);
   assert.equal(execFileSync("git", ["-C", f.root, "rev-parse", "HEAD"], { encoding: "utf8" }), head);
   assert.equal(execFileSync("git", ["-C", f.root, "ls-files", "--stage"], { encoding: "utf8" }), index);
@@ -2003,9 +2317,10 @@ test("task-native handoff delivers status/plan changes but rejects foreign task/
         nativeView: { task: { id: "PRIMECLAW-10.38", ...scenario } } }),
     });
     assert.equal(result.admitted, true);
-    for (const prompt of f.calls.find(([kind]) => kind === "handoff").slice(1)) {
-      assert.ok(prompt.includes(JSON.stringify({ task: { id: "PRIMECLAW-10.38", ...scenario } })));
-    }
+    const prompts = f.calls.find(([kind]) => kind === "handoff").slice(1);
+    const observation = readHandoffObservation(f, result.observationReference, prompts);
+    assert.deepEqual(observation.providerTaskObservation.mainTaskEvidence, { task: { id: "PRIMECLAW-10.38", ...scenario } });
+    assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, { task: { id: "PRIMECLAW-10.38", ...scenario } });
   });
   for (const foreign of ["path", "session"]) await t.test(foreign, async () => {
     const f = harness({ list: (_count, session) => [{ ...session, ...(foreign === "session" ? { cwd: "/foreign" } : {}) }] });
@@ -3809,6 +4124,11 @@ for (const provider of ["backlog", "beads"]) {
       assert.deepEqual(events, firstFailed ? ["first"] : failure === "callback" ? ["first", "evidence"] : ["first", "evidence", "second"]);
       assert.equal(callbacks, firstFailed ? 0 : 1);
       assert.equal(requests.length, firstFailed || failure === "callback" ? 1 : 2);
+      assert.equal(f.nativeEntries.length, 1, "identity-only preflight does not capture; actual handoff captures once");
+      const reference = handoffReferenceFromPrompt(requests[0].message);
+      const observation = readHandoffObservation(f, reference, requests.map((request) => request.message));
+      assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence, initial.taskEvidence);
+      assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, initial.taskEvidence);
       assert.equal(f.record.providerRevision, firstFailed || failure === "callback" ? initial.providerRevision : currentRevision);
       assert.match(requests[0].message, /HANDOFF POLICY/);
       if (requests[1]) assert.match(requests[1].message, /EXECUTE POLICY/);
@@ -3831,6 +4151,8 @@ test("retained version-1 real caller/publisher remains idle-only", async () => {
   publisher.getState = f.publisher.getState;
   await assert.rejects(handoffSpecEpisode(LOCATION, "accepted focus", f.ctx, { ...f.deps, publisher }), /heartbeat made retained Episode busy/);
   assert.equal(requests.length, 1);
+  assert.equal(f.nativeEntries.length, 0, "retained version 1 does not capture task-native observations");
+  assert.doesNotMatch(requests[0].message, /<task-handoff-observation-reference>/);
   assert.equal(requests[0].queueIfBusy, false);
   assert.equal(Object.hasOwn(requests[0], "streamingBehavior"), false);
 });

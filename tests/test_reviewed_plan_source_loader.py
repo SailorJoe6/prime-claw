@@ -167,3 +167,5 @@ def test_native_observation_entry_durable_cross_worktree_repl(tmp_path):
     assert proof["compactionCompleted"] == 1
     assert proof["customPayloadInModelContext"] is False
     assert proof["reopenedExactEntry"] is True
+    assert proof["productionHelperExactRead"] is True
+    assert proof["queuedPromptCharacters"] >= 900_000

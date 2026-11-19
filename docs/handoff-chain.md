@@ -1,9 +1,10 @@
 # Ralph handoff chain
 
 Prime Claw keeps handoff and execute as two separate canonical workflows.
-Handoff compacts and records the transition. Execute remains the sole queued
-follow-up. A prep or handoff turn never reconstructs, retries, or directly runs
-the queued continuation.
+Handoff requests native compaction once and ends. Execute remains the sole
+canonical follow-up. A prep or handoff turn never reconstructs, retries, or
+directly runs that continuation. Task-native handoff may start before the local
+observation callback or execute send; prompt receipt is not execute admission.
 
 ## Ordinary handoff
 
@@ -120,28 +121,79 @@ use normal provider publication, not a new endpoint, store, classifier or replay
 protocol. This change authorizes no historical recovery or live activation.
 Ordinary successful future handoffs need no new routine permission.
 
-Grandfathered Backlog carries complete current primary and Episode native task
-views to both prompts and the caller. Independent Backlog prepares only the
-Episode task clone once, without synchronizing another writer's mutable primary
-bytes/index or freezing paired heads. Both prompts retain exact previous/current
-native views/revisions and Episode code-head/upstream/status results. Unrelated
-Git bytes, staging and compatible history descendants survive. Publication and
-same-task refinements are LLM judgments, not a classifier or frozen approval.
-Backlog authoring remains literal selected-file-only, separately from code in
-both topologies; each coherent ticket edit is committed ASAP and published
-promptly, not saved for handoff or session end.
+Grandfathered Backlog captures complete current primary and Episode native task
+views. Independent Backlog prepares only the Episode task clone once, without
+synchronizing another writer's mutable primary bytes/index or freezing paired
+heads. The exact observation includes previous/current native views/revisions
+and Episode code-head/upstream/status results. Unrelated Git bytes, staging and
+compatible history descendants survive. Publication and same-task refinements
+are LLM judgments, not a classifier or frozen approval. Backlog authoring remains
+literal selected-file-only, separately from code in both topologies; each
+coherent ticket edit is committed ASAP and published promptly, not saved for
+handoff or session end.
 
 Beads performs one supported pull and reads current native transport and raw
-task facts. Both prompts and the caller receive previous/current raw views,
-local revisions, native results/warnings/working-set/ref qualifications and code
+task facts. Its exact observation includes previous/current raw views, local
+revisions, native results/warnings/working-set/ref qualifications and code
 observations. The old persisted design is not a readiness lock. No clean/pushed
 code or ancestry predicate can reject the observation callback after admission.
 Exact fixed ownership/resource targeting and readback remain. Native session
-list/get_state flags also reach both prompts; they are facts for editable policy.
+list/get_state flags are also captured as facts for editable policy.
 `currentProviderRevision` is local HEAD, not exact-task publication proof.
 The first message's callback records only existing task/provider/code observations;
 execute is its sole follow-up. R1 preserves successful stderr; R2 preserves full
 create mutation results through one initial execute. No new mirror or assignment.
+
+### Exact native task observation reference
+
+Task-native handoff and execute carry the same bounded
+`<task-handoff-observation-reference>` JSON rather than giant inline task views.
+It names `schemaVersion: 1`, the source native `sessionId`, absolute `sessionFile`,
+exact `entryId`, `parentId`, `customType: "prime-claw-task-handoff-observation"`,
+`entrySha256`, and exact `bindings`. Bindings identify `ownerSessionId`, `provider`,
+`taskId`, `operationId`, `episodeId`, `episodeSessionFile`, `episodeActiveSessionId`,
+`worktree`, `branch`, `baseRef`, `integrationBranch`, `engine`, and optional
+`projectSetupId`/`routingEnvironmentId`.
+
+The custom entry data is `{schemaVersion: 1, bindings,
+providerTaskObservation, episodeSessionObservation: {session, state}}`.
+`providerTaskObservation` is the full unchanged native observation, not a
+normalized model or summary. The native task remains authority. The reference
+only selects factual context; it is not semantic acceptance or publication proof.
+The caller receives bounded transport/reference facts, not the entire payload.
+
+Both editable workflows require the Episode REPL to read only the exact source
+session file, verify its exact session header ID, select one exact entry ID,
+and verify `type: "custom"`, custom type, parent, schema and bindings against its
+own selected registry Episode. SHA-256 covers the exact UTF-8 JSONL row bytes
+excluding the newline, not JSON reserialization. The full parsed entry data
+stays in named REPL variables. The reference's `sessionId` must equal `bindings.ownerSessionId`. That source
+Conversation session and the bound Episode session are distinct identities;
+neither silently substitutes for the other.
+
+Supported placement uses the pinned same-user local daemon. For Orca, inspect
+the exact selected current setup: `hostId` must be local/unrouted. Check the
+exact native Episode session header/file, current route and CWD, and actual
+same-UID disk access to the source session file. These are placement facts, not
+a new approval protocol. External sandboxes, different user namespaces and
+remote execution are not proven by this support; do not infer access there.
+
+The LLM enumerates the native structure, then inspects the entire current task
+contract and relevant prior/current differences. Provider envelopes, arrays,
+unknown fields, comments, nulls and absence retain their exact meaning. Large
+collections and individual huge values are read completely in bounded chunks
+of about 4096 characters per output. Key/length/digest checks, previews and
+summaries cannot replace semantic inspection. Neither workflow prints the whole
+history or one giant payload.
+
+Missing, unreadable, ambiguous, mismatched or remotely inaccessible exact
+evidence stops continuation. The supported placement needs real access to the
+same native session file; host labels alone do not prove access. There is no
+journal search, copied evidence store or giant-inline fallback. Prior loaded
+generations' `<provider-task-observation>` and `<episode-session-observation>`
+remain readable when no reference is supplied, never as repair for a failed
+reference. Retained version-1 handoff is unchanged. The reference does not add
+transport retry, callback atomicity, historical recovery or assignment authority.
 
 Beads authoring uses its accepted touched-table/staged-set multi-issue semantics:
 review pending/staged consequences BEFORE mutation/commit/push, consult unclear
@@ -238,11 +290,21 @@ The container suite includes the reviewed-plan Node behavior bridge and native
 Prime Agent lifecycle probes. Host-safe Tier 0 covers static policy and pure
 logic only.
 
-## Native observation feasibility proof (not yet adopted)
+## Native observation feasibility evidence
 
-PRIMECLAW-62 slice 1 tests lossless, exact custom-entry access from a native
+PRIMECLAW-62 slice 1 proved lossless, exact custom-entry access from a native
 Episode REPL on the same filesystem. See the
-[proof and placement limits](evidence/primeclaw-62-native-entry-proof.md). This
-test-only candidate does not change production handoff prompts, delivery reporting or canonical
-follow-ups. In particular, pre-assistant append can be deferred in memory;
-in-memory entry access alone is not evidence that another session can read it.
+[proof and placement limits](evidence/primeclaw-62-native-entry-proof.md).
+Slice 2 adopts that exact-reference shape in the task-native handoff candidate;
+it does not claim host activation or real-model UAT. Pre-assistant append can
+be deferred in memory, so in-memory entry access alone is not evidence that
+another session can read it. Dispatch needs actual exact-row persistence.
+Native compaction and the sole existing execute follow-up remain in place;
+deep transport-correlation tests and historical delivery recovery are not part
+of this slice.
+
+Goals stay bounded to the admitted phase, report or wait boundary. Continuation
+and post-compaction reminders are advisory background guidance, not assignments
+or acknowledgement requests. They do not start another slice, compaction,
+execute pass or recovery turn. Existing authorized supervision may continue
+without extra reminder-driven status chatter.

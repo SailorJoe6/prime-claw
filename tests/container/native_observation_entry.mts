@@ -57,6 +57,7 @@ const extension = join(root, "proof-extension.ts");
 writeFileSync(extension, `
 import assert from "node:assert/strict";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+import { retainTaskHandoffObservation } from "/candidate/extension-support/task-handoff-observation.ts";
 const state = globalThis.__nativeEntryProof;
 export default function proof(pi) {
   pi.registerCommand("capture-entry", { description: "fixture capture", handler: async (arg, ctx) => {
@@ -73,6 +74,10 @@ export default function proof(pi) {
     state.references.push({ sessionId: ctx.sessionManager.getSessionId(),
       sessionFile: ctx.sessionManager.getSessionFile(), entryId: entry.id,
       customType: entry.customType, parentId: entry.parentId });
+  }});
+  pi.registerCommand("capture-production", { description: "production public-entry helper", handler: async (_arg, ctx) => {
+    state.productionReference = retainTaskHandoffObservation(ctx, state.productionRecord, "reader-route",
+      state.observation, state.sessionObservation, (type, data) => pi.appendEntry(type, data));
   }});
   pi.on("tool_execution_end", (event) => {
     if (event.toolName === "ipython") state.readerToolEnds.push({ isError: event.isError, result: event.result });
@@ -147,6 +152,15 @@ try {
 
   reader = await make(readerCwd, "reader", SessionManager.create(readerCwd, join(root, "reader-sessions")));
   const readerId = reader.sessionManager.getSessionId();
+  await reader.prompt("Seed the selected reader's actual native session file.");
+  state.productionRecord = { version: 2, status: "active", provider: "backlog", engine: "local",
+    ownerSessionId: writer.sessionManager.getSessionId(), operationId: "synthetic-operation",
+    taskId: "SYNTHETIC-62", episodeId: readerId, episodeSessionFile: reader.sessionManager.getSessionFile(),
+    worktree: readerCwd, branch: "episode-proof", baseRef: git("rev-parse", "HEAD"), integrationBranch: "main" };
+  state.sessionObservation = { session: { sessionId: readerId, cwd: readerCwd, unknown: null },
+    state: { sessionActions: { followUps: [{ message: "QUEUED_EARLY_α" + "q".repeat(900000) + "QUEUED_LATE_γ" }] } } };
+  await writer.prompt("/capture-production");
+  assert.ok(state.productionReference?.entrySha256);
   state.pythonCode = `from pathlib import Path
 import json, hashlib
 assert str(Path.cwd()) == ${JSON.stringify(readerCwd)}
@@ -155,11 +169,13 @@ def load_exact(reference):
     with Path(reference['sessionFile']).open(encoding='utf-8') as journal:
         header = json.loads(next(journal))
         assert header['type'] == 'session' and header['id'] == reference['sessionId']
-        matches = [json.loads(line) for line in journal if line.strip()]
-    matches = [entry for entry in matches if entry.get('id') == reference['entryId']]
+        matches = [(line.removesuffix(chr(10)), json.loads(line)) for line in journal if line.strip()]
+    matches = [(line, entry) for line, entry in matches if entry.get('id') == reference['entryId']]
     if len(matches) != 1:
         raise LookupError('exact native entry unavailable')
-    entry = matches[0]
+    line, entry = matches[0]
+    if 'entrySha256' in reference:
+        assert hashlib.sha256(line.encode('utf-8')).hexdigest() == reference['entrySha256']
     assert entry['type'] == 'custom' and entry['customType'] == reference['customType']
     assert entry['parentId'] == reference['parentId']
     return entry['data']
@@ -188,6 +204,14 @@ def inspect_pieces(value, path=()):
         assert ''.join(pieces) == value
         text_pieces += len(pieces)
 inspect_pieces(observation)
+production_reference = json.loads(${JSON.stringify(JSON.stringify(state.productionReference))})
+production_data = load_exact(production_reference)
+assert production_data['bindings'] == production_reference['bindings']
+assert production_data['bindings']['episodeId'] == ${JSON.stringify(readerId)}
+assert production_data['providerTaskObservation'] == observation
+queued = production_data['episodeSessionObservation']['state']['sessionActions']['followUps'][0]['message']
+assert queued.startswith('QUEUED_EARLY_α') and queued.endswith('QUEUED_LATE_γ') and len(queued) > 900000
+inspect_pieces(production_data)
 for key, sentinel in [('previousTaskEvidence', 'PREVIOUS'), ('currentTaskEvidence', 'CURRENT')]:
     body = observation[key]['task']['comments'][0]['body']
     assert body.startswith(sentinel + '_EARLY_α')
@@ -237,7 +261,8 @@ print('ENTRY_READ_OK', len(encoded), len(structure), text_pieces)
   console.log("NATIVE_ENTRY_RESULT=" + JSON.stringify({ preAssistantDeferred: true,
     appendReturnedVoid: true, payloadCharacters: serialized.length, exactEntryCount: exact.length,
     readerToolSuccesses: state.readerToolEnds.length, compactionCompleted: state.compactions.length,
-    customPayloadInModelContext, reopenedExactEntry: true }));
+    customPayloadInModelContext, reopenedExactEntry: true,
+    productionHelperExactRead: true, queuedPromptCharacters: 900000 }));
 } finally {
   await reader?.disposeAsync();
   await writer?.disposeAsync();

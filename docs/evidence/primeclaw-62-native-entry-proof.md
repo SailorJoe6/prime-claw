@@ -110,3 +110,24 @@ verified image rejected it at the exact-entry disk assertion (zero matches
 instead of one): **1 failed in 13.21s**, as intended. The snapshot lacked the
 repo's marker registration and emitted two nonfunctional pytest marker warnings.
 No production or live journal was used.
+
+## Slice-2 production-helper extension
+
+The same offline native fixture now also calls the candidate
+`retainTaskHandoffObservation` through a real extension command, using public
+`pi.appendEntry` and the invoking native read-only session manager. It seeds an
+actual selected reader journal, then checks the production helper's exact
+persisted row and bindings before any reference is sent to the reader. The
+reader's two real `ipython` calls also load that exact production reference,
+verify SHA-256 over its original UTF-8 row (not reserialized JSON), compare the
+full provider object, and reconstruct a separate 900,000-character queued-prompt
+body in bounded pieces. The production row is read again after writer reopen
+and the same one writer SDK compaction.
+
+Recorded on the same pinned image above: **2 passed in 20.19s**. The result adds
+`productionHelperExactRead: true` and `queuedPromptCharacters: 900000`. Temporary
+evidence is under `primeclaw62-slice2-quhqxrfx/native/`. This extends the public
+helper/readability evidence; it is not the full production handoff chain, a
+reader-side `compact.run` test, live activation or real-model semantic proof.
+The separate deterministic handoff suite checks prompt/owner-result size and
+pre-dispatch failure behavior. Its results are recorded in the native task.

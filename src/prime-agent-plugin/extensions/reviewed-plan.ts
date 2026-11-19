@@ -911,12 +911,14 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
-          const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, dependencies);
+          const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, {
+            ...dependencies, appendEntry: dependencies?.appendEntry ?? ((type, data) => pi.appendEntry(type, data)),
+          });
           const conversationCompaction = await runConversationAfterHandoff(pi, ctx, dependencies);
           return {
-            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.${conversationCompactionWarning(conversationCompaction)}${result.providerTaskObservation ? `
+            content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.${conversationCompactionWarning(conversationCompaction)}${result.observationReference ? `
 
-${JSON.stringify(result.providerTaskObservation)}` : ""}` }],
+${JSON.stringify(result.observationReference)}` : ""}` }],
             details: { ...result, conversationCompaction },
           };
         } catch (error) {

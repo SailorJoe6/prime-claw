@@ -61,6 +61,51 @@ files decides may `<operator-episode-task>` become a candidate task binding.
 The tag alone cannot establish a live Episode or authorize task handoff; stop
 for exact version-2 ownership recovery before task-native continuation.
 
+### Read the exact handoff observation
+
+For a task-native continuation, `<task-handoff-observation-reference>` contains
+JSON with `schemaVersion: 1`, `sessionId`, an absolute `sessionFile`, `entryId`,
+`parentId`, `customType: "prime-claw-task-handoff-observation"`, `entrySha256`,
+and `bindings`. This is factual context, not task authority or acceptance.
+Load it before judging continuation:
+
+1. Read only that exact native `sessionFile` through the Episode's Python REPL.
+   Verify its session header has `type: "session"` and the exact `sessionId`.
+   Select exactly one row whose `id` equals `entryId`; verify `type: "custom"`,
+   `customType` and `parentId`. Hash its exact UTF-8 JSONL bytes, excluding the newline,
+   with SHA-256 and require `entrySha256`. Do not hash reserialized JSON, choose
+   the latest entry, search other sessions, or print the journal/history.
+2. Require schema version 1 in the reference and entry data. Require the entry's
+   `bindings` to equal the reference's `bindings` and match this exact selected
+   owner/registry Episode: `ownerSessionId`, `provider`, `taskId`, `operationId`,
+   `episodeId`, `episodeSessionFile`, `episodeActiveSessionId`, `worktree`,
+   `branch`, `baseRef`, `integrationBranch`, `engine`, and optional
+   `projectSetupId`/`routingEnvironmentId`. Apply the existing provider and
+   integration-branch defaults above for older records. Require the reference's
+   `sessionId` to equal `bindings.ownerSessionId`. That source Conversation
+   session is not a replacement for the Episode's durable session binding.
+3. Keep the full parsed entry data in named REPL variables. Its structure is
+   `{schemaVersion: 1, bindings, providerTaskObservation,
+   episodeSessionObservation: {session, state}}`. Retain the full unchanged
+   provider observation and native session/state facts. Preserve provider-native
+   envelopes, arrays, keys, unknown fields, nulls, and absent fields; never
+   normalize, flatten, truncate, or replace them with a summary.
+4. Enumerate the native structure, then inspect the entire current task contract
+   and all relevant prior/current differences, including fields and comments.
+   Read large collections and individual huge values in bounded chunks of about
+   4096 characters per output, with paths and offsets so no remainder is skipped.
+   A key list, length/digest check, preview or summary is not semantic inspection.
+   Do not dump one giant JSON value into model context.
+
+A missing, unreadable, ambiguous, mismatched or inaccessible exact session/entry
+stops continuation with a bounded explanation. Same-filesystem access must be
+real; a remote/host label does not establish it. Do not fall back to another
+entry, ownership evidence, a copied journal, a new store or giant inline data.
+Previously loaded generations may still supply `<provider-task-observation>`
+and `<episode-session-observation>` inline. Read those complete native values
+when no reference was supplied; they never repair a failed reference. Retained
+version-1 folder-plan handling is unchanged.
+
 For provider-absent/Backlog task-native handoff, reload the bound candidate
 through the supported structured interface:
 
@@ -122,11 +167,12 @@ expansion. Do not use Backlog, translate or mutate Beads during handoff. Leave
 content updates to execute's native cycle, reviewing touched-table/staged-set
 multi-issue consequences first. Guidance never reconstructs provider facts.
 
-The `<provider-task-observation>` JSON is factual before/current context, not
-semantic acceptance or new authority. Grandfathered Backlog includes complete
+The referenced `providerTaskObservation` is factual before/current context,
+not semantic acceptance or new authority. Grandfathered Backlog includes complete
 primary/Episode native views; independent Backlog and Beads include prior/current
-native views and code observations. `<episode-session-observation>` carries the
-native list/state flags. Check idle completion, children/queues and publication
+native views and code observations. `episodeSessionObservation` carries the
+native list/state flags. The prior-generation inline tags carry the same facts.
+Check idle completion, children/queues and publication
 facts before ordinary continuation; these are LLM decisions under this policy,
 not duplicate status/design/code-dirt/upstream/ancestry or role-depth predicates.
 The first task-native request uses `followUp` with `queueIfBusy: true`, allowing
@@ -179,13 +225,13 @@ their authorities.
 
 ## Request compaction once
 
-For task-native handoff, the queued-execute statements below describe successful
-two-stage delivery, not proof from first admission alone. A callback or second-send
-failure remains the owner's stopped case above; never synthesize its follow-up.
-
 Compaction is a best-effort context improvement, not the continuation trigger.
-The `ralph_handoff` operation or owning Conversation has already queued
-canonical `execute` independently as one follow-up.
+For task-native handoff, this turn can start before the observation callback or
+execute send. Receiving this prompt proves neither that execute is queued nor
+that the callback or continuation completed. The existing transport alone sends
+the sole canonical execute follow-up. Never send, reconstruct or retry it here,
+including after a callback or second-send failure. Ordinary `ralph_handoff` and
+retained version-1 handoff keep their existing independently queued execute.
 
 When the handoff prompt appends an `<operator-compaction-guidance>` block, treat
 its entire contents as additional operator-provided focus. Preserve its intent
@@ -208,12 +254,12 @@ Interpret only the immediate result:
 - If the call raises, report that compaction failed without pasting a traceback
   or raw provider data.
 
-In every case, canonical `execute` is already queued independently. Do not wait
-for `session_compact`, infer a later outcome from its absence, invoke execute
-yourself, or reproduce the execute workflow. Prime Agent surfaces later
-compaction success, cancellation, or failure and owns the native follow-up
-queue. Explicit queue removal or session termination/replacement cancels that
-queued continuation.
+In every case, do not wait for `session_compact`, infer a later outcome from
+its absence, invoke execute yourself, or reproduce the execute workflow. Prime
+Agent surfaces later compaction success, cancellation, or failure and owns its
+native follow-up queue. Explicit queue removal or session termination/replacement
+cancels any queued continuation. Report only observed transport facts; handoff
+prompt receipt and a compaction result do not establish execute admission.
 
 After the compact call returns or raises, output only:
 - Status
@@ -221,5 +267,7 @@ After the compact call returns or raises, output only:
 - Next Step
 
 Distinguish “compaction requested” from “compaction confirmed.” Then end the
-turn so the queued execute follow-up can run. Do not include a narrative summary
-or restate task, plan, or specification content.
+turn and leave continuation to the existing canonical transport. Complete any
+phase-bounded goal before yielding; do not start a goal, heartbeat or extra turn
+to wait for or acknowledge the callback/follow-up. Do not include a narrative
+summary or restate task, plan, specification or raw observation content.

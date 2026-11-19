@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -213,7 +213,7 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
       assert.ok(existsSync(join(options.worktree, ".backlog", ".git")), "nested task checkout exists before session allocation");
       preSessionView = view(options.worktree, taskId);
       const identity = { sessionId: "independent-episode", sessionFile: join(dir, "independent-episode.jsonl") };
-      writeFileSync(identity.sessionFile, "{}\n");
+      writeFileSync(identity.sessionFile, JSON.stringify({ type: "session", id: identity.sessionId, cwd: options.worktree }) + "\n");
       await options.onAllocated?.(identity);
       return { ...identity, activeSessionId: "independent-route" };
     },
@@ -321,7 +321,17 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
     deliveredContinuation = execute;
     await onHandoffAdmitted?.();
   };
+  const nativeEntries = [];
+  writeFileSync(ctx.sessionManager.getSessionFile(), JSON.stringify({ type: "session", id: "independent-owner", cwd: root }) + "\n");
+  ctx.sessionManager.getLeafEntry = () => nativeEntries.at(-1);
+  ctx.sessionManager.getEntry = (id) => nativeEntries.find((entry) => entry.id === id);
   const handoffDependencies = {
+    appendEntry(customType, data) {
+      const entry = { type: "custom", id: `observation-${nativeEntries.length}`, parentId: nativeEntries.at(-1)?.id ?? null,
+        timestamp: "2026-10-26T20:01:00.000Z", customType, data };
+      nativeEntries.push(entry);
+      appendFileSync(ctx.sessionManager.getSessionFile(), JSON.stringify(entry) + "\n");
+    },
     admissionRunner: runner, taskRunner: runner, taskResolver, ownership, publisher,
     prepareEpisodeTaskHistory,
     now: () => "2026-10-26T20:01:00.000Z",
@@ -364,9 +374,13 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   assert.equal(advancedOwner.baseRef, codeHead);
   assert.match(advancedOwner.taskEvidence.task.implementationNotes, /accepted handoff advance/);
   for (const prompt of [deliveredHandoff, deliveredContinuation]) {
-    assert.ok(prompt.includes(JSON.stringify(beforeHandoff.taskEvidence)));
-    assert.ok(prompt.includes(JSON.stringify(advancedOwner.taskEvidence)));
-    const observation = JSON.parse(prompt.match(/(?:^|\n)<provider-task-observation>\r?\n([\s\S]*?)\r?\n<\/provider-task-observation>/)[1]);
+    assert.equal(prompt.includes(JSON.stringify(beforeHandoff.taskEvidence)), false);
+    assert.equal(prompt.includes(JSON.stringify(advancedOwner.taskEvidence)), false);
+    const reference = JSON.parse(prompt.match(/(?:^|\n)<task-handoff-observation-reference>\r?\n([\s\S]*?)\r?\n<\/task-handoff-observation-reference>/)[1]);
+    assert.deepEqual(reference, continued.observationReference);
+    const observation = ctx.sessionManager.getEntry(reference.entryId).data.providerTaskObservation;
+    assert.deepEqual(observation.previousTaskEvidence, beforeHandoff.taskEvidence);
+    assert.deepEqual(observation.currentTaskEvidence, advancedOwner.taskEvidence);
     assert.equal(observation.episodeCodeHead, codeHead);
     assert.match(observation.episodeCode.status.stdout, /unrelated-code.txt/);
     assert.notEqual(observation.episodeUpstream.status, 0, "missing upstream is an observation, not coded eligibility");
