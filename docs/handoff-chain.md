@@ -237,3 +237,12 @@ scripts/test-all.sh
 The container suite includes the reviewed-plan Node behavior bridge and native
 Prime Agent lifecycle probes. Host-safe Tier 0 covers static policy and pure
 logic only.
+
+## Native observation feasibility proof (not yet adopted)
+
+PRIMECLAW-62 slice 1 tests lossless, exact custom-entry access from a native
+Episode REPL on the same filesystem. See the
+[proof and placement limits](evidence/primeclaw-62-native-entry-proof.md). This
+test-only candidate does not change production handoff prompts, delivery reporting or canonical
+follow-ups. In particular, pre-assistant append can be deferred in memory;
+in-memory entry access alone is not evidence that another session can read it.

@@ -40,3 +40,7 @@ console.log("SOURCE_LOADER_RESULT=" + JSON.stringify({
     tools: [...extension.tools.keys()].sort(),
   })),
 }));
+
+if (process.env.SOURCE_LOADER_NATIVE_ENTRY_PROOF === "1") {
+  await import("./native_observation_entry.mts");
+}

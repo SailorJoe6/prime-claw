@@ -1,7 +1,7 @@
 # Pinned source-loader fixture. No package dist build or extension aliases.
 # Build context contains only this Dockerfile; no host dependency/state inputs.
 FROM node:22.14.0-bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 ARG PRIME_AGENT_REQUIRED_VERSION=0.9.8
 ENV PRIME_AGENT_SOURCE_TAG=cwd-fix-v0.9.8-r1 \
@@ -35,5 +35,12 @@ RUN git clone --filter=blob:none --depth 1 --single-branch \
     && test "$(git describe --tags --always --dirty)" = "$PRIME_AGENT_SOURCE_TAG" \
     && test -x prime-agent.sh
 RUN git config --system --add safe.directory /opt/prime-agent
+# Native public-entry proof uses a real Episode ipython kernel while offline.
+# Bake it outside /tmp and HOME, which the run replaces with scratch roots.
 USER node
+ENV PRIME_AGENT_KERNEL_VENV=/home/node/fixture-kernel-venv
+RUN cd /opt/prime-agent \
+    && PRIME_AGENT_INSTALL_UV=1 node_modules/.bin/tsx -e \
+       'import { ensureKernelPython } from "./packages/coding-agent/src/core/kernel/bootstrap.ts"; ensureKernelPython().catch((error) => { console.error(error); process.exit(1); });' \
+    && test -x /home/node/fixture-kernel-venv/bin/python
 WORKDIR /tmp

@@ -55,8 +55,7 @@ def _require_success(result):
     )
 
 
-@pytest.mark.container
-def test_reviewed_plan_loads_with_default_source_loader(tmp_path):
+def _run_source_loader_fixture(tmp_path, *, native_entry=False):
     context = tmp_path / "build-context"
     context.mkdir()
     shutil.copyfile(
@@ -97,6 +96,9 @@ def test_reviewed_plan_loads_with_default_source_loader(tmp_path):
     shutil.copyfile(
         REPO / "tests/container/reviewed_plan_source_loader.mts", snapshot / "driver.mts",
     )
+    shutil.copyfile(
+        REPO / "tests/container/native_observation_entry.mts", snapshot / "native_observation_entry.mts",
+    )
     name = f"prime-claw-source-loader-{uuid.uuid4().hex}"
     try:
         result = _docker([
@@ -106,6 +108,8 @@ def test_reviewed_plan_loads_with_default_source_loader(tmp_path):
             "--mount", f"type=bind,src={snapshot / 'candidate'},dst=/candidate,readonly",
             "--mount", f"type=bind,src={snapshot / 'probe.sh'},dst=/fixture/probe.sh,readonly",
             "--mount", f"type=bind,src={snapshot / 'driver.mts'},dst=/fixture/driver.mts,readonly",
+            "--mount", f"type=bind,src={snapshot / 'native_observation_entry.mts'},dst=/fixture/native_observation_entry.mts,readonly",
+            "--env", f"SOURCE_LOADER_NATIVE_ENTRY_PROOF={int(native_entry)}",
             "--env", "HOME=/tmp/home", "--env", "TMPDIR=/tmp",
             "--env", "TSX_TSCONFIG_PATH=/opt/prime-agent/tsconfig.json",
             "--env", f"SOURCE_LOADER_IDENTITY={json.dumps(IDENTITY)}",
@@ -138,3 +142,28 @@ def test_reviewed_plan_loads_with_default_source_loader(tmp_path):
     assert handoff["tools"] == ["ralph_handoff"]
     assert all(REMOVED_COMMANDS.isdisjoint(row["commands"]) for row in loaded["loaded"])
     assert set(reviewed["tools"]) == TOOLS
+    return result.stdout
+
+
+@pytest.mark.container
+def test_reviewed_plan_loads_with_default_source_loader(tmp_path):
+    _run_source_loader_fixture(tmp_path)
+
+
+@pytest.mark.container
+def test_native_observation_entry_durable_cross_worktree_repl(tmp_path):
+    """Public append/read proof only; not production handoff or model judgment."""
+    stdout = _run_source_loader_fixture(tmp_path, native_entry=True)
+    lines = [line.removeprefix("NATIVE_ENTRY_RESULT=") for line in stdout.splitlines()
+             if line.startswith("NATIVE_ENTRY_RESULT=")]
+    assert len(lines) == 1, stdout
+    proof = json.loads(lines[0])
+    (tmp_path / "native-entry-result.json").write_text(json.dumps(proof, indent=2))
+    assert proof["preAssistantDeferred"] is True
+    assert proof["appendReturnedVoid"] is True
+    assert proof["payloadCharacters"] >= 1_700_000
+    assert proof["exactEntryCount"] == 1
+    assert proof["readerToolSuccesses"] == 2
+    assert proof["compactionCompleted"] == 1
+    assert proof["customPayloadInModelContext"] is False
+    assert proof["reopenedExactEntry"] is True
