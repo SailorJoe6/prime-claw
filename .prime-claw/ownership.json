@@ -1,4 +1,134 @@
 {
   "schemaVersion": 1,
-  "owners": {}
+  "owners": {
+    "01a1ef0e-10fe-77f6-a550-f5120139ec6c": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "94468e68-68b7-49ae-993a-467cbd304db7",
+      "engine": "orca",
+      "ownerSessionId": "01a1ef0e-10fe-77f6-a550-f5120139ec6c",
+      "taskId": "PRIMECLAW-62",
+      "taskPath": ".backlog/tasks/primeclaw-62 - Bound-task-handoff-evidence-and-retain-truthful-delivery-outcomes.md",
+      "providerRevision": "5dc5026e0609205921eab8cc5bfd3993fa9827a0",
+      "taskEvidence": {
+        "schemaVersion": 1,
+        "kind": "task-view",
+        "task": {
+          "id": "PRIMECLAW-62",
+          "title": "Bound task handoff evidence and retain truthful delivery outcomes",
+          "status": "In Progress",
+          "type": "bug",
+          "priority": "p1",
+          "project": null,
+          "assignees": [],
+          "reporter": null,
+          "labels": [],
+          "milestone": null,
+          "parentTaskId": null,
+          "acceptanceCriteriaCompleted": 0,
+          "acceptanceCriteriaCount": 7,
+          "references": [
+            "REQUIREMENTS.md"
+          ],
+          "modifiedFiles": [],
+          "ordinal": 147000,
+          "createdAt": "2026-11-18T21:05:00Z",
+          "updatedAt": "2026-11-19T02:17:00Z",
+          "dueDate": null,
+          "isReady": true,
+          "path": ".backlog/tasks/primeclaw-62 - Bound-task-handoff-evidence-and-retain-truthful-delivery-outcomes.md",
+          "description": "## Outcome and authority\nRepair future task-native handoff/execute context crossing and delivery reporting in the prime-claw plugin. One new task covers specification, planning, and isolated Episode implementation when semantically ready under the operator's delegated runtime-repair authority (owning Conversation session 01a1ef0e-10fe-77f6-a550-f5120139ec6c; delegation native entry 8b72ca67). Do not reopen PRIMECLAW-61. Planning alone does not authorize unrelated implementation; the existing explicit conditional authority applies only to this bounded repair. Stop before merge, global apply/activation, daemon/full restart, or live UAT.\n\n## Accepted defects and evidence limits\nCurrent source duplicates complete previous/current provider-native task views into both canonical handoff and execute prompts, then echoes them in successful owner output. Backlog includes all comments, so long-running task history creates unbounded context growth. Editable handoff prose asserts execute is already queued even though first admission, callback, and follow-up are ordered but not atomic. Transport errors discard generated correlation and cause/stage facts. These are confirmed source defects, not a proven cause of any historical timeout or compaction sequence. No inspected goal hook deletes or dispatches execute. A future patch cannot establish a missing historical execute receipt or recover an already-returned uncertain chain.\n\n## Required behavior\n- Keep future task-native handoff/execute prompts and normal owner tool text/details bounded as raw history grows. Preserve the complete previous/current native evidence, full contract, native envelopes and unknown fields, null values and genuinely absent keys, with meaningful bounded-piece LLM inspection. Do not silently truncate, summarize, classify important fields, or normalize Beads into a Backlog/provider-neutral shape. The native task remains authority; a captured observation is only factual context.\n- Preserve exact provider/task/owner/operation/durable session/worktree/branch/host bindings. Editable Markdown and the LLM continue to decide eligibility, compatibility, product and scope. Do not add deterministic semantic policy or frozen revision gates.\n- Prefer supported native facilities. A proposed minimal direction is one lossless factual observation in an EXISTING native session custom entry via public pi.appendEntry, exact short native-entry references, and full-object Episode REPL access with bounded reads. This is not mandated architecture. Prove supported durable persistence, exact-entry targeting, and readability from the selected placement with a minimal isolated Docker reproduction BEFORE adopting it. Missing/unreadable/remote-inaccessible evidence is a disclosed blocker/placement limitation; never silently omit evidence, add a parallel store, or fall back to a huge prompt. Consult the owner on a genuine material interface/product constraint rather than patching upstream.\n- Preserve first native admission -> factual callback -> ONE canonical execute follow-up. Report actual first/callback/follow-up results and distinct safe stopped cases. A received handoff is not execute admission evidence. Preserve original private-safe transport client/command IDs and stage/cause facts through the existing normal tool result on success/failure/uncertainty where applicable. Include only factual bounded diagnostics; no prompt/task bodies, credentials, or raw exception text. A late reply cannot restart an already-returned chain. No catch/resend, direct execute, reconstructed assignment, generic replay, rollback fiction, or exact-once claim.\n- Correct editable phase/work-control Markdown: reminders are advisory, not assignments or acknowledgement requests. Apply mandatory goals/heartbeats quietly. Goals end at the currently admitted phase/report/wait boundary; missing next-phase authority cannot come from compaction or reminders. Preserve useful native compaction and the existing canonical follow-up mechanism. No scheduler, disabling compaction, or hook-driven execute dispatch.\n\n## Validation and delivery\nUse proportional existing deterministic network-disconnected Docker fixtures, synthetic data only. Extend existing tests rather than add a framework or massive matrix. Cover at least a 1.7-million-character complete synthetic Backlog previous/current history with early/middle/late sentinels, all native fields, unknown keys, explicit null and absence; one small raw Beads shape case; exact lossless bounded-piece evidence retrieval; and history-independent prompt/owner-output size. Exercise one deliberate native compaction, exactly the existing one canonical execute follow-up, and a substantive post-compaction marker rather than repeated compliance. Distinguish requested/completed compaction and mechanics from real-model semantic proof. Use the real plugin client with a fake JSONL socket for success, delayed/lost result, socket closure, callback failure and follow-up uncertainty, retaining stage facts and proving no resend. Reuse busy-gap and retained-version-1 regressions. After plugin-source changes run mandated Tier 1 candidate validation in Docker. Publish coherent native task/code updates promptly and obtain independent read-only candidate review.\n\n## Boundaries\nNo new API, durable receipt/command-history/evidence store, replay protocol/state machine, classifier, or upstream Prime Agent edits. A timeout increase alone is not a cure. Optional noncausal valid-response hardening is not required acceptance or a reason to expand scope. Prime Agent is read-only dependency. No host apply/check/probe. No AWS access, authentication or credential inspection. Preserve the separate paused pod-pricing task/Episode exactly: no messages, handoff, execute, replay, registry repair, resource probes, experiments or lifecycle changes there. No terminal disposition or cleanup is authorized. Report historical recovery limits honestly; candidate publication is not activation.",
+          "dependencies": [],
+          "dependencyGraph": {
+            "root": "PRIMECLAW-62",
+            "nodes": [
+              {
+                "id": "PRIMECLAW-62",
+                "title": "Bound task handoff evidence and retain truthful delivery outcomes",
+                "status": "In Progress",
+                "state": "resolved",
+                "completed": false,
+                "dependencyDepth": 0,
+                "dependentDepth": 0
+              }
+            ],
+            "edges": []
+          },
+          "readiness": {
+            "isReady": true,
+            "isBlocked": false,
+            "blockingDependencies": [],
+            "missingDependencies": []
+          },
+          "documentation": [
+            "docs/handoff-chain.md"
+          ],
+          "subtasks": [],
+          "acceptanceCriteria": [
+            {
+              "index": 1,
+              "text": "Future task-native handoff and execute prompts plus normal owner outputs remain bounded as complete raw task history grows; all previous/current native evidence is exactly retrievable and inspectable in bounded pieces with shape, unknown fields, nulls and absence preserved, and exact identities plus LLM semantic authority unchanged.",
+              "checked": false
+            },
+            {
+              "index": 2,
+              "text": "Any chosen native evidence-reference mechanism first has minimal Docker proof of supported durable persistence, exact entry access and selected-placement readability. Unavailable evidence or unsupported placement stops truthfully without omission, giant-inline fallback, parallel store or upstream patch.",
+              "checked": false
+            },
+            {
+              "index": 3,
+              "text": "The existing ordered first admission, factual callback and one canonical execute follow-up remain intact. Existing tool outputs retain original private-safe correlation, stage and cause facts for actual success/stopped/uncertain outcomes without bodies, credentials, raw exceptions, automatic resend or exact-once/recovery claims.",
+              "checked": false
+            },
+            {
+              "index": 4,
+              "text": "Editable handoff and work-control Markdown no longer claims receipt proves execute queued; reminders are not assignments/ack requests; mandatory goals/heartbeats end at actual admitted phase/wait boundaries while useful native compaction and the sole existing follow-up remain.",
+              "checked": false
+            },
+            {
+              "index": 5,
+              "text": "Existing offline Docker fixtures prove lossless bounded retrieval and prompt/output boundedness using at least incident-scale 1.7M-character synthetic Backlog prior/current history with early/mid/late sentinels and full fields/null/absence plus a small raw Beads case; one deliberate native compaction reaches a substantive marker through exactly one existing canonical follow-up.",
+              "checked": false
+            },
+            {
+              "index": 6,
+              "text": "Real plugin client/fake JSONL socket regressions cover success, delayed/lost result, closure, callback failure and follow-up uncertainty with retained stage facts and no resend. Mandated Tier 1 Docker validation and independent candidate review are reported with exact revisions and limits.",
+              "checked": false
+            },
+            {
+              "index": 7,
+              "text": "Published task/code candidate preserves unrelated work and the paused external Episode, performs no AWS/host activation/restart/merge/upstream mutation, and explicitly states that this future fix does not recover historical uncertain delivery or prove real-model semantic behavior.",
+              "checked": false
+            }
+          ],
+          "definitionOfDone": [],
+          "implementationPlan": "## Implementation sequence\n1. In the one isolated Episode, first add a minimal public-interface reproduction to the existing native Docker fixture BEFORE choosing the evidence-reference design. Use public pi.appendEntry and read-only sessionManager getSessionId/getSessionFile/getLeafEntry/getEntry (appendEntry returns void). Prove exact custom-entry durability and lossless reading from a second worktree-rooted Episode REPL before dispatch, then after reload/compaction; custom entries must not become giant model/compaction messages. The public persistence path can defer pre-assistant custom writes, so observe actual durability rather than assuming flush or calling private methods. Isolate settings/sessions through scripts/run-prime-agent-probe.sh within the network-disconnected fixture. Record supported placement/access limits and missing/unreadable-entry behavior. If public facilities cannot meet the contract, stop for owner assessment without a parallel store, huge inline fallback, upstream edit or guessed cross-host access. This proof is the first implementation slice, not existing evidence.\n2. After that proof, repair task-native context crossing in extension-support/spec-episode.ts and extensions/reviewed-plan.ts: retain one complete factual observation in the existing invoking native session journal and pass short exact native-entry references in canonical handoff/execute prompts and normal owner text/details. Preserve raw previous/current provider objects, revisions/code facts, and complete session/state observations that could otherwise include queued prompt bodies. Carry native entry identity, owner session/file, and exact provider/task/operation/Episode/worktree/branch/host bindings. Use existing dependency seams for public native append/read access. Verify persistence/readability before sending. Keep ownership factual advancement in the existing after-first callback, not after storage/socket write. Cover independent and branch-local Backlog plus raw Beads handoffs; preserve retained version-1 behavior. No normalized model, authority mirror, observation registry or receipt gate.\n3. Put evidence-loading and meaningful bounded inspection in editable handoff/execute guidance. Load the complete referenced object into the Episode REPL, enumerate native structure, inspect the full current contract and relevant previous/current changes in bounded field/text pieces, including huge individual fields/comments. Preserve unknown fields/null/absence/provider shape; references are complete available evidence, not excerpts or approval. The LLM owns eligibility/compatibility/scope. Missing/inaccessible evidence stops truthfully without omission or reconstructed assignments. Remove assertions that handoff receipt proves execute queued. Update plugin-owned continuation and relevant phase/role prose so mandatory goals/heartbeats apply quietly, reminders are advisory rather than assignments/ack requests, and goals end at the admitted phase/report/wait boundary. Retain useful native compaction and the existing sole follow-up; no scheduler or hook execute dispatch.\n4. In the existing real JSONL client/publisher and normal handoff output, retain bounded private-safe original client/command IDs, command/route, request timing, native result/ack facts and native code/cause where known. Propagate through wrapper errors without bodies, credentials or raw exception strings. Preserve first admission -> factual callback -> ONE canonical execute follow-up. Distinguish callback failure after first success, whether follow-up was attempted, definite refusal, and timeout/socket/native uncertainty at either delivery stage. Late replies cannot restart a returned chain. No retries, replay, new lookup API/history store, command-semantic changes, rollback fiction, exact-once claim or timeout-only fix. Optional noncausal response-discrimination hardening is not blocking scope.\n5. Extend existing tests/spec_episode_extension.test.mjs/container bridge and tests/test_conversation_oversight_native.py or its existing equivalent. Generate >=1.7M characters total of complete synthetic previous/current Backlog history with all native fields, unknown keys, early/mid/late sentinels, explicit null and absent keys; add a small raw Beads shape case. Assert exact complete-object reconstruction and bounded-piece retrieval including huge values, history-independent prompt/output size, exact identities, no owner full-history echo, and truthful unavailable evidence. Preserve busy-gap and retained legacy regressions. In a real native Episode REPL fixture, use exactly ONE deliberate compact.run, the existing one canonical execute follow-up and unchanged identity to reach a substantive post-compaction marker without compliance-only loops or hook assignments. Distinguish requested/completed compaction. Use the REAL client and a test-owned fake JSONL socket with short injected deadlines for fragmented success, delayed/lost first result and late reply, closure, first success then callback failure, and follow-up refusal/uncertainty; assert original correlation/stage facts and no extra send. Reuse fixtures, not a new framework/massive matrix; scripted markers prove mechanics, not real-model semantics.\n6. After every plugin-source change run mandated Docker Tier 1 (scripts/test-tier1.sh --probe or documented container equivalent); iterate proportionately with focused existing fixtures. Update docs/handoff-chain.md and directly affected developer/workflow docs for actual stage/reference/placement limits. Change REQUIREMENTS.md only for an actual accepted product clarification, not extra process requirements. Maintain native task plan/notes promptly through CLI. Commit/push coherent selected-task-only updates and separate Episode code commits while preserving unrelated bytes/index/history. Obtain one independent read-only expert review of the published candidate using synthetic evidence, resolve accepted concrete in-scope findings in the SAME Episode, then report exact code/task/base/resource tuple, test artifacts, findings and limits for owner review. No merge/activation/host apply/check/probe/restart/live UAT/terminal cleanup/AWS/auth/upstream edits or action/message to the paused external Episode.\n\n## Required limits\nA passing fixture is mechanical evidence, not real-model semantic review or proof of loaded live code. The historical first handoff remains delivered with execute admission unproved; a future fix cannot restore missing historical IDs/results. Timeout changes, idle queues and handoff prose cannot establish nonadmission or authorize resend. If the public persistence/access proof fails, report the concrete constraint and consult rather than expand architecture.",
+          "implementationNotes": null,
+          "comments": [],
+          "finalSummary": null
+        }
+      },
+      "baseRef": "f2268207fb27609659ebb6e53e70edd7985fc53d",
+      "createdAt": "2026-11-19T02:17:40.535Z",
+      "updatedAt": "2026-11-19T02:18:17.780Z",
+      "integrationBranch": "main",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-62-episode-94468e68",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-62-episode-94468e68",
+      "worktreeIdentity": "wt2:local:d4252913-6de8-4562-aa89-52d5819db313",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-62-episode-94468e68",
+      "branch": "JLanders/prime-claw-primeclaw-62-episode-94468e68",
+      "head": "f2268207fb27609659ebb6e53e70edd7985fc53d",
+      "launchAutomationName": "prime-claw-launch-94468e68-68b7-49ae-993a-467cbd304db7",
+      "episodeId": "01a1f198-c5fc-70bb-ac08-82983d381963",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a1f198-c5fc-70bb-ac08-82983d381963.jsonl",
+      "episodeActiveSessionId": "4aa68cb01894",
+      "terminalHandle": "term_9c655d4f-364d-471c-bd0f-5a8e52bc1122",
+      "terminalHandles": [
+        "term_669236ae-e0e7-4fa0-96f1-27b10c9e05f9",
+        "term_9c655d4f-364d-471c-bd0f-5a8e52bc1122"
+      ]
+    }
+  }
 }
