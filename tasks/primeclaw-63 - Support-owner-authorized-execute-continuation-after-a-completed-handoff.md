@@ -4,6 +4,7 @@ title: Support owner-authorized execute continuation after a completed handoff
 status: In Design
 assignee: []
 created_date: '2026-11-20 16:26'
+updated_date: '2026-11-20 16:31'
 labels: []
 dependencies: []
 references:
@@ -75,5 +76,5 @@ Non-goals: automatic recovery, historical packet reconstruction/receipt lookup, 
 - [ ] #4 Owner-native Blocked clearance and publication precede sending when needed; current In Progress avoids a status round trip. Existing native fields retain the informed decision and evidence limits; after new definite admission only current factual observations advance through managed mechanisms. Refusal/uncertainty or factual-write failure preserves actual effects without silent registry edits or resend.
 - [ ] #5 The smallest supported owner invocation uses existing public/native transport and canonical phase/evidence facilities where possible; no new endpoint/protocol/store/state machine is presumed. A concrete unsupported-interface constraint is reported rather than patched upstream or replaced with an ad hoc raw execute workaround.
 - [ ] #6 Proportional synthetic offline fixtures demonstrate one new execute, preserved identities and bounded raw evidence, no repeated completed steps, and truthful stops for missing authority, pending work/conflicts, failed status publication, new-send refusal/uncertainty and post-admission observation failure. Relevant ordinary-handoff/busy-gap/retained-v1 regressions remain intact; actual proof limits are disclosed.
-- [ ] #7 The specification stays a published native In Design task pending review, with no implementation plan, code or lifecycle-source edits, Episode allocation/dispatch, live pod-pricing probe/recovery, activation/restart, auth/model changes or alteration of Done PRIMECLAW-62. Later implementation must reconcile REQUIREMENTS.md P15 and affected editable guidance under separately granted authority.
+- [ ] #7 Under separately granted implementation authority, REQUIREMENTS.md P15 and affected editable guidance/docs are reconciled to the bounded new-continuation policy without weakening ordinary no-replay rules. Specification approval alone authorizes neither implementation nor actual historical-case recovery/global activation, which retain their separate authority and loaded-generation proof requirements.
 <!-- AC:END -->
