@@ -371,13 +371,63 @@ session/worktree/branch, original accepted scope/focus and current native facts.
 Refusal alone grants no authority; empty queues or missing observed actions alone
 are not proof of non-admission. Preserve preparation effects and evidence gaps.
 Uncertain first admission, callback failure after admission, and refused or
-uncertain second delivery remain distinct stopped cases without generic replay,
-direct execute or chat steering. When public evidence cannot establish definite
-refusal, state the precise limit and concrete operator choices, not a safe resend.
-Record findings and disposition in existing native task fields/history, not a
-new recovery framework, store, endpoint or classifier. Retained version-1 behavior
-is unchanged; this exception authorizes no historical recovery and adds no routine
-permission gate for successful future handoffs.
+uncertain second delivery remain distinct stopped cases without generic replay
+or chat steering. When public evidence cannot establish definite refusal, state
+the precise limit, not a safe resend of the old chain.
+
+A separate version-2-only exception supports ONE NEW canonical execute-only
+continuation after the original handoff was demonstrably received and completed,
+when the following execute failed or its historical admission remains unknown.
+The exact owner reads current full native task/history and meaningful living
+plan, accepted bounded focus, code/publication/worktree facts, available history,
+and fresh provider-reported Episode and explicitly proven descendant
+state/actions/queues. Preserve the same owner/provider/task/operation, durable
+session, worktree/branch, host/placement, original code basis and integration
+target. A changed route must resolve natively to that same durable session.
+Judge compatible updates semantically, not by frozen revision/evidence equality.
+Foreign identity, real scope conflict, unsafe work, unavailable required current
+evidence or unproved current idleness stops. Known pending/running execute or
+unfinished admitted work cannot qualify; do not cancel it to qualify.
+
+Disclose completed handoff, known execute failure/refusal/not-attempted versus
+unknown historical admission, callback/partial effects, current receiver report
+and native idle/empty queues, current progress/scope and remaining uncertainty.
+The operator may explicitly authorize this NEW continuation through ordinary
+conversation. A receiver's no-execute/no-pending report with fresh native
+readiness can reach that decision without historical sender IDs, ACKs, callback
+proof or impossible proof of absence; it is not retrospective non-delivery proof.
+Generic prior “continue”, compaction/model change, unblock alone, idle, silence
+or Episode advice is not informed authorization. Honor an already informed
+decision without a repeated gate. Cancellation and terminal disposition stand.
+
+For a genuinely cleared Blocked task, the owner first publishes truthful
+clearance and In Progress through its normal native lifecycle procedure. Already
+In Progress needs no status round trip; do not promote Ready or reopen Done.
+Record decision/focus/current facts and historical limits in existing
+owner-appropriate native fields/history, without mirroring Episode-owned content.
+Verify publication and prepare only the intended Episode workspace, preserving
+unrelated bytes/index/history. Preparation/publication failure means no send.
+Use supported canonical execute-only transport with current factual context and
+bounded full native-entry evidence access, not stale snapshots, arbitrary chat,
+new allocation, handoff/compaction/initial-assignment resend, historical callback
+replay, ordinary `ralph_handoff`, or a hook/heartbeat dispatch. Compaction is
+optional context control, never authority or a prerequisite.
+
+After definite NEW execute admission only, advance current provider/task/code
+observations through the existing managed factual-update mechanism. No direct
+registry edit or retrospective callback claim is permitted. Report native send
+facts separately from factual-update results; admission is not completion.
+Refusal/uncertainty stops this authorization without optimistic advancement.
+An observation failure, including possible partial write, preserves admitted
+execute and actual effects; inspect before another transition, never resend.
+No automatic retry, late-result restart, rollback fiction or global exactly-once
+claim. Further disposition needs fresh evidence and a separate informed decision.
+Keep unknown history unknown. Add no recovery store, endpoint, classifier or
+state machine; an unsupported public interface is a concrete product constraint,
+not permission to patch upstream or use ad hoc raw execute. Ordinary successful
+handoff gains no routine approval gate. Retained version-1 and initial-creation
+recovery are unchanged. Source publication is not live activation; historical
+case recovery and global refresh/restart/UAT require separate authority.
 
 Preserve role, scope, placement, task identity, and operator authority across
 compaction and resume. High-utilization owner compaction is configurable and

@@ -105,7 +105,7 @@ def test_blocked_skill_tracked_copy_and_manifest_hash_match_source() -> None:
     assert TRACKED.read_bytes() == source
     digest = hashlib.sha256(source).hexdigest()
     item = json.loads(MANIFEST.read_text())["assets"]["project-skill-blocked"]
-    assert item["baselineSha256"] == "eca05a76c08279aa95d90de7ca3ce78737addfc3177f80f0b4273ca23bd56d39"  # retained historical baseline; current bytes are verified below
+    assert item["baselineSha256"] == "1db1d352a1c06955895da70e979a8cb8c4247d63940decce21cfcddb7ff2e729"  # retained historical baseline; current bytes are verified below
     assert item["installedSha256"] == digest
     assert item["availableUpstreamSha256"] == digest
     assert item["state"] == "managed"

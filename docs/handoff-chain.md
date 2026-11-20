@@ -111,15 +111,90 @@ Keep the other cases distinct and stopped:
 - **Second-stage refusal or uncertainty:** preserve the first admission and
   completed callback; report execute's definite refusal or uncertain delivery.
 
-Those cases receive no generic replay permission, direct execute or ordinary
-handoff/chat-steering workaround. If public evidence cannot establish definite
-first-stage refusal, explain the precise limit and offer inspection of missing
-supported native evidence without sending work, continued pause, or a separately
-authorized normal terminal disposition—not an invented safe resend. Record the
-findings, gaps and operator disposition in existing native task fields/history;
-use normal provider publication, not a new endpoint, store, classifier or replay
-protocol. This change authorizes no historical recovery or live activation.
-Ordinary successful future handoffs need no new routine permission.
+Those cases receive no generic replay permission or ordinary handoff/chat-steering
+workaround. If public evidence cannot establish definite first-stage refusal,
+explain the precise limit, not a safe resend of the old chain. Inspect supported
+evidence without sending work, remain paused, or seek a separately authorized
+normal terminal disposition. A demonstrably completed handoff can instead be
+assessed under the separate NEW continuation policy below. Record findings,
+gaps and disposition in existing native task fields/history and publish normally,
+not through a new endpoint, store, classifier or replay protocol. Ordinary
+successful handoffs need no new routine permission.
+
+### New execute-only continuation after completed handoff
+
+REQUIREMENTS.md P15 and editable `prime-claw-oversee-episode` policy permit ONE
+NEW canonical execute-only request to the SAME version-2 task-native Episode,
+after the original canonical handoff was demonstrably received and completed.
+This is not re-invocation of the old two-stage chain. A known refused/failed or
+not-attempted execute differs from genuinely unknown historical admission; both
+can reach an informed operator decision. A receiver's no-execute/no-pending
+report and fresh native idle/empty queues are useful current evidence, not
+retrospective proof of non-delivery. No historical sender IDs, ACKs, callback
+proof, receipts or universal proof of absence are required. Known pending/running
+execute or unfinished admitted work stops; never cancel it to qualify.
+
+The exact owner reads current full native task/history, meaningful living plan,
+accepted bounded focus, code/head/publication/worktree facts and available
+historical observations. Inspect fresh native Episode and explicitly proven
+descendant state/actions/queues. The existing handoff entry captures only the
+selected session/state, not all descendants; do not claim otherwise. Retain full
+raw envelopes, unknown keys, null/absence and observations through bounded exact
+native-entry access and meaningful reads, not giant prompt copies or an idle
+boolean. Semantic judgment accepts compatible current changes and unrelated
+history advances; frozen equality is not approval. Stop real identity/scope
+conflicts, unsafe current work, unavailable required current evidence or
+unproved idleness. Preserve owner/provider/task/operation, durable session,
+worktree/branch, host/placement, original code basis and integration target.
+A changed live route must resolve through supported facts to that same durable
+session, not guessed name or CWD.
+
+Brief the operator on completed handoff, known failure versus unknown history,
+callback/partial effects, receiver report/native readiness, current progress,
+accepted next scope, uncertainty and possible prior effects. Explicit informed
+authority for this NEW request is required; ordinary conversation suffices and an
+already informed decision needs no second phase gate. Generic earlier “continue”,
+model/context change, compaction, unblock alone, idle, silence or Episode advice
+is not enough. Cancellation, terminal outcomes and scope boundaries stand.
+
+Only the owner clears a genuinely satisfied Blocked condition and publishes
+truthful clearance plus In Progress through the normal provider-native lifecycle
+before sending. Already In Progress needs no Blocked round trip. Do not promote
+Ready or reopen Done. Record decision/focus/current facts/history limits in
+existing owner-appropriate fields/history; never copy Episode Plan/Notes or use
+task prose as a send receipt. Verify actual publication and prepare only the
+intended Episode workspace while preserving unrelated bytes/index/history.
+Failure means no send. The new request carries full current factual context
+even when stored observations are older or a prior callback partly wrote.
+
+**Policy slice availability:** this source slice documents the exception but
+does not yet implement the planned optional `mode: "execute-only"` on
+`handoff_task_episode`. Until that managed invocation is implemented, validated
+and separately activated where needed, report the interface constraint and
+remain paused. Do not pass an unsupported mode, inject raw execute, use ordinary
+`ralph_handoff`, patch upstream, or treat this policy as live recovery authority.
+Later mechanical slices must load canonical execute only with accepted bounded
+EXECUTE focus, current native contract and exact evidence. They must not resend
+handoff, request compaction as a prerequisite, replay the historical callback,
+send initial assignment, allocate/rebind resources, re-enter create/implement,
+or dispatch through a heartbeat/hook. Resume current durable progress rather
+than replaying historical effects or a stale task/comment snapshot. No routine
+approval gate is added to successful ordinary handoff.
+
+After definite NEW native execute admission only, the existing managed factual
+mechanism advances current provider/task/code observations, not historical
+callback completion. Refusal or uncertainty ends that authorization without
+optimistic advancement. Report requested/admitted (not completed), refused,
+not attempted or uncertain using bounded private-safe native stage/correlation
+facts separately from factual-update results. A failed update, including
+write-then-throw partial effects, preserves admitted execute and actual effects.
+Inspect before another transition; never resend or invent rollback. No automatic
+retry, late-reply restart, global exactly-once or retrospective non-delivery
+claim; unknown history stays unknown. Further disposition requires fresh evidence
+and a separate informed operator decision. No new store/protocol/state machine
+is required. Retained version-1 and creation/initial-assignment recovery are
+unchanged. Actual historical-case recovery and global activation/full restart/
+live UAT still need separate authority and intended-generation proof.
 
 Grandfathered Backlog captures complete current primary and Episode native task
 views. Independent Backlog prepares only the Episode task clone once, without
@@ -260,7 +335,9 @@ Resume and Request Changes continuations are covered by the same
 `handoff_task_episode` adapter after their ordinary Git/Backlog status steps,
 so no separate trigger exists for them. Creation, blocking, candidate
 acceptance, delay, merge, abandonment, cleanup, ordinary `ralph_handoff`, and
-heartbeat ticks never trigger it.
+heartbeat ticks never trigger it. The separate new execute-only continuation
+must not invoke this after-handoff hook; compaction remains optional context
+control, never execution authority.
 
 After the admitted handoff result is returned, the plugin loads
 `.prime-claw/workflows/conversation-after-handoff.md` from the owning

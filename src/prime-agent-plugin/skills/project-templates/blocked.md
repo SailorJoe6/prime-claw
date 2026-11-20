@@ -164,6 +164,31 @@ the sole execute follow-up. Never write `ownership.json` directly in this normal
 active flow; only the owning Conversation's targeted documented creation-recovery
 exception above permits an edit, never Episode or Expert authority.
 
+For a demonstrably completed handoff with failed or historically unproved
+following execute, use the exact owner's separate “New execute-only continuation
+after completed handoff” procedure in `prime-claw-oversee-episode`, not the
+ordinary handoff calls above. Blocker clearance alone does not authorize that
+new send. Disclose known failure versus unknown history and callback/partial
+effects, current receiver report and fresh native Episode/explicit-descendant
+state/actions/queues, progress and accepted next focus. A no-execute/no-pending
+report plus native readiness can reach an informed decision without historical
+sender IDs/ACK/callback proof; it cannot prove historical non-admission. Require
+explicit informed authority for ONE NEW continuation, not silence, compaction,
+model change or idle alone. Known pending/running or unfinished admitted work,
+real conflict or unproved current idleness stops; do not cancel work to qualify.
+Publish actual clearance and In Progress first, with normal history/publication
+proof and preserved unrelated work. Already In Progress needs no Blocked round
+trip; assess it through oversight instead of forcing this Blocked-only flow.
+Do not promote Ready or reopen Done. Record decision/focus/facts/history limits
+in existing owner-native fields without copying Episode-owned content. Failed
+publication/preparation means no send. Use only the supported managed execute-only
+invocation when available, not raw execute, handoff/compaction/assignment resend,
+manual registry edit or historical callback replay. New refusal/uncertainty ends
+that authorization. A post-admission observation failure preserves admitted work
+and any partial effects; report separately and inspect, never resend. This adds
+no authority for actual historical recovery, activation/restart/live UAT,
+retained version-1 or creation recovery.
+
 Both providers resume the same task, ownership, branch, worktree, and durable
 Episode session. Never create a new task, admission, Episode resource,
 status-sync message, status receipt, or replacement assignment, and never mutate Episode-owned product or

@@ -195,16 +195,22 @@ actions alone do not prove non-admission. Preserve evidence gaps and preparation
 or task-history effects; first refusal does not mean preparation had no effects.
 Uncertain first admission, callback failure after admission, and refused or
 uncertain second-stage delivery remain separate stopped cases, with no generic
-replay, direct execute, ordinary handoff or chat steering. The first request may
-have been admitted even when execute was not queued; the compaction instructions
-below never authorize reconstructing that missing or uncertain follow-up. Record
-findings and operator disposition in existing native task fields/history, not a
-new recovery store, endpoint or classifier. If public evidence cannot establish
-definite refusal, state the precise limit and offer evidence inspection without
-sending work, continued pause or a separately authorized normal terminal
-disposition. This exception changes neither retained version-1 behavior nor
-routine successful future handoff authority, and authorizes no historical
-recovery or live activation.
+replay, ordinary handoff or chat steering. The first request may have been
+admitted even when execute was not queued. Do not send execute from this handoff
+turn; compaction instructions below never authorize reconstructing a missing or
+uncertain follow-up. Record findings and operator disposition in existing native
+fields/history. State evidence limits without inventing refusal or a safe resend.
+If the original handoff is demonstrably completed, the exact owner may instead
+assess the separate “New execute-only continuation after completed handoff” policy
+in `prime-claw-oversee-episode`. That requires explicit informed authority for
+ONE NEW continuation, fresh current task/code/session and explicit-descendant
+facts, and the supported managed execute-only invocation. It is not replay of
+this chain, an Episode dispatch decision, a compaction trigger or permission to
+use raw execute on a generation without that invocation. A receiver report with
+fresh idle/empty queues can support that decision without historical sender IDs
+or callback proof; unknown history remains unknown. No new endpoint/store or
+classifier, routine successful-handoff gate, retained version-1 change,
+initial-assignment recovery or live activation is implied.
 
 In either task-native branch, guidance is bounded compaction focus only. It
 never accepts task content or supplies provider revision or raw evidence. Never pass `--status`, complete or archive the task, select replacement work,

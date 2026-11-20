@@ -95,8 +95,9 @@ def test_handoff_skill_reports_compaction_without_owning_execute_admission():
     assert "It is guidance only; it never selects the next phase." in skill
     assert "scheduled: true" in skill
     assert "not confirmation that compaction completed" in skill
-    assert "canonical `execute` is already queued independently" in skill
-    assert "Do not wait for `session_compact`" in skill
+    assert "Receiving this prompt proves neither that execute is queued" in skill
+    assert "Never send, reconstruct or retry it here" in skill
+    assert "do not wait for `session_compact`" in skill
     assert "invoke execute yourself" in skill
 
 

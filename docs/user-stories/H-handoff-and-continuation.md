@@ -55,7 +55,14 @@ native facts. Refusal alone is not authority or a new advance; missing actions o
 empty queues alone do not prove non-admission. Preserve preparation effects and
 evidence gaps in existing native task fields/history. Uncertain first admission,
 callback failure, and refused/uncertain second delivery remain distinct stopped
-cases with no generic replay, direct execute or chat steering. If public evidence
+cases with no generic replay or chat steering. A demonstrably completed handoff
+can instead reach the separate informed-owner
+[new execute-only continuation decision](../handoff-chain.md#new-execute-only-continuation-after-completed-handoff).
+It is ONE NEW request on the same version-2 resources, not a replay. It can reach
+authorization without historical sender IDs/ACK/callback proof, but known pending
+work or unproved current idleness stops it. The invocation remains unavailable
+until implemented and validated; this policy is not live recovery authority.
+If public evidence
 cannot establish definite refusal, state the precise limit and offer evidence
 inspection without sending work, pause, or a separately authorized normal
 terminal disposition. See the [failure disposition](../handoff-chain.md#task-native-refusal-and-delivery-uncertainty)

@@ -88,22 +88,87 @@ Missing observed actions or empty queues alone do not prove non-admission.
   available evidence cannot establish admission or non-admission.
 - **Callback failure after first admission:** preserve that admitted first
   request and any actual observation effects. Execute was not sent by this
-  invocation; do not rerun handoff or invoke execute directly.
+  invocation; do not rerun handoff or invoke execute from that failed chain.
 - **Second-stage refusal or uncertainty:** preserve the first admission and
   completed factual callback. Report whether execute was definitely refused or
   remains uncertain; do not replay either stage.
 
 The last three cases have no generic replay permission, even on operator
-request under this exception. Offer concrete choices: inspect the missing
-supported native evidence without sending work, remain paused with the named
-evidence limit, or seek a separate normal operator terminal disposition. Do not
-invent a safe resend when public evidence cannot establish definite first-stage
-refusal. No direct execute, ordinary handoff, chat steering, replacement Episode,
-new recovery endpoint, classifier, receipt store or replay protocol is allowed.
-Record exact findings, gaps and the operator's disposition in existing native
-task fields/history and publish through the selected provider's normal procedure.
-This repair does not authorize any historical refused intent. Ordinary successful
-future handoffs need no new routine operator permission.
+request under this refusal exception. Inspect missing supported evidence without
+sending work, remain paused, or seek a separately authorized normal terminal
+disposition. If handoff is demonstrably completed, the separate NEW continuation
+policy below may apply; historical uncertainty alone does not exclude it. Never
+invent a safe resend of the old chain, use ordinary handoff/chat steering or
+replace resources. Record findings, gaps and disposition in existing native
+fields/history and publish normally. Neither exception adds routine permission
+to ordinary successful handoffs or authorizes a live historical recovery itself.
+
+### New execute-only continuation after completed handoff
+
+For the same active version-2 task-native Episode only: original canonical
+handoff must be demonstrably received and completed; following execute may have
+failed or remain historically unproved. Preserve exact owner/provider/task,
+operation, durable session, worktree/branch, host/placement, original code basis
+and integration target. Resolve a changed route through supported native facts
+to that SAME durable session, never by name/CWD alone. No allocation or rebinding.
+
+Read current published full native task/history and meaningful living plan,
+accepted bounded focus, code/head/publication/worktree facts, available historical
+observations and fresh native Episode and explicitly proven descendant
+state/actions/queues. Keep complete raw fields, unknown keys, nulls and absence
+through existing exact native-entry evidence and meaningful bounded reads, not
+giant prompts or an idle boolean. Current handoff capture is selected-session
+only; inspect explicit descendants rather than claiming their state was captured.
+Judge compatible task/plan/history advances semantically, not frozen equality.
+Foreign identity, real scope conflict, unsafe current work, missing required
+current evidence or unproved current idleness stops. Known pending/running execute
+or unfinished admitted work stops. Do not cancel work to qualify. Cancellation,
+terminal disposition and scope boundaries stand.
+
+Brief the operator: completed handoff; known failed/refused/not-attempted versus
+unknown historical execute admission; known callback/partial effects; receiver
+report plus fresh native idle/empty-queue facts; current progress, accepted next
+scope and remaining uncertainty/possible prior effects. A no-execute/no-pending
+receiver report is useful current evidence, not historical non-admission proof.
+That reported TASK-2-shaped case can reach the decision without historical sender
+IDs, ACKs or callback proof, receipts or impossible proof of absence.
+Require explicit informed operator authorization for ONE NEW continuation.
+Ordinary conversational authority suffices; honor an already informed decision
+without another phase gate, token or syntax ritual. Generic prior “continue”,
+model change, compaction, unblock alone, idle, silence or Episode advice is not it.
+
+If genuinely cleared Blocked, first publish truthful clearance and In Progress
+through the owner-native procedure below. Already In Progress needs no status
+round trip; do not promote Ready or reopen Done. Record decision/focus/current
+facts and historical limits in existing owner-appropriate native fields/history.
+Do not mirror Episode-owned content or manufacture a send receipt. Verify actual
+publication and prepare only the intended Episode provider workspace; preserve
+unrelated bytes/index/history. Publication/preparation failure means no send.
+
+Use only the documented managed execute-only operation when its supported
+invocation is available; otherwise report that concrete interface constraint,
+not an ad hoc raw execute workaround or upstream patch. Send one NEW canonical
+execute with current factual context and accepted bounded EXECUTE focus. Resume
+current durable progress, not stale snapshots or historical side effects. Never
+resend handoff/initial assignment, replay historical callback, call ordinary
+`ralph_handoff`, re-enter creation/implementation admission, or dispatch from a
+hook/heartbeat. No compaction prerequisite or after-handoff compaction trigger.
+Compaction is optional context control, never authority.
+
+After definite NEW native admission only, use the existing managed factual-update
+mechanism for current provider/task/code observations, not the historical callback
+or manual registry edits. Report bounded private-safe native send/stage/correlation
+facts separately from factual-update results: requested/admitted (not completed),
+refused, not attempted or uncertain. Definite refusal or uncertainty stops this
+authorization without optimistic advancement. Factual-update failure, including
+possible partial writes, preserves admitted execute and actual effects: inspect
+before another transition, never resend or invent rollback. No catch/retry,
+automatic retry or late-result restart. Further disposition needs fresh evidence
+and a separate informed decision. Keep unknown history unknown; claim neither
+retrospective non-delivery nor global exactly-once. Add no store/state machine,
+endpoint or classifier. This does not change retained version-1 and
+initial-creation recovery. Global activation/restart/UAT and actual historical
+case recovery require separate authority and loaded-generation proof.
 
 Only the owning Conversation publishes accepted blockers. Grandfathered Backlog uses exact-task code-DAG commits/pushes. Independent Backlog commits/pushes only the task path to `HEAD:refs/heads/prime-claw/tasks`, leaving code HEAD unchanged; synchronize the Conversation's own clone for publication, while handoff prepares only the Episode clone. Preserve unrelated bytes/index/history. Restore `In Progress` before continuation. Judge native prior/current views, code-head/upstream observations, eligibility and compatibility in editable guidance, not equality or frozen-head gates. Record observations after admission.
 

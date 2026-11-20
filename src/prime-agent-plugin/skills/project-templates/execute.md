@@ -80,6 +80,30 @@ branch), and provider revisions. A switched owner checkout is a recovery
 blocker, not permission to retarget or switch branches. Continue the same
 owner/task/worktree/session binding.
 
+### Owner-authorized execute-only continuation
+
+A version-2 owner may send one NEW canonical execute after demonstrably completed
+handoff under `prime-claw-oversee-episode`'s informed-authorization procedure.
+This is distinct from replaying the old chain. Preserve the exact existing
+binding and read current native task/history, meaningful living plan, accepted
+bounded EXECUTE focus and full factual observation below. Continue from current
+durable progress, not a stale task or comment snapshot, and do not repeat
+historical side effects. Historical execute admission and callback/partial
+effects may remain unknown; neither fresh idle/empty queues nor this new request
+proves prior non-delivery. Current evidence may compatibly advance beyond stored
+ownership observations. Judge its meaning; do not freeze task revisions or
+replace native fields with summaries.
+
+No new resources, handoff, compaction prerequisite, initial assignment or
+historical callback replay is part of this request. The owner alone authorizes
+and sends it through the documented managed operation, never this Episode or a
+handoff turn/hook. If it conflicts with current task/scope/identity or known
+unfinished work, report and stop rather than duplicating work. The normal
+provider-specific status and content-authority rules below still apply. Do not
+repair ownership or resend if the owner's post-admission factual update failed;
+preserve actual effects and report the failure. Retained version-1 and ordinary
+successful handoffs are unchanged.
+
 ### Read the exact handoff observation
 
 For a task-native continuation, `<task-handoff-observation-reference>` contains

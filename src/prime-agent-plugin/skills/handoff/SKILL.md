@@ -21,7 +21,11 @@ This is ordinary handoff, not Conversation supervision: an owning Conversation
 continuing its exact managed Episode uses `prime-claw-oversee-episode` and its
 bound `handoff_task_episode` or `handoff_spec_episode` operation instead. Do not
 use ordinary handoff for blocked recovery, pause, consultation, merge,
-abandonment, cleanup, or scope expansion.
+abandonment, cleanup, or scope expansion. A completed handoff with failed or
+unknown historical execute admission belongs to the owner's separate informed
+execute-only continuation procedure in `prime-claw-oversee-episode`, not this
+entry. It authorizes a new request only through a supported managed invocation,
+never replay or an ordinary-handoff workaround.
 
 Call `ralph_handoff` once. Successful admission queues handoff and exactly one
 canonical execute follow-up. It does not prove compaction or execution completed.

@@ -1038,7 +1038,8 @@ def test_changed_loaded_policy_keeps_phase_ids_fallback_and_builder_customizatio
     assert "Planning alone grants no implementation authority" in oversee
     assert "not dependency readiness or a phase-history receipt" in oversee
     handoff = " ".join(workflow("handoff").read_text().split())
-    assert "`ralph_handoff` operation or owning Conversation" in handoff
+    assert "The existing transport alone sends the sole canonical execute follow-up" in handoff
+    assert "Receiving this prompt proves neither that execute is queued" in handoff
     assert "native `/handoff` command" not in handoff
 
 

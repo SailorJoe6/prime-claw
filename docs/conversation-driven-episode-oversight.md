@@ -98,7 +98,13 @@ is not authority or a new advance. Empty queues or missing observed actions alon
 do not prove non-admission. Preserve preparation effects and evidence gaps;
 source/runtime localization is not wire-level proof of every event. Uncertain
 first admission, callback failure, and refused/uncertain second delivery remain
-distinct stopped cases with no generic replay, direct execute or chat steering.
+distinct stopped cases with no generic replay or chat steering. A demonstrably
+completed handoff can instead reach the separate informed-owner
+[new execute-only continuation decision](handoff-chain.md#new-execute-only-continuation-after-completed-handoff).
+That is ONE NEW request on the same version-2 resources, not replay, and remains
+unavailable until the managed invocation is implemented and validated. It can
+proceed to an informed decision without historical sender IDs/ACK/callback proof,
+but never with known pending work or unproved current idleness.
 Record findings and disposition through existing native task fields/history.
 When available public evidence is insufficient, explain the exact limit and offer
 missing-evidence inspection without sending work, pause, or separately authorized

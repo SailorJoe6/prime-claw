@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 2700
+    assert 300 <= len(words) <= 3300
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -361,3 +361,33 @@ def test_task_native_terminal_policy_is_editable_while_exact_cleanup_mechanics_r
     assert "input.expectedRevision" not in cleanup
     assert "verifyIndependentTaskClone" in cleanup
     assert "uncommitted-task-content" in cleanup
+
+
+def test_completed_handoff_continuation_is_new_owner_authority_not_replay():
+    guide = " ".join(GUIDE.read_text().split())
+    policy = guide.split("### New execute-only continuation after completed handoff", 1)[1].split("Only the owning Conversation publishes accepted blockers", 1)[0]
+    for phrase in (
+        "demonstrably received and completed",
+        "unknown historical execute admission",
+        "receiver report plus fresh native idle/empty-queue facts",
+        "without historical sender IDs, ACKs or callback proof",
+        "explicit informed operator authorization for ONE NEW continuation",
+        "Known pending/running execute or unfinished admitted work stops",
+        "Do not cancel work to qualify",
+        "Already In Progress needs no status round trip",
+        "Publication/preparation failure means no send",
+        "Do not mirror Episode-owned content",
+        "not the historical callback",
+        "Definite refusal or uncertainty stops this authorization",
+        "including possible partial writes",
+        "never resend",
+        "retained version-1 and initial-creation recovery",
+    ):
+        assert phrase in policy
+    assert "explicit informed operator decision" in guide.split("### Task-native handoff refusal disposition", 1)[1]
+    handoff = " ".join((REPO / "src/prime-agent-plugin/workflows/handoff.md").read_text().split())
+    execute = " ".join((REPO / "src/prime-agent-plugin/skills/project-templates/execute.md").read_text().split())
+    blocked = " ".join((REPO / "src/prime-agent-plugin/skills/project-templates/blocked.md").read_text().split())
+    assert "Do not send execute from this handoff turn" in handoff
+    assert "current durable progress, not a stale task or comment snapshot" in execute
+    assert "Blocker clearance alone does not authorize that new send" in blocked
