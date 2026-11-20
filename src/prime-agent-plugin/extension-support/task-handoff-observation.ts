@@ -20,7 +20,7 @@ export interface TaskHandoffObservationReference {
 }
 
 function unavailable(reason: string): never {
-  throw new Error(`Task handoff observation unavailable (${reason}); no handoff was sent. Preserve current facts and inspect; do not retry or use an inline/copy fallback.`);
+  throw new Error(`Task handoff observation unavailable (${reason}); no continuation was sent. Preserve current facts and inspect; do not retry or use an inline/copy fallback.`);
 }
 
 function localRows(file: string): { line: string; row: any }[] {

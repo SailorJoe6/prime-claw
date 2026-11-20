@@ -60,8 +60,11 @@ can instead reach the separate informed-owner
 [new execute-only continuation decision](../handoff-chain.md#new-execute-only-continuation-after-completed-handoff).
 It is ONE NEW request on the same version-2 resources, not a replay. It can reach
 authorization without historical sender IDs/ACK/callback proof, but known pending
-work or unproved current idleness stops it. The invocation remains unavailable
-until implemented and validated; this policy is not live recovery authority.
+work or unproved current idleness stops it. The source candidate supports
+`handoff_task_episode` with `mode: "execute-only"` and accepted execution focus in
+`guidance`, using one native follow-up and separate current factual-update result.
+An older loaded generation may not support it. Source validation is not live
+recovery authority or proof of activation.
 If public evidence
 cannot establish definite refusal, state the precise limit and offer evidence
 inspection without sending work, pause, or a separately authorized normal

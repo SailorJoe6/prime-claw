@@ -101,8 +101,11 @@ first admission, callback failure, and refused/uncertain second delivery remain
 distinct stopped cases with no generic replay or chat steering. A demonstrably
 completed handoff can instead reach the separate informed-owner
 [new execute-only continuation decision](handoff-chain.md#new-execute-only-continuation-after-completed-handoff).
-That is ONE NEW request on the same version-2 resources, not replay, and remains
-unavailable until the managed invocation is implemented and validated. It can
+That is ONE NEW request on the same version-2 resources, not replay. This source
+candidate supports the existing `handoff_task_episode` with `mode: "execute-only"`
+and accepted execution focus in `guidance`; a loaded older generation still
+cannot use it. Activation and actual historical recovery remain separately
+authorized, not implied by source publication or candidate validation. It can
 proceed to an informed decision without historical sender IDs/ACK/callback proof,
 but never with known pending work or unproved current idleness.
 Record findings and disposition through existing native task fields/history.

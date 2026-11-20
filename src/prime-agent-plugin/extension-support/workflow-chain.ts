@@ -4,6 +4,7 @@ const LEGACY_SNAPSHOT_WORKFLOWS = new Set(["handoff", "execute"]);
 
 export interface CanonicalWorkflowPromptOptions {
   guidance?: string;
+  executeGuidance?: string;
   legacySnapshot?: boolean;
   location?: { tag: string; value: string };
   ownerSessionId?: string;
@@ -49,6 +50,13 @@ ${options.ownerSessionId}
 <operator-compaction-guidance>
 ${options.guidance}
 </operator-compaction-guidance>`;
+  }
+  if (options.executeGuidance) {
+    prompt += `
+
+<operator-execute-guidance>
+${options.executeGuidance}
+</operator-execute-guidance>`;
   }
   return prompt;
 }

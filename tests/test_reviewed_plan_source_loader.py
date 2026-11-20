@@ -152,7 +152,7 @@ def test_reviewed_plan_loads_with_default_source_loader(tmp_path):
 
 @pytest.mark.container
 def test_native_observation_entry_durable_cross_worktree_repl(tmp_path):
-    """Public entry proof plus SDK-adapted canonical task chain; not live UAT/model judgment."""
+    """Public entry/ordinary chain/execute-only SDK proof; not live UAT/model judgment."""
     stdout = _run_source_loader_fixture(tmp_path, native_entry=True)
     lines = [line.removeprefix("NATIVE_ENTRY_RESULT=") for line in stdout.splitlines()
              if line.startswith("NATIVE_ENTRY_RESULT=")]
@@ -188,3 +188,30 @@ def test_native_observation_entry_durable_cross_worktree_repl(tmp_path):
     assert chain["completeEvidenceAfterCompaction"] is True
     assert chain["contextLeak"] is False
     assert chain["phases"] == ["first-admitted", "factual-callback", "followUp-admitted"]
+
+
+    lines = [line.removeprefix("NATIVE_EXECUTE_ONLY_RESULT=") for line in stdout.splitlines()
+             if line.startswith("NATIVE_EXECUTE_ONLY_RESULT=")]
+    assert len(lines) == 1, stdout
+    continuation = json.loads(lines[0])
+    (tmp_path / "native-execute-only-result.json").write_text(json.dumps(continuation, indent=2))
+    assert continuation["adapter"] == "public-promptUntilAccepted"
+    assert continuation["ownerOperationCalls"] == 1
+    assert continuation["priorHandoffCompleted"] is True
+    assert continuation["historicalExecuteAdmission"] == "unknown"
+    assert continuation["historicalCallback"] == "unknown"
+    assert continuation["scriptedAuthorization"] is True
+    assert continuation["historicalSenderProof"] == "unavailable"
+    assert continuation["historicalCallbackReplays"] == 0
+    assert continuation["initialAssignments"] == 0
+    assert continuation["freshFactualWrites"] == 1
+    assert continuation["substantiveTotal"] == 61
+    assert continuation["canonicalPromptRequests"] == 1
+    assert continuation["handoffRequests"] == 0
+    assert continuation["compactionRequests"] == 0
+    assert continuation["factualUpdate"] == "completed"
+    assert continuation["delivery"]["execute"]["outcome"] == "admitted"
+    for field in ("sameIdentity", "sameKernelObject", "preservedPartialEffects",
+                  "currentEvidenceRead", "previousEvidenceRead", "nativeQueueDrained"):
+        assert continuation[field] is True, (field, continuation)
+    assert continuation["contextLeak"] is False

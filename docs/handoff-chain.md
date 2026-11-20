@@ -167,23 +167,36 @@ intended Episode workspace while preserving unrelated bytes/index/history.
 Failure means no send. The new request carries full current factual context
 even when stored observations are older or a prior callback partly wrote.
 
-**Policy slice availability:** this source slice documents the exception but
-does not yet implement the planned optional `mode: "execute-only"` on
-`handoff_task_episode`. Until that managed invocation is implemented, validated
-and separately activated where needed, report the interface constraint and
-remain paused. Do not pass an unsupported mode, inject raw execute, use ordinary
-`ralph_handoff`, patch upstream, or treat this policy as live recovery authority.
-Later mechanical slices must load canonical execute only with accepted bounded
-EXECUTE focus, current native contract and exact evidence. They must not resend
-handoff, request compaction as a prerequisite, replay the historical callback,
-send initial assignment, allocate/rebind resources, re-enter create/implement,
-or dispatch through a heartbeat/hook. Resume current durable progress rather
-than replaying historical effects or a stale task/comment snapshot. No routine
-approval gate is added to successful ordinary handoff.
+**Managed invocation in this source candidate:** after the informed decision,
+call the existing `handoff_task_episode` with the exact `taskId`,
+`mode: "execute-only"`, and the accepted bounded execution focus in `guidance`.
+Omitting `mode` retains the ordinary handoff/execute chain. This is a source
+capability, not proof that any running process supports the mode. If the loaded
+generation lacks it, stop for the interface constraint; do not inject raw
+execute, use ordinary `ralph_handoff`, or patch upstream.
+
+The new mode loads only the current canonical execute asset. It carries
+`<operator-execute-guidance>`, exact owner/task tags and one bounded reference to
+the existing native observation entry. That entry retains full prior/current
+provider observations, selected Episode session/state, and raw explicitly linked
+descendant session/state facts. Saved descendants without live state keep that
+state absent, not an invented idle boolean. The owner must obtain and judge
+required current readiness evidence before invoking. A freshly resolved route
+can differ from the historical ownership route only for the same natively
+verified durable Episode; the operation does not reopen or rebind resources.
+
+It sends ONE existing native busy-safe `followUp`, not handoff, compaction,
+initial assignment, a historical callback, creation, or heartbeat/hook dispatch.
+No after-handoff compaction trigger runs. Resume current durable progress, not
+historical effects or a stale task/comment snapshot. Semantic eligibility,
+informed authority, scope and history compatibility remain editable guidance,
+not another code classifier or approval protocol. No routine gate is added to
+successful ordinary handoff. Candidate tests do not authorize live recovery.
 
 After definite NEW native execute admission only, the existing managed factual
 mechanism advances current provider/task/code observations, not historical
-callback completion. Refusal or uncertainty ends that authorization without
+callback completion. Grandfathered Backlog retains its original record shape
+and advances only its existing code observation; no provider fields are invented. Refusal or uncertainty ends that authorization without
 optimistic advancement. Report requested/admitted (not completed), refused,
 not attempted or uncertain using bounded private-safe native stage/correlation
 facts separately from factual-update results. A failed update, including

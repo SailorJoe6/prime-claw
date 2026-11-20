@@ -61,6 +61,7 @@ import assert from "node:assert/strict";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import { retainTaskHandoffObservation } from "/candidate/extension-support/task-handoff-observation.ts";
 import { createReviewedPlanExtension } from "/candidate/extensions/reviewed-plan.ts";
+import { continueTaskEpisodeExecute } from "/candidate/extension-support/spec-episode.ts";
 const state = globalThis.__nativeEntryProof;
 export default function proof(pi) {
   createReviewedPlanExtension(state.chainDependencies)(pi);
@@ -82,6 +83,13 @@ export default function proof(pi) {
   pi.registerCommand("capture-production", { description: "production public-entry helper", handler: async (_arg, ctx) => {
     state.productionReference = retainTaskHandoffObservation(ctx, state.productionRecord, "reader-route",
       state.observation, state.sessionObservation, (type, data) => pi.appendEntry(type, data));
+  }});
+  pi.registerCommand("continue-execute", { description: "scripted informed owner operation", handler: async (_arg, ctx) => {
+    // This fixture scripts informed authority; it does not test model policy.
+    assert.equal(state.executeOnlyAuthorization, "one new current-work execute; historical uncertainty disclosed");
+    state.executeOnlyOwnerCalls++;
+    state.executeOnlyResult = await continueTaskEpisodeExecute("SYNTHETIC-62", state.executeOnlyFocus, ctx,
+      { ...state.executeOnlyDependencies, appendEntry: (type, data) => pi.appendEntry(type, data) });
   }});
   pi.on("tool_execution_end", (event) => {
     if (event.toolName === "ipython") state.readerToolEnds.push({ isError: event.isError, result: event.result });
@@ -453,6 +461,202 @@ print('SUBSTANTIVE_AFTER_COMPACT', {'task': chain_current['id'], 'total': chain_
     canonicalPromptRequests: requests.length, compactRunRequests: compactCalls, completed, persistedCompactions: nativeCompactions.length,
     substantiveMarkers: workCalls, nativeQueueDrained: true, sameIdentity: true, sameKernelObject: true,
     completeEvidenceAfterCompaction: true, contextLeak, phases, events, toolResults: chainEnds }));
+
+
+  // Sibling scenario: missing historical sender/callback evidence is a scripted
+  // premise, not a conclusion from queues. This is NOT the ordinary chain above:
+  // a later, separate handoff completes and leaves useful partial current work.
+  // The NEW authorization below does not repeat that handoff or compaction.
+  const { canonicalWorkflowPrompt } = await import("/candidate/extension-support/workflow-chain.ts");
+  const partialFile = join(readerCwd, "synthetic-partial-work.txt");
+  let historicalCompactCalls = 0, continuationWorkCalls = 0;
+  const continuationTask: any = task("CONTINUATION");
+  continuationTask.task.description = "Continue the preserved prefix; sum current workInputs without repeating prior effects.";
+  continuationTask.task.implementationPlan = "Keep the completed [17,25] prefix; append only remaining [8,11], then report total 61.";
+  continuationTask.task.implementationNotes = "Prior prefix side effects exist. Historical callback and execute admission remain unknown.";
+  continuationTask.task.unknownTask.workInputs = [17, 25, 8, 11];
+  state.executeOnlyFocus = "Continue the existing prefix object and file. Append only the current remaining inputs [8,11]; report total 61.";
+  state.chainTool = (model: any, context: any) => {
+    if (model.id !== "reader") return undefined;
+    const content = context.messages.filter((m: any) => m.role === "user").at(-1)?.content;
+    const text = typeof content === "string" ? content : (content ?? []).map((part: any) => part.text ?? "").join("\n");
+    if (text.includes("SYNTHETIC_SEPARATE_PRIOR_HANDOFF") && historicalCompactCalls === 0) {
+      historicalCompactCalls++;
+      return cell("historical-completed-handoff", `assert chain_work['completed'] and chain_work['total'] == 50
+continuation_work = {'pid': os.getpid(), 'cwd': str(Path.cwd()), 'done': [17, 25], 'completed': False}
+continuation_identity = id(continuation_work)
+continuation_file = Path(${JSON.stringify(partialFile)})
+continuation_file.write_text('17,25', encoding='utf-8')
+# These are useful existing partial effects, not a recovered sender receipt.
+historical_handoff_compact = await compact.run('The separate prior handoff is complete. Preserve continuation_work and its [17,25] prefix. No execute is queued by this historical fixture branch.')
+assert historical_handoff_compact.get('scheduled') is True, historical_handoff_compact
+print('SEPARATE_PRIOR_HANDOFF_COMPLETED', {'partial_prefix': continuation_work['done'], 'execute_admission': 'unknown', 'callback': 'unknown'})
+`);
+    }
+    const match = text.match(/<task-handoff-observation-reference>\n(.*?)\n<\/task-handoff-observation-reference>/);
+    const currentExecuteGuidance = `<operator-execute-guidance>\n${state.executeOnlyFocus}\n</operator-execute-guidance>`;
+    if (state.executeOnlyAuthorization === "one new current-work execute; historical uncertainty disclosed"
+        && text.includes('<skill name="execute"') && text.includes(currentExecuteGuidance)
+        && match && continuationWorkCalls === 0) {
+      continuationWorkCalls++;
+      assert.ok(text.includes(currentExecuteGuidance));
+      assert.ok(!text.includes("<operator-compaction-guidance>"));
+      const reference = JSON.parse(match[1]);
+      return cell("execute-only-current-work", `continuation_reference = json.loads(${JSON.stringify(JSON.stringify(reference))})
+continuation_data = load_exact(continuation_reference)
+assert continuation_data['bindings'] == continuation_reference['bindings']
+assert continuation_data['bindings']['episodeId'] == ${JSON.stringify(readerId)}
+provider_now = continuation_data['providerTaskObservation']
+assert provider_now['previousProviderRevision'] == '2' * 40
+assert provider_now['publishedProviderRevision'] == '3' * 40
+previous_now = provider_now['previousTaskEvidence']['task']
+current_now = provider_now['currentTaskEvidence']['task']
+assert previous_now['unknownTask']['workInputs'] == [17,25,8]
+assert current_now['unknownTask']['workInputs'] == [17,25,8,11]
+assert previous_now['implementationPlan'] != current_now['implementationPlan']
+assert current_now['unknownTask']['nullable'] is None and 'genuinely_absent' not in current_now
+assert current_now['comments'][0]['body'].startswith('CONTINUATION_' + 'EARLY_α')
+assert current_now['comments'][0]['body'].endswith('CONTINUATION_' + 'LATE_γ')
+fresh_session = continuation_data['episodeSessionObservation']
+assert fresh_session['session']['sessionId'] == ${JSON.stringify(readerId)}
+assert fresh_session['state']['isStreaming'] is False and fresh_session['state']['isCompacting'] is False
+assert fresh_session['state']['sessionActions']['queuedCount'] == 0
+assert fresh_session['state']['fixtureUnknown'] is None
+assert fresh_session['descendants'] == []
+inspect_pieces(continuation_data)
+# Exact earlier observations remain available, including their unknown fields.
+assert load_exact(chain_reference) == chain_data
+assert load_exact(native_reference) == observation
+assert load_exact(production_reference) == production_data
+assert os.getpid() == continuation_work['pid'] and str(Path.cwd()) == continuation_work['cwd']
+assert id(continuation_work) == continuation_identity and not continuation_work['completed']
+assert continuation_work['done'] == [17,25] and continuation_file.read_text(encoding='utf-8') == '17,25'
+remaining = current_now['unknownTask']['workInputs'][len(continuation_work['done']):]
+assert remaining == [8,11]
+continuation_work['done'].extend(remaining)
+with continuation_file.open('a', encoding='utf-8') as partial_output:
+    partial_output.write(',' + ','.join(map(str, remaining)))
+continuation_work['total'] = sum(continuation_work['done'])
+continuation_work['completed'] = True
+assert continuation_work['total'] == 61
+assert continuation_file.read_text(encoding='utf-8') == '17,25,8,11'
+print('SUBSTANTIVE_EXECUTE_ONLY', {'total': continuation_work['total'], 'same_kernel_object': True, 'preserved_prefix': True, 'full_current_and_prior_evidence': True, 'historical_execute_admission': 'unknown', 'historical_callback': 'unknown'})
+`);
+    }
+    return undefined;
+  };
+  for (let i = 0; i < 2; i++) await reader.prompt(`SEPARATE_HANDOFF_PADDING_${i} ` + "s".repeat(30000));
+  const historicalCompactionsBefore = rows(reader.sessionManager.getSessionFile()).filter((row) => row.type === "compaction").length;
+  await reader.prompt(canonicalWorkflowPrompt(readerCwd, "handoff") + "\nSYNTHETIC_SEPARATE_PRIOR_HANDOFF");
+  await reader.waitForHeadlessIdle();
+  assert.equal(historicalCompactCalls, 1);
+  assert.equal(rows(reader.sessionManager.getSessionFile()).filter((row) => row.type === "compaction").length, historicalCompactionsBefore + 1);
+  assert.equal(state.readerToolEnds.at(-1).isError, false, JSON.stringify(state.readerToolEnds.at(-1)));
+  assert.ok(JSON.stringify(state.readerToolEnds.at(-1)).includes("SEPARATE_PRIOR_HANDOFF_COMPLETED"));
+  assert.equal(readFileSync(partialFile, "utf8"), "17,25");
+
+  const executeOnlyRequests: any[] = [], executeOnlyStates: any[] = [];
+  const continuationBefore = structuredClone(record);
+  const currentNativeState = () => ({ ...sessionSummary(), sessionActions: reader.getSessionActionSnapshot(), fixtureUnknown: null });
+  const receiverReport = { separateExecuteReceived: false, pendingWork: false };
+  const assessment = { completedHandoff: true, receiverReport, current: currentNativeState(),
+    historicalExecuteAdmission: "unknown", historicalCallback: "unknown", senderTransport: "unavailable",
+    partialEffects: "preserved prefix [17,25]", currentTaskPlanChanged: true, acceptedFocus: state.executeOnlyFocus };
+  assert.equal(assessment.current.isStreaming, false);
+  assert.equal(assessment.current.isCompacting, false);
+  assert.equal(assessment.current.sessionActions.queuedCount, 0);
+  assert.deepEqual(reader.getFollowUpMessages(), []);
+  assert.deepEqual(reader.getSteeringMessages(), []);
+  // Deliberately no historical sender ID/ACK/callback is supplied. This current
+  // receiver report plus idle queues does NOT prove old execute non-admission.
+  assert.equal("historicalSenderReceipt" in assessment, false);
+  state.executeOnlyAssessment = structuredClone(assessment);
+  // Separate SCRIPTED informed operator decision, after the above disclosure.
+  // No autonomous LLM authorization, token/receipt protocol or gate is claimed.
+  state.executeOnlyAuthorization = "one new current-work execute; historical uncertainty disclosed";
+  state.executeOnlyOwnerCalls = 0;
+  const newCompactionsBefore = rows(reader.sessionManager.getSessionFile()).filter((row) => row.type === "compaction").length;
+  const continuationEndsBefore = state.readerToolEnds.length;
+  let freshFactualWrites = 0;
+  state.executeOnlyDependencies = {
+    taskRunner: { run(program: string, args: string[], options: any = {}) {
+      if (program === "backlog") {
+        assert.deepEqual(args, ["task", "view", "--json", "--", "SYNTHETIC-62"]);
+        assert.equal(options.cwd, readerCwd);
+        return { status: 0, stdout: JSON.stringify(continuationTask), stderr: "" };
+      }
+      return taskRunner.run(program, args, options);
+    } },
+    ownership: { read(_root: string, owner: string) { return !owner || owner === record.ownerSessionId ? record : null; },
+      write(_root: string, value: any) { freshFactualWrites++; record = value; } },
+    prepareEpisodeTaskHistory: () => ({ status: "prepared", head: "3".repeat(40) }),
+    publisher: new PrimeSessionPublisher({ async request(command: any) {
+      if (command.type === "list") return { success: true, data: { sessions: [sessionSummary()] } };
+      assert.equal(command.activeSessionId, "reader-route");
+      if (command.type === "get_state") {
+        const captured = currentNativeState();
+        executeOnlyStates.push(structuredClone(captured));
+        return { success: true, data: captured };
+      }
+      assert.equal(command.type, "prompt");
+      executeOnlyRequests.push(structuredClone(command));
+      assert.equal(executeOnlyRequests.length, 1, "one new authorization means one native execute send");
+      assert.equal(command.streamingBehavior, "followUp");
+      assert.equal(command.queueIfBusy, true);
+      assert.equal(command.expandPromptTemplates, false);
+      assert.ok(command.message.includes('<skill name="execute"'));
+      assert.ok(!command.message.includes('<skill name="handoff"'));
+      await reader.promptUntilAccepted(command.message, {
+        source: command.source, streamingBehavior: command.streamingBehavior,
+        expandPromptTemplates: false, queueIfBusy: true, resumeIfIdle: true, skipInputHandlers: true,
+      });
+      return { success: true, data: {} };
+    }, close() {} } as any),
+  };
+  await writer.prompt("/continue-execute");
+  await reader.waitForHeadlessIdle();
+  assert.equal(state.executeOnlyOwnerCalls, 1);
+  assert.equal(executeOnlyRequests.length, 1);
+  assert.equal(continuationWorkCalls, 1);
+  assert.equal(freshFactualWrites, 1);
+  assert.equal(state.executeOnlyResult.mode, "execute-only");
+  assert.equal(state.executeOnlyResult.admitted, true);
+  assert.equal(state.executeOnlyResult.executeDelivery, "followUp");
+  assert.equal(state.executeOnlyResult.factualUpdate, "completed");
+  assert.equal(state.executeOnlyResult.delivery.execute.outcome, "admitted");
+  assert.equal("handoffDelivery" in state.executeOnlyResult, false);
+  assert.equal("first" in state.executeOnlyResult.delivery, false);
+  assert.equal(rows(reader.sessionManager.getSessionFile()).filter((row) => row.type === "compaction").length, newCompactionsBefore);
+  assert.equal(reader.getSessionActionSnapshot().queuedCount, 0);
+  assert.deepEqual(reader.getFollowUpMessages(), []);
+  assert.deepEqual(reader.getSteeringMessages(), []);
+  assert.equal(reader.sessionManager.getSessionId(), readerId);
+  for (const key of ["ownerSessionId", "operationId", "taskId", "episodeId", "episodeSessionFile", "episodeActiveSessionId", "worktree", "branch", "baseRef", "integrationBranch", "engine"]) assert.equal(record[key], continuationBefore[key]);
+  assert.equal(record.providerRevision, "3".repeat(40));
+  assert.deepEqual(record.taskEvidence, continuationTask);
+  assert.equal(readFileSync(partialFile, "utf8"), "17,25,8,11");
+  const continuationEnds = state.readerToolEnds.slice(continuationEndsBefore);
+  assert.equal(continuationEnds.length, 1);
+  assert.equal(continuationEnds[0].isError, false, JSON.stringify(continuationEnds));
+  assert.ok(JSON.stringify(continuationEnds[0]).includes("SUBSTANTIVE_EXECUTE_ONLY"));
+  assert.ok(JSON.stringify(continuationEnds).length < 4096);
+  assert.ok(executeOnlyRequests[0].message.length < 70000);
+  assert.equal(executeOnlyStates.length, 1);
+  assert.equal(executeOnlyStates[0].isStreaming, false);
+  assert.equal(executeOnlyStates[0].sessionActions.queuedCount, 0);
+  const continuationContextLeak = state.contexts.some((context: any) => ["CONTINUATION_EARLY_α", "CURRENT_LATE_γ", "PREVIOUS_EARLY_α"].some((sentinel) => context.text.includes(sentinel)));
+  assert.equal(continuationContextLeak, false);
+  assert.equal(state.executeOnlyAssessment.historicalExecuteAdmission, "unknown");
+  assert.equal(state.executeOnlyAssessment.historicalCallback, "unknown");
+  console.log("NATIVE_EXECUTE_ONLY_RESULT=" + JSON.stringify({ adapter: "public-promptUntilAccepted",
+    ownerOperationCalls: state.executeOnlyOwnerCalls, priorHandoffCompleted: true, receiverReport,
+    historicalExecuteAdmission: "unknown", historicalCallback: "unknown", historicalSenderProof: "unavailable",
+    scriptedAuthorization: true, canonicalPromptRequests: executeOnlyRequests.length, handoffRequests: 0, compactionRequests: 0,
+    historicalCallbackReplays: 0, initialAssignments: 0, freshFactualWrites,
+    factualUpdate: state.executeOnlyResult.factualUpdate, delivery: state.executeOnlyResult.delivery,
+    sameIdentity: true, sameKernelObject: true, preservedPartialEffects: true, substantiveTotal: 61,
+    currentEvidenceRead: true, previousEvidenceRead: true, nativeQueueDrained: true,
+    contextLeak: continuationContextLeak, toolResults: continuationEnds }));
 
 } finally {
   await reader?.disposeAsync();

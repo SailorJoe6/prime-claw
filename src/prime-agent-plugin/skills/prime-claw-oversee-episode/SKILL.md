@@ -117,8 +117,10 @@ accepted bounded focus, code/head/publication/worktree facts, available historic
 observations and fresh native Episode and explicitly proven descendant
 state/actions/queues. Keep complete raw fields, unknown keys, nulls and absence
 through existing exact native-entry evidence and meaningful bounded reads, not
-giant prompts or an idle boolean. Current handoff capture is selected-session
-only; inspect explicit descendants rather than claiming their state was captured.
+giant prompts or an idle boolean. Ordinary handoff capture remains selected-session
+only; execute-only capture also retains raw explicitly linked descendants. Saved
+descendants without live state keep that state absent. Inspect actual supplied
+facts and obtain required current evidence rather than declaring absence idle.
 Judge compatible task/plan/history advances semantically, not frozen equality.
 Foreign identity, real scope conflict, unsafe current work, missing required
 current evidence or unproved current idleness stops. Known pending/running execute
@@ -145,10 +147,15 @@ Do not mirror Episode-owned content or manufacture a send receipt. Verify actual
 publication and prepare only the intended Episode provider workspace; preserve
 unrelated bytes/index/history. Publication/preparation failure means no send.
 
-Use only the documented managed execute-only operation when its supported
-invocation is available; otherwise report that concrete interface constraint,
-not an ad hoc raw execute workaround or upstream patch. Send one NEW canonical
-execute with current factual context and accepted bounded EXECUTE focus. Resume
+After the informed decision, call `handoff_task_episode` once with the exact
+`taskId`, `mode: "execute-only"`, and accepted bounded execution focus in
+`guidance`. Omit `mode` for the unchanged ordinary chain, never as a substitute
+for this new request. Use this mode only on a supporting loaded generation;
+otherwise report the concrete interface constraint, not an ad hoc raw execute
+workaround or upstream patch. It sends one NEW canonical execute with current
+factual context, exact native-entry reference and `<operator-execute-guidance>`.
+Native same-durable-session resolution may supply a current route different
+from historical ownership; do not guess or manually rebind it. Resume
 current durable progress, not stale snapshots or historical side effects. Never
 resend handoff/initial assignment, replay historical callback, call ordinary
 `ralph_handoff`, re-enter creation/implementation admission, or dispatch from a

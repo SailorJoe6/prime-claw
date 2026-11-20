@@ -13,7 +13,7 @@ import {
   EpisodeStateUncertainError, OrcaMutationUncertainError, OrcaUnavailableError,
   allocateReservedTaskEpisode, bundleContentDigest, commitConversationTaskStatus, createSpecEpisode, createTaskEpisode, handoffSpecEpisode,
   restoreBlockedSpecEpisode, transitionSpecEpisodeToTaskOwnership,
-  handoffTaskEpisode, resolveBlockedWorkflowAuthority, finalizeTaskEpisodeCleanup,
+  handoffTaskEpisode, continueTaskEpisodeExecute, resolveBlockedWorkflowAuthority, finalizeTaskEpisodeCleanup,
   verifyActiveTaskEpisodeContinuity,
 } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { parseEpisodeOwnership, writeEpisodeOwnership } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
@@ -767,6 +767,190 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
     assert.equal(readFileSync(activeSpec,"utf8"),"partial active spec\n");
     assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/SPECIFICATION.md")),true);
     assert.equal(existsSync(join(f.worktree,".ralph/plans/blocked/EXECUTION_PLAN.md")),true);
+  });
+});
+
+// Scripted informed-owner invocation. Policy eligibility is not a code classifier.
+function executeOnlyHarness(provider = "backlog", options = {}) {
+  const f = harness({ list: (_count, session) => [session] });
+  const taskId = provider === "beads" ? BEADS_TASK_ID : "PRIMECLAW-10.38";
+  const raw = (phase) => provider === "beads" ? {
+    ...BEADS_TASK_EVIDENCE, design: `Current accepted ${phase} plan`, notes: `partial effect retained ${phase}`,
+    unknownRaw: { phase, nullable: null, nested: [false, 0, "原文", { tail: "z".repeat(40_000) }] },
+  } : { schemaVersion: 1, kind: "task-view", unknownEnvelope: { phase, nullable: null }, task: {
+    id: taskId, path: "backlog/tasks/primeclaw-10.38.md", status: "In Progress",
+    description: `Accepted bounded scope ${phase}`, implementationPlan: `Current accepted ${phase} plan`,
+    implementationNotes: `partial effect retained ${phase}`, comments: [{ body: "raw comment " + phase }],
+    unknownRaw: { nullable: null, nested: [false, 0, "原文", { tail: "z".repeat(40_000) }] },
+    ...(phase === "current" ? { currentOnly: null } : { previousOnly: null }),
+  } };
+  const previous = raw("previous"), current = raw("current");
+  const initial = provider === "beads" ? activeBeadsTaskRecord(f, { taskEvidence: previous })
+    : activeTaskRecord(f, provider === "grandfathered" ? {} : {
+      provider: "backlog", providerRevision: "c".repeat(40), taskEvidence: previous,
+    });
+  f.ownership.write(f.root, initial);
+  f.git.head = (path) => path === f.worktree ? "b".repeat(40) : TASK_BASE;
+  const events = [];
+  const write = f.ownership.write;
+  f.ownership.write = (repo, value) => { events.push("current-factual-write"); write(repo, value); };
+  f.publisher.deliverExecute = async (route, prompt) => {
+    assert.deepEqual(f.record, initial, "do not optimistically advance before admission");
+    f.calls.push(["execute", prompt]); events.push("new-execute-admitted");
+    return { activeSessionId: route, execute: { outcome: "admitted" } };
+  };
+  const dependencies = {
+    ...f.deps,
+    now: () => "2026-11-20T19:00:00Z",
+    prepareEpisodeTaskHistory(input) {
+      events.push("provider-prepared"); assert.equal(input.targetWorktree, f.worktree); assert.equal(input.primaryRoot, f.root);
+      return { status: "prepared", head: "d".repeat(40) };
+    },
+    taskRunner: { run(command, args, opts) {
+      if (command === "backlog") {
+        assert.deepEqual(args, ["task", "view", "--json", "--", taskId]);
+        assert.equal(opts.cwd, f.worktree, "independent mode never reads mutable primary task bytes");
+        return { status: 0, stdout: JSON.stringify(current), stderr: "" };
+      }
+      return new ProcessCommandRunner().run(command, args, opts);
+    } },
+    taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd, nativeView: cwd === f.worktree ? current : previous }),
+    advanceBeadsEvidence(input) {
+      events.push("provider-prepared");
+      const target = parseEpisodeOwnership({ ...initial, providerRevision: "d".repeat(32),
+        taskEvidence: current, head: input.episodeHead, updatedAt: "2026-11-20T19:00:00Z" });
+      return { record: target, previousProviderRevision: initial.providerRevision,
+        currentProviderRevision: target.providerRevision, previousTaskEvidence: previous, currentTaskEvidence: current,
+        synchronization: { status: 0, stdout: "native pull complete", stderr: "warning retained" },
+        preparation: { status: "ready", nativeUnknown: null },
+        commit() { f.ownership.write(f.root, target); return target; } };
+    },
+    ...options,
+  };
+  f.calls.length = 0;
+  return { f, taskId, initial, previous, current, events, dependencies };
+}
+
+function registeredExecuteOnly(h, additional = {}) {
+  const tools = new Map();
+  createReviewedPlanExtension({ ...h.dependencies,
+    conversationAfterHandoff() { throw new Error("execute-only must not invoke after-handoff compaction"); },
+    ...additional,
+  })({ registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
+    sendUserMessage() { throw new Error("no ordinary chat or compaction send"); }, async sendMessage() {} });
+  const tool = tools.get("handoff_task_episode");
+  assert.deepEqual(tool.parameters.properties.mode.enum, ["execute-only"]);
+  return tool.execute("new-execute", { taskId: h.taskId, mode: "execute-only", guidance: "ONE current accepted EXECUTE focus" }, undefined, undefined, h.f.ctx);
+}
+
+test("execute-only registered operation preserves provider shapes, current focus and single admission before factual write", async (t) => {
+  for (const provider of ["backlog", "beads", "grandfathered"]) await t.test(provider, async () => {
+    const h = executeOnlyHarness(provider), { f } = h;
+    unlinkSync(join(f.worktree, ".prime-claw/workflows/handoff.md")); // loader must not require it
+    const result = await registeredExecuteOnly(h);
+    assert.equal(result.isError, undefined, result.content[0].text);
+    assert.equal(result.details.mode, "execute-only"); assert.equal(result.details.factualUpdate, "completed");
+    assert.equal(result.details.delivery.execute.outcome, "admitted");
+    assert.equal(Object.hasOwn(result.details, "conversationCompaction"), false);
+    assert.equal(Object.hasOwn(result.details, "handoffDelivery"), false);
+    const execute = f.calls.filter(([kind]) => kind === "execute"); assert.equal(execute.length, 1);
+    assert.match(execute[0][1], /<skill name="execute"/);
+    assert.match(execute[0][1], /<operator-execute-guidance>\s*ONE current accepted EXECUTE focus\s*<\/operator-execute-guidance>/);
+    assert.doesNotMatch(execute[0][1], /operator-compaction-guidance|HANDOFF POLICY|<skill name="handoff"/);
+    const observation = readHandoffObservation(f, result.details.observationReference, [execute[0][1]]);
+    assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, h.current);
+    assert.deepEqual(observation.providerTaskObservation[provider === "grandfathered" ? "mainTaskEvidence" : "previousTaskEvidence"], h.previous);
+    assert.deepEqual(observation.episodeSessionObservation.descendants, []);
+    for (const key of Object.keys(h.initial)) {
+      if (!["head", "updatedAt", "providerRevision", "taskEvidence"].includes(key)) assert.deepEqual(f.record[key], h.initial[key], key);
+    }
+    assert.deepEqual(Object.keys(f.record).sort(), Object.keys(h.initial).sort(), "grandfathered shape gains no invented fields");
+    assert.equal(f.record.head, "b".repeat(40));
+    assert.ok(h.events.indexOf("current-factual-write") > h.events.indexOf("new-execute-admitted"));
+    assert.equal(f.nativeEntries.length, 1);
+    for (const output of [execute[0][1], JSON.stringify(result)]) {
+      assert.ok(output.length < 12_000); assert.doesNotMatch(output, /partial effect retained|raw comment|unknownRaw/);
+    }
+    assert.equal(f.calls.some(([kind]) => ["handoff", "fresh", "reopen", "orca-create", "local-create", "auto-run"].includes(kind)), false);
+  });
+});
+
+test("execute-only captures raw explicitly proven descendants, not CWD siblings or idle booleans", async () => {
+  const h = executeOnlyHarness(), { f } = h;
+  const root = transitionSession(f, { unknownRoot: { keep: null } });
+  const child = { sessionId: "child", activeSessionId: "child-route", sessionFile: join(f.root,"child.jsonl"),
+    parentActiveSessionId: "route", cwd: f.worktree, unknownChild: [null, false] };
+  const saved = { id: "saved-not-a-route", lifecycle: "archived", sessionId: "saved", sessionFile: join(f.root,"saved.jsonl"), parentSessionId: "child", unknownSaved: null };
+  const sibling = { sessionId: "foreign", activeSessionId: "foreign-route", sessionFile: join(f.root,"foreign.jsonl"), cwd: f.worktree };
+  const rootState = { ...await f.publisher.getState(), unknownRootState: { queued: null } };
+  const childState = { ...child, sessionActions: { queuedCount: 0, steering: [], followUps: [], nativeUnknown: null },
+    unfinishedActionCount: 0, unknownState: ["whole", null] };
+  f.publisher.list = async () => [root, child, sibling, saved];
+  const stateReads = [];
+  f.publisher.getState = async (route) => { stateReads.push(route); return route === "route" ? rootState : childState; };
+  const result = await registeredExecuteOnly(h); assert.equal(result.isError, undefined, result.content[0].text);
+  const observed = readHandoffObservation(f, result.details.observationReference).episodeSessionObservation;
+  assert.deepEqual(observed, { session: root, state: rootState, descendants: [{session:child,state:childState},{session:saved}] });
+  assert.deepEqual(stateReads,["route","child-route"]);
+  assert.equal(Object.hasOwn(observed.descendants[1], "state"), false, "missing live state remains absent, not idle");
+});
+
+test("execute-only preserves same durable session on a natively resolved changed route without reopening or rebinding", async () => {
+  const h = executeOnlyHarness(), { f } = h;
+  f.publisher.list = async () => [transitionSession(f, { activeSessionId: "current-route" })];
+  const originalState = await f.publisher.getState();
+  f.publisher.getState = async (route) => ({ ...originalState, activeSessionId: route });
+  const result = await registeredExecuteOnly(h); assert.equal(result.isError, undefined, result.content[0].text);
+  assert.equal(result.details.episodeActiveSessionId, "current-route");
+  assert.equal(result.details.observationReference.bindings.episodeActiveSessionId, "current-route");
+  assert.equal(f.record.episodeActiveSessionId, h.initial.episodeActiveSessionId, "no route or identity rebinding in factual provider/code write");
+  assert.equal(f.calls.some(([kind]) => ["reopen", "fresh"].includes(kind)), false);
+});
+
+test("execute-only stops new refusal, uncertainty or unproved admission without optimistic factual writes or resend", async (t) => {
+  for (const outcome of ["refused", "uncertain", "void"]) await t.test(outcome, async () => {
+    const h = executeOnlyHarness("beads"), { f } = h; let sends = 0;
+    f.publisher.deliverExecute = async (route) => {
+      sends += 1;
+      if (outcome === "void") return;
+      throw Object.assign(new EpisodeStateUncertainError("native send stopped"), { delivery: { activeSessionId: route, execute: { outcome } } });
+    };
+    const result = await registeredExecuteOnly(h);
+    assert.equal(result.isError, true); assert.equal(result.details.factualUpdate, "not_attempted");
+    assert.equal(result.details.delivery.execute.outcome, outcome === "void" ? "uncertain" : outcome);
+    assert.deepEqual(f.record, h.initial); assert.equal(sends, 1);
+    assert.equal(h.events.includes("current-factual-write"), false);
+  });
+});
+
+test("execute-only preserves admitted work and actual post-admission write effects without resend", async (t) => {
+  for (const partial of [false, true]) await t.test(partial ? "write then throw" : "throw before write", async () => {
+    const h = executeOnlyHarness(), { f } = h; const write = f.ownership.write;
+    f.ownership.write = (repo, record) => { if (partial) write(repo,record); throw new Error("factual write failed"); };
+    const result = await registeredExecuteOnly(h);
+    assert.equal(result.isError, true); assert.equal(result.details.delivery.execute.outcome, "admitted");
+    assert.equal(result.details.factualUpdate, "failed"); assert.match(result.content[0].text,/partial effects/);
+    assert.equal(f.calls.filter(([kind]) => kind === "execute").length, 1);
+    assert.deepEqual(f.record.taskEvidence, partial ? h.current : h.previous);
+    assert.equal(f.record.operationId, h.initial.operationId);
+  });
+});
+
+test("execute-only preparation and exact identity failures do not send or roll back actual preparation effects", async (t) => {
+  for (const [label, mutate] of [
+    ["provider preparation/publication failed", (h) => { h.dependencies.prepareEpisodeTaskHistory = () => {
+      h.events.push("preparation-effect-retained"); return { status: "blocked", code: "native-publication-unavailable", detail: "fixture failure" }; }; }],
+    ["exact owner missing", (h) => { h.f.ctx.sessionManager.getSessionId = () => "foreign-owner"; }],
+    ["foreign session", (h) => { h.f.publisher.list = async () => [transitionSession(h.f, {sessionId:"foreign"})]; }],
+    ["ambiguous descendant parent", (h) => { const root = transitionSession(h.f); h.f.publisher.list = async () => [root,
+      {sessionId:"child",sessionFile:join(h.f.root,"child.jsonl"),parentSessionId:"episode",parentSessionPath:"/foreign"}]; }],
+    ["native evidence unavailable", (h) => { h.dependencies.appendEntry = undefined; }],
+  ]) await t.test(label, async () => {
+    const h = executeOnlyHarness(); mutate(h);
+    await assert.rejects(continueTaskEpisodeExecute(h.taskId,"accepted",h.f.ctx,h.dependencies));
+    assert.deepEqual(h.f.record,h.initial);
+    assert.equal(h.f.calls.some(([kind]) => ["execute","handoff","reopen","fresh"].includes(kind)),false);
+    if (label.startsWith("provider")) assert.ok(h.events.includes("preparation-effect-retained"));
   });
 });
 
@@ -4262,6 +4446,77 @@ function assertWireTransport(observation, received, expected, invocationStarted,
   if (expected.code) assert.equal(observation.nativeCode, expected.code);
   else assert.equal(Object.hasOwn(observation, "nativeCode"), false);
   assertPrivateSafeHandoffOutput(observation);
+}
+
+// Exercise the execute-only path with the real JSONL client, never a live daemon.
+for (const scenario of [
+  { name: "admitted bounded facts", outcome: "admitted", cause: "result", success: true },
+  { name: "native refusal", outcome: "refused", cause: "result", success: false, code: "busy" },
+  { name: "native uncertainty", outcome: "uncertain", cause: "result", success: false, code: "command_result_uncertain" },
+  { name: "timeout ignores late result without resend", outcome: "uncertain", cause: "timeout" },
+]) {
+  test(`execute-only publisher ${scenario.name}`, { timeout: 5000 }, async (t) => {
+    let pendingLate;
+    const wire = await fakeHandoffDaemon(t, (socket, frame, { reply }) => {
+      const command = frame.command;
+      if (command.type === "get_state") { reply(socket, frame, { data: { activeSessionId: "route" } }); return; }
+      assert.equal(command.type, "prompt", "only one native execute prompt is sent");
+      assert.equal(command.activeSessionId, "route");
+      assert.equal(command.message, HANDOFF_WIRE_SENTINELS.prompt);
+      assert.equal(command.streamingBehavior, "followUp");
+      assert.equal(command.queueIfBusy, true);
+      assert.equal(command.expandPromptTemplates, false);
+      assert.equal(command.source, "extension");
+      if (scenario.cause === "timeout") { pendingLate = { socket, frame }; return; }
+      reply(socket, frame, {
+        success: scenario.success,
+        data: { privateTask: HANDOFF_WIRE_SENTINELS.task },
+        error: HANDOFF_WIRE_SENTINELS.credential,
+        errorInfo: { ...(scenario.code ? { code: scenario.code } : {}), message: HANDOFF_WIRE_SENTINELS.exception },
+      }, scenario.success);
+    });
+    const publisher = new PrimeSessionPublisher(new DaemonJsonlClient(wire.socketPath, { requestTimeoutMs: 150 }));
+    t.after(() => publisher.close());
+    const invocationStarted = Date.now();
+    let delivery, failure;
+    try { delivery = await publisher.deliverExecute("route", HANDOFF_WIRE_SENTINELS.prompt); }
+    catch (error) { failure = error; delivery = error.delivery; }
+    const returnedAt = Date.now();
+    assert.ok(delivery, "execute-only delivery returns or attaches factual observation");
+    assert.deepEqual(Object.keys(delivery).sort(), ["activeSessionId", "execute"]);
+    assert.equal(delivery.activeSessionId, "route");
+    assert.equal(delivery.execute.outcome, scenario.outcome);
+    if (scenario.outcome === "admitted") assert.equal(failure, undefined);
+    else {
+      assert.ok(failure instanceof Error);
+      assert.equal(failure instanceof EpisodeStateUncertainError, scenario.outcome === "uncertain");
+      assert.match(failure.message, new RegExp(`Execute delivery ${scenario.outcome}`));
+      assertPrivateSafeHandoffOutput({ message: failure.message, delivery });
+    }
+    assertPrivateSafeHandoffOutput(delivery);
+    assert.ok(JSON.stringify(delivery).length < 2000, "bounded facts exclude raw response/error/prompt bodies");
+    const prompts = wire.frames.filter(({ frame }) => frame.command.type === "prompt");
+    assert.equal(prompts.length, 1);
+    assertWireTransport(delivery.execute.transport, prompts[0], scenario, invocationStarted, returnedAt);
+    const snapshot = structuredClone(delivery);
+    if (pendingLate) {
+      wire.reply(pendingLate.socket, pendingLate.frame);
+      // A later same-socket reply is a read barrier, not a retry of execute.
+      await publisher.getState("route");
+      assert.deepEqual(delivery, snapshot, "late result cannot change the returned uncertainty");
+    } else {
+      await wire.seen((frames) => frames.some(({ frame }) => frame.command.type === "ack_result"));
+    }
+    const acknowledgements = wire.frames.filter(({ frame }) => frame.command.type === "ack_result");
+    assert.equal(acknowledgements.length, scenario.cause === "timeout" ? 0 : 1);
+    if (acknowledgements.length) {
+      assert.equal(acknowledgements[0].frame.command.commandId, prompts[0].frame.id);
+      assert.equal(acknowledgements[0].frame.id, delivery.execute.transport.ack.commandId);
+    }
+    assert.equal(wire.frames.filter(({ frame }) => frame.command.type === "prompt").length, 1,
+      "no handoff, retry, resend, or late-result continuation");
+    assert.equal(wire.connections, 1, "the original request uses one client connection");
+  });
 }
 
 for (const scenario of [

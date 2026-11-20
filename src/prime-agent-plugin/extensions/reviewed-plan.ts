@@ -11,6 +11,7 @@ import {
   finalizeTaskEpisodeCleanup,
   handoffSpecEpisode,
   handoffTaskEpisode,
+  continueTaskEpisodeExecute,
   resolveTaskEpisodePlacement,
   restoreBlockedSpecEpisode,
   transitionSpecEpisodeToTaskOwnership,
@@ -412,12 +413,14 @@ function conversationCompactionWarning(result: ConversationAfterHandoffResult): 
 type TaskEpisodePublicActions = {
   create: typeof createTaskEpisode;
   handoff: typeof handoffTaskEpisode;
+  continueExecute: typeof continueTaskEpisodeExecute;
   cleanup: typeof finalizeTaskEpisodeCleanup;
 };
 
 const DEFAULT_TASK_ACTIONS: TaskEpisodePublicActions = {
   create: createTaskEpisode,
   handoff: handoffTaskEpisode,
+  continueExecute: continueTaskEpisodeExecute,
   cleanup: finalizeTaskEpisodeCleanup,
 };
 
@@ -896,14 +899,15 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "handoff_task_episode",
       label: "Hand off task Episode",
-      description: "Send canonical handoff and queue execute for the task's existing Episode.",
-      promptSnippet: "Deliver the task Episode handoff and execute workflow chain",
+      description: "Send the canonical handoff/execute chain, or one execute-only continuation, to the task's existing Episode.",
+      promptSnippet: "Continue the exact task Episode using the selected canonical delivery mode",
       executionMode: "sequential",
       parameters: {
         type: "object",
         properties: {
           taskId: { type: "string", description: "Canonical task ID" },
-          guidance: { type: "string", description: "Compaction focus text" },
+          guidance: { type: "string", description: "Bounded focus: compaction for ordinary handoff, current execution for execute-only" },
+          mode: { type: "string", enum: ["execute-only"], description: "Optional single-stage canonical execute delivery; omit for ordinary handoff" },
         },
         required: ["taskId"],
         additionalProperties: false,
@@ -911,9 +915,17 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         try {
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
-          const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, {
+          const continuationDependencies = {
             ...dependencies, appendEntry: dependencies?.appendEntry ?? ((type, data) => pi.appendEntry(type, data)),
-          });
+          };
+          if (params.mode === "execute-only") {
+            const result = await actions.continueExecute(params.taskId, params.guidance ?? "", ctx, continuationDependencies);
+            return {
+              content: [{ type: "text", text: `Task Episode NEW execute admitted for ${result.taskId}; admission is not completion. Current factual update: ${result.factualUpdate}.\n${JSON.stringify(result)}` }],
+              details: result,
+            };
+          }
+          const result = await actions.handoff(params.taskId, params.guidance ?? "", ctx, continuationDependencies);
           const conversationCompaction = await runConversationAfterHandoff(pi, ctx, dependencies);
           return {
             content: [{ type: "text", text: `Task Episode handoff admitted for ${result.taskId}: canonical handoff was admitted and execute queued as the sole follow-up.${conversationCompactionWarning(conversationCompaction)}${result.observationReference ? `
@@ -924,10 +936,19 @@ ${JSON.stringify(result.observationReference)}` : ""}${result.delivery ? `\n\n${
         } catch (error) {
           const delivery = error && typeof error === "object" && "delivery" in error ? error.delivery : undefined;
           const transport = !delivery && error && typeof error === "object" && "transport" in error ? error.transport : undefined;
-          const message = transport ? "Daemon preparation stopped before the handoff delivery chain."
+          const executeOnly = params.mode === "execute-only";
+          const message = executeOnly ? (error instanceof Error ? error.message : "Execute-only continuation stopped.")
+            : transport ? "Daemon preparation stopped before the handoff delivery chain."
             : error instanceof Error ? error.message : "Task Episode handoff stopped.";
-          const details = { error: message, ...(delivery ? { delivery } : {}), ...(transport ? { transport } : {}) };
-          return { content: [{ type: "text", text: `Task Episode handoff failed: ${message}\n${JSON.stringify(details)}` }], details, isError: true };
+          const factualUpdate = executeOnly && error && typeof error === "object" && "factualUpdate" in error ? error.factualUpdate : undefined;
+          const observationReference = executeOnly && error && typeof error === "object" && "observationReference" in error ? error.observationReference : undefined;
+          const stoppedAt = executeOnly && error && typeof error === "object" && "stoppedAt" in error ? error.stoppedAt : undefined;
+          const executeOutcome = executeOnly && error && typeof error === "object" && "executeOutcome" in error ? error.executeOutcome : undefined;
+          const details = { error: message, ...(executeOnly ? { mode: "execute-only" } : {}),
+            ...(stoppedAt ? { stoppedAt } : {}), ...(executeOutcome ? { executeOutcome } : {}),
+            ...(delivery ? { delivery } : {}), ...(transport ? { transport } : {}),
+            ...(factualUpdate ? { factualUpdate } : {}), ...(observationReference ? { observationReference } : {}) };
+          return { content: [{ type: "text", text: `Task Episode ${executeOnly ? "execute-only continuation" : "handoff"} stopped: ${message}\n${JSON.stringify(details)}` }], details, isError: true };
         }
       },
     });

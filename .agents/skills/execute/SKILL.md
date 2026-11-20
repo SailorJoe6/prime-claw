@@ -94,6 +94,11 @@ proves prior non-delivery. Current evidence may compatibly advance beyond stored
 ownership observations. Judge its meaning; do not freeze task revisions or
 replace native fields with summaries.
 
+
+The optional `<operator-execute-guidance>` block carries the accepted bounded
+EXECUTE focus for this new request, not compaction instructions or new scope.
+Keep that focus within the current native task and stop after one slice.
+
 No new resources, handoff, compaction prerequisite, initial assignment or
 historical callback replay is part of this request. The owner alone authorizes
 and sends it through the documented managed operation, never this Episode or a
@@ -127,6 +132,11 @@ Load it before judging continuation:
    integration-branch defaults above for older records. Require the reference's
    `sessionId` to equal `bindings.ownerSessionId`. That source Conversation
    session is not a replacement for the Episode's durable session binding.
+   For an owner-authorized execute-only request, `episodeActiveSessionId` may
+   instead be the freshly natively resolved route for that SAME durable Episode.
+   Verify it against the complete supplied native session/state identity, not
+   by a guessed name or CWD; the historical route in ownership need not be current.
+   This factual route does not rebind resources or authorize an Episode registry edit.
 3. Keep the full parsed entry data in named REPL variables. Its structure is
    `{schemaVersion: 1, bindings, providerTaskObservation,
    episodeSessionObservation: {session, state}}`. Retain the full unchanged

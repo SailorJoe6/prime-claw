@@ -217,7 +217,7 @@ export interface SessionPublisher {
   deleteSaved?(sessionFile: string): Promise<void>;
   createFresh(options: { worktree: string; sessionName: string; model?: { provider: string; id: string }; onAllocated?: (identity: { sessionId: string; sessionFile: string }) => void | Promise<void> }): Promise<PublishedSession>;
   reopen(options: { sessionFile: string; sessionId: string; worktree: string; sessionName: string; model?: { provider: string; id: string } }): Promise<PublishedSession>;
-  deliverExecute(activeSessionId: string, prompt: string): Promise<void>;
+  deliverExecute(activeSessionId: string, prompt: string): Promise<void | ExecuteDeliveryObservation>;
   deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string, onHandoffAdmitted?: () => void | Promise<void>, queueHandoffIfBusy?: boolean): Promise<void | HandoffDeliveryObservation>;
   close(): void;
 }
@@ -510,13 +510,17 @@ export interface DaemonCommandObservation {
   /** Local ack_result write only; not confirmation of native acknowledgement. */
   ack?: { commandId: string; writeAttempted: true; writeReturned: boolean };
 }
+export interface ExecuteDeliveryObservation {
+  activeSessionId: string;
+  execute: HandoffDeliveryStage;
+}
 export interface HandoffDeliveryObservation {
   activeSessionId: string;
   first: HandoffDeliveryStage;
   callback: "not_required" | "not_attempted" | "completed" | "failed";
   followUp: HandoffDeliveryStage;
 }
-interface HandoffDeliveryStage {
+export interface HandoffDeliveryStage {
   outcome: "not_attempted" | "admitted" | "refused" | "failed" | "uncertain";
   transport?: DaemonCommandObservation;
 }
@@ -813,11 +817,32 @@ export class PrimeSessionPublisher implements SessionPublisher {
       throw error;
     }
   }
-  async deliverExecute(activeSessionId: string, prompt: string): Promise<void> {
+  async deliverExecute(activeSessionId: string, prompt: string): Promise<ExecuteDeliveryObservation> {
+    const delivery: ExecuteDeliveryObservation = { activeSessionId, execute: { outcome: "not_attempted" } };
     try {
-      requireSuccess(await this.client.request({ type: "prompt", activeSessionId, message: prompt, streamingBehavior: "followUp", queueIfBusy: true, expandPromptTemplates: false, source: "extension" }), "execute delivery");
+      await this.deliverQueuedPrompt(activeSessionId, prompt, "execute delivery", (stage) => { delivery.execute = stage; });
+      return delivery;
+    } catch (cause) {
+      const message = `Execute delivery ${delivery.execute.outcome}; inspect before another transition.`;
+      const error = isUncertainMutation(cause)
+        ? new EpisodeStateUncertainError(message, { cause })
+        : new Error(message, { cause });
+      throw Object.assign(error, { delivery });
+    }
+  }
+  private async deliverQueuedPrompt(activeSessionId: string, message: string, operation: string, observe: (stage: HandoffDeliveryStage) => void): Promise<void> {
+    let response: DaemonResponse | undefined;
+    try {
+      response = await this.client.request({ type: "prompt", activeSessionId, message,
+        streamingBehavior: "followUp", queueIfBusy: true, expandPromptTemplates: false, source: "extension" });
+      requireSuccess(response, operation);
+      observe({ outcome: "admitted", ...(response.transport ? { transport: response.transport } : {}) });
     } catch (error) {
-      if (isUncertainMutation(error)) throw new EpisodeStateUncertainError("Execute task admission is uncertain; preserve the Episode until inspected.", { cause: error });
+      const transport = errorTransport(error);
+      observe({
+        outcome: isUncertainMutation(error) ? "uncertain" : response?.success === false ? "refused" : "failed",
+        ...(transport ? { transport } : {}),
+      });
       throw error;
     }
   }
@@ -828,22 +853,9 @@ export class PrimeSessionPublisher implements SessionPublisher {
         callback: onHandoffAdmitted ? "not_attempted" : "not_required",
         followUp: { outcome: "not_attempted" },
       };
-      const deliver = async (stage: "first" | "followUp", message: string): Promise<void> => {
-        let response: DaemonResponse | undefined;
-        try {
-          response = await this.client.request({ type: "prompt", activeSessionId, message,
-            streamingBehavior: "followUp", queueIfBusy: true, expandPromptTemplates: false, source: "extension" });
-          requireSuccess(response, stage === "first" ? "handoff delivery" : "execute follow-up delivery");
-          delivery[stage] = { outcome: "admitted", ...(response.transport ? { transport: response.transport } : {}) };
-        } catch (error) {
-          const transport = errorTransport(error);
-          delivery[stage] = {
-            outcome: isUncertainMutation(error) ? "uncertain" : response?.success === false ? "refused" : "failed",
-            ...(transport ? { transport } : {}),
-          };
-          throw error;
-        }
-      };
+      const deliver = (stage: "first" | "followUp", message: string): Promise<void> =>
+        this.deliverQueuedPrompt(activeSessionId, message, stage === "first" ? "handoff delivery" : "execute follow-up delivery",
+          (observation) => { delivery[stage] = observation; });
       let failure: unknown;
       let failedStage: "first" | "callback" | "followUp";
       try {
@@ -1862,6 +1874,236 @@ function preparePublishedBacklogHandoffEvidence(
       episodeUpstream: upstream,
     }),
   };
+}
+
+/** Fresh raw facts for this live durable Episode and only explicitly linked
+ * descendants. No idle/lifecycle/authorization classifier: the editable policy
+ * and invoking owner judge the native facts before requesting continuation.
+ * A saved descendant without a live route retains its roster fields and absent
+ * state; absence is not silently promoted to an idle observation.
+ */
+async function observeTaskEpisodeExecuteSessions(
+  record: TaskEpisodeOwnershipRecord,
+  publisher: SessionPublisher,
+): Promise<{ activeSessionId: string; session: SessionSummary; state: EpisodeSessionState;
+  descendants: Array<{ session: SessionSummary; state?: EpisodeSessionState }> }> {
+  const sessions = await publisher.list();
+  const roots = sessions.filter((entry) => entry.sessionId === record.episodeId);
+  if (roots.length !== 1 || !samePath(roots[0].sessionFile, record.episodeSessionFile)
+      || !samePath(roots[0].cwd, record.worktree)) {
+    throw new Error("Execute-only continuation could not resolve the exact durable Episode session");
+  }
+  const session = roots[0];
+  const liveRoute = (entry: SessionSummary): string | undefined =>
+    entry.activeSessionId ?? (entry.lifecycle === "live" ? entry.id : undefined);
+  const activeSessionId = liveRoute(session);
+  if (!activeSessionId || sessions.some((entry) => entry !== session
+      && (sessionRuntimeRoute(entry) === activeSessionId
+        || samePath(entry.sessionFile, record.episodeSessionFile)
+        || sessionRuntimeRoute(entry) === record.episodeActiveSessionId))) {
+    throw new Error("Execute-only continuation has no unambiguous current route for the same durable Episode");
+  }
+  const state = await publisher.getState(activeSessionId);
+  assertEpisodeStateIdentity(state, record, activeSessionId);
+  if (!samePath(state.cwd, record.worktree)) throw new Error("Execute-only Episode state has a different worktree");
+  const selected = new Set<SessionSummary>([session]);
+  const nodes = [session];
+  const descendants: Array<{ session: SessionSummary; state?: EpisodeSessionState }> = [];
+  for (const parent of nodes) {
+    for (const candidate of sessions) {
+      if (selected.has(candidate)) continue;
+      const idMatch = candidate.parentSessionId === parent.sessionId;
+      const pathMatch = samePath(candidate.parentSessionPath, parent.sessionFile!);
+      const parentRoute = liveRoute(parent);
+      const routeMatch = Boolean(parentRoute) && candidate.parentActiveSessionId === parentRoute;
+      if (!idMatch && !pathMatch && !routeMatch) continue;
+      if ((candidate.parentSessionId !== undefined && !idMatch)
+          || (candidate.parentSessionPath !== undefined && !pathMatch)
+          || (candidate.parentActiveSessionId !== undefined && !routeMatch)
+          || !candidate.sessionId || !candidate.sessionFile
+          || sessions.filter((entry) => entry.sessionId === candidate.sessionId
+            || samePath(entry.sessionFile, candidate.sessionFile)).length !== 1) {
+        throw new Error("Execute-only continuation found ambiguous explicit descendant identity");
+      }
+      selected.add(candidate);
+      nodes.push(candidate);
+      const route = liveRoute(candidate);
+      let childState: EpisodeSessionState | undefined;
+      if (route) {
+        if (sessions.filter((entry) => sessionRuntimeRoute(entry) === route).length !== 1) {
+          throw new Error("Execute-only descendant has an ambiguous runtime route");
+        }
+        childState = await publisher.getState(route);
+        if (childState.sessionId !== candidate.sessionId
+            || !samePath(childState.sessionFile, candidate.sessionFile)
+            || sessionRuntimeRoute(childState) !== route) {
+          throw new Error("Execute-only descendant state has a different durable identity");
+        }
+      }
+      descendants.push({ session: candidate, ...(childState ? { state: childState } : {}) });
+    }
+  }
+  return { activeSessionId, session, state, descendants };
+}
+
+export interface TaskEpisodeExecuteResult {
+  mode: "execute-only";
+  admitted: true;
+  taskId: string;
+  episodeId: string;
+  episodeActiveSessionId: string;
+  executeDelivery: "followUp";
+  observationReference: TaskHandoffObservationReference;
+  delivery: ExecuteDeliveryObservation;
+  factualUpdate: "completed";
+}
+
+/** ONE new execute-only continuation. Eligibility and informed authority live
+ * in editable oversight guidance, not in tokens, receipts or code predicates.
+ * Preparation, native admission, and the newly prepared factual write remain
+ * distinct. Never reuse a historical handoff callback or resend after failure.
+ */
+export async function continueTaskEpisodeExecute(
+  rawTaskId: string,
+  focus: string,
+  ctx: ExtensionContext,
+  dependencies: TaskEpisodeHandoffDependencies = {},
+): Promise<TaskEpisodeExecuteResult> {
+  const git = dependencies.git ?? new CliGitAdapter();
+  const filesystem = dependencies.filesystem ?? new NodeFilesystemAdapter();
+  const store = dependencies.ownership ?? defaultOwnershipStore;
+  const orca = dependencies.orca ?? new CliOrcaAdapter();
+  const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
+  let publisher = dependencies.publisher;
+  let delivery: ExecuteDeliveryObservation | undefined;
+  let observationReference: TaskHandoffObservationReference | undefined;
+  let factualUpdate: "not_attempted" | "failed" = "not_attempted";
+  let stoppedAt = "resource preparation";
+  let executeOutcome: HandoffDeliveryStage["outcome"] = "not_attempted";
+  try {
+    const taskId = rawTaskId.trim();
+    if (!taskId || /\s/.test(taskId) || taskId.startsWith("-")) throw new Error("Execute-only continuation requires one exact canonical task ID");
+    const repo = git.repositoryRoot(ctx.cwd);
+    const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", runner);
+    if (!samePath(repo, realpathSync(ctx.cwd)) || !samePath(project.root, repo) || project.kind === "linked-worktree") {
+      throw new Error("Execute-only continuation must address the canonical primary checkout");
+    }
+    const ownerSessionId = ctx.sessionManager.getSessionId();
+    const record = store.read(repo, ownerSessionId);
+    if (!record) throw new Error("Execute-only continuation found no exact task-native owner");
+    exactAllocatableTaskRecord(record, taskId, ownerSessionId);
+    if (record.status !== "active") throw new Error("Execute-only continuation requires the exact active Episode resources");
+    taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
+    validateWorktreeRecord(record, git, filesystem, repo);
+    if (record.engine === "orca") {
+      await reservedTaskSetup(record, repo, orca);
+      const worktree = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
+      if (worktree.id !== record.worktreeId || worktree.identity !== record.worktreeIdentity
+          || !samePath(worktree.path, record.worktree!) || worktree.branch !== record.branch
+          || worktree.projectSetupId !== record.projectSetupId) {
+        throw new Error("Execute-only continuation found a different Orca worktree identity");
+      }
+    }
+    stoppedAt = "canonical execute loading";
+    let executePrompt = canonicalWorkflowPrompt(record.worktree!, "execute", {
+      executeGuidance: focus.trim(),
+      location: { tag: "operator-episode-task", value: taskId },
+      ownerSessionId,
+    });
+    if (!executePrompt) throw new Error("Episode worktree is missing .agents/skills/execute/SKILL.md");
+    const episodeCode = {
+      head: git.head(record.worktree!), branch: git.branch(record.worktree!),
+      status: runner.run("git", ["status", "--porcelain=v1", "--untracked-files=all"], { cwd: record.worktree!, allowFailure: true }),
+      upstream: runner.run("git", ["rev-parse", "--verify", "@{upstream}"], { cwd: record.worktree!, allowFailure: true }),
+    };
+    stoppedAt = "provider preparation";
+    let providerTaskObservation: Record<string, unknown>;
+    let commit: () => void;
+    if (isBeadsTaskEpisodeOwnership(record)) {
+      const advancement = (dependencies.advanceBeadsEvidence ?? advancePublishedBeadsTaskEpisodeEvidence)({
+        projectRoot: repo, ownerSessionId, taskId,
+        previousProviderRevision: record.providerRevision, previousTaskEvidence: record.taskEvidence,
+        episodeHead: episodeCode.head,
+      });
+      if (!samePublishedHandoffIdentity(record, advancement.record)) throw new Error("Execute-only Beads preparation changed fixed resource identity");
+      const { record: _target, commit: _commit, ...observations } = advancement;
+      providerTaskObservation = { ...observations, episodeCode };
+      commit = () => {
+        const committed = advancement.commit();
+        if (!samePublishedHandoffIdentity(record, committed)
+            || JSON.stringify(committed) !== JSON.stringify(advancement.record)) {
+          throw new Error("Execute-only Beads factual update returned unexpected observations");
+        }
+      };
+    } else {
+      let target: TaskEpisodeOwnershipRecord;
+      if (isPublishedBacklogTaskEpisodeOwnership(record)) {
+        const prepared = preparePublishedBacklogHandoffEvidence(record, repo, runner, dependencies, episodeCode.head);
+        providerTaskObservation = { ...JSON.parse(prepared.observation), episodeCode };
+        target = prepared.record;
+      } else {
+        const resolveTask = dependencies.taskResolver ?? defaultEpisodeTaskResolver(runner);
+        const integrationTask = resolveTask(repo, taskId);
+        const episodeTask = resolveTask(record.worktree!, taskId);
+        for (const [selection, root] of [[integrationTask, repo], [episodeTask, record.worktree!]] as const) {
+          if (!selection || selection.taskId !== taskId || !samePath(selection.projectRoot, root)
+              || selection.taskPathRelative !== record.taskPath) {
+            throw new Error("Execute-only continuation resolved a different grandfathered Backlog task");
+          }
+        }
+        providerTaskObservation = { mainTaskEvidence: integrationTask!.nativeView, currentTaskEvidence: episodeTask!.nativeView, episodeCode };
+        // Keep the grandfathered shape. There are no provider revision/evidence
+        // fields to invent; only its existing code observation advances.
+        target = { ...record, head: episodeCode.head, updatedAt: dependencies.now?.() ?? new Date().toISOString() };
+      }
+      commit = () => {
+        if (JSON.stringify(store.read(repo, ownerSessionId)) !== JSON.stringify(record)) {
+          throw new Error("Execute-only ownership changed before the current factual update");
+        }
+        store.write(repo, target);
+        if (JSON.stringify(store.read(repo, ownerSessionId)) !== JSON.stringify(target)) {
+          throw new Error("Execute-only factual update could not be verified");
+        }
+      };
+    }
+    stoppedAt = "native session/descendant observation";
+    publisher ??= new PrimeSessionPublisher();
+    const { activeSessionId, ...sessionObservation } = await observeTaskEpisodeExecuteSessions(record, publisher);
+    stoppedAt = "exact native evidence retention";
+    observationReference = retainTaskHandoffObservation(
+      ctx, record, activeSessionId, providerTaskObservation, sessionObservation, dependencies.appendEntry,
+    );
+    executePrompt += `\n\n<task-handoff-observation-reference>\n${JSON.stringify(observationReference)}\n</task-handoff-observation-reference>`;
+    // No old route write, reopen, handoff, compaction, assignment or callback.
+    // Native session facts, not a guessed name/CWD, resolve any changed route.
+    taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
+    stoppedAt = "new execute admission";
+    executeOutcome = "uncertain"; // Until the native request returns definite facts.
+    delivery = await publisher.deliverExecute(activeSessionId, executePrompt)
+      || { activeSessionId, execute: { outcome: "uncertain" } };
+    if (delivery.activeSessionId !== activeSessionId || delivery.execute.outcome !== "admitted") {
+      throw new EpisodeStateUncertainError("New execute admission was not proven; current observations were not advanced");
+    }
+    executeOutcome = "admitted";
+    stoppedAt = "current factual update";
+    factualUpdate = "failed"; // A throwing write can have partial effects.
+    commit();
+    return { mode: "execute-only", admitted: true, taskId, episodeId: record.episodeId!,
+      episodeActiveSessionId: activeSessionId, executeDelivery: "followUp",
+      observationReference, delivery, factualUpdate: "completed" };
+  } catch (error) {
+    const observedDelivery = delivery ?? (error && typeof error === "object" && "delivery" in error ? error.delivery : undefined);
+    const message = observedDelivery && factualUpdate === "failed"
+      ? "New execute was admitted, but its current factual update failed or may have partial effects; preserve execution and inspect. Do not resend."
+      : observedDelivery ? "New execute delivery stopped; current factual update was not attempted. Inspect; do not resend."
+      : `Execute-only ${stoppedAt} stopped; execute ${executeOutcome}. Inspect current effects before another transition. Do not resend.`;
+    throw Object.assign(new Error(message, { cause: error }), {
+      ...(observedDelivery ? { delivery: observedDelivery } : {}),
+      ...(errorTransport(error) ? { transport: errorTransport(error) } : {}),
+      ...(observationReference ? { observationReference } : {}), factualUpdate, stoppedAt,
+      executeOutcome: observedDelivery ? (observedDelivery as ExecuteDeliveryObservation).execute.outcome : executeOutcome,
+    });
+  } finally { try { publisher?.close(); } catch { /* preserve actual admission/write result */ } }
 }
 
 export async function handoffTaskEpisode(
