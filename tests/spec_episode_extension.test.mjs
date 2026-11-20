@@ -879,7 +879,7 @@ test("execute-only captures raw explicitly proven descendants, not CWD siblings 
   const h = executeOnlyHarness(), { f } = h;
   const root = transitionSession(f, { unknownRoot: { keep: null } });
   const child = { sessionId: "child", activeSessionId: "child-route", sessionFile: join(f.root,"child.jsonl"),
-    parentActiveSessionId: "route", cwd: f.worktree, unknownChild: [null, false] };
+    parentSessionId: root.sessionId, parentActiveSessionId: "route", cwd: f.worktree, unknownChild: [null, false] };
   const saved = { id: "saved-not-a-route", lifecycle: "archived", sessionId: "saved", sessionFile: join(f.root,"saved.jsonl"), parentSessionId: "child", unknownSaved: null };
   const sibling = { sessionId: "foreign", activeSessionId: "foreign-route", sessionFile: join(f.root,"foreign.jsonl"), cwd: f.worktree };
   const rootState = { ...await f.publisher.getState(), unknownRootState: { queued: null } };
@@ -893,6 +893,74 @@ test("execute-only captures raw explicitly proven descendants, not CWD siblings 
   assert.deepEqual(observed, { session: root, state: rootState, descendants: [{session:child,state:childState},{session:saved}] });
   assert.deepEqual(stateReads,["route","child-route"]);
   assert.equal(Object.hasOwn(observed.descendants[1], "state"), false, "missing live state remains absent, not idle");
+});
+
+test("execute-only excludes route-only and same-CWD rows from durable descendants", async () => {
+  const h = executeOnlyHarness(), { f } = h;
+  const root = transitionSession(f);
+  const routeOnly = { id: "route-only-route", activeSessionId: "route-only-route", sessionId: "route-only",
+    sessionFile: join(f.root, "route-only.jsonl"), parentActiveSessionId: root.activeSessionId, cwd: f.worktree };
+  const sibling = { id: "sibling-route", activeSessionId: "sibling-route", sessionId: "sibling",
+    sessionFile: join(f.root, "sibling.jsonl"), cwd: f.worktree };
+  const rootState = await f.publisher.getState();
+  const stateReads = [];
+  f.publisher.list = async () => [root, routeOnly, sibling];
+  f.publisher.getState = async (route) => { stateReads.push(route); assert.equal(route, root.activeSessionId); return rootState; };
+  const result = await registeredExecuteOnly(h);
+  assert.equal(result.isError, undefined, result.content[0].text);
+  const observed = readHandoffObservation(f, result.details.observationReference).episodeSessionObservation;
+  assert.deepEqual(observed.descendants, []);
+  assert.deepEqual(stateReads, [root.activeSessionId]);
+  assert.equal(f.calls.filter(([kind]) => kind === "execute").length, 1);
+});
+
+test("execute-only follows durable parent ID/file edges recursively despite stale transient parent routes", async () => {
+  const h = executeOnlyHarness(), { f } = h;
+  const root = transitionSession(f);
+  const child = { id: "child-route", activeSessionId: "child-route", sessionId: "child", sessionFile: join(f.root,"child.jsonl"),
+    parentSessionId: root.sessionId, parentSessionPath: root.sessionFile, parentActiveSessionId: "old-root-route", unknownChild: null };
+  const savedById = { sessionId: "saved-by-id", sessionFile: join(f.root,"saved-by-id.jsonl"),
+    parentSessionId: child.sessionId, parentActiveSessionId: "old-child-route" };
+  const savedByFile = { sessionId: "saved-by-file", sessionFile: join(f.root,"saved-by-file.jsonl"),
+    parentSessionPath: savedById.sessionFile, parentActiveSessionId: "old-saved-route" };
+  const rootState = await f.publisher.getState();
+  const childState = { ...child, unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [] } };
+  const stateReads = [];
+  // Reverse durable order to exercise recursive traversal rather than list placement.
+  f.publisher.list = async () => [savedByFile, savedById, child, root];
+  f.publisher.getState = async (route) => { stateReads.push(route); return route === root.activeSessionId ? rootState : childState; };
+  const result = await registeredExecuteOnly(h);
+  assert.equal(result.isError, undefined, result.content[0].text);
+  const observed = readHandoffObservation(f, result.details.observationReference).episodeSessionObservation;
+  assert.deepEqual(observed.descendants, [{ session: child, state: childState }, { session: savedById }, { session: savedByFile }]);
+  assert.deepEqual(stateReads, [root.activeSessionId, child.activeSessionId]);
+  assert.equal(f.calls.filter(([kind]) => kind === "execute").length, 1);
+});
+
+test("execute-only retains a native inactive nonarchived live-lifecycle descendant with state absent", async () => {
+  const h = executeOnlyHarness(), { f } = h;
+  const root = transitionSession(f);
+  // Pinned summaryForInactiveSession: id is the durable ID, not a resident route.
+  const saved = { id: "saved-durable-id", sessionId: "saved-durable-id", sessionFile: join(f.root,"saved.jsonl"),
+    lifecycle: "live", activity: "idle", isSessionActive: false, messageCount: 2,
+    parentSessionId: root.sessionId, parentSessionPath: root.sessionFile, nativeUnknown: { keep: null } };
+  const rootState = await f.publisher.getState();
+  const stateReads = [];
+  f.publisher.list = async () => [root, saved];
+  f.publisher.getState = async (route) => {
+    stateReads.push(route);
+    if (route !== root.activeSessionId) throw new Error("saved durable session is not resident");
+    return rootState;
+  };
+  const result = await registeredExecuteOnly(h);
+  assert.equal(result.isError, undefined, result.content[0].text);
+  const observed = readHandoffObservation(f, result.details.observationReference).episodeSessionObservation;
+  assert.deepEqual(observed, { session: root, state: rootState, descendants: [{ session: saved }] });
+  assert.equal(Object.hasOwn(observed.descendants[0], "state"), false);
+  assert.deepEqual(stateReads, [root.activeSessionId]);
+  assert.equal(f.nativeEntries.length, 1);
+  assert.equal(f.calls.filter(([kind]) => kind === "execute").length, 1);
+  assert.equal(result.details.factualUpdate, "completed");
 });
 
 test("execute-only preserves same durable session on a natively resolved changed route without reopening or rebinding", async () => {
@@ -942,6 +1010,7 @@ test("execute-only preparation and exact identity failures do not send or roll b
       h.events.push("preparation-effect-retained"); return { status: "blocked", code: "native-publication-unavailable", detail: "fixture failure" }; }; }],
     ["exact owner missing", (h) => { h.f.ctx.sessionManager.getSessionId = () => "foreign-owner"; }],
     ["foreign session", (h) => { h.f.publisher.list = async () => [transitionSession(h.f, {sessionId:"foreign"})]; }],
+    ["no explicit root route", (h) => { h.f.publisher.list = async () => [transitionSession(h.f, { lifecycle: "live", activeSessionId: undefined })]; }],
     ["ambiguous descendant parent", (h) => { const root = transitionSession(h.f); h.f.publisher.list = async () => [root,
       {sessionId:"child",sessionFile:join(h.f.root,"child.jsonl"),parentSessionId:"episode",parentSessionPath:"/foreign"}]; }],
     ["native evidence unavailable", (h) => { h.dependencies.appendEntry = undefined; }],

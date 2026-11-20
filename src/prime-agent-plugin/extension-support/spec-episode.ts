@@ -1894,8 +1894,9 @@ async function observeTaskEpisodeExecuteSessions(
     throw new Error("Execute-only continuation could not resolve the exact durable Episode session");
   }
   const session = roots[0];
-  const liveRoute = (entry: SessionSummary): string | undefined =>
-    entry.activeSessionId ?? (entry.lifecycle === "live" ? entry.id : undefined);
+  // Inactive saved sessions can have lifecycle="live" and id=durable ID.
+  // Only an explicit activeSessionId establishes a resident runtime route.
+  const liveRoute = (entry: SessionSummary): string | undefined => entry.activeSessionId;
   const activeSessionId = liveRoute(session);
   if (!activeSessionId || sessions.some((entry) => entry !== session
       && (sessionRuntimeRoute(entry) === activeSessionId
@@ -1914,12 +1915,11 @@ async function observeTaskEpisodeExecuteSessions(
       if (selected.has(candidate)) continue;
       const idMatch = candidate.parentSessionId === parent.sessionId;
       const pathMatch = samePath(candidate.parentSessionPath, parent.sessionFile!);
-      const parentRoute = liveRoute(parent);
-      const routeMatch = Boolean(parentRoute) && candidate.parentActiveSessionId === parentRoute;
-      if (!idMatch && !pathMatch && !routeMatch) continue;
+      // Transient parentActiveSessionId is raw context, not a durable
+      // ownership edge or a veto over agreeing durable ID/file edges.
+      if (!idMatch && !pathMatch) continue;
       if ((candidate.parentSessionId !== undefined && !idMatch)
           || (candidate.parentSessionPath !== undefined && !pathMatch)
-          || (candidate.parentActiveSessionId !== undefined && !routeMatch)
           || !candidate.sessionId || !candidate.sessionFile
           || sessions.filter((entry) => entry.sessionId === candidate.sessionId
             || samePath(entry.sessionFile, candidate.sessionFile)).length !== 1) {
