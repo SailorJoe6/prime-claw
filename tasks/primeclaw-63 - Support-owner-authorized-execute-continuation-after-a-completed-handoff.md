@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-63
 title: Support owner-authorized execute continuation after a completed handoff
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-20 16:26'
-updated_date: '2026-11-20 18:37'
+updated_date: '2026-11-20 18:45'
 labels: []
 dependencies: []
 references:
