@@ -4,7 +4,7 @@ title: Support owner-authorized execute continuation after a completed handoff
 status: In Progress
 assignee: []
 created_date: '2026-11-20 16:26'
-updated_date: '2026-11-20 18:45'
+updated_date: '2026-11-20 18:47'
 labels: []
 dependencies: []
 references:
@@ -101,3 +101,11 @@ Joe explicitly authorized PLAN THEN IMPLEMENT the reviewed PRIMECLAW-63, as rela
 - Mandated `scripts/test-tier1.sh --probe` after plugin-source changes. Candidate validation Docker-only; no host/user-global apply/check/probes.
 Fake socket proves real client/framing, not daemon behavior. Native SDK/REPL uses an adapter and scripted provider, not actual socket transport, model-policy understanding, loaded-generation UAT or historical TASK-2 recovery. Keep those limits separate. Planning research ran no tests/probes or live-case operations.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Slice 1 — editable continuation policy (started)
+Bound exact owner 01a1ef0e-10fe-77f6-a550-f5120139ec6c, operation fc1b08b6-11a6-4a81-820f-14053079e299 and Episode 01a1fa47-9e48-727a-a474-6c3497c9d717. Code basis fbc42720ad6e802cb2879c207b6bdb134eebcdd2; integration target main; independent Backlog task history 28f187f4d2d53217dca85cf74303abc86bea820e.
+This pass implements ordered step 1 only: REQUIREMENTS P15, editable oversee/handoff/execute/blocked guidance, affected docs and focused policy regressions. It distinguishes one informed new execute-only continuation from replay and definite-first-stage-refusal handling. No transport implementation, live recovery/contact, global activation/restart/UAT, status change, merge or cleanup. The documented execute-only invocation remains unavailable until a later mechanical slice; guidance must stop rather than recommend raw execute on an old generation. Planned proof: focused static policy checks plus mandated Docker Tier 1 probe. No behavioral transport or autonomous model-policy proof is claimed for this slice.
+<!-- SECTION:NOTES:END -->
