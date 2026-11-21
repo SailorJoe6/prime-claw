@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 15:29'
+updated_date: '2026-11-21 15:47'
 labels: []
 dependencies: []
 references:
@@ -335,4 +335,8 @@ Initial focused native snapshot: 0PASS5FAIL, all at fixture setup because the ne
 Read-only native auditor found two actionable concrete defects: dirty-layout complete replay could perform destination reads before the pre-native guard, and unsupported multiline/anchored block lists could be corrupted by a too-broad statuses-node conversion. Both repaired: guard immediately after replay exact-store selection; complete simple scalar block proof before any write, otherwise refuse exact config unchanged. Added two real-native refusal fixtures (multiline quoted scalar and anchor referenced by unknown key). Missing statuses now insert immediately before the last original value, preserving original first on multi-status lists as well as order/terminal; flow splice retains quoted commas/raw anchors/trailing commas, and native JSON readback must match. Complete-receipt/full current reuse verification now precedes configuration writes.
 
 Full migration + current helper + owned Web + history workspace + initialization + activeBacklog + destination-layout Docker suites and a fresh required tier1 probe are running on the candidate snapshot; no final passing result claimed. Saved inputs/results under .test-results/primeclaw59-config-preservation-20261121/; final docs/evidence will distinguish snapshot hashes and limits. No task lifecycle/AC/Final Summary/resource/live action change; all previously parked work stays parked. Stop after this one slice for independent owner review.
+
+### Concrete scratch-check regression — repaired; focused native validation pending
+First full/shared candidate run20261121T152856Z-51046-c058dddc: migration60PASS18FAIL12retired-reverseSKIP/90; six shared suites allPASS232 checks (current20/Web10/workspace89/init88/active12/layout13). Pytest1FAIL6PASS21deselected1067.48s. Most migration failures share one cause: migration config checking redetected provider/Git ownership inside validateRootConfigCandidate’s disposable config-only directory, where no Git worktree exists. This is a candidate regression, not a product blocker or reason to relax original preservation.
+Repaired by separating the private exact-path native config check from the exported live-store selection wrapper. Only the existing scratch check supplies its known disposable config path; real migration/replay/active target discovery and pre-native normalization guards remain unchanged. Two complex-block refusal tests now require the actual simple-sequence refusal, not a generic config error that could falsely pass early preparation failures. Prior probePASS predates this source repair. Focused new7/config plus accepted current/replay8 and fresh required probe are running on scratch-repair-input-hashes.json; final full-source regression still needed. No passing repaired result claimed yet. Exact task lifecycle/9AC/Final Summary and scope unchanged.
 <!-- SECTION:NOTES:END -->
