@@ -1,6 +1,8 @@
 # PRIMECLAW-59 — readable current-state authoring/readback dependency
 
-Date: 2026-11-21. Disposable Docker validation passed for this dependency only.
+Date: 2026-11-21. Initial limited validation passed; owner review found a
+material comment-heading defect. The bounded repair and red/green evidence below
+remain a candidate for owner review, not dependency or full-task acceptance.
 
 ## Bounded claim
 
@@ -94,11 +96,102 @@ were changed. The first implementation/test draft was repaired from read-only
 review before native testing; no failing native result was suppressed or a
 fixture safeguard bypassed.
 
+## Comment-heading material repair (2026-11-21)
+
+Owner review did **not** accept the original `1494015` readable dependency.
+Its original 27 passing checks above remain true but missed a valid source
+comment with a `Final Summary` heading and no source summary. The accepted
+source-capture and owned-Web partial dependencies remain unchanged.
+
+### Cause and minimal change
+
+The pinned native reader (`structured-sections.ts:269–272,782–790`) falls back
+to a case-insensitive, unanchored legacy section heading when a real task section
+is absent. A matching heading in an actual authored comment can therefore become
+a spurious task Final Summary. Successful native writes do not certify the task:
+the existing full verifier correctly rejects it as `native-readback-fields`.
+No silent acceptance, source loss, cutover or uncertain HTTP write was observed.
+
+The repair adds one predicate and its comment to `unsafeMarkdown`. A matching
+`Final Summary` title is carried by the existing labeled exact JSON string
+representation. The complete source body and heading remain readable and recover
+exactly, with source author/time unchanged. An ordinary `Source heading` stays
+ordinary prose. No Final Summary is fabricated, no field is dropped, and the
+full verifier, native authoring, accepted transport and provider are unchanged.
+No forward/replay/worker integration is included.
+
+### Real-native old-code failure
+
+Before changing production code, the same new tests ran against `1494015` /
+module SHA-256 `f1e7821565098f638ff0b2822095d7242196c5549d9560f12b514fdd681448c1`.
+Source `close_reason` and `finalSummary` keys are genuinely **absent from both**
+export/native rows; the fixture's usual closure default cannot mask the defect.
+The source body is this readable escaped string:
+`"Work completed.\n\n## Final Summary\n\nPreserve this ordinary heading."`
+
+- Command: `python3.14 -m pytest tests/test_task_provider_migration.py -q -m
+  container -k beads_backlog_current_node_suite`.
+- Expected red result: **1 failed, 10 deselected in 124.01s**.
+  Native TAP: **19 passed, 1 failed** of 20 checks (12 top-level + 8 nested).
+- The accepted heading case alone failed after one successful actual native
+  POST, one successful PUT and complete CLI readback. Diagnostics prove source
+  summary absent, expected null, and actual spurious comment suffix/closing markup.
+  The author refused with `native-readback-fields`; no resend followed.
+- The otherwise identical ordinary-heading control and all 18 prior checks
+  passed, including the meaningful 2,610,950-byte metadata/current-state regression.
+- Manifest: `.test-results/20261121T034700Z-74799-50285fb4/tier1/manifest.json`.
+  Saved result: `beads-backlog-current-node.tap` in that directory. Network absent;
+  runtime/source-builder teardown clean. All 15 listed artifact hashes verified.
+
+The regression suite is unchanged between old and fixed runs. Its SHA-256 is
+`8bb105fbc4ce8356ba11438f1be5de9a4b8b4529a1340d2dfdd424312e6536b1`.
+It tests actual native creation/comment/read, null task summary, exact JSON-string
+body recovery, source author/time, full field verification and no resend. The
+control also asserts that ordinary prose does not switch to the exact-string form.
+A bounded read-only helper found no issue in these tests and the minimal repair
+approach. This was inspection, not owner acceptance or a test rerun.
+
+### Fixed-code validation
+
+- Required `scripts/test-tier1.sh --probe`: **PASS** on the fixed source.
+  Manifest: `.test-results/20261121T034945Z-86586-cce06d04/tier1/manifest.json`.
+  Offline apply/check/RPC probe and clean runtime/source-builder teardown passed.
+- Focused `python3.14 -m pytest tests/test_task_provider_migration.py -q -m
+  container -k "beads_backlog_current_node_suite or migration_backlog_web_node_suite"`:
+  **2 passed, 9 deselected in 132.72s**.
+  Manifest: `.test-results/20261121T034945Z-86505-363ae408/tier1/manifest.json`.
+- `beads-backlog-current-node.tap`: **20 passed** (12 top-level + 8 nested),
+  7.778s. Both new real-native heading cases passed. The affected comment uses
+  exactly one recoverable JSON string; the control remains ordinary prose.
+  Both complete native CLI reads show **null** task Final Summary.
+- `migration-backlog-web-node.tap`: **9 passed**, 8.567s, unchanged shared checks.
+  Total fixed-run checks: **29**, including only **two new native scenarios**;
+  not 29 migrations or full-task acceptance.
+- All **46** manifest-listed artifact hashes matched across red (15), fixed
+  (16) and probe (15). Each run independently records network absence and clean
+  runtime/source-builder teardown. Image:
+  `sha256:8c29c92ba6edbf9fd75574795f06ab8b03e0e9a2f1e2a87b7f39d2205e01483d`.
+- Fixed production module SHA-256:
+  `4641ca767df102d6b5e46f9201512a11724a149f47a3f11d26bfc335dca0c9f2`.
+  Test SHA-256 is identical to the red run above. Neither source nor test bytes
+  changed after these runs; only documentation/evidence followed validation.
+- Host-safe static bridge: **2 passed, 9 skipped**. `git diff --check` passed.
+
+The meaningful 2,610,950-byte metadata/Unicode/padding/tail-once checks, all prior
+current fields/AC/assignee/configured priority/type/relationships/source identity,
+exact comments/author/time, strict mutation refusal and no-resend checks passed.
+No source capture, transport, forward/replay importer, verifier, provider or
+worker behavior was changed. The complete importer/cancellation/recovery/
+coexistence/config/progress/406-ticket suites were **not** rerun or accepted.
+This repair is a tested candidate for owner review, not owner acceptance or
+permission to advance integration. All nine AC remain unchecked.
+
 ## Remaining work and limits
 
 Forward/replay still use their old encoded package/chunks/archive verifier.
-The new helper is staged, not integrated into migration orchestration. Integrate
-it and remove those paths without relocating archives, while retaining the small
+The new helper is staged, not integrated into migration orchestration. After
+owner acceptance and continuation, integrate it and remove those paths without
+relocating archives, while retaining the small
 mapping/existing receipt and separate memory treatment. Caller-supplied mapped
 status/relationships and configured type/priority inputs remain integration work.
 So do responsive-worker/process ownership, ordinary cancellation/progress,

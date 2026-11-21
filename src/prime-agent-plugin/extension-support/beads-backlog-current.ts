@@ -68,6 +68,8 @@ function readableJson(value: unknown): string {
 function unsafeMarkdown(value: string): boolean {
   return value !== value.trim() || /\r/.test(value) || /\n[\t ]*\n[\t ]*\n/.test(value)
     || /^\s*---\s*$/m.test(value)
+    // Native legacy fallback can read this title from inside a source comment.
+    || /## Final Summary\s*(?:\n|$)/i.test(value)
     || /<!--\s*COMMENTS?:/i.test(value)
     || /^\s*<!-- (?:SECTION:[A-Z][A-Z0-9_]*|AC|DOD):(?:BEGIN|END) -->[\t ]*$/m.test(value);
 }

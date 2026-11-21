@@ -362,6 +362,15 @@ that marker alone never proves complete content. Configured type/priority option
 are inputs to this projection, not settings it replaces. Deferral-only fields
 are dropped under the existing deferral mapping.
 
+A source comment heading named `Final Summary` is content, not task closure.
+The pinned native Markdown reader can otherwise interpret it as a legacy task
+section when no source summary exists. The projection uses its existing labeled
+exact JSON string representation for that content. The complete body and heading
+remain readable and recover exactly, with source author/time retained; no task
+summary is invented and full native readback remains mandatory. Ordinary source
+headings stay ordinary prose. See the comment-heading red/green evidence in the
+same [readable-content dependency evidence](evidence/primeclaw-59-readable-current-projection-20261121.md).
+
 This helper is not yet wired into the forward importer or replay. Their old
 encoded package/chunk authoring and archive verification still need replacement;
 shipping the helper does not certify those paths or authorize live migration.

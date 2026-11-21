@@ -268,6 +268,70 @@ test("native current prose preserves exact normalization-sensitive description p
   }
 });
 
+for (const heading of ["Final Summary", "Source heading"]) {
+  test(`native authored comment with ${heading} heading preserves body and absent source summary`, { timeout: 90_000 }, async (t) => {
+    const fixture = repository(t, `comment-heading-${heading.replace(/ /g, "-").toLowerCase()}`);
+    const body = `Work completed.\n\n## ${heading}\n\nPreserve this ordinary heading.`;
+    const pkg = sourcePackage({ status: "open" });
+    // sourcePackage normally supplies close_reason: remove it from BOTH current
+    // rows so an existing real summary cannot mask native legacy-heading parsing.
+    for (const row of [pkg.exportRow, pkg.nativeView]) {
+      delete row.close_reason;
+      delete row.finalSummary;
+      delete row.closed_at;
+      assert.equal(Object.hasOwn(row, "close_reason"), false);
+      assert.equal(Object.hasOwn(row, "finalSummary"), false);
+    }
+    pkg.nativeView.comments = [{ id: 1, author: "source-author", text: body, created_at: SOURCE_TIME }];
+    const projection = projectBeadsCurrentTask(pkg, context(fixture, { status: "In Design" }));
+    assert.equal(projection.payload.finalSummary, "");
+    assert.equal(projection.expected.finalSummary, null);
+    const web = await startMigrationBacklogWeb({ cwd: fixture.root, backlogDirectory: join(fixture.root, "backlog"), backlogCommand: BACKLOG });
+    t.after(() => web.close());
+    const calls = [];
+    // Count actual successful native operations, not payload echoes or a mock.
+    const native = {
+      async createTask(payload) {
+        const created = await web.createTask(payload);
+        calls.push("POST returned");
+        return created;
+      },
+      async updateTask(id, payload) {
+        const updated = await web.updateTask(id, payload);
+        calls.push("PUT returned");
+        return updated;
+      },
+      async readTask(id) {
+        const view = await web.readTask(id);
+        calls.push("CLI read");
+        t.diagnostic(JSON.stringify({ heading, calls, destinationId: id,
+          sourceSummaryAbsent: [pkg.exportRow, pkg.nativeView].every((row) => !Object.hasOwn(row, "close_reason") && !Object.hasOwn(row, "finalSummary")),
+          expectedFinalSummary: projection.expected.finalSummary, actualFinalSummary: view.task.finalSummary,
+          sourceBody: body, actualComment: view.task.comments[0] }));
+        return view;
+      },
+    };
+    let id;
+    try { id = await authorBeadsCurrentTask(native, projection); }
+    finally { assert.deepEqual(calls, ["POST returned", "PUT returned", "CLI read"], "one native create/comment/read and no resend"); }
+    const view = cliView(fixture.root, id);
+    assertBeadsCurrentTask(view, projection, id);
+    assert.equal(view.task.finalSummary, null, "a comment heading must not fabricate task closure information");
+    assert.equal(view.task.comments.length, 1);
+    const comment = view.task.comments[0];
+    assert.equal(comment.author, "source-author");
+    assert.ok(comment.body.includes(SOURCE_TIME), "source comment time is retained readably");
+    if (heading === "Final Summary") {
+      const prefix = "Beads comment text (exact JSON string): ";
+      assert.ok(comment.body.startsWith(prefix), "affected comment uses the existing exact-readable representation");
+      assert.equal(JSON.parse(comment.body.slice(prefix.length).split("\n\n")[0]), body, "complete exact source body and heading survive native round trip");
+    } else {
+      assert.ok(comment.body.startsWith(body), "ordinary source heading remains ordinary readable prose");
+      assert.equal(comment.body.includes("exact JSON string"), false);
+    }
+  });
+}
+
 test("current projection retains differing current export and native prose without copying source envelopes", () => {
   const pkg = sourcePackage();
   pkg.exportRow.notes = "Export-only current notes Ω";
