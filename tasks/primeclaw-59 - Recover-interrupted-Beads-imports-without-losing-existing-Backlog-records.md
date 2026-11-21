@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 17:20'
+updated_date: '2026-11-21 17:31'
 labels: []
 dependencies: []
 references:
@@ -379,4 +379,8 @@ Received canonical execute without reconstructing/resending transport. Revalidat
 Owner-supplied review: expert-primeclaw59-config-same-provider/sub-d382417e/durable01a1feff-5839-718c-9240-150523499f26, actualopenai-codex/gpt-6.1-sol/max, completed six-file4dcd..5e88 and complete42/current4f review with38native toolcalls34after real task, pinned contracts/tests/docs and independently matched148artifacts/9runs+4candidateinputs. No other concrete defect. Root independently confirmed the finding. Neither reran tests/probes/servers/migrations or reproduced it. Reviewer completed/idle/emptyqueue/deleted. Earlier wrong-provider reviewer failed429 with zero input/output/tools and supplied NO review; retain as failure, not acceptance evidence.
 
 Episode static trace confirms task-provider-migration.ts897–903,1821–1822,2112–2115,2307–2313: source closed maps Done; first case/all-whitespace canonical match is authored; no missing status returns before completion validation. Pinned utils/terminal-status.ts1–15 checks final status with trim+lowercase; task-record-index.ts88–89 and readiness.ts57–61 use that meaning. Closed C/open D depending C can therefore lose completion semantics although raw fields verify. No executed reproduction/cutover/source loss is claimed. The living plan now records ONE conditioned completion guard and bounded real-native red/green tests. No code/tests/server changes yet. Candidate5e88 remains NOT accepted, all9AC unchecked, In Progress and Final Summarynull; prior accepted partials and all scope/live/resource/cleanup/merge/activation limits remain.
+
+### Completion regression — initial fixture refusal retained; corrected old-candidate proof running
+Initial Docker run20261121T172414Z-49530-604d4996 completed: 8 native PASS/7FAIL/15, pytest1FAIL12deselected352.06s. All seven existing configuration checks plus no-source-Done/receipt-only control PASS. Six new scenario bodies stopped in fixture setup: Beads correctly rejected an explicit child-to-parent dependency because the child already inherits parent completion; the aggregate replay parent is the seventh failing check. This is NOT the accepted product-defect reproduction. No product guard was changed. Manifest hashes, offline runtime, clean runtime+builder teardown and unchanged upstream builder inventory verified.
+Corrected only synthetic source setup to create independent C and D, add D->C, then close C natively. Production stays exact published5e88/moduleSHA25605073cac890ec7b74ccfe5aae60437ac9acc7efe7eca7fab33034d24e228cc70. Existing seven tests remain intact. Corrected old-candidate red bridge is running with corrected-red-input-hashes.json and corrected-old-candidate-red.log in .test-results/primeclaw59-completion-status-repair-20261121/. No corrected result/repair/acceptance claim yet; same admitted one-repair scope, InProgress/all9ACunchecked/nullSummary.
 <!-- SECTION:NOTES:END -->
