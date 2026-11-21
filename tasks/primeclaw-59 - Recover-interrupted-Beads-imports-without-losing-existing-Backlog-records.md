@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 17:31'
+updated_date: '2026-11-21 17:40'
 labels: []
 dependencies: []
 references:
@@ -383,4 +383,9 @@ Episode static trace confirms task-provider-migration.ts897–903,1821–1822,21
 ### Completion regression — initial fixture refusal retained; corrected old-candidate proof running
 Initial Docker run20261121T172414Z-49530-604d4996 completed: 8 native PASS/7FAIL/15, pytest1FAIL12deselected352.06s. All seven existing configuration checks plus no-source-Done/receipt-only control PASS. Six new scenario bodies stopped in fixture setup: Beads correctly rejected an explicit child-to-parent dependency because the child already inherits parent completion; the aggregate replay parent is the seventh failing check. This is NOT the accepted product-defect reproduction. No product guard was changed. Manifest hashes, offline runtime, clean runtime+builder teardown and unchanged upstream builder inventory verified.
 Corrected only synthetic source setup to create independent C and D, add D->C, then close C natively. Production stays exact published5e88/moduleSHA25605073cac890ec7b74ccfe5aae60437ac9acc7efe7eca7fab33034d24e228cc70. Existing seven tests remain intact. Corrected old-candidate red bridge is running with corrected-red-input-hashes.json and corrected-old-candidate-red.log in .test-results/primeclaw59-completion-status-repair-20261121/. No corrected result/repair/acceptance claim yet; same admitted one-repair scope, InProgress/all9ACunchecked/nullSummary.
+
+### Completion regression — corrected-source run retained; final focused old-candidate checks running
+Run20261121T173051Z-79644-97c4dfbd:8PASS7FAIL/15native,1pytestFAIL12deselected399.44s. All seven prior configuration checks and receipt-onlyDone control PASS. Four new prewrite cases stopped at a test assertion that accepted only depends_on_id; pinned native long dependency views also use id, already handled by accepted importer/test relationship logic. Corrected that test assertion to the same pinned supported dependency keys, without weakening the required C/D relationship.
+Both actual complete-receipt replay scenarios reached existing refusal: selected-existing native-readback-fields; fresh layout receipt destination-digest mismatch. Neither reached source deletion. These runs do NOT prove unsafe cutover or loss in a completed migration. The admitted repair remains the exact earlier explicit semantic check, before bounded status additions/no-missing return and against actual owned startup lists before allocation/reuse. No source/config/terminal remapping or universalDone-last policy.
+Added a narrow Docker completion-status bridge to avoid repeating seven unchanged configuration cases for old-candidate proof. Final focused old-candidate run is in progress; production still exact5e88 bytes; hashes in final-old-candidate-red-input-hashes.json, output final-old-candidate-red.log. Initial and corrected-source runs remain separate honest fixture/readback evidence; 30artifact hashes across both runs match/offline/bothteardownclean/upstreaminventoryunchanged. Task remains InProgress/all9ACunchecked/nullSummary; no repair result or acceptance claimed.
 <!-- SECTION:NOTES:END -->
