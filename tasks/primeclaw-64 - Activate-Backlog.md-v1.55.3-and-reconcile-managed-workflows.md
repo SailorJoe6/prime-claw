@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: In Progress
 assignee: []
 created_date: '2026-11-21 20:38'
-updated_date: '2026-11-21 22:26'
+updated_date: '2026-11-21 22:29'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -27,6 +27,9 @@ modified_files:
   - REQUIREMENTS.md
   - tests/test_oversee_episode_skill.py
   - docs/evidence/primeclaw64-off-global-build-20261121.md
+  - docs/backlog.md
+  - docs/project-initialization.md
+  - docs/evidence/primeclaw64-rollout-preparation.md
 priority: p1
 type: task
 ordinal: 149000
@@ -70,8 +73,8 @@ Joe explicitly clarified: “That file should be committed as a critical change.
 <!-- AC:BEGIN -->
 - [ ] #1 A separate published native task carries the rollout authority and boundaries while PRIMECLAW-45 remains active Done; canonical source and pre-activation artifact state are verified.
 - [x] #2 The supported build and compiled smoke produce a version-1.55.3 artifact from exact unmodified upstream 0cf4fdbc70020327f4366a29d3f405f83d180301, with exact source/toolchain/artifact identities and preserved fallback evidence.
-- [ ] #3 Installed global guidance and known managed-project workflows are inventoried for removed commands, lifecycle/storage semantics, complete identity-set reads, and unattended input; the supported upgrade boundary, safe selected-project reconciliation, preserved customizations/snapshots, and exact deferred owner/operator actions are documented.
-- [ ] #4 Plain Backlog projects are not presumed to need data conversion; supported non-mutating doctor evidence or exact inspection limits are reported per affected project, with no doctor --fix, provider switch, silent cross-project mutation, or destructive history repair.
+- [x] #3 Installed global guidance and known managed-project workflows are inventoried for removed commands, lifecycle/storage semantics, complete identity-set reads, and unattended input; the supported upgrade boundary, safe selected-project reconciliation, preserved customizations/snapshots, and exact deferred owner/operator actions are documented.
+- [x] #4 Plain Backlog projects are not presumed to need data conversion; supported non-mutating doctor evidence or exact inspection limits are reported per affected project, with no doctor --fix, provider switch, silent cross-project mutation, or destructive history repair.
 - [ ] #5 Accepted merged source is installed through supported canonical-primary user-global/artifact paths, preserving unrelated global state and all old-generation live resources; no candidate host install or second daemon is used.
 - [ ] #6 One safely coordinated full restart is followed by successful resumed-owner, applicable exact-Episode, and designated ordinary-session live UAT that proves the actual installed Backlog version/plugin generation and representative native workflow/history behavior; installation or a fresh probe alone is not cutover proof.
 - [ ] #7 The Backlog.md Expert receives exact activation/UAT and project-impact evidence before it decides to advance its separate latest-stable pointer; failures, unresolved customizations, required operator actions, and acceptance limits remain explicit.
@@ -129,4 +132,6 @@ Steps 2–3 reviewed and accepted as a nonterminal build slice. The owner indepe
 Next accepted slice: native plan steps 4–5 only. Using known registered/managed contexts and delivery evidence, inventory consumers and actual guidance, distinguish stale active resources needing owner action from inactive/deferred or excluded contexts, and preserve all customized/unknown assets and live snapshots. For safely inspectable affected Backlog projects only, run the absolute reviewed Episode 1.55.3 binary with plain text doctor from each project CWD; record raw output, exit, before/after evidence or the exact inspection limit without repair. Beads-authoritative projects are not Backlog conversion targets. Preserve archived-draft physical evidence and do not investigate deliberately deleted finished sessions. Draft bounded, privacy-safe deployment/reconciliation documentation and evidence, with concrete owner actions, the completed plugin-only maintenance distinguished from pending Backlog activation, and the owner-only quiescence/install/restart/UAT procedure. Stop for owner review; no initializer run, activation, project/fleet mutation, restart, or lifecycle change.
 
 Steps 4–5 intermediate evidence: reviewed exact pinned doctor path. Plain doctor does not enter requested repairs, but before diagnosis ContentStore.loadInitialData calls ensureBacklogStructure (recursive mkdir). The selected primary is missing archive/tasks; the isolated Episode also lacks required directories. Skipped doctor on both rather than allow directory creation. Retained physical archived-draft bytes/modes/history evidence separately; this is a source-backed inspection limit, not a native doctor pass or a reason to move legacy records. Consumer inventory and rollout docs still being completed.
+
+Steps 4–5 complete as bounded preparation; not activation. Published docs-only Episode fe9e7dfe44f91b691e5dee5483635f7f92bbdb62 (docs/backlog.md, docs/project-initialization.md, docs/evidence/primeclaw64-rollout-preparation.md). Native registered/ownership/manifest inventory: 34 local roots (14 Backlog including six linked snapshots, eight Beads markers without Backlog config, 12 without either marker); nine paired paths metadata-only (incompatible_runtime for paired session listing). Exact reviewed 1.55.3 plain doctor ran once from a safely inspectable managed local project, exit 0 with no duplicate ID/self-dependency/cycle findings; captured path/mode/content and Git evidence matched. Skipped other 13 Backlog roots for exact startup mkdir or remote ref-refresh limits, including selected primary missing archive/tasks. Private evidence retained in Episode session artifacts. No affirmative removed completion recipe in bounded guidance; preserve custom design/prepare/spec-it-out/plan-task and live/uncertain snapshots. Selected managed conversation-after-handoff is a normal refresh candidate; blocked/execute/handoff have baseline drift and fresh reconciliation alone is expected not to install their newer interruption guidance, so owner must make an exact content decision if that route is required, or defer it. No provider switch, repair, global/project deployment, restart, activation UAT, stable-pointer update or terminal summary. Stop for owner review and separately approved cutover.
 <!-- SECTION:NOTES:END -->
