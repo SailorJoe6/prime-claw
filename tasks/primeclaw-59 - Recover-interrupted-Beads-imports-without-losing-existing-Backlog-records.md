@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 01:56'
+updated_date: '2026-11-21 02:13'
 labels: []
 dependencies: []
 references:
@@ -117,4 +117,11 @@ Evidence: `docs/evidence/primeclaw-59-current-state-capture-20261121.md`. Requir
 Evidence limits/failures retained: first focused setup stopped before tests when Docker could not inspect its Buildx IID. A disposable same-context build with `BUILDX_NO_DEFAULT_ATTESTATIONS=1` produced an exact inspectable IID, and canonical retry used that environment without bypassing fixture checks. The broad snapshot had one fixture-only relationship edge to a descendant; cycle preflight correctly refused it. The fixture now uses an independent current task; fresh canonical boundary run passed 23/23. No product guard changed for this repair. Both final runtime and builder teardown were verified.
 
 Remaining scope: forward current-data base64 package/chunk authoring and repeated source context still exist and must be removed in the readable-projection slice. Original destination coexistence/config/history reconciliation, interrupted-import recovery, ordinary cancellation/progress, 406-ticket performance proof and full acceptance remain unfinished. No AC is marked complete and no full-task Final Summary is claimed. Old history-bound receipts are not automatically accepted/repaired. No live migration, cleanup, merge, global apply/activation/restart or Prime Agent source change is authorized or performed. Stop after this slice for owner review/continuation.
+
+### Reviewed slice 1a accepted; bounded continuation focus
+The owner accepted source-capture increment `50dd3be9eef64693db9b499248cd8ea718a9e008` after current native task/code/docs/manifests review. Independent read-only Expert `openai/gpt-6-astra` at max found no material defect within that partial claim; the Expert did not rerun Docker. This is not whole-task acceptance or merge authority. Status remains In Progress and all nine AC remain unchecked.
+
+Next bounded execute slice follows steps 1–2 and Progress after slice 1a: remove the remaining encoded forward current-data source package/chunks/repeated source context and archive-package verifier; implement one readable native current-state projection and readback. Preserve complete current fields, meaningful metadata, actual authored comments with author/source time, relationships and exact non-equivalent current values through native fields or concise labeled readable text. Record source-ID identity in initial native creation, retain the small mapping/provenance/receipt, and keep one separate memory-document/index/USER treatment. Use supported native batched authoring and detect incomplete readback. No base64/archive relocation or repeated store-wide catalog per ticket. Preserve current-state capture/identity/drift, large-current-data capture/errors, originals, continuity and publication/cutover checks.
+
+Coexistence/config reconciliation/legacy duplicate originals, interrupted-import recovery, ordinary cancellation/progress and representative 406-ticket performance remain later approved work, not this slice's completion claim. Stop for a real missing product choice rather than guessing or expanding. Use Docker-only validation and required tier 1 after plugin changes; publish task edits promptly and code separately, report exact heads/limits, then stop for owner review. No live migration/retry/switch, private incident-data access, destructive live cleanup, merge, global apply/activation/restart, Prime Agent source change, new resources or initial assignment. Existing evidence records the verified read-only exact-tag test input and disposable selector procedure.
 <!-- SECTION:NOTES:END -->
