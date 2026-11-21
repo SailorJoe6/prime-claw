@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 01:22'
+updated_date: '2026-11-21 01:25'
 labels: []
 dependencies: []
 references:
@@ -90,3 +90,10 @@ Joe explicitly instructed this owning Conversation to plan and implement PRIMECL
 
 7. **Document, validate and publish the reviewable candidate (AC 7–9).** Update `REQUIREMENTS.md` migration requirements (including P5’s narrow grandfathered-duplicate exception and M2’s history correction) and `docs/project-initialization.md`, `docs/backlog.md` and managed initialization guidance to reflect the later current-state-only correction, actual cancellation, recovery/disposability rules and additive statuses. Distinguish native `.backlog/config.yml` discovery from Prime Claw's root-link/ignore/layout conventions. Describe safe bounded rollback/retry, retained partial state, explicit later authority and the source-retirement boundary; leave older incident/evidence reports historical. Record measured disposable evidence and exact command results in this task's native notes. Run focused container suites through the existing bridges, then required tier 1 after plugin-source changes (`scripts/test-tier1.sh --probe` or the supported container suite); before review run relevant shared-runner/layout/lifecycle container regressions. No host plugin apply/check/probe or live migration is a test. Commit/publish coherent Episode code separately from exact selected-task changes and report the tested candidate, evidence paths, limits and blockers to the owner and Initialize PVA on Prime-Claw for independent review; do not merge or activate it.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+### Slice 1a — current-state source capture (started 2026-11-21)
+Bound this execute pass to the source-read boundary of plan step 1: remove per-ticket Dolt history/events/provenance capture and bind inspection/recapture to the complete current native export, independent inventory, long views/comments, source identity/version/catalog and memories. Test that history size does not affect source capture and current content drift still refuses cutover. Forward encoded current-state package authoring/readback is explicitly unfinished and remains for the next slice, along with readable projection, coexistence/recovery/cancellation and final acceptance. No live migration, cleanup or activation is authorized.
+<!-- SECTION:NOTES:END -->
