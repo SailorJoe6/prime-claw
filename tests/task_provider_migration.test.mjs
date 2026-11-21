@@ -2810,12 +2810,12 @@ function publishedPopulatedBacklogDestination(fixture) {
 }
 
 // Selected-existing configuration must not become a fresh canonical bootstrap.
-function selectedMigrationConfigFixture(t, name, { missing = false, block = false, autoCommit = false } = {}) {
+function selectedMigrationConfigFixture(t, name, { missing = false, block = false, autoCommit = false, statuses: selectedStatuses } = {}) {
   const fixture = embeddedBeadsSource(t, name), destination = publishedPopulatedBacklogDestination(fixture);
   const path = join(destination.store, "config.yml");
   git(destination.store, "config", "user.name", "Config Fixture"); git(destination.store, "config", "user.email", "config@example.invalid");
-  const statuses = missing ? [block ? "Triage" : "Triage, Carefully", "In Planning", "Done"]
-    : ["Triage", "in progress", "Ready for Merge", "Blocked", "In Planning", "In Design", "Done"];
+  const statuses = selectedStatuses ?? (missing ? [block ? "Triage" : "Triage, Carefully", "In Planning", "Done"]
+    : ["Triage", "in progress", "Ready for Merge", "Blocked", "In Planning", "In Design", "Done"]);
   const section = block ? `statuses:\n${statuses.map(value => `  - ${JSON.stringify(value)}`).join("\n")}\n`
     : `statuses: ${JSON.stringify(statuses)} # retain terminal column\n`;
   const config = readFileSync(path, "utf8").replace(/^statuses:.*\n/m, section + (block ? "# Retain the operator status comment outside the node.\n" : ""))
@@ -2906,6 +2906,129 @@ for (const variant of [
     assert.equal(existsSync(join(f.fixture.root, ".beads")), false);
   });
 }
+
+function addSourceCompletionDependency(fixture) {
+  const closed = JSON.parse(bd(fixture.root, "create", "Source completion C", "--description", "Complete current source ticket C.", "--json")).id;
+  const dependent = JSON.parse(bd(fixture.root, "create", "Open dependent D", "--description", "Open D depends only on completed C.", "--json")).id;
+  bd(fixture.root, "dep", "add", dependent, closed);
+  bd(fixture.root, "close", closed, "--reason", "Source C is complete; dependent D stays open.", "--json");
+  return { closed, dependent };
+}
+
+// Count actual owned HTTP requests without changing persistence or responses.
+async function observeCompletionMigration(request) {
+  const originalRequest = http.request, requests = [];
+  http.request = function (...args) {
+    requests.push({ url: String(args[0]), method: args[1]?.method ?? "GET" });
+    return originalRequest.apply(this, args);
+  };
+  syncBuiltinESMExports();
+  try { return { result: await migrateTaskProvider(request), requests }; }
+  finally { http.request = originalRequest; syncBuiltinESMExports(); }
+}
+
+for (const variant of [
+  { name: "complete supported list", statuses: ["Triage", "In Design", "In Progress", "Blocked", "Done", "Cancelled"] },
+  { name: "missing active statuses", statuses: ["Triage", "Done", "Cancelled"] },
+  { name: "unsupported native flow", statuses: ["Triage", "In Design", "In Progress", "Blocked", "Done", "Cancelled"], unsupported: true },
+  { name: "first canonical spelling differs internally from terminal", statuses: ["Triage", "In Design", "In Progress", "Blocked", "D o n e", "Done"] },
+]) {
+  test(`selected-existing source completion refuses before writes: ${variant.name}`, { timeout: 240_000 }, async t => {
+    const f = selectedMigrationConfigFixture(t, `completion-${variant.name.replaceAll(" ", "-")}`, variant);
+    const sourceIds = addSourceCompletionDependency(f.fixture);
+    const closed = JSON.parse(bd(f.fixture.root, "--readonly", "show", sourceIds.closed, "--json", "--long", "--include-comments"))[0];
+    const dependent = JSON.parse(bd(f.fixture.root, "--readonly", "show", sourceIds.dependent, "--json", "--long", "--include-comments"))[0];
+    assert.equal(closed.status, "closed"); assert.equal(dependent.status, "open");
+    assert.ok(dependent.dependencies.some(row => (typeof row === "string" ? row : row.depends_on_id ?? row.id ?? row.issue_id) === sourceIds.closed));
+    if (variant.unsupported) {
+      const node = `statuses: [${variant.statuses.map(value => `'${value}'`).join(", ")}] # retain terminal column\n`;
+      f.config = f.config.replace(f.section, node); writeFileSync(f.path, f.config);
+      git(f.destination.store, "add", "config.yml"); git(f.destination.store, "commit", "-qm", "retain native single-quoted flow"); git(f.destination.store, "push", "-q");
+    }
+    const inspection = inspectTaskProviderMigration({ cwd: f.fixture.root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+    assert.equal(inspection.status, "ready", inspection.detail); f.request.expectedSourceRevision = inspection.sourceRevision;
+    const source = sourceAuthorityFiles(f.fixture.root), sourceExport = bd(f.fixture.root, "--readonly", "export", "--all");
+    const records = physicalDestinationRecords(f.destination.store), head = git(f.destination.store, "rev-parse", "HEAD"), mode = lstatSync(f.path).mode;
+    const codeHead = git(f.fixture.root, "rev-parse", "HEAD"), codeIndex = git(f.fixture.root, "ls-files", "--stage");
+    const originals = Object.fromEntries(Object.keys(f.files).map(file => [file, {
+      bytes: readFileSync(join(f.destination.store, file)).toString("base64"), mode: lstatSync(join(f.destination.store, file)).mode,
+      history: git(f.destination.store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", file),
+    }]));
+    let deletions = 0;
+    const { result, requests } = await observeCompletionMigration({ ...f.request, runner: new AsIsBeadsRunner(),
+      deleteSource() { deletions += 1; throw new Error("completion fixture retains source if unsafe cutover is reached"); } });
+    console.info(JSON.stringify({ completionCase: variant.name, status: result.status, detail: result.detail, deletions,
+      nativeWrites: requests.filter(row => ["POST", "PUT"].includes(row.method)).length,
+      startupConfigReads: requests.filter(row => row.url.endsWith("/api/config")).length, configUnchanged: readFileSync(f.path, "utf8") === f.config }));
+    assert.equal(result.status, "blocked", result.detail);
+    assert.match(result.detail, /source.*Done.*native terminal.*placement/i, "must detect completion meaning, not a later unrelated failure");
+    assert.equal(deletions, 0); assert.equal(requests.some(row => ["POST", "PUT"].includes(row.method)), false, "no native allocation or update");
+    assert.equal(requests.filter(row => row.url.endsWith("/api/config")).length, variant.unsupported ? 1 : 0,
+      "bounded lists refuse before startup/list edits; unsupported form uses the ONE owned native startup list");
+    assert.equal(readFileSync(f.path, "utf8"), f.config); assert.equal(lstatSync(f.path).mode, mode);
+    assert.equal(git(f.destination.store, "rev-parse", "HEAD"), head); assert.equal(git(f.destination.store, "status", "--porcelain=v1"), "");
+    assert.equal(git(f.destination.store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], head);
+    for (const [file, before] of Object.entries(originals)) {
+      assert.equal(readFileSync(join(f.destination.store, file)).toString("base64"), before.bytes, file);
+      assert.equal(lstatSync(join(f.destination.store, file)).mode, before.mode, file);
+      assert.equal(git(f.destination.store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", file), before.history, file);
+    }
+    assert.deepEqual(physicalDestinationRecords(f.destination.store), records); assert.deepEqual(sourceAuthorityFiles(f.fixture.root), source);
+    assert.equal(bd(f.fixture.root, "--readonly", "export", "--all"), sourceExport);
+    assert.equal(git(f.fixture.root, "rev-parse", "HEAD"), codeHead); assert.equal(git(f.fixture.root, "ls-files", "--stage"), codeIndex);
+    assert.equal(readlinkSync(join(f.fixture.root, "backlog.config.yml")), ".backlog/config.yml");
+  });
+}
+
+test("selected-existing receipt-only Done does not impose universal terminal placement", { timeout: 300_000 }, async t => {
+  const f = selectedMigrationConfigFixture(t, "receipt-only-nonterminal-done", {
+    statuses: ["Triage", "In Design", "In Progress", "Blocked", "Done", "Cancelled"], autoCommit: true,
+  });
+  const rows = bd(f.fixture.root, "--readonly", "export", "--all").split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+  assert.ok(rows.every(row => !["closed", "done"].includes(row.status)), "no actual source issue maps to Done");
+  const result = await migrateTaskProvider({ ...f.request, runner: new AsIsBeadsRunner() });
+  assert.equal(result.status, "completed", result.detail); assert.equal(readFileSync(f.path, "utf8"), f.config);
+  assert.equal(JSON.parse(backlog(f.fixture.root, "task", "view", "--json", "--", result.receiptTaskId)).task.status, "Done");
+  assert.equal(existsSync(join(f.fixture.root, ".beads")), false);
+  for (const [file, before] of Object.entries(f.files)) {
+    assert.equal(readFileSync(join(f.destination.store, file)).toString("base64"), before.bytes, file);
+    assert.equal(lstatSync(join(f.destination.store, file)).mode, before.mode, file);
+    assert.equal(git(f.destination.store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", file), before.history, file);
+  }
+});
+
+test("selected-existing source completion replay refuses without config repair or reuse cutover", { timeout: 600_000 }, async t => {
+  for (const placement of ["selected existing", "fresh dirty layout"]) await t.test(placement, async t => {
+    const selected = placement === "selected existing" ? selectedMigrationConfigFixture(t, "completion-replay-selected") : undefined;
+    const fixture = selected?.fixture ?? embeddedBeadsSource(t, "completion-replay-fresh");
+    addSourceCompletionDependency(fixture);
+    const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+    assert.equal(inspection.status, "ready", inspection.detail);
+    const request = { cwd: fixture.root, targetProvider: "backlog", runner: new AsIsBeadsRunner(), expectedSourceRevision: inspection.sourceRevision,
+      confirmedSwitch: true, actor: "completion-replay", semanticPlacement: "Preserve source completion and original native configuration." };
+    const first = await migrateTaskProvider({ ...request, deleteSource() { throw new Error("retain complete destination and authoritative source for replay fixture"); } });
+    assert.equal(first.status, "blocked", first.detail); assert.match(first.detail, /retain complete destination and authoritative source/);
+    const store = join(fixture.root, ".backlog"), path = join(store, "config.yml");
+    const config = readFileSync(path, "utf8").replace(/^statuses:.*$/m, 'statuses: ["Triage", "In Design", "In Progress", "Blocked", "Done", "Cancelled"]');
+    writeFileSync(path, config); git(store, "add", "config.yml");
+    git(store, "-c", "user.name=Replay Fixture", "-c", "user.email=replay@example.invalid", "commit", "-qm", "published operator terminal change after receipt");
+    git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+    const head = git(store, "rev-parse", "HEAD"), mode = lstatSync(path).mode, records = physicalDestinationRecords(store), source = sourceAuthorityFiles(fixture.root);
+    const codeHead = git(fixture.root, "rev-parse", "HEAD"), codeIndex = git(fixture.root, "ls-files", "--stage");
+    let deletions = 0;
+    const { result, requests } = await observeCompletionMigration({ ...request,
+      deleteSource() { deletions += 1; throw new Error("unsafe replay reached source retirement"); } });
+    console.info(JSON.stringify({ completionReplay: placement, status: result.status, detail: result.detail, deletions }));
+    assert.equal(result.status, "blocked", result.detail); assert.match(result.detail, /source.*Done.*native terminal.*placement/i);
+    assert.equal(requests.filter(row => row.url.endsWith("/api/config")).length, 1, "replay checks the owned native startup list");
+    assert.equal(requests.some(row => ["POST", "PUT"].includes(row.method)), false); assert.equal(deletions, 0);
+    assert.equal(readFileSync(path, "utf8"), config); assert.equal(lstatSync(path).mode, mode);
+    assert.deepEqual(physicalDestinationRecords(store), records); assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
+    assert.equal(git(store, "rev-parse", "HEAD"), head); assert.equal(git(store, "status", "--porcelain=v1"), "");
+    assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], head);
+    assert.equal(git(fixture.root, "rev-parse", "HEAD"), codeHead); assert.equal(git(fixture.root, "ls-files", "--stage"), codeIndex);
+  });
+});
 
 test("selected-existing sparse config refuses before native normalization and preserves original bytes and modes", { timeout: 180_000 }, async t => {
   const f = selectedMigrationConfigFixture(t, "selected-sparse-config");

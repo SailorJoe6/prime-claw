@@ -433,6 +433,21 @@ never add a semantic duplicate. Missing active values go immediately before the
 original last status, retaining old relative order and the final native terminal
 (and the first value for multi-status lists). A required absent `Done` needs
 separate placement resolution, not silent terminal change.
+
+When an **actual source ticket** maps to `Done`, migration also requires that
+its first canonical configured spelling is natively terminal. Authoring matches
+case and all whitespace, but pinned native completion compares that spelling
+with the final configured status using **trim + lowercase only**. Internal
+whitespace therefore matters for completion. `Done` before `Cancelled`, or a
+first `D o n e` before terminal `Done`, needs separate placement resolution.
+Refuse before a bounded list's no-missing shortcut or any additive write. Repeat
+the check against the one owned server's startup list for unsupported forms and
+complete-receipt/import replay before allocation or reuse. Do not reorder the
+list, replace its terminal/default, remap closed tickets or repair config. If no
+actual source ticket maps to `Done`, receipt-only `Done` does **not** impose a
+universal terminal-placement policy. See the separate
+[completion repair evidence](evidence/primeclaw-59-completion-status-repair-20261121.md).
+
 Bounded preparation handles JSON-compatible one-line flow (including a trailing
 comma) and complete simple scalar block sequences. Raw old flow syntax stays;
 block conversion refuses continuations, anchors, aliases, tags, dependent syntax

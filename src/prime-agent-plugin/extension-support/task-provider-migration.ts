@@ -2059,6 +2059,19 @@ function additiveBacklogStatusText(content: string, existing: string[], missing:
   return lines.join("\n");
 }
 
+/** Completion is source-conditioned, not a universal receipt/Done-last policy.
+ * Resolve the FIRST spelling exactly as current task authoring does; the pinned
+ * native terminal comparison removes only surrounding whitespace, not internal.
+ */
+function assertBeadsCompletionStatus(source: BeadsSnapshot, statuses: string[]): void {
+  if (!source.tasks.some(pkg => statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status) === "Done")) return;
+  const authored = statuses.find(status => backlogStatusKey(status) === "done");
+  const terminal = statuses.at(-1);
+  if (!authored || !terminal || authored.trim().toLowerCase() !== terminal.trim().toLowerCase()) {
+    throw new Error("source Done completion does not match the configured native terminal; preserve status order/default/terminal and resolve completion placement separately before migration writes or reuse");
+  }
+}
+
 function missingBacklogMigrationStatuses(source: BeadsSnapshot, statuses: string[]): string[] {
   const required = [...source.tasks.map(pkg => statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status)),
     "In Progress", "Done", ...(source.memories.length ? ["In Design"] : [])];
@@ -2109,6 +2122,7 @@ function prepareRequiredBacklogMigrationStatuses(source: BeadsSnapshot, prepared
   // Unsupported native forms may still need NO edit. The single owned server
   // decides that losslessly after startup; missing values then STOP unchanged.
   if (!existing) return undefined;
+  assertBeadsCompletionStatus(source, existing);
   const missing = missingBacklogMigrationStatuses(source, existing);
   if (!missing.length) return existing;
   if (missing.some(status => backlogStatusKey(status) === "done")) {
@@ -2196,6 +2210,7 @@ async function freshBacklogMigrationReplay(
   if (views.size !== source.counts.total + 1 + (source.memories.length ? 1 : 0) || Object.keys(mapping).length !== source.counts.total
       || canonical(receipt.mappings) !== canonical(expectedMappings)) throw new Error("fresh same-migration replay inventory/mappings do not match the verified receipt");
   const configuration = await beadsCurrentConfiguration(await openWeb(storeDir));
+  assertBeadsCompletionStatus(source, configuration.statuses);
   const paths = backlogPhysicalTaskPaths(storeDir);
   const tasks = source.tasks.map((pkg) => {
     const id = mapping[pkg.sourceTaskId];
@@ -2308,6 +2323,7 @@ async function migrateBeadsToBacklog(
     if (expectedStatuses && canonical(configuration.statuses) !== canonical(expectedStatuses)) {
       throw new Error("owned native startup status readback mismatch; STOP and retain config without task allocation or resend");
     }
+    assertBeadsCompletionStatus(source, configuration.statuses);
     if (missingBacklogMigrationStatuses(source, configuration.statuses).length) {
       throw new Error("required statuses need a supported JSON-compatible flow or simple one-line scalar block items; preserve unsupported configuration/replay without writing");
     }
