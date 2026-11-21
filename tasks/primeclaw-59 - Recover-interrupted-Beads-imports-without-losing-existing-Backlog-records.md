@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 21:16'
+updated_date: '2026-11-21 21:36'
 labels: []
 dependencies: []
 references:
@@ -21,6 +21,7 @@ documentation:
   - docs/evidence/primeclaw-59-current-integration-20261121.md
   - docs/evidence/primeclaw-59-config-preservation-20261121.md
   - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
+  - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -40,6 +41,7 @@ modified_files:
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - docs/evidence/primeclaw-59-config-preservation-20261121.md
   - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
+  - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -237,6 +239,9 @@ Canonical execute received for this ONE new step-3 increment, not replay. Exact 
 Concrete gaps: originalBacklogLayout returns no original when only config.yml.pre-migration exists; preparation falls through to fresh bootstrap, and ordinary adoption refuses an existing published task branch before subtree history preservation. Implement ONE migration-only parked reconciliation hook without changing ordinary discovery/fresh-init behavior. Snapshot and retain inactive original parked files/modes/history and selected clone identity before mutation; build compatible file union and ordinary non-squashed task-DAG merge in disposable Git, using native subtree split for code-owned originals (never merge full code HEAD) and existing exact published task ancestry. Reuse exact selected hidden/custom clone, or normal .backlog target only when no destination is selected. Preserve BOTH histories/ancestors and original bytes/paths/IDs/config customization. Leave the old parked tree inactive and unchanged; no cleanup/detach/reactivation. Restore a COPY as active config only against a proven untouched whole bootstrap or compatible placement-adjusted config; unresolved meaningful config/path/history/identity conflict stops with both sides retained. Validate candidate native normalization-free config before publication, retain source-conditioned completion guard before supported edits plus the SAME single owned startup guard, then existing additive status/baseline/native current verification. Carry pre-hook preservation proof through existing baseline/receipt/cutover checks, not a new journal/framework.
 
 Synthetic tests will cover published-bootstrap reuse with absent/existing hidden/custom selected clone, exact originals/config/modes and BOTH native ancestors, plus concrete conflict refusal retaining both sides. Record genuine oldcandidate red separately; then focused/shared and required final-source Docker tier1. Tests/helpers may be authored in parallel, but no duplicate runtime dispatch. Publish task evidence promptly/code separately and STOP after this ONE candidate for owner review. All deferred slices/no-live/no-provider-change/resources/ownership/lifecycle/merge/globalactivation/upstream/cleanup limits remain. This entry records audit/design progress, not implemented/tested/accepted behavior.
+
+## Parked reconciliation — genuine oldcandidate red; candidate under focused validation
+Oldcandidate omission/conflict defect now reproduced in disposable native Docker, not merely static. Candidate helper/caller/baseline integration and six focused fixtures are applied on this same Episode; docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md records exact evidence and limits. Original parked tree stays inactive/unchanged, exact selected clone and both task ancestries retained, config/modes preserved without ordinary fresh-init changes or invented conflict winners. First focused candidate validation is running. Inspect actual results, make only bounded in-scope repairs if needed, then retain meaningful shared guards and final-source required tier1 probe with exact unchanged source/test/bridge hashes. Publishnative/code separately andSTOP independentownerreview. No result/whole-task/merge claim yet; all9ACunchecked/nullSummary and deferred slices unchanged.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -463,4 +468,8 @@ No implementation, fixture/server launch, resource/lifecycle change or execute s
 ### Canonical parked-store execute admitted; preparation/audit completed
 Exact selected v2 Backlog authority and original observation c55b184e/SHA66aaf537785dc98fde97fcc88f065e7d51a8ec7d32369257c51cee77ed86c4e6 reverified. Full unchanged native envelopes retained; same-task semantic history remains compatible. Latest76ba is the recorded pre-code living plan; primary main has advanced compatibly without changing integration selection or this Episode codecbf4. Both delegated implementation audits used inherited openai-codex route, inspected the whole native contract in4096char chunks and confirmed only historical repair/handoff appends; no EXPERT acceptance or new test results are claimed. No live/private source inspected; personal brain unavailable, repository requirements used as fallback.
 Implementation sized as one migration-only inactive-parked-store consolidation using disposable ordinary Git candidate merge, original native subtree ancestry + exact published destination ancestry, actual selected clone/context/config preservation and pre-hook proof carried into existing baseline/receipt/cutover checks. Original parked data stays inactive/unchanged; ordinary fresh initialization unchanged; no guessed conflict strategy. Test authoring is delegated separately with no runtime launch, source hook first authored as ignored candidate artifact so oldcandidate red can use unchangedcbf4 plugin. Native task remains InProgress0/9/nullSummary. Next: inspect focused fixture additions, capture oldcandidate inputs and genuine red, apply minimal hook/integration, then final-source focused/shared/tier1 and separate publications/STOP.
+
+### Parked-store oldcandidate defect reproduced; minimal candidate under focused Docker validation
+Actual oldcandidate Docker run20261121T212805Z-78813-d06f7192:6nativechecks1PASS5FAIL,1pytestFAIL14deselected208.34s. Threeforwardcases each6POST/PUT andretirementcallback1, butoriginalrecordsabsentfromselectedstore; callbackthrowsbefore rm => NOactualsourcedeletion. Config/pathconflicts also reachedthrowingcallback; existingcodeancestryrefusalcontrolPASS.15manifesthashes matched/offline/runtime+builderclean/upstreambuilderunchanged/inputhashesmatched. Defaultpython3.15missingpytest and thenmissing.env were separate pre-runtime setupfailures, notproductred. Reused/reverified previousexact readonly cwd-fix-v0.9.8-r1 source+selector, no dependency/global/upstream change.
+Applied ONE migration-only workspace hook + small existing-baseline/caller integration after fullcode review: inactiveparkedtree/index unchanged, native subtree+published taskancestry merge in disposableGit, exactselectedhidden/customclone reuse, wholepristinebootstrap/configchoice proof, exactoriginalmodes andprehookpreservationclosure through existingbaseline/receipt/cutover; normalfreshinit unchanged. Review repaired generatedplacement+activeconfigcopymode andisolatedphysicalpathfixturefromconfigconflict. Sixfocusedtests/bridge/docsevidence authored. Current candidate firstfocused Docker run is ongoing (green-first-focused.log/green-first-input-hashes.json); no green/shared/probe or owneracceptance claim. Record exactfinalinputs/results/limits before separatecodepublication/STOP. InProgress0/9/nullSummary; no live/private/Episodeownership/resources/lifecycle/merge/globalactivation/upstream/cleanup actions.
 <!-- SECTION:NOTES:END -->
