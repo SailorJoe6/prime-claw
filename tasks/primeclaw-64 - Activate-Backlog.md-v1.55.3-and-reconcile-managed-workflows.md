@@ -16,6 +16,16 @@ documentation:
   - docs/project-initialization.md
   - docs/evidence/primeclaw45-integrated-compatibility-20261115.md
 modified_files:
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/handoff/SKILL.md
+  - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - docs/handoff-chain.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - REQUIREMENTS.md
+  - tests/test_oversee_episode_skill.py
   - docs/evidence/primeclaw64-off-global-build-20261121.md
 priority: p1
 type: task
@@ -59,7 +69,7 @@ Joe explicitly clarified: “That file should be committed as a critical change.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 A separate published native task carries the rollout authority and boundaries while PRIMECLAW-45 remains active Done; canonical source and pre-activation artifact state are verified.
-- [ ] #2 The supported build and compiled smoke produce a version-1.55.3 artifact from exact unmodified upstream 0cf4fdbc70020327f4366a29d3f405f83d180301, with exact source/toolchain/artifact identities and preserved fallback evidence.
+- [x] #2 The supported build and compiled smoke produce a version-1.55.3 artifact from exact unmodified upstream 0cf4fdbc70020327f4366a29d3f405f83d180301, with exact source/toolchain/artifact identities and preserved fallback evidence.
 - [ ] #3 Installed global guidance and known managed-project workflows are inventoried for removed commands, lifecycle/storage semantics, complete identity-set reads, and unattended input; the supported upgrade boundary, safe selected-project reconciliation, preserved customizations/snapshots, and exact deferred owner/operator actions are documented.
 - [ ] #4 Plain Backlog projects are not presumed to need data conversion; supported non-mutating doctor evidence or exact inspection limits are reported per affected project, with no doctor --fix, provider switch, silent cross-project mutation, or destructive history repair.
 - [ ] #5 Accepted merged source is installed through supported canonical-primary user-global/artifact paths, preserving unrelated global state and all old-generation live resources; no candidate host install or second daemon is used.
