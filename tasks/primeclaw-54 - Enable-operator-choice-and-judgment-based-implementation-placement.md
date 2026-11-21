@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-54
 title: Enable operator choice and judgment-based implementation placement
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-03 02:59'
-updated_date: '2026-11-21 22:07'
+updated_date: '2026-11-21 22:10'
 labels: []
 dependencies: []
 references:
