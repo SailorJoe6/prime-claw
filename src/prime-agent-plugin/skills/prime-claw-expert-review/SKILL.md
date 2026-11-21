@@ -90,16 +90,28 @@ new session unless the operator explicitly directs a provider change. Selecting
 a model does not authorize changing providers; `openai-codex` and `openai` are
 different providers even when both offer the same model name.
 
-Use `await rlm.find_models(...)` to resolve model choices, then restrict results
-to the parent's provider. Without a model override, prefer `gpt-6-astra` on that
-provider; otherwise choose a reasonably strong model on the same provider and
-tell the caller which provider/model will be used. Never select a cross-provider
-fallback. An unavailable model, missing discovery results, or a quota error is
-not permission to change provider. When discovery omits the parent's models,
-omit `model` from a supported native launch to inherit the current provider and
-model rather than guessing an unlisted selector. If neither a suitable same-provider
-model nor supported inheritance is available, report the constraint and consult
-the operator; do not silently change authentication routes.
+Use `prime-agent model list [search]` to look up a requested model. Quote a
+multi-word search to include both the provider and model family:
+
+```sh
+prime-agent model list "openai-codex astra"
+```
+
+Use the exact `provider/model-id` the operator named. If the operator asks for
+the latest in a family, choose the newest matching model on the required
+provider. For example, choose `openai-codex/gpt-6.2-astra` over
+`openai-codex/gpt-6-astra` when both are listed and latest Astra is requested.
+Without an override, prefer the latest Astra available on the parent's provider.
+State the actual provider and model choice before the review.
+
+Catalog presence is not launch authorization or proof that the running session
+can start the model. For an RLM child using a different model, use
+`await rlm.find_models(...)` to confirm the exact CLI-selected selector is
+returned before spawning. If it is not returned, report the discovery gap. If
+launch fails, report the actual error rather than inferring its cause. Never
+substitute a different provider or silently replace an explicitly requested
+model. If no model was requested and no same-provider Astra is selectable,
+ask before using a different model for the independent review.
 
 Request `thinking="max"`. If the selected fallback model does not support that
 setting, use its strongest supported reasoning level. Use an ordinary unique

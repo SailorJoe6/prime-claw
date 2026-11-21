@@ -111,6 +111,17 @@ If the launch surface cannot preserve the provider, report that constraint
 instead of silently switching providers. This is separate from task providers
 such as Backlog and Beads.
 
+Use `prime-agent model list [search]` to look up a requested model. Quote a
+multi-word search so it can include both the provider and model family, for
+example `prime-agent model list "openai-codex astra"`. Use an exact requested
+selector as given; for a request for the latest in a family, choose the newest
+matching model on the required provider. In the example, choose
+`openai-codex/gpt-6.2-astra` over `openai-codex/gpt-6-astra` when both are
+listed.
+Check the native launch surface separately; a catalog match does not prove it
+can start the model. Report missing discovery results or actual launch errors
+without switching providers or substituting an expressly requested model.
+
 ## Prime Agent RLM Delegation — Safe Spawn Protocol
 
 Prime Agent releases can lose the initial RLM task when a `session_start`
