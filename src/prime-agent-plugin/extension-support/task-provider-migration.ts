@@ -66,6 +66,7 @@ import {
 const RECEIPT_TITLE = "Prime Claw task-provider migration receipt";
 const RECEIPT_MARKER = "prime-claw-task-provider-migration-receipt-v1";
 const SOURCE_MARKER = "prime-claw-task-provider-migration-source-v1";
+const SOURCE_RELATIONSHIP_MARKER = "prime-claw-task-provider-migration-relationships-v1";
 const BEADS_CUSTOM_STATUSES = "in_design:active,in_planning:active,ready_for_merge:wip,done:done";
 const BACKLOG_TASK_DIRS = ["tasks", "completed", "archive/tasks", "drafts", "archive/drafts"] as const;
 const GIT_OID = /^[0-9a-f]{40,64}$/;
@@ -649,7 +650,7 @@ function validateBeadsRelationshipTargets(tasks: BeadsTaskPackage[]): void {
   const problems: string[] = [];
   for (const pkg of tasks) {
     const parent = typeof pkg.nativeView.parent === "string" ? pkg.nativeView.parent : pkg.exportRow.parent;
-    const targets = [...dependencyIds(pkg).map((id) => ({ id, kind: "dependency" })),
+    const targets = [...beadsRelationships(pkg).map(({ id, type }) => ({ id, kind: `${type} relationship` })),
       ...(typeof parent === "string" && parent ? [{ id: parent, kind: "parent" }] : [])];
     for (const { id, kind } of targets) {
       if (id === pkg.sourceTaskId) problems.push(`${pkg.sourceTaskId} ${kind} ${id}: self target`);
@@ -1826,9 +1827,40 @@ function createBacklogTaskFromBeads(pkg: BeadsTaskPackage, source: BeadsSnapshot
   return id;
 }
 
+interface BeadsRelationship {
+  id: string;
+  type: string;
+}
+
+function beadsRelationships(pkg: BeadsTaskPackage): BeadsRelationship[] {
+  const dependencies = Array.isArray(pkg.nativeView.dependencies)
+    ? pkg.nativeView.dependencies
+    : Array.isArray(pkg.exportRow.dependencies) ? pkg.exportRow.dependencies : [];
+  return dependencies.map((dep: any): BeadsRelationship => {
+    const id = typeof dep === "string" ? dep : String(dep.depends_on_id ?? dep.id ?? dep.issue_id ?? "");
+    const rawType = typeof dep === "string" ? "blocks" : String(dep.dependency_type ?? dep.type ?? "blocks");
+    return { id, type: rawType.trim().toLowerCase().replace(/_/g, "-") || "blocks" };
+  }).filter(({ id }) => Boolean(id));
+}
+
+/** Backlog dependencies are hard ordering edges; other Beads types retain their own meaning. */
 function dependencyIds(pkg: BeadsTaskPackage): string[] {
-  const dependencies = Array.isArray(pkg.nativeView.dependencies) ? pkg.nativeView.dependencies : Array.isArray(pkg.exportRow.dependencies) ? pkg.exportRow.dependencies : [];
-  return dependencies.map((dep: any) => typeof dep === "string" ? dep : String(dep.depends_on_id ?? dep.id ?? dep.issue_id ?? "")).filter(Boolean);
+  return beadsRelationships(pkg).filter(({ type }) => type === "blocks").map(({ id }) => id);
+}
+
+function beadsRelationshipComment(
+  pkg: BeadsTaskPackage,
+  mapping: Record<string, string>,
+  semanticPlacement: string,
+): string | undefined {
+  const relationships = beadsRelationships(pkg).filter(({ type }) => type !== "blocks" && type !== "parent-child");
+  if (!relationships.length) return undefined;
+  const lines = relationships.map(({ id, type }) => `- ${type}: ${id} -> ${mapping[id] ?? id}`);
+  return `${SOURCE_RELATIONSHIP_MARKER}
+Source Beads relationships with no native Backlog dependency equivalent:
+${lines.join("\n")}
+
+Semantic placement: ${semanticPlacement}`;
 }
 
 function commitBacklogDestination(runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace, message: string): string {
@@ -2184,6 +2216,8 @@ function migrateBeadsToBacklog(
   for (const pkg of source.tasks) {
     const id = mapping[pkg.sourceTaskId];
     if (reusedDestinationIds.has(id)) continue;
+    const relationshipComment = beadsRelationshipComment(pkg, mapping, semanticPlacement);
+    if (relationshipComment) nativeBacklogComment(runner, source.projectRoot, id, relationshipComment, "prime-claw-migration");
     const deps = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId);
     if (deps.length) runRequired(runner, "backlog", ["task", "edit", "--depends-on", deps.join(","), "--plain", "--", id], source.projectRoot, `migrate dependencies for ${pkg.sourceTaskId}`);
     const status = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
@@ -2231,6 +2265,12 @@ function migrateBeadsToBacklog(
     if (expectedParent !== actualParent) throw new Error(`Backlog destination parent mapping mismatch for ${pkg.sourceTaskId}`);
     const expectedDependencies = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId).sort();
     assertSameIds(relationshipIds(view.task.dependencies, id), expectedDependencies, `Backlog destination dependencies for ${pkg.sourceTaskId}`);
+    const expectedRelationshipComment = beadsRelationshipComment(pkg, mapping, semanticPlacement);
+    if (expectedRelationshipComment) {
+      const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
+      const matches = comments.filter((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "") === expectedRelationshipComment);
+      if (matches.length !== 1) throw new Error(`Backlog destination relationship placement mismatch for ${pkg.sourceTaskId}`);
+    }
     return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath, taskEvidence: view };
   });
   const destinationDigest = (tasks: DestinationTask[]) => {

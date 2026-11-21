@@ -2842,6 +2842,46 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
   });
 }
 
+test("typed Beads relationships preserve meaning without false dependency cycles", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "typed-relationship-migration");
+  bd(fixture.root, "dep", "relate", fixture.ids.parent, fixture.ids.blocked);
+  bd(fixture.root, "dep", "add", fixture.ids.child, fixture.ids.blocked, "--type", "discovered-from");
+  const destination = publishedPopulatedBacklogDestination(fixture);
+  const runner = new AsIsBeadsRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const semanticPlacement = "Place non-blocking typed Beads relationships in readable migration comments; preserve exact raw source evidence.";
+  const result = await migrateTaskProvider({ cwd: fixture.root, targetProvider: "backlog", runner,
+    expectedSourceRevision: inspection.sourceRevision, confirmedSwitch: true, actor: "operator",
+    semanticPlacement, verifyActiveRuntime: proveFixtureRuntime });
+  assert.equal(result.status, "completed", result.detail);
+  const mappings = Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId]));
+  const view = (sourceId) => JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mappings[sourceId])).task;
+  const parent = view(fixture.ids.parent), child = view(fixture.ids.child), blocked = view(fixture.ids.blocked);
+  assert.deepEqual(parent.dependencies, []);
+  assert.deepEqual(child.dependencies, []);
+  assert.deepEqual(blocked.dependencies, [mappings[fixture.ids.child]]);
+  const relationComment = (task) => task.comments.map((comment) => String(comment.text ?? comment.content ?? comment.body ?? ""))
+    .find((text) => text.startsWith("prime-claw-task-provider-migration-relationships-v1\n"));
+  assert.equal(relationComment(parent), `prime-claw-task-provider-migration-relationships-v1\nSource Beads relationships with no native Backlog dependency equivalent:\n- relates-to: ${fixture.ids.blocked} -> ${mappings[fixture.ids.blocked]}\n\nSemantic placement: ${semanticPlacement}`);
+  assert.equal(relationComment(child), `prime-claw-task-provider-migration-relationships-v1\nSource Beads relationships with no native Backlog dependency equivalent:\n- discovered-from: ${fixture.ids.blocked} -> ${mappings[fixture.ids.blocked]}\n\nSemantic placement: ${semanticPlacement}`);
+  assert.equal(relationComment(blocked), `prime-claw-task-provider-migration-relationships-v1\nSource Beads relationships with no native Backlog dependency equivalent:\n- relates-to: ${fixture.ids.parent} -> ${mappings[fixture.ids.parent]}\n\nSemantic placement: ${semanticPlacement}`);
+  const childPackage = sourcePackageFromBacklogComments(child);
+  assert.ok(childPackage.nativeView.dependencies.some((dep) => dep.id === fixture.ids.blocked && dep.dependency_type === "discovered-from"));
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  for (const [path, expected] of Object.entries(destination.baseline)) assert.equal(readFileSync(join(destination.store, path)).toString("base64"), expected.bytes, path);
+});
+
+test("true Beads blocking cycles still fail before destination mutation", { timeout: 120_000 }, (t) => {
+  const fixture = beadsSource(t, "blocking-cycle-preflight");
+  bd(fixture.root, "dep", "add", fixture.ids.parent, fixture.ids.archived);
+  bd(fixture.root, "sql", `INSERT INTO dependencies (id, issue_id, type, created_by, depends_on_issue_id) VALUES ('00000000-0000-0000-0000-000000000062', '${fixture.ids.archived}', 'blocks', 'fixture', '${fixture.ids.parent}')`);
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+  assert.equal(inspection.status, "blocked");
+  assert.match(inspection.detail, /dependency cycle/);
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+});
+
 test("native archived-target source graph preserves mapped dependencies through migration", { timeout: 240_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "archived-target-migration");
   const destination = publishedPopulatedBacklogDestination(fixture);
