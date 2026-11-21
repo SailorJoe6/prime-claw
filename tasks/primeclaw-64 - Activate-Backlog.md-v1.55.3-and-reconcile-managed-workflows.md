@@ -3,14 +3,14 @@ id: PRIMECLAW-64
 title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: In Progress
 assignee: []
-created_date: '2026-11-21 20:38'
-updated_date: '2026-11-21 22:29'
+created_date: 2026-11-21 20:38
+updated_date: '2026-11-21T23:12:00Z'
 labels: []
 dependencies:
   - PRIMECLAW-45
 references:
   - PRIMECLAW-45
-  - 'https://github.com/MrLesk/Backlog.md/releases/tag/v1.55.3'
+  - https://github.com/MrLesk/Backlog.md/releases/tag/v1.55.3
 documentation:
   - docs/backlog.md
   - docs/project-initialization.md
@@ -134,4 +134,8 @@ Next accepted slice: native plan steps 4–5 only. Using known registered/manage
 Steps 4–5 intermediate evidence: reviewed exact pinned doctor path. Plain doctor does not enter requested repairs, but before diagnosis ContentStore.loadInitialData calls ensureBacklogStructure (recursive mkdir). The selected primary is missing archive/tasks; the isolated Episode also lacks required directories. Skipped doctor on both rather than allow directory creation. Retained physical archived-draft bytes/modes/history evidence separately; this is a source-backed inspection limit, not a native doctor pass or a reason to move legacy records. Consumer inventory and rollout docs still being completed.
 
 Steps 4–5 complete as bounded preparation; not activation. Published docs-only Episode fe9e7dfe44f91b691e5dee5483635f7f92bbdb62 (docs/backlog.md, docs/project-initialization.md, docs/evidence/primeclaw64-rollout-preparation.md). Native registered/ownership/manifest inventory: 34 local roots (14 Backlog including six linked snapshots, eight Beads markers without Backlog config, 12 without either marker); nine paired paths metadata-only (incompatible_runtime for paired session listing). Exact reviewed 1.55.3 plain doctor ran once from a safely inspectable managed local project, exit 0 with no duplicate ID/self-dependency/cycle findings; captured path/mode/content and Git evidence matched. Skipped other 13 Backlog roots for exact startup mkdir or remote ref-refresh limits, including selected primary missing archive/tasks. Private evidence retained in Episode session artifacts. No affirmative removed completion recipe in bounded guidance; preserve custom design/prepare/spec-it-out/plan-task and live/uncertain snapshots. Selected managed conversation-after-handoff is a normal refresh candidate; blocked/execute/handoff have baseline drift and fresh reconciliation alone is expected not to install their newer interruption guidance, so owner must make an exact content decision if that route is required, or defer it. No provider switch, repair, global/project deployment, restart, activation UAT, stable-pointer update or terminal summary. Stop for owner review and separately approved cutover.
+
+Owner reviewed steps 4–5 and accepted actual host cutover and all three live UAT contexts (steps 6–7); hold cleared. PATH Backlog 1.55.3 (Mach-O arm64, 0755, SHA-256 169976d4a37230e4e650cac3dfa15a03436809fc97dfb7551354e63a9808c586) is installed; primary dist remains the separate 1.53.0 fallback, and both rollback copies are intact. Accepted plugin source 30bd6c53a349113944bda48a69f8a0f2c5963bb5 passed Docker Tier 1 run 20261121T225811Z-75113-41d80e86 and canonical user-global apply/check. Selected reconcile on main 5af4e912a6641eac13c11522817dfc471b2ed5a0 updated managed conversation-after-handoff and recovered metadata only, with nine customizations and all snapshots preserved and the native root alias pointing to the same config. One coordinated actual cutover restart (65235 → 88168) preceded passed resumed-owner, exact retained Episode and ordinary GStack UAT; this is distinct from earlier plugin-only UAT. Installed CLI/browser/MCP and a disposable lifecycle fixture passed; retain the input refusals separately. Private receipts: owner primeclaw64-plugin-install-20261121T215149Z/actual-backlog155-cutover (installation-evidence.json, post-restart-uat-owner.json, installed-binary-smoke.log, installed-lifecycle-fixture-results.json). No claim of public registry hash/count, dispatch/recovery proof, or all-project health. Paired remote, preserved snapshots’ new interruption route, TASK2 name collision, and frozen Beads PVA are excluded.
+
+Next accepted slice: step 8 only in this exact Episode. Update narrow tracked rollout docs with dated verified outcomes, fallback and limits; update native criteria/notes and candidate Final Summary truthfully after verifying evidence, and publish/report candidate for independent review. Backlog.md Expert evidence message was queued; verify actual receipt before criterion #7 and do not claim/advance its pointer. Keep In Progress and preserve resources. No repeat install/reconcile/restart/UAT, source changes, integration, lifecycle transition or cleanup.
 <!-- SECTION:NOTES:END -->
