@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: In Progress
 assignee: []
 created_date: '2026-11-21 20:38'
-updated_date: '2026-11-21 22:22'
+updated_date: '2026-11-21 22:26'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -127,4 +127,6 @@ Steps 2–3 executed off-global. The pinned and clean Episode source `0cf4fdbc70
 Steps 2–3 reviewed and accepted as a nonterminal build slice. The owner independently verified the evidence commit c1e4c66ec4672b80c78039f128004feca1894d67, task checkpoint 329905c5abae4ce84ec8d989929136a3b56f7d74, exact source/tag, official Bun, manifest digests, artifact and compiled smoke, and both original and rollback binary hashes/modes. Review evidence: /Users/jlanders/.prime/agent/session-artifacts/01a1a90b-0fba-7778-b1e5-0087bdaf8fec/primeclaw64-plugin-install-20261121T215149Z/off-global-build-owner-review.json. The later published descendant 385ee964e5db6183f0c56fad8ff49a3081ffe653 changed only an unrelated ticket. This acceptance does not activate 1.55.3; Backlog remains 1.53.0 globally and only criterion #2 is checked.
 
 Next accepted slice: native plan steps 4–5 only. Using known registered/managed contexts and delivery evidence, inventory consumers and actual guidance, distinguish stale active resources needing owner action from inactive/deferred or excluded contexts, and preserve all customized/unknown assets and live snapshots. For safely inspectable affected Backlog projects only, run the absolute reviewed Episode 1.55.3 binary with plain text doctor from each project CWD; record raw output, exit, before/after evidence or the exact inspection limit without repair. Beads-authoritative projects are not Backlog conversion targets. Preserve archived-draft physical evidence and do not investigate deliberately deleted finished sessions. Draft bounded, privacy-safe deployment/reconciliation documentation and evidence, with concrete owner actions, the completed plugin-only maintenance distinguished from pending Backlog activation, and the owner-only quiescence/install/restart/UAT procedure. Stop for owner review; no initializer run, activation, project/fleet mutation, restart, or lifecycle change.
+
+Steps 4–5 intermediate evidence: reviewed exact pinned doctor path. Plain doctor does not enter requested repairs, but before diagnosis ContentStore.loadInitialData calls ensureBacklogStructure (recursive mkdir). The selected primary is missing archive/tasks; the isolated Episode also lacks required directories. Skipped doctor on both rather than allow directory creation. Retained physical archived-draft bytes/modes/history evidence separately; this is a source-backed inspection limit, not a native doctor pass or a reason to move legacy records. Consumer inventory and rollout docs still being completed.
 <!-- SECTION:NOTES:END -->
