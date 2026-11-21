@@ -327,6 +327,30 @@ and complete current-state acceptance are also unfinished. This increment is
 not permission to retry a live migration. See the [source-capture evidence and
 limits](evidence/primeclaw-59-current-state-capture-20261121.md).
 
+A migration-only native Web transport is staged in
+`extension-support/migration-backlog-web.ts`. It is not yet called by the forward
+importer, so it does not make the encoded writer acceptable for live use. The
+transport starts one owned `backlog browser --no-open --port <selected>
+--non-interactive` process. It pins `BACKLOG_CWD` and cwd to the prepared project,
+uses only that child's actual loopback bind announcement, then checks native
+`/api/status` for the exact canonical project and prepared Backlog directory.
+An occupied port can cause native selection of a different free port; the
+transport never attaches to the foreign listener.
+
+Task POST/PUT bodies, HTTP results, browser logs and native CLI readback are
+private file-backed transport data, not task archives. CLI readback uses the same
+pinned project context. The caller still owns readable projection and complete
+field/comment/relationship comparison. Successful close removes ephemeral
+transport files; failure keeps them in the error's private `artifactDirectory`
+for bounded inspection. Public errors contain stage/outcome metadata, never
+provider responses or payload-bearing stderr. A failed or uncertain write fences
+further writes and shuts down only owned process groups, with bounded TERM/KILL
+escalation and observed exit. There is no automatic resend, CLI fallback,
+rollback, provider cleanup or source retirement. Transport AbortSignal support
+is not full importer cancellation: the responsive migration worker and existing
+orchestration still need integration and their own acceptance evidence. See the
+[owned transport evidence and limits](evidence/primeclaw-59-owned-web-transport-20261121.md).
+
 The confirmed maintenance window is one linear operation:
 
 1. capture every source task's current provider-native rows and long view,
