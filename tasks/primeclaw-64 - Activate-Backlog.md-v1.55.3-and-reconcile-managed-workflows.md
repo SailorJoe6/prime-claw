@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: In Progress
 assignee: []
 created_date: 2026-11-21 20:38
-updated_date: '2026-11-21T23:30:00Z'
+updated_date: '2026-11-21T23:34:00Z'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -15,6 +15,8 @@ documentation:
   - docs/backlog.md
   - docs/project-initialization.md
   - docs/evidence/primeclaw45-integrated-compatibility-20261115.md
+  - docs/evidence/primeclaw64-off-global-build-20261121.md
+  - docs/evidence/primeclaw64-rollout-preparation.md
 modified_files:
   - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
   - src/prime-agent-plugin/skills/handoff/SKILL.md
@@ -71,13 +73,13 @@ Joe explicitly clarified: “That file should be committed as a critical change.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A separate published native task carries the rollout authority and boundaries while PRIMECLAW-45 remains active Done; canonical source and pre-activation artifact state are verified.
+- [x] #1 A separate published native task carries the rollout authority and boundaries while PRIMECLAW-45 remains active Done; canonical source and pre-activation artifact state are verified.
 - [x] #2 The supported build and compiled smoke produce a version-1.55.3 artifact from exact unmodified upstream 0cf4fdbc70020327f4366a29d3f405f83d180301, with exact source/toolchain/artifact identities and preserved fallback evidence.
 - [x] #3 Installed global guidance and known managed-project workflows are inventoried for removed commands, lifecycle/storage semantics, complete identity-set reads, and unattended input; the supported upgrade boundary, safe selected-project reconciliation, preserved customizations/snapshots, and exact deferred owner/operator actions are documented.
 - [x] #4 Plain Backlog projects are not presumed to need data conversion; supported non-mutating doctor evidence or exact inspection limits are reported per affected project, with no doctor --fix, provider switch, silent cross-project mutation, or destructive history repair.
-- [ ] #5 Accepted merged source is installed through supported canonical-primary user-global/artifact paths, preserving unrelated global state and all old-generation live resources; no candidate host install or second daemon is used.
-- [ ] #6 One safely coordinated full restart is followed by successful resumed-owner, applicable exact-Episode, and designated ordinary-session live UAT that proves the actual installed Backlog version/plugin generation and representative native workflow/history behavior; installation or a fresh probe alone is not cutover proof.
-- [ ] #7 The Backlog.md Expert receives exact activation/UAT and project-impact evidence before it decides to advance its separate latest-stable pointer; failures, unresolved customizations, required operator actions, and acceptance limits remain explicit.
+- [x] #5 Accepted merged source is installed through supported canonical-primary user-global/artifact paths, preserving unrelated global state and all old-generation live resources; no candidate host install or second daemon is used.
+- [x] #6 One safely coordinated full restart is followed by successful resumed-owner, applicable exact-Episode, and designated ordinary-session live UAT that proves the actual installed Backlog version/plugin generation and representative native workflow/history behavior; installation or a fresh probe alone is not cutover proof.
+- [x] #7 The Backlog.md Expert receives exact activation/UAT and project-impact evidence before it decides to advance its separate latest-stable pointer; failures, unresolved customizations, required operator actions, and acceptance limits remain explicit.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,9 +105,11 @@ PRIMECLAW-45 stays merged/Done. Use its accepted source and unchanged compatibil
 
 8. **Complete the candidate and report.** After successful cutover/UAT, the same Episode finishes only the narrow tracked rollout docs/evidence, replacing pre-activation statements with verified facts, updates native implementation notes/summary, and commits/pushes its candidate. Report source/toolchain/build/artifact/install identities, project/doctor inventory and owner actions, restart coordination, all three live-UAT contexts, retained failures and acceptance limits. Then use independent review, normal exact-candidate operator merge, native Ready/Done publication and supported cleanup only for the complete accepted task; keep it active Done unless archive is separately requested. Send the Backlog.md Expert the published planned revision, progress/blockers and final published activation/UAT evidence. Only the Expert advances its own latest-stable pointer.
 
-## Resolved content decision and remaining cutover boundary
+## Resolved content decision and current boundary
 
-Joe selected the widened installed recovery policy as a critical bug fix to commit into source. Historical installed SHA-256 is `986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776`; the narrower source/recorded-installed SHA-256 was `95c6c20494db03775e12c4edee829a88fe8c4a0a3c40c8b19d7669b7b0454a92`. Reread actual bytes and incorporate compatible current changes; these hashes are provenance, not frozen approval gates. The former operator content-choice blocker is cleared. Source implementation may proceed under the existing conditional authority plus this explicit correction; global installation remains blocked until the critical source fix is reviewed and accepted on canonical main. No build/install/restart/live UAT has yet run. Missing release tag and isolated Bun remain bounded preparation work, not permission to weaken checks or upgrade global tooling.
+Joe selected the widened installed recovery policy as a critical source fix. The accepted installed SHA-256 is `986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776`; the older narrow source was `95c6c20494db03775e12c4edee829a88fe8c4a0a3c40c8b19d7669b7b0454a92`. The prerequisite source fix, exact off-global build, consumer inventory, owner installation and three-context live UAT are complete within the recorded limits. The subsequent daemon interruption is separate from the successful cutover. The latest-stable decision was made separately by the Backlog.md Expert after receipt of the evidence.
+
+The Episode has published the step 8 documentation candidate. Next is independent review and the normal owner/operator integration decision for the exact candidate; prior rollout authority does not authorize that merge. Keep the task and Episode active until owner-controlled lifecycle publication and supported cleanup. Do not repeat deployment or mutate the deferred snapshots.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -138,6 +142,10 @@ Steps 4–5 complete as bounded preparation; not activation. Published docs-only
 Owner reviewed steps 4–5 and accepted actual host cutover and all three live UAT contexts (steps 6–7); hold cleared. PATH Backlog 1.55.3 (Mach-O arm64, 0755, SHA-256 169976d4a37230e4e650cac3dfa15a03436809fc97dfb7551354e63a9808c586) is installed; primary dist remains the separate 1.53.0 fallback, and both rollback copies are intact. Accepted plugin source 30bd6c53a349113944bda48a69f8a0f2c5963bb5 passed Docker Tier 1 run 20261121T225811Z-75113-41d80e86 and canonical user-global apply/check. Selected reconcile on main 5af4e912a6641eac13c11522817dfc471b2ed5a0 updated managed conversation-after-handoff and recovered metadata only, with nine customizations and all snapshots preserved and the native root alias pointing to the same config. One coordinated actual cutover restart (65235 → 88168) preceded passed resumed-owner, exact retained Episode and ordinary GStack UAT; this is distinct from earlier plugin-only UAT. Installed CLI/browser/MCP and a disposable lifecycle fixture passed; retain the input refusals separately. Private receipts: owner primeclaw64-plugin-install-20261121T215149Z/actual-backlog155-cutover (installation-evidence.json, post-restart-uat-owner.json, installed-binary-smoke.log, installed-lifecycle-fixture-results.json). No claim of public registry hash/count, dispatch/recovery proof, or all-project health. Paired remote, preserved snapshots’ new interruption route, TASK2 name collision, and frozen Beads PVA are excluded.
 
 Next accepted slice: step 8 only in this exact Episode. Update narrow tracked rollout docs with dated verified outcomes, fallback and limits; update native criteria/notes and candidate Final Summary truthfully after verifying evidence, and publish/report candidate for independent review. Backlog.md Expert evidence message was queued; verify actual receipt before criterion #7 and do not claim/advance its pointer. Keep In Progress and preserve resources. No repeat install/reconcile/restart/UAT, source changes, integration, lifecycle transition or cleanup.
+
+Step 8 candidate published at 4aae0f5076e5040b08d1972faad4771d0a063ed3 (three rollout documentation files only; six local rollout links and git diff --check passed). Criterion 1: separate native authority and initial pre-activation artifact/source evidence are preserved; native PRIMECLAW-45 read still shows active Done. Criteria 5–6: verified owner installation/reconciliation receipts for 30bd6c53a349113944bda48a69f8a0f2c5963bb5 and 5af4e912a6641eac13c11522817dfc471b2ed5a0, and post-restart daemon 88168 with three live contexts passed. Both 1.53.0 rollback-copy digests rechecked against their own originals. No repeat UAT or shared changes in step 8. Later daemon 511 likewise distinct; past execute start remains unknown.
+
+Criterion 7: owning Conversation forwarded actual substantive Backlog.md Expert receipt/review of the installed artifact, accepted source, complete three-context UAT, installed smoke and fixture, rollback and project impact evidence, with one safe doctor check and 13 inspection limits, PVA freeze and explicit registry/dispatch/recovery limits. The earlier queued note's receipt remains unknown. After its independent review the Expert alone reported fast-forward of its local latest-stable from fd20f71493fb4eda44b021aa89f257956f17fb71 to 0cf4fdbc70020327f4366a29d3f405f83d180301, with no remote ref moved; the Episode did not change the pointer. Owner retains receipt privately. Any newer release is outside PRIMECLAW-64. Candidate awaits exact independent review and owner/operator integration, not final merge or cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -155,3 +163,11 @@ Accepted scope is ONLY existing step8: finish narrow verified rollout docs/evide
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The selected macOS host activated Backlog.md 1.55.3 on 2026-11-21 UTC from unmodified upstream 0cf4fdbc70020327f4366a29d3f405f83d180301. The reviewed PATH binary, approved plugin delivery, one selected-project reconciliation, coordinated restart, and all three live UAT contexts were verified; the installed binary smoke and disposable native lifecycle fixture passed. Both distinct 1.53.0 fallbacks, nine customizations and all Episode snapshots were preserved. Inventory found one safe native doctor pass and 13 explicit inspection limits; paired remote, frozen Beads PVA and the newer recovery route in preserved snapshots were excluded. Public registry and dispatch/recovery proof are not claimed. The Backlog.md Expert received and reviewed the evidence and separately advanced only its local latest-stable pointer.
+
+The rollout documentation candidate is published for independent review. PRIMECLAW-64 remains In Progress; final integration, lifecycle transition and cleanup have not occurred.
+<!-- SECTION:FINAL_SUMMARY:END -->
