@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: In Progress
 assignee: []
 created_date: '2026-11-21 20:38'
-updated_date: '2026-11-21 22:15'
+updated_date: '2026-11-21 22:18'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -16,16 +16,7 @@ documentation:
   - docs/project-initialization.md
   - docs/evidence/primeclaw45-integrated-compatibility-20261115.md
 modified_files:
-  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
-  - src/prime-agent-plugin/skills/handoff/SKILL.md
-  - src/prime-agent-plugin/workflows/handoff.md
-  - src/prime-agent-plugin/skills/project-templates/blocked.md
-  - src/prime-agent-plugin/skills/project-templates/execute.md
-  - docs/handoff-chain.md
-  - docs/conversation-driven-episode-oversight.md
-  - docs/user-stories/H-handoff-and-continuation.md
-  - REQUIREMENTS.md
-  - tests/test_oversee_episode_skill.py
+  - docs/evidence/primeclaw64-off-global-build-20261121.md
 priority: p1
 type: task
 ordinal: 149000
@@ -120,4 +111,6 @@ Step 1 accepted (prerequisite only). The owner confirmed operator acceptance of 
 Next accepted scope: native plan steps 2–3 only, on the same retained Episode. Reread and preserve both actual distinct 1.53.0 binaries (canonical primary dist and installed user binary) with verified bytes/modes in durable out-of-worktree rollback storage and report the paths before any dist overwrite. Build and smoke exact unmodified v1.55.3 in the Episode only, using the verified release tag and command-local checksum-verified Bun 1.4.4, isolated cache and cleared build overrides. Keep primary/global and live snapshot resources untouched; record source/toolchain/artifact identity, raw failures separately, and report the nonterminal checkpoint for owner review. Inventory and deployment are not this slice.
 
 Step 2 fallback checkpoint (before any dist overwrite): verified the two real Mach-O arm64 Backlog 1.53.0 executables and their durable copies by native --version, SHA-256, byte count and mode. /Users/jlanders/code/prime-claw/deps/backlog/dist/backlog → /Users/jlanders/.prime/agent/session-artifacts/01a20001-5a66-75c9-9899-a9f743e43903/primeclaw64-off-global-20261121T221527Z/rollback/backlog-1.53.0-primary-dist (96044ce2319e84112b9490257f2b8a47a4458754a3c48472fb17452e511ffa00, mode 0755); /Users/jlanders/.local/bin/backlog → /Users/jlanders/.prime/agent/session-artifacts/01a20001-5a66-75c9-9899-a9f743e43903/primeclaw64-off-global-20261121T221527Z/rollback/backlog-1.53.0-user-installed (0da86f0edf37e11955e600da94754add2ea75718a47dcd7ea7c2420aa7de8511, mode 0755). Owner notified with exact paths before build. Primary main observed at 3f5fd0729db6918b6d2ac7a65d4892bd3cb9004c; it and Episode code 4601f334e32cdf17c812ad9adaed5f0eabaca63c both record gitlink 0cf4fdbc70020327f4366a29d3f405f83d180301. The Episode submodule directory is initially empty; prepare an independent checkout there so the canonical submodule repository and global runtime remain untouched.
+
+Steps 2–3 executed off-global. The pinned and clean Episode source `0cf4fdbc70020327f4366a29d3f405f83d180301` matched its gitlink and the only fetched upstream tag `v1.55.3`; origin matched `.gitmodules` (`https://github.com/MrLesk/Backlog.md.git`). Darwin arm64/macOS 26.7.3 build 25G342, official pinned Bun 1.4.4+38afee6c8 (archive SHA-256 c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510), command-local PATH/cache/temp, all four specified build overrides unset. `scripts/build-backlog.sh` exited 0 with frozen install and upstream compiled smoke passed; no failed build attempt. Artifact `/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-64-episode-8608a32d/deps/backlog/dist/backlog` reports 1.55.3, Mach-O arm64, 106150754 bytes, mode 0755, SHA-256 169976d4a37230e4e650cac3dfa15a03436809fc97dfb7551354e63a9808c586. Exact commands, raw build log, exit receipt, and manifest (SHA-256 c87964b18a7e500dbabde8003e425fc2afd20a1b8a013627c408139f9529f382) retained in `/Users/jlanders/.prime/agent/session-artifacts/01a20001-5a66-75c9-9899-a9f743e43903/primeclaw64-off-global-20261121T221527Z`; tracked evidence: `docs/evidence/primeclaw64-off-global-build-20261121.md`. The original and preserved fallback hashes/modes still match. User-global Backlog remains 1.53.0, general Bun/Node unchanged. No activation, inventory, reconciliation, new restart, or terminal decision. Stop for the owner to review this slice before the next native plan step.
 <!-- SECTION:NOTES:END -->
