@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: In Progress
 assignee: []
 created_date: '2026-11-21 20:38'
-updated_date: '2026-11-21 21:26'
+updated_date: '2026-11-21 21:29'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -92,3 +92,9 @@ PRIMECLAW-45 stays merged/Done. Use its accepted source and unchanged compatibil
 
 Joe selected the widened installed recovery policy as a critical bug fix to commit into source. Historical installed SHA-256 is `986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776`; the narrower source/recorded-installed SHA-256 was `95c6c20494db03775e12c4edee829a88fe8c4a0a3c40c8b19d7669b7b0454a92`. Reread actual bytes and incorporate compatible current changes; these hashes are provenance, not frozen approval gates. The former operator content-choice blocker is cleared. Source implementation may proceed under the existing conditional authority plus this explicit correction; global installation remains blocked until the critical source fix is reviewed and accepted on canonical main. No build/install/restart/live UAT has yet run. Missing release tag and isolated Bun remain bounded preparation work, not permission to weaken checks or upgrade global tooling.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Step 1 source audit: installed global-oversee-episode SHA-256 986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776 and Episode source SHA-256 95c6c20494db03775e12c4edee829a88fe8c4a0a3c40c8b19d7669b7b0454a92 exactly match the recorded operator-selected correction. The installed delta adds the verified pre-work runtime interruption path and retains informed owner authorization, same-resource binding, and delivery/effect safeguards. Source guidance still assumes completed handoff in several copies. This slice will align canonical delivery guidance and docs without changing mechanics or reconciling any installed/project snapshot. Global rollout stays pending.
+<!-- SECTION:NOTES:END -->
