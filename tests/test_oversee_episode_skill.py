@@ -363,11 +363,17 @@ def test_task_native_terminal_policy_is_editable_while_exact_cleanup_mechanics_r
     assert "uncommitted-task-content" in cleanup
 
 
-def test_completed_handoff_continuation_is_new_owner_authority_not_replay():
+def test_execute_only_continuation_is_new_owner_authority_not_replay():
     guide = " ".join(GUIDE.read_text().split())
-    policy = guide.split("### New execute-only continuation after completed handoff", 1)[1].split("Only the owning Conversation publishes accepted blockers", 1)[0]
+    policy = guide.split("### New execute-only continuation after a verified runtime interruption", 1)[1].split("Only the owning Conversation publishes accepted blockers", 1)[0]
     for phrase in (
-        "demonstrably received and completed",
+        "The original canonical handoff demonstrably completed; the following execute failed or remains historically unproved.",
+        "Both canonical prompts demonstrably reached the exact Episode, but a verified model/runtime failure stopped both before task work.",
+        "Reconcile native history, code and observed effects",
+        "neither task steering nor replay",
+        "Do not use this path for uncertain delivery or possible unaccounted task effects.",
+        "Idle or an empty queue alone does not qualify.",
+        "Brief the operator: actual handoff completion or the proven pre-work interruption;",
         "unknown historical execute admission",
         "receiver report plus fresh native idle/empty-queue facts",
         "without historical sender IDs, ACKs or callback proof",
@@ -391,3 +397,9 @@ def test_completed_handoff_continuation_is_new_owner_authority_not_replay():
     assert "Do not send execute from this handoff turn" in handoff
     assert "current durable progress, not a stale task or comment snapshot" in execute
     assert "Blocker clearance alone does not authorize that new send" in blocked
+    # Delivery copies must route the verified interruption to the same owner
+    # decision rather than reimpose the old completed-handoff-only gate.
+    entry = " ".join((REPO / "src/prime-agent-plugin/skills/handoff/SKILL.md").read_text().split())
+    for copy in (entry, handoff, execute, blocked):
+        assert "verified pre-work runtime interruption" in copy
+        assert "prime-claw-oversee-episode" in copy
