@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 17:40'
+updated_date: '2026-11-21 17:48'
 labels: []
 dependencies: []
 references:
@@ -20,6 +20,7 @@ documentation:
   - docs/project-initialization.md
   - docs/evidence/primeclaw-59-current-integration-20261121.md
   - docs/evidence/primeclaw-59-config-preservation-20261121.md
+  - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -38,6 +39,7 @@ modified_files:
   - docs/evidence/primeclaw-59-current-integration-20261121.md
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
   - docs/evidence/primeclaw-59-config-preservation-20261121.md
+  - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -192,6 +194,12 @@ Candidate code5e88a37ce5980c1c2ce0a5490704b7dceb6be3fb/native4f4539c5dde1175124e
 Implement only a migration-specific guard when an ACTUAL source issue maps to Done. Resolve its first canonical spelling exactly as authoring/current projection; require that spelling to meet the pinned native terminal comparison. Otherwise stop truthfully for placement resolution before supported-list early return, additive writes, task allocation or source retirement. Apply the same check to the exact owned native startup list for unsupported forms and receipt/import replay before reuse can authorize cutover. Never reorder statuses, replace the custom terminal/default, remap closed issues, normalize configuration, edit Beads/upstream or impose universal Done-last when Done is only receipt bookkeeping. Preserve existing no-repair/replay and uncertain-write behavior.
 
 Add disposable Docker closed-C/open-dependent-D refusal regressions: complete nonterminal-Done list unchanged; missing-active variant refuses before list edits; owned-native unsupported-form/replay path and no-source-Done control. Keep bytes/modes/originals/history/publication/continuity/current-content guards intact. Retain honest old-candidate red snapshots and exact green final inputs. Required Docker tier1 on final plugin bytes plus focused/shared regressions. Publish coherent task progress promptly, code separately, then STOP after this ONE tested documented pushed repair for independent owner review. Keep In Progress, 0/9 AC and null Final Summary. All parked work and no-live/merge/activation/resources/cleanup restrictions stand.
+
+## Completion repair — implemented, final-source validation pending (2026-11-21)
+### Completion repair — genuine forward red captured; minimal guard now under final-source validation
+Final old-candidate run20261121T173943Z-19658-09a6e38f:1PASS7FAIL/8native,1pytestFAIL13deselected339.81s. All four actual forward cases reached the fixture retirement callback once after9nativePOST/PUT writes and1startupconfigread; missing-active config also changed. Fixture threw to retain source: NO actual deletion claimed. Receipt-onlyDone controlPASS. Both replay reds still stopped existing later nativefield/digestguards with0callbacks; not unsafe replay proof. First two setup/readback runs retained honestly.45artifacthashes/3runs matched/offline/bothteardownclean/upstreaminventoryunchanged. Native dependency assertion now uses accepted pinned dependency key shapes; fixtures are independent C/D rather than redundant hierarchy edges.
+Applied ONLY16pluginlines: one actual-sourceDone-conditioned guard + three callsites. Resolve first canonical spelling exactly as authoring, then compare with last configured status using native trim+lowercase, NOT internal-whitespace removal. Supported lists check before missing/no-missing or writes; forward unsupported/existingimport reuse and freshdirtylayout replay check ONE owned native startup JSON before allocation/reuse. Receipt-onlyDone is not universal terminal placement. No reordering/remapping/default/terminal/configrepair, additional process/API/journal/upstream or scope/lifecycle changes.
+Focused completion Docker, final full/shared native suites and required final-source tier1probe started on green-input-hashes.json; static contracts2PASS0.02s. Docs/evidence/primeclaw-59-completion-status-repair-20261121.md records exact snapshots/limits and pending final results; no green/publication/acceptance claim. Publish native/code separately after verified final evidence, STOP for independent ownerreview. Keep InProgress/0of9AC/nullSummary and all no-live/cleanup/resources/merge/activation limits.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -388,4 +396,9 @@ Corrected only synthetic source setup to create independent C and D, add D->C, t
 Run20261121T173051Z-79644-97c4dfbd:8PASS7FAIL/15native,1pytestFAIL12deselected399.44s. All seven prior configuration checks and receipt-onlyDone control PASS. Four new prewrite cases stopped at a test assertion that accepted only depends_on_id; pinned native long dependency views also use id, already handled by accepted importer/test relationship logic. Corrected that test assertion to the same pinned supported dependency keys, without weakening the required C/D relationship.
 Both actual complete-receipt replay scenarios reached existing refusal: selected-existing native-readback-fields; fresh layout receipt destination-digest mismatch. Neither reached source deletion. These runs do NOT prove unsafe cutover or loss in a completed migration. The admitted repair remains the exact earlier explicit semantic check, before bounded status additions/no-missing return and against actual owned startup lists before allocation/reuse. No source/config/terminal remapping or universalDone-last policy.
 Added a narrow Docker completion-status bridge to avoid repeating seven unchanged configuration cases for old-candidate proof. Final focused old-candidate run is in progress; production still exact5e88 bytes; hashes in final-old-candidate-red-input-hashes.json, output final-old-candidate-red.log. Initial and corrected-source runs remain separate honest fixture/readback evidence; 30artifact hashes across both runs match/offline/bothteardownclean/upstreaminventoryunchanged. Task remains InProgress/all9ACunchecked/nullSummary; no repair result or acceptance claimed.
+
+### Completion repair — genuine forward red captured; minimal guard now under final-source validation
+Final old-candidate run20261121T173943Z-19658-09a6e38f:1PASS7FAIL/8native,1pytestFAIL13deselected339.81s. All four actual forward cases reached the fixture retirement callback once after9nativePOST/PUT writes and1startupconfigread; missing-active config also changed. Fixture threw to retain source: NO actual deletion claimed. Receipt-onlyDone controlPASS. Both replay reds still stopped existing later nativefield/digestguards with0callbacks; not unsafe replay proof. First two setup/readback runs retained honestly.45artifacthashes/3runs matched/offline/bothteardownclean/upstreaminventoryunchanged. Native dependency assertion now uses accepted pinned dependency key shapes; fixtures are independent C/D rather than redundant hierarchy edges.
+Applied ONLY16pluginlines: one actual-sourceDone-conditioned guard + three callsites. Resolve first canonical spelling exactly as authoring, then compare with last configured status using native trim+lowercase, NOT internal-whitespace removal. Supported lists check before missing/no-missing or writes; forward unsupported/existingimport reuse and freshdirtylayout replay check ONE owned native startup JSON before allocation/reuse. Receipt-onlyDone is not universal terminal placement. No reordering/remapping/default/terminal/configrepair, additional process/API/journal/upstream or scope/lifecycle changes.
+Focused completion Docker, final full/shared native suites and required final-source tier1probe started on green-input-hashes.json; static contracts2PASS0.02s. Docs/evidence/primeclaw-59-completion-status-repair-20261121.md records exact snapshots/limits and pending final results; no green/publication/acceptance claim. Publish native/code separately after verified final evidence, STOP for independent ownerreview. Keep InProgress/0of9AC/nullSummary and all no-live/cleanup/resources/merge/activation limits.
 <!-- SECTION:NOTES:END -->
