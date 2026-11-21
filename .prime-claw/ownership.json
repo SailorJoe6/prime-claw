@@ -1,6 +1,148 @@
 {
   "schemaVersion": 1,
   "owners": {
+    "01a1a289-106d-748e-b0a2-bde82cb7a63d": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "0b8e6ce6-61de-4284-a42e-fa4205cb3521",
+      "engine": "orca",
+      "ownerSessionId": "01a1a289-106d-748e-b0a2-bde82cb7a63d",
+      "taskId": "PRIMECLAW-54",
+      "taskPath": ".backlog/tasks/primeclaw-54 - Enable-operator-choice-and-judgment-based-implementation-placement.md",
+      "providerRevision": "acfb82971d27f7197d573f374ca275519fe07eda",
+      "taskEvidence": {
+        "schemaVersion": 1,
+        "kind": "task-view",
+        "task": {
+          "id": "PRIMECLAW-54",
+          "title": "Enable operator choice and judgment-based implementation placement",
+          "status": "In Progress",
+          "type": "feature",
+          "priority": "p1",
+          "project": null,
+          "assignees": [],
+          "reporter": null,
+          "labels": [],
+          "milestone": null,
+          "parentTaskId": null,
+          "acceptanceCriteriaCompleted": 0,
+          "acceptanceCriteriaCount": 9,
+          "references": [
+            "src/prime-agent-plugin/extensions/reviewed-plan.ts",
+            "src/prime-agent-plugin/skills/implement-task/SKILL.md",
+            "src/prime-agent-plugin/workflows/implement-task.md",
+            "src/prime-agent-plugin/workflows/plan-task.md",
+            "src/prime-agent-plugin/ROLE_KERNEL.md",
+            "src/prime-agent-plugin/skills/project-templates/execute.md"
+          ],
+          "modifiedFiles": [],
+          "ordinal": 139000,
+          "createdAt": "2026-11-03T02:59:00Z",
+          "updatedAt": "2026-11-21T22:10:00Z",
+          "dueDate": null,
+          "isReady": true,
+          "path": ".backlog/tasks/primeclaw-54 - Enable-operator-choice-and-judgment-based-implementation-placement.md",
+          "description": "## Outcome\nEnable operator choice between direct implementation in the current checkout and the existing isolated Episode workflow. Stop treating every task implementation request as a command to invoke implement_task or to enter formal planning. Joe explicitly approved the routing behavior below and requested implementation (\"make it so\"). This is separate from PRIMECLAW-52, which must remain untouched.\n\n## Agreed routing behavior\nAn explicit operator placement choice wins. \"Here\", \"in this checkout\", or \"on main\" means direct work in that checkout without implement_task, Episode allocation, or an Episode-only execute workflow. An explicit Episode request uses the existing implementation-readiness and isolated Episode lifecycle.\nWhen placement is unspecified, use semantic judgment: a task clearly already planned, evidenced by appropriate native ticket status and a meaningful plan/design, defaults to an Episode; an obvious quick bug fix or easy small unplanned change defaults to direct implementation; a substantial task still in design that would benefit from formal planning requires one focused operator question before starting that workflow. Ambiguous or conflicting evidence also calls for a focused question, not an always-ask rule. In Design alone must not block a clearly small authorized direct change. Do not implement a rigid size/status classifier.\n\n## Direct task lifecycle (operator decisions from grill-me)\nBefore editing implementation files for any authorized direct tracked change, including a quick fix, publish the exact task's native `In Progress` state. First verify the selected task, placement, and absence of a same-task active Episode. After required checks pass and the approved change is committed and pushed (or committed locally in a project with no remote), publish the task as `Done` without a separate approval solely for status. Honor any explicit review hold; this does not grant merge, deployment, or activation authority.\n\n## Scope\nUpdate plugin-injected routing guidance, managed entry skills, relevant project workflow/template guidance, and role wording so these paths agree. Preserve explicit placement through any requested planning and conditional implementation continuation; do not force \"plan then implement here\" into an Episode. Scope owner-Conversation implementation prohibitions and Episode identity/plan checks to managed Episode work, rather than all ordinary implementation. Direct execution uses ordinary supported native task CLI, tests, and Git operations; it creates no Episode resources or ownership record and does not borrow another role's authority. Keep this task-native; do not redesign retained version-1 specification lifecycle.\n\n## Constraints and non-goals\nKeep operator scope/implementation authority, exact task identity, provider-native task publication, existing Git/test safety, credential isolation, and all existing Episode ownership/terminal safeguards. Do not allow direct work to conflict with an active Episode bound to the same task or modify another owner's state; surface that conflict rather than adopting or bypassing it. Preserve EXPERT read-only boundaries. No new public tool, routing service, persisted mode state, ownership format, approval receipt, classifier framework, Prime Agent upstream change, or unrelated cleanup. Do not silently select another task. This implementation authorizes source changes and isolated candidate validation, not merge, user-global activation, restart, live migration, or cleanup of unrelated resources.\n\n## Validation\nAdd proportional regression coverage for explicit direct/Episode choice, judgment-based defaults, substantial-unplanned/ambiguous ask-first cases, and placement surviving plan-then-implement. Show that direct instructions do not invoke Episode tools or require Episode identity/formal plan evidence, while existing Episode admission and ownership protections remain intact. Use Docker-only candidate validation and mandatory Tier 1 --probe after plugin source changes. Do not use host/user-global candidate apply/check/probes.",
+          "dependencies": [],
+          "dependencyGraph": {
+            "root": "PRIMECLAW-54",
+            "nodes": [
+              {
+                "id": "PRIMECLAW-54",
+                "title": "Enable operator choice and judgment-based implementation placement",
+                "status": "In Progress",
+                "state": "resolved",
+                "completed": false,
+                "dependencyDepth": 0,
+                "dependentDepth": 0
+              }
+            ],
+            "edges": []
+          },
+          "readiness": {
+            "isReady": true,
+            "isBlocked": false,
+            "blockingDependencies": [],
+            "missingDependencies": []
+          },
+          "documentation": [],
+          "subtasks": [],
+          "acceptanceCriteria": [
+            {
+              "index": 1,
+              "text": "Explicit current-checkout/main implementation requests take the direct path without implement_task, Episode allocation/ownership, or a mandatory design/planning phase; explicit Episode requests retain the existing readiness and isolated lifecycle.",
+              "checked": false
+            },
+            {
+              "index": 2,
+              "text": "Without explicit placement, guidance uses judgment: appropriate native planned status plus meaningful plan/design defaults to an Episode; obvious small unplanned work defaults to direct implementation; substantial work still in design or unclear/conflicting evidence gets a focused operator question.",
+              "checked": false
+            },
+            {
+              "index": 3,
+              "text": "In Design alone does not prohibit a clearly small authorized direct change, and routing is neither always-ask nor a rigid programmatic size/status classifier.",
+              "checked": false
+            },
+            {
+              "index": 4,
+              "text": "Plugin-injected routing, managed skills, relevant workflows/templates, and role guidance consistently distinguish direct work from Episode-specific authority; EXPERT and active Episode ownership safeguards are preserved.",
+              "checked": false
+            },
+            {
+              "index": 5,
+              "text": "Explicit placement survives requested planning and authorized plan-then-implement continuation; planning-only instructions still do not authorize implementation.",
+              "checked": false
+            },
+            {
+              "index": 6,
+              "text": "Direct work uses supported provider-native task operations and existing Git/test safety without adding a public tool, persisted execution-mode/ownership format, approval receipt, or orchestration framework; active same-task Episode conflicts stop for operator resolution.",
+              "checked": false
+            },
+            {
+              "index": 7,
+              "text": "Focused regression coverage exercises direct, Episode, judgment defaults, ask-first, and plan-continuation paths; required Docker-only validation including Tier 1 --probe passes or reports a concrete blocker truthfully.",
+              "checked": false
+            },
+            {
+              "index": 8,
+              "text": "PRIMECLAW-52, retained version-1 lifecycle, Prime Agent upstream, user-global activation/restart, live migrations, and unrelated ownership/resources remain outside this change.",
+              "checked": false
+            },
+            {
+              "index": 9,
+              "text": "For direct tracked work, publish native In Progress before implementation edits, even for a quick fix; publish Done after required checks and commit/publication are proven, without a separate closure approval unless the operator explicitly asked to stop for review. Existing merge, deployment, and activation authority remains unchanged.",
+              "checked": false
+            }
+          ],
+          "definitionOfDone": [],
+          "implementationPlan": "1. Update injected task-implementation routing and the managed entry guidance to honor explicit placement and Joe's judgment-based planned/small-unplanned/substantial-design defaults. Keep Episode tool admission scoped to Episode requests or the planned-work default, and retain ambiguity and same-task active-Episode safeguards.\n2. Align the relevant role, task execution, planning-continuation, and project-template instructions. Add a lightweight ordinary direct-task execution path with supported native task updates and existing Git/test safety, no Episode identity or mandatory formal plan requirement, and no new runtime tool/state/protocol. Preserve existing Episode and retained version-1 behavior.\n3. Add proportional routing/guidance regression cases for both explicit modes, judgment defaults, ask-first situations, and preserved placement after planning. Run the required Docker-only plugin validation, including Tier 1 --probe; update directly affected user-facing docs and report truthful results. Do not deploy user-globally or merge.",
+          "implementationNotes": null,
+          "comments": [],
+          "finalSummary": null
+        }
+      },
+      "baseRef": "ac02ff1dd4033e3e30015d8876f483e4afc520d3",
+      "createdAt": "2026-11-21T22:10:14.536Z",
+      "updatedAt": "2026-11-21T22:10:36.364Z",
+      "integrationBranch": "main",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-54-episode-0b8e6ce6",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-54-episode-0b8e6ce6",
+      "worktreeIdentity": "wt2:local:250af0d9-5de9-4eb2-b6c1-1225a963081c",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-54-episode-0b8e6ce6",
+      "branch": "JLanders/prime-claw-primeclaw-54-episode-0b8e6ce6",
+      "head": "ac02ff1dd4033e3e30015d8876f483e4afc520d3",
+      "launchAutomationName": "prime-claw-launch-0b8e6ce6-61de-4284-a42e-fa4205cb3521",
+      "episodeId": "01a20029-3f0d-7730-bfb1-ae9410dc26fb",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a20029-3f0d-7730-bfb1-ae9410dc26fb.jsonl",
+      "episodeActiveSessionId": "35708cf9fb6b",
+      "terminalHandle": "term_bd3d799e-3329-4f99-b3d0-db350b8eae13",
+      "terminalHandles": [
+        "term_bd3d799e-3329-4f99-b3d0-db350b8eae13",
+        "term_f090ffc8-9279-470b-802f-f6e417a7d995"
+      ]
+    },
     "01a1a90b-0fba-7778-b1e5-0087bdaf8fec": {
       "version": 2,
       "provider": "backlog",
