@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: In Progress
 assignee: []
 created_date: '2026-11-21 20:38'
-updated_date: '2026-11-21 22:13'
+updated_date: '2026-11-21 22:15'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -118,4 +118,6 @@ Next: independent source review and operator-controlled nonterminal source accep
 Step 1 accepted (prerequisite only). The owner confirmed operator acceptance of Episode source 4601f334e32cdf17c812ad9adaed5f0eabaca63c, merged as canonical main cd940e13ea80dacdfe0467eb4d327c247832aa0b, user-global plugin apply/check with zero conflicts and default drift preservation, then one full restart (daemon 47407 → 59626). The resumed owning Conversation, exact Episode, and designated GStack ordinary session passed bounded read-only consumer UAT. The owner retained the evidence as primeclaw64-plugin-install-20261121T215149Z/post-restart-owner-evidence.json. Both recovery paths and safeguards were read from the installed skill; this is not dispatch or historical-case recovery proof, nor Backlog 1.55.3 activation proof. The maintenance hold is cleared. Backlog remains 1.53.0; no lifecycle or rollout acceptance criteria advanced on this evidence.
 
 Next accepted scope: native plan steps 2–3 only, on the same retained Episode. Reread and preserve both actual distinct 1.53.0 binaries (canonical primary dist and installed user binary) with verified bytes/modes in durable out-of-worktree rollback storage and report the paths before any dist overwrite. Build and smoke exact unmodified v1.55.3 in the Episode only, using the verified release tag and command-local checksum-verified Bun 1.4.4, isolated cache and cleared build overrides. Keep primary/global and live snapshot resources untouched; record source/toolchain/artifact identity, raw failures separately, and report the nonterminal checkpoint for owner review. Inventory and deployment are not this slice.
+
+Step 2 fallback checkpoint (before any dist overwrite): verified the two real Mach-O arm64 Backlog 1.53.0 executables and their durable copies by native --version, SHA-256, byte count and mode. /Users/jlanders/code/prime-claw/deps/backlog/dist/backlog → /Users/jlanders/.prime/agent/session-artifacts/01a20001-5a66-75c9-9899-a9f743e43903/primeclaw64-off-global-20261121T221527Z/rollback/backlog-1.53.0-primary-dist (96044ce2319e84112b9490257f2b8a47a4458754a3c48472fb17452e511ffa00, mode 0755); /Users/jlanders/.local/bin/backlog → /Users/jlanders/.prime/agent/session-artifacts/01a20001-5a66-75c9-9899-a9f743e43903/primeclaw64-off-global-20261121T221527Z/rollback/backlog-1.53.0-user-installed (0da86f0edf37e11955e600da94754add2ea75718a47dcd7ea7c2420aa7de8511, mode 0755). Owner notified with exact paths before build. Primary main observed at 3f5fd0729db6918b6d2ac7a65d4892bd3cb9004c; it and Episode code 4601f334e32cdf17c812ad9adaed5f0eabaca63c both record gitlink 0cf4fdbc70020327f4366a29d3f405f83d180301. The Episode submodule directory is initially empty; prepare an independent checkout there so the canonical submodule repository and global runtime remain untouched.
 <!-- SECTION:NOTES:END -->
