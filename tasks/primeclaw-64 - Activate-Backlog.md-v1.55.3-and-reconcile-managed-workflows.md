@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-64
 title: Activate Backlog.md v1.55.3 and reconcile managed workflows
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-21 20:38'
-updated_date: '2026-11-21 21:15'
+updated_date: '2026-11-21 21:26'
 labels: []
 dependencies:
   - PRIMECLAW-45
