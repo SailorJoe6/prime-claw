@@ -4,7 +4,7 @@ title: Enable operator choice and judgment-based implementation placement
 status: In Progress
 assignee: []
 created_date: '2026-11-03 02:59'
-updated_date: '2026-11-21 22:11'
+updated_date: '2026-11-21 22:19'
 labels: []
 dependencies: []
 references:
@@ -14,6 +14,32 @@ references:
   - src/prime-agent-plugin/workflows/plan-task.md
   - src/prime-agent-plugin/ROLE_KERNEL.md
   - src/prime-agent-plugin/skills/project-templates/execute.md
+documentation:
+  - docs/implementation-placement.md
+modified_files:
+  - docs/implementation-placement.md
+  - tests/test_implementation_placement.py
+  - .agents/skills/backlog/SKILL.md
+  - .agents/skills/execute/SKILL.md
+  - .prime-claw/templates.json
+  - .prime-claw/workflows/implement-task-prep.md
+  - .prime-claw/workflows/implement-task.md
+  - .prime-claw/workflows/plan-task-prep.md
+  - .prime-claw/workflows/plan-task.md
+  - AGENTS.md
+  - docs/README.md
+  - src/prime-agent-plugin/ROLE_KERNEL.md
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/implement-task/SKILL.md
+  - src/prime-agent-plugin/skills/plan/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/workflows/implement-task-prep.md
+  - src/prime-agent-plugin/workflows/implement-task.md
+  - src/prime-agent-plugin/workflows/plan-task-prep.md
+  - src/prime-agent-plugin/workflows/plan-task.md
+  - tests/reviewed_plan_extension.test.mjs
+  - tests/test_future_plan_skills.py
+  - tests/test_role_kernel.py
 priority: p1
 type: feature
 ordinal: 139000
@@ -44,15 +70,15 @@ Add proportional regression coverage for explicit direct/Episode choice, judgmen
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Explicit current-checkout/main implementation requests take the direct path without implement_task, Episode allocation/ownership, or a mandatory design/planning phase; explicit Episode requests retain the existing readiness and isolated lifecycle.
-- [ ] #2 Without explicit placement, guidance uses judgment: appropriate native planned status plus meaningful plan/design defaults to an Episode; obvious small unplanned work defaults to direct implementation; substantial work still in design or unclear/conflicting evidence gets a focused operator question.
-- [ ] #3 In Design alone does not prohibit a clearly small authorized direct change, and routing is neither always-ask nor a rigid programmatic size/status classifier.
-- [ ] #4 Plugin-injected routing, managed skills, relevant workflows/templates, and role guidance consistently distinguish direct work from Episode-specific authority; EXPERT and active Episode ownership safeguards are preserved.
-- [ ] #5 Explicit placement survives requested planning and authorized plan-then-implement continuation; planning-only instructions still do not authorize implementation.
-- [ ] #6 Direct work uses supported provider-native task operations and existing Git/test safety without adding a public tool, persisted execution-mode/ownership format, approval receipt, or orchestration framework; active same-task Episode conflicts stop for operator resolution.
-- [ ] #7 Focused regression coverage exercises direct, Episode, judgment defaults, ask-first, and plan-continuation paths; required Docker-only validation including Tier 1 --probe passes or reports a concrete blocker truthfully.
-- [ ] #8 PRIMECLAW-52, retained version-1 lifecycle, Prime Agent upstream, user-global activation/restart, live migrations, and unrelated ownership/resources remain outside this change.
-- [ ] #9 For direct tracked work, publish native In Progress before implementation edits, even for a quick fix; publish Done after required checks and commit/publication are proven, without a separate closure approval unless the operator explicitly asked to stop for review. Existing merge, deployment, and activation authority remains unchanged.
+- [x] #1 Explicit current-checkout/main implementation requests take the direct path without implement_task, Episode allocation/ownership, or a mandatory design/planning phase; explicit Episode requests retain the existing readiness and isolated lifecycle.
+- [x] #2 Without explicit placement, guidance uses judgment: appropriate native planned status plus meaningful plan/design defaults to an Episode; obvious small unplanned work defaults to direct implementation; substantial work still in design or unclear/conflicting evidence gets a focused operator question.
+- [x] #3 In Design alone does not prohibit a clearly small authorized direct change, and routing is neither always-ask nor a rigid programmatic size/status classifier.
+- [x] #4 Plugin-injected routing, managed skills, relevant workflows/templates, and role guidance consistently distinguish direct work from Episode-specific authority; EXPERT and active Episode ownership safeguards are preserved.
+- [x] #5 Explicit placement survives requested planning and authorized plan-then-implement continuation; planning-only instructions still do not authorize implementation.
+- [x] #6 Direct work uses supported provider-native task operations and existing Git/test safety without adding a public tool, persisted execution-mode/ownership format, approval receipt, or orchestration framework; active same-task Episode conflicts stop for operator resolution.
+- [x] #7 Focused regression coverage exercises direct, Episode, judgment defaults, ask-first, and plan-continuation paths; required Docker-only validation including Tier 1 --probe passes or reports a concrete blocker truthfully.
+- [x] #8 PRIMECLAW-52, retained version-1 lifecycle, Prime Agent upstream, user-global activation/restart, live migrations, and unrelated ownership/resources remain outside this change.
+- [x] #9 For direct tracked work, publish native In Progress before implementation edits, even for a quick fix; publish Done after required checks and commit/publication are proven, without a separate closure approval unless the operator explicitly asked to stop for review. Existing merge, deployment, and activation authority remains unchanged.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -67,4 +93,12 @@ Add proportional regression coverage for explicit direct/Episode choice, judgmen
 
 <!-- SECTION:NOTES:BEGIN -->
 Execution slice: implement prompt-led placement end to end (routing, ordinary direct lifecycle, and planning continuation), keep Episode admission unchanged, then validate the candidate with focused Docker regressions and Tier 1 --probe. No merge or activation.
+
+Implemented the placement-routing candidate in the Episode: injected entry guidance, explicit/native-evidence defaults, direct tracked lifecycle, and preserved placement through requested planning. Episode entry handler, allocation and ownership checks are unchanged. Docker Tier 1 --probe passed (run 20261121T221507Z-93469-a0235dbe). Offline Docker policy tests: 46 passed, 3 skipped, 2 deselected (archived-history test needs Git metadata; retained implement-spec manifest checksum mismatch is present in the base). Offline Node snapshot comparison on the Tier 1 runtime image: candidate 152/154; base ac02ff1dd4033e3e30015d8876f483e4afc520d3 151/153. The same two failures reproduced on both: stale handoff tool guidance expectation and the registered Beads continuation fixture. New routing test passed; no live LLM UAT, merge or activation. Repro: official Tier 1 source selector, then node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs tests/task_episode_ownership_extension.test.mjs tests/managed_session_protocol.test.mjs on identical read-only snapshot layouts with network disabled.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Candidate for owner review: honor explicit current-checkout or Episode placement and use judgment when unspecified; keep direct tracked status changes native and separate from owned Episode lifecycle. Carry placement through authorized planning continuation. Docker Tier 1 --probe passed; focused tests introduced no new failures in the matched base comparison. Live behavior still awaits separate review/UAT.
+<!-- SECTION:FINAL_SUMMARY:END -->
