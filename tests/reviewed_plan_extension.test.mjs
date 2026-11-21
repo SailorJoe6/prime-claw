@@ -181,6 +181,21 @@ test("plan_task steers prep, queues sole phase follow-up, and returns canonical 
   assert.match(result.content[0].text, /Planning admitted for PRIMECLAW-10\.38/);
 });
 
+test("implementation admission advertises isolated Episode routing, not direct work", () => {
+  const f = fixture();
+  const entry = f.tools.get("implement_task");
+  const guidance = entry.promptGuidelines.join("\n");
+  assert.match(entry.description, /isolated Episode/);
+  assert.match(guidance, /Explicit placement wins:.*'here'.*'on main'.*direct work.*without implement_task/);
+  assert.match(guidance, /explicit Episode request uses Episode readiness/);
+  assert.match(guidance, /native planning status plus meaningful plan\/design normally means Episode/);
+  assert.match(guidance, /small unplanned change normally means direct, even in In Design/);
+  assert.match(guidance, /substantial work still in design or unclear\/conflicting evidence, ask one focused question/);
+  assert.match(guidance, /Preserve explicit placement through requested planning/);
+  assert.match(guidance, /Planning alone never authorizes implementation/);
+  assert.deepEqual(f.sent, []);
+});
+
 test("task planning rejects a missing task without workflow admission", async () => {
   const missing = fixture(); const absent = await missing.tools.get("plan_task").execute("missing", { taskId: "missing" }, undefined, undefined, missing.ctx);
   assert.equal(absent.isError, true); assert.equal(missing.sent.length, 0); assert.match(absent.content[0].text, /plan_task requires one exact/);
@@ -614,11 +629,11 @@ test("retained planning keeps its existing semantic and conditional skill guidan
   assert.doesNotMatch(guidance, /never search for, select/);
 });
 
-test("task entry tool metadata is mechanical and has no duplicate prompt policy", () => {
+test("task entry schemas stay mechanical; only implementation has placement routing guidance", () => {
   const f = fixture();
   for (const name of ["plan_task", "implement_task", "create_task_episode"]) {
     const tool = f.tools.get(name);
-    assert.equal(tool.promptGuidelines, undefined, name);
+    if (name !== "implement_task") assert.equal(tool.promptGuidelines, undefined, name);
     const descriptions = [tool.description, tool.promptSnippet, ...Object.values(tool.parameters.properties).map(({ description }) => description)].join(" ");
     assert.doesNotMatch(descriptions, /In Design|In Planning|implementation-ready|readiness succeeds|approved by|operator authority|bounded delegation|terminal routing/i, name);
     assert.deepEqual(tool.parameters.required, ["taskId"]);

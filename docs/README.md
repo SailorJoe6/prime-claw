@@ -8,6 +8,11 @@
   validator inventories support that document; they are not competing product
   contracts. Existing implementation or test guards do not create requirements.
 
+## Implement a tracked task
+
+- [Implementation placement](implementation-placement.md) — how to request
+  direct work or an isolated Episode, and what happens after planning.
+
 ## Founding
 
 - [../VISION.md](../VISION.md) — the agent hierarchy, three-horizon context

@@ -3,6 +3,11 @@ name: implement-task
 description: Review one exact operator-approved provider-native task and create its isolated implementation Episode only when it is implementation-ready.
 ---
 
+This workflow is only for isolated Episode readiness; ordinary direct work uses
+the direct path in the `implement-task` skill. If the operator chose direct
+placement, stop this queued Episode workflow without allocation or Episode
+lifecycle changes and follow the authorized direct path.
+
 ## Preserve the launching session's LLM provider
 
 Every new Episode, subagent, reviewer, sibling session, or other new session

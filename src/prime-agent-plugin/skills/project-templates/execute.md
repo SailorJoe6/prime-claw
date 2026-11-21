@@ -6,6 +6,11 @@ description: Use for Ralph's execution phase in Backlog.md-tracked projects to i
 Run the `prepare` skill if it is not fresh in your context window. If the
 conversation was recently compacted, nothing is fresh.
 
+Ordinary direct task implementation follows the direct path in the managed
+`implement-task` skill, not this workflow. The checks below apply to managed
+Episodes and existing retained folder-plan execution; a direct request cannot
+bypass an owned same-task Episode or change the mode of a bound execute pass.
+
 ## Select the bound authority
 
 A managed Episode prompt normally carries `<operator-episode-owner-session>`.

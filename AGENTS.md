@@ -12,13 +12,14 @@ backlog task create "Short title" --status "In Design" --description "Outcome an
 ```
 
 Use `/skill:design` or `/skill:spec-it-out` for specification authoring. Ask the
-agent to plan or implement work; the `plan` and `implement-task` skills route to
-`plan_task` and `implement_task`. Planning alone does not authorize implementation.
-An explicit plan-then-implement instruction may continue within scope after
-readiness. Bounded delegated selection must bind an exact canonical task;
-implementation requires `In Planning` after design/planning, not `--ready` alone.
-The owning Conversation controls later lifecycle status; do not use a generic
-claim, completion, or archive edit to bypass it. Native `/skill:` invocation and
+agent to plan or implement work. The `plan` skill calls `plan_task`; the
+`implement-task` skill respects explicit direct or Episode placement and uses
+judgment only when placement is unspecified. Planning alone does not authorize
+implementation. An authorized plan-then-implement request retains its placement.
+Bounded delegated selection must bind an exact canonical task. Episode readiness
+requires `In Planning` and a meaningful plan, not `--ready` alone. For an owned
+Episode, the owning Conversation controls lifecycle status. Direct tracked work
+uses its own native `In Progress` and `Done` procedure in the entry skill. Native `/skill:` invocation and
 Prime Agent built-ins remain available; custom workflow commands are removed.
 
 ## What this repo is

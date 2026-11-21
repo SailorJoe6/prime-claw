@@ -614,7 +614,7 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
         "bd dolt push --no-adopt",
         "Incorporate compatible refinements",
         "does not authorize implementation",
-        "invoke `implement_task` for this exact ID",
+        "Episode path alone calls `implement_task`",
     ):
         assert fragment in plan
 
@@ -769,10 +769,9 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
 def test_task_implementation_entry_is_thin_global_guidance_with_skill_owned_authority() -> None:
     source = ROOT / "src/prime-agent-plugin"
     entry = " ".join((source / "skills/implement-task/SKILL.md").read_text().split())
+    direct, episode = entry.split("## Direct tracked implementation ", 1)[1].split("## Isolated Episode implementation ")
     for fragment in (
-        "name: implement-task",
         "implement_task(taskId, host?)",
-        "no custom slash command is a prerequisite",
         ".prime-claw/workflows/implement-task-prep.md",
         "do not demand a fresh approval solely because planning finished",
         "planning-only request does not authorize implementation",
@@ -788,8 +787,10 @@ def test_task_implementation_entry_is_thin_global_guidance_with_skill_owned_auth
         "Retained version-1 workflows, ownership, plans, and resources remain supported",
     ):
         assert fragment in entry
-    assert "backlog task edit" not in entry
-    assert "bd update" not in entry
+    assert "backlog task edit" not in episode
+    assert "bd update" not in episode
+    assert "backlog task edit" in direct
+    assert "bd update" in direct
     inventory = json.loads((source / "asset-inventory.json").read_text())
     row = next(asset for asset in inventory["assets"] if asset["id"] == "global-implement-task")
     assert row == {
@@ -998,9 +999,9 @@ def test_actual_planning_completion_honors_conditional_authority_without_a_seque
         assert "Wait for a separate explicit" not in text
         assert "command" not in completion
         if name == "plan-task":
-            assert "invoke `implement_task` for this exact ID" in completion
-            assert "native `In Planning` (Beads `in_planning`) after design and planning" in completion
-            assert "full semantic readiness review" in completion
+            assert "Episode path alone calls `implement_task`" in completion
+            assert "native `In Planning` (Beads `in_planning`)" in completion
+            assert "full semantic readiness" in completion
             assert "dependency readiness alone is insufficient" in completion
             assert "No separate phase-history receipt is required" in completion
         else:
