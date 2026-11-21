@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 04:17'
+updated_date: '2026-11-21 05:25'
 labels: []
 dependencies: []
 references:
@@ -17,6 +17,8 @@ documentation:
   - docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md
   - docs/evidence/primeclaw-59-owned-web-transport-20261121.md
   - docs/evidence/primeclaw-59-readable-current-projection-20261121.md
+  - docs/project-initialization.md
+  - docs/evidence/primeclaw-59-current-integration-20261121.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -32,6 +34,7 @@ modified_files:
   - src/prime-agent-plugin/extension-support/beads-backlog-current.ts
   - tests/beads_backlog_current.test.mjs
   - docs/evidence/primeclaw-59-readable-current-projection-20261121.md
+  - docs/evidence/primeclaw-59-current-integration-20261121.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -138,14 +141,14 @@ Use one migration-owned/lifetime native browser in the exact selected project/pr
 
 Publish native plan/progress promptly through this Episode's native content/history and code separately. Cover actual claimed forward/replay/current-content mapping/readback plus retained identity/drift/continuity/no-resend/native guards with meaningful large current data, required Docker tier1 after plugin changes and focused shared regressions. Preserve honest failures and evidence limits. Stop after ONE tested documented pushed bounded slice for independent owner review, reporting exact code/task heads/artifacts/remaining work/concrete blockers. Full ordinary cancellation/progress/coexistence/parked-config reconciliation/recovery/406-ticket acceptance remain later work, not conditions for an honest partial integration claim. Keep In Progress/all9ACunchecked/FinalSummarynull. All no-live-action/resources/merge/activation/provider-upstream-change/lifecycle-finalization restrictions stand.
 
-## Forward/replay current-content integration (started 2026-11-21)
-The canonical execute arrived during publication of task-only checkpoint b0b4564307ef7943596f4fd27e2cbc572ddb6e31. Continue that received request in the same Episode; no new handoff, execute resend, resources or assignment.
+## Forward/replay current-content integration — tested candidate (2026-11-21)
+Completed this ONE bounded integration increment of approved steps 1–2, based on accepted helper repair06555ad. The received canonical execute was not resent. Forward import and complete-receipt replay now use the accepted readable projection/native Web authoring/full selected-store CLI readback; encoded forward packages/chunks/repeated source context and archive verification were removed without relocation. Meaningful 2,610,950-byte UTF-8 metadata and exact values/tail, AC/assignees/configured priorities/types/status-close/mapped relationships, actual source comments/author-time, initial source references, small mapping/existing receipt and separate memories/index/USER remain. Initial source identity is recorded once in the existing receipt.
 
-Sized one integration increment of steps 1–2. Make the existing Beads-to-Backlog branch async and await the accepted owned-Web authoring; no worker is required for these calls. Keep synchronous source/Git/continuity operations unchanged and make no ordinary cancellation/responsiveness claim. Read configured priorities/types losslessly through the already-shipped native GET /api/config on that owned browser, not comma-split CLI output. Fresh complete-receipt replay may await the same owned read-only configuration access. Pin BACKLOG_CWD for migration-local synchronous Backlog calls and restore the prior environment immediately after each call.
+One owned browser serves async forward/replay and native GET /api/config. Configured comma-bearing names remain intact, including valid receipt/USER types. All migration Backlog commands pin/restore BACKLOG_CWD. Full current readback precedes reuse and publication; source references never certify incomplete content. Source comments resembling migration markers stay source comments. Owned transport closes before publication/cutover, including early replay failures. Uncertain writes/readback STOP with retained partial state/evidence and no resend, fallback allocation, completion/reconciliation/rollback/delete. Source drift/identity, original destination/config/history/placement, native archive, publication/receipt, active continuity and guarded cutover remain tested.
 
-Use accepted initial source/current references for mapping, not extra comments. Author parent-first with initially empty dependencies, then batch mapped dependencies and verify full final projections, including reused records and replay. Preserve native archive placement. Keep initial source identity once in the existing receipt, never export/native envelopes/catalog/memory archives. Retain separate memory documents/index/USER, baseline/originals, receipt/publication, source recapture/drift and ownership/cutover safeguards.
+Validation complete: final full migration71PASS0FAIL12retired-reverseSKIP/83nativeTAP;1pytestPASS11deselected1028.54s. Corrected-fixture focused8PASS/1pytestPASS11deselected277.99s. Shared helper20/Web10/history-workspace89/initialization88/activeBacklog12PASS (219 checks). Final required tier1 probePASS; static2PASS10skip0.04s. All112manifest hashes across7retainedruns match, alloffline/runtime+sourcebuilderteardownclean. Intermediate failures and their repairs remain recorded honestly in docs/evidence/primeclaw-59-current-integration-20261121.md. This is native check coverage, not290migrations or cancellation/scale proof.
 
-Update existing native success tests, meaningful 2,610,950-byte UTF-8 current metadata/tail, complete-receipt unchanged reuse and drift refusal, plus initial-write failure/no-next-task/no-duplicate behavior. Run existing Docker helper/integration/shared suites and required tier1; retain honest failures. Uncertain allocation/write/readback stops with partial state retained and no automatic resend/reconciliation/rollback/deletion. Full cancellation/progress/recovery/coexistence/parked-config/406-scale acceptance remains later. Publish one tested documented code increment separately from native task content, report exact evidence/limits, then stop for independent owner review. Native lifecycle and all nine unchecked AC/absent Final Summary stay unchanged.
+STOP after separate task/code publication for independent owner review. No owner/Expert acceptance of this integration is claimed. Full ordinary responsive-worker cancellation/progress, coexistence/parked-config reconciliation, explicitly authorized interrupted recovery and406-ticket scale acceptance remain later approved work; synchronous source/Git/continuity calls still block their caller. No live migration/retry/switch, private incident access, cleanup/merge/global activation/restart/provider-upstream changes/resources/execute resend/handoff/lifecycle finalization. Keep In Progress, all9ACunchecked and Final Summarynull.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -273,4 +276,13 @@ This handoff only records accepted partial review and bounded focus; it implemen
 
 ### Forward/replay integration started
 Read-only sizing audits completed. Selected the bounded async forward/replay integration recorded in the living plan, including existing native Web configuration read, initial-reference mapping, full current-content verification and retained guards. Implementation/testing has not yet completed; this is not acceptance or live authority. Code starts from accepted helper repair06555ad; all9AC unchecked, In Progress, Final Summary absent.
+
+### Tested forward/replay current-content integration candidate (2026-11-21)
+One bounded steps1–2 increment is complete for independent owner review, not full-task acceptance. Integrated accepted readable projection, actual native Web POST/PUT and complete CLI verification into forward and complete-receipt replay; removed encoded forward packages/chunks/repeated source context/archive verifier without relocation. Preserved meaningful2610950-byteUTF8metadata/tail/exact-once treatment, native current mappings, authored comments, initial source refs, small mapping/receipt and separate memories/index/USER. Existing receipt records initial source identity once. Native config JSON preserves comma-bearing choices and valid receipt/USER type; reference-bound marker-shaped source comments remain ordinary source prose. One owned browser, exact project/store and pinned/restored BACKLOG_CWD; early failures close owned transport. STOP/no-resend/no-next/no-duplicate/foreign-context guard proved through real native persistence plus controlled accepted-comment HTTP503 response, not actual lost response or ordinary cancellation proof.
+
+Final full: `python3.14 -m pytest tests/test_task_provider_migration.py -q -m container -k task_provider_migration_node_suite` ->1pytestPASS11deselected1028.54s,71TAPchecksPASS0FAIL12retired-reverseSKIP/83total; `.test-results/20261121T050501Z-78066-1e3c6741/tier1/manifest.json`. Focused: `python3.14 -m pytest tests/test_task_provider_migration.py -q -m container -k current_native_migration_integration_node_suite` ->1pytestPASS11deselected277.99s,8TAPchecksPASS; `.test-results/20261121T045940Z-57077-4ff6fae2/tier1/manifest.json`. Shared helper20/Web10/task-history89/initialization88/activeBacklog12PASS (219checks) in `.test-results/20261121T044322Z-94135-cdb067e8/tier1/manifest.json`. Final required `scripts/test-tier1.sh --probe` PASS `.test-results/20261121T044323Z-94227-658aec2e/tier1/manifest.json`; static2PASS10skip0.04s. All112manifestlistedhashes across7runs recomputed/matched; networkabsent/runtime+sourcebuilderteardownclean. Final five source/testhashes match final-input-hashes.json; production source unchanged after finalprobe. Manifests are tested precommit065dirty trees; docs finalized after tests.
+
+Honest intermediate results: initial1pytestFAIL2PASS909.49s,68TAPPASS2FAIL12skip (empty fixture Git commit; resource-advice regression); fixed by conditional fixturecommit and retained command/capture/resource STOP guidance. Next1pytestFAIL5PASS1019.44s,70TAPPASS1FAIL12skip (testfixture replaced Beads ignore); test-only append repair retains original ignore, correctedfocused+finalfull nowgreen. Configured-type bookkeeping and source-marker classification were also repaired from bounded read-only implementation feedback before the latestfull/probe. Evidence/commands/inputhashes/limits: docs/evidence/primeclaw-59-current-integration-20261121.md and docs/project-initialization.md.
+
+Code candidate publishes separately on the existing Episode branch; final owner report carries exact code and native task heads. No new resources/assignment/execute/handoff. Full ordinary cancellation/progress/recovery/coexistence/parked-config/406-scale acceptance remains later; current source/Git calls still synchronous. No live migration/retry/provider switch/private incident/cleanup/merge/host apply-check-activation-restart/PrimeAgentorBacklogsourcechange/finalization. InProgress/all9ACunchecked/FinalSummarynull. Stop for independent owner review after publication.
 <!-- SECTION:NOTES:END -->
