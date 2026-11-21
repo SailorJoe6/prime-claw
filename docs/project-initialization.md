@@ -567,7 +567,17 @@ Copy success, `/reload`, and a fresh probe alone do not establish cutover.
 
 ## Selected-project boundary for Backlog 1.55.3
 
-After separate operator approval, reconcile only the selected canonical
+On 2026-11-21 UTC the owner reconciled canonical prime-claw once, recorded in
+`5af4e912a6641eac13c11522817dfc471b2ed5a0`. The managed
+`conversation-after-handoff.md` was refreshed, one metadata entry was
+recovered, and nine customized assets and all Episode snapshots were
+preserved. The native `backlog.config.yml` alias points to the same
+`.backlog/config.yml`, not another store. The newer pre-work interruption
+route remains deferred for the preserved `blocked`, `execute`, and `handoff`
+copies. See the [rollout evidence](evidence/primeclaw64-rollout-preparation.md#verified-host-cutover-and-live-uat)
+for the restart and test limits. No repeated reconciliation is needed here.
+
+For a future separately authorized update, reconcile only the selected canonical
 prime-claw project via `initialize_prime_claw(action="reconcile")`. First
 identify the loaded initializer generation and read the current comparison and
 manifest evidence; copied code is not loaded code. If the loaded initializer is

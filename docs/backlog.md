@@ -1,9 +1,11 @@
 # Backlog.md dependency and build
 
 Prime Claw pins Backlog.md as the Git submodule at `deps/backlog`. The
-PRIMECLAW-45 implementation candidate uses the unmodified upstream release from
-`MrLesk/Backlog.md`. The accepted host artifact remains v1.53.0 until a separate
-reviewed cutover; a candidate source-pin update does not activate it.
+PRIMECLAW-45 integrated compatibility with the unmodified `MrLesk/Backlog.md`
+v1.55.3 release. PRIMECLAW-64 activated that release on the selected macOS
+host on 2026-11-21 UTC. Use `backlog` on PATH there (`~/.local/bin/backlog`),
+not the primary `deps/backlog/dist/backlog`, which remains a distinct v1.53.0
+fallback. A Git pin or build alone still does not activate a host.
 
 Ordinary continuation likewise uses editable handoff/execute/oversight policy,
 not status/design/code-clean/upstream/ancestry approval in code. Both prompts
@@ -65,14 +67,14 @@ selected `sessionId`; see the final section. Its disposable regression evidence
 does not prove live recovery or historical assignment delivery. Broader partial
 shapes and unavailable session routes remain explicit limits.
 
-## Current bounded candidate release
+## Pinned release
 
 - release: `v1.55.3`
 - exact release-tag and source commit: `0cf4fdbc70020327f4366a29d3f405f83d180301`
 - source: `https://github.com/MrLesk/Backlog.md`
 - Backlog build/smoke tool: Bun `1.4.4`
 
-The candidate is unmodified upstream. Do not replay the three v1.53.0 downstream
+The release is unmodified upstream. Do not replay the three v1.53.0 downstream
 restore/dependency patches. Builds require exact HEAD and exact release-tag
 resolution/ancestry; tracked source changes refuse before compilation. Image
 labels and runtime build stamps bind the same version and commit.
@@ -87,12 +89,10 @@ historical evidence in
 [`primeclaw44-integration-20261030.md`](evidence/primeclaw44-integration-20261030.md).
 They are not patches to port to this release.
 
-**Candidate boundary:** current guidance describes the approved v1.55.3
-lifecycle, not an accepted or activated integrated upgrade. Required integrated
-compatibility and validation work in PRIMECLAW-45 must finish before a separate
-operator-authorized cutover. The accepted v1.53.0 host remains authoritative;
-do not operate the candidate on live task history. Source/build results and
-limits are recorded in
+PRIMECLAW-45 compatibility evidence predates host activation. PRIMECLAW-64
+records the separate [host cutover and live UAT](evidence/primeclaw64-rollout-preparation.md#verified-host-cutover-and-live-uat).
+That activation is scoped to the selected host and tested contexts, not a
+fleet upgrade or a provider change. Earlier source/build results appear in
 [`primeclaw45-upstream-candidate-20261106.md`](evidence/primeclaw45-upstream-candidate-20261106.md).
 The bounded migration lifecycle adaptation, historical archived-draft CLI limit,
 and 2026-11-12 operator-directed adaptation are recorded in
@@ -102,9 +102,9 @@ identity/collision checks. Their unavailable native CLI view alone does not bloc
 migration. Active drafts and active/archived tasks still require native evidence;
 actual identity, integrity and transport failures still refuse. Do not relocate,
 promote, restore, discard or manufacture an active view of an archived draft.
-Those bounded results do not activate the candidate or replace required
-integrated validation. The remaining compatibility changes, preserved failed runs,
-fixture repairs and final validation receipts are tracked in
+The earlier bounded results did not themselves activate the host. The
+compatibility changes, preserved failed runs, fixture repairs and integrated
+validation receipts are tracked in
 [`primeclaw45-integrated-compatibility-20261115.md`](evidence/primeclaw45-integrated-compatibility-20261115.md).
 
 Clone this repository with `git clone --recurse-submodules`, or initialize an
@@ -127,9 +127,10 @@ compiled artifact does not require Bun at runtime.
 ### Owner-only v1.55.3 host cutover
 
 The [reviewed build](evidence/primeclaw64-off-global-build-20261121.md) and
-[consumer inventory](evidence/primeclaw64-rollout-preparation.md) are preparation,
-not activation. The earlier plugin-only maintenance and restart did not install
-Backlog 1.55.3 or run its live UAT.
+[consumer inventory](evidence/primeclaw64-rollout-preparation.md) preceded the
+verified 2026-11-21 UTC cutover. The earlier plugin-only restart was not
+Backlog activation. The procedure below is for a future separately authorized
+host cutover or recovery; it is not a request to repeat PRIMECLAW-64.
 
 1. The owner reviews the rollout evidence and confirms the accepted canonical
    primary `main`, task authority, source pin and actual installed generation.

@@ -1,10 +1,10 @@
-# PRIMECLAW-64 rollout preparation: steps 4–5
+# PRIMECLAW-64 Backlog 1.55.3 rollout evidence
 
-**Review only.** Primary dist and the user-installed executable still report
-1.53.0. The accepted recovery-policy plugin maintenance and its read-only
-post-restart consumer checks were separate from Backlog 1.55.3 activation.
-No installer, initializer, provider switch, repair, restart, or lifecycle
-change ran for this slice.
+**Selected host activated and verified on 2026-11-21 UTC.** PATH resolves to
+`~/.local/bin/backlog` at 1.55.3; primary dist remains the distinct 1.53.0
+fallback. This record includes the pre-cutover inventory and the later owner
+installation and live UAT. The earlier recovery-policy plugin maintenance and
+restart did not activate Backlog 1.55.3.
 
 ## Artifact and rollback
 
@@ -12,8 +12,9 @@ See the [reviewed off-global build](primeclaw64-off-global-build-20261121.md)
 for source/tag, toolchain, exact paths and log/manifest evidence. The check
 used the retained Episode’s `deps/backlog/dist/backlog`, 1.55.3, mode `0755`,
 SHA-256 `169976d4a37230e4e650cac3dfa15a03436809fc97dfb7551354e63a9808c586`.
-The two 1.53.0 originals are canonical primary `deps/backlog/dist/backlog`
-and `~/.local/bin/backlog`. Their verified copies are respectively
+The two pre-cutover 1.53.0 originals were canonical primary
+`deps/backlog/dist/backlog` and `~/.local/bin/backlog`. The latter now holds
+1.55.3. The verified 1.53.0 copies are respectively
 `rollback/backlog-1.53.0-primary-dist` and
 `rollback/backlog-1.53.0-user-installed` under the retained Episode’s
 `primeclaw64-off-global-20261121T221527Z` session-artifact directory.
@@ -87,12 +88,10 @@ with the Episode session artifacts, not in Git.
   publication guidance), `prepare` (orientation), and `plan-task` (shared
   checkout and selected-store preservation). No cutover-driven reset is
   justified. Leave inactive customizations for their owners.
-- In the selected primary, the project-local `conversation-after-handoff.md`
-  is actually loaded from the project. Its current managed bytes lack the
-  current source’s phase-goal and no-repeat guidance (`8209305f` → `576cdab3`
-  by SHA-256 prefix). Refresh that exact untouched managed destination during
-  separately approved reconciliation if fresh evidence still agrees. Do not
-  rewrite existing Episode snapshots to update this file.
+- The project loader reads `conversation-after-handoff.md` from the selected
+  root. The owner’s one reconciliation updated this untouched managed file
+  (`8209305f` → `576cdab3` by SHA-256 prefix) with phase-goal and no-repeat
+  guidance. Existing Episode snapshots were not rewritten.
 - The current comparator is expected to preserve/reclassify `blocked`,
   `execute`, and `handoff`, not refresh them automatically: recorded baseline
   differs from installed and upstream has advanced. Those project bytes lack
@@ -105,8 +104,70 @@ with the Episode session artifacts, not in Git.
   current source; different manifest metadata is not stale behavior. No plugin
   source change is needed to deliver the proven untouched managed update.
 
-**Disposition:** ready for owner review, not activation. Use the
-[host cutover](../backlog.md#owner-only-v1553-host-cutover) and
-[selected-project reconciliation and restart/UAT](../project-initialization.md#selected-project-boundary-for-backlog-1553)
-runbooks only after separate authorization, fresh quiescence checks and consumer
-owner dispositions. Do not advance the stable pointer on this evidence.
+## Verified host cutover and live UAT
+
+- **Build and install.** Unmodified upstream `v1.55.3` resolved to
+  `0cf4fdbc70020327f4366a29d3f405f83d180301`. The standalone build and smoke
+  used checksum-verified official Bun 1.4.4 on command-local PATH. The owner
+  installed the reviewed 106,150,754-byte Mach-O arm64 artifact at
+  `~/.local/bin/backlog` with mode `0755` and the SHA-256 above. Both distinct
+  1.53.0 rollback copies were verified and retained outside the worktree.
+- **Plugin delivery.** Accepted canonical source
+  `30bd6c53a349113944bda48a69f8a0f2c5963bb5` passed Docker Tier 1 `--probe`,
+  run `20261121T225811Z-75113-41d80e86` (15 declared digests verified, offline
+  probe, clean teardown; manifest SHA-256
+  `7436a78ed2790928f7b22876303411bec5e8653f136586290cb97072bcf65be1`). The earlier
+  `2fe5f75` source run has narrower scope. Canonical-primary user-global
+  apply and check both exited 0 with zero conflicts and default drift protection.
+- **Selected reconciliation.** The owner ran the initializer once. The changes
+  published on main at `5af4e912a6641eac13c11522817dfc471b2ed5a0` updated one
+  managed workflow and recovered one metadata entry; six entries were
+  unchanged and nine customizations were preserved with explicit conflicts.
+  Native `backlog.config.yml` points to the same `.backlog/config.yml`.
+  Ownership, config bytes, legacy allowlist and every Episode snapshot were
+  preserved. The newer pre-work interruption route in old `blocked`, `execute`
+  and `handoff` copies is deferred by affected owners, not reconciled or tested.
+- **Restart and UAT.** After affected owners and their explicit descendants
+  reached safe checkpoints, the coordinator performed one full cutover restart
+  (daemon `65235` → `88168`, Prime Agent `0.9.8`, protocol `7`, build
+  `cwd-fix-v0.9.8-r1-14-g6cd28f90e`). An unrelated Docker job finished naturally
+  with its own retained fixture failure; no force-idle, cancellation or cleanup
+  qualified the restart. All three live contexts resolved the actual installed
+  1.55.3 binary and verified its digest and visible Prime Claw tool context:
+
+  | Context | Representative native evidence |
+  | --- | --- |
+  | Resumed owner (`cd7d65ecc4c3`) | `backlog task view --json -- PRIMECLAW-64`: schema 1, In Progress, `archived: false`. |
+  | Same PRIMECLAW-64 Episode (`c0acb7c94e46`) | Same active task read; PRIMECLAW-1 was Done and `archived: true` at its real legacy `completed/` path. Native history and selected fingerprints were unchanged. |
+  | Designated ordinary GStack (`e288de7b357e`) | Native Beads context, task view and history passed. PVA stayed frozen and Beads-authoritative; no Backlog task calls, writes or conversion there. |
+
+- **Installed binary checks.** Compiled CLI/browser/MCP smoke exited 0. In a
+  disposable Backlog fixture, a new To Do task stayed active when edited to
+  Done. Explicit archive kept Done and returned `archived: true` at
+  `archive/tasks/`. An archived edit exited 1 with unchanged bytes; the next
+  native allocation produced `UATC-2`, preserving archived `UATC-1`’s identity.
+  Two initial caller-input refusals are retained separately: incompatible init
+  flags refused before writes, and a plain fixture rejected repository-specific
+  `P2` before a task write. Corrected native inputs passed; neither refusal was
+  a binary regression or a transport retry. No production lifecycle test writes.
+- **Later interruption.** After successful cutover UAT and hold release, the
+  daemon changed `88168` → `511` for an unknown reason. That interrupted the
+  subsequent handoff turn boundary; its durable checkpoint survived. A report
+  from the same Episode on the recovered route still verified the installed
+  binary. Historical execute start remains unknown. This was not a planned
+  second cutover restart, replacement UAT, or evidence of recovery dispatch.
+
+Owner session artifacts under `actual-backlog155-cutover/` retain the
+installation, post-restart UAT, compiled smoke, lifecycle fixture and later
+interruption receipts. The Episode separately retained raw native view and Git
+receipts; no private corpus is checked in. Live schema visibility does not
+prove a public registry count/hash, the absence of every startup warning, or
+end-to-end lifecycle dispatch or historical recovery. The 13 doctor limits,
+paired remote exclusion, PVA freeze, and unrelated TASK2 name collision remain
+outside the proven host behavior.
+
+**Disposition:** verified host cutover; this documentation candidate awaits
+independent review and owner-controlled integration. The maintenance hold is
+released. No repeat install, reconcile, restart, or UAT is called for. Only the
+Backlog.md Expert decides whether to advance its separate latest-stable pointer;
+message queue admission alone does not establish receipt.
