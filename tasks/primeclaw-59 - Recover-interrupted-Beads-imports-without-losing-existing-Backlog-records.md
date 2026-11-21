@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 02:40'
+updated_date: '2026-11-21 02:57'
 labels: []
 dependencies: []
 references:
@@ -15,6 +15,7 @@ references:
 documentation:
   - docs/evidence/primeclaw-59-current-state-capture-20261121.md
   - docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md
+  - docs/evidence/primeclaw-59-owned-web-transport-20261121.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -23,6 +24,10 @@ modified_files:
   - tests/test_task_provider_migration.py
   - docs/evidence/primeclaw-59-current-state-capture-20261121.md
   - docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md
+  - src/prime-agent-plugin/extension-support/migration-backlog-web.ts
+  - src/prime-agent-plugin/asset-inventory.json
+  - tests/migration_backlog_web.test.mjs
+  - docs/evidence/primeclaw-59-owned-web-transport-20261121.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -112,6 +117,9 @@ For remaining steps 1–2, replace current-field argv ingress with one migration
 Use the same pair-specific readable current-state projection for native authoring and complete selected-store native CLI readback. Keep exact meaningful current values/metadata, AC, assignee, status/relationships and actual comments with source author/time; retain small mapping/receipt and one separate memory-document/index/USER treatment. Do not copy a raw current-view envelope/catalog/archive to satisfy the large fixture, shrink its meaningful text/padding/tail, truncate, relocate an archive or fall back to encoded chunks. Native errors and limits are bounded payload-safe failures. Writes scale with current tasks, actual comments and relationship batches.
 
 Preserve source capture/identity/drift, original destination/configuration, active continuity and publication/cutover checks. Uncertain HTTP allocation/write stops without automatic resend; stopping a client alone does not prove the server stopped writing. Integrate necessary server/request ownership with the already approved migration-only responsive-worker/owned-process-tree cancellation boundary. Do not claim full ordinary cancellation/recovery/progress/406-ticket acceptance from an input probe or this bounded slice. Docker-only validation, required tier 1 after plugin changes, truthful full-regression evidence and separate prompt task/code publication remain required. Report exact candidate/evidence/limits and stop for owner review. All existing no-live-action/merge/activation constraints stand.
+
+## Progress after owned-Web transport sub-increment (2026-11-21)
+Implemented and tested the migration-only owned Web transport as a bounded dependency of steps 1–2. It pins browser/CLI BACKLOG_CWD, verifies native root/store plus the owned actual loopback URL, uses private file-backed POST/PUT/CLI results, fences uncertain writes and supports owned shutdown. It is not yet called by the forward importer. Next accepted work is still the readable pair-specific current-state projection/readback, removal of encoded package/chunks/repeated context/archive verifier from forward and replay, and necessary responsive-worker integration. No AC/full-task or live-action acceptance is claimed. Stop for owner review of this sub-increment before another slice.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -160,4 +168,13 @@ Owner-supplied independently reviewed input feasibility: POST 201 with 2,610,950
 
 ### Slice 1b transport sub-increment (started 2026-11-21)
 Sized the accepted steps 1–2 work before coding: this execute pass implements the migration-only owned native Web transport, with private file-backed POST/PUT inputs/results, pinned BACKLOG_CWD for browser/CLI, actual owned readiness and shutdown, payload-safe failure/no-resend handling, and disposable native large-value readback tests. This is production transport code, not another input feasibility probe. The forward readable projection/archive-package replacement and integration into migration orchestration remain unfinished for the next increment. Necessary process handles/AbortSignal support stay local to this transport for later responsive-worker integration; full cancellation/recovery/scale acceptance is not claimed. No AC, lifecycle, live-provider or resource change is included.
+
+### Owned native-Web transport sub-increment — tested and published (2026-11-21)
+Code candidate `2cd57331b39a6c00bbbd18c5503cfda5a842ba07` pushed non-force on `JLanders/prime-claw-primeclaw-59-episode-277260cb`; direct remote HEAD verified. Evidence: `docs/evidence/primeclaw-59-owned-web-transport-20261121.md`. One new inventoried migration-only async transport supplies actual owned browser readiness/root/store checks, explicit BACKLOG_CWD for browser/CLI, private file-backed native POST/PUT input/output and complete CLI envelopes, no payload-bearing public errors, no resend after uncertainty, retained failed evidence and exact owned TERM/KILL shutdown. Normal close removes ephemeral transport captures, not provider records.
+
+Final Docker transport suite **9/9 native tests passed**; 1 pytest bridge passed/9 deselected in169.85s. Artifact `.test-results/20261121T025131Z-46695-9f8744c2/tier1/migration-backlog-web-node.tap`; final manifest confirms offline network and clean runtime/builder teardown. Whole2,610,950-byte readable UTF-8 descriptions survived native POST/PUT and complete native CLI envelope/value/AC/reference/comment checks. Tests protect an ambient foreign BACKLOG_CWD store, reject wrong resolved root/store, use only the owned fallback port without contacting/killing its foreign listener, retain private0600/0700 transport files on failures, fence no-resend after a countable lost response, bound startup status timeout, and prove normal/forced owned group absence. In-flight abort/lost-response/TERM resistance use controlled native-shaped executables; they do not prove cancellation in real Backlog hooks or whole importer orchestration.
+
+Existing regressions **23 source-boundary +3 native allocation/lifecycle checks passed**; 2 pytest bridges passed/8 deselected in564.21s. Artifacts `.test-results/20261121T024635Z-26638-fc2e09be/tier1/retiring-beads-source-boundary-node.tap` and `native-populated-backlog-allocation-node.tap` in that directory; offline/clean runtime+builder teardown verified. Final distinct native checks35passed. Host-safe static checks9passed/8skipped. Initial requiredtier1 probe passed at `.test-results/20261121T024412Z-17029-e1ee88a0/tier1/manifest.json`; this preceded final ready-state/descriptor repairs, and subsequent native fixtures independently applied/checked final source. Earlier8-test transport PASS is retained, not counted again; final run added owned forced-shutdown coverage. Initial combined -k named the new bridge incorrectly and selected only existing regressions; separate exact bridge invocations ran the transport tests. No failure was suppressed or fixture safeguard bypassed.
+
+Read-only delegated audit supplied native root/status/port contract facts and found concrete pre-ready/descriptor-ownership/startup-deadline gaps, repaired before native testing. This is not independent owner/Expert candidate acceptance. The forward importer remains unchanged and still uses encoded packages/chunks/archive verification; full readable projection/readback and responsive-worker integration are unfinished. Later coexistence/recovery/config reconciliation, ordinary cancellation/progress and406-ticket scale acceptance remain pending. No AC checked, no Final Summary, native status unchanged In Progress. No live migration/retry/switch, private incident-data access, destructive live cleanup, merge, global apply/activation/restart, Prime Agent source changes, new Episode resources or initial assignment occurred. Stop for owning Conversation review.
 <!-- SECTION:NOTES:END -->
