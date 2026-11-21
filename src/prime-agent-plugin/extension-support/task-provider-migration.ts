@@ -322,6 +322,46 @@ function canonical(value: unknown): string {
   return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`).join(",")}}`;
 }
 
+function updateCanonicalHash(
+  hash: ReturnType<typeof createHash>,
+  value: unknown,
+  context: "root" | "array" | "object" = "root",
+): void {
+  if (value === null || typeof value !== "object") {
+    const encoded = JSON.stringify(value);
+    if (encoded !== undefined) hash.update(encoded);
+    else if (context === "object") hash.update("undefined");
+    else if (context === "root") throw new TypeError("canonical SHA-256 requires a serializable root value");
+    return;
+  }
+  if (Array.isArray(value)) {
+    hash.update("[");
+    for (let index = 0; index < value.length; index += 1) {
+      if (index > 0) hash.update(",");
+      updateCanonicalHash(hash, value[index], "array");
+    }
+    hash.update("]");
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  hash.update("{");
+  const keys = Object.keys(record).sort();
+  for (let index = 0; index < keys.length; index += 1) {
+    if (index > 0) hash.update(",");
+    const key = keys[index];
+    hash.update(JSON.stringify(key));
+    hash.update(":");
+    updateCanonicalHash(hash, record[key], "object");
+  }
+  hash.update("}");
+}
+
+export function canonicalSha256(value: unknown): string {
+  const hash = createHash("sha256");
+  updateCanonicalHash(hash, value);
+  return hash.digest("hex");
+}
+
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -513,7 +553,7 @@ function captureBacklog(
     archived: tasks.filter((task) => task.classification === "archived").length,
     total: tasks.length,
   };
-  const digest = sha256(canonical(tasks));
+  const digest = canonicalSha256(tasks);
   return {
     provider: "backlog", projectRoot, evidence, revision, digest, repositoryRoot,
     ...(publication ? { publicationRemote: publication.remote, publicationRef: publication.ref } : {}),
@@ -636,7 +676,7 @@ function captureBeads(
     archived: tasks.filter((task) => task.classification === "archived").length,
     total: tasks.length,
   };
-  const digest = sha256(canonical({ sourceIdentity, sourceVersion, statusCatalog, tasks, memories }));
+  const digest = canonicalSha256({ sourceIdentity, sourceVersion, statusCatalog, tasks, memories });
   return {
     provider: "beads", projectRoot, evidence, sourceIdentity,
     sourceVersion, statusCatalog,
@@ -1395,7 +1435,7 @@ function migrateBacklogToBeads(
     assertSameIds(relationshipIds(targetView.dependencies, id), expectedRelationships, `Beads destination relationships for ${pkg.sourceTaskId}`);
     return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskEvidence: targetView };
   });
-  const destinationDataDigest = sha256(canonical(destinationTasks.map((task) => task.taskEvidence)));
+  const destinationDataDigest = canonicalSha256(destinationTasks.map((task) => task.taskEvidence));
   const transitions = ownershipRows.map((row) => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));
   if (transitions.some((row) => !row.destinationTaskId)) throw new Error("active ownership has no Beads destination mapping");
   const receiptBase = migrationReceiptBase(source, "beads", dataTransport.evidence.publishedRevision, destinationDataDigest,
@@ -1414,7 +1454,7 @@ function migrateBacklogToBeads(
       if (!Array.isArray(view) || view.length !== 1) throw new Error(`Beads task ${task.destinationTaskId} is not exactly readable after receipt`);
       return { ...task, taskEvidence: asObject(view[0], `Beads task ${task.destinationTaskId}`) };
     });
-    return { revision: proof.evidence.publishedRevision, digest: sha256(canonical(refreshedTasks.map((task) => task.taskEvidence))), tasks: refreshedTasks, receiptTaskId };
+    return { revision: proof.evidence.publishedRevision, digest: canonicalSha256(refreshedTasks.map((task) => task.taskEvidence)), tasks: refreshedTasks, receiptTaskId };
   };
   const final = refresh();
   return {
@@ -2119,7 +2159,7 @@ function freshBacklogMigrationReplay(
     assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
     return view;
   });
-  if (sha256(canonical({ preserved: [], imported: tasks, ...(source.memories.length ? { memory } : {}) })) !== receipt.destinationDataDigest) throw new Error("same-migration replay native destination digest differs from its complete receipt");
+  if (canonicalSha256({ preserved: [], imported: tasks, ...(source.memories.length ? { memory } : {}) }) !== receipt.destinationDataDigest) throw new Error("same-migration replay native destination digest differs from its complete receipt");
   runRequired(runner, "git", ["-C", storeDir, "merge-base", "--is-ancestor", receipt.destinationDataRevision, head], storeDir, "verify replay receipt data ancestry");
   const receiptPath = relative(storeDir, resolve(source.projectRoot, String(receiptView!.task.path))).replace(/\\/g, "/");
   const laterFiles = runRequired(runner, "git", ["-C", storeDir, "diff", "--name-only", "-z", receipt.destinationDataRevision, head], storeDir, "verify replay receipt-only native changes").stdout.split("\0").filter(Boolean);
@@ -2171,7 +2211,7 @@ function migrationCodeProjection(projectRoot: string, runner: CommandRunner, all
   if (foreign.length) throw new Error(`migration layout encountered unrelated code changes: ${foreign.join(", ")}`);
   const diff = allowed.length ? runRequired(runner, "git", ["-C", projectRoot, "diff", "--binary", "HEAD", "--", ...allowed], projectRoot, "capture migration layout diff").stdout : "";
   const index = runRequired(runner, "git", ["-C", projectRoot, "ls-files", "--stage", "-z"], projectRoot, "capture migration layout index").stdout;
-  return sha256(canonical({ diff, index, files: untracked.filter(layoutPath).map((path) => [path, backlogFileBytes(join(projectRoot, path))]) }));
+  return canonicalSha256({ diff, index, files: untracked.filter(layoutPath).map((path) => [path, backlogFileBytes(join(projectRoot, path))]) });
 }
 
 function migrateBeadsToBacklog(
@@ -2275,8 +2315,8 @@ function migrateBeadsToBacklog(
   });
   const destinationDigest = (tasks: DestinationTask[]) => {
     const memory = backlogMemoryEvidence(source, memoryOutputs, runner);
-    return sha256(canonical({ preserved: [...baseline.records], imported: tasks.map((task) => task.taskEvidence),
-      ...(source.memories.length ? { memory } : {}) }));
+    return canonicalSha256({ preserved: [...baseline.records], imported: tasks.map((task) => task.taskEvidence),
+      ...(source.memories.length ? { memory } : {}) });
   };
   const destinationDataDigest = destinationDigest(destinationTasks);
   const transitions = ownershipRows.map((row) => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));

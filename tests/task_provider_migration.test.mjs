@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
+import { canonicalSha256, completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { checkBeadsCapabilities, detectExplicitTaskProvider, detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
@@ -19,6 +20,30 @@ const BACKLOG = process.platform === "linux" && existsSync(RUNTIME_BACKLOG)
 const CUSTOM = "in_design:active,in_planning:active,ready_for_merge:wip,done:done";
 const BEADS_INVENTORY = ["--readonly", "list", "--all", "--limit", "0", "--include-infra",
   "--include-templates", "--include-gates", "--include-ephemeral", "--json"];
+
+function legacyCanonical(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => legacyCanonical(item)).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${legacyCanonical(value[key])}`).join(",")}}`;
+}
+
+test("streaming canonical migration digest matches the legacy canonical bytes", () => {
+  const values = [
+    null,
+    true,
+    42,
+    -0,
+    1.25,
+    "line\n雪",
+    [3, { z: null, a: ["x", false] }],
+    { z: "last", a: "first", nested: { beta: 2, alpha: [1, null, "three"] } },
+  ];
+  for (const value of values) {
+    const expected = createHash("sha256").update(legacyCanonical(value)).digest("hex");
+    assert.equal(canonicalSha256(value), expected);
+  }
+  assert.equal(canonicalSha256({ b: 2, a: 1 }), canonicalSha256({ a: 1, b: 2 }));
+});
 
 class CandidateRunner extends ProcessCommandRunner {
   run(commandName, args, options = {}) {
