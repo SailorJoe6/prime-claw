@@ -4,7 +4,7 @@ title: Enable operator choice and judgment-based implementation placement
 status: In Progress
 assignee: []
 created_date: 2026-11-03 02:59
-updated_date: '2026-11-21T23:44:00Z'
+updated_date: '2026-11-21T23:49:00Z'
 labels: []
 dependencies: []
 references:
@@ -40,6 +40,11 @@ modified_files:
   - tests/reviewed_plan_extension.test.mjs
   - tests/test_future_plan_skills.py
   - tests/test_role_kernel.py
+  - README.md
+  - docs/backlog.md
+  - docs/future-specification-bundles.md
+  - tests/test_backlog_workflow.py
+  - tests/test_reviewed_plan_extension.py
 priority: p1
 type: feature
 ordinal: 139000
@@ -97,10 +102,12 @@ Execution slice: implement prompt-led placement end to end (routing, ordinary di
 Implemented the placement-routing candidate in the Episode: injected entry guidance, explicit/native-evidence defaults, direct tracked lifecycle, and preserved placement through requested planning. Episode entry handler, allocation and ownership checks are unchanged. Docker Tier 1 --probe passed (run 20261121T221507Z-93469-a0235dbe). Offline Docker policy tests: 46 passed, 3 skipped, 2 deselected (archived-history test needs Git metadata; retained implement-spec manifest checksum mismatch is present in the base). Offline Node snapshot comparison on the Tier 1 runtime image: candidate 152/154; base ac02ff1dd4033e3e30015d8876f483e4afc520d3 151/153. The same two failures reproduced on both: stale handoff tool guidance expectation and the registered Beads continuation fixture. New routing test passed; no live LLM UAT, merge or activation. Repro: official Tier 1 source selector, then node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs tests/task_episode_ownership_extension.test.mjs tests/managed_session_protocol.test.mjs on identical read-only snapshot layouts with network disabled.
 
 Owner-authorized revision on published code 363f96b, limited to two placement findings. Replace duplicated injected lifecycle guidance with a short pointer to the editable implement-task skill (REQUIREMENTS.md G2) and update the stale Backlog workflow and reviewed-plan code assertions while preserving native eligibility protections. Scope planning and implement_task statements in README.md, docs/future-specification-bundles.md, and docs/backlog.md to Episode work and link docs/implementation-placement.md for direct work. Run affected checks in Docker with PyYAML and mandatory Tier 1 --probe after plugin source changes. Leave retained v1, unrelated failures, transport, lifecycle status, merge, activation and cleanup untouched.
+
+Bounded owner revision on 363f96b completed: implement_task metadata points to the editable implement-task skill, with no handler, native eligibility-policy, or Episode mechanics change. Updated stale assertions and scoped docs in README.md, docs/future-specification-bundles.md, and docs/backlog.md to make the direct route clear. Docker Tier 1 --probe passed (20261121T234740Z-26762-2452bada). Offline PyYAML policy run (Backlog workflow, reviewed-plan and placement tests): revision 22 passed, 1 failed, 10 deselected; 363f96b 20 passed, 3 failed, 10 deselected. Both targeted Python regressions now pass; remaining failure test_operator_guidance_creates_new_work_explicitly_in_design (stale generic claim assertion against unchanged AGENTS.md) reproduced on 363f96b. Offline Node reviewed_plan_extension.test.mjs: 68/69 on both; existing tool guidance preserves operator authority and fixed fresh assignment failure unchanged. Matched read-only snapshots used committed Backlog config from 014208e237516015f73c23c2f9fff25480c0dfba for Python. No runtime/transport changes, live UAT, merge, or activation.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Candidate for owner review: honor explicit current-checkout or Episode placement and use judgment when unspecified; keep direct tracked status changes native and separate from owned Episode lifecycle. Carry placement through authorized planning continuation. Docker Tier 1 --probe passed; focused tests introduced no new failures in the matched base comparison. Live behavior still awaits separate review/UAT.
+Candidate for owner review: explicit direct or Episode placement, judgment when unspecified, preserved placement through planning, and native status ordering for direct work. Placement and readiness policy stays in the editable skill; user docs distinguish direct quick fixes from Episode readiness. Docker Tier 1 probe and targeted regressions passed. Remaining broad-suite failures reproduced on the published pre-revision candidate. Live behavior still awaits separate review/UAT.
 <!-- SECTION:FINAL_SUMMARY:END -->
