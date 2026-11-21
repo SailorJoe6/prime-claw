@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 02:35'
+updated_date: '2026-11-21 02:40'
 labels: []
 dependencies: []
 references:
@@ -157,4 +157,7 @@ This clears only the reported input-route choice. Native status stays In Progres
 Incorporated the owner's published native input disposition `66d49d4bbdb3773f54a2b492d97153c2242c0fe8` into the living steps 1–2 plan. The prior argv evidence-only stop is not rewritten as a migration implementation. One migration-owned, migration-lifetime CLI-launched native Web process with exact BACKLOG_CWD context, private file-backed JSON, actual native fields, complete native CLI readback and owned shutdown replaces current-field argv ingress. No implementation or extra execute was performed by this handoff.
 
 Owner-supplied independently reviewed input feasibility: POST 201 with 2,610,950 Unicode bytes and initial source reference; PUT 200 with the intentionally edited 2,610,948-byte value; full native CLI/HTTP hashes/reference/Unicode/tail matched; owned SIGTERM exited 0. The two-byte change is intentional CJK-to-ASCII replacement. Repro artifacts: `/Users/jlanders/.prime/agent/session-artifacts/01a1ac67-8d52-702d-aa29-0c3be8a7a3d2/native-input-probes/native-web-input-probe-v2.cjs` and `native-web-input-v2-result.json` in that directory. The first setup-only rejected flags remain historical evidence. This proves input feasibility only, not unlimited capacity, migration/publication, comment mapping, cancellation/recovery or scale. Native status remains In Progress, all nine AC unchecked, no Final Summary. Resume only the same bounded readable-current-state slice through the existing canonical execute transport; later work and live-action restrictions remain unchanged.
+
+### Slice 1b transport sub-increment (started 2026-11-21)
+Sized the accepted steps 1–2 work before coding: this execute pass implements the migration-only owned native Web transport, with private file-backed POST/PUT inputs/results, pinned BACKLOG_CWD for browser/CLI, actual owned readiness and shutdown, payload-safe failure/no-resend handling, and disposable native large-value readback tests. This is production transport code, not another input feasibility probe. The forward readable projection/archive-package replacement and integration into migration orchestration remain unfinished for the next increment. Necessary process handles/AbortSignal support stay local to this transport for later responsive-worker integration; full cancellation/recovery/scale acceptance is not claimed. No AC, lifecycle, live-provider or resource change is included.
 <!-- SECTION:NOTES:END -->
