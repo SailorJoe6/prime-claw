@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: In Progress
 assignee: []
 created_date: '2026-11-21 20:38'
-updated_date: '2026-11-21 21:29'
+updated_date: '2026-11-21 21:33'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -15,6 +15,17 @@ documentation:
   - docs/backlog.md
   - docs/project-initialization.md
   - docs/evidence/primeclaw45-integrated-compatibility-20261115.md
+modified_files:
+  - src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md
+  - src/prime-agent-plugin/skills/handoff/SKILL.md
+  - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - docs/handoff-chain.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/user-stories/H-handoff-and-continuation.md
+  - REQUIREMENTS.md
+  - tests/test_oversee_episode_skill.py
 priority: p1
 type: task
 ordinal: 149000
@@ -97,4 +108,10 @@ Joe selected the widened installed recovery policy as a critical bug fix to comm
 
 <!-- SECTION:NOTES:BEGIN -->
 Step 1 source audit: installed global-oversee-episode SHA-256 986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776 and Episode source SHA-256 95c6c20494db03775e12c4edee829a88fe8c4a0a3c40c8b19d7669b7b0454a92 exactly match the recorded operator-selected correction. The installed delta adds the verified pre-work runtime interruption path and retains informed owner authorization, same-resource binding, and delivery/effect safeguards. Source guidance still assumes completed handoff in several copies. This slice will align canonical delivery guidance and docs without changing mechanics or reconciling any installed/project snapshot. Global rollout stays pending.
+
+Step 1 source-fix prerequisite is published at 4601f334e32cdf17c812ad9adaed5f0eabaca63c on refs/heads/JLanders/prime-claw-primeclaw-64-episode-8608a32d; direct remote read confirmed the OID. Canonical oversight skill matches the operator-selected installed bytes (SHA-256 986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776). Synchronized canonical handoff/blocked/execute guidance, P15 and docs preserve the completed-handoff path and the same-Episode, delivery/effects, idle and informed new-send safeguards. No transport code, installed bytes, or project/Episode snapshots changed.
+
+Validation: the focused regression failed on the prior source (missing interruption path); the focused Tier0 command `uv run --no-project --python 3.13 --with pytest --with pyyaml python -m pytest tests/test_oversee_episode_skill.py tests/test_expert_review_skill.py tests/test_global_asset_drift.py -q` produced 27 passed on the candidate. Docker `TIER1_ENV_FILE=<verified source selector> scripts/test-tier1.sh --probe` passed with verified public Prime Agent source tag cwd-fix-v0.9.8-r1 / a1faacd53ac4473a75de1d434afaf50945c2f647. Run 20261121T213119Z-89557-c124ba8b, image sha256:7e4ce2b7f98a252031bf47d6a7b3348665924f91585612b74c54f186e7bd3db9, manifest SHA-256 43b65ad2a7519ad0bb1ca5ac99a60291b06c752537c706086310fb1472cfc3ea; all declared evidence digests verified, offline apply/check/RPC probe passed, teardown clean. The first run 20261121T213036Z-86981-5824085f failed before the builder could inspect source: the selected /var path traversed a symlink. Provenance inventory and Tier1 passed using its canonical /private/var path with unchanged candidate inputs. Docker validation is not host live UAT.
+
+Next: independent source review and operator-controlled nonterminal source acceptance on canonical main. Episode source head and current primary main 60dcb257915b053c41701444f771f7ea4ce587c6 have diverged: main adds the ownership commit, not changes to the fix paths. The documented terminal fast-forward procedure cannot take the published head as-is (and requires Ready for Merge/Done); the owner must choose a supported nonterminal integration disposition with the task/ownership/resources staying active. No merge, Backlog v1.55.3 build/install, reconciliation, restart, live UAT, or cleanup performed in this slice.
 <!-- SECTION:NOTES:END -->
