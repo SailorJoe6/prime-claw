@@ -4,7 +4,7 @@ title: Enable operator choice and judgment-based implementation placement
 status: In Planning
 assignee: []
 created_date: '2026-11-03 02:59'
-updated_date: '2026-11-03 02:59'
+updated_date: '2026-11-21 22:07'
 labels: []
 dependencies: []
 references:
@@ -29,6 +29,9 @@ Enable operator choice between direct implementation in the current checkout and
 An explicit operator placement choice wins. "Here", "in this checkout", or "on main" means direct work in that checkout without implement_task, Episode allocation, or an Episode-only execute workflow. An explicit Episode request uses the existing implementation-readiness and isolated Episode lifecycle.
 When placement is unspecified, use semantic judgment: a task clearly already planned, evidenced by appropriate native ticket status and a meaningful plan/design, defaults to an Episode; an obvious quick bug fix or easy small unplanned change defaults to direct implementation; a substantial task still in design that would benefit from formal planning requires one focused operator question before starting that workflow. Ambiguous or conflicting evidence also calls for a focused question, not an always-ask rule. In Design alone must not block a clearly small authorized direct change. Do not implement a rigid size/status classifier.
 
+## Direct task lifecycle (operator decisions from grill-me)
+Before editing implementation files for any authorized direct tracked change, including a quick fix, publish the exact task's native `In Progress` state. First verify the selected task, placement, and absence of a same-task active Episode. After required checks pass and the approved change is committed and pushed (or committed locally in a project with no remote), publish the task as `Done` without a separate approval solely for status. Honor any explicit review hold; this does not grant merge, deployment, or activation authority.
+
 ## Scope
 Update plugin-injected routing guidance, managed entry skills, relevant project workflow/template guidance, and role wording so these paths agree. Preserve explicit placement through any requested planning and conditional implementation continuation; do not force "plan then implement here" into an Episode. Scope owner-Conversation implementation prohibitions and Episode identity/plan checks to managed Episode work, rather than all ordinary implementation. Direct execution uses ordinary supported native task CLI, tests, and Git operations; it creates no Episode resources or ownership record and does not borrow another role's authority. Keep this task-native; do not redesign retained version-1 specification lifecycle.
 
@@ -49,6 +52,7 @@ Add proportional regression coverage for explicit direct/Episode choice, judgmen
 - [ ] #6 Direct work uses supported provider-native task operations and existing Git/test safety without adding a public tool, persisted execution-mode/ownership format, approval receipt, or orchestration framework; active same-task Episode conflicts stop for operator resolution.
 - [ ] #7 Focused regression coverage exercises direct, Episode, judgment defaults, ask-first, and plan-continuation paths; required Docker-only validation including Tier 1 --probe passes or reports a concrete blocker truthfully.
 - [ ] #8 PRIMECLAW-52, retained version-1 lifecycle, Prime Agent upstream, user-global activation/restart, live migrations, and unrelated ownership/resources remain outside this change.
+- [ ] #9 For direct tracked work, publish native In Progress before implementation edits, even for a quick fix; publish Done after required checks and commit/publication are proven, without a separate closure approval unless the operator explicitly asked to stop for review. Existing merge, deployment, and activation authority remains unchanged.
 <!-- AC:END -->
 
 ## Implementation Plan
