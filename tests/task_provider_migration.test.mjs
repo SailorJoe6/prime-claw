@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import http from "node:http";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -10,6 +13,7 @@ import { completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOut
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { checkBeadsCapabilities, detectExplicitTaskProvider, detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
+import { projectBeadsCurrentTask, assertBeadsCurrentTask } from "../src/prime-agent-plugin/extension-support/beads-backlog-current.ts";
 
 const BACKLOG_CANDIDATE = "deps/backlog/dist/backlog";
 const RUNTIME_BACKLOG = "/usr/local/bin/backlog";
@@ -177,12 +181,14 @@ function embeddedBeadsSource(t, name = "embedded-beads-source", customStatuses) 
   bd(fixture.root, "dolt", "remote", "remove", "origin");
   if (customStatuses) bd(fixture.root, "config", "set", "status.custom", customStatuses);
   const parent = JSON.parse(bd(fixture.root, "create", "Embedded original", "--description", "original description",
-    "--design", "living source plan", "--notes", "original notes", "--metadata", '{"opaque":{"shape":[1,null,false]}}', "--json")).id;
+    "--design", "living source plan", "--notes", "original notes", "--acceptance", "Current acceptance Ω\nSecond source check",
+    "--assignee", "@source-owner", "--labels", "current-label,unicode-Ω", "--type", "bug", "--priority", "1",
+    "--metadata", '{"opaque":{"shape":[1,null,false]}}', "--json")).id;
   bd(fixture.root, "update", parent, "--title", "Embedded revised", "--status", "in_progress", "--notes", "final source notes", "--json");
   const child = JSON.parse(bd(fixture.root, "create", "Embedded open child", "--parent", parent, "--json")).id;
   const blocked = JSON.parse(bd(fixture.root, "create", "Embedded blocked", "--status", "blocked", "--json")).id;
   bd(fixture.root, "dep", "add", blocked, child);
-  bd(fixture.root, "comments", "add", parent, "embedded native comment", "--author", "source-author");
+  bd(fixture.root, "comments", "add", parent, "embedded native comment Ω\n\n## Final Summary\n\nAn ordinary source comment, not task closure.", "--author", "source-author");
   bd(fixture.root, "provenance", "record", "--issue", parent, "--kind", "commit", "--source", "fixture",
     "--ref", git(fixture.root, "rev-parse", "HEAD"), "--ref-kind", "git-sha", "--actor", "source-actor", "--payload", '{"opaque":true}');
   git(fixture.root, "add", "-A");
@@ -223,22 +229,21 @@ class AsIsBeadsRunner extends RecordingBeadsRunner {
 }
 
 
-// Large current metadata must survive file-backed capture without history reads.
-// Keep it out of native description/comment argv; source package chunks remain
-// the intentionally retained authoring path for this bounded slice.
+// Meaningful current metadata must cross capture and native authoring without
+// argv chunks, raw source envelopes, or repeated export/native copies.
 function syntheticCurrentViewFile(fixture, view, byteLength = 2_610_950) {
   const current = structuredClone(view);
-  current.metadata = { ...current.metadata, current_capture: {
-    text: "界🙂".repeat(180_000), padding: "", tail: "PRIVATE-CURRENT-TAIL-界🙂",
-  } };
-  const padding = byteLength - Buffer.byteLength(JSON.stringify([current]));
-  assert.ok(padding >= 0);
-  current.metadata.current_capture.padding = "p".repeat(padding);
+  const line = "Current rollout decision: preserve Ω and 日本語, owner-approved detail.\n";
+  const tail = "\nPRIVATE-CURRENT-TAIL-界🙂";
+  const count = Math.floor((byteLength - Buffer.byteLength(tail)) / Buffer.byteLength(line));
+  const body = line.repeat(count);
+  const metadataText = body + "x".repeat(byteLength - Buffer.byteLength(body) - Buffer.byteLength(tail)) + tail;
+  assert.equal(Buffer.byteLength(metadataText), byteLength);
+  current.metadata = { ...current.metadata, current_capture: { text: metadataText } };
   const text = JSON.stringify([current]);
-  assert.equal(Buffer.byteLength(text), byteLength);
   const path = join(fixture.outer, "synthetic-current-view.json");
   writeFileSync(path, text);
-  return { view: current, text, path };
+  return { view: current, text, path, metadataText };
 }
 
 function readSyntheticOutput(runner, file, options) {
@@ -246,10 +251,56 @@ function readSyntheticOutput(runner, file, options) {
     ["-e", "process.stdout.write(require('node:fs').readFileSync(process.argv[1]))", file], options);
 }
 
-function assertCurrentSourcePackage(pkg) {
-  for (const key of ["history", "events", "provenance"]) {
-    assert.equal(Object.hasOwn(pkg, key), false, `current source package must not contain ${key}`);
+function captureBeadsCurrentTasks(root, ids) {
+  const exported = completeBeadsExport(RUNNER, root, "fixture current source capture");
+  return Object.fromEntries(ids.map((id) => {
+    const entry = exported.find(({ kind, row }) => kind === "issue" && row.id === id);
+    assert.ok(entry, "fixture source must be present in the independent native export");
+    const nativeView = JSON.parse(RUNNER.run("bd", ["--readonly", "show", id, "--json", "--long", "--include-comments"], { cwd: root }).stdout)[0];
+    return [id, { sourceTaskId: id, exportRow: entry.row, nativeView }];
+  }));
+}
+
+function assertCurrentBacklogTask(view, pkg, inspection, mapping, configuration = {}) {
+  const parent = pkg.nativeView.parent ?? pkg.exportRow.parent;
+  const dependencies = pkg.nativeView.dependencies ?? pkg.exportRow.dependencies ?? [];
+  const context = {
+    sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest,
+    status: ({ open: "In Design", deferred: "In Design", in_design: "In Design", in_planning: "In Planning",
+      in_progress: "In Progress", blocked: "Blocked", ready_for_merge: "Ready for Merge", done: "Done", closed: "Done" })[pkg.nativeView.status],
+    ...(parent ? { parentTaskId: mapping[parent] ?? parent } : {}),
+    dependencies: dependencies.map((value) => typeof value === "string" ? value : value.depends_on_id ?? value.id ?? value.issue_id)
+      .filter(Boolean).map((id) => mapping[id] ?? id),
+    priorities: ["high", "medium", "low"], types: ["bug", "feature", "enhancement", "task", "chore", "docs", "spike"],
+    ...configuration,
+  };
+  const projection = projectBeadsCurrentTask(pkg, context);
+  const id = mapping[pkg.sourceTaskId];
+  assertBeadsCurrentTask(view, projection, id);
+  assert.deepEqual(view.task.references, [
+    `prime-claw-beads-source:${pkg.sourceTaskId}`,
+    `prime-claw-beads-current:${JSON.stringify({ sourceTaskId: pkg.sourceTaskId,
+      sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest }, null, 2)}`,
+  ], "initial native references bind current source identity without a comment package");
+  assert.equal(view.task.comments.length, projection.comments.length, "only actual authored source comments are imported");
+  const readable = [view.task.description, view.task.implementationPlan, view.task.implementationNotes,
+    view.task.finalSummary, ...view.task.comments.map((comment) => comment.body)].join("\n");
+  for (const forbidden of ["prime-claw-task-provider-migration-source-v1 part=", "prime-claw-task-provider-migration-source-v1 mapping ",
+    '"exportLineBase64":', '"exportRow":', '"statusCatalog":', '"sourceVersion":']) {
+    assert.equal(readable.includes(forbidden), false, "new Beads imports contain no encoded package, raw envelope, or repeated catalog");
   }
+  return projection;
+}
+
+function assertMeaningfulMetadataOnce(task, value) {
+  assert.equal(Buffer.byteLength(value), 2_610_950);
+  const readable = [task.description, task.implementationPlan, task.implementationNotes, task.finalSummary ?? ""].join("\n");
+  const exact = readable.includes(value) ? value : JSON.stringify(value);
+  assert.equal(readable.includes(exact), true, "complete meaningful current metadata survives native CLI readback");
+  const start = readable.indexOf(exact);
+  assert.equal(createHash("sha256").update(readable.slice(start, start + exact.length)).digest("hex"),
+    createHash("sha256").update(exact).digest("hex"), "current metadata has its exact tail and digest");
+  assert.equal(readable.split(exact).length - 1, 1, "metadata is not repeated from native/export envelopes");
 }
 
 async function proveFixtureRuntime(records) {
@@ -260,14 +311,6 @@ async function proveFixtureRuntime(records) {
   }));
 }
 
-function sourcePackageFromBacklogComments(task) {
-  const parts = task.comments.map((comment) => String(comment.text ?? comment.content ?? comment.body))
-    .map((text) => /^prime-claw-task-provider-migration-source-v1 part=(\d+)\/(\d+)\n([A-Za-z0-9+/=]+)$/.exec(text))
-    .filter(Boolean).sort((a, b) => Number(a[1]) - Number(b[1]));
-  assert.ok(parts.length > 0, "native Backlog comments have no exact source package");
-  assert.ok(parts.every((part, index) => Number(part[1]) === index + 1 && Number(part[2]) === parts.length));
-  return JSON.parse(Buffer.from(parts.map((part) => part[3]).join(""), "base64").toString("utf8"));
-}
 
 function retainedBacklogArchivePackage(entityKind) {
   const sourceTaskId = entityKind === "draft" ? "DRAFT-12" : "OLD-7";
@@ -671,8 +714,7 @@ test("current Beads source digest binds comments relationships metadata and raw 
 
 test("confirmed Beads to Backlog migration preserves active Episode identity and continues on canonical-primary Backlog", { timeout: 180_000 }, async (t) => {
   const fixture = beadsSource(t, "beads-active-owner");
-  const sourceVersion = command(fixture.root, "bd", ["--version"]);
-  const statusCatalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
+  const nativeCurrent = captureBeadsCurrentTasks(fixture.root, Object.values(fixture.ids));
   const owner = addActiveBeadsOwner(fixture);
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
   assert.equal(inspection.status, "ready", inspection.detail);
@@ -694,17 +736,12 @@ test("confirmed Beads to Backlog migration preserves active Episode identity and
   const receipt = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", result.receiptTaskId)).task;
   assert.ok(receipt.comments.some((comment) => String(comment.text ?? comment.content ?? comment.body).includes("prime-claw-task-provider-migration-receipt-v1")));
   for (const mapping of result.receipt.mappings) {
-    const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
+    const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId));
+    const task = view.task;
     assert.equal(task.status, mapping.sourceTaskId === fixture.ids.parent ? "In Progress" : "Done");
     assert.ok(task.path.startsWith(mapping.sourceTaskId === fixture.ids.archived ? ".backlog/archive/tasks/" : ".backlog/tasks/"));
-    const text = task.comments.map((comment) => String(comment.text ?? comment.content ?? comment.body)).join("\n");
-    assert.match(text, /prime-claw-task-provider-migration-source-v1/);
-    const sourcePackage = sourcePackageFromBacklogComments(task);
-    assertCurrentSourcePackage(sourcePackage);
-    assert.equal(sourcePackage.sourceTaskId, mapping.sourceTaskId);
-    assert.equal(sourcePackage.sourceVersion, sourceVersion, "preserve raw version stdout, including its newline");
-    assert.deepEqual(sourcePackage.statusCatalog, statusCatalog);
-    assert.equal(sourcePackage.sourceDigest, inspection.sourceDigest);
+    assertCurrentBacklogTask(view, nativeCurrent[mapping.sourceTaskId], inspection,
+      Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId])));
   }
   const registry = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8"));
   const current = registry.owners[owner.ownerSessionId];
@@ -1359,6 +1396,298 @@ test("Backlog native drafts are counted and preserved exactly before source dele
 
 
 
+test("complete-receipt same-destination replay rejects current AC and comment drift with source references retained", { timeout: 300_000 }, async (t) => {
+  for (const kind of ["acceptance criteria", "actual comment"]) {
+    await t.test(kind, async (t) => {
+      const fixture = embeddedBeadsSource(t, `current-replay-drift-${kind.replaceAll(" ", "-")}`);
+      const owner = addActiveBeadsOwner(fixture);
+      const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
+      assert.equal(inspection.status, "ready", inspection.detail);
+      const sourceBefore = sourceAuthorityFiles(fixture.root);
+      const registryPath = join(fixture.root, ".prime-claw", "ownership.json");
+      const ownershipBefore = readFileSync(registryPath, "utf8");
+      const request = {
+        cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
+        confirmedSwitch: true, actor: "current-replay-operator", semanticPlacement: "Preserve complete readable current ticket content.",
+        verifyActiveRuntime: proveFixtureRuntime,
+        deleteSource() { throw new Error("fixture retains source after complete native destination proof"); },
+      };
+      const first = await migrateTaskProvider(request);
+      assert.equal(first.status, "blocked", first.detail);
+      assert.equal(first.code, "pre-cutover-failed");
+      assert.match(first.detail, /fixture retains source after complete native destination proof/);
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
+      assert.equal(readFileSync(registryPath, "utf8"), ownershipBefore);
+      const store = join(fixture.root, ".backlog");
+      const receiptText = Object.values(physicalDestinationRecords(store)).map((bytes) => Buffer.from(bytes, "base64").toString("utf8"))
+        .find((value) => value.includes("title: Prime Claw task-provider migration receipt"));
+      assert.ok(receiptText, "partial destination has a complete published native receipt before deliberate drift");
+      const receiptId = receiptText.match(/^id: (.+)$/m)[1];
+      const receiptView = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", receiptId));
+      assert.equal(receiptView.task.status, "Done");
+      const receipt = JSON.parse(receiptView.task.implementationNotes.match(/^```json\n([\s\S]+)\n```$/)[1]);
+      assert.equal(receipt.sourceRevision, inspection.sourceRevision);
+      assert.equal(receipt.sourceDigest, inspection.sourceDigest);
+      const mapped = receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId;
+      const before = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapped));
+      assert.deepEqual(before.task.references, [
+        `prime-claw-beads-source:${fixture.ids.parent}`,
+        `prime-claw-beads-current:${JSON.stringify({ sourceTaskId: fixture.ids.parent,
+          sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest }, null, 2)}`,
+      ]);
+      if (kind === "acceptance criteria") backlog(fixture.root, "task", "edit", mapped, "--ac", "Deliberate changed current criterion Ω", "--plain");
+      else backlog(fixture.root, "task", "edit", mapped, "--comment", "Deliberate changed actual comment Ω", "--comment-author", "drift-author", "--plain");
+      const altered = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapped));
+      assert.deepEqual(altered.task.references, before.task.references, "identity references cannot stand in for complete current-state verification");
+      if (kind === "acceptance criteria") assert.notDeepEqual(altered.task.acceptanceCriteria, before.task.acceptanceCriteria);
+      else assert.notDeepEqual(altered.task.comments, before.task.comments);
+      const taskPath = altered.task.path.slice(".backlog/".length);
+      git(store, "add", "--", taskPath);
+      git(store, "-c", "user.name=Current Drift Fixture", "-c", "user.email=current-drift@example.invalid", "commit", "-qm", `persist ${kind} drift with source identity retained`);
+      git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+      const driftHead = git(store, "rev-parse", "HEAD");
+      assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], driftHead,
+        "replay must reject current content, not merely unpublished or dirty state");
+      const driftRecords = physicalDestinationRecords(store);
+      const codeHead = git(fixture.root, "rev-parse", "HEAD");
+      const codeIndex = git(fixture.root, "ls-files", "--stage");
+      let deletions = 0;
+      const replay = await migrateTaskProvider({ ...request, deleteSource() { deletions += 1; } });
+      assert.equal(replay.status, "blocked", replay.detail);
+      assert.equal(replay.code, "pre-cutover-failed");
+      assert.equal(deletions, 0, "changed current ticket cannot reach source retirement");
+      assert.equal(git(store, "rev-parse", "HEAD"), driftHead, "replay neither repairs nor reauthors the destination");
+      assert.equal(git(store, "status", "--porcelain=v1"), "");
+      assert.deepEqual(physicalDestinationRecords(store), driftRecords, "no duplicate task, comment, or receipt after refused replay");
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
+      assert.equal(readFileSync(registryPath, "utf8"), ownershipBefore);
+      assert.equal(git(fixture.root, "rev-parse", "HEAD"), codeHead);
+      assert.equal(git(fixture.root, "ls-files", "--stage"), codeIndex);
+      assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
+      assert.equal(existsSync(join(fixture.root, ".beads")), true);
+    });
+  }
+});
+
+test("current native migration and replay preserve configured type priority and metadata-shaped source comments", { timeout: 300_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "current-configured-bookkeeping-replay");
+  const sourceComments = [
+    "prime-claw-task-provider-migration-source-v1 mapping ordinary current source prose Ω",
+    "prime-claw-task-provider-migration-receipt-v1\nAn ordinary current source comment, not a destination receipt.",
+  ];
+  for (const body of sourceComments) bd(fixture.root, "comments", "add", fixture.ids.parent, body, "--author", "source-marker-author");
+  bd(fixture.root, "remember", "One current separate memory Ω", "--key", "configured-public-memory");
+  const destination = publishedPopulatedBacklogDestination(fixture);
+  const configPath = join(destination.store, "config.yml");
+  const types = ["Incident, Follow-up"];
+  const priorities = ["P4", "P1", "P0", "Very High, Almost"];
+  // Disposable native configuration fixture; preserve its exact bytes during
+  // migration, including legitimate comma-bearing names and no literal task.
+  let config = readFileSync(configPath, "utf8");
+  for (const [key, values] of [["types", types], ["priorities", priorities]]) {
+    const line = `${key}: ${JSON.stringify(values)}`;
+    const pattern = new RegExp(`^${key}:.*$`, "m");
+    config = pattern.test(config) ? config.replace(pattern, line) : `${config}\n${line}\n`;
+  }
+  writeFileSync(configPath, config);
+  git(destination.store, "add", "config.yml");
+  git(destination.store, "-c", "user.name=Configured Fixture", "-c", "user.email=configured@example.invalid", "commit", "-qm", "fixture selects custom configured native values");
+  git(destination.store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  // Fixture starts with its selected independent layout already published, so
+  // replay exercises existing-destination content rather than fresh-layout-only
+  // recovery (which deliberately remains a separate bounded path).
+  command(fixture.root, "ln", ["-s", ".backlog/config.yml", "backlog.config.yml"]);
+  const ignorePath = join(fixture.root, ".gitignore");
+  writeFileSync(ignorePath, (existsSync(ignorePath) ? readFileSync(ignorePath, "utf8") : "") + "\n/.backlog/\n");
+  git(fixture.root, "add", ".gitignore", "backlog.config.yml");
+  git(fixture.root, "commit", "-qm", "fixture publishes selected independent native layout");
+  git(fixture.root, "push", "-q");
+  const current = captureBeadsCurrentTasks(fixture.root, Object.values(fixture.ids));
+  const sourceBefore = sourceAuthorityFiles(fixture.root);
+  const runner = new AsIsBeadsRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  let retirements = 0;
+  const request = {
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "configured-native-fixture", now: () => "2026-11-21T00:00:00.000Z",
+    semanticPlacement: "Preserve current fields and actual comments; respect configured native values.",
+    deleteSource() { retirements += 1; throw new Error("configured fixture deliberately retains source"); },
+  };
+  const first = await migrateTaskProvider(request);
+  assert.equal(first.status, "blocked", first.detail);
+  assert.match(first.detail, /configured fixture deliberately retains source/);
+  const records = physicalDestinationRecords(destination.store);
+  const receiptMarkdown = Object.values(records).map((value) => Buffer.from(value, "base64").toString("utf8"))
+    .find((value) => /^title: Prime Claw task-provider migration receipt$/m.test(value));
+  assert.ok(receiptMarkdown);
+  const receiptId = receiptMarkdown.match(/^id: (.+)$/m)[1];
+  const receiptTask = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", receiptId)).task;
+  const receipt = JSON.parse(receiptTask.implementationNotes.match(/^```json\n([\s\S]+)\n```$/)[1]);
+  const mapping = Object.fromEntries(receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId]));
+  assert.equal(receiptTask.type, types[0], "receipt uses an actual configured native type");
+  const userTask = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", receipt.backlogMemoryOutputs.userTask.taskId)).task;
+  assert.equal(userTask.type, types[0], "exactly one separate memory USER uses the configured fallback too");
+  assert.equal(receipt.backlogMemoryOutputs.documents.length, 1);
+  const imported = {};
+  for (const [sourceId, id] of Object.entries(mapping)) {
+    const pkg = current[sourceId];
+    const parent = pkg.nativeView.parent ?? pkg.exportRow.parent;
+    const dependencies = (pkg.nativeView.dependencies ?? pkg.exportRow.dependencies ?? []).map((value) =>
+      typeof value === "string" ? value : value.depends_on_id ?? value.id ?? value.issue_id).map((sourceId) => mapping[sourceId] ?? sourceId);
+    const projection = projectBeadsCurrentTask(pkg, {
+      sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest,
+      status: ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked" })[pkg.nativeView.status],
+      ...(parent ? { parentTaskId: mapping[parent] } : {}), dependencies, types, priorities,
+    });
+    const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id));
+    assertBeadsCurrentTask(view, projection, id);
+    assert.equal(view.task.type, types[0]);
+    imported[view.task.path] = readFileSync(join(fixture.root, view.task.path), "utf8");
+    if (sourceId === fixture.ids.parent) {
+      assert.equal(view.task.priority.toLowerCase(), "p1", "configured numeric P1 beats the legacy priority alias");
+      for (const body of sourceComments) assert.ok(view.task.comments.some((comment) => comment.body.startsWith(body)),
+        "real source metadata-shaped prose remains an ordinary authored comment");
+      assert.equal(view.task.comments.length, current[sourceId].nativeView.comments.length);
+    }
+  }
+  const replay = await migrateTaskProvider(request);
+  assert.equal(replay.status, "blocked", replay.detail);
+  assert.match(replay.detail, /configured fixture deliberately retains source/);
+  assert.equal(retirements, 2, "valid source comments do not become legacy evidence or duplicate receipts on replay");
+  assert.deepEqual(Object.keys(physicalDestinationRecords(destination.store)).sort(), Object.keys(records).sort());
+  for (const [path, bytes] of Object.entries(imported)) assert.equal(readFileSync(join(fixture.root, path), "utf8"), bytes);
+  assert.equal(readFileSync(configPath, "utf8"), config);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
+  assert.equal(git(destination.store, "status", "--porcelain=v1"), "");
+});
+
+test("current native importer stops after an accepted comment response failure and never duplicates a partial allocation", { timeout: 240_000 }, async (t) => {
+  const fixture = repository(t, "current-native-partial-write");
+  bd(fixture.root, "init", "--skip-hooks", "--skip-agents", "--prefix", "PART", "--quiet", "--non-interactive");
+  bd(fixture.root, "dolt", "remote", "remove", "origin");
+  const parent = JSON.parse(bd(fixture.root, "create", "First current task", "--description", "Current readable description Ω", "--json")).id;
+  const child = JSON.parse(bd(fixture.root, "create", "Later current child", "--parent", parent, "--json")).id;
+  bd(fixture.root, "comments", "add", parent, "First actual current comment Ω", "--author", "partial-source-author");
+  fixture.ids = { parent, child };
+  git(fixture.root, "add", "-A");
+  if (git(fixture.root, "status", "--porcelain=v1")) git(fixture.root, "commit", "-qm", "seed bounded native partial-write fixture");
+  git(fixture.root, "push", "-q");
+  const owner = addActiveBeadsOwner(fixture);
+  const runner = new AsIsBeadsRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const foreign = repository(t, "current-native-partial-foreign-context");
+  backlog(foreign.root, "init", "foreign", "--defaults", "--backlog-dir", "backlog", "--config-location", "folder", "--integration-mode", "none");
+  canonicalBacklogConfig(foreign.root);
+  backlog(foreign.root, "task", "create", "Untouched foreign task", "--status", "In Design", "--plain");
+  git(foreign.root, "add", "-A");
+  git(foreign.root, "commit", "-qm", "seed foreign native context");
+  const foreignHead = git(foreign.root, "rev-parse", "HEAD");
+  const foreignRecords = physicalDestinationRecords(join(foreign.root, "backlog"));
+  const foreignConfig = readFileSync(join(foreign.root, "backlog", "config.yml"), "utf8");
+  const sourceBefore = sourceAuthorityFiles(fixture.root);
+  const exportBefore = bd(fixture.root, "--readonly", "export", "--all");
+  const registryPath = join(fixture.root, ".prime-claw", "ownership.json");
+  const ownershipBefore = readFileSync(registryPath, "utf8");
+  const requests = [];
+  let originalNativeStatus;
+  let deletions = 0;
+  const request = {
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "partial-write-fixture", semanticPlacement: "Preserve complete readable current ticket content.",
+    verifyActiveRuntime: proveFixtureRuntime,
+    deleteSource() { deletions += 1; },
+  };
+  // Transparent wrapper around REAL native HTTP operations: the first actual
+  // comment has persisted and native returned200 before this fixture changes
+  // only the response status seen by the client. No second tracker or fake
+  // persistence is involved. This is controlled response failure, not proof of
+  // ordinary importer cancellation or a real transport losing its response.
+  const originalRequest = http.request;
+  http.request = function (...args) {
+    const url = String(args[0]);
+    const method = args[1]?.method ?? "GET";
+    if (method === "POST" || method === "PUT") requests.push({ method, url });
+    const callback = args.at(-1);
+    if (method === "PUT" && originalNativeStatus === undefined && typeof callback === "function") {
+      args[args.length - 1] = (response) => {
+        originalNativeStatus = response.statusCode;
+        response.statusCode = 503;
+        callback(response);
+      };
+    }
+    return originalRequest.apply(this, args);
+  };
+  syncBuiltinESMExports();
+  let first;
+  const previousBacklogCwd = process.env.BACKLOG_CWD;
+  let observedAmbient;
+  try {
+    process.env.BACKLOG_CWD = foreign.root;
+    first = await migrateTaskProvider(request);
+    observedAmbient = process.env.BACKLOG_CWD;
+  } finally {
+    if (previousBacklogCwd === undefined) delete process.env.BACKLOG_CWD;
+    else process.env.BACKLOG_CWD = previousBacklogCwd;
+    http.request = originalRequest; syncBuiltinESMExports();
+  }
+  assert.equal(observedAmbient, foreign.root, "migration-local synchronous context pinning restores the foreign ambient value");
+  assert.deepEqual(physicalDestinationRecords(join(foreign.root, "backlog")), foreignRecords);
+  assert.equal(readFileSync(join(foreign.root, "backlog", "config.yml"), "utf8"), foreignConfig);
+  assert.equal(git(foreign.root, "rev-parse", "HEAD"), foreignHead);
+  assert.equal(git(foreign.root, "status", "--porcelain=v1"), "");
+  assert.equal(originalNativeStatus, 200, "real native comment write succeeded before the controlled response failure");
+  assert.equal(first.status, "blocked", first.detail);
+  assert.equal(first.code, "pre-cutover-failed");
+  assert.match(first.detail, /http-status-503; outcome=uncertain/);
+  assert.match(first.remediation, /STOP and preserve/);
+  assert.match(first.remediation, /Do not automatically resend/);
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "PUT"], "no next source task or resend after uncertain comment response");
+  const artifactDirectory = first.detail.match(/Private transport evidence: ([^\n]+)$/)?.[1];
+  assert.ok(artifactDirectory && existsSync(artifactDirectory), "private transport failure evidence is retained");
+  t.after(() => rmSync(artifactDirectory, { recursive: true, force: true }));
+  const store = join(fixture.root, ".backlog");
+  const partial = physicalDestinationRecords(store);
+  assert.equal(Object.keys(partial).length, 1, "no child, receipt, or replacement allocation follows the failed write");
+  const markdown = Buffer.from(Object.values(partial)[0], "base64").toString("utf8");
+  const id = markdown.match(/^id: (.+)$/m)[1];
+  const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id));
+  assert.equal(view.task.title, "First current task");
+  assert.equal(view.task.description, "Current readable description Ω");
+  assert.deepEqual(view.task.references, [
+    `prime-claw-beads-source:${parent}`,
+    `prime-claw-beads-current:${JSON.stringify({ sourceTaskId: parent,
+      sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest }, null, 2)}`,
+  ], "the initial native allocation already has complete source identity before any comment response");
+  assert.equal(view.task.comments.length, 1, "actual comment persisted despite uncertain client outcome");
+  assert.equal(view.task.comments[0].author, "partial-source-author");
+  assert.ok(view.task.comments[0].body.includes("First actual current comment Ω"));
+  assert.equal(deletions, 0);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
+  assert.equal(bd(fixture.root, "--readonly", "export", "--all"), exportBefore);
+  assert.equal(readFileSync(registryPath, "utf8"), ownershipBefore);
+  assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
+  // Deliberately publish this fixture's partial record, separately from the
+  // failed importer. An explicit re-invocation must still refuse identity-only
+  // evidence, not merely refuse a dirty/unpublished store.
+  git(store, "add", "-A");
+  git(store, "-c", "user.name=Partial Write Fixture", "-c", "user.email=partial@example.invalid", "commit", "-qm", "fixture publishes unverified partial allocation");
+  git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  const partialHead = git(store, "rev-parse", "HEAD");
+  const replay = await migrateTaskProvider(request);
+  assert.equal(replay.status, "blocked", replay.detail);
+  assert.equal(replay.code, "pre-cutover-failed");
+  assert.match(replay.detail, /complete destination-native receipt|incomplete or unverified/);
+  assert.equal(git(store, "rev-parse", "HEAD"), partialHead);
+  assert.equal(git(store, "status", "--porcelain=v1"), "");
+  assert.deepEqual(physicalDestinationRecords(store), partial, "no duplicate, comment completion, or receipt on partial reinvocation");
+  assert.equal(deletions, 0);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
+  assert.equal(bd(fixture.root, "--readonly", "export", "--all"), exportBefore);
+  assert.equal(readFileSync(registryPath, "utf8"), ownershipBefore);
+});
+
 test("used unsupported Beads statuses and ambiguous archive records aggregate before inspection or confirmation destination writes", { timeout: 240_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "embedded-status-archive-preflight", "unused:active,finished:done,paused:wip");
   const runner = new AsIsBeadsRunner();
@@ -1440,6 +1769,7 @@ test("native Beads deferred tasks project to In Design without active deferral a
     view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
   }]));
   const native = readNative();
+  const nativeCurrent = captureBeadsCurrentTasks(fixture.root, sourceIds);
   for (const { id, until } of cases) {
     assert.equal(native[id].view.status, "deferred");
     assert.equal(native[id].view.defer_until ?? null, until ?? null);
@@ -1448,10 +1778,8 @@ test("native Beads deferred tasks project to In Design without active deferral a
   }
   const before = sourceAuthorityFiles(fixture.root);
   const sourceHead = git(fixture.root, "rev-parse", "HEAD");
-  const sourceVersion = command(fixture.root, "bd", ["--version"]);
   const statusCatalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
   const exportBefore = bd(fixture.root, "--readonly", "export", "--all");
-  const exportLines = Object.fromEntries(exportBefore.split(/\r?\n/).filter(Boolean).map((line) => [JSON.parse(line).id, line]));
   const runner = new AsIsBeadsRunner();
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
   assert.equal(inspection.status, "ready", inspection.detail);
@@ -1496,7 +1824,8 @@ test("native Beads deferred tasks project to In Design without active deferral a
   for (const { id } of cases) {
     const mapping = firstReceipt.receipt.mappings.find((row) => row.sourceTaskId === id);
     assert.ok(mapping, `missing native destination identity for ${id}`);
-    const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
+    const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId));
+    const task = view.task;
     const expected = native[id];
     assert.equal(task.status, "In Design");
     const path = task.path.slice(".backlog/".length);
@@ -1506,28 +1835,12 @@ test("native Beads deferred tasks project to In Design without active deferral a
     assert.equal(task.title, expected.view.title);
     assert.equal(task.description, expected.view.description);
     assert.equal(task.implementationPlan, expected.view.design);
-    assert.equal(task.implementationNotes, expected.view.notes);
+    assert.ok(task.implementationNotes.includes(expected.view.notes), "ordinary source notes remain readable alongside current metadata");
     assert.equal(task.dueDate, null, "defer_until must not become an active due date");
     assert.ok(Object.keys(task).every((field) => !/defer|snooze|wake/i.test(field)), "no active native deferral fields");
     assert.doesNotMatch(markdown.match(/^---\n([\s\S]*?)\n---/)[1], /^\s*(?:defer\w*|snooze\w*|\w*wake\w*):/im);
-    const expectedComments = expected.view.comments.map((comment) => ({
-      text: `[source Beads comment at ${comment.created_at}]\n${comment.text ?? comment.body ?? comment.content}`,
-      author: comment.author ?? comment.created_by ?? "unknown",
-    }));
-    const ordinaryComments = task.comments.filter((comment) => !String(comment.text ?? comment.content ?? comment.body).startsWith("prime-claw-task-provider-migration-source-v1"));
-    assert.deepEqual(ordinaryComments.map((comment) => ({ text: comment.text ?? comment.content ?? comment.body, author: comment.author })), expectedComments,
-      "only original ordinary comments may accompany canonical migration evidence; no added deferral annotations");
-    const pkg = sourcePackageFromBacklogComments(task);
-    assert.equal(pkg.sourceTaskId, id);
-    assert.equal(pkg.sourceRevision, inspection.sourceRevision);
-    assert.equal(pkg.sourceDigest, inspection.sourceDigest);
-    assert.equal(pkg.sourceVersion, sourceVersion);
-    assert.deepEqual(pkg.statusCatalog, statusCatalog);
-    assert.equal(pkg.sourceIdentity.storeDir, join(fixture.root, ".beads"));
-    assert.deepEqual(pkg.nativeView, expected.view);
-    assert.deepEqual(pkg.exportRow, JSON.parse(exportLines[id]));
-    assert.equal(pkg.exportLineBase64, Buffer.from(exportLines[id]).toString("base64"));
-    assertCurrentSourcePackage(pkg);
+    assertCurrentBacklogTask(view, nativeCurrent[id], inspection,
+      Object.fromEntries(firstReceipt.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId])));
   }
   const destinationPaths = Object.keys(physicalDestinationRecords(store)).sort();
   const replay = await migrateTaskProvider(request);
@@ -1587,15 +1900,10 @@ test("Beads closed reasons and categories complete normally while exact archive 
     expectedClass[id] = "archived";
   }
   const before = sourceAuthorityFiles(fixture.root);
-  const sourceVersion = command(fixture.root, "bd", ["--version"]);
-  const statusCatalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
-  const exportRows = Object.fromEntries(bd(fixture.root, "--readonly", "export", "--all").split(/\r?\n/).filter(Boolean).map((line) => {
-    const row = JSON.parse(line);
-    return [row.id, row];
-  }));
   const native = Object.fromEntries(Object.keys(expectedClass).map((id) => [id, {
     view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
   }]));
+  const nativeCurrent = captureBeadsCurrentTasks(fixture.root, Object.keys(expectedClass));
   class ArchivePublicationRunner extends AsIsBeadsRunner {
     constructor() { super(); this.destinationPublications = 0; }
     run(commandName, args, options = {}) {
@@ -1642,17 +1950,13 @@ test("Beads closed reasons and categories complete normally while exact archive 
     assert.equal(matching.length, 1, `one physical destination task required for ${mapping.sourceTaskId}`);
     const physicalPath = matching[0];
     assert.ok(physicalPath.startsWith(classification === "archived" ? "archive/tasks/" : "tasks/"), physicalPath);
-    const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
+    const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId));
+    const task = view.task;
     const expected = native[mapping.sourceTaskId];
     assert.equal(task.path, `.backlog/${physicalPath}`, "native archived read must use the original path");
     assert.equal(task.status, ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked", closed: "Done" })[expected.view.status]);
-    const pkg = sourcePackageFromBacklogComments(task);
-    assert.equal(pkg.sourceVersion, sourceVersion);
-    assert.deepEqual(pkg.statusCatalog, statusCatalog);
-    assert.equal(pkg.sourceDigest, inspection.sourceDigest);
-    assert.deepEqual(pkg.exportRow, exportRows[mapping.sourceTaskId]);
-    assert.deepEqual(pkg.nativeView, expected.view);
-    assertCurrentSourcePackage(pkg);
+    assertCurrentBacklogTask(view, nativeCurrent[mapping.sourceTaskId], inspection,
+      Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId])));
   }
   assert.deepEqual(physicalDestinationRecords(store), originalRecords, "native readback must not relocate or rewrite archives");
   assert.equal(existsSync(join(store, "completed")), false, "ordinary closed imports stay active Done tasks");
@@ -1693,13 +1997,13 @@ test("canonical source inspection reads embedded local-only built-in and partial
 test("confirmed embedded local-only migration publishes Backlog before retiring source and preserves compatible active ownership", { timeout: 240_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "embedded-active-retirement");
   const before = sourceAuthorityFiles(fixture.root);
-  const sourceVersion = command(fixture.root, "bd", ["--version"]);
-  const statusCatalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
   const native = Object.fromEntries(Object.values(fixture.ids).map((id) => [id, {
     view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
   }]));
+  const nativeCurrent = captureBeadsCurrentTasks(fixture.root, Object.values(fixture.ids));
   const large = syntheticCurrentViewFile(fixture, native[fixture.ids.parent].view);
   native[fixture.ids.parent].view = large.view;
+  nativeCurrent[fixture.ids.parent].nativeView = large.view;
   const owner = addActiveBeadsOwner(fixture);
   writeFileSync(join(owner.episode, "compatible-progress.txt"), "compatible active source progress\n");
   git(owner.episode, "add", "compatible-progress.txt");
@@ -1751,18 +2055,35 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
   const store = join(fixture.root, ".backlog");
   assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], result.receipt.destinationReceiptRevision);
   for (const mapping of result.receipt.mappings) {
-    const task = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId)).task;
-    const pkg = sourcePackageFromBacklogComments(task);
+    const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mapping.destinationTaskId));
+    const task = view.task;
     const expected = native[mapping.sourceTaskId];
-    assert.equal(pkg.sourceVersion, sourceVersion);
-    assert.deepEqual(pkg.statusCatalog, statusCatalog);
-    assert.equal(pkg.sourceDigest, inspection.sourceDigest);
-    assert.equal(pkg.sourceIdentity.storeDir, join(fixture.root, ".beads"));
-    assert.equal(pkg.sourceIdentity.doltMode, "embedded");
-    assert.equal(pkg.sourceIdentity.database, "EMB");
-    assert.deepEqual(pkg.nativeView, expected.view);
-    assertCurrentSourcePackage(pkg);
+    const mappings = Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId]));
+    assertCurrentBacklogTask(view, nativeCurrent[mapping.sourceTaskId], inspection, mappings);
     assert.equal(task.status, ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked" })[expected.view.status]);
+    if (mapping.sourceTaskId === fixture.ids.parent) {
+      assert.equal(task.description, expected.view.description);
+      assert.equal(task.implementationPlan, expected.view.design);
+      assert.deepEqual(task.assignees, ["@source-owner"]);
+      assert.deepEqual(task.labels, ["current-label", "unicode-Ω"]);
+      assert.equal(task.type.toLowerCase(), "bug");
+      assert.equal(task.priority.toLowerCase(), "high");
+      assert.equal(task.acceptanceCriteria.length, 1);
+      const rawAcceptance = "Current acceptance Ω\nSecond source check";
+      const acceptancePrefix = "Beads acceptance_criteria (exact JSON string): ";
+      assert.equal(task.acceptanceCriteria[0].text, acceptancePrefix + JSON.stringify(rawAcceptance));
+      assert.equal(JSON.parse(task.acceptanceCriteria[0].text.slice(acceptancePrefix.length)), rawAcceptance,
+        "native criterion retains complete exact multiline source acceptance criteria");
+      assert.equal(task.acceptanceCriteria[0].checked, false);
+      assert.equal(task.comments.length, 1);
+      assert.equal(task.comments[0].author, "source-author");
+      assert.ok(task.comments[0].body.includes("embedded native comment Ω"));
+      assert.ok(task.comments[0].body.includes(expected.view.comments[0].created_at));
+      assert.equal(task.finalSummary, null, "source comment headings do not manufacture task closure");
+      assertMeaningfulMetadataOnce(task, large.metadataText);
+    }
+    if (mapping.sourceTaskId === fixture.ids.child) assert.equal(task.parentTaskId, mappings[fixture.ids.parent]);
+    if (mapping.sourceTaskId === fixture.ids.blocked) assert.deepEqual(task.dependencies, [mappings[fixture.ids.child]]);
   }
   const current = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8")).owners[owner.ownerSessionId];
   assert.equal(current.provider, "backlog");
@@ -2783,6 +3104,7 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
     const originalFolderConfig = existsSync(join(destination.store, "config.yml"))
       ? readFileSync(join(destination.store, "config.yml"), "utf8") : null;
     const before = sourceAuthorityFiles(fixture.root);
+    const nativeCurrent = captureBeadsCurrentTasks(fixture.root, Object.values(fixture.ids));
     class PublicationBeforeRetirement extends AsIsBeadsRunner {
       run(name, args, options = {}) {
         if (name === "backlog" && args[0] === "task" && args[1] === "view" && existsSync(join(fixture.root, ".beads"))) {
@@ -2857,9 +3179,10 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
     // Only the selected default directory spelling may change with normalization.
     assert.equal(finalConfig.replace(/^backlog(?:Directory|_directory):.*\n?/gm, ""), config.replace(/^backlog(?:Directory|_directory):.*\n?/gm, ""));
     const mappings = Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId]));
-    const imported = Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId,
-      JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", row.destinationTaskId)).task]));
-    for (const [sourceId, task] of Object.entries(imported)) assert.equal(sourcePackageFromBacklogComments(task).sourceTaskId, sourceId);
+    const importedViews = Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId,
+      JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", row.destinationTaskId))]));
+    for (const [sourceId, view] of Object.entries(importedViews)) assertCurrentBacklogTask(view, nativeCurrent[sourceId], inspection, mappings);
+    const imported = Object.fromEntries(Object.entries(importedViews).map(([id, view]) => [id, view.task]));
     assert.equal(imported[fixture.ids.child].parentTaskId, mappings[fixture.ids.parent]);
     assert.deepEqual(imported[fixture.ids.blocked].dependencies, [mappings[fixture.ids.child]]);
     assert.equal(existsSync(join(fixture.root, ".beads")), false);
@@ -2889,6 +3212,7 @@ test("native archived-target source graph preserves mapped dependencies through 
   const destination = publishedPopulatedBacklogDestination(fixture);
   bd(fixture.root, "close", fixture.ids.child, "--reason",
     `Prime Claw abandonment: task ${fixture.ids.child}; pushed Episode head ${git(fixture.root, "rev-parse", "HEAD")}; code was not merged.`, "--force", "--json");
+  const nativeCurrent = captureBeadsCurrentTasks(fixture.root, Object.values(fixture.ids));
   const records = physicalDestinationRecords(destination.store);
   const before = sourceAuthorityFiles(fixture.root);
   class ArchivedDependencyRunner extends AsIsBeadsRunner {
@@ -2907,16 +3231,16 @@ test("native archived-target source graph preserves mapped dependencies through 
   assert.equal(result.status, "completed", result.detail);
   assert.deepEqual(result.receipt.taskCounts, inspection.taskCounts);
   const mappings = Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId]));
-  const child = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mappings[fixture.ids.child])).task;
+  const childView = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mappings[fixture.ids.child]));
+  const child = childView.task;
   const blocked = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mappings[fixture.ids.blocked])).task;
   assert.equal(child.status, "Done");
   assert.ok(child.path.startsWith(".backlog/archive/tasks/"));
   assert.equal(child.parentTaskId, mappings[fixture.ids.parent]);
   assert.deepEqual(blocked.dependencies, [mappings[fixture.ids.child]]);
-  const pkg = sourcePackageFromBacklogComments(child);
-  assert.equal(pkg.nativeView.status, "closed");
-  assert.match(pkg.nativeView.close_reason, /^Prime Claw abandonment:/);
-  assertCurrentSourcePackage(pkg);
+  assertCurrentBacklogTask(childView, nativeCurrent[fixture.ids.child], inspection, mappings);
+  assert.equal(nativeCurrent[fixture.ids.child].nativeView.status, "closed");
+  assert.match(child.finalSummary, /^Prime Claw abandonment:/);
   for (const [path, bytes] of Object.entries(records)) assert.equal(readFileSync(join(destination.store, path)).toString("base64"), bytes, path);
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
   assert.equal(git(destination.store, "status", "--porcelain=v1"), "");

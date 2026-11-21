@@ -189,6 +189,40 @@ test("native migration web POST PUT and CLI view preserve 2610950 UTF-8 bytes in
   assert.deepEqual(snapshot(foreign), originalForeign);
 });
 
+test("native migration web configuration preserves comma-bearing lists in the selected context", { timeout: 30_000 }, async (t) => {
+  const directory = sandbox(t);
+  const target = repository(directory, "configured-selected");
+  const foreign = repository(directory, "configured-foreign");
+  const priorities = ["Very High, Almost", "Low"];
+  const types = ["task", "Incident, Follow-up"];
+  const configPath = join(target, "backlog", "config.yml");
+  const configText = readFileSync(configPath, "utf8").replace(/^(?:priorities|types):.*\n?/gm, "").trimEnd();
+  writeFileSync(configPath, `${configText}\npriorities: ${JSON.stringify(priorities)}\ntypes: ${JSON.stringify(types)}\n`);
+  const originalTarget = snapshot(target);
+  const originalForeign = snapshot(foreign);
+  const previous = process.env.BACKLOG_CWD;
+  process.env.BACKLOG_CWD = foreign;
+  t.after(() => {
+    if (previous === undefined) delete process.env.BACKLOG_CWD;
+    else process.env.BACKLOG_CWD = previous;
+  });
+  const transport = await startMigrationBacklogWeb({ cwd: target, backlogDirectory: join(target, "backlog"), backlogCommand: BACKLOG });
+  t.after(() => transport.close());
+  const configuration = await transport.readConfiguration();
+  assert.equal(configuration.projectName, "configured-selected");
+  assert.deepEqual(configuration.priorities, priorities);
+  assert.deepEqual(configuration.types, types);
+  assert.equal(configuration.autoCommit, false);
+  assert.equal(transport.cwd, target);
+  assert.equal(process.env.BACKLOG_CWD, foreign, "transport does not change ambient project selection");
+  const nativeResponse = await fetch(`${transport.url}/api/config`);
+  assert.equal(nativeResponse.status, 200);
+  assert.deepEqual(configuration, await nativeResponse.json(), "readConfiguration preserves the unchanged native object");
+  await transport.close();
+  assert.deepEqual(snapshot(target), originalTarget, "configuration reads do not change the selected project");
+  assert.deepEqual(snapshot(foreign), originalForeign, "configuration reads ignore ambient foreign BACKLOG_CWD");
+});
+
 test("migration web uses only its owned fallback on an occupied foreign port without touching its owner", { timeout: 30_000 }, async (t) => {
   const directory = sandbox(t);
   const target = repository(directory, "occupied");

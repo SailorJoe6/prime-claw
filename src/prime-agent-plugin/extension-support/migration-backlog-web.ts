@@ -1,6 +1,5 @@
 /** Migration-only native Web ingress. No provider files or lifecycle policy live here.
- * This async boundary owns its browser and CLI children so the migration worker's
- * responsive parent can stop them. It is not yet wired into the legacy writer.
+ * The current importer uses this async boundary to own its browser and CLI children.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { createReadStream, createWriteStream, closeSync, chmodSync, mkdtempSync,
@@ -237,6 +236,11 @@ class MigrationBacklogWeb {
       await this.close();
       throw failure;
     } finally { source?.destroy(); this.busy = false; }
+  }
+
+  /** Return the native configuration object unchanged, including configured list values. */
+  readConfiguration(): Promise<any> {
+    return this.request("GET", "/api/config");
   }
 
   createTask(payload: Record<string, unknown>): Promise<any> {

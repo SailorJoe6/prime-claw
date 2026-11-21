@@ -22,6 +22,18 @@ def test_task_provider_migration_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_current_native_migration_integration_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
+        "current native|complete-receipt same-destination replay", WS_NODE_SUITE,
+        timeout=600,
+    )
+    (tier1_container.share.parent / "current-native-migration-integration-node.tap").write_text(
+        result.stdout + result.stderr
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_migration_entry_admission_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", "--test-name-pattern",
@@ -51,7 +63,7 @@ def test_retiring_beads_source_boundary_node_suite(tier1_container) -> None:
         "read-only inspection captures complete current Beads|Beads source digest|current Beads source digest|"
         "canonical source inspection|confirmed embedded|embedded source refuses|repeated embedded|"
         "independent Backlog publication|typed Beads export|native Beads memory capture|native Beads memory outputs|"
-        "active Beads Episode deletion refusal|default migration capture",
+        "active Beads Episode deletion refusal|complete-receipt same-destination replay|current native migration and replay|current native importer stops|default migration capture",
         WS_NODE_SUITE, timeout=900,
     )
     (tier1_container.share.parent / "retiring-beads-source-boundary-node.tap").write_text(

@@ -278,8 +278,10 @@ semantic-placement prompt and explicit confirmation requirement. Inspection does
 not create a destination, change ownership or write a receipt.
 
 Migration commands capture complete stdout through private temporary files and
-file descriptors, not a fixed pipe-output buffer. This applies to source export,
-inventory, task views, full history, events and provenance, including recapture.
+file descriptors, not a fixed pipe-output buffer. This applies to current source
+export/inventory/long task views and destination history-preservation reads,
+including recapture. Retiring Beads per-ticket history/events/provenance are not
+read as migration prerequisites.
 The existing parsers still read complete strings, so available memory, string
 capacity and temporary storage remain real limits. A resource or capture failure
 blocks the operation; partial output is never certified as complete. Each command
@@ -290,7 +292,7 @@ Command/capture failures report a bounded command label and available error code
 native exit status and signal. Ordinary command failures may include a short
 stderr excerpt, but diagnostics never substitute captured stdout or echo native
 JSON payloads. Empty stderr and a null native status do not hide `ENOBUFS`.
-Transport/resource advice addresses capture or execution, not trimming history,
+Transport/resource advice addresses capture or execution, not trimming required current content,
 changing task status or repairing otherwise readable source data. Invalid native
 JSON is reported separately without quoting its contents. Resolve the reported
 failure before requesting another inspection; no transport retry or migration
@@ -320,17 +322,18 @@ only after explicit operator confirmation of the exact inspected source and the
 quiesced maintenance window. Viewing inspection output never
 confirms a switch. PRIMECLAW-59 corrects migration to current ticket state only;
 managed prose chooses readable placement of non-equivalent current content,
-not whether to import revision archives. The source-capture increment removes
-historical reads, but the forward writer still uses its old encoded package of
-current data pending the readable-projection increment. Recovery/cancellation
-and complete current-state acceptance are also unfinished. This increment is
-not permission to retry a live migration. See the [source-capture evidence and
-limits](evidence/primeclaw-59-current-state-capture-20261121.md).
+not whether to import revision archives. Source capture omits historical reads.
+The forward importer and complete-receipt replay now use the accepted readable
+current-content projection and full native verification, not encoded packages
+or chunk comments. Recovery/cancellation and complete-task acceptance remain
+unfinished. This candidate is not permission to retry a live migration. See the
+[source-capture evidence](evidence/primeclaw-59-current-state-capture-20261121.md)
+and [integration evidence and limits](evidence/primeclaw-59-current-integration-20261121.md).
 
-A migration-only native Web transport is staged in
-`extension-support/migration-backlog-web.ts`. It is not yet called by the forward
-importer, so it does not make the encoded writer acceptable for live use. The
-transport starts one owned `backlog browser --no-open --port <selected>
+The migration-only native Web transport in
+`extension-support/migration-backlog-web.ts` serves forward current-task authoring
+and lossless configuration reads. Fresh complete-receipt replay and forward
+import share one owned `backlog browser --no-open --port <selected>
 --non-interactive` process. It pins `BACKLOG_CWD` and cwd to the prepared project,
 uses only that child's actual loopback bind announcement, then checks native
 `/api/status` for the exact canonical project and prepared Backlog directory.
@@ -339,8 +342,10 @@ transport never attaches to the foreign listener.
 
 Task POST/PUT bodies, HTTP results, browser logs and native CLI readback are
 private file-backed transport data, not task archives. CLI readback uses the same
-pinned project context. The caller still owns readable projection and complete
-field/comment/relationship comparison. Successful close removes ephemeral
+pinned project context. Migration-local synchronous Backlog commands also pin
+BACKLOG_CWD for each call and immediately restore its previous value. The
+pair-specific caller compares complete authored fields/comments/relationships.
+Successful close removes ephemeral
 transport files; failure keeps them in the error's private `artifactDirectory`
 for bounded inspection. Public errors contain stage/outcome metadata, never
 provider responses or payload-bearing stderr. A failed or uncertain write fences
@@ -351,7 +356,7 @@ is not full importer cancellation: the responsive migration worker and existing
 orchestration still need integration and their own acceptance evidence. See the
 [owned transport evidence and limits](evidence/primeclaw-59-owned-web-transport-20261121.md).
 
-A pair-specific readable-content helper is staged in
+The pair-specific readable-content helper is integrated from
 `extension-support/beads-backlog-current.ts`. It builds one current-ticket
 projection for native Web authoring and complete native CLI verification. Native
 fields carry equivalent content. Concise labeled current values retain meaningful
@@ -371,13 +376,37 @@ summary is invented and full native readback remains mandatory. Ordinary source
 headings stay ordinary prose. See the comment-heading red/green evidence in the
 same [readable-content dependency evidence](evidence/primeclaw-59-readable-current-projection-20261121.md).
 
-This helper is not yet wired into the forward importer or replay. Their old
-encoded package/chunk authoring and archive verification still need replacement;
-shipping the helper does not certify those paths or authorize live migration.
-It adds no recovery, publication/cutover, worker or cancellation behavior. Its
-caller owns the migration-lifetime Web transport and must stop without replay
-when any native write or verification fails. See the
-[readable-content dependency evidence](evidence/primeclaw-59-readable-current-projection-20261121.md).
+Forward import allocates parent-first with initial source/current references and
+only actual source comments. One native dependency batch per applicable task
+sets mapped relationships after all IDs exist. Full CLI verification checks
+current fields, AC, assignees, comments, supplemental metadata and relationships
+before data publication, again after publication, and on refresh/replay. Native
+archive placement remains separately checked. Equivalent configured type/priority
+choices come losslessly from the owned native `/api/config` JSON response;
+comma-bearing configured names are not split. Receipt and memory USER creation
+use an actual configured type fallback without replacing configuration.
+
+Initial references identify a partial allocation but never verify its content.
+Imported source comments that resemble old migration/receipt markers remain
+ordinary comments; the native source reference distinguishes them from migration
+bookkeeping. Existing complete-receipt reuse verifies all imported current
+content before any reauthoring; an incomplete or changed record stops without
+automatic completion, duplicate allocation or cleanup. Legacy encoded import
+evidence is preserved but is not silently promoted to current-content proof.
+The initial retiring source identity is recorded once in the existing receipt;
+whole source envelopes/catalogs/memory collections are not repeated in tickets.
+Memory documents/index/USER remain a separate once-only treatment.
+
+The one owned browser and readback descendants stop before publication/cutover.
+Early replay failures also close only owned transport resources. Failed or
+uncertain allocation/write/readback retains truthful partial state and private
+transport evidence; no resend, fallback allocation, reconciliation, rollback or
+record deletion is automatic. This does not add ordinary responsive-worker
+cancellation, interrupted-import recovery, parked-configuration reconciliation,
+progress, or 406-ticket performance acceptance. Existing baseline/publication,
+source-drift, active-Episode continuity and guarded cutover checks remain. See
+[helper evidence](evidence/primeclaw-59-readable-current-projection-20261121.md)
+and [integration evidence and limits](evidence/primeclaw-59-current-integration-20261121.md).
 
 The confirmed maintenance window is one linear operation:
 
@@ -464,8 +493,8 @@ never sent to issue show/history/provenance commands or included in task counts.
 Malformed memory rows, unsupported record types and genuine invalid, duplicate
 or missing issues refuse inspection. The reader does not require SQL or clear
 source export filters. A filter that actually omits an issue produces an
-inventory mismatch and leaves the source configuration unchanged. Beads source
-packages retain the raw CLI version and complete raw status-catalog response
+inventory mismatch and leaves the source configuration unchanged. The in-memory
+Beads source capture retains the raw CLI version and complete status-catalog response
 alongside current export rows, exact export lines and current native
 `show --long --include-comments` views. They do not read per-ticket revision
 history, database events or provenance logs. Migration-only source reads bind

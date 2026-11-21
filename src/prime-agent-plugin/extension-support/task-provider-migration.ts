@@ -6,9 +6,9 @@
  * Markdown bytes, placement, and Git history. Beads snapshots bind the complete
  * current export, independent issue inventory and long native views/comments;
  * they neither read nor bind old revisions, database events or provenance logs.
- * Pair-specific writers use only supported native CLIs and verify current
- * source content before the one-way ownership/source cutover. The legacy encoded
- * current-state destination package remains pending readable-projection work.
+ * Pair-specific writers use supported native Web/CLI operations and verify full
+ * readable current content before the one-way ownership/source cutover. Source
+ * identity lives once in the existing receipt, not in per-ticket archives.
  */
 import { createHash } from "node:crypto";
 import {
@@ -64,6 +64,13 @@ import {
   type TaskEpisodeOwnershipRecord,
 } from "./episode-ownership.ts";
 
+import { projectBeadsCurrentTask, authorBeadsCurrentTask, assertBeadsCurrentTask } from "./beads-backlog-current.ts";
+import { startMigrationBacklogWeb, MigrationBacklogWebError } from "./migration-backlog-web.ts";
+
+type BeadsMigrationWeb = Awaited<ReturnType<typeof startMigrationBacklogWeb>>;
+type OpenBeadsMigrationWeb = (storeDir: string) => Promise<BeadsMigrationWeb>;
+interface BeadsCurrentConfiguration { priorities: string[]; types: string[] }
+
 const RECEIPT_TITLE = "Prime Claw task-provider migration receipt";
 const RECEIPT_MARKER = "prime-claw-task-provider-migration-receipt-v1";
 const SOURCE_MARKER = "prime-claw-task-provider-migration-source-v1";
@@ -113,6 +120,8 @@ export interface ProviderMigrationReceipt {
   semanticPlacement: string;
   /** Exact managed native Beads values applied for ambiguous Backlog projections. */
   beadsNativePlacements?: BeadsNativePlacement[];
+  /** Initial retiring Beads store/connection identity, once per migration. */
+  beadsSourceIdentity?: Record<string, unknown>;
   /** Native memory outputs, separate from issue-only counts and mappings. */
   backlogMemoryOutputs?: BacklogMemoryOutputs;
 }
@@ -276,7 +285,20 @@ function migrationRunner(supplied?: CommandRunner): CommandRunner {
     run(command, args, options) {
       // Supplied runners keep their existing seam, including synthetic runners.
       const captureOptions = { ...options, allowFailure: true };
-      const result = supplied ? supplied.run(command, args, captureOptions) : processRunner.runFileBacked(command, args, captureOptions);
+      // BACKLOG_CWD overrides cwd natively. Pin only this synchronous migration
+      // call, including supplied runners, and restore the ambient value before
+      // returning. The owned async Web transport snapshots its own explicit env.
+      const previousBacklogCwd = process.env.BACKLOG_CWD;
+      let result: NativeCommand;
+      try {
+        if (command === "backlog" && options?.cwd) process.env.BACKLOG_CWD = options.cwd;
+        result = supplied ? supplied.run(command, args, captureOptions) : processRunner.runFileBacked(command, args, captureOptions);
+      } finally {
+        if (command === "backlog") {
+          if (previousBacklogCwd === undefined) delete process.env.BACKLOG_CWD;
+          else process.env.BACKLOG_CWD = previousBacklogCwd;
+        }
+      }
       // Resource/spawn failures must not be mistaken for a negative discovery
       // probe. Nonzero native-provider commands also cannot certify source data.
       // Ordinary negative Git existence/ancestry probes retain their semantics.
@@ -1421,31 +1443,6 @@ function migrateBacklogToBeads(
   };
 }
 
-function backlogSourcePackage(pkg: BeadsTaskPackage, source: BeadsSnapshot, semanticPlacement: string): string {
-  return JSON.stringify({
-    marker: SOURCE_MARKER,
-    sourceProvider: "beads",
-    sourceRevision: source.revision,
-    sourceDigest: source.digest,
-    sourceIdentity: source.sourceIdentity,
-    sourceVersion: source.sourceVersion,
-    statusCatalog: source.statusCatalog,
-    memories: source.memories,
-    sourceTaskId: pkg.sourceTaskId,
-    exportRow: pkg.exportRow,
-    exportLineBase64: pkg.exportLineBase64,
-    nativeView: pkg.nativeView,
-    semanticPlacement,
-  });
-}
-
-function chunkComment(value: string): string[] {
-  const encoded = Buffer.from(value).toString("base64");
-  const size = 24_000;
-  const count = Math.max(1, Math.ceil(encoded.length / size));
-  return Array.from({ length: count }, (_, index) => `${SOURCE_MARKER} part=${index + 1}/${count}\n${encoded.slice(index * size, (index + 1) * size)}`);
-}
-
 function backlogCreateId(output: string): string {
   const heading = /^Task ([A-Z][A-Z0-9_-]*-\d+(?:\.\d+)*) -/m.exec(output);
   if (heading) return heading[1];
@@ -1577,7 +1574,7 @@ ${beadsMemoryProvenance(source)}`;
 const MEMORY_USER_TITLE = "USER: Review imported Beads memories and integrate or delete";
 
 /** Pair-specific native writer; returned identities join the existing receipt. */
-export function importBeadsMemoryDocuments(source: BeadsMemorySource, runner: CommandRunner): BacklogMemoryOutputs {
+export function importBeadsMemoryDocuments(source: BeadsMemorySource, runner: CommandRunner, taskType = "task"): BacklogMemoryOutputs {
   const outputs: BacklogMemoryOutputs = { documents: [] };
   if (!source.memories.length) return outputs;
   for (const [index, memory] of source.memories.entries()) {
@@ -1586,7 +1583,7 @@ export function importBeadsMemoryDocuments(source: BeadsMemorySource, runner: Co
   outputs.index = createBacklogMemoryDocument(runner, source.projectRoot, "Imported Beads memories source index", beadsMemoryIndexBody(source, outputs.documents));
   const title = MEMORY_USER_TITLE;
   const description = beadsMemoryUserDescription(source, outputs.index);
-  const created = runRequired(runner, "backlog", ["task", "create", title, "--status", "In Design", "--type", "task", "--description", description,
+  const created = runRequired(runner, "backlog", ["task", "create", title, "--status", "In Design", "--type", taskType, "--description", description,
     "--doc", outputs.index.path, "--no-dod-defaults", "--plain"], source.projectRoot, "create one USER memory review task");
   const taskId = backlogCreateId(created.stdout);
   const nativeView = backlogTaskView(runner, source.projectRoot, taskId);
@@ -1642,13 +1639,6 @@ function assertCommittedBacklogMemoryOutputs(
   }
 }
 
-function beadsTaskType(value: unknown): string {
-  const raw = String(value ?? "task").toLowerCase();
-  const aliases: Record<string, string> = { story: "feature", milestone: "task", epic: "task", decision: "task", "merge-request": "task", molecule: "task", gate: "task", convoy: "task" };
-  const mapped = aliases[raw] ?? raw;
-  return ["bug", "feature", "enhancement", "task", "chore", "docs", "spike"].includes(mapped) ? mapped : "task";
-}
-
 function topologicalBeadsPackages(tasks: BeadsTaskPackage[]): BeadsTaskPackage[] {
   const byId = new Map(tasks.map((task) => [task.sourceTaskId, task]));
   const ordered: BeadsTaskPackage[] = [];
@@ -1692,22 +1682,36 @@ function backlogDestinationViews(runner: CommandRunner, projectRoot: string, sto
   }
 }
 
+/** Initial native references identify imports, never certify their content. */
+function backlogCurrentSourceReference(view: JsonObject): { sourceTaskId: string; sourceRevision: string; sourceDigest: string } | undefined {
+  const references = Array.isArray(view.task.references) ? view.task.references : [];
+  const ids = references.filter((value: unknown) => typeof value === "string" && value.startsWith("prime-claw-beads-source:"));
+  const current = references.filter((value: unknown) => typeof value === "string" && value.startsWith("prime-claw-beads-current:"));
+  if (!ids.length && !current.length) return undefined;
+  if (ids.length !== 1 || current.length !== 1) throw new Error("Backlog import has conflicting initial source references");
+  let binding: JsonObject;
+  try { binding = asObject(JSON.parse(current[0].slice("prime-claw-beads-current:".length)), "Backlog initial current binding"); }
+  catch { throw new Error("Backlog import has unreadable initial source references"); }
+  if (typeof binding.sourceTaskId !== "string" || !binding.sourceTaskId
+      || ids[0] !== `prime-claw-beads-source:${binding.sourceTaskId}`
+      || typeof binding.sourceRevision !== "string" || !binding.sourceRevision
+      || typeof binding.sourceDigest !== "string" || !binding.sourceDigest) {
+    throw new Error("Backlog import has inconsistent initial source references");
+  }
+  return { sourceTaskId: binding.sourceTaskId, sourceRevision: binding.sourceRevision, sourceDigest: binding.sourceDigest };
+}
+
 function backlogDestinationViewById(views: Map<string, JsonObject>, id: string, sourceTaskId?: string): JsonObject | undefined {
-  const matches = [...views.values()].filter((view) => view.task.id === id &&
-    (Array.isArray(view.task.comments) ? view.task.comments : []).some((comment: JsonObject) => {
-      if (!sourceTaskId) return isBacklogReceiptComment(comment);
-      const text = String(comment.text ?? comment.content ?? comment.body ?? "");
-      if (!text.startsWith(`${SOURCE_MARKER} mapping `)) return false;
-      const marker = asObject(parseJson(text.slice(`${SOURCE_MARKER} mapping `.length), `Backlog migration marker ${id}`), `Backlog migration marker ${id}`);
-      return marker.sourceTaskId === sourceTaskId;
-    }));
+  const matches = [...views.values()].filter((view) => view.task.id === id && (sourceTaskId
+    ? backlogCurrentSourceReference(view)?.sourceTaskId === sourceTaskId
+    : (Array.isArray(view.task.comments) ? view.task.comments : []).some(isBacklogReceiptComment)));
   if (matches.length > 1) throw new Error(`Backlog migration identity ${id} repeats exact migration provenance`);
   return matches[0];
 }
 
 function backlogReceiptId(views: Map<string, JsonObject>): string | undefined {
-  const receipts = [...views.values()].filter((view) =>
-    (Array.isArray(view.task.comments) ? view.task.comments : []).some(isBacklogReceiptComment));
+  const receipts = [...views.values()].filter((view) => !backlogCurrentSourceReference(view)
+    && (Array.isArray(view.task.comments) ? view.task.comments : []).some(isBacklogReceiptComment));
   if (receipts.length > 1) throw new Error("Backlog destination contains more than one migration receipt");
   return receipts[0]?.task.id;
 }
@@ -1750,7 +1754,16 @@ function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: st
   for (const view of views.values()) {
     const id = view.task.id;
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
-    const marker = comments.map((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "")).find((text: string) => text.startsWith(`${SOURCE_MARKER} mapping `));
+    const binding = backlogCurrentSourceReference(view);
+    if (binding) {
+      if (binding.sourceRevision !== source.revision || binding.sourceDigest !== source.digest
+          || !source.tasks.some((task) => task.sourceTaskId === binding.sourceTaskId)) throw new Error(`Backlog destination task ${id} belongs to a different source snapshot`);
+      if (mapping[binding.sourceTaskId]) throw new Error(`Backlog destination repeats source task ${binding.sourceTaskId}`);
+      mapping[binding.sourceTaskId] = id;
+      continue; // Real source comments never become receipt/legacy metadata.
+    }
+    const legacy = comments.some((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "").startsWith(`${SOURCE_MARKER} mapping `));
+    if (legacy) throw new Error("legacy Backlog import evidence is preserved but does not prove current readable content; no automatic reuse or repair");
     const receipt = comments.some(isBacklogReceiptComment);
     if (receipt) {
       const notes = String(view.task.implementationNotes ?? "");
@@ -1763,13 +1776,7 @@ function existingBacklogMigrationMappings(runner: CommandRunner, projectRoot: st
       }
       continue;
     }
-    if (!marker) continue; // Unrelated original records are preserved, never remapped.
-    const parsed = asObject(parseJson(marker.slice(`${SOURCE_MARKER} mapping `.length), `Backlog migration marker ${id}`), `Backlog migration marker ${id}`);
-    if (parsed.sourceRevision !== source.revision || parsed.sourceDigest !== source.digest
-        || !source.tasks.some((task) => task.sourceTaskId === parsed.sourceTaskId)) throw new Error(`Backlog destination task ${id} belongs to a different source snapshot`);
-    const sourceTaskId = String(parsed.sourceTaskId);
-    if (mapping[sourceTaskId]) throw new Error(`Backlog destination repeats source task ${sourceTaskId}`);
-    mapping[sourceTaskId] = id;
+    // Unrelated original records are preserved, never remapped.
   }
   return mapping;
 }
@@ -1783,38 +1790,33 @@ function nativeBacklogComment(runner: CommandRunner, projectRoot: string, taskId
   runRequired(runner, "backlog", ["task", "edit", "--comment", text, "--comment-author", author, "--plain", "--", taskId], projectRoot, `append Backlog provenance to ${taskId}`);
 }
 
-function createBacklogTaskFromBeads(pkg: BeadsTaskPackage, source: BeadsSnapshot, projectRoot: string, runner: CommandRunner,
-  mapping: Record<string, string>, semanticPlacement: string): string {
-  const row = pkg.nativeView;
-  const parentSource = typeof row.parent === "string" ? row.parent : typeof pkg.exportRow.parent === "string" ? pkg.exportRow.parent : null;
-  const numericPriority = Math.min(4, Math.max(0, Number(row.priority ?? 2)));
-  const backlogPriority = numericPriority <= 1 ? "High" : numericPriority >= 3 ? "Low" : "Medium";
-  const args = ["task", "create", String(row.title ?? pkg.sourceTaskId), "--status", "In Progress", "--type", beadsTaskType(row.issue_type ?? row.type),
-    "--priority", backlogPriority, "--no-dod-defaults"];
-  if (typeof row.description === "string") args.push("--description", row.description);
-  if (typeof row.design === "string" && row.design) args.push("--plan", row.design);
-  if (typeof row.notes === "string" && row.notes) args.push("--notes", row.notes);
-  if (typeof row.acceptance_criteria === "string" && row.acceptance_criteria) args.push("--ac", row.acceptance_criteria);
-  if (Array.isArray(row.labels) && row.labels.length) args.push("--labels", row.labels.map(String).join(","));
-  if (typeof row.assignee === "string" && row.assignee) args.push("--assignee", row.assignee);
-  if (parentSource) {
-    const parent = mapping[parentSource];
-    if (!parent) throw new Error(`Beads task ${pkg.sourceTaskId} parent ${parentSource} has no destination mapping`);
-    args.push("--parent", parent);
-  }
-  args.push("--plain");
-  const created = runRequired(runner, "backlog", args, projectRoot, `create Backlog task for ${pkg.sourceTaskId}`);
-  const id = backlogCreateId(created.stdout);
-  nativeBacklogComment(runner, projectRoot, id, `${SOURCE_MARKER} mapping ${JSON.stringify({ sourceTaskId: pkg.sourceTaskId, sourceRevision: source.revision, sourceDigest: source.digest })}`, "prime-claw-migration");
-  for (const comment of chunkComment(backlogSourcePackage(pkg, source, semanticPlacement))) nativeBacklogComment(runner, projectRoot, id, comment, "prime-claw-migration");
-  const nativeComments = Array.isArray(row.comments) ? row.comments : Array.isArray(pkg.exportRow.comments) ? pkg.exportRow.comments : [];
-  for (const comment of nativeComments) {
-    const body = String(comment.text ?? comment.body ?? comment.content ?? "");
-    const author = String(comment.author ?? comment.created_by ?? "unknown");
-    const at = String(comment.created_at ?? comment.createdAt ?? "unknown-time");
-    nativeBacklogComment(runner, projectRoot, id, `[source Beads comment at ${at}]\n${body}`, author);
-  }
-  return id;
+/** Lossless native configuration read; CLI config get joins lists with commas. */
+async function beadsCurrentConfiguration(web: BeadsMigrationWeb): Promise<BeadsCurrentConfiguration> {
+  const config = asObject(await web.readConfiguration(), "Backlog current configuration");
+  const values = (key: "priorities" | "types"): string[] => {
+    const value = config[key];
+    if (value === undefined) return [];
+    if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) {
+      throw new Error("Backlog current configuration has an invalid native priority/type list");
+    }
+    return value;
+  };
+  return { priorities: values("priorities"), types: values("types") };
+}
+
+/** Same final current-content projection for authoring, reuse, replay and refresh. */
+function beadsCurrentProjection(pkg: BeadsTaskPackage, source: BeadsSnapshot, mapping: Record<string, string>,
+  configuration: BeadsCurrentConfiguration, includeDependencies = true) {
+  const parentSource = typeof pkg.nativeView.parent === "string" ? pkg.nativeView.parent
+    : typeof pkg.exportRow.parent === "string" ? pkg.exportRow.parent : "";
+  const parentTaskId = parentSource ? mapping[parentSource] : undefined;
+  if (parentSource && !parentTaskId) throw new Error(`Beads task ${pkg.sourceTaskId} parent has no destination mapping`);
+  return projectBeadsCurrentTask(pkg, {
+    sourceRevision: source.revision, sourceDigest: source.digest,
+    status: statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status),
+    parentTaskId, dependencies: includeDependencies ? dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId) : [],
+    ...configuration,
+  });
 }
 
 function dependencyIds(pkg: BeadsTaskPackage): string[] {
@@ -1833,10 +1835,10 @@ function commitBacklogDestination(runner: CommandRunner, prepared: ExplicitBackl
   return head;
 }
 
-function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: string, source: BeadsSnapshot, receiptTaskId?: string): string {
+function ensureBacklogReceiptPlaceholder(runner: CommandRunner, projectRoot: string, source: BeadsSnapshot, receiptTaskId: string | undefined, taskType: string): string {
   if (receiptTaskId) return receiptTaskId;
   const pending = { marker: RECEIPT_MARKER, pending: true, sourceProvider: "beads", targetProvider: "backlog", sourceRevision: source.revision, sourceDigest: source.digest };
-  const created = runRequired(runner, "backlog", ["task", "create", RECEIPT_TITLE, "--status", "In Progress", "--type", "task", "--notes", `\`\`\`json\n${JSON.stringify(pending, null, 2)}\n\`\`\``, "--no-dod-defaults", "--plain"], projectRoot, "reserve Backlog migration receipt identity");
+  const created = runRequired(runner, "backlog", ["task", "create", RECEIPT_TITLE, "--status", "In Progress", "--type", taskType, "--notes", `\`\`\`json\n${JSON.stringify(pending, null, 2)}\n\`\`\``, "--no-dod-defaults", "--plain"], projectRoot, "reserve Backlog migration receipt identity");
   const id = backlogCreateId(created.stdout);
   nativeBacklogComment(runner, projectRoot, id, `${RECEIPT_MARKER}\nPending complete destination proof for ${source.revision}; this task becomes the sole final receipt.`, "prime-claw-migration");
   return id;
@@ -1870,20 +1872,6 @@ function assertExactBacklogReceipt(
       || !hasMarker) {
     throw new Error(`Backlog destination receipt ${receiptTaskId} native payload does not exactly match the verified migration receipt`);
   }
-}
-
-function migratedBacklogPackage(view: JsonObject): string {
-  const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
-  const parts: string[] = comments.map((comment: JsonObject) => String(comment.text ?? comment.body ?? comment.content ?? ""))
-    .filter((text: string) => text.startsWith(`${SOURCE_MARKER} part=`));
-  if (!parts.length) throw new Error(`Backlog destination task ${String(view.task.id)} has no migration provenance chunks`);
-  const parsed: Array<{ index: number; count: number; value: string }> = parts.map((text: string) => {
-    const match = new RegExp(`^${SOURCE_MARKER} part=(\\d+)/(\\d+)\\n([A-Za-z0-9+/=]+)$`).exec(text);
-    if (!match) throw new Error(`Backlog destination task ${String(view.task.id)} has malformed migration provenance`);
-    return { index: Number(match[1]), count: Number(match[2]), value: match[3] };
-  }).sort((a, b) => a.index - b.index);
-  if (parsed.some((part) => part.count !== parsed.length) || parsed.some((part, index) => part.index !== index + 1)) throw new Error(`Backlog destination task ${String(view.task.id)} has incomplete migration provenance`);
-  return Buffer.from(parsed.map((part) => part.value).join(""), "base64").toString("utf8");
 }
 
 interface ExplicitBacklogMigrationWorkspace {
@@ -1953,8 +1941,8 @@ function captureBacklogDestinationBaseline(
 ): BacklogDestinationBaseline {
   const records = new Map([...views].filter(([, view]) => {
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
-    return view.task.id !== memoryOutputs.userTask?.taskId && !comments.some((comment: JsonObject) => isBacklogReceiptComment(comment)
-      || String(comment.text ?? comment.content ?? comment.body ?? "").startsWith(`${SOURCE_MARKER} mapping `));
+    return view.task.id !== memoryOutputs.userTask?.taskId && !backlogCurrentSourceReference(view)
+      && !comments.some(isBacklogReceiptComment);
   }).map(([path, view]) => [path, preservedBacklogNativeView(view)]));
   const migrationPaths = new Set([
     ...[...views.keys()].filter((path) => !records.has(path)),
@@ -2032,9 +2020,9 @@ function originalBacklogLayout(projectRoot: string, runner: CommandRunner) {
 }
 
 /** Read-only proof for the observed fresh-store, explicit same-migration replay. */
-function freshBacklogMigrationReplay(
-  source: BeadsSnapshot, runner: CommandRunner,
-): (worktree: string) => () => void {
+async function freshBacklogMigrationReplay(
+  source: BeadsSnapshot, runner: CommandRunner, openWeb: OpenBeadsMigrationWeb,
+): Promise<(worktree: string) => () => void> {
   const storeDir = join(source.projectRoot, ".backlog");
   const selected = detectExplicitTaskProvider(source.projectRoot, "backlog", runner);
   if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || selected.evidence.storeDir !== storeDir
@@ -2056,6 +2044,7 @@ function freshBacklogMigrationReplay(
   const receipt = asObject(parseJson(payload, "same-migration replay receipt"), "same-migration replay receipt") as Omit<ProviderMigrationReceipt, "destinationReceiptRevision">;
   if (receipt.schemaVersion !== 1 || receipt.marker !== RECEIPT_MARKER || receipt.sourceProvider !== "beads" || receipt.targetProvider !== "backlog"
       || receipt.sourceRevision !== source.revision || receipt.sourceDigest !== source.digest || canonical(receipt.taskCounts) !== canonical(source.counts)
+      || canonical(receipt.beadsSourceIdentity) !== canonical(source.sourceIdentity)
       || !GIT_OID.test(receipt.destinationDataRevision) || typeof receipt.semanticPlacement !== "string") {
     throw new Error("same-migration layout replay receipt does not bind the complete exact source capture");
   }
@@ -2067,14 +2056,13 @@ function freshBacklogMigrationReplay(
   assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [receipt.destinationDataRevision, head], runner);
   if (views.size !== source.counts.total + 1 + (source.memories.length ? 1 : 0) || Object.keys(mapping).length !== source.counts.total
       || canonical(receipt.mappings) !== canonical(expectedMappings)) throw new Error("fresh same-migration replay inventory/mappings do not match the verified receipt");
+  const configuration = await beadsCurrentConfiguration(await openWeb(storeDir));
   const paths = backlogPhysicalTaskPaths(storeDir);
   const tasks = source.tasks.map((pkg) => {
     const id = mapping[pkg.sourceTaskId];
     const view = backlogDestinationViewById(views, id, pkg.sourceTaskId);
-    if (!view || canonical(parseJson(migratedBacklogPackage(view), `replay source package ${id}`))
-        !== canonical(parseJson(backlogSourcePackage(pkg, source, receipt.semanticPlacement), `complete source package ${pkg.sourceTaskId}`))) {
-      throw new Error(`same-migration replay does not preserve the exact native source package ${pkg.sourceTaskId}`);
-    }
+    if (!view) throw new Error(`same-migration replay cannot read current task ${pkg.sourceTaskId}`);
+    assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration), id);
     assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
     return view;
   });
@@ -2133,14 +2121,15 @@ function migrationCodeProjection(projectRoot: string, runner: CommandRunner, all
   return sha256(canonical({ diff, index, files: untracked.filter(layoutPath).map((path) => [path, backlogFileBytes(join(projectRoot, path))]) }));
 }
 
-function migrateBeadsToBacklog(
+async function migrateBeadsToBacklog(
   source: BeadsSnapshot,
   runner: CommandRunner,
   actor: string,
   timestamp: string,
   semanticPlacement: string,
   ownershipRows: Array<{ ownerSessionId: string; taskId: string; worktree: string; verifyCodeProjection?: () => void }>,
-): DestinationCandidate {
+  openWeb: OpenBeadsMigrationWeb,
+): Promise<DestinationCandidate> {
   const originalLayout = originalBacklogLayout(source.projectRoot, runner);
   const activeCodeProjections = new Map<string, () => void>();
   const activeLayoutPublishers = new Map<string, () => string>();
@@ -2168,22 +2157,62 @@ function migrateBeadsToBacklog(
   const baseline = captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, originalViews, reusedMemoryOutputs ?? { documents: [] });
   const expectedCount = baseline.records.size + source.counts.total + 1 + (source.memories.length ? 1 : 0);
   const reusedDestinationIds = new Set(Object.values(mapping));
-  for (const pkg of topologicalBeadsPackages(source.tasks)) {
-    if (!mapping[pkg.sourceTaskId]) mapping[pkg.sourceTaskId] = createBacklogTaskFromBeads(pkg, source, source.projectRoot, runner, mapping, semanticPlacement);
-  }
-  const reservedReceiptId = ensureBacklogReceiptPlaceholder(runner, source.projectRoot, source, backlogReceiptId(originalViews));
-  for (const pkg of source.tasks) {
-    const id = mapping[pkg.sourceTaskId];
-    if (reusedDestinationIds.has(id)) continue;
-    const deps = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId);
-    if (deps.length) runRequired(runner, "backlog", ["task", "edit", "--depends-on", deps.join(","), "--plain", "--", id], source.projectRoot, `migrate dependencies for ${pkg.sourceTaskId}`);
-    const status = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
-    runRequired(runner, "backlog", ["task", "edit", "--status", status, "--plain", "--", id], source.projectRoot, `migrate status for ${pkg.sourceTaskId}`);
-    if (pkg.classification === "archived") {
-      runRequired(runner, "backlog", ["task", "archive", id], source.projectRoot, `archive evidenced Backlog task ${id}`);
+  const web = await openWeb(storeDir);
+  let configuration: BeadsCurrentConfiguration;
+  try {
+    configuration = await beadsCurrentConfiguration(web);
+    // Initial references identify partial allocations. Only an existing complete
+    // receipt AND complete current readback permit reuse; never fill or replay a
+    // partially authored record, or continue with another source task after it.
+    if (reusedDestinationIds.size || existingReceiptId) {
+      const expectedMappings = source.tasks.map((pkg) => ({ sourceTaskId: pkg.sourceTaskId, destinationTaskId: mapping[pkg.sourceTaskId] }));
+      if (!existingReceiptId || !existingReceipt || reusedDestinationIds.size !== source.counts.total
+          || canonical(existingReceipt.mappings) !== canonical(expectedMappings)
+          || canonical(existingReceipt.beadsSourceIdentity) !== canonical(source.sourceIdentity)) {
+        throw new Error("existing Backlog import is incomplete or unverified; preserve partial records without automatic resend, completion or allocation");
+      }
+      assertExactBacklogReceipt(originalViews, existingReceiptId, existingReceipt as Omit<ProviderMigrationReceipt, "destinationReceiptRevision">);
+      const paths = backlogPhysicalTaskPaths(storeDir);
+      for (const pkg of source.tasks) {
+        const id = mapping[pkg.sourceTaskId];
+        const view = backlogDestinationViewById(originalViews, id, pkg.sourceTaskId);
+        if (!view) throw new Error("existing Backlog import has no complete native current readback");
+        assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration), id);
+        assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
+      }
     }
+    for (const pkg of topologicalBeadsPackages(source.tasks)) {
+      if (!mapping[pkg.sourceTaskId]) {
+        mapping[pkg.sourceTaskId] = await authorBeadsCurrentTask(web, beadsCurrentProjection(pkg, source, mapping, configuration, false));
+      }
+    }
+    for (const pkg of source.tasks) {
+      const id = mapping[pkg.sourceTaskId];
+      if (reusedDestinationIds.has(id)) continue;
+      const projection = beadsCurrentProjection(pkg, source, mapping, configuration);
+      if ((projection.payload.dependencies as string[]).length) {
+        await web.updateTask(id, { dependencies: projection.payload.dependencies });
+      }
+      if (pkg.classification === "archived") {
+        runRequired(runner, "backlog", ["task", "archive", id], source.projectRoot, `archive evidenced Backlog task ${id}`);
+      }
+    }
+    const paths = backlogPhysicalTaskPaths(storeDir);
+    for (const pkg of source.tasks) {
+      const id = mapping[pkg.sourceTaskId];
+      const view = await web.readTask(id);
+      assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration), id);
+      assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
+    }
+  } finally {
+    // Await owned server/readback descendants before synchronous publication or
+    // any ownership/source cutover. No provider records are cleaned up here.
+    await web.close();
   }
-  const memoryOutputs = reusedMemoryOutputs ?? importBeadsMemoryDocuments(source, runner);
+  const bookkeepingType = configuration.types.find((value) => value.trim().toLowerCase() === "task")
+    ?? configuration.types[0] ?? "task";
+  const reservedReceiptId = ensureBacklogReceiptPlaceholder(runner, source.projectRoot, source, existingReceiptId, bookkeepingType);
+  const memoryOutputs = reusedMemoryOutputs ?? importBeadsMemoryDocuments(source, runner, bookkeepingType);
   backlogMemoryEvidence(source, memoryOutputs, runner);
   assertPreservedBacklogBaseline(baseline, storeDir, runner);
   const dataRevision = commitBacklogDestination(runner, prepared, "prime-claw: migrate Beads task history");
@@ -2196,32 +2225,8 @@ function migrateBeadsToBacklog(
     const id = mapping[pkg.sourceTaskId];
     const view = backlogDestinationViewById(dataViews, id, pkg.sourceTaskId);
     if (!view) throw new Error(`Backlog destination task ${id} is not exactly readable`);
-    const packageText = migratedBacklogPackage(view);
-    if (canonical(parseJson(packageText, `Backlog migration package ${id}`)) !== canonical(parseJson(backlogSourcePackage(pkg, source, semanticPlacement), `source migration package ${pkg.sourceTaskId}`))) {
-      throw new Error(`Backlog destination did not preserve the exact source package for ${pkg.sourceTaskId}`);
-    }
-    const sourceRow = pkg.nativeView;
-    const expectedPriorityNumber = Math.min(4, Math.max(0, Number(sourceRow.priority ?? 2)));
-    const expectedPriority = expectedPriorityNumber <= 1 ? "high" : expectedPriorityNumber >= 3 ? "low" : "medium";
-    const projectionPairs: Array<[string, unknown, unknown]> = [
-      ["title", view.task.title, sourceRow.title],
-      ["description", view.task.description ?? "", sourceRow.description ?? ""],
-      ["plan", view.task.implementationPlan ?? "", sourceRow.design ?? ""],
-      ["notes", view.task.implementationNotes ?? "", sourceRow.notes ?? ""],
-      ["type", String(view.task.type ?? "").toLowerCase(), beadsTaskType(sourceRow.issue_type ?? sourceRow.type)],
-      ["priority", String(view.task.priority ?? "").toLowerCase(), expectedPriority],
-      ["labels", Array.isArray(view.task.labels) ? view.task.labels.map(String).sort() : [], Array.isArray(sourceRow.labels) ? sourceRow.labels.map(String).sort() : []],
-    ];
-    for (const [field, actual, expected] of projectionPairs) {
-      if (canonical(actual) !== canonical(expected)) throw new Error(`Backlog destination ${field} projection mismatch for ${pkg.sourceTaskId}: expected ${canonical(expected)}, observed ${canonical(actual)}`);
-    }
+    assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration), id);
     const taskPath = relative(source.projectRoot, assertBacklogLifecyclePlacement(pkg, id, view, storeDir, dataPaths)).replace(/\\/g, "/");
-    const sourceParent = typeof pkg.nativeView.parent === "string" ? pkg.nativeView.parent : typeof pkg.exportRow.parent === "string" ? pkg.exportRow.parent : "";
-    const expectedParent = sourceParent ? mapping[sourceParent] ?? sourceParent : "";
-    const actualParent = String(view.task.parentTaskId ?? "");
-    if (expectedParent !== actualParent) throw new Error(`Backlog destination parent mapping mismatch for ${pkg.sourceTaskId}`);
-    const expectedDependencies = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId).sort();
-    assertSameIds(relationshipIds(view.task.dependencies, id), expectedDependencies, `Backlog destination dependencies for ${pkg.sourceTaskId}`);
     return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath, taskEvidence: view };
   });
   const destinationDigest = (tasks: DestinationTask[]) => {
@@ -2234,6 +2239,7 @@ function migrateBeadsToBacklog(
   if (transitions.some((row) => !row.destinationTaskId)) throw new Error("active ownership has no Backlog destination mapping");
   const receiptBase = migrationReceiptBase(source, "backlog", dataRevision, destinationDataDigest,
     destinationTasks.map(({ sourceTaskId, destinationTaskId }) => ({ sourceTaskId, destinationTaskId })), transitions, actor, timestamp, semanticPlacement);
+  receiptBase.beadsSourceIdentity = source.sourceIdentity;
   if (source.memories.length) receiptBase.backlogMemoryOutputs = memoryOutputs;
   const receiptTaskId = createOrUpdateBacklogReceipt(runner, source.projectRoot, receiptBase, reservedReceiptId);
   assertPreservedBacklogBaseline(baseline, storeDir, runner);
@@ -2252,7 +2258,9 @@ function migrateBeadsToBacklog(
     const refreshed = destinationTasks.map((task) => {
       const taskEvidence = backlogDestinationViewById(views, task.destinationTaskId, task.sourceTaskId);
       if (!taskEvidence) throw new Error(`Backlog destination task ${task.destinationTaskId} is not exactly readable after receipt`);
-      assertBacklogLifecyclePlacement(sourceById.get(task.sourceTaskId)!, task.destinationTaskId, taskEvidence, storeDir, paths);
+      const pkg = sourceById.get(task.sourceTaskId)!;
+      assertBeadsCurrentTask(taskEvidence, beadsCurrentProjection(pkg, source, mapping, configuration), task.destinationTaskId);
+      assertBacklogLifecyclePlacement(pkg, task.destinationTaskId, taskEvidence, storeDir, paths);
       return { ...task, taskEvidence };
     });
     return { revision: exact, digest: destinationDigest(refreshed), tasks: refreshed, receiptTaskId };
@@ -2634,6 +2642,21 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
   const runner = migrationRunner(options.runner);
   let source: SourceSnapshot | undefined;
   let ownershipSwitch: ActiveTaskProviderOwnershipSwitchResult | undefined;
+  let backlogWeb: BeadsMigrationWeb | undefined;
+  let backlogWebStore: string | undefined;
+  // Fresh replay and forward import share this one migration-owned browser.
+  // Allocation happens only after the caller proves/prepares its exact store.
+  const openBacklogWeb: OpenBeadsMigrationWeb = async (storeDir) => {
+    if (source?.provider !== "beads") throw new Error("native current Web ingress requires the exact Beads source");
+    const exactStore = realpathSync(storeDir);
+    if (backlogWeb) {
+      if (backlogWebStore !== exactStore) throw new Error("migration native Web store changed");
+      return backlogWeb;
+    }
+    backlogWebStore = exactStore;
+    backlogWeb = await startMigrationBacklogWeb({ cwd: source.projectRoot, backlogDirectory: exactStore });
+    return backlogWeb;
+  };
   try {
     if (options.targetProvider !== "backlog") return blocked("unsupported-direction", "provider migration supports only Beads-to-Backlog", "request an explicit Beads-to-Backlog inspection; reverse migration is not supported", { targetProvider: options.targetProvider });
     if (!options.confirmedSwitch) return blocked("confirmation-required", "provider switch requires explicit operator confirmation", "inspect the migration, present the exact source revision and semantic placement, then call switch-confirm with confirmedSwitch=true", { targetProvider: options.targetProvider });
@@ -2648,7 +2671,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     source = captureConfirmedSource(project.root, options.targetProvider, options.expectedSourceRevision, runner);
     if (source.provider === options.targetProvider) return blocked("same-provider", `the selected provider is already ${source.provider}`, "choose the other supported provider", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     if (source.revision !== options.expectedSourceRevision) return blocked("source-revision-changed", `confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`, "quiesce mutations, request a fresh inspection, and confirm that exact revision", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
-    const replayProjection = initialCodeStatus && source.provider === "beads" ? freshBacklogMigrationReplay(source, runner) : undefined;
+    const replayProjection = initialCodeStatus && source.provider === "beads" ? await freshBacklogMigrationReplay(source, runner, openBacklogWeb) : undefined;
     if (initialCodeStatus && !replayProjection) throw new Error(`source task history is not clean: ${initialCodeStatus.trim()}`);
     const verifyInitialProjection = replayProjection?.(project.root);
     verifyInitialProjection?.();
@@ -2669,7 +2692,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     verifyInitialProjection?.();
     const candidate = source.provider === "backlog"
       ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), beadsPlacements, ownershipRows)
-      : migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows);
+      : await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb);
     for (const owner of ownershipRows) {
       candidate.prepareActiveWorktree(owner.worktree);
       owner.verifyCodeProjection = candidate.activeCodeProjections?.get(owner.worktree);
@@ -2773,7 +2796,12 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     };
     return { status: "completed", receipt, receiptTaskId: candidate.receiptTaskId, sourceAbsent: true, selectedProvider: candidate.provider };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    // Fresh replay can fail before the forward writer's finally is entered.
+    // A failed owned-stop proof is itself the reported uncertainty; no retry.
+    try { await backlogWeb?.close(); } catch (stopError) { error = stopError; }
+    const message = (error instanceof Error ? error.message : String(error))
+      + (error instanceof MigrationBacklogWebError && error.artifactDirectory
+        ? ` Private transport evidence: ${error.artifactDirectory}` : "");
     const sourcePath = source?.evidence.storeDir ?? "the exact inspected source store";
     const destinationPath = source
       ? join(source.projectRoot, options.targetProvider === "beads" ? ".beads" : ".backlog")
@@ -2783,9 +2811,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       message,
       ownershipSwitch
         ? `stop all task mutation and recover the exact source ${sourcePath}, destination ${destinationPath}, and ownership evidence; do not create another destination`
-        : error instanceof MigrationCommandFailure
-          ? `the source remains authoritative at ${sourcePath}; resolve the reported command/capture or resource failure without trimming required current content or repairing readable source data; preserve the existing destination ${destinationPath} and retry only that same destination after the stated condition is satisfied`
-          : `the source remains authoritative at ${sourcePath}; preserve it, inspect the exact invalid or incomplete native evidence, and either clean only the existing destination ${destinationPath} or retry only that same destination after the stated condition is satisfied`,
+        : `the source remains authoritative at ${sourcePath}; STOP and preserve source, existing destination ${destinationPath}, ownership and private evidence. Native effects may be partial or unverified. Do not automatically resend, allocate, reconcile, roll back, delete or clean records. ${error instanceof MigrationCommandFailure ? "resolve the reported command/capture or resource failure without trimming required current content or repairing readable source data. " : ""}Inspect the exact stopped state; later recovery requires explicit authority. Required current content must not be trimmed`,
       { sourceProvider: source?.provider, targetProvider: options.targetProvider, sourceRevision: source?.revision },
     );
   }
