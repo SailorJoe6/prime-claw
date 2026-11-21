@@ -36,6 +36,7 @@ import {
 } from "./project-initialization.ts";
 import {
   prepareExistingBacklogTaskHistoryWorkspace,
+  checkBacklogMigrationConfiguration,
   prepareExistingBacklogEpisodeProjection,
   TASK_HISTORY_REF,
 } from "./task-history-workspace.ts";
@@ -69,7 +70,7 @@ import { startMigrationBacklogWeb, MigrationBacklogWebError } from "./migration-
 
 type BeadsMigrationWeb = Awaited<ReturnType<typeof startMigrationBacklogWeb>>;
 type OpenBeadsMigrationWeb = (storeDir: string) => Promise<BeadsMigrationWeb>;
-interface BeadsCurrentConfiguration { priorities: string[]; types: string[] }
+interface BeadsCurrentConfiguration { priorities: string[]; types: string[]; statuses: string[] }
 
 const RECEIPT_TITLE = "Prime Claw task-provider migration receipt";
 const RECEIPT_MARKER = "prime-claw-task-provider-migration-receipt-v1";
@@ -1508,7 +1509,7 @@ export function verifyBacklogMemoryOutputs(outputs: BacklogMemoryOutputs, projec
     const expected = outputs.userTask;
     const view = backlogTaskView(runner, projectRoot, expected.taskId);
     const task = view.task;
-    if (!outputs.index || task.title !== expected.title || task.description !== expected.description || task.status !== "In Design"
+    if (!outputs.index || task.title !== expected.title || task.description !== expected.description || backlogStatusKey(task.status) !== backlogStatusKey("In Design")
         || task.path !== expected.path || canonical(task.documentation) !== canonical([outputs.index.path])
         || canonical(task.assignees) !== canonical([])) {
       throw new Error(`Backlog memory USER task ${expected.taskId} native content/status/index mismatch`);
@@ -1738,7 +1739,7 @@ function assertBacklogLifecyclePlacement(
   pkg: BeadsTaskPackage, id: string, view: JsonObject, storeDir: string, paths: Map<string, string[]>,
 ): string {
   const expectedStatus = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
-  if (view.task.status !== expectedStatus) throw new Error(`Backlog destination status projection mismatch for ${pkg.sourceTaskId}`);
+  if (backlogStatusKey(view.task.status) !== backlogStatusKey(expectedStatus)) throw new Error(`Backlog destination status projection mismatch for ${pkg.sourceTaskId}`);
   const matches = (paths.get(id) ?? []).filter((path) => String(view.task.path).replace(/\\/g, "/").endsWith(relative(storeDir, path).replace(/\\/g, "/")));
   const folder = pkg.classification === "archived" ? "archive/tasks/" : "tasks/";
   if (matches.length !== 1 || !relative(storeDir, matches[0]).replace(/\\/g, "/").startsWith(folder)) {
@@ -1786,6 +1787,10 @@ function isBacklogReceiptComment(comment: JsonObject): boolean {
   return text === RECEIPT_MARKER || text.startsWith(`${RECEIPT_MARKER}\n`);
 }
 
+// Native create/edit canonicalizes case and ALL whitespace, retaining the first
+// configured spelling. Do not manufacture semantic duplicate statuses.
+function backlogStatusKey(value: unknown): string { return String(value ?? "").toLowerCase().replace(/\s/g, ""); }
+
 function nativeBacklogComment(runner: CommandRunner, projectRoot: string, taskId: string, text: string, author: string): void {
   runRequired(runner, "backlog", ["task", "edit", "--comment", text, "--comment-author", author, "--plain", "--", taskId], projectRoot, `append Backlog provenance to ${taskId}`);
 }
@@ -1793,7 +1798,7 @@ function nativeBacklogComment(runner: CommandRunner, projectRoot: string, taskId
 /** Lossless native configuration read; CLI config get joins lists with commas. */
 async function beadsCurrentConfiguration(web: BeadsMigrationWeb): Promise<BeadsCurrentConfiguration> {
   const config = asObject(await web.readConfiguration(), "Backlog current configuration");
-  const values = (key: "priorities" | "types"): string[] => {
+  const values = (key: "priorities" | "types" | "statuses"): string[] => {
     const value = config[key];
     if (value === undefined) return [];
     if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) {
@@ -1801,7 +1806,7 @@ async function beadsCurrentConfiguration(web: BeadsMigrationWeb): Promise<BeadsC
     }
     return value;
   };
-  return { priorities: values("priorities"), types: values("types") };
+  return { priorities: values("priorities"), types: values("types"), statuses: values("statuses") };
 }
 
 /** Same final current-content projection for authoring, reuse, replay and refresh. */
@@ -1813,7 +1818,8 @@ function beadsCurrentProjection(pkg: BeadsTaskPackage, source: BeadsSnapshot, ma
   if (parentSource && !parentTaskId) throw new Error(`Beads task ${pkg.sourceTaskId} parent has no destination mapping`);
   return projectBeadsCurrentTask(pkg, {
     sourceRevision: source.revision, sourceDigest: source.digest,
-    status: statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status),
+    status: configuration.statuses.find(value => backlogStatusKey(value) === backlogStatusKey(statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status)))
+      ?? statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status),
     parentTaskId, dependencies: includeDependencies ? dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId) : [],
     ...configuration,
   });
@@ -1866,7 +1872,7 @@ function assertExactBacklogReceipt(
   const task = asObject(view.task, `Backlog migration receipt ${receiptTaskId}`);
   const comments = Array.isArray(task.comments) ? task.comments : [];
   const hasMarker = comments.some(isBacklogReceiptComment);
-  if (task.id !== receiptTaskId || task.title !== RECEIPT_TITLE || task.status !== "Done"
+  if (task.id !== receiptTaskId || task.title !== RECEIPT_TITLE || backlogStatusKey(task.status) !== backlogStatusKey("Done")
       || task.implementationNotes !== backlogReceiptNotes(receipt)
       || task.finalSummary !== "Verified selected-provider migration receipt"
       || !hasMarker) {
@@ -1897,7 +1903,7 @@ function prepareExplicitBacklogMigrationWorkspace(projectRoot: string, runner: C
   if (prepared.status !== "prepared" || !prepared.remote || !prepared.remoteUrl) {
     throw new Error(`Backlog destination preparation failed: ${prepared.status === "blocked" ? `${prepared.detail}; ${prepared.remediation}` : "destination publication remote is required"}`);
   }
-  checkBacklogCapabilities(projectRoot, runner);
+  checkBacklogMigrationConfiguration(projectRoot, runner);
   ignoreMigrationBacklogStore(projectRoot, runner, relative(projectRoot, prepared.storeDir).replace(/\\/g, "/"));
   assertPublishedGitRef(runner, prepared.storeDir, prepared.head, prepared.remote, prepared.remoteUrl, TASK_HISTORY_REF, "Backlog destination preparation publication");
   return { storeDir: prepared.storeDir, remoteName: prepared.remote, remoteUrl: prepared.remoteUrl, head: prepared.head, codePaths: prepared.codePaths ?? [] };
@@ -1915,6 +1921,7 @@ interface BacklogDestinationBaseline {
   cloneIdentity: string;
   records: Map<string, JsonObject>;
   files: Map<string, { bytes: string; history: string; repository: string; relativePath: string }>;
+  statusChanges?: Map<string, { bytes: string; content: string; fileHistoryMayAdvance: boolean }>;
 }
 
 function backlogFileBytes(path: string): string {
@@ -1983,8 +1990,19 @@ function assertPreservedBacklogBaseline(
   if (backlogCloneIdentity(storeDir) !== baseline.cloneIdentity) throw new Error("Backlog destination original clone identity changed");
   runRequired(runner, "git", ["-C", storeDir, "merge-base", "--is-ancestor", baseline.head, "HEAD"], storeDir, "Backlog baseline ancestry");
   for (const [path, original] of baseline.files) {
-    if (!existsSync(path) || backlogFileBytes(path) !== original.bytes
-        || backlogFileHistory(runner, original.repository, original.relativePath) !== original.history) {
+    const allowed = baseline.statusChanges?.get(path);
+    const history = backlogFileHistory(runner, original.repository, original.relativePath);
+    let historyPreserved = history === original.history;
+    if (!historyPreserved && allowed?.fileHistoryMayAdvance && history.endsWith(original.history)) {
+      const added = history.slice(0, history.length - original.history.length).trim().split("\n").filter(Boolean);
+      const mode = Number(original.bytes.split(":", 1)[0]) & 0o111 ? "100755" : "100644";
+      historyPreserved = added.every(commit => runRequired(runner, "git",
+        ["-C", original.repository, "show", `${commit}:${original.relativePath}`], original.repository,
+        "verify only authorized status configuration history").stdout === allowed.content
+        && runRequired(runner, "git", ["-C", original.repository, "ls-tree", commit, "--", original.relativePath],
+          original.repository, "verify additive config history mode").stdout.startsWith(`${mode} blob `));
+    }
+    if (!existsSync(path) || backlogFileBytes(path) !== (allowed?.bytes ?? original.bytes) || !historyPreserved) {
       throw new Error(`Backlog destination changed original baseline file/history ${original.relativePath}`);
     }
   }
@@ -1994,10 +2012,130 @@ function assertPreservedBacklogBaseline(
   }
 }
 
+/** The pinned CLI explicitly supports editing the project YAML list directly,
+ * not `config set statuses` or a whole-config PUT/save (which drops unknown keys).
+ * Preserve every non-list byte. Flow insertion retains its exact old entries;
+ * simple native block lists become the inline form the native watcher supports.
+ */
+function additiveBacklogStatusText(content: string, existing: string[], missing: string[]): string {
+  const lines = content.split("\n");
+  const candidates = lines.map((line, index) => /^statuses:/.test(line) ? index : -1).filter(index => index >= 0);
+  const index = candidates.at(-1);
+  if (index === undefined) throw new Error("missing statuses need a recognizable native YAML statuses list; preserve config and resolve its form separately");
+  const line = lines[index];
+  const opening = /^statuses:[ \t]*\[/.exec(line);
+  const next = [...existing.slice(0, -1), ...missing, ...existing.slice(-1)];
+  if (opening && /^statuses:.*\][ \t]*(?:#.*)?$/.test(line)) {
+    // Find only outer-flow commas, without parsing or reserializing old YAML.
+    // Keep quoted commas, nested values, anchors and unrelated aliases intact.
+    let quote = "", depth = 1, last = opening[0].length, previous = last, closed = false;
+    for (let cursor = opening[0].length; cursor < line.length; cursor++) {
+      const char = line[cursor];
+      if (quote) {
+        if (quote === '"' && char === "\\") cursor++;
+        else if (char === quote) quote = "";
+      } else if (char === '"' || char === "'") quote = char;
+      else if (char === "[" || char === "{") depth++;
+      else if (char === "]" || char === "}") {
+        if (--depth === 0) { if (!line.slice(last, cursor).trim()) last = previous; closed = true; break; }
+      } else if (char === "," && depth === 1) { previous = last; last = cursor + 1; }
+    }
+    if (!closed || !existing.length) throw new Error("missing statuses need a complete nonempty native flow list; preserve this form without writing");
+    lines[index] = line.slice(0, last) + missing.map(value => JSON.stringify(value)).join(", ") + ", " + line.slice(last);
+  } else if (/^statuses:[ \t]*(?:#.*)?$/.test(line)) {
+    let end = index + 1, items = 0;
+    const comments: string[] = [];
+    while (end < lines.length) {
+      const entry = lines[end];
+      if (/^[ \t]*(?:#.*)?$/.test(entry)) comments.push(entry);
+      else if (/^[ \t]*-[ \t]+(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[A-Za-z0-9][A-Za-z0-9 _.,()/-]*)[ \t]*$/.test(entry)) items++;
+      else if (/^[ \t-]/.test(entry)) throw new Error("missing statuses need simple one-line scalar block items; preserve continuations, anchors, aliases, tags and comments without writing");
+      else break;
+      end++;
+    }
+    if (items !== existing.length) throw new Error("native status block shape is not a complete simple sequence; preserve it without writing");
+    lines.splice(index, end - index, `statuses: ${JSON.stringify(next)}${line.slice("statuses:".length)}`, ...comments);
+  } else throw new Error("missing statuses need a bounded native YAML list edit; preserve this configuration form without rewriting it");
+  return lines.join("\n");
+}
+
+function missingBacklogMigrationStatuses(source: BeadsSnapshot, statuses: string[]): string[] {
+  const required = [...source.tasks.map(pkg => statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status)),
+    "In Progress", "Done", ...(source.memories.length ? ["In Design"] : [])];
+  const keys = new Set(statuses.map(backlogStatusKey));
+  return required.filter(status => { const key = backlogStatusKey(status); if (keys.has(key)) return false; keys.add(key); return true; });
+}
+
+/** Only the bounded native YAML forms we can edit without a config serializer.
+ * Other forms remain readable by the owned native server, but are not rewritten.
+ * JSON-compatible flow and complete scalar blocks have unambiguous list values.
+ */
+function editableBacklogStatuses(content: string): string[] | undefined {
+  const lines = content.split("\n");
+  const index = lines.map((line, offset) => /^statuses:/.test(line) ? offset : -1).filter(offset => offset >= 0).at(-1);
+  if (index === undefined) return undefined;
+  const flow = /^statuses:[ \t]*(\[.*\])[ \t]*(?:#.*)?$/.exec(lines[index]);
+  try {
+    if (flow) {
+      const values = JSON.parse(flow[1].replace(/,[ \t]*\]$/, "]"));
+      return Array.isArray(values) && values.every(value => typeof value === "string")
+        ? values.map(value => value.trim()).filter(Boolean) : undefined;
+    }
+    if (!/^statuses:[ \t]*(?:#.*)?$/.test(lines[index])) return undefined;
+    const values: string[] = [];
+    for (let cursor = index + 1; cursor < lines.length; cursor++) {
+      const line = lines[cursor];
+      if (/^[ \t]*(?:#.*)?$/.test(line)) continue;
+      const item = /^[ \t]*-[ \t]+("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[A-Za-z][A-Za-z0-9 _.,()/-]*)[ \t]*$/.exec(line);
+      if (!item) { if (/^[ \t-]/.test(line)) return undefined; break; }
+      const text = item[1].trim();
+      // Do not guess YAML implicit scalar types or JSON-incompatible escapes.
+      if (/^(?:true|false|null)$/i.test(text)) return undefined;
+      const value = text.startsWith('"') ? JSON.parse(text) : text.startsWith("'") ? text.slice(1, -1).replace(/''/g, "'") : text;
+      if (value.trim()) values.push(value.trim());
+    }
+    return values;
+  } catch { return undefined; }
+}
+
+function prepareRequiredBacklogMigrationStatuses(source: BeadsSnapshot, prepared: ExplicitBacklogMigrationWorkspace,
+  baseline: BacklogDestinationBaseline, runner: CommandRunner): string[] | undefined {
+  const selected = detectExplicitTaskProvider(source.projectRoot, "backlog", runner);
+  if (selected.kind !== "selected" || selected.evidence.provider !== "backlog") throw new Error("migration configuration selection changed");
+  const path = realpathSync(selected.evidence.configPath);
+  if (!contained(prepared.storeDir, path)) throw new Error("migration status configuration is outside the exact prepared store");
+  const bytes = readFileSync(path), before = bytes.toString("utf8");
+  const existing = editableBacklogStatuses(before);
+  // Unsupported native forms may still need NO edit. The single owned server
+  // decides that losslessly after startup; missing values then STOP unchanged.
+  if (!existing) return undefined;
+  const missing = missingBacklogMigrationStatuses(source, existing);
+  if (!missing.length) return existing;
+  if (missing.some(status => backlogStatusKey(status) === "done")) {
+    throw new Error("required Done status is absent; preserve the existing terminal/order and resolve its native completion placement before status writes");
+  }
+  if (!Buffer.from(before).equals(bytes)) throw new Error("status configuration is not lossless UTF-8; preserve exact bytes without rewriting");
+  assertPreservedBacklogBaseline(baseline, prepared.storeDir, runner);
+  const native = runRequired(runner, "backlog", ["config", "get", "statuses"], source.projectRoot, "read bounded native status list");
+  if (native.stdout.trim() !== existing.join(", ")) throw new Error("bounded native status list mismatch; preserve config without writing");
+  const updated = additiveBacklogStatusText(before, existing, missing);
+  baseline.statusChanges = new Map([...baseline.files].filter(([file]) => realpathSync(file) === path).map(([file, original]) => [file, {
+    bytes: original.bytes.slice(0, original.bytes.lastIndexOf(":") + 1) + Buffer.from(updated).toString("base64"),
+    content: updated, fileHistoryMayAdvance: !lstatSync(file).isSymbolicLink(),
+  }]));
+  writeFileSync(path, updated);
+  assertPreservedBacklogBaseline(baseline, prepared.storeDir, runner);
+  const expected = [...existing.slice(0, -1), ...missing, ...existing.slice(-1)];
+  const fresh = runRequired(runner, "backlog", ["config", "get", "statuses"], source.projectRoot, "verify additive migration statuses");
+  if (fresh.stdout.trim() !== expected.join(", ")) throw new Error("native additive status readback mismatch; STOP and retain config without resend");
+  return expected;
+}
+
 function originalBacklogLayout(projectRoot: string, runner: CommandRunner) {
   const selected = detectExplicitTaskProvider(projectRoot, "backlog", runner);
   if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || !selected.evidence.storeDir) return null;
   const store = selected.evidence.storeDir;
+  checkBacklogMigrationConfiguration(projectRoot, runner);
   // Inventory all IDs and read available native views before layout adoption,
   // task allocation or publication can change original destination bytes/history.
   backlogDestinationViews(runner, projectRoot, store, "preparation preflight");
@@ -2029,6 +2167,7 @@ async function freshBacklogMigrationReplay(
       || !existsSync(join(storeDir, ".git")) || !lstatSync(join(storeDir, ".git")).isDirectory()) {
     throw new Error("same-migration layout replay requires the exact existing independent hidden destination");
   }
+  checkBacklogMigrationConfiguration(source.projectRoot, runner);
   const head = cleanGitRevision(runner, storeDir);
   const remote = gitRemoteForDolt(runner, source.projectRoot);
   const actualRemote = runRequired(runner, "git", ["-C", storeDir, "remote", "get-url", remote.name], storeDir, "read replay destination transport").stdout.trim();
@@ -2157,10 +2296,22 @@ async function migrateBeadsToBacklog(
   const baseline = captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, originalViews, reusedMemoryOutputs ?? { documents: [] });
   const expectedCount = baseline.records.size + source.counts.total + 1 + (source.memories.length ? 1 : 0);
   const reusedDestinationIds = new Set(Object.values(mapping));
+  // Prepare additions before starting the ONE owned browser. Its native config
+  // cache is not a reliable hot-reload interface (including valid comments).
+  // Existing receipt/import reuse never triggers automatic config repairs.
+  const expectedStatuses = !existingReceiptId && !reusedDestinationIds.size
+    ? prepareRequiredBacklogMigrationStatuses(source, prepared, baseline, runner) : undefined;
   const web = await openWeb(storeDir);
   let configuration: BeadsCurrentConfiguration;
   try {
     configuration = await beadsCurrentConfiguration(web);
+    if (expectedStatuses && canonical(configuration.statuses) !== canonical(expectedStatuses)) {
+      throw new Error("owned native startup status readback mismatch; STOP and retain config without task allocation or resend");
+    }
+    if (missingBacklogMigrationStatuses(source, configuration.statuses).length) {
+      throw new Error("required statuses need a supported JSON-compatible flow or simple one-line scalar block items; preserve unsupported configuration/replay without writing");
+    }
+    assertPreservedBacklogBaseline(baseline, storeDir, runner);
     // Initial references identify partial allocations. Only an existing complete
     // receipt AND complete current readback permit reuse; never fill or replay a
     // partially authored record, or continue with another source task after it.
@@ -2334,7 +2485,7 @@ function verifyExactRetryDestination(source: SourceSnapshot, target: TaskProvide
   if (source.provider === "beads" && target === "backlog") {
     const selected = detectExplicitTaskProvider(source.projectRoot, "backlog", runner);
     if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || !selected.evidence.storeDir) throw new Error("existing Backlog destination native identity is unavailable");
-    checkBacklogCapabilities(source.projectRoot, runner);
+    checkBacklogMigrationConfiguration(source.projectRoot, runner);
     existingBacklogMigrationMappings(runner, source.projectRoot, selected.evidence.storeDir, source);
     return;
   }
@@ -2634,7 +2785,7 @@ function exactSelectedTarget(projectRoot: string, target: TaskProviderId, runner
   if (detection.kind !== "selected" || detection.evidence.provider !== target) {
     throw new Error(`post-cutover provider selection is not exactly ${target}: ${detection.kind === "blocked" ? detection.detail : detection.kind}`);
   }
-  if (target === "backlog") checkBacklogCapabilities(projectRoot, runner);
+  if (target === "backlog") checkBacklogMigrationConfiguration(projectRoot, runner);
   else checkBeadsCapabilities(projectRoot, runner);
 }
 

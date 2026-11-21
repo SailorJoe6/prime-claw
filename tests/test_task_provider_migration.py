@@ -22,6 +22,17 @@ def test_task_provider_migration_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_selected_existing_configuration_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
+        "selected-existing", WS_NODE_SUITE, timeout=1200,
+    )
+    (tier1_container.share.parent / "selected-existing-configuration-node.tap").write_text(
+        result.stdout + result.stderr
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_current_native_migration_integration_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", "--test-name-pattern",

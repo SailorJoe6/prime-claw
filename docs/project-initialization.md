@@ -408,6 +408,55 @@ source-drift, active-Episode continuity and guarded cutover checks remain. See
 [helper evidence](evidence/primeclaw-59-readable-current-projection-20261121.md)
 and [integration evidence and limits](evidence/primeclaw-59-current-integration-20261121.md).
 
+### Selected-existing configuration compatibility (bounded increment)
+
+Migration preparation uses the selected destination's real native settings, not
+ordinary fresh-init lifecycle/default/auto-commit requirements. Ordinary
+preparation and lifecycle policy are unchanged. Existing `default_status`,
+`auto_commit` (including true), configured priority/type names, unknown keys,
+comments and all non-status settings remain. USER memory bookkeeping still
+explicitly requests `In Design`; a custom default is not substituted for it.
+Native task auto-commits, hooks, author identity and failure effects are not
+silently disabled.
+
+Pinned Backlog 1.55.3 has no status-list setter. Its CLI explicitly supports
+editing the project YAML list directly. Whole-config CLI/Web setters discard
+unknown keys/comments and are not used. Even normal CLI reads can first rewrite
+sparse/legacy config. A migration-only pre-native check refuses missing native
+startup fields/task prefix or unproven legacy milestones before such reads;
+there is no automatic normalization, rollback or alternate reader.
+
+For an already safe selected config, add only missing mapped-current statuses,
+receipt `In Progress`/`Done`, and memory USER `In Design` when needed. Native
+matching ignores case and all whitespace; retain actual configured spelling and
+never add a semantic duplicate. Missing active values go immediately before the
+original last status, retaining old relative order and the final native terminal
+(and the first value for multi-status lists). A required absent `Done` needs
+separate placement resolution, not silent terminal change.
+Bounded preparation handles JSON-compatible one-line flow (including a trailing
+comma) and complete simple scalar block sequences. Raw old flow syntax stays;
+block conversion refuses continuations, anchors, aliases, tags, dependent syntax
+and implicit scalar guesses. Unsupported forms remain unchanged. They can
+continue through native readback only if no required status additions are needed.
+
+Prepare the list **before** starting the one owned native browser. Its startup
+loads cached config; GET `/api/config` does not initialize lazy config watchers,
+and watcher validation can reject otherwise valid inline comments. Hot reload
+is therefore not the readback boundary. Do not remove comments, round-trip
+config, start a second server or patch upstream to force it. Fresh native CLI
+parsing and the **same owned server's startup** exact JSON list proof precede
+allocation. Failed readback retains actual config and stops without another
+write. Existing receipt/import replay never triggers automatic config repairs.
+
+The existing in-memory original baseline permits exactly the computed list
+addition and config-history entries containing it with the same native file
+mode. Original history ancestry, other bytes/modes/paths/records, clone identity,
+Git settings and placement stay protected. Existing receipt/import replay never
+repairs configuration automatically. This does not consolidate parked configs, accept
+ambiguous duplicate records, repair partial imports, or complete the remaining
+cancellation/progress/scale work. Validation and limits are recorded in
+[configuration evidence](evidence/primeclaw-59-config-preservation-20261121.md).
+
 The confirmed maintenance window is one linear operation:
 
 1. capture every source task's current provider-native rows and long view,

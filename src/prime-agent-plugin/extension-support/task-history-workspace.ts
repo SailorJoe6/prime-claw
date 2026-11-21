@@ -125,7 +125,7 @@ export type TaskHistoryWorkspace =
       head: string;
       storeDir: string;
       configSource: "root" | "folder" | "none";
-      autoCommit: false;
+      autoCommit: boolean;
       layoutWarning?: string;
     }
   | {
@@ -138,7 +138,7 @@ export type TaskHistoryWorkspace =
       head: string;
       storeDir: string;
       configSource: "root" | "folder" | "none";
-      autoCommit: false;
+      autoCommit: boolean;
       unpublished: true;
       layoutWarning?: string;
     }
@@ -577,17 +577,56 @@ function directoryTreeHasMaterialContent(root: string): boolean {
   return false;
 }
 
+/** Migration preserves existing native settings, not fresh-init lifecycle defaults.
+ * Pinned Backlog runs a whole-config upgrade BEFORE even config/task reads.
+ * Refuse unproven legacy forms before that read can discard unknown content.
+ * This is deliberately not a YAML normalizer or an ordinary preparation policy.
+ */
+export function checkBacklogMigrationConfiguration(primaryRoot: string, runner: CommandRunner): void {
+  const selected = detectExplicitTaskProvider(primaryRoot, "backlog", runner);
+  if (selected.kind !== "selected" || selected.evidence.provider !== "backlog") {
+    throw new Error("migration Backlog configuration is not exactly selected");
+  }
+  checkNativeMigrationConfigAt(primaryRoot, runner, selected.evidence.configPath);
+}
+
+/** A disposable root-config candidate has no Git/provider ownership to discover.
+ * Its exact native config path is supplied only by that existing scratch check.
+ */
+function checkNativeMigrationConfigAt(primaryRoot: string, runner: CommandRunner, configPath: string): void {
+  const content = readFileSync(configPath, "utf8");
+  // These scalar keys are exactly the native startup-upgrade prerequisites
+  // not already defaulted by its loader. Native scalar extraction trims keys.
+  const required = ["default_port", "auto_open_browser", "remote_operations", "auto_commit", "task_prefix"];
+  const milestones = content.split(/\r?\n/).filter(line => /^\s*milestones\s*:/.test(line));
+  if (required.some(key => !new RegExp(`^[ \t]*${key}[ \t]*:`, "m").test(content))
+      || milestones.some(line => !/^\s*milestones\s*:[ \t]*\[[ \t]*\][ \t]*(?:#.*)?$/.test(line))) {
+    throw new Error("migration cannot prove native configuration reads are normalization-free; preserve the selected config and resolve its legacy fields/form separately before native reads (including auto_commit and task_prefix); no config rewrite or rollback was attempted");
+  }
+  const version = runner.run("backlog", ["--version"], { cwd: primaryRoot, allowFailure: true });
+  if (version.status !== 0 || !/^\d+\.\d+\.\d+$/.test(version.stdout.trim())) {
+    throw new Error("migration Backlog executable/version is unavailable");
+  }
+  const before = readFileSync(configPath);
+  const statuses = runner.run("backlog", ["config", "get", "statuses"], { cwd: primaryRoot, allowFailure: true });
+  if (statuses.status !== 0 || readFileSync(configPath).compare(before) !== 0) {
+    throw new Error("migration native configuration read failed or changed selected config; STOP and retain its actual state without retry or rollback");
+  }
+}
+
 function validateRootConfigCandidate(
   primaryRoot: string,
   content: string,
   storeDir: string,
   runner: CommandRunner,
+  explicitMigration = false,
 ): void {
   const temp = mkdtempSync(join(tmpdir(), "prime-claw-backlog-config-check-"));
   try {
     const rel = relative(primaryRoot, storeDir);
     mkdirSync(join(temp, rel), { recursive: true });
     writeFileSync(join(temp, "backlog.config.yml"), content);
+    if (explicitMigration) { checkNativeMigrationConfigAt(temp, runner, join(temp, "backlog.config.yml")); return; }
     checkBacklogCapabilities(temp, runner);
     const defaultStatus = runner.run("backlog", ["config", "get", "defaultStatus"], { cwd: temp, allowFailure: true });
     const autoCommit = runner.run("backlog", ["config", "get", "autoCommit"], { cwd: temp, allowFailure: true });
@@ -754,7 +793,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     // Validate the exact native configuration before any filesystem or Git
     // mutation. Relocation changes only discovery placement.
     try {
-      validateRootConfigCandidate(primaryRoot, rootConfigContent, rootLayout.storeDir!, runner);
+      validateRootConfigCandidate(primaryRoot, rootConfigContent, rootLayout.storeDir!, runner, input.explicitMigration);
     } catch (error) {
       return {
         status: "blocked", code: "backlog-cli",
@@ -1004,7 +1043,8 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   // The existing capability gate proves the exact ordered canonical lifecycle
   // statuses; a pre-existing remote branch with generic statuses cannot pass.
   try {
-    checkBacklogCapabilities(primaryRoot, runner);
+    if (input.explicitMigration) checkBacklogMigrationConfiguration(primaryRoot, runner);
+    else checkBacklogCapabilities(primaryRoot, runner);
   } catch (error) {
     return {
       status: "blocked", code: "backlog-cli",
@@ -1015,7 +1055,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   // Prove the effective native default status is exactly "In Design"; do not
   // rely only on generated config bytes.
   const defaultStatus = runner.run("backlog", ["config", "get", "defaultStatus"], { cwd: primaryRoot, allowFailure: true });
-  if (defaultStatus.status !== 0 || defaultStatus.stdout.trim() !== "In Design") {
+  if (defaultStatus.status !== 0 || (!input.explicitMigration && defaultStatus.stdout.trim() !== "In Design")) {
     return {
       status: "blocked", code: "backlog-cli",
       detail: `the task store's effective native default status is ${JSON.stringify(defaultStatus.stdout.trim())} (exit ${defaultStatus.status}), not exactly "In Design"`,
@@ -1025,7 +1065,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
   // Read the effective auto_commit value natively; require the exact false
   // result. Never `config set` or locally rewrite the published config.
   const autoCommit = runner.run("backlog", ["config", "get", "autoCommit"], { cwd: primaryRoot, allowFailure: true });
-  if (autoCommit.status !== 0 || autoCommit.stdout.trim() !== "false") {
+  if (autoCommit.status !== 0 || !(input.explicitMigration ? ["true", "false"] : ["false"]).includes(autoCommit.stdout.trim())) {
     return {
       status: "blocked", code: "backlog-cli",
       detail: `the task store's effective native auto_commit is ${JSON.stringify(autoCommit.stdout.trim())} (exit ${autoCommit.status}), not exactly "false"; code-repository auto-commit must be disabled`,
@@ -1089,7 +1129,8 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     }
 
     try {
-      checkBacklogCapabilities(primaryRoot, runner);
+      if (input.explicitMigration) checkBacklogMigrationConfiguration(primaryRoot, runner);
+      else checkBacklogCapabilities(primaryRoot, runner);
       const relocatedDetection = input.explicitMigration ? detectExplicitTaskProvider(primaryRoot, "backlog", runner) : detectTaskProvider(primaryRoot, runner);
       if (relocatedDetection.kind !== "selected" || relocatedDetection.evidence.provider !== "backlog"
           || !relocatedDetection.evidence.storeDir
@@ -1126,7 +1167,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       head: branchState.head,
       storeDir,
       configSource: finalConfigSource,
-      autoCommit: false,
+      autoCommit: autoCommit.stdout.trim() === "true",
       unpublished: true,
       ...(layoutWarning ? { layoutWarning } : {}),
     };
@@ -1141,7 +1182,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     head: branchState.head,
     storeDir,
     configSource: finalConfigSource,
-    autoCommit: false,
+    autoCommit: autoCommit.stdout.trim() === "true",
     ...(layoutWarning ? { layoutWarning } : {}),
   };
 }
@@ -1207,7 +1248,7 @@ export function prepareExistingBacklogTaskHistoryWorkspace(
     // config. Keep that folder file untouched; retain the full selected root
     // config under its native root filename within the same published store.
     if (distinctRootConfig && existsSync(join(original, "backlog.config.yml"))) return refuse("config-not-preserved", "selected root and existing in-store native root configuration disagree");
-    validateRootConfigCandidate(root, config, original, runner);
+    validateRootConfigCandidate(root, config, original, runner, input.explicitMigration);
     const rootEntry = lstatIfPresent(rootConfig);
     if (rootEntry?.isSymbolicLink()) {
       const expected = relative(root, taskStoreConfigPath(original, rootConfig)).split(sep).join("/");
@@ -1534,7 +1575,7 @@ export function prepareExistingBacklogEpisodeProjection(input: {
     if (isAbsolute(link) || resolve(input.primaryRoot, link) !== taskStoreConfigPath(join(input.primaryRoot, targetRel), publishedRootLink)) return fail("primary destination root link does not select its exact published native configuration");
     if (oldRoot) unlinkSync(rootConfig);
     symlinkSync(link, rootConfig);
-    checkBacklogCapabilities(worktree, runner);
+    checkBacklogMigrationConfiguration(worktree, runner);
     const selected = detectExplicitTaskProvider(worktree, "backlog", runner);
     if (selected.kind !== "selected" || selected.evidence.storeDir !== target) return fail("Episode native discovery does not select the projected exact task store");
     if (refHead(runner, target, "HEAD") !== input.expectedRevision || gitOk(runner, target, ["status", "--porcelain", "--untracked-files=all"], "verify materialized Episode task store") !== "") return fail("Episode task materialization is not clean at the exact published revision");
