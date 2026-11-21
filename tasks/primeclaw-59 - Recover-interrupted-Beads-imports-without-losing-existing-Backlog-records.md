@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 03:14'
+updated_date: '2026-11-21 03:26'
 labels: []
 dependencies: []
 references:
@@ -16,6 +16,7 @@ documentation:
   - docs/evidence/primeclaw-59-current-state-capture-20261121.md
   - docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md
   - docs/evidence/primeclaw-59-owned-web-transport-20261121.md
+  - docs/evidence/primeclaw-59-readable-current-projection-20261121.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -28,6 +29,9 @@ modified_files:
   - src/prime-agent-plugin/asset-inventory.json
   - tests/migration_backlog_web.test.mjs
   - docs/evidence/primeclaw-59-owned-web-transport-20261121.md
+  - src/prime-agent-plugin/extension-support/beads-backlog-current.ts
+  - tests/beads_backlog_current.test.mjs
+  - docs/evidence/primeclaw-59-readable-current-projection-20261121.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -125,8 +129,10 @@ Next is one bounded reviewable increment of steps 1–2: pair-specific readable 
 
 Keep one owned migration-lifetime native browser in the exact selected project/store, explicit BACKLOG_CWD for browser/CLI, private file-backed input/results and actual owned readiness/shutdown. Uncertain writes retain truthful state and STOP without automatic resend/fallback/allocation reconciliation/rollback/deletion. Client abort alone proves no stopped-write guarantee. Integrate only necessary already-approved migration-worker/owned-process-tree cancellation dependencies; full ordinary cancellation/recovery/progress/coexistence/config reconciliation/406-ticket scale remain later work. The same resource/authority boundaries stand. Publish truthful native plan/progress promptly and code separately; validate in Docker with required tier 1, report complete current-value/projection evidence and honest failures/limits, then stop after one tested documented pushed slice for owner review.
 
-## Current execute slice — readable authoring/readback dependency (2026-11-21)
-Sized before coding as one pair-specific current-state projection plus supported native Web authoring/full CLI verification dependency of steps1–2. Prove actual meaningful fields/metadata/comments/relationships and complete large-value readback, not input feasibility alone. This slice does not yet call the helper from the forward importer or remove its old package/replay verifier; that integration and necessary responsive-worker ownership remain the next bounded slice. No full AC/migration/cancellation/recovery/scale acceptance is claimed. Keep the already accepted transport unchanged unless a concrete integration defect requires repair.
+## Progress after readable authoring/readback dependency (2026-11-21)
+Implemented and published code `1494015189731b9f3fdf3a25d99293ed226fb34f`: one pair-specific complete-current projection, native Web authoring and full selected-store CLI authored-state verification. The new helper is inventoried and tested with meaningful2,610,950-byte current metadata, exact normalization-sensitive values, actual comments/source author/time, AC/assigned/unassigned, configured type/priority and parent/dependencies. Docker:18 new checks plus9 shared transport checks passed; required tier1 probe passed with offline/clean runtime+builder teardown. This is a staged dependency, not full migration implementation or owner acceptance.
+
+Next bounded integration remains steps1–2: call this projection/authoring/readback from forward import and replay, remove encoded packages/chunks/repeated source context/archive verifier without relocation, and integrate only necessary already-approved responsive-worker/owned-process-tree dependencies. Preserve complete current values, separate memories once, small mapping/existing receipt, source drift/identity, originals/config/history/placement, continuity and publication/cutover guards. Caller-supplied mapped status/relationships/configured choices need wiring; the helper owns no lifecycle, source retirement or transport lifetime. Full cancellation/progress/coexistence/recovery/406-ticket work remains later. All9AC remain unchecked, status In Progress, Final Summary null. Stop after this tested documented pushed slice for owning Conversation review.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -196,4 +202,13 @@ This handoff records accepted guidance only; it implements no plugin change and 
 
 ### Readable current-state authoring/readback dependency (started 2026-11-21)
 Canonical execute received after the completed handoff. Exact owner/provider/task/operation/session/worktree/branch and native In Progress plan revalidated; current task checkpoint6d3d63ad4eae8d864702f1a18efaf6fcd5b1f5ff is a compatible content-only descendant of supplied7db6960. Before coding, split the remaining steps1–2 work into a pair-specific current-state projection/native authoring/full CLI verification dependency, then later forward/replay integration and necessary worker ownership. This is production readable-content logic using the accepted transport, not another input-only feasibility probe. Parallel child owns only the new projection module; another owns only new tests. Episode owns task content, inventory/bridge/docs, Docker validation and separate publication. Existing forward encoded package/chunks/replay verifier remain unfinished until integration; no AC/status/Final Summary or live-action authority changes.
+
+### Readable current-state authoring/readback dependency — tested and published (2026-11-21)
+Code `1494015189731b9f3fdf3a25d99293ed226fb34f` pushed non-force to the same Episode branch; direct remote HEAD verified. Evidence: `docs/evidence/primeclaw-59-readable-current-projection-20261121.md`. New inventoried pair-specific helper maps current fields and meaningful per-field metadata to actual native Web payloads, authors one native task plus actual authored comments, then verifies complete authored CLI fields/comments. No whole export/current-view/catalog/memory archive is embedded. Small source references are present in initial POST; identity alone cannot certify incomplete content. Same projection drives authoring and full readback. Source-exact normalization-sensitive prose/multiline AC/comment markers use one labeled readable JSON string where native Markdown cannot preserve them directly. Raw type/priority/fallback values stay readable; configured numericP1 is preferred over legacy aliases when available, and explicit empty assignee overrides an active native default. Typed transport errors retain safe stage/outcome/private artifact path; no native call follows a create/comment/read failure.
+
+Required `scripts/test-tier1.sh --probe` PASS at `.test-results/20261121T032024Z-66175-6b0155e8/tier1/manifest.json` on final source. Focused `python3.14 -m pytest tests/test_task_provider_migration.py -q -m container -k "beads_backlog_current_node_suite or migration_backlog_web_node_suite"`:2 passed/9deselected in168.38s. Artifacts in `.test-results/20261121T032045Z-67726-89ff4c5b/tier1`: `beads-backlog-current-node.tap`18PASS (10top-level+8nestedmutation checks;4top-level real native scenarios, remaining projection/countable-failure mechanics), `migration-backlog-web-node.tap`9PASS shared transport rerun. Total27checks in this run, not27new migration runs. Offline network absence and clean runtime/source-builder teardown verified; all manifest-listed hashes recomputed/matched. Host-safe static2PASS/9skip; diff--check PASS. New module SHA256 `f1e7821565098f638ff0b2822095d7242196c5549d9560f12b514fdd681448c1`, new suite `5b012b873283b3c53c376f0750d2eb61698d9135f7ca003be65e64fba8c74fae`. Only docs/evidence changed after validation.
+
+Complete meaningful2,610,950-byte current metadata/text/padding/Unicode/tail survived production projection, native authoring and full CLI verification once, not as a raw source envelope. Eight mutated AC/assignee/supplement/tail/comment/author/parent/dependency values failed verification while source references stayed intact; a real persisted AC change also failed native CLI verification. Current close information/status, exact author/time, native normalization-sensitive strings, source export/native prose divergence, default-assignee control and configuredP1 mapping were covered. Initial drafts were repaired from read-only review before tests; no native test failure was suppressed or safeguard bypassed. Controlled error tests are not ordinary importer cancellation proof.
+
+The forward importer/replay and their package/chunk/archive verification remain UNCHANGED and unfinished. This slice stages the readable dependency; it does not claim integrated migration, source-retirement/publication behavior, worker ownership, full ordinary cancellation/progress, coexistence/config reconciliation, interrupted recovery or406-ticket performance. No AC checked, no Final Summary, unchanged native In Progress. No live migration/retry/switch, private incident access, destructive live cleanup, merge, global apply/check/activation/restart, Prime Agent source changes, new resources or execute assignment. Both bounded children completed and were deleted. Stop for owning Conversation review; relay exact candidate/evidence/limits to Initialize PVA on Prime-Claw.
 <!-- SECTION:NOTES:END -->
