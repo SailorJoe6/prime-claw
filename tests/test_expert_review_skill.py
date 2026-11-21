@@ -10,12 +10,28 @@ def test_expert_skill_uses_native_model_spawn_message_and_cleanup() -> None:
     text = SKILL.read_text()
     assert "name: prime-claw-expert-review" in text
     for required in (
-        "rlm.find_models", "openai-codex/gpt-6-astra", 'thinking="max"',
+        "rlm.find_models", "gpt-6-astra", 'thinking="max"',
         "rlm.spawn", "Bootstrap only", "agent_message.send",
         "agent_observe", "rlm.collect", "rlm.delete_subagent", "actual model",
     ):
         assert required in text
     assert text.index("rlm.spawn") < text.index("agent_message.send")
+
+
+def test_expert_model_selection_keeps_parent_llm_provider() -> None:
+    text = " ".join(SKILL.read_text().split())
+    for required in (
+        "parent session's actual current LLM provider",
+        "unless the operator explicitly directs a provider change",
+        "`openai-codex` and `openai` are different providers",
+        "restrict results to the parent's provider",
+        "Never select a cross-provider fallback",
+        "quota error is not permission to change provider",
+        "omit `model` from a supported native launch to inherit the current provider and model",
+        "same provider as parent; omit to inherit both",
+    ):
+        assert required in text
+    assert "select a reasonably strong available review model" not in text
 
 
 def test_expert_skill_accepts_normal_context_and_preserves_review_judgment() -> None:

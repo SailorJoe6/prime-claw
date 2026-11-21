@@ -21,6 +21,10 @@ def test_role_kernel_is_the_single_advisory_policy_source() -> None:
     for phrase in (
         "Roles are skill-based responsibilities, not authenticated identities.",
         "CONVERSATION supervises. EPISODE implements. EXPERT reviews.",
+        "Every new subagent, reviewer, sibling Episode, sibling session, or other new session",
+        "unless the operator explicitly directs a provider change",
+        "Model selection may change the model, not the provider",
+        "quota error never authorizes a provider fallback",
         "The plugin helps invoke those skills at the appropriate lifecycle boundaries.",
         "The user-level `/skill:goals-and-heartbeats` operating contract is always in effect and is mandatory reading",
     ):

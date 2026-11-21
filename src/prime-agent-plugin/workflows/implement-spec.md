@@ -3,6 +3,18 @@ name: implement-spec
 description: Review an operator-approved future plan bundle and create one isolated implementation episode only when it is implementation-ready.
 ---
 
+## Preserve the launching session's LLM provider
+
+Every new Episode, subagent, reviewer, sibling session, or other new session
+must retain the launching session's current LLM provider (the model/authentication
+route), unless the operator explicitly directs a provider change. Model choices
+may change only the model, not the provider. Use native session facts and
+supported same-provider selection or inheritance; never fall back to another
+provider because a model is unavailable, discovery omits it, or quota is exhausted.
+If the launch surface cannot preserve that provider, report the constraint
+instead of switching. This does not change the selected Backlog/Beads task provider,
+creation authority, recovery path, or existing Episode identity.
+
 First, run the `prepare` skill.
 
 Read the exact project-relative folder supplied in the operator implementation

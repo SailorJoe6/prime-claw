@@ -98,6 +98,19 @@ apt-get -y
 HOMEBREW_NO_AUTO_UPDATE=1 brew ...
 ```
 
+## Provider selection for every new agent or session
+
+Every new subagent, reviewer, sibling Episode, sibling session, or other new
+session must use the launching session's current **LLM provider** (the
+model/authentication route), unless the operator explicitly directs a provider
+change. Change only the model, never the provider as a side effect. Determine
+the actual parent provider from native session facts; choose models only within
+that provider or use supported inheritance. Missing model discovery, an
+unavailable model, or a quota error does not authorize a provider fallback.
+If the launch surface cannot preserve the provider, report that constraint
+instead of silently switching providers. This is separate from task providers
+such as Backlog and Beads.
+
 ## Prime Agent RLM Delegation — Safe Spawn Protocol
 
 Prime Agent releases can lose the initial RLM task when a `session_start`

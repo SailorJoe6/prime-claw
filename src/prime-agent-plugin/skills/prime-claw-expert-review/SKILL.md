@@ -83,11 +83,23 @@ retargeting or replacement resources.
 
 ## Select and start the reviewer
 
-Use `await rlm.find_models(...)` to resolve an operator-selected model. Without
-an override, look for the exact selector `openai-codex/gpt-6-astra`. If it is
-unavailable, select a reasonably strong available review model and tell the
-caller which model will be used. Consult the operator only if no suitable model
-is available.
+First determine the parent session's actual current LLM provider from native
+session/model facts. Keep that same provider (the model/authentication route)
+for this reviewer and every subagent, sibling Episode, sibling session, or other
+new session unless the operator explicitly directs a provider change. Selecting
+a model does not authorize changing providers; `openai-codex` and `openai` are
+different providers even when both offer the same model name.
+
+Use `await rlm.find_models(...)` to resolve model choices, then restrict results
+to the parent's provider. Without a model override, prefer `gpt-6-astra` on that
+provider; otherwise choose a reasonably strong model on the same provider and
+tell the caller which provider/model will be used. Never select a cross-provider
+fallback. An unavailable model, missing discovery results, or a quota error is
+not permission to change provider. When discovery omits the parent's models,
+omit `model` from a supported native launch to inherit the current provider and
+model rather than guessing an unlisted selector. If neither a suitable same-provider
+model nor supported inheritance is available, report the constraint and consult
+the operator; do not silently change authentication routes.
 
 Request `thinking="max"`. If the selected fallback model does not support that
 setting, use its strongest supported reasoning level. Use an ordinary unique
@@ -101,7 +113,7 @@ the real task exactly once:
 handle = await rlm.spawn(
     "Bootstrap only. Wait for the review task from your parent.",
     name="expert-review-<short-unique-name>",
-    model=selected_model,
+    model=selected_model,  # same provider as parent; omit to inherit both
     thinking="max",
 )
 await agent_message.send(
