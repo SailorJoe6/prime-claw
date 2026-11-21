@@ -351,6 +351,25 @@ is not full importer cancellation: the responsive migration worker and existing
 orchestration still need integration and their own acceptance evidence. See the
 [owned transport evidence and limits](evidence/primeclaw-59-owned-web-transport-20261121.md).
 
+A pair-specific readable-content helper is staged in
+`extension-support/beads-backlog-current.ts`. It builds one current-ticket
+projection for native Web authoring and complete native CLI verification. Native
+fields carry equivalent content. Concise labeled current values retain meaningful
+metadata and exact values that native formatting cannot represent directly.
+Actual authored comments remain comments, with readable source author/time.
+The initial native task write includes a small source-ID/reference binding;
+that marker alone never proves complete content. Configured type/priority options
+are inputs to this projection, not settings it replaces. Deferral-only fields
+are dropped under the existing deferral mapping.
+
+This helper is not yet wired into the forward importer or replay. Their old
+encoded package/chunk authoring and archive verification still need replacement;
+shipping the helper does not certify those paths or authorize live migration.
+It adds no recovery, publication/cutover, worker or cancellation behavior. Its
+caller owns the migration-lifetime Web transport and must stop without replay
+when any native write or verification fails. See the
+[readable-content dependency evidence](evidence/primeclaw-59-readable-current-projection-20261121.md).
+
 The confirmed maintenance window is one linear operation:
 
 1. capture every source task's current provider-native rows and long view,
