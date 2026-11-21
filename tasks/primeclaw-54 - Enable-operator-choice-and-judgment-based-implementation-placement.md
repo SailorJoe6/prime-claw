@@ -4,7 +4,7 @@ title: Enable operator choice and judgment-based implementation placement
 status: In Progress
 assignee: []
 created_date: '2026-11-03 02:59'
-updated_date: '2026-11-21 22:10'
+updated_date: '2026-11-21 22:11'
 labels: []
 dependencies: []
 references:
@@ -62,3 +62,9 @@ Add proportional regression coverage for explicit direct/Episode choice, judgmen
 2. Align the relevant role, task execution, planning-continuation, and project-template instructions. Add a lightweight ordinary direct-task execution path with supported native task updates and existing Git/test safety, no Episode identity or mandatory formal plan requirement, and no new runtime tool/state/protocol. Preserve existing Episode and retained version-1 behavior.
 3. Add proportional routing/guidance regression cases for both explicit modes, judgment defaults, ask-first situations, and preserved placement after planning. Run the required Docker-only plugin validation, including Tier 1 --probe; update directly affected user-facing docs and report truthful results. Do not deploy user-globally or merge.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Execution slice: implement prompt-led placement end to end (routing, ordinary direct lifecycle, and planning continuation), keep Episode admission unchanged, then validate the candidate with focused Docker regressions and Tier 1 --probe. No merge or activation.
+<!-- SECTION:NOTES:END -->
