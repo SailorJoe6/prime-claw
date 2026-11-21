@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-63
 title: Support owner-authorized execute continuation after a completed handoff
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: '2026-11-20 16:26'
-updated_date: '2026-11-20 20:23'
+updated_date: '2026-11-21 00:50'
 labels: []
 dependencies: []
 references:
@@ -250,6 +250,16 @@ Existing corrective evidence root .test-results/primeclaw-63-collector-revision/
 Exact commands/source tag/object/commit/tree/lock/images remain in prior Notes/artifacts. SDK/scripted public promptUntilAccepted proves one new canonical execute/one currentwrite, full bounded prior/current raw access, same REPL/resources/preserved effects and substantive total61/no context leak/drained queue. Real-client fake socket is separate framing proof. Not actual daemon owner-operation integration, autonomous authorization, activated-generation UAT, historical nondelivery/global exactly-once or historical recovery. Standalone Tier1 still lacks explicit .env selector; no guess. Prior fullstatic734pass/105skip/140subtests with THREE named inventory/local-input failures was not rerun/cleared. No full-suite-green/deployed claim.
 Current reporting observation: direct children list is empty and current roster queuedCount0; this own turn is active/tool/streaming, not idle. Supplied pre-handoff full native state was idle/zero unfinished/empty queues; that earlier fact is not a current post-yield assertion. No child or long-running validation work was started. Exact owner must freshly verify root/explicit-descendant idleness after yield for Ready preparation. Stop after publication/report, with no wait goal/heartbeat; no further slice under reminders. Keep In Progress/parentnull. No status/ownership/resource mutation, main merge/rebase/ancestry repair, cleanup, activation/restart/live UAT, historical pod-pricing TASK-2 contact/sync/dispatch/recovery, upstream/compaction/model/provider/tier/auth/credential changes or PRIMECLAW-62 reopening.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Prime Claw owner 01a1ef0e-10fe-77f6-a550-f5120139ec6c
+created: 2026-11-21 00:50
+---
+Operator-authorized merged terminal disposition for PRIMECLAW-63. Exact reviewed tuple: integration main; target f6bbeb97b5416c1620c766daa71e9632b7df1115; candidate 7b10f84003d51c4023958e60ed6746cf63c53d15. One fast-forward merge and normal main push completed; main local/upstream/direct origin were verified at the candidate. Original accepted repair/source/test/doc bytes remain unchanged by the preceding ownership-only integration. All seven criteria remain checked. Publish Done in independent task history; keep this task active through normal owned-Episode cleanup, which is separately included in the operator terminal decision and follows only after Done publication, intended Episode task synchronization and fresh idle/resource checks. No plugin activation/apply/check/probe, restart, live UAT, historical TASK-2 contact/recovery, upstream/compaction/model/provider/tier/auth/credential/AWS work or PRIMECLAW-62 reopening is part of this disposition.
+---
+<!-- COMMENTS:END -->
 
 ## Final Summary
 
