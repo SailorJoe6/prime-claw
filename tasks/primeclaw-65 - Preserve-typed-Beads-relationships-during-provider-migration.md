@@ -1,10 +1,10 @@
 ---
-id: PRIMECLAW-62
+id: PRIMECLAW-65
 title: Preserve typed Beads relationships during provider migration
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-21T21:48:00Z'
-updated_date: '2026-11-21T21:48:00Z'
+updated_date: '2026-11-21T21:54:00Z'
 labels: []
 dependencies: []
 priority: p0
@@ -38,3 +38,9 @@ Pre-change impact assessment (2026-11-21): `main` is clean and equal to `origin/
 3. During import, write only projected blockers through `--depends-on`. For each non-parent, non-blocking typed edge, append one readable destination-native migration comment naming its type and mapped target together with the confirmed semantic-placement prose. Verify both the exact package and native projections on readback.
 4. Add focused fixtures for bidirectional `relates-to`, `discovered-from` back-links, missing/self targets, genuine blocking cycles, and final Backlog projection/readable evidence. Run focused Node migration tests and Docker-only tier 1/plugin probe. Publish source and task history before any user-global activation.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation is in progress. Root cause confirmed: `dependencyIds` discarded Beads relationship types and treated every native edge as a hard Backlog dependency. Candidate now validates all typed targets, cycle-checks only `blocks`, keeps parent hierarchy separate, projects only blockers, and writes exact readable comments for other relationship types using the confirmed semantic-placement prose. Focused acceptance passes the full bidirectional `relates-to` + `discovered-from` migration and separately rejects a deliberately malformed true blocking cycle. Next gate is Docker-only tier 1/plugin probe.
+<!-- SECTION:NOTES:END -->
