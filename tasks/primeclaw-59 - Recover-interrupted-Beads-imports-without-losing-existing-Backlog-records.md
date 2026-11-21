@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 02:13'
+updated_date: '2026-11-21 02:17'
 labels: []
 dependencies: []
 references:
@@ -124,4 +124,7 @@ The owner accepted source-capture increment `50dd3be9eef64693db9b499248cd8ea718a
 Next bounded execute slice follows steps 1–2 and Progress after slice 1a: remove the remaining encoded forward current-data source package/chunks/repeated source context and archive-package verifier; implement one readable native current-state projection and readback. Preserve complete current fields, meaningful metadata, actual authored comments with author/source time, relationships and exact non-equivalent current values through native fields or concise labeled readable text. Record source-ID identity in initial native creation, retain the small mapping/provenance/receipt, and keep one separate memory-document/index/USER treatment. Use supported native batched authoring and detect incomplete readback. No base64/archive relocation or repeated store-wide catalog per ticket. Preserve current-state capture/identity/drift, large-current-data capture/errors, originals, continuity and publication/cutover checks.
 
 Coexistence/config reconciliation/legacy duplicate originals, interrupted-import recovery, ordinary cancellation/progress and representative 406-ticket performance remain later approved work, not this slice's completion claim. Stop for a real missing product choice rather than guessing or expanding. Use Docker-only validation and required tier 1 after plugin changes; publish task edits promptly and code separately, report exact heads/limits, then stop for owner review. No live migration/retry/switch, private incident-data access, destructive live cleanup, merge, global apply/activation/restart, Prime Agent source change, new resources or initial assignment. Existing evidence records the verified read-only exact-tag test input and disposable selector procedure.
+
+### Slice 1b — readable destination current state (started 2026-11-21)
+This execute pass implements only the accepted next steps 1–2 increment: replace forward encoded current-data packages and their verifier with one readable pair-specific native projection/readback, including exact non-equivalent current values, actual comment author/time, AC/assignee/relationships and initial source-ID identity. Retain small mapping/receipt evidence and separate memories. Configuration/coexistence/recovery/cancellation and final scale acceptance remain later work. Parallel read-only helpers are auditing native CLI batching/normalization and existing regression fixtures; the Episode owns implementation, task content and validation. No lifecycle, live migration, activation, cleanup or source-authority change is included.
 <!-- SECTION:NOTES:END -->
