@@ -124,8 +124,50 @@ version-stamped standalone binary, and runs `scripts/smoke-compiled-build.ts`. T
 `deps/backlog/dist/backlog`. Bun is required to build and smoke-test it, but the
 compiled artifact does not require Bun at runtime.
 
-The operator-owned cutover later copies the accepted host artifact to
-`~/.local/bin/backlog`. Do not activate a candidate globally from an Episode.
+### Owner-only v1.55.3 host cutover
+
+The [reviewed build](evidence/primeclaw64-off-global-build-20261121.md) and
+[consumer inventory](evidence/primeclaw64-rollout-preparation.md) are preparation,
+not activation. The earlier plugin-only maintenance and restart did not install
+Backlog 1.55.3 or run its live UAT.
+
+1. The owner reviews the rollout evidence and confirms the accepted canonical
+   primary `main`, task authority, source pin and actual installed generation.
+   Use the reviewed standalone artifact only if it is bound to the accepted
+   source and host; otherwise build and smoke from accepted `main` with the
+   verified, command-local Bun toolchain. Record its SHA-256, file type, mode
+   and version. Reverify both distinct 1.53.0 fallbacks against the build
+   manifest before any overwrite.
+2. Before any shared write, the owner and maintenance coordinator account for
+   running, queued and unfinished work and explicitly owned descendants. Agree
+   on quiescence with affected owners. Retain all old-generation resources;
+   resolve or deliberately exclude any active incompatible consumer before
+   switching what it executes. Do not force-stop foreign work or change
+   schedules to make it appear quiescent.
+3. From canonical primary `main`, use the documented host boundary to install
+   the exact accepted standalone executable at `~/.local/bin/backlog` (mode
+   `0755`). Verify actual `command -v backlog`, SHA-256, mode and `backlog
+   --version` in the affected runtime. Preserve the separate primary-dist and
+   user-installed rollback copies; neither may substitute for the other.
+   Apply and check accepted plugin delivery, with default drift protection:
+
+   ```sh
+   scripts/apply-prime-agent-plugin.sh --user-global
+   scripts/check-prime-agent-plugin.sh --user-global
+   ```
+
+   Inspect partial or uncertain effects before deciding recovery. Do not
+   automatically rerun or reset drift. Follow the [selected-project boundary
+   and restart/UAT procedure](project-initialization.md#selected-project-boundary-for-backlog-1553).
+4. If installation or UAT fails, stop and preserve the receipts and resources.
+   The owner coordinates rollback under the same quiescence boundary, verifies
+   the fallback against the original destination's digest, and verifies actual
+   command resolution, version and intended plugin generation after recovery.
+   Restoring a binary does not undo plugin changes or reconcile project files.
+   Send the activation/UAT and impact evidence to the Backlog.md Expert before
+   any separate latest-stable pointer decision.
+
+Do not activate a candidate globally from an Episode.
 
 ## Sandbox artifact
 
