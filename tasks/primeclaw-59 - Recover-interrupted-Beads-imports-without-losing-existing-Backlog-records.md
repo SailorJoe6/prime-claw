@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 03:40'
+updated_date: '2026-11-21 03:47'
 labels: []
 dependencies: []
 references:
@@ -226,4 +226,9 @@ Owner-supplied ordinary review evidence directory: `/Users/jlanders/.prime/agent
 Repair focus: beads-backlog-current.ts68–80,115–145,278–286; pinned structured-sections.ts782–790 fallback. Route affected comment content through existing exact-readable representation or an equally small native-safe form. Preserve exact body/heading/author/time; no dropped heading, fabricated source summary, weakened verifier, provider/upstream patch or framework. Add focused REAL native absent-summary/ordinary-heading control, practical old-fail/new-pass proof, required Docker tier1 and shared checks. Keep huge current metadata/exactUnicode/padding/tail once and existing full current-state/no-resend checks. Publish truthful plan/progress and code separately, stop after one pushed tested documented repair slice. Do not advance forward/replay integration or worker work in this pass; later work/all9AC remain unfinished.
 
 Same exact active v2 owner/task/provider/operation/Episode/session/worktree/branch/base/integration/resources and In Progress/0of9AC/nullFinalSummary. This handoff changes only native plan/notes; no code, tests, server, resource, lifecycle or execute assignment. Compaction is requested once, not continuation authority. Existing canonical transport alone owns follow-up; unknown callback/delivery facts remain unknown. No live migration/retry/switch/private incident access/destructive live cleanup/merge/user-global apply/check/activation/restart/Prime Agent source change/new resources/initial assignment/scope expansion.
+
+### Accepted comment-heading repair (started 2026-11-21)
+Canonical execute received. Revalidated the same exact active v2 Backlog owner/task/operation/Episode/session/worktree/branch/original base/integration. Current task0908acdc5684e6007b57794ebd1531fbf2b75673 is the compatible published handoff-only plan/notes clarification beyond supplied99743eb; it explicitly supersedes next integration with ONE narrow comment-heading repair. Source/transport acceptance stands, readable dependency remains unaccepted. No task lifecycle or resource change.
+
+Pinned native structured-sections.ts269–272 and782–790 confirm that absent FinalSummary can fall back to a matching comment heading. Added two real-native regression cases to the existing suite BEFORE changing production code: exact accepted Final Summary comment and ordinary Source heading control, close_reason/finalSummary genuinely absent on BOTH export/native rows. They count successful actual POST/PUT/complete CLI operations, preserve author/source time and verify null task summary, full authored fields and exact comment body. Running existing Docker bridge against unchanged1494015/moduleSHA256f1e7821565098f638ff0b2822095d7242196c5549d9560f12b514fdd681448c1 to retain old-candidate failure. Then smallest existing-representation repair and full current/shared green plus required tier1, truthful docs/evidence, separate publication and stop. No forward/replay/worker integration in this pass. A bounded read-only helper audits only this concrete repair/test direction; no delegated mutation or owner acceptance.
 <!-- SECTION:NOTES:END -->
