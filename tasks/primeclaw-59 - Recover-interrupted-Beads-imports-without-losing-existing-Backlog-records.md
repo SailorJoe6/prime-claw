@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 17:53'
+updated_date: '2026-11-21 18:00'
 labels: []
 dependencies: []
 references:
@@ -412,4 +412,8 @@ Focused completion Docker, final full/shared native suites and required final-so
 Final-source focused run20261121T174605Z-49056-56605db4:8nativePASS0FAIL,pytest1PASS13deselected382.23s. Four forward refusals:0nativewrites/0retirementcallbacks/configunchanged; three bounded cases stop beforebrowser, unsupported single-quotedflow readsONEownedstartupJSONonce. Both selected/fresh complete-receipt replays readstartupJSONonce and stop with exact semanticplacement error/0writes/0deletion, unchanged destination bytes/modes/records/history/remotehead/source/codeidentity. Receipt-only nonterminalDone success controlPASS withtrueautoCommit; no universalDone-lastpolicy.
 Required final-source DockerRPCprobe20261121T174606Z-49146-096ecc6bPASS186.13s; static2PASS0.02s.75artifacthashes/5retainedruns match,allruntimeoffline/runtime+builderclean/upstreaminventoryunchanged; three explicit plugin/test/bridge inputhashes unchanged. Actual oldcandidatefinalred and both initialfixture/readback runs retainedseparately; no actualsourcedeletion orunsafe replay claim. Evidence doc updated.
 Existing final full/shared regression is STILL RUNNING; no duplicate/retry or fullgreenclaim. No further plugin/test/bridge edits. Keep InProgress0of9AC/nullSummary; after verified full results publish ONE code/native repair separately andSTOPforindependentownerreview, not acceptance or nextslice.
+
+### Full/shared validation interrupted by Docker engine shutdown; unchanged inputs rerunning
+Run20261121T174630Z-50962-654a5051:7pytestFAIL22deselected673.25s. Native migration TAP reaches test29 with no not-ok before Docker lostexec/stoppedcontainer; no complete TAP summary. Sixremainingbridges could not execute. Not fullgreen or identified native assertion regression. Existing DockerDesktop VM control log records POST/shutdown17:57:24Z and shutdowncomplete17:57:28Z, matchingfailure. Restart initiator not inferred; no agentDockerconfig/restart action. Curated evidence saved interrupted-full-engine-restart-evidence.json, incomplete TAP/log retained separately.
+Interrupted run21artifacthashes matched/offline/clean runtime+builderteardown/upstreaminventoryunchanged; total96hashes/6runs verified. Final3inputhashes unchanged, focused8PASS/probePASS/static2PASS stand. ONLY full/shared validation command restarted in new disposable fixtures, saved final-full-native-shared-after-engine-restart.log, not live-migration resend/retry or codechange. No success claim while running. Keep InProgress0of9nullSummary; ONErepairthenSTOPownerreview and all no-live/cleanup/merge/activation/resource restrictions unchanged.
 <!-- SECTION:NOTES:END -->
