@@ -165,9 +165,9 @@ active flow; only the owning Conversation's targeted documented creation-recover
 exception above permits an edit, never Episode or Expert authority.
 
 For a demonstrably completed handoff with failed or historically unproved
-following execute, use the exact owner's separate “New execute-only continuation
-after completed handoff” procedure in `prime-claw-oversee-episode`, not the
-ordinary handoff calls above. Blocker clearance alone does not authorize that
+following execute, or a verified pre-work runtime interruption of both received
+prompts, use the exact owner's separate execute-only continuation procedure in
+`prime-claw-oversee-episode`, not the ordinary handoff calls above. Blocker clearance alone does not authorize that
 new send. Disclose known failure versus unknown history and callback/partial
 effects, current receiver report and fresh native Episode/explicit-descendant
 state/actions/queues, progress and accepted next focus. A no-execute/no-pending

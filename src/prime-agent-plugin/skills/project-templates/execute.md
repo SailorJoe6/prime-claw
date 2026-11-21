@@ -82,9 +82,10 @@ owner/task/worktree/session binding.
 
 ### Owner-authorized execute-only continuation
 
-A version-2 owner may send one NEW canonical execute after demonstrably completed
-handoff under `prime-claw-oversee-episode`'s informed-authorization procedure.
-This is distinct from replaying the old chain. Preserve the exact existing
+Under `prime-claw-oversee-episode`'s informed-authorization procedure, a version-2
+owner may send one NEW canonical execute after demonstrably completed handoff with
+failed or historically unproved execute, or after a verified pre-work runtime interruption
+of both received prompts. This is distinct from replaying the old chain. Preserve the exact existing
 binding and read current native task/history, meaningful living plan, accepted
 bounded EXECUTE focus and full factual observation below. Continue from current
 durable progress, not a stale task or comment snapshot, and do not repeat

@@ -376,8 +376,13 @@ or chat steering. When public evidence cannot establish definite refusal, state
 the precise limit, not a safe resend of the old chain.
 
 A separate version-2-only exception supports ONE NEW canonical execute-only
-continuation after the original handoff was demonstrably received and completed,
-when the following execute failed or its historical admission remains unknown.
+continuation when the original handoff demonstrably completed and the following
+execute failed or remains historically unproved, or when both canonical prompts
+provably reached the same Episode and a verified model/runtime failure stopped
+both before task work. For the interruption path, reconcile native task history,
+code and observed effects; a bounded report-only turn may confirm recovery and
+the current checkpoint without steering or replay. Uncertain delivery, possible
+unaccounted task effects, or idle/empty queues alone do not qualify for that path.
 The exact owner reads current full native task/history and meaningful living
 plan, accepted bounded focus, code/publication/worktree facts, available history,
 and fresh provider-reported Episode and explicitly proven descendant
@@ -389,8 +394,9 @@ Foreign identity, real scope conflict, unsafe work, unavailable required current
 evidence or unproved current idleness stops. Known pending/running execute or
 unfinished admitted work cannot qualify; do not cancel it to qualify.
 
-Disclose completed handoff, known execute failure/refusal/not-attempted versus
-unknown historical admission, callback/partial effects, current receiver report
+Disclose actual handoff completion or the proven pre-work interruption, known
+execute failure/refusal/not-attempted versus unknown historical admission,
+callback/partial effects, current receiver report
 and native idle/empty queues, current progress/scope and remaining uncertainty.
 The operator may explicitly authorize this NEW continuation through ordinary
 conversation. A receiver's no-execute/no-pending report with fresh native

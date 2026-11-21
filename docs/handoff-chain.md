@@ -115,24 +115,32 @@ Those cases receive no generic replay permission or ordinary handoff/chat-steeri
 workaround. If public evidence cannot establish definite first-stage refusal,
 explain the precise limit, not a safe resend of the old chain. Inspect supported
 evidence without sending work, remain paused, or seek a separately authorized
-normal terminal disposition. A demonstrably completed handoff can instead be
-assessed under the separate NEW continuation policy below. Record findings,
+normal terminal disposition. The exact owner can assess a separate NEW
+continuation only if the conditions below are met. Record findings,
 gaps and disposition in existing native task fields/history and publish normally,
 not through a new endpoint, store, classifier or replay protocol. Ordinary
 successful handoffs need no new routine permission.
 
-### New execute-only continuation after completed handoff
+### New execute-only continuation
 
 REQUIREMENTS.md P15 and editable `prime-claw-oversee-episode` policy permit ONE
-NEW canonical execute-only request to the SAME version-2 task-native Episode,
-after the original canonical handoff was demonstrably received and completed.
-This is not re-invocation of the old two-stage chain. A known refused/failed or
-not-attempted execute differs from genuinely unknown historical admission; both
-can reach an informed operator decision. A receiver's no-execute/no-pending
-report and fresh native idle/empty queues are useful current evidence, not
-retrospective proof of non-delivery. No historical sender IDs, ACKs, callback
-proof, receipts or universal proof of absence are required. Known pending/running
-execute or unfinished admitted work stops; never cancel it to qualify.
+NEW canonical execute-only request to the SAME version-2 task-native Episode in
+one of two cases:
+
+- **Completed handoff:** the original canonical handoff demonstrably completed
+  and the following execute failed or remains historically unproved. A receiver's
+  no-execute/no-pending report and fresh native idle/empty queues are current
+  evidence, not retrospective proof of non-delivery. Historical sender IDs,
+  ACKs, callback proof, receipts or universal proof of absence are not required.
+- **Verified pre-work runtime interruption:** both canonical prompts demonstrably
+  reached the exact Episode, but a verified model/runtime failure stopped both
+  before task work. Reconcile native task history, code and observed effects. A
+  bounded report-only turn may confirm recovery, the current checkpoint and the
+  next already-authorized step, without steering or replay. Uncertain delivery,
+  possible unaccounted task effects, or idle/empty queues alone do not qualify.
+
+Neither path re-invokes the old two-stage chain. Known pending/running execute or
+unfinished admitted work stops; never cancel it to qualify.
 
 The exact owner reads current full native task/history, meaningful living plan,
 accepted bounded focus, code/head/publication/worktree facts and available
@@ -149,8 +157,9 @@ worktree/branch, host/placement, original code basis and integration target.
 A changed live route must resolve through supported facts to that same durable
 session, not guessed name or CWD.
 
-Brief the operator on completed handoff, known failure versus unknown history,
-callback/partial effects, receiver report/native readiness, current progress,
+Brief the operator on actual handoff completion or the proven pre-work
+interruption, known failure versus unknown history, callback/partial effects,
+receiver report/native readiness, current progress,
 accepted next scope, uncertainty and possible prior effects. Explicit informed
 authority for this NEW request is required; ordinary conversation suffices and an
 already informed decision needs no second phase gate. Generic earlier “continue”,
