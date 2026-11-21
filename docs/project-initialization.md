@@ -318,21 +318,28 @@ The agent calls `action="switch-confirm"`, `targetProvider="backlog"`,
 `expectedSourceRevision`, `actor`, `semanticPlacement`, and `confirmedSwitch=true`
 only after explicit operator confirmation of the exact inspected source and the
 quiesced maintenance window. Viewing inspection output never
-confirms a switch. The existing native Beads package importer keeps every raw
-value/history; managed prose may choose human-facing placement but never permit
-omission. The confirmed maintenance window is one linear operation:
+confirms a switch. PRIMECLAW-59 corrects migration to current ticket state only;
+managed prose chooses readable placement of non-equivalent current content,
+not whether to import revision archives. The source-capture increment removes
+historical reads, but the forward writer still uses its old encoded package of
+current data pending the readable-projection increment. Recovery/cancellation
+and complete current-state acceptance are also unfinished. This increment is
+not permission to retry a live migration. See the [source-capture evidence and
+limits](evidence/primeclaw-59-current-state-capture-20261121.md).
 
-1. capture every source task plus its provider-native bytes or rows, all open,
-   closed, and archived states, relationships, comments, native history,
-   provenance, actor, timestamp, and transition evidence;
+The confirmed maintenance window is one linear operation:
+
+1. capture every source task's current provider-native rows and long view,
+   all open, closed and archived states, current relationships/metadata and
+   actual authored comments; do not capture historical revisions/events;
 2. preserve existing Backlog IDs, content, history and configuration, and reuse
    the existing Beads importer with native Backlog create operations and the
    exact returned source-to-destination ID mapping;
-3. retain the existing field/status/history/relationship projections and record
+3. retain current field/status/relationship projections and record
    managed semantic-placement prose for non-equivalent fields without omitting
    raw values. There is no reverse-migration structured confirmation field or
    new mapping policy. Native readback proves counts, projections, relationships,
-   complete histories, revisions and mappings;
+   current content, revisions and mappings, plus existing destination history;
 4. publish and re-read the complete target, then write one final
    destination-native migration receipt containing the exact source and target
    revisions, digests, counts, mappings, actor, semantic-placement record, and
@@ -407,15 +414,20 @@ or missing issues refuse inspection. The reader does not require SQL or clear
 source export filters. A filter that actually omits an issue produces an
 inventory mismatch and leaves the source configuration unchanged. Beads source
 packages retain the raw CLI version and complete raw status-catalog response
-alongside issue views, unbounded issue history/events, and provenance. Migration-only source reads bind the native `context` and
-`dolt show` store/database/connection identity. The confirmation revision is a
-`capture-sha256:` token over that identity, raw version/catalog, and complete
-issue/history and memory packages, not a required outgoing published Dolt
-commit. A memory-only change also changes this revision. The same capture is
-repeated from primary and active source workspaces through guarded retirement;
-task, memory, catalog, history or identity drift refuses cutover. No source
-custom lifecycle setup, server conversion, remote, push or publication is
-required. Ordinary active Beads lifecycle/write checks remain strict.
+alongside current export rows, exact export lines and current native
+`show --long --include-comments` views. They do not read per-ticket revision
+history, database events or provenance logs. Migration-only source reads bind
+the native `context` and `dolt show` store/database/connection identity. The
+confirmation revision is a `capture-sha256:` token over that identity, raw
+version/catalog, complete current issue content and memory packages, not a
+required outgoing published Dolt commit or historical archive. A memory-only
+change also changes this revision. The same capture repeats from primary and
+active source workspaces through guarded retirement; current task content,
+comments, relationships, memory, catalog or identity drift refuses cutover.
+Older history-bound inspection revisions/receipts are not current-state proof;
+this change does not automatically accept or repair an interrupted old import.
+No source custom lifecycle setup, server conversion, remote, push or publication
+is required. Ordinary active Beads lifecycle/write checks remain strict.
 
 Confirmed migration creates one native Backlog document per memory, one
 source/index document and exactly one USER curation task through the supported
@@ -453,9 +465,9 @@ source IDs/statuses; unused catalog entries do not block. Legacy `open` and
 native `deferred` map to ordinary `In Design` tasks. Past, future or absent
 `defer_until` does not change that projection. Migration drops active deferral
 state, not ordinary text: titles (including `DEFERRED:`), descriptions, notes
-(including reasons appended by `bd defer`) and comments are preserved. Historical
-deferral fields remain only in the existing raw source/history evidence; no
-active deferral fields, extra annotations or scheduling behavior are created,
+(including reasons appended by `bd defer`) and comments are preserved. Old
+deferral revisions are not captured or imported. No active deferral fields,
+extra annotations or scheduling behavior are created,
 and migration never normalizes the retiring source. Ordinary `closed` maps to
 active `Done` in `tasks/`, without a completion move.
 A nonempty `close_reason`, keyword or status category does not mean archive.
@@ -469,7 +481,8 @@ The importer verifies native status and actual active or archive placement;
 legacy `completed/` remains preserved archive input, while new archives use
 `archive/tasks/`. No removed completion command or automatic permanent delete
 is used.
-Raw catalog/category, reason and complete history remain in source provenance.
+Current raw catalog/category and closure reason remain bound by the source capture;
+complete revision history is not migration content.
 
 After destination publication and ownership/runtime/source rechecks, retirement
 removes the exact local `.beads` store. Embedded mode makes no server-stop call;

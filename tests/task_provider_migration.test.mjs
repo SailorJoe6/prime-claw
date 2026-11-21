@@ -208,6 +208,8 @@ class AsIsBeadsRunner extends RecordingBeadsRunner {
         || JSON.stringify(args) === JSON.stringify(["context", "--json"]);
       assert.ok(args[0] === "--readonly" || (args.length === 1 && args[0] === "--version") || discovery,
         `retiring-source migration attempted active preparation/write: bd ${args.join(" ")}`);
+      const verb = args[0] === "--readonly" ? args[1] : args[0];
+      assert.ok(!["history", "provenance"].includes(verb), `current-state capture must not read bd ${verb}`);
       assert.equal(args.includes("sql"), false, "source capture must not require embedded SQL");
       assert.equal(args.includes("remote"), false, "source capture must not require a Dolt remote");
       assert.equal(args.includes("stop"), false, "embedded source retirement must not stop a server");
@@ -221,37 +223,33 @@ class AsIsBeadsRunner extends RecordingBeadsRunner {
 }
 
 
-// Match the reported byte count without real native revisions. The final record
-// and multibyte text detect prefix-only capture and incorrect byte decoding.
-function syntheticHistory(taskId, byteLength = 1_305_475, multibyte = false) {
-  const rows = Array.from({ length: 108 }, (_, index) => ({
-    Issue: { id: taskId, description: multibyte ? "界🙂".repeat(1800) : "x".repeat(11_500) },
-    revision: index,
-  }));
-  rows[107].tail = multibyte ? "PRIVATE-MULTIBYTE-EVENT-TAIL-界🙂" : "PRIVATE-HISTORY-TAIL-SENTINEL";
-  rows[107].padding = "";
-  const padding = byteLength - Buffer.byteLength(JSON.stringify(rows));
+// Large current metadata must survive file-backed capture without history reads.
+// Keep it out of native description/comment argv; source package chunks remain
+// the intentionally retained authoring path for this bounded slice.
+function syntheticCurrentViewFile(fixture, view, byteLength = 2_610_950) {
+  const current = structuredClone(view);
+  current.metadata = { ...current.metadata, current_capture: {
+    text: "界🙂".repeat(180_000), padding: "", tail: "PRIVATE-CURRENT-TAIL-界🙂",
+  } };
+  const padding = byteLength - Buffer.byteLength(JSON.stringify([current]));
   assert.ok(padding >= 0);
-  rows[107].padding = "p".repeat(padding);
-  const text = JSON.stringify(rows);
+  current.metadata.current_capture.padding = "p".repeat(padding);
+  const text = JSON.stringify([current]);
   assert.equal(Buffer.byteLength(text), byteLength);
-  assert.equal(rows.length, 108);
-  return { rows, text };
-}
-
-function syntheticHistoryFiles(fixture) {
-  const history = syntheticHistory(fixture.ids.parent);
-  const events = syntheticHistory(fixture.ids.parent, 2_610_950, true);
-  for (const [name, value] of Object.entries({ history, events })) {
-    value.path = join(fixture.outer, `synthetic-${name}.json`);
-    writeFileSync(value.path, value.text);
-  }
-  return { history, events };
+  const path = join(fixture.outer, "synthetic-current-view.json");
+  writeFileSync(path, text);
+  return { view: current, text, path };
 }
 
 function readSyntheticOutput(runner, file, options) {
   return runner.runFileBacked(process.execPath,
     ["-e", "process.stdout.write(require('node:fs').readFileSync(process.argv[1]))", file], options);
+}
+
+function assertCurrentSourcePackage(pkg) {
+  for (const key of ["history", "events", "provenance"]) {
+    assert.equal(Object.hasOwn(pkg, key), false, `current source package must not contain ${key}`);
+  }
 }
 
 async function proveFixtureRuntime(records) {
@@ -562,7 +560,7 @@ test("partial source deletion preserves verified destination ownership and repor
   assert.equal(current.head, owner.record.head);
 });
 
-test("read-only inspection captures complete published Beads history and provenance", { timeout: 120_000 }, (t) => {
+test("read-only inspection captures complete current Beads state without history reads", { timeout: 120_000 }, (t) => {
   const fixture = beadsSource(t, "inspect-beads");
   const runner = new RecordingBeadsRunner();
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
@@ -577,10 +575,8 @@ test("read-only inspection captures complete published Beads history and provena
   assert.ok(sourceReads.every(({ args }) => args[0] === "--readonly"), "source task reads must fail closed in readonly mode");
   for (const id of Object.values(fixture.ids)) {
     assert.ok(sourceReads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "show", id, "--json", "--long", "--include-comments"])));
-    assert.ok(sourceReads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "history", id, "--json", "--limit", "0"])));
-    assert.ok(sourceReads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "history", id, "--events", "--json", "--limit", "0"])));
-    assert.ok(sourceReads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "provenance", "log", id, "--json"])));
   }
+  assert.ok(!sourceReads.some(({ args }) => ["history", "provenance"].includes(args[1])));
   assert.ok(runner.reads.some(({ args }) => JSON.stringify(args) === JSON.stringify(BEADS_INVENTORY)));
   assert.ok(runner.reads.some(({ args }) => JSON.stringify(args) === JSON.stringify(["--readonly", "statuses", "--json"])));
 });
@@ -618,6 +614,61 @@ test("Beads source digest binds raw version and complete catalog independently o
 });
 
 
+test("current Beads source digest binds comments relationships metadata and raw export independently of old history", { timeout: 180_000 }, (t) => {
+  const fixture = embeddedBeadsSource(t, "current-source-digest");
+  const independent = JSON.parse(bd(fixture.root, "create", "Independent relationship target", "--json")).id;
+  class CurrentDigestRunner extends AsIsBeadsRunner {
+    constructor() { super(); this.mutation = null; this.oldHistoryVersion = 1; this.historicalReads = 0; }
+    run(commandName, args, options = {}) {
+      const verb = args[0] === "--readonly" ? args[1] : args[0];
+      // Hypothetical old history changes independently of every current response.
+      // Intercept before native execution; even one attempted read fails below.
+      if (commandName === "bd" && ["history", "provenance"].includes(verb)) {
+        this.historicalReads += 1;
+        return { status: 0, stdout: JSON.stringify([{ revision: this.oldHistoryVersion }]), stderr: "" };
+      }
+      const result = super.run(commandName, args, options);
+      if (result.status !== 0 || commandName !== "bd") return result;
+      if (this.mutation === "raw export" && verb === "export") {
+        return { ...result, stdout: result.stdout.split("\n").map((line) =>
+          line && JSON.parse(line).id === fixture.ids.parent ? `  ${line}  ` : line).join("\n") };
+      }
+      if (verb !== "show" || args[2] !== fixture.ids.parent || !this.mutation) return result;
+      const rows = JSON.parse(result.stdout);
+      const view = rows[0];
+      if (this.mutation === "comments") view.comments = [...(view.comments ?? []), {
+        text: "Current comment-only change", author: "current-source-author", created_at: "2026-11-20T00:00:00Z",
+      }];
+      if (this.mutation === "relationships") view.dependencies = [...(view.dependencies ?? []), { depends_on_id: independent }];
+      if (this.mutation === "metadata") view.metadata = { ...view.metadata, current_opaque: { values: [false, null, "界🙂"] } };
+      return { ...result, stdout: JSON.stringify(rows) };
+    }
+  }
+  const runner = new CurrentDigestRunner();
+  const inspect = () => inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  const baseline = inspect();
+  assert.equal(baseline.status, "ready", baseline.detail);
+  runner.oldHistoryVersion += 1;
+  const sameCurrent = inspect();
+  assert.equal(sameCurrent.status, "ready", sameCurrent.detail);
+  assert.equal(sameCurrent.sourceRevision, baseline.sourceRevision);
+  assert.equal(sameCurrent.sourceDigest, baseline.sourceDigest, "old history must not bind current-state capture");
+  for (const mutation of ["comments", "relationships", "metadata", "raw export"]) {
+    runner.mutation = mutation;
+    const changed = inspect();
+    assert.equal(changed.status, "ready", changed.detail);
+    assert.notEqual(changed.sourceDigest, baseline.sourceDigest, mutation);
+    assert.notEqual(changed.sourceRevision, baseline.sourceRevision, mutation);
+    assert.equal(changed.sourceRevision, `capture-sha256:${changed.sourceDigest}`);
+    assert.deepEqual(changed.taskCounts, baseline.taskCounts);
+    runner.mutation = null;
+    assert.equal(inspect().sourceDigest, baseline.sourceDigest, `restore ${mutation}`);
+  }
+  assert.equal(runner.historicalReads, 0, "current capture must never request historical evidence");
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+});
+
 test("confirmed Beads to Backlog migration preserves active Episode identity and continues on canonical-primary Backlog", { timeout: 180_000 }, async (t) => {
   const fixture = beadsSource(t, "beads-active-owner");
   const sourceVersion = command(fixture.root, "bd", ["--version"]);
@@ -649,6 +700,7 @@ test("confirmed Beads to Backlog migration preserves active Episode identity and
     const text = task.comments.map((comment) => String(comment.text ?? comment.content ?? comment.body)).join("\n");
     assert.match(text, /prime-claw-task-provider-migration-source-v1/);
     const sourcePackage = sourcePackageFromBacklogComments(task);
+    assertCurrentSourcePackage(sourcePackage);
     assert.equal(sourcePackage.sourceTaskId, mapping.sourceTaskId);
     assert.equal(sourcePackage.sourceVersion, sourceVersion, "preserve raw version stdout, including its newline");
     assert.deepEqual(sourcePackage.statusCatalog, statusCatalog);
@@ -1333,13 +1385,14 @@ test("used unsupported Beads statuses and ambiguous archive records aggregate be
   const before = sourceAuthorityFiles(fixture.root);
   const exportBefore = bd(fixture.root, "--readonly", "export", "--all");
   const sourceRecords = [...offenders, { id: retainedArchive, status: "open" }];
-  const historyBefore = Object.fromEntries(sourceRecords.map(({ id }) => [id, bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")]));
+  const currentBefore = Object.fromEntries(sourceRecords.map(({ id }) => [id,
+    bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments")]));
   const sourceHead = git(fixture.root, "rev-parse", "HEAD");
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
   let deletions = 0;
   const confirmed = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: baseline.sourceRevision,
-    confirmedSwitch: true, actor: "status-preflight-operator", semanticPlacement: "Preserve complete source fields and history.",
+    confirmedSwitch: true, actor: "status-preflight-operator", semanticPlacement: "Preserve complete current source fields.",
     deleteSource() { deletions += 1; },
   });
   for (const result of [inspection, confirmed]) {
@@ -1354,7 +1407,8 @@ test("used unsupported Beads statuses and ambiguous archive records aggregate be
   assert.equal(deletions, 0);
   assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
   assert.equal(bd(fixture.root, "--readonly", "export", "--all"), exportBefore);
-  for (const { id } of sourceRecords) assert.equal(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0"), historyBefore[id]);
+  for (const { id } of sourceRecords) assert.equal(
+    bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"), currentBefore[id]);
   assert.equal(git(fixture.root, "rev-parse", "HEAD"), sourceHead);
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
   assert.equal(existsSync(join(fixture.root, ".backlog")), false);
@@ -1384,9 +1438,6 @@ test("native Beads deferred tasks project to In Design without active deferral a
   const sourceIds = [...Object.values(fixture.ids), ...cases.map(({ id }) => id)];
   const readNative = () => Object.fromEntries(sourceIds.map((id) => [id, {
     view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
-    history: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")),
-    events: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--events", "--json", "--limit", "0")),
-    provenance: JSON.parse(bd(fixture.root, "--readonly", "provenance", "log", id, "--json")),
   }]));
   const native = readNative();
   for (const { id, until } of cases) {
@@ -1476,9 +1527,7 @@ test("native Beads deferred tasks project to In Design without active deferral a
     assert.deepEqual(pkg.nativeView, expected.view);
     assert.deepEqual(pkg.exportRow, JSON.parse(exportLines[id]));
     assert.equal(pkg.exportLineBase64, Buffer.from(exportLines[id]).toString("base64"));
-    assert.deepEqual(pkg.history, expected.history);
-    assert.deepEqual(pkg.events, expected.events);
-    assert.deepEqual(pkg.provenance, expected.provenance);
+    assertCurrentSourcePackage(pkg);
   }
   const destinationPaths = Object.keys(physicalDestinationRecords(store)).sort();
   const replay = await migrateTaskProvider(request);
@@ -1486,6 +1535,8 @@ test("native Beads deferred tasks project to In Design without active deferral a
   assert.equal(replay.code, "pre-cutover-failed");
   assert.match(replay.detail, /fixture refuses deferred source retirement/);
   assert.equal(retirements, 2, "exact replay must pass destination verification and reach the same guarded refusal");
+  assert.ok(!runner.reads.some(({ args }) => ["history", "provenance"].includes(args[1])),
+    "confirmation and same-destination replay must not read source history/provenance");
   const replayReceipt = readReceipt();
   assert.equal(replayReceipt.id, firstReceipt.id);
   assert.deepEqual(replayReceipt.receipt.mappings, firstReceipt.receipt.mappings, "replay must reuse all destination identities");
@@ -1544,9 +1595,6 @@ test("Beads closed reasons and categories complete normally while exact archive 
   }));
   const native = Object.fromEntries(Object.keys(expectedClass).map((id) => [id, {
     view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
-    history: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")),
-    events: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--events", "--json", "--limit", "0")),
-    provenance: JSON.parse(bd(fixture.root, "--readonly", "provenance", "log", id, "--json")),
   }]));
   class ArchivePublicationRunner extends AsIsBeadsRunner {
     constructor() { super(); this.destinationPublications = 0; }
@@ -1604,9 +1652,7 @@ test("Beads closed reasons and categories complete normally while exact archive 
     assert.equal(pkg.sourceDigest, inspection.sourceDigest);
     assert.deepEqual(pkg.exportRow, exportRows[mapping.sourceTaskId]);
     assert.deepEqual(pkg.nativeView, expected.view);
-    assert.deepEqual(pkg.history, expected.history);
-    assert.deepEqual(pkg.events, expected.events);
-    assert.deepEqual(pkg.provenance, expected.provenance);
+    assertCurrentSourcePackage(pkg);
   }
   assert.deepEqual(physicalDestinationRecords(store), originalRecords, "native readback must not relocate or rewrite archives");
   assert.equal(existsSync(join(store, "completed")), false, "ordinary closed imports stay active Done tasks");
@@ -1651,33 +1697,29 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
   const statusCatalog = JSON.parse(bd(fixture.root, "--readonly", "statuses", "--json"));
   const native = Object.fromEntries(Object.values(fixture.ids).map((id) => [id, {
     view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
-    history: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--json", "--limit", "0")),
-    events: JSON.parse(bd(fixture.root, "--readonly", "history", id, "--events", "--json", "--limit", "0")),
-    provenance: JSON.parse(bd(fixture.root, "--readonly", "provenance", "log", id, "--json")),
   }]));
-  const large = syntheticHistoryFiles(fixture);
-  native[fixture.ids.parent].history = large.history.rows;
-  native[fixture.ids.parent].events = large.events.rows;
+  const large = syntheticCurrentViewFile(fixture, native[fixture.ids.parent].view);
+  native[fixture.ids.parent].view = large.view;
   const owner = addActiveBeadsOwner(fixture);
   writeFileSync(join(owner.episode, "compatible-progress.txt"), "compatible active source progress\n");
   git(owner.episode, "add", "compatible-progress.txt");
   git(owner.episode, "commit", "-qm", "compatible later Episode implementation");
   git(owner.episode, "push", "-q");
   const laterHead = git(owner.episode, "rev-parse", "HEAD");
-  class LargeHistoryRunner extends AsIsBeadsRunner {
+  class ForbiddenHistoryCurrentRunner extends AsIsBeadsRunner {
     run(commandName, args, options = {}) {
-      if (commandName === "bd" && args[0] === "--readonly" && args[1] === "history" && args[2] === fixture.ids.parent) {
-        const expected = args.includes("--events") ? large.events : large.history;
-        const result = readSyntheticOutput(this, expected.path, options);
-        assert.equal(result.stdout, expected.text);
-        assert.deepEqual(JSON.parse(result.stdout), expected.rows);
+      if (commandName === "bd" && args[0] === "--readonly" && args[1] === "show" && args[2] === fixture.ids.parent) {
+        assert.deepEqual(args, ["--readonly", "show", fixture.ids.parent, "--json", "--long", "--include-comments"]);
+        const result = readSyntheticOutput(this, large.path, options);
+        assert.equal(result.stdout, large.text);
+        assert.deepEqual(JSON.parse(result.stdout), [large.view]);
         this.reads.push({ args: [...args], cwd: options.cwd, ...result });
         return result;
       }
       return super.run(commandName, args, options);
     }
   }
-  const runner = new LargeHistoryRunner();
+  const runner = new ForbiddenHistoryCurrentRunner();
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
   assert.equal(inspection.status, "ready", inspection.detail);
   assert.deepEqual(inspection.activeOwnership, [{ ownerSessionId: owner.ownerSessionId, taskId: fixture.ids.parent }]);
@@ -1685,7 +1727,7 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
   const result = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "embedded-migration-operator",
-    semanticPlacement: "Preserve exact native source data and history in Backlog provenance.",
+    semanticPlacement: "Preserve exact current native source data in Backlog.",
     async verifyActiveRuntime(records) {
       runtimeProofs += 1;
       assert.ok(records.every((record) => record.head === laterHead));
@@ -1719,9 +1761,7 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
     assert.equal(pkg.sourceIdentity.doltMode, "embedded");
     assert.equal(pkg.sourceIdentity.database, "EMB");
     assert.deepEqual(pkg.nativeView, expected.view);
-    assert.deepEqual(pkg.history, expected.history);
-    assert.deepEqual(pkg.events, expected.events);
-    assert.deepEqual(pkg.provenance, expected.provenance);
+    assertCurrentSourcePackage(pkg);
     assert.equal(task.status, ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked" })[expected.view.status]);
   }
   const current = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8")).owners[owner.ownerSessionId];
@@ -1740,11 +1780,13 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
     "complete source must be recaptured through active workspace and guarded retirement proofs");
   assert.ok(runner.reads.some(({ cwd, args }) => cwd === owner.episode && args[0] === "--readonly" && args[1] === "context"),
     "active source workspace needs its own native source identity proof");
+  assert.ok(!runner.reads.some(({ args }) => ["history", "provenance"].includes(args[0] === "--readonly" ? args[1] : args[0])),
+    "inspection, confirmation and active source recaptures must not read history/provenance");
   assert.deepEqual(runner.sourcePublicationCommands, []);
 });
 
-test("embedded source refuses mismatched active workspace identity and unreadable native history before destination creation", { timeout: 180_000 }, async (t) => {
-  for (const kind of ["active identity", "history"]) {
+test("embedded source refuses mismatched active workspace identity and unreadable current native view before destination creation", { timeout: 180_000 }, async (t) => {
+  for (const kind of ["active identity", "current view"]) {
     await t.test(kind, (t) => {
       const fixture = embeddedBeadsSource(t, `embedded-refuse-${kind.replaceAll(" ", "-")}`);
       const owner = kind === "active identity" ? addActiveBeadsOwner(fixture) : null;
@@ -1758,9 +1800,9 @@ test("embedded source refuses mismatched active workspace identity and unreadabl
               refused = true;
               return { ...result, stdout: JSON.stringify({ ...JSON.parse(result.stdout), database: "OTHER" }) };
             }
-            if (kind === "history" && args[1] === "history") {
+            if (kind === "current view" && args[1] === "show") {
               refused = true;
-              return { status: 1, stdout: "", stderr: "fixture cannot read required native history" };
+              return { status: 1, stdout: "", stderr: "fixture cannot read required current native view" };
             }
           }
           return result;
@@ -1769,7 +1811,7 @@ test("embedded source refuses mismatched active workspace identity and unreadabl
       const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: new UnreadableSourceRunner() });
       assert.equal(refused, true);
       assert.equal(inspection.status, "blocked");
-      assert.match(inspection.detail, kind === "history" ? /cannot read required native history/ : /source context.*store, database and mode/);
+      assert.match(inspection.detail, kind === "current view" ? /cannot read required current native view/ : /source context.*store, database and mode/);
       assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
       assert.equal(existsSync(join(fixture.root, ".backlog")), false);
       assert.equal(existsSync(join(fixture.root, ".beads")), true);
@@ -1980,10 +2022,11 @@ test("native Beads memory capture binds exact content without inspection writes"
   const first = inspect();
   assert.equal(first.status, "ready", first.detail);
   assert.deepEqual(first.taskCounts, { open: 3, closed: 0, archived: 0, total: 3 });
-  const issueReads = runner.reads.filter(({ args }) => ["show", "history", "provenance"].includes(args[1]));
+  const issueReads = runner.reads.filter(({ args }) => args[1] === "show");
   assert.ok(issueReads.length > 0);
-  assert.ok(issueReads.every(({ args }) => Object.values(fixture.ids).includes(args[1] === "provenance" ? args[3] : args[2])),
-    "native memory keys must never enter task show/history/events/provenance");
+  assert.ok(issueReads.every(({ args }) => Object.values(fixture.ids).includes(args[2])),
+    "native memory keys must never enter task show");
+  assert.ok(!runner.reads.some(({ args }) => ["history", "provenance"].includes(args[1])));
   assert.equal(inspect().sourceRevision, first.sourceRevision);
   runner.padMemoryLines = true;
   const rawLineChanged = inspect();
@@ -1998,8 +2041,7 @@ test("native Beads memory capture binds exact content without inspection writes"
   assert.notEqual(changed.sourceDigest, first.sourceDigest);
   assert.deepEqual(changed.taskCounts, first.taskCounts);
   bd(fixture.root, "remember", value, "--key", key);
-  // Native writes may add history even after the exported value is restored.
-  // Confirm the current exact capture, never assume the old history returns.
+  // Restored current content is independent of any old native history.
   const restored = inspect();
   assert.equal(restored.status, "ready", restored.detail);
   assert.equal(inspect().sourceRevision, restored.sourceRevision);
@@ -2297,7 +2339,7 @@ test("migration admission refuses contested Backlog IDs across active archive le
   const activeBytes = readFileSync(join(fixture.root, destination.activePath));
   const source = { authority: sourceAuthorityFiles(fixture.root),
     export: bd(fixture.root, "--readonly", "export", "--all"),
-    history: bd(fixture.root, "--readonly", "history", fixture.ids.parent, "--json", "--limit", "0") };
+    currentView: bd(fixture.root, "--readonly", "show", fixture.ids.parent, "--json", "--long", "--include-comments") };
   for (const [folder, taskId] of [["tasks", destination.active], ["archive/tasks", destination.active],
     ["completed", destination.active], ["drafts", destination.active], ["archive/drafts", destination.active], ["archive/tasks", "BASE-01"]]) {
     await t.test(`${folder} ${taskId}`, async () => {
@@ -2328,7 +2370,7 @@ test("migration admission refuses contested Backlog IDs across active archive le
       assert.deepEqual(admissionTree(join(fixture.root, "backlog")), before);
       assert.deepEqual(sourceAuthorityFiles(fixture.root), source.authority);
       assert.equal(bd(fixture.root, "--readonly", "export", "--all"), source.export);
-      assert.equal(bd(fixture.root, "--readonly", "history", fixture.ids.parent, "--json", "--limit", "0"), source.history);
+      assert.equal(bd(fixture.root, "--readonly", "show", fixture.ids.parent, "--json", "--long", "--include-comments"), source.currentView);
       assert.equal(git(fixture.root, "rev-parse", "HEAD"), head);
       assert.equal(git(fixture.root, "ls-files", "--stage"), index);
       assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote), refs);
@@ -2348,19 +2390,19 @@ test("migration admission refuses contested Backlog IDs across active archive le
 test("migration admission keeps malformed coexistence and unreadable source refusals before writes", { timeout: 180_000 }, (t) => {
   const fixture = embeddedBeadsSource(t, "admission-invalid");
   const destination = coexistenceDestination(fixture, "backlog");
-  class UnreadableHistory extends AdmissionRunner {
+  class UnreadableCurrentView extends AdmissionRunner {
     run(name, args, options) {
       const result = super.run(name, args, options);
-      return name === "bd" && args[0] === "--readonly" && args[1] === "history"
-        ? { status: 1, stdout: "", stderr: "fixture cannot read required native history" } : result;
+      return name === "bd" && args[0] === "--readonly" && args[1] === "show"
+        ? { status: 1, stdout: "", stderr: "fixture cannot read required current native view" } : result;
     }
   }
-  const runner = new UnreadableHistory();
+  const runner = new UnreadableCurrentView();
   const before = admissionTree(join(fixture.root, destination.store));
   const source = sourceAuthorityFiles(fixture.root);
   const unreadable = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
   assert.equal(unreadable.status, "blocked");
-  assert.match(unreadable.detail, /cannot read required native history/);
+  assert.match(unreadable.detail, /cannot read required current native view/);
   assertNoAdmissionWrites(runner);
   assert.deepEqual(admissionTree(join(fixture.root, destination.store)), before);
   assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
@@ -2874,7 +2916,7 @@ test("native archived-target source graph preserves mapped dependencies through 
   const pkg = sourcePackageFromBacklogComments(child);
   assert.equal(pkg.nativeView.status, "closed");
   assert.match(pkg.nativeView.close_reason, /^Prime Claw abandonment:/);
-  assert.ok(pkg.history.length > 0);
+  assertCurrentSourcePackage(pkg);
   for (const [path, bytes] of Object.entries(records)) assert.equal(readFileSync(join(destination.store, path)).toString("base64"), bytes, path);
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
   assert.equal(git(destination.store, "status", "--porcelain=v1"), "");
@@ -2884,7 +2926,8 @@ test("native archived-target source graph preserves mapped dependencies through 
 test("default migration capture is file-backed for every native read and reports bounded payload-safe failures", { timeout: 180_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "file-backed-migration");
   const owner = addActiveBeadsOwner(fixture);
-  const large = syntheticHistoryFiles(fixture);
+  const currentView = JSON.parse(bd(fixture.root, "--readonly", "show", fixture.ids.parent, "--json", "--long", "--include-comments"))[0];
+  const large = syntheticCurrentViewFile(fixture, currentView);
   const before = sourceAuthorityFiles(fixture.root);
   const ownershipPath = join(fixture.root, ".prime-claw", "ownership.json");
   const ownership = readFileSync(ownershipPath, "utf8");
@@ -2897,20 +2940,23 @@ test("default migration capture is file-backed for every native read and reports
   let failExport = false;
   ProcessCommandRunner.prototype.run = () => { throw new Error("migration used pipe-buffer capture"); };
   ProcessCommandRunner.prototype.runFileBacked = function (commandName, args, options = {}) {
-    if (commandName === "bd") reads.push([...args]);
+    if (commandName === "bd") {
+      reads.push([...args]);
+      assert.ok(!["history", "provenance"].includes(args[0] === "--readonly" ? args[1] : args[0]),
+        "default capture must not read historical commands");
+    }
     if (failExport && commandName === "bd" && args[0] === "--readonly" && args[1] === "export") return injection;
     if ((failDiscovery && commandName === "bd" && args[0] === "config" && args[1] === "get" && args[2] === "no-db")
         || (failRequiredGit && commandName === "git" && args.includes("--git-dir"))) {
       assert.equal(options.allowFailure, true, "adapter must collect native metadata before throwing");
       return injection;
     }
-    if (commandName === "bd" && args[0] === "--readonly" && args[1] === "history" && args[2] === fixture.ids.parent) {
+    if (commandName === "bd" && args[0] === "--readonly" && args[1] === "show" && args[2] === fixture.ids.parent) {
       if (injection) return injection;
-      const expected = args.includes("--events") ? large.events : large.history;
       const result = originalFileBacked.call(this, process.execPath,
-        ["-e", "process.stdout.write(require('node:fs').readFileSync(process.argv[1]))", expected.path], options);
-      assert.equal(result.stdout, expected.text);
-      assert.deepEqual(JSON.parse(result.stdout), expected.rows);
+        ["-e", "process.stdout.write(require('node:fs').readFileSync(process.argv[1]))", large.path], options);
+      assert.equal(result.stdout, large.text);
+      assert.deepEqual(JSON.parse(result.stdout), [large.view]);
       return result;
     }
     return originalFileBacked.call(this, commandName === "backlog" ? BACKLOG : commandName, args, options);
@@ -2921,25 +2967,25 @@ test("default migration capture is file-backed for every native read and reports
   });
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
   assert.equal(inspection.status, "ready", inspection.detail);
-  for (const verb of ["export", "list", "show", "history", "provenance", "context", "statuses", "dolt"]) {
+  for (const verb of ["export", "list", "show", "context", "statuses", "dolt"]) {
     assert.ok(reads.some((args) => args[0] === "--readonly" && args[1] === verb), `missing file-backed ${verb}`);
   }
   assert.ok(reads.some((args) => args.length === 1 && args[0] === "--version"));
-  assert.ok(reads.some((args) => args[1] === "history" && args.includes("--events")));
+  assert.ok(!reads.some((args) => ["history", "provenance"].includes(args[1])));
 
   const failures = [
-    { name: "ENOBUFS", stdout: large.history.text, stderr: "", status: 1, errorCode: "ENOBUFS", nativeStatus: null, signal: "SIGTERM" },
-    { name: "ENOSPC", stdout: large.history.text, stderr: "", status: 1, errorCode: "ENOSPC", nativeStatus: null, signal: null },
-    { name: "output-read EIO", stdout: large.events.text, stderr: "", status: 1, errorCode: "EIO", nativeStatus: null, signal: null },
-    { name: "short stderr", stdout: large.history.text, stderr: "fixture command unavailable", status: 7, nativeStatus: 7, signal: null },
-    { name: "large stderr", stdout: large.events.text, stderr: "fixture ordinary error ".repeat(2000) + "PRIVATE-STDERR-TAIL", status: 9, nativeStatus: 9 },
-    { name: "empty stderr", stdout: large.history.text, stderr: "", status: 7, nativeStatus: 7, signal: null },
-    { name: "empty export stderr", operation: "export", stdout: large.history.text, stderr: "", status: 7, nativeStatus: 7, signal: null },
+    { name: "ENOBUFS", stdout: large.text, stderr: "", status: 1, errorCode: "ENOBUFS", nativeStatus: null, signal: "SIGTERM" },
+    { name: "ENOSPC", stdout: large.text, stderr: "", status: 1, errorCode: "ENOSPC", nativeStatus: null, signal: null },
+    { name: "output-read EIO", stdout: large.text, stderr: "", status: 1, errorCode: "EIO", nativeStatus: null, signal: null },
+    { name: "short stderr", stdout: large.text, stderr: "fixture command unavailable", status: 7, nativeStatus: 7, signal: null },
+    { name: "large stderr", stdout: large.text, stderr: "fixture ordinary error ".repeat(2000) + "PRIVATE-STDERR-TAIL", status: 9, nativeStatus: 9 },
+    { name: "empty stderr", stdout: large.text, stderr: "", status: 7, nativeStatus: 7, signal: null },
+    { name: "empty export stderr", operation: "export", stdout: large.text, stderr: "", status: 7, nativeStatus: 7, signal: null },
   ];
   for (const failure of failures) {
     injection = failure;
     failExport = failure.operation === "export";
-    const expectedLabel = failExport ? "Beads source complete export" : `bd history ${fixture.ids.parent}`;
+    const expectedLabel = failExport ? "Beads source complete export" : `bd show ${fixture.ids.parent}`;
     const refused = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog" });
     assert.equal(refused.status, "blocked", failure.name);
     assert.ok(refused.detail.startsWith(`${expectedLabel}:`), refused.detail);

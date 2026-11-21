@@ -3,11 +3,12 @@
  *
  * Public entry points admit only Beads to Backlog. Existing pair-specific
  * native helpers are retained rather than introducing a universal task model. Backlog snapshots retain the exact structured view,
- * Markdown bytes, placement, and Git history. Beads snapshots retain the exact
- * export row, long native view, Dolt history/events, and append-only
- * provenance. Pair-specific writers use only supported native CLIs, preserve
- * non-equivalent source bytes in destination-native metadata/comments, and
- * verify those exact packages before the one-way ownership/source cutover.
+ * Markdown bytes, placement, and Git history. Beads snapshots bind the complete
+ * current export, independent issue inventory and long native views/comments;
+ * they neither read nor bind old revisions, database events or provenance logs.
+ * Pair-specific writers use only supported native CLIs and verify current
+ * source content before the one-way ownership/source cutover. The legacy encoded
+ * current-state destination package remains pending readable-projection work.
  */
 import { createHash } from "node:crypto";
 import {
@@ -198,9 +199,6 @@ interface BeadsTaskPackage {
   exportRow: JsonObject;
   exportLineBase64: string;
   nativeView: JsonObject;
-  history: unknown;
-  events: unknown;
-  provenance: unknown;
 }
 
 interface BeadsSnapshot {
@@ -610,18 +608,14 @@ function captureBeads(
     if (views.length !== 1) throw new Error(`bd show ${taskId} did not return one exact native task`);
     const nativeView = asObject(views[0], `bd show ${taskId}`);
     if (nativeView.id !== taskId) throw new Error(`bd show ${taskId} returned a different ID`);
-    const history = jsonCommand(runner, "bd", ["--readonly", "history", taskId, "--json", "--limit", "0"], projectRoot, `bd history ${taskId}`);
-    const events = jsonCommand(runner, "bd", ["--readonly", "history", taskId, "--events", "--json", "--limit", "0"], projectRoot, `bd history ${taskId} --events`);
-    const provenance = jsonCommand(runner, "bd", ["--readonly", "provenance", "log", taskId, "--json"], projectRoot, `bd provenance log ${taskId}`);
+    // Authored comments are current ticket content in the long native view.
+    // Revision snapshots/events/provenance logs are not migration prerequisites.
     return {
       sourceTaskId: taskId,
       classification: "open",
       exportRow,
       exportLineBase64: Buffer.from(line).toString("base64"),
       nativeView,
-      history,
-      events,
-      provenance,
     };
   }).sort((a, b) => a.sourceTaskId.localeCompare(b.sourceTaskId));
   if (new Set(tasks.map((task) => task.sourceTaskId)).size !== tasks.length) throw new Error("Beads source export repeats a canonical task ID");
@@ -827,7 +821,7 @@ function semanticPrompt(source: SourceSnapshot, target: TaskProviderId): string 
   const nativeValues = nativeRequirements.length
     ? ` These Backlog fields cannot project to one native Beads value without a decision: ${nativeRequirements.join(", ")}. On switch-confirm, supply each actual literal destination value through one task-specific beadsNativePlacements entry; priority is an integer 0..4 and assignee is a non-empty string. Prose is never parsed as a value.`
     : "";
-  return `Review exact ${source.provider} source fields that have no native ${target} equivalent. Supply concise semantic-placement prose for the confirm call.${nativeValues} The code preserves every raw value, absence, actor, timestamp, status transition, and history entry losslessly in destination-native metadata/provenance; your prose decides only the human-facing placement of non-equivalent content and must not authorize omission or normalization.`;
+  return `Review exact ${source.provider} current source fields that have no native ${target} equivalent. Supply concise semantic-placement prose for the confirm call.${nativeValues} Preserve current ticket content, meaningful metadata, actual authored comments and relationships. Do not require or import old revisions, database events or provenance logs. Your prose decides only the human-facing placement of non-equivalent current content and must not authorize its omission.`;
 }
 
 export function inspectTaskProviderMigration(options: {
@@ -864,7 +858,7 @@ export function inspectTaskProviderMigration(options: {
   } catch (error) {
     return blocked("preflight", error instanceof Error ? error.message : String(error),
       error instanceof MigrationCommandFailure
-        ? "resolve the reported command/capture or resource failure, preserve the source and its full history, then request a new migration inspection; do not trim history or repair readable source data"
+        ? "resolve the reported command/capture or resource failure, preserve the source intact, then request a new migration inspection; do not trim required current content or repair readable source data"
         : "repair the exact invalid or incomplete native source/publication evidence, then request a new migration inspection",
       { targetProvider: options.targetProvider });
   }
@@ -1441,9 +1435,6 @@ function backlogSourcePackage(pkg: BeadsTaskPackage, source: BeadsSnapshot, sema
     exportRow: pkg.exportRow,
     exportLineBase64: pkg.exportLineBase64,
     nativeView: pkg.nativeView,
-    history: pkg.history,
-    events: pkg.events,
-    provenance: pkg.provenance,
     semanticPlacement,
   });
 }
@@ -2793,7 +2784,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       ownershipSwitch
         ? `stop all task mutation and recover the exact source ${sourcePath}, destination ${destinationPath}, and ownership evidence; do not create another destination`
         : error instanceof MigrationCommandFailure
-          ? `the source remains authoritative at ${sourcePath}; resolve the reported command/capture or resource failure without trimming history or repairing readable source data; preserve the existing destination ${destinationPath} and retry only that same destination after the stated condition is satisfied`
+          ? `the source remains authoritative at ${sourcePath}; resolve the reported command/capture or resource failure without trimming required current content or repairing readable source data; preserve the existing destination ${destinationPath} and retry only that same destination after the stated condition is satisfied`
           : `the source remains authoritative at ${sourcePath}; preserve it, inspect the exact invalid or incomplete native evidence, and either clean only the existing destination ${destinationPath} or retry only that same destination after the stated condition is satisfied`,
       { sourceProvider: source?.provider, targetProvider: options.targetProvider, sourceRevision: source?.revision },
     );

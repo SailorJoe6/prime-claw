@@ -521,36 +521,52 @@ stores in place. Existing destination data is not itself a migration conflict.
 Sources: [PRIMECLAW-44][T44], [46][T46]. Older bidirectional migration plans in
 [43][T43] are superseded.
 
-### M2. Preserve meaning and history, not invented destination behavior
+### M2. Preserve current ticket meaning, not revision archives
 
-Preserve all issue content, relationships, comments, history, and provenance,
-including large native histories without fixed per-command capture ceilings or
-silent truncation. Report capture/resource failures as transport failures with
-bounded private-data-safe diagnostics, not malformed-source accusations.
-Preserve active Episode identity and resources. Use supported native destination
-authoring and LLM judgment for non-equivalent
-fields; do not omit them or build a general mapping framework.
+Migrate each ticket's complete current readable content and meaningful metadata:
+title, description, acceptance criteria, current plan/design and notes, current
+status/close information, priority, type, labels, assignee, parent/dependency
+relationships, and actual authored comments. Use supported native destination
+fields or concise labeled readable text for non-equivalent current fields.
+Preserve active Episode identity and resources. Use LLM judgment for placement;
+do not omit current content or build a general mapping framework.
+
+Do not require, collect or import per-ticket Dolt revision histories, old issue
+snapshots, database event streams or provenance logs. Do not embed base64 export
+packages or equivalent archive blobs in tasks/comments, or move them to a newly
+invented archive destination. Current source identity and content binding remain
+required; repeated source checks and destination verification concern current
+content, comments, metadata and relationships, not historical revisions. Existing
+destination history remains protected and need not be rewritten or deleted.
+Required current data still has no fixed per-command capture ceiling or silent
+truncation. Report capture/resource failures as transport failures with bounded
+private-data-safe diagnostics, not malformed-source accusations.
 
 Legacy open work becomes In Design; ordinary closed work becomes active `Done`,
 not automatically archived or moved to legacy `completed/`. Archive only from
 explicit source archive/abandonment evidence, preserving the normally mapped
-status and raw source history rather than forcing `In Progress`. Preserve both
-legacy `completed/` and canonical `archive/tasks/` as archived history, never as
-an implicit permanent delete.
+status and current closure information rather than forcing `In Progress`.
+Preserve both legacy `completed/` and canonical `archive/tasks/` as existing
+archived history, never as an implicit permanent delete.
 Native Beads memories become readable Backlog documents, an origin index, and
 exactly one USER task to curate them; no memories means no empty curation work.
-Do not curate or delete memories automatically.
+Do not curate or delete memories automatically, or repeat the whole memory
+collection in every imported ticket.
 
-**Requested correction:** deferred work becomes ordinary In Design. Drop active
-deferral-only fields, but preserve ordinary prose and historical raw evidence;
-do not add a snooze, freeze, scheduling, or special annotation feature.
+Deferred work becomes ordinary In Design. Drop active deferral-only fields but
+preserve ordinary current prose; do not add a snooze, freeze, scheduling, or
+special annotation feature. The later current-state-only correction supersedes
+the earlier requirement to retain raw historical deferral evidence.
 
-Sources: [PRIMECLAW-44][T44], [45][T45], [49][T49], [50][T50], [52][T52].
+Sources: [PRIMECLAW-44][T44], [45][T45], [49][T49], [50][T50], [52][T52];
+[PRIMECLAW-59][T59] records Joe's later current-state-only correction. These
+requirements are intent, not a claim that the remaining migration work is done.
 
 ### M3. Verify the destination before retiring the source
 
 Keep the source intact and authoritative until complete destination publication,
-readback, preserved mappings/history, and active-owner continuity are verified.
+readback of complete current ticket state, preserved mappings and existing
+destination history, and active-owner continuity are verified.
 Then leave one active authority, not a mirror or dual-write arrangement. Use the
 existing destination-native migration evidence, not another coordinator/store.
 Failure must state which authority and resources actually remain. Do not retry
@@ -769,3 +785,5 @@ not a claim of an exhaustive transcript audit.
 [T10_39]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/tasks/primeclaw-10.39%20-%20Compact-Conversation-context-after-episode-handoff-when-utilization-exceeds-threshold.md
 [T10_40]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/tasks/primeclaw-10.40%20-%20Remove-untraceable-Episode-cleanup-machinery.md
 [T10_41]: https://github.com/SailorJoe6/prime-claw/blob/68bb7f1f21e9ac2badcae6b3ae0c811a3c2b86b2/tasks/primeclaw-10.41%20-%20Handle-Orca-nonzero-after-successful-Episode-worktree-removal.md
+
+[T59]: https://github.com/SailorJoe6/prime-claw/blob/964111e687a5656f63d3f3fba7bf55e6d2a66519/tasks/primeclaw-59%20-%20Recover-interrupted-Beads-imports-without-losing-existing-Backlog-records.md
