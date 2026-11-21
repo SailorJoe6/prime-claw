@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 15:58'
+updated_date: '2026-11-21 16:03'
 labels: []
 dependencies: []
 references:
@@ -344,4 +344,8 @@ Repaired by separating the private exact-path native config check from the expor
 Scratch-repaired focused run20261121T154653Z-25796-279ae724: accepted current/replay8PASS; selected-config5PASS2FAIL/7. Both failures were actual missing-status cases: fresh CLI saw the addition, but same owned server never observed it. Pytest1FAIL1PASS11deselected331.93s. Required probe20261121T154653Z-26055-a2c4f58c PASS136.03s, not final source after this repair.
 Root cause in pinned native source: browser startup loads cached config; GET /api/config only loads that cache and does not initialize content services/watchers. Watcher validation additionally rejects otherwise valid inline config comments, so waiting longer or removing one comment is not a correct solution. No upstream/accepted transport patch or second server is needed: move the supported bounded YAML list preparation before starting the ONE owned server, then require its exact lossless JSON startup list before ANY task allocation. Bounded reader handles JSON-compatible flow and complete simple scalar blocks only, preserving raw old flow syntax and all nonstatus bytes/mode; unsupported forms remain unchanged and native readback may proceed only when no additions are needed. No guessed implicit YAML scalar normalization, invalid UTF-8 rewrite, config hot reload, config PUT/set serializer, arbitrary YAML framework or automatic replay/partial repair. Native existing receipt/import replay skips config edits.
 Focused selected7 and required final-source probe now running with startup-preparation-input-hashes.json. Final full/shared regression still required after actual passing focused behavior. Same scope/lifecycle/9AC/Final Summary limits; preserve all intermediate failures and exact actual effects.
+
+### Selected-existing configuration candidate — focused green; final full regression running
+Final startup-preparation focused run20261121T155822Z-73271-eca77be7: selected-existing7PASS0FAIL/7; pytest1PASS12deselected251.73s. This proves actual complete custom/no-op config with native autoCommit true; additive flow with comma-bearing first/default, only mapped/bookkeeping misses before old terminal; simple block addition with native autoCommit true; sparse pre-native refusal; actual multiline/anchored-block refusal before writes; and original config drift refusal after imports/receipt native create. Preserves original bytes/modes/paths/records/full history/clone and Git config, comments/unknown keys/default/priority/type values, explicit USER In Design rather than Triage, and actual native autocommit effects.
+Required final-source probe20261121T155822Z-73518-5495b5ba PASS136.16s; static2PASS11skip0.02s. Candidate four input hashes match startup-preparation-input-hashes.json. Intermediate fixture, scratch selection and hot-cache failures remain recorded, not overwritten or counted as passing. Final full migration90-check suite plus shared current/Web/history/init/active/layout regressions is NOW running on unchanged source; no final pass or acceptance claim yet. Keep lifecycle/9AC/Final Summary untouched. After final evidence review, publish one coherent code slice separately and stop for independent owner review; no new scope or live action.
 <!-- SECTION:NOTES:END -->
