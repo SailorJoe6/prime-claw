@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -181,18 +181,18 @@ test("plan_task steers prep, queues sole phase follow-up, and returns canonical 
   assert.match(result.content[0].text, /Planning admitted for PRIMECLAW-10\.38/);
 });
 
-test("implementation admission advertises isolated Episode routing, not direct work", () => {
+test("implementation admission advertises isolation and leaves placement policy in the skill", () => {
   const f = fixture();
   const entry = f.tools.get("implement_task");
-  const guidance = entry.promptGuidelines.join("\n");
-  assert.match(entry.description, /isolated Episode/);
-  assert.match(guidance, /Explicit placement wins:.*'here'.*'on main'.*direct work.*without implement_task/);
-  assert.match(guidance, /explicit Episode request uses Episode readiness/);
-  assert.match(guidance, /native planning status plus meaningful plan\/design normally means Episode/);
-  assert.match(guidance, /small unplanned change normally means direct, even in In Design/);
-  assert.match(guidance, /substantial work still in design or unclear\/conflicting evidence, ask one focused question/);
-  assert.match(guidance, /Preserve explicit placement through requested planning/);
-  assert.match(guidance, /Planning alone never authorizes implementation/);
+  const skill = readFileSync(new URL("../src/prime-agent-plugin/skills/implement-task/SKILL.md", import.meta.url), "utf8").replace(/\s+/g, " ");
+  assert.match(entry.description, /isolated Episode.*Not for direct implementation/);
+  assert.match(skill, /Explicit placement wins.*“here”.*“on main”.*direct implementation/i);
+  assert.match(skill, /explicit Episode request uses the isolated path/);
+  assert.match(skill, /planning status.*meaningful Implementation Plan or Beads `design` normally points to an Episode/);
+  assert.match(skill, /small unplanned fix normally stays direct; `In Design` alone does not disqualify it/);
+  assert.match(skill, /substantial work still in design.*unclear\/conflicting evidence, ask one focused question/);
+  assert.match(skill, /Preserve explicit placement through planning/);
+  assert.match(skill, /Planning alone grants no implementation authority/);
   assert.deepEqual(f.sent, []);
 });
 
@@ -629,11 +629,13 @@ test("retained planning keeps its existing semantic and conditional skill guidan
   assert.doesNotMatch(guidance, /never search for, select/);
 });
 
-test("task entry schemas stay mechanical; only implementation has placement routing guidance", () => {
+test("task entry schemas stay mechanical; implementation points to the editable skill", () => {
   const f = fixture();
   for (const name of ["plan_task", "implement_task", "create_task_episode"]) {
     const tool = f.tools.get(name);
-    if (name !== "implement_task") assert.equal(tool.promptGuidelines, undefined, name);
+    assert.deepEqual(tool.promptGuidelines, name === "implement_task"
+      ? ["Follow the implement-task skill for placement and readiness."]
+      : undefined, name);
     const descriptions = [tool.description, tool.promptSnippet, ...Object.values(tool.parameters.properties).map(({ description }) => description)].join(" ");
     assert.doesNotMatch(descriptions, /In Design|In Planning|implementation-ready|readiness succeeds|approved by|operator authority|bounded delegation|terminal routing/i, name);
     assert.deepEqual(tool.parameters.required, ["taskId"]);

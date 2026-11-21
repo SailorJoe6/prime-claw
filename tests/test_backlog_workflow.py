@@ -115,14 +115,17 @@ def test_project_backlog_skill_teaches_supported_task_native_lifecycle() -> None
         'backlog task create "Short title" --status "In Design"',
         'This repository now defaults new ordinary tasks to `In Design`.',
         'The `plan` skill calls `plan_task` for one exact task.',
-        'The `implement-task` skill calls `implement_task` for one exact implementation-ready `In Planning` task.',
+        'The Episode path in `implement-task` calls `implement_task` for one exact implementation-ready `In Planning` task.',
         'Planning alone does not authorize implementation',
         'explicit conditional plan-then-implement instruction may remain valid within approved scope.',
-        'There is no generic claim edit that may bypass planning or admission.',
+        'Do not use a generic claim edit to bypass Episode planning or admission.',
         'Do not edit provider storage directly',
-        'Only the owning Conversation closes a task through `backlog task edit <id> --status Done`.',
-        'The task stays active through `finalize_task_episode`',
-        'optional archive follows only after merged cleanup.',
+        'For an owned Episode, only its Conversation closes the task',
+        'stays active through `finalize_task_episode`; optional archive follows merged cleanup.',
+        'For ordinary direct work follow the `implement-task` skill',
+        'verify exact placement and no same-task Episode, publish `In Progress` before implementation edits',
+        'publish `Done` only after required checks and code commit/publication, unless there is a review hold.',
+        'Direct work does not confer archive authority.',
     ):
         assert fragment in text
 

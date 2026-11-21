@@ -10,7 +10,11 @@ Dolt mutation while preserving the complete raw task view and any material
 reference/documentation meaning. Both stop for operator review without planning
 or Episode admission.
 
-## Primary task-native lifecycle
+## Primary task-native lifecycle for Episodes
+
+The steps below describe isolated work. For an authorized direct quick fix,
+follow [implementation placement](implementation-placement.md) instead;
+formal planning and Episode admission are not required.
 
 1. Create or revise one exact `In Design` task with `design` or `spec-it-out`
    (native `/skill:design` and `/skill:spec-it-out` remain available).
@@ -21,9 +25,9 @@ or Episode admission.
    within scope after readiness, without fresh approval solely because planning
    finished.
 3. The global `implement-task` skill invokes `implement_task(taskId, host?)` for
-   authorized implementation. Explicitly delegated selection stays within bounds
-   and binds an exact canonical ID. Implementation requires `In Planning` after
-   design and planning, not dependency readiness alone. The compact-first chain
+   authorized Episode implementation. Explicitly delegated selection stays within
+   bounds and binds an exact canonical ID. Episode readiness requires `In Planning`
+   and a meaningful plan, not dependency readiness alone. The compact-first chain
    binds task and placement, performs semantic readiness, then calls
    self-contained `create_task_episode` once. No prior-entry receipt is required.
 4. Trusted admission publishes the exact task as `In Progress` in its selected

@@ -218,13 +218,14 @@ concrete interface limits; ambiguous delivery is inspected, never replayed.
 Branch/worktree deletion remains an exceptional separately operator-authorized
 workaround, not the recovery design.
 
-The global `plan` skill and `plan_task({"taskId":"TASK-ID"})` tool resolve
-one exact task through the live native provider and admit it only in canonical
-`In Design` or `In Planning`. They preload the project-customizable
-`plan-task-prep` and `plan-task` workflows, bind the exact provider/project root
-(and a task path only for Backlog) into both messages, request focused
-compaction on a best-effort basis, queue the semantic planning turn as the sole
-follow-up. A planning-only request stops for review without authorizing
+To prepare an Episode, use the global `plan` skill and `plan_task({"taskId":"TASK-ID"})`
+for one exact task in canonical `In Design` or `In Planning`. An authorized direct
+quick fix does not need formal planning or Episode admission; see
+[implementation placement](implementation-placement.md). The planning entry
+loads native task facts and the project-customizable
+`plan-task-prep` and `plan-task` workflows, binds the exact provider/project root
+(and a task path only for Backlog) into both messages, and queues the semantic
+planning turn as the sole follow-up after requesting best-effort compaction. A planning-only request stops for review without authorizing
 implementation. Explicit conditional plan-then-implement authority may continue
 within scope after readiness, without fresh approval solely because planning
 finished. Backlog preserves its
@@ -235,14 +236,14 @@ supported native CLI, and proves the exact provider revision, publication ref,
 raw reread, and clean working set without a task path or mirror. Compatible
 same-task refinements are factual LLM context rather than an approval lock.
 
-The global `implement-task` skill invokes `implement_task(taskId, host?)` for
-authorized implementation. Explicit delegated selection stays within bounds and
-binds an exact canonical ID before task-specific operations. Implementation
-requires existing `In Planning` after design/planning, not dependency readiness
-alone or a separate phase-history proof. It resolves one exact `In Planning` task through the live
-provider and preselects placement before it queues the compact-first readiness
-turn. Backlog retains its exact returned task path and native Implementation
-Plan. Beads retains the exact canonical ID, project root, complete raw native
+The Episode path in the global `implement-task` skill invokes
+`implement_task(taskId, host?)` for authorized Episode implementation. Explicit
+delegated selection stays within bounds and binds an exact canonical ID before
+task-specific operations. Episode readiness requires `In Planning` and a meaningful
+plan, not dependency readiness alone or a separate phase-history proof. The tool
+loads facts for the exact task and any selected host before it queues the
+compact-first readiness turn. Backlog retains its exact returned task path and
+native Implementation Plan. Beads retains the exact canonical ID, project root, complete raw native
 view, raw design, and native `in_planning` plus canonical `In Planning` status;
 it never invents a task path or normalized task model. Semantic readiness stays
 in the managed `implement-task` workflow. Backlog runs ordinary `prepare`;
@@ -514,12 +515,13 @@ New ordinary work should continue to pass `--status "In Design"` explicitly so
 the intended authoring state is visible even though it is now the project default.
 
 Use `/skill:design` or `/skill:spec-it-out` for specification authoring, the `plan`
-skill with `plan_task` for native planning, and `implement-task` with
-`implement_task` for authorized admission. The five custom workflow commands are
-removed; Prime Agent built-ins and native `/skill:` remain. There is
-no generic claim edit: implementation admission and later `Blocked`, resumed
-`In Progress`, and terminal `Done` transitions remain explicit Conversation
-work through the supported Backlog CLI.
+skill with `plan_task` for requested native planning. The Episode path in
+`implement-task` uses `implement_task` for authorized Episode readiness. For direct
+work, follow [implementation placement](implementation-placement.md) without
+Episode tools. The five custom workflow commands are removed; Prime Agent
+built-ins and native `/skill:` remain. There is no generic claim edit to bypass
+Episode admission. The owning Conversation controls an Episode task's lifecycle
+transitions through the supported Backlog CLI.
 
 ### Closure, archive, restore and delete
 

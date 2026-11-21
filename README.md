@@ -53,13 +53,14 @@ review candidate, not proof of live activation or full Phase 4 acceptance.
   or uncertain Episodes retain their template snapshots.
 - [Task-native specification authoring and retained bundle compatibility](docs/future-specification-bundles.md)
   — use `/skill:design` or `/skill:spec-it-out` to author or revise an `In Design`
-  task. Ask the agent to plan it, then implement it when authorized. Discoverable
-  `plan` and `implement-task` skills route to `plan_task` and `implement_task`.
+  task. For an Episode, use the `plan` skill (`plan_task`) to prepare the task
+  and the Episode path in `implement-task` (`implement_task`) for authorized
+  readiness review. Episode readiness requires `In Planning` and a meaningful
+  plan, not dependency readiness alone. A direct quick fix does not require
+  formal planning or Episode admission; see [implementation placement](docs/implementation-placement.md).
   Planning alone stops for review. Explicit plan-then-implement authority may
-  continue within scope after readiness, without fresh approval solely because
-  planning finished. Delegated selection stays within the operator's bounds and
-  binds an exact canonical ID. Implementation requires `In Planning` after
-  design/planning, not dependency readiness alone.
+  continue within scope, preserving the chosen placement. Delegated selection
+  stays within the operator's bounds and binds an exact canonical ID.
   Retained version-1 bundles use `plan-spec`/`plan_spec` and
   `implement-spec`/`implement_spec`. Final creation checks current integrity,
   placement, ownership, and resources without invocation-proof receipts. Exact

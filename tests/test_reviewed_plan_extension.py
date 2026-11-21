@@ -767,7 +767,12 @@ def test_task_entry_code_loads_native_facts_without_status_or_plan_policy() -> N
     for name in ("plan_task", "implement_task", "create_task_episode"):
         start = extension.index(f'name: "{name}"')
         metadata = extension[start:extension.index("async execute", start)]
-        assert "promptGuidelines" not in metadata
+        if name == "implement_task":
+            assert metadata.split("promptGuidelines:", 1)[1].split("executionMode:", 1)[0].strip() == (
+                '["Follow the implement-task skill for placement and readiness."],'
+            )
+        else:
+            assert "promptGuidelines" not in metadata
         assert "In Planning" not in metadata
         assert "In Design" not in metadata
         assert "implementation-ready" not in metadata

@@ -583,11 +583,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
       label: "Review task implementation readiness",
       description: "Queue isolated Episode implementation readiness for one provider-native task ID and optional Episode host. Not for direct implementation.",
       promptSnippet: "Queue isolated task Episode readiness (not direct implementation)",
-      promptGuidelines: [
-        "Route task implementation with the implement-task skill. Explicit placement wins: 'here', 'in this checkout', or 'on main' means direct work in that checkout without implement_task, Episode allocation, or Episode execute. An explicit Episode request uses Episode readiness and isolation.",
-        "Without explicit placement, use judgment: appropriate native planning status plus meaningful plan/design normally means Episode; an obvious small unplanned change normally means direct, even in In Design. For substantial work still in design or unclear/conflicting evidence, ask one focused question before starting planning or implementation. Do not use a rigid classifier or always ask.",
-        "Preserve explicit placement through requested planning and authorized plan-then-implement. Planning alone never authorizes implementation. For direct tracked work follow the skill's exact-task, same-task Episode conflict, and native status publication guidance.",
-      ],
+      promptGuidelines: ["Follow the implement-task skill for placement and readiness."],
       executionMode: "sequential",
       parameters: {
         type: "object",
