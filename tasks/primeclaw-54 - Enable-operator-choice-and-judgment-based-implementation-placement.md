@@ -3,8 +3,8 @@ id: PRIMECLAW-54
 title: Enable operator choice and judgment-based implementation placement
 status: In Progress
 assignee: []
-created_date: '2026-11-03 02:59'
-updated_date: '2026-11-21 22:19'
+created_date: 2026-11-03 02:59
+updated_date: '2026-11-21T23:44:00Z'
 labels: []
 dependencies: []
 references:
@@ -95,6 +95,8 @@ Add proportional regression coverage for explicit direct/Episode choice, judgmen
 Execution slice: implement prompt-led placement end to end (routing, ordinary direct lifecycle, and planning continuation), keep Episode admission unchanged, then validate the candidate with focused Docker regressions and Tier 1 --probe. No merge or activation.
 
 Implemented the placement-routing candidate in the Episode: injected entry guidance, explicit/native-evidence defaults, direct tracked lifecycle, and preserved placement through requested planning. Episode entry handler, allocation and ownership checks are unchanged. Docker Tier 1 --probe passed (run 20261121T221507Z-93469-a0235dbe). Offline Docker policy tests: 46 passed, 3 skipped, 2 deselected (archived-history test needs Git metadata; retained implement-spec manifest checksum mismatch is present in the base). Offline Node snapshot comparison on the Tier 1 runtime image: candidate 152/154; base ac02ff1dd4033e3e30015d8876f483e4afc520d3 151/153. The same two failures reproduced on both: stale handoff tool guidance expectation and the registered Beads continuation fixture. New routing test passed; no live LLM UAT, merge or activation. Repro: official Tier 1 source selector, then node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs tests/task_episode_ownership_extension.test.mjs tests/managed_session_protocol.test.mjs on identical read-only snapshot layouts with network disabled.
+
+Owner-authorized revision on published code 363f96b, limited to two placement findings. Replace duplicated injected lifecycle guidance with a short pointer to the editable implement-task skill (REQUIREMENTS.md G2) and update the stale Backlog workflow and reviewed-plan code assertions while preserving native eligibility protections. Scope planning and implement_task statements in README.md, docs/future-specification-bundles.md, and docs/backlog.md to Episode work and link docs/implementation-placement.md for direct work. Run affected checks in Docker with PyYAML and mandatory Tier 1 --probe after plugin source changes. Leave retained v1, unrelated failures, transport, lifecycle status, merge, activation and cleanup untouched.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
