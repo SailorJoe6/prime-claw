@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 01:25'
+updated_date: '2026-11-21 01:56'
 labels: []
 dependencies: []
 references:
@@ -12,6 +12,15 @@ references:
   - PRIMECLAW-50
   - src/prime-agent-plugin/extension-support/task-provider-migration.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+documentation:
+  - docs/evidence/primeclaw-59-current-state-capture-20261121.md
+modified_files:
+  - REQUIREMENTS.md
+  - docs/project-initialization.md
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
+  - tests/task_provider_migration.test.mjs
+  - tests/test_task_provider_migration.py
+  - docs/evidence/primeclaw-59-current-state-capture-20261121.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -89,6 +98,9 @@ Joe explicitly instructed this owning Conversation to plan and implement PRIMECL
 6. **Prove the changed behavior in disposable Docker fixtures (AC 1–8).** Update `tests/task_provider_migration.test.mjs`, its pytest bridge and relevant initialization/runner/source-capture tests to assert current-state behavior instead of full-history archive preservation. Use native embedded/server fixtures and file remotes already provided. Cover readable content and non-equivalent metadata, authored comments versus old events, AC/assignee/priority/type/status/close mapping, parent/dependencies, memories, originals/custom config, parked config and the same-ID live/archive pair. Generate a small current ticket with a large history (synthetic forbidden-history runner is enough for the scale regression), assert history/event/provenance commands are never called and no encoded/history-sized output appears, and retain current-data large-output/resource-failure protection. Exercise actual native commit/write cancellation through the initialized tool with AbortController/onUpdate while the agent process remains responsive; a fixture-only blocked Git hook with an owned grandchild can prove process-tree cancellation after native task files already exist; record cancellation latency and prove no later provider/retirement writes, no automatic cleanup, intact source and retained partial destination. Also cover pre-aborted/no-launch, a late custom verifier reply after cancellation, the real worker default continuity path, and post-ownership-switch-before-delete cancellation without automatic ownership rollback. Then explicitly authorize same-destination recovery and verify exactly one complete import, original byte/config/history preservation, plus refusal without mutation for user-modified/ambiguous leftovers. Exercise mid-create/comment/relationships/memory/receipt and pre-cutover failure boundaries with focused shared fixtures, not a new exhaustive harness. Measure representative multi-ticket current-state runtime, output bytes, command/write counts and progress/elapsed updates, including a 406-ticket synthetic workload matching the reported scale; compare command growth against actual comments, not historical revision count. Keep active-Episode continuity, publication/receipt, source drift and guarded deletion regressions.
 
 7. **Document, validate and publish the reviewable candidate (AC 7–9).** Update `REQUIREMENTS.md` migration requirements (including P5’s narrow grandfathered-duplicate exception and M2’s history correction) and `docs/project-initialization.md`, `docs/backlog.md` and managed initialization guidance to reflect the later current-state-only correction, actual cancellation, recovery/disposability rules and additive statuses. Distinguish native `.backlog/config.yml` discovery from Prime Claw's root-link/ignore/layout conventions. Describe safe bounded rollback/retry, retained partial state, explicit later authority and the source-retirement boundary; leave older incident/evidence reports historical. Record measured disposable evidence and exact command results in this task's native notes. Run focused container suites through the existing bridges, then required tier 1 after plugin-source changes (`scripts/test-tier1.sh --probe` or the supported container suite); before review run relevant shared-runner/layout/lifecycle container regressions. No host plugin apply/check/probe or live migration is a test. Commit/publish coherent Episode code separately from exact selected-task changes and report the tested candidate, evidence paths, limits and blockers to the owner and Initialize PVA on Prime-Claw for independent review; do not merge or activate it.
+
+## Progress after slice 1a (2026-11-21)
+Source capture/recapture no longer reads per-ticket history/events/provenance. Current export/inventory/long views/comments, source identity/version/catalog and memories still bind the content revision. This is only the capture sub-step of step 1. Next: remove the reduced but still encoded forward source package/chunk authoring and its package verifier, then implement the readable native current-state projection/readback in steps 1–2. Steps 3–7 remain pending. Do not use this intermediate increment for a live migration/retry.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -96,4 +108,13 @@ Joe explicitly instructed this owning Conversation to plan and implement PRIMECL
 <!-- SECTION:NOTES:BEGIN -->
 ### Slice 1a — current-state source capture (started 2026-11-21)
 Bound this execute pass to the source-read boundary of plan step 1: remove per-ticket Dolt history/events/provenance capture and bind inspection/recapture to the complete current native export, independent inventory, long views/comments, source identity/version/catalog and memories. Test that history size does not affect source capture and current content drift still refuses cutover. Forward encoded current-state package authoring/readback is explicitly unfinished and remains for the next slice, along with readable projection, coexistence/recovery/cancellation and final acceptance. No live migration, cleanup or activation is authorized.
+
+### Slice 1a — tested source-capture increment (2026-11-21)
+Tested code candidate: `50dd3be9eef64693db9b499248cd8ea718a9e008` on `JLanders/prime-claw-primeclaw-59-episode-277260cb` (publication is reported separately after direct verification). Changed Beads capture/recapture and source package to omit per-ticket revision history, database events and provenance logs; kept complete current export, independent inventory, long views/comments, source identity/version/catalog, relationships/metadata and memories. No source reads/writes or live migration ran outside disposable fixtures. Requirements M2/M3 and current source-capture documentation reflect Joe's later current-state-only correction.
+
+Evidence: `docs/evidence/primeclaw-59-current-state-capture-20261121.md`. Required `scripts/test-tier1.sh --probe` passed with offline apply/check/RPC, clean teardown and manifest publication: `.test-results/20261121T013016Z-6550-24967c0a/tier1/manifest.json`. Native focused results: admission 15/15, lifecycle/archive preflight 3/3, populated Backlog 19/19 in `.test-results/20261121T013313Z-18332-82054172/tier1/`; corrected retiring-source boundary 23/23 in `.test-results/20261121T014558Z-69468-aced30c5/tier1/`. Total selected native checks: 60 passed. Static `python3.14 -m pytest tests/test_task_provider_migration.py -q`: 2 passed, 7 skipped. New regressions failed 2/2 against old code, then passed 2/2 with the changed module. Tests cover no history reads through inspection/confirmation/recapture/replay; current comments/relationships/metadata/raw export digest binding; current-data drift refusal; active continuity; and 2,610,950-byte multibyte current data plus payload-safe ENOBUFS/ENOSPC/EIO capture failures.
+
+Evidence limits/failures retained: first focused setup stopped before tests when Docker could not inspect its Buildx IID. A disposable same-context build with `BUILDX_NO_DEFAULT_ATTESTATIONS=1` produced an exact inspectable IID, and canonical retry used that environment without bypassing fixture checks. The broad snapshot had one fixture-only relationship edge to a descendant; cycle preflight correctly refused it. The fixture now uses an independent current task; fresh canonical boundary run passed 23/23. No product guard changed for this repair. Both final runtime and builder teardown were verified.
+
+Remaining scope: forward current-data base64 package/chunk authoring and repeated source context still exist and must be removed in the readable-projection slice. Original destination coexistence/config/history reconciliation, interrupted-import recovery, ordinary cancellation/progress, 406-ticket performance proof and full acceptance remain unfinished. No AC is marked complete and no full-task Final Summary is claimed. Old history-bound receipts are not automatically accepted/repaired. No live migration, cleanup, merge, global apply/activation/restart or Prime Agent source change is authorized or performed. Stop after this slice for owner review/continuation.
 <!-- SECTION:NOTES:END -->
