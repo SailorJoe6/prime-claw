@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: '2026-11-04 18:32'
-updated_date: '2026-11-21 02:17'
+updated_date: '2026-11-21 02:22'
 labels: []
 dependencies: []
 references:
@@ -14,6 +14,7 @@ references:
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
 documentation:
   - docs/evidence/primeclaw-59-current-state-capture-20261121.md
+  - docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -21,6 +22,7 @@ modified_files:
   - tests/task_provider_migration.test.mjs
   - tests/test_task_provider_migration.py
   - docs/evidence/primeclaw-59-current-state-capture-20261121.md
+  - docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -101,6 +103,9 @@ Joe explicitly instructed this owning Conversation to plan and implement PRIMECL
 
 ## Progress after slice 1a (2026-11-21)
 Source capture/recapture no longer reads per-ticket history/events/provenance. Current export/inventory/long views/comments, source identity/version/catalog and memories still bind the content revision. This is only the capture sub-step of step 1. Next: remove the reduced but still encoded forward source package/chunk authoring and its package verifier, then implement the readable native current-state projection/readback in steps 1–2. Steps 3–7 remain pending. Do not use this intermediate increment for a live migration/retry.
+
+## Slice 1b native input boundary (2026-11-21)
+The readable-destination slice stopped before plugin implementation: the existing 2,610,950-byte current-data fixture exceeds native CLI argument input limits (offline Docker E2BIG), while MCP caps individual fields. Do not shrink that regression or keep encoded chunks. Next disposition is a bounded owner-selected native large-field input route (for example, validated shipped HTTP authoring or supported provider file input), with the corresponding implementation-plan adjustment. Then resume steps 1–2 and their complete readable readback. This does not change current-state preservation or authorize later recovery/live actions; see native notes and linked input-boundary evidence.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -127,4 +132,11 @@ Coexistence/config reconciliation/legacy duplicate originals, interrupted-import
 
 ### Slice 1b — readable destination current state (started 2026-11-21)
 This execute pass implements only the accepted next steps 1–2 increment: replace forward encoded current-data packages and their verifier with one readable pair-specific native projection/readback, including exact non-equivalent current values, actual comment author/time, AC/assignee/relationships and initial source-ID identity. Retain small mapping/receipt evidence and separate memories. Configuration/coexistence/recovery/cancellation and final scale acceptance remain later work. Parallel read-only helpers are auditing native CLI batching/normalization and existing regression fixtures; the Episode owns implementation, task content and validation. No lifecycle, live migration, activation, cleanup or source-authority change is included.
+
+### Slice 1b — native readable-input blocker (2026-11-21)
+Stopped before plugin-writer implementation. The existing 2,610,950-byte current native metadata/view regression cannot be sent unchunked through supported Backlog create/edit CLI arguments: a disposable offline Docker native invocation returned E2BIG before process launch (nativeStatus null, no stdout/stderr). No project/provider was mounted and no task command could run. The CLI exposes no file/stdin field input; MCP notesSet is capped at 20,000 characters (implementationNotes 10,000), confirmed in source and actual host binary. Output-capture changes do not solve input limits. Existing large-current-data tests and source/error protection were not weakened.
+
+Read-only native interface audit found a shipped loopback browser task HTTP API that may accept large readable notes, but no server was started and 2.6MB/request behavior is untested. Adopting server-backed authoring requires a bounded transport design for exact root/port/readiness/shutdown/uncertain writes; adding provider-native file input is the other possible direction. The approved create/edit-CLI plan does not resolve that boundary. Unblock condition: owner chooses a supported large-current-data input route and records the bounded plan adjustment. Do not truncate, relocate an archive, retain/rename the encoded chunk scheme, borrow checkout-only provider Core or disguise direct task-Markdown writes as an editor.
+
+Published evidence-only code head `84fe675754fad75d7c5c1884f1a4e7835a946923` on `JLanders/prime-claw-primeclaw-59-episode-277260cb`; direct remote head verified. Artifact: `docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md` includes exact image/binary identities, probe command/result, native surface refs and explicit limits. Slice1a writer/source implementation remains at50dd3be9eef64693db9b499248cd8ea718a9e008; this evidence commit does not implement readable authoring. Both helpers finished; partial test-only edits were restored byte-exact, leaving no plugin/test changes. No migration suite/tier1 plugin rerun was claimed because plugin source did not change. No full-task Final Summary or AC completion; status remains In Progress for owner disposition. No live migration, provider switch, private incident data, cleanup, merge, global apply/activation/restart, Prime Agent changes, new Episode resources or initial assignment occurred.
 <!-- SECTION:NOTES:END -->
