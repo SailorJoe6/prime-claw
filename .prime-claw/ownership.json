@@ -1,6 +1,359 @@
 {
   "schemaVersion": 1,
   "owners": {
+    "01a1a289-106d-748e-b0a2-bde82cb7a63d": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "0b8e6ce6-61de-4284-a42e-fa4205cb3521",
+      "engine": "orca",
+      "ownerSessionId": "01a1a289-106d-748e-b0a2-bde82cb7a63d",
+      "taskId": "PRIMECLAW-54",
+      "taskPath": ".backlog/tasks/primeclaw-54 - Enable-operator-choice-and-judgment-based-implementation-placement.md",
+      "providerRevision": "48a39e369cb341b5b9433c4376cf83601fa105c5",
+      "taskEvidence": {
+        "schemaVersion": 1,
+        "kind": "task-view",
+        "task": {
+          "id": "PRIMECLAW-54",
+          "title": "Enable operator choice and judgment-based implementation placement",
+          "status": "In Progress",
+          "archived": false,
+          "type": "feature",
+          "priority": "p1",
+          "project": null,
+          "assignees": [],
+          "reporter": null,
+          "labels": [],
+          "milestone": null,
+          "parentTaskId": null,
+          "acceptanceCriteriaCompleted": 9,
+          "acceptanceCriteriaCount": 9,
+          "references": [
+            "src/prime-agent-plugin/extensions/reviewed-plan.ts",
+            "src/prime-agent-plugin/skills/implement-task/SKILL.md",
+            "src/prime-agent-plugin/workflows/implement-task.md",
+            "src/prime-agent-plugin/workflows/plan-task.md",
+            "src/prime-agent-plugin/ROLE_KERNEL.md",
+            "src/prime-agent-plugin/skills/project-templates/execute.md"
+          ],
+          "modifiedFiles": [
+            "docs/implementation-placement.md",
+            "tests/test_implementation_placement.py",
+            ".agents/skills/backlog/SKILL.md",
+            ".agents/skills/execute/SKILL.md",
+            ".prime-claw/templates.json",
+            ".prime-claw/workflows/implement-task-prep.md",
+            ".prime-claw/workflows/implement-task.md",
+            ".prime-claw/workflows/plan-task-prep.md",
+            ".prime-claw/workflows/plan-task.md",
+            "AGENTS.md",
+            "docs/README.md",
+            "src/prime-agent-plugin/ROLE_KERNEL.md",
+            "src/prime-agent-plugin/extensions/reviewed-plan.ts",
+            "src/prime-agent-plugin/skills/implement-task/SKILL.md",
+            "src/prime-agent-plugin/skills/plan/SKILL.md",
+            "src/prime-agent-plugin/skills/project-templates/execute.md",
+            "src/prime-agent-plugin/workflows/implement-task-prep.md",
+            "src/prime-agent-plugin/workflows/implement-task.md",
+            "src/prime-agent-plugin/workflows/plan-task-prep.md",
+            "src/prime-agent-plugin/workflows/plan-task.md",
+            "tests/reviewed_plan_extension.test.mjs",
+            "tests/test_future_plan_skills.py",
+            "tests/test_role_kernel.py"
+          ],
+          "ordinal": 139000,
+          "createdAt": "2026-11-03T02:59:00Z",
+          "updatedAt": "2026-11-21T22:19:00Z",
+          "dueDate": null,
+          "isReady": true,
+          "path": ".backlog/tasks/primeclaw-54 - Enable-operator-choice-and-judgment-based-implementation-placement.md",
+          "description": "## Outcome\nEnable operator choice between direct implementation in the current checkout and the existing isolated Episode workflow. Stop treating every task implementation request as a command to invoke implement_task or to enter formal planning. Joe explicitly approved the routing behavior below and requested implementation (\"make it so\"). This is separate from PRIMECLAW-52, which must remain untouched.\n\n## Agreed routing behavior\nAn explicit operator placement choice wins. \"Here\", \"in this checkout\", or \"on main\" means direct work in that checkout without implement_task, Episode allocation, or an Episode-only execute workflow. An explicit Episode request uses the existing implementation-readiness and isolated Episode lifecycle.\nWhen placement is unspecified, use semantic judgment: a task clearly already planned, evidenced by appropriate native ticket status and a meaningful plan/design, defaults to an Episode; an obvious quick bug fix or easy small unplanned change defaults to direct implementation; a substantial task still in design that would benefit from formal planning requires one focused operator question before starting that workflow. Ambiguous or conflicting evidence also calls for a focused question, not an always-ask rule. In Design alone must not block a clearly small authorized direct change. Do not implement a rigid size/status classifier.\n\n## Direct task lifecycle (operator decisions from grill-me)\nBefore editing implementation files for any authorized direct tracked change, including a quick fix, publish the exact task's native `In Progress` state. First verify the selected task, placement, and absence of a same-task active Episode. After required checks pass and the approved change is committed and pushed (or committed locally in a project with no remote), publish the task as `Done` without a separate approval solely for status. Honor any explicit review hold; this does not grant merge, deployment, or activation authority.\n\n## Scope\nUpdate plugin-injected routing guidance, managed entry skills, relevant project workflow/template guidance, and role wording so these paths agree. Preserve explicit placement through any requested planning and conditional implementation continuation; do not force \"plan then implement here\" into an Episode. Scope owner-Conversation implementation prohibitions and Episode identity/plan checks to managed Episode work, rather than all ordinary implementation. Direct execution uses ordinary supported native task CLI, tests, and Git operations; it creates no Episode resources or ownership record and does not borrow another role's authority. Keep this task-native; do not redesign retained version-1 specification lifecycle.\n\n## Constraints and non-goals\nKeep operator scope/implementation authority, exact task identity, provider-native task publication, existing Git/test safety, credential isolation, and all existing Episode ownership/terminal safeguards. Do not allow direct work to conflict with an active Episode bound to the same task or modify another owner's state; surface that conflict rather than adopting or bypassing it. Preserve EXPERT read-only boundaries. No new public tool, routing service, persisted mode state, ownership format, approval receipt, classifier framework, Prime Agent upstream change, or unrelated cleanup. Do not silently select another task. This implementation authorizes source changes and isolated candidate validation, not merge, user-global activation, restart, live migration, or cleanup of unrelated resources.\n\n## Validation\nAdd proportional regression coverage for explicit direct/Episode choice, judgment-based defaults, substantial-unplanned/ambiguous ask-first cases, and placement surviving plan-then-implement. Show that direct instructions do not invoke Episode tools or require Episode identity/formal plan evidence, while existing Episode admission and ownership protections remain intact. Use Docker-only candidate validation and mandatory Tier 1 --probe after plugin source changes. Do not use host/user-global candidate apply/check/probes.",
+          "dependencies": [],
+          "dependencyGraph": {
+            "root": "PRIMECLAW-54",
+            "nodes": [
+              {
+                "id": "PRIMECLAW-54",
+                "title": "Enable operator choice and judgment-based implementation placement",
+                "status": "In Progress",
+                "state": "resolved",
+                "completed": false,
+                "dependencyDepth": 0,
+                "dependentDepth": 0
+              }
+            ],
+            "edges": []
+          },
+          "readiness": {
+            "isReady": true,
+            "isBlocked": false,
+            "blockingDependencies": [],
+            "missingDependencies": []
+          },
+          "documentation": [
+            "docs/implementation-placement.md"
+          ],
+          "subtasks": [],
+          "acceptanceCriteria": [
+            {
+              "index": 1,
+              "text": "Explicit current-checkout/main implementation requests take the direct path without implement_task, Episode allocation/ownership, or a mandatory design/planning phase; explicit Episode requests retain the existing readiness and isolated lifecycle.",
+              "checked": true
+            },
+            {
+              "index": 2,
+              "text": "Without explicit placement, guidance uses judgment: appropriate native planned status plus meaningful plan/design defaults to an Episode; obvious small unplanned work defaults to direct implementation; substantial work still in design or unclear/conflicting evidence gets a focused operator question.",
+              "checked": true
+            },
+            {
+              "index": 3,
+              "text": "In Design alone does not prohibit a clearly small authorized direct change, and routing is neither always-ask nor a rigid programmatic size/status classifier.",
+              "checked": true
+            },
+            {
+              "index": 4,
+              "text": "Plugin-injected routing, managed skills, relevant workflows/templates, and role guidance consistently distinguish direct work from Episode-specific authority; EXPERT and active Episode ownership safeguards are preserved.",
+              "checked": true
+            },
+            {
+              "index": 5,
+              "text": "Explicit placement survives requested planning and authorized plan-then-implement continuation; planning-only instructions still do not authorize implementation.",
+              "checked": true
+            },
+            {
+              "index": 6,
+              "text": "Direct work uses supported provider-native task operations and existing Git/test safety without adding a public tool, persisted execution-mode/ownership format, approval receipt, or orchestration framework; active same-task Episode conflicts stop for operator resolution.",
+              "checked": true
+            },
+            {
+              "index": 7,
+              "text": "Focused regression coverage exercises direct, Episode, judgment defaults, ask-first, and plan-continuation paths; required Docker-only validation including Tier 1 --probe passes or reports a concrete blocker truthfully.",
+              "checked": true
+            },
+            {
+              "index": 8,
+              "text": "PRIMECLAW-52, retained version-1 lifecycle, Prime Agent upstream, user-global activation/restart, live migrations, and unrelated ownership/resources remain outside this change.",
+              "checked": true
+            },
+            {
+              "index": 9,
+              "text": "For direct tracked work, publish native In Progress before implementation edits, even for a quick fix; publish Done after required checks and commit/publication are proven, without a separate closure approval unless the operator explicitly asked to stop for review. Existing merge, deployment, and activation authority remains unchanged.",
+              "checked": true
+            }
+          ],
+          "definitionOfDone": [],
+          "implementationPlan": "1. Update injected task-implementation routing and the managed entry guidance to honor explicit placement and Joe's judgment-based planned/small-unplanned/substantial-design defaults. Keep Episode tool admission scoped to Episode requests or the planned-work default, and retain ambiguity and same-task active-Episode safeguards.\n2. Align the relevant role, task execution, planning-continuation, and project-template instructions. Add a lightweight ordinary direct-task execution path with supported native task updates and existing Git/test safety, no Episode identity or mandatory formal plan requirement, and no new runtime tool/state/protocol. Preserve existing Episode and retained version-1 behavior.\n3. Add proportional routing/guidance regression cases for both explicit modes, judgment defaults, ask-first situations, and preserved placement after planning. Run the required Docker-only plugin validation, including Tier 1 --probe; update directly affected user-facing docs and report truthful results. Do not deploy user-globally or merge.",
+          "implementationNotes": "Execution slice: implement prompt-led placement end to end (routing, ordinary direct lifecycle, and planning continuation), keep Episode admission unchanged, then validate the candidate with focused Docker regressions and Tier 1 --probe. No merge or activation.\n\nImplemented the placement-routing candidate in the Episode: injected entry guidance, explicit/native-evidence defaults, direct tracked lifecycle, and preserved placement through requested planning. Episode entry handler, allocation and ownership checks are unchanged. Docker Tier 1 --probe passed (run 20261121T221507Z-93469-a0235dbe). Offline Docker policy tests: 46 passed, 3 skipped, 2 deselected (archived-history test needs Git metadata; retained implement-spec manifest checksum mismatch is present in the base). Offline Node snapshot comparison on the Tier 1 runtime image: candidate 152/154; base ac02ff1dd4033e3e30015d8876f483e4afc520d3 151/153. The same two failures reproduced on both: stale handoff tool guidance expectation and the registered Beads continuation fixture. New routing test passed; no live LLM UAT, merge or activation. Repro: official Tier 1 source selector, then node --experimental-strip-types --test tests/reviewed_plan_extension.test.mjs tests/task_episode_ownership_extension.test.mjs tests/managed_session_protocol.test.mjs on identical read-only snapshot layouts with network disabled.",
+          "comments": [],
+          "finalSummary": "Candidate for owner review: honor explicit current-checkout or Episode placement and use judgment when unspecified; keep direct tracked status changes native and separate from owned Episode lifecycle. Carry placement through authorized planning continuation. Docker Tier 1 --probe passed; focused tests introduced no new failures in the matched base comparison. Live behavior still awaits separate review/UAT."
+        }
+      },
+      "baseRef": "ac02ff1dd4033e3e30015d8876f483e4afc520d3",
+      "createdAt": "2026-11-21T22:10:14.536Z",
+      "updatedAt": "2026-11-21T23:43:40.219Z",
+      "integrationBranch": "main",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-54-episode-0b8e6ce6",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-54-episode-0b8e6ce6",
+      "worktreeIdentity": "wt2:local:250af0d9-5de9-4eb2-b6c1-1225a963081c",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-54-episode-0b8e6ce6",
+      "branch": "JLanders/prime-claw-primeclaw-54-episode-0b8e6ce6",
+      "head": "363f96bda1c278db333f9d954bd5fdb7f1c924ad",
+      "launchAutomationName": "prime-claw-launch-0b8e6ce6-61de-4284-a42e-fa4205cb3521",
+      "episodeId": "01a20029-3f0d-7730-bfb1-ae9410dc26fb",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a20029-3f0d-7730-bfb1-ae9410dc26fb.jsonl",
+      "episodeActiveSessionId": "37b4fdba8bb3",
+      "terminalHandle": "term_bd3d799e-3329-4f99-b3d0-db350b8eae13",
+      "terminalHandles": [
+        "term_bd3d799e-3329-4f99-b3d0-db350b8eae13",
+        "term_f090ffc8-9279-470b-802f-f6e417a7d995"
+      ]
+    },
+    "01a1a90b-0fba-7778-b1e5-0087bdaf8fec": {
+      "version": 2,
+      "provider": "backlog",
+      "status": "active",
+      "operationId": "8608a32d-4a3e-4686-a558-84e531dcc94a",
+      "engine": "orca",
+      "ownerSessionId": "01a1a90b-0fba-7778-b1e5-0087bdaf8fec",
+      "taskId": "PRIMECLAW-64",
+      "taskPath": ".backlog/tasks/primeclaw-64 - Activate-Backlog.md-v1.55.3-and-reconcile-managed-workflows.md",
+      "providerRevision": "2b396426f7ecbd572166182dce80e8e393b0c183",
+      "taskEvidence": {
+        "schemaVersion": 1,
+        "kind": "task-view",
+        "task": {
+          "id": "PRIMECLAW-64",
+          "title": "Activate Backlog.md v1.55.3 and reconcile managed workflows",
+          "status": "In Progress",
+          "archived": false,
+          "type": "task",
+          "priority": "p1",
+          "project": null,
+          "assignees": [],
+          "reporter": null,
+          "labels": [],
+          "milestone": null,
+          "parentTaskId": null,
+          "acceptanceCriteriaCompleted": 3,
+          "acceptanceCriteriaCount": 7,
+          "references": [
+            "PRIMECLAW-45",
+            "https://github.com/MrLesk/Backlog.md/releases/tag/v1.55.3"
+          ],
+          "modifiedFiles": [
+            "src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md",
+            "src/prime-agent-plugin/skills/handoff/SKILL.md",
+            "src/prime-agent-plugin/workflows/handoff.md",
+            "src/prime-agent-plugin/skills/project-templates/blocked.md",
+            "src/prime-agent-plugin/skills/project-templates/execute.md",
+            "docs/handoff-chain.md",
+            "docs/conversation-driven-episode-oversight.md",
+            "docs/user-stories/H-handoff-and-continuation.md",
+            "REQUIREMENTS.md",
+            "tests/test_oversee_episode_skill.py",
+            "docs/evidence/primeclaw64-off-global-build-20261121.md",
+            "docs/backlog.md",
+            "docs/project-initialization.md",
+            "docs/evidence/primeclaw64-rollout-preparation.md"
+          ],
+          "ordinal": 149000,
+          "createdAt": "2026-11-21T20:38:00Z",
+          "updatedAt": "2026-11-21T23:30:00Z",
+          "dueDate": null,
+          "isReady": true,
+          "path": ".backlog/tasks/primeclaw-64 - Activate-Backlog.md-v1.55.3-and-reconcile-managed-workflows.md",
+          "description": "## Outcome and authority\n\nComplete the post-merge Backlog.md v1.55.3 rollout for prime-claw. Joe explicitly authorized this through the Backlog.md Expert: “Do it — or ask the Prime-Claw agent to do it.” The Expert delegated creation of this separate task, planning, and implementation if ready, including supported host/plugin activation, one coordinated full Prime Agent restart, and live UAT. Preserve that conditional authority across phases; do not ask again solely because a phase ended. Product/scope changes, new source merges, destructive data repair, and customized-asset replacement retain their normal explicit decisions.\n\nPRIMECLAW-45 is merged, active Done, and cleaned up. It explicitly excluded activation and must not be reopened. Its compatibility implementation pins unmodified upstream v1.55.3 commit `0cf4fdbc70020327f4366a29d3f405f83d180301`. Initial read-only checks for this task show canonical main `5e52159927063ec01176305059c4632d45e5e848`, that exact submodule HEAD, and both `deps/backlog/dist/backlog` and the global `~/.local/bin/backlog` still reporting 1.53.0. Source publication is not artifact activation. Backlog Expert retains its separate v1.53.0 latest-stable pointer until it receives verified activation/UAT evidence; that pointer is not this task's mutation surface.\n\n## Required rollout behavior\n\nBuild the merged exact v1.55.3 source using the supported pinned toolchain and existing build/compiled smoke interfaces. Establish the exact source, artifact identity/hash, version, installation destination, and supported command resolution. Preserve the accepted fallback until the reviewed replacement is proven; report failed or uncertain writes by inspecting actual state rather than blindly retrying. Do not print or obtain credentials, alter upstream source, or patch Prime Agent.\n\nActivate the accepted Backlog artifact and coherent prime-claw user-global plugin generation through their supported installation paths, from canonical primary main at the deployment boundary. Candidate plugin development/testing remains Docker-only; no candidate host apply/check or second Prime Agent daemon. If narrow rollout tooling/docs changes are needed, deliver them through the normal isolated Episode, validation, review, and operator-controlled merge before deploying merged source. An Episode must not activate a candidate globally. Preserve unrelated global files/configuration and avoid project/global duplicate plugin discovery.\n\nA global binary swap alone is insufficient. Inventory the relevant installed global guidance and discoverable prime-claw-managed project workflow assets using supported project/asset evidence. Bound discovery to known managed/registered project contexts; do not crawl or mutate arbitrary home-directory repositories. Distinguish ordinary Backlog projects, initialized prime-claw projects, customization/override conflicts, active or uncertain Episode snapshots, and unrelated projects. Establish and document the supported project-upgrade/reconciliation boundary. Reconcile safe untouched assets only in the selected prime-claw project through the existing initializer; preserve customized/unknown bytes, index state, task history, and live-generation resources. Coordinate other projects through their actual owners or report exact operator actions, not silent cross-project writes. Do not accept/reset overrides or overwrite customized assets without a separate explicit content decision.\n\nAccount for removed `task complete`/`task_complete`, legacy `completed/` versus canonical `archive/tasks/`, status-derived closure, archive identity reservation/read-only behavior, ordering/pagination, and unattended inputs. Legacy completed storage remains readable and does not imply a universal data rewrite. Use supported non-mutating native doctor inspection for each affected project that can be safely inspected; report unavailable evidence rather than assuming health. Never run `doctor --fix`, renumber/delete/relocate records, switch providers, or migrate real data under this rollout authority. Preserve the accepted archived-draft physical-byte/history/collision policy; unavailable archived-draft native view alone is not a new blocker.\n\nBefore coordinated restart, safely account for running/queued/unfinished work and explicitly owned descendants through actual owner/session evidence. Do not force-stop foreign work or infer ownership from CWD. Preserve every resource the old loaded generation may read. Coordinate the one full restart with Joe/the owning maintenance coordinator through supported public interfaces; do not use `/reload`, copy success, a fresh probe, or elapsed time as cutover proof. Existing schedules stay unchanged unless separately authorized.\n\nAfter restart, prove exact installed artifact and plugin generation through successful live UAT in resumed owning Conversation, its exact Episode where applicable, and a designated ordinary project session. Exercise representative real native task/history and workflow behavior at the actual installed boundary without modifying unrelated production tasks/projects. Report any unsupported interface or unsafe active stale workflow as a blocker, not completed rollout. Inactive projects with unresolved customization must be explicitly identified as requiring owner/operator upgrade, not represented as upgraded. Document acceptance scope and any real deployment limitations.\n\nSend the Backlog.md Expert exact published source/build/install/restart/UAT evidence and the affected-project/operator-action inventory. Only that Expert advances its own latest-stable pointer after verification.\n\n## Non-goals\n\nNo new project manager/framework, parallel task authority, custom allocator/parser/index, global compliance database, broad refactor, upstream/Prime Agent patch, new sandbox rollout, mass repository mutation, blanket doctor fix, schedule changes, or reopening/completing PRIMECLAW-45 again. Reuse its unchanged compatibility/build/test evidence within stated limits, with fresh validation for changed and activated surfaces. Keep failed and incomplete histories distinct from passing proof. The native task remains the specification and living plan, not a new .ralph bundle.\n\n## Operator correction: critical recovery-policy bug fix\n\nJoe explicitly clarified: “That file should be committed as a critical change. That widening was a bug fix!” The installed `global-oversee-episode` policy is therefore the operator-selected critical source correction, not an optional customization to settle with an accepted override. Preserve its verified pre-work model/runtime-interruption recovery path and existing exact-owner, delivery/effects, idle, and explicit new-continuation authorization safeguards. Bring that exact correction into canonical plugin source, add focused regression evidence, commit and push it through the isolated Episode workflow, and obtain normal operator-controlled source merge acceptance before global rollout. Do not revert the fix or mark it an accepted override instead of landing it. Preserve the installed bytes while source acceptance is pending. A prerequisite source-fix slice is not completion of this whole activation task: retain active task/Episode/resources until the full rollout and UAT succeed. No activation, restart, or terminal cleanup follows merely from committing the fix.",
+          "dependencies": [
+            "PRIMECLAW-45"
+          ],
+          "dependencyGraph": {
+            "root": "PRIMECLAW-64",
+            "nodes": [
+              {
+                "id": "PRIMECLAW-64",
+                "title": "Activate Backlog.md v1.55.3 and reconcile managed workflows",
+                "status": "In Progress",
+                "state": "resolved",
+                "completed": false,
+                "dependencyDepth": 0,
+                "dependentDepth": 0
+              },
+              {
+                "id": "PRIMECLAW-45",
+                "title": "Migrate prime-claw to Backlog.md v1.55.3",
+                "status": "Done",
+                "state": "resolved",
+                "completed": true,
+                "dependencyDepth": 1,
+                "dependentDepth": null
+              },
+              {
+                "id": "PRIMECLAW-55",
+                "title": "Allow Episode initiation during unrelated ticket edits and task-history advances",
+                "status": "Done",
+                "state": "resolved",
+                "completed": true,
+                "dependencyDepth": 2,
+                "dependentDepth": null
+              }
+            ],
+            "edges": [
+              {
+                "from": "PRIMECLAW-45",
+                "to": "PRIMECLAW-55"
+              },
+              {
+                "from": "PRIMECLAW-64",
+                "to": "PRIMECLAW-45"
+              }
+            ]
+          },
+          "readiness": {
+            "isReady": true,
+            "isBlocked": false,
+            "blockingDependencies": [],
+            "missingDependencies": []
+          },
+          "documentation": [
+            "docs/backlog.md",
+            "docs/project-initialization.md",
+            "docs/evidence/primeclaw45-integrated-compatibility-20261115.md"
+          ],
+          "subtasks": [],
+          "acceptanceCriteria": [
+            {
+              "index": 1,
+              "text": "A separate published native task carries the rollout authority and boundaries while PRIMECLAW-45 remains active Done; canonical source and pre-activation artifact state are verified.",
+              "checked": false
+            },
+            {
+              "index": 2,
+              "text": "The supported build and compiled smoke produce a version-1.55.3 artifact from exact unmodified upstream 0cf4fdbc70020327f4366a29d3f405f83d180301, with exact source/toolchain/artifact identities and preserved fallback evidence.",
+              "checked": true
+            },
+            {
+              "index": 3,
+              "text": "Installed global guidance and known managed-project workflows are inventoried for removed commands, lifecycle/storage semantics, complete identity-set reads, and unattended input; the supported upgrade boundary, safe selected-project reconciliation, preserved customizations/snapshots, and exact deferred owner/operator actions are documented.",
+              "checked": true
+            },
+            {
+              "index": 4,
+              "text": "Plain Backlog projects are not presumed to need data conversion; supported non-mutating doctor evidence or exact inspection limits are reported per affected project, with no doctor --fix, provider switch, silent cross-project mutation, or destructive history repair.",
+              "checked": true
+            },
+            {
+              "index": 5,
+              "text": "Accepted merged source is installed through supported canonical-primary user-global/artifact paths, preserving unrelated global state and all old-generation live resources; no candidate host install or second daemon is used.",
+              "checked": false
+            },
+            {
+              "index": 6,
+              "text": "One safely coordinated full restart is followed by successful resumed-owner, applicable exact-Episode, and designated ordinary-session live UAT that proves the actual installed Backlog version/plugin generation and representative native workflow/history behavior; installation or a fresh probe alone is not cutover proof.",
+              "checked": false
+            },
+            {
+              "index": 7,
+              "text": "The Backlog.md Expert receives exact activation/UAT and project-impact evidence before it decides to advance its separate latest-stable pointer; failures, unresolved customizations, required operator actions, and acceptance limits remain explicit.",
+              "checked": false
+            }
+          ],
+          "definitionOfDone": [],
+          "implementationPlan": "## Ordered rollout\n\nPRIMECLAW-45 stays merged/Done. Use its accepted source and unchanged compatibility evidence. The Episode prepares and validates off-global artifacts, inventory and documentation; only this owning canonical-primary Conversation installs accepted main and coordinates restart. Keep PRIMECLAW-64 In Progress through cutover/UAT. Prepared artifacts, a runbook, or the prerequisite critical source-fix slice alone are not a terminal candidate.\n\n1. **Land the operator-selected critical recovery fix before cutover.** Joe confirmed the installed widened `global-oversee-episode` rule is a critical bug fix and requested it committed, not retained as an optional override. In the isolated Episode port the exact installed change to `src/prime-agent-plugin/skills/prime-claw-oversee-episode/SKILL.md`: allow the bounded new execute-only continuation when both canonical prompts demonstrably reached the same Episode but verified model/runtime failure stopped them before task work. Retain all delivery/effects, same-owner/resources, idle, scope and explicit new-continuation authorization safeguards; do not allow uncertain delivery or unaccounted effects to qualify. Inspect relevant delivery copies/tests for the same concrete omission; make no broad policy expansion. Add focused regression coverage and run the required Docker Tier1 after this plugin-source change. Commit and push the exact source fix with proof; report it as a nonterminal prerequisite slice for independent review and normal operator-controlled source merge acceptance before deployment. Preserve the installed bug-fix bytes; do not reset them or substitute accepted-override bookkeeping. Do not publish terminal Ready/Done or clean up the Episode merely because this prerequisite slice is accepted/merged. If an actual supported lifecycle/transport constraint prevents this staged acceptance, explain it to the owner rather than inventing a new resource or premature completion.\n\n2. **Establish source and fallback.** Inspect the exact native task, current accepted primary main, unmodified submodule HEAD `0cf4fdbc70020327f4366a29d3f405f83d180301`, platform and selected task-store topology. Record source/code/task revisions and the resolved local/global executable versions, SHA-256 and modes. Preserve the actual accepted 1.53.0 executable outside build/install destinations, original guidance/manifests and every old-generation resource. The local `v1.55.3` tag is currently absent: verify the configured upstream, fetch only that release tag through native Git, and prove its commit equals the pin before building. No source patch or blanket tag update. Preserve both distinct current1.53.0 binaries (repository dist and installed host), not just one; rebuilding overwrites dist.\n\n3. **Build off-global.** Supply Backlog-only Bun1.4.4 on command-local PATH; general Bun1.3.11 and Node stay unchanged. Obtain the platform asset from the official Bun1.4.4 release and verify the digest in pinned `deps/backlog/scripts/prepare-bun-runtime.cjs` before extracting into isolated scratch (darwin-arm64 ZIP SHA-256 `c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510`). Do not run that helper on host Node25.6.0: it requires26.12.1. Clear inherited `BACKLOG_BUILD_OUTDIR`, `BACKLOG_BUILD_OUTFILE`, `BACKLOG_BUILD_TARGET` and `BACKLOG_BUILD_EXECUTABLE_PATH`, scope the build cache to scratch, and run `scripts/build-backlog.sh` (exact HEAD/tag, frozen install, version-stamped standalone build, upstream compiled smoke). Record source/toolchain/platform/artifact identities and output hash/version. The Episode never installs to `~/.local/bin/backlog`, applies/checks a candidate host plugin, or runs a second daemon. Reuse unchanged PRIMECLAW-45 Tier0/Tier1 evidence within its stated limits; retain failures separately. Run fresh relevant tests for changed surfaces; any plugin-source edit requires Docker Tier1 (`scripts/test-tier1.sh --probe` or documented container-marked pytest), never candidate host validation.\n\n4. **Inventory consumers and native health.** Use existing registered project/session/ownership evidence and delivery inventory/manifests, not a home-directory crawl or new registry. Classify each known context: plain Backlog, initialized managed project, customization/unknown/override conflict, active or uncertain Episode snapshot, or unrelated. Preserve selected-project customized `design`, `prepare`, `spec-it-out` and `plan-task`; `conversation-after-handoff.md` is a safe managed-update candidate subject to fresh initializer evidence. Inspect installed global/project guidance for removed `task complete`/`task_complete`, active-Done closure, canonical `archive/tasks/` versus readable legacy `completed/`, archive identity reservation/dependencies, complete unwindowed identity reads versus ordering/pagination, and unattended input. Preserve archived-draft physical bytes/paths/modes/history/collision evidence without synthesizing a native view. For each safely inspectable affected Backlog project run the absolute validated1.55.3 executable with plain `doctor` (text output; neither --fix nor --yes); record raw findings and before/after state, or the precise unsafe/unavailable inspection limit. Never use doctor --fix, move/renumber/delete records, switch providers or migrate data. Prepare exact owner/operator upgrade actions for other projects/customizations; do not write them silently. An unsafe active stale workflow blocks cutover until its actual owner resolves it or explicitly excludes that consumer from the rollout.\n\n5. **Prepare the deployment record.** Draft the bounded runbook/upgrade boundary in `docs/backlog.md` and `docs/project-initialization.md`, plus a task-specific `docs/evidence/` record; keep progress in native task notes/plan. Include selected-project safe reconciliation, deferred owner actions, exact install/restart/UAT procedure and preserved fallback. Prefer existing accepted interfaces. If a real tooling/source fix is required before deployment, report the exact gap for isolated validation/review and normal operator-controlled source acceptance first; never globally deploy an Episode change, treat a preparatory merge as task completion, or infer source-merge approval from rollout authority.\n\n6. **Owner deploys accepted main.** Review Episode preparation and freshly verify actual canonical-primary main/source/task/artifact/global state. Before any shared binary/guidance write, coordinate quiescence with actual affected owners/maintenance coordinator and preserve all old-generation resources; unsafe or unaccounted work blocks installation as well as restart. Build/smoke accepted main with the same isolated toolchain as needed; bind installation to that reviewed accepted-source artifact. Preserve the verified fallback, copy the standalone binary to `~/.local/bin/backlog` through the documented host boundary, and prove actual command resolution/hash/mode/1.55.3 version. Run `scripts/apply-prime-agent-plugin.sh --user-global` and `scripts/check-prime-agent-plugin.sh --user-global` from canonical primary main only. Preserve default global drift protections, customizations and unrelated files; never accept/reset/backup-reset without a separate exact content decision. Inspect partial or uncertain results instead of retrying. Reconcile safe untouched assets only in selected prime-claw through `initialize_prime_claw(action=\"reconcile\")`, preserving index/task history, customized/unknown assets, legacy allowlist and active/uncertain Episode snapshots. Use the coherent accepted initializer generation; if the loaded one is old, defer reconciliation until the full restart rather than claiming copied code is running.\n\n7. **Coordinate restart and prove live UAT.** With Joe/the actual maintenance coordinator, account for running/queued/unfinished work and explicitly owned descendants, obtain affected owners' readiness, and preserve all resources old processes may read. Coordinate one supported full restart; no force-stopping foreign work, schedule changes, /reload or second daemon. Record process/daemon start evidence and exact source/install generation hashes. Resume this Conversation, its exact retained Episode and an explicitly designated ordinary project session. In every applicable context verify actual installed Backlog1.55.3 resolution and expected single plugin registration/workflow behavior through supported public interfaces. Exercise representative live native task/history reads and safe authoring/lifecycle boundaries without changing unrelated production tasks. Record exact sessions, commands/results and unavailable proof. Fresh probes, disk hashes or copy success alone are not loaded-generation acceptance. Failed/uncertain UAT keeps rollout unaccepted, with fallback/resources intact; consult for consequential rollback. Identify inactive unresolved customized projects as deferred, not upgraded.\n\n8. **Complete the candidate and report.** After successful cutover/UAT, the same Episode finishes only the narrow tracked rollout docs/evidence, replacing pre-activation statements with verified facts, updates native implementation notes/summary, and commits/pushes its candidate. Report source/toolchain/build/artifact/install identities, project/doctor inventory and owner actions, restart coordination, all three live-UAT contexts, retained failures and acceptance limits. Then use independent review, normal exact-candidate operator merge, native Ready/Done publication and supported cleanup only for the complete accepted task; keep it active Done unless archive is separately requested. Send the Backlog.md Expert the published planned revision, progress/blockers and final published activation/UAT evidence. Only the Expert advances its own latest-stable pointer.\n\n## Resolved content decision and remaining cutover boundary\n\nJoe selected the widened installed recovery policy as a critical bug fix to commit into source. Historical installed SHA-256 is `986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776`; the narrower source/recorded-installed SHA-256 was `95c6c20494db03775e12c4edee829a88fe8c4a0a3c40c8b19d7669b7b0454a92`. Reread actual bytes and incorporate compatible current changes; these hashes are provenance, not frozen approval gates. The former operator content-choice blocker is cleared. Source implementation may proceed under the existing conditional authority plus this explicit correction; global installation remains blocked until the critical source fix is reviewed and accepted on canonical main. No build/install/restart/live UAT has yet run. Missing release tag and isolated Bun remain bounded preparation work, not permission to weaken checks or upgrade global tooling.",
+          "implementationNotes": "Step 1 source audit: installed global-oversee-episode SHA-256 986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776 and Episode source SHA-256 95c6c20494db03775e12c4edee829a88fe8c4a0a3c40c8b19d7669b7b0454a92 exactly match the recorded operator-selected correction. The installed delta adds the verified pre-work runtime interruption path and retains informed owner authorization, same-resource binding, and delivery/effect safeguards. Source guidance still assumes completed handoff in several copies. This slice will align canonical delivery guidance and docs without changing mechanics or reconciling any installed/project snapshot. Global rollout stays pending.\n\nStep 1 source-fix prerequisite is published at 4601f334e32cdf17c812ad9adaed5f0eabaca63c on refs/heads/JLanders/prime-claw-primeclaw-64-episode-8608a32d; direct remote read confirmed the OID. Canonical oversight skill matches the operator-selected installed bytes (SHA-256 986b7149a850946466e1dd1f53229ecad82004d44a00d2221f5a7f9dafc65776). Synchronized canonical handoff/blocked/execute guidance, P15 and docs preserve the completed-handoff path and the same-Episode, delivery/effects, idle and informed new-send safeguards. No transport code, installed bytes, or project/Episode snapshots changed.\n\nValidation: the focused regression failed on the prior source (missing interruption path); the focused Tier0 command `uv run --no-project --python 3.13 --with pytest --with pyyaml python -m pytest tests/test_oversee_episode_skill.py tests/test_expert_review_skill.py tests/test_global_asset_drift.py -q` produced 27 passed on the candidate. Docker `TIER1_ENV_FILE=<verified source selector> scripts/test-tier1.sh --probe` passed with verified public Prime Agent source tag cwd-fix-v0.9.8-r1 / a1faacd53ac4473a75de1d434afaf50945c2f647. Run 20261121T213119Z-89557-c124ba8b, image sha256:7e4ce2b7f98a252031bf47d6a7b3348665924f91585612b74c54f186e7bd3db9, manifest SHA-256 43b65ad2a7519ad0bb1ca5ac99a60291b06c752537c706086310fb1472cfc3ea; all declared evidence digests verified, offline apply/check/RPC probe passed, teardown clean. The first run 20261121T213036Z-86981-5824085f failed before the builder could inspect source: the selected /var path traversed a symlink. Provenance inventory and Tier1 passed using its canonical /private/var path with unchanged candidate inputs. Docker validation is not host live UAT.\n\nNext: independent source review and operator-controlled nonterminal source acceptance on canonical main. Episode source head and current primary main 60dcb257915b053c41701444f771f7ea4ce587c6 have diverged: main adds the ownership commit, not changes to the fix paths. The documented terminal fast-forward procedure cannot take the published head as-is (and requires Ready for Merge/Done); the owner must choose a supported nonterminal integration disposition with the task/ownership/resources staying active. No merge, Backlog v1.55.3 build/install, reconciliation, restart, live UAT, or cleanup performed in this slice.\n\nStep 1 accepted (prerequisite only). The owner confirmed operator acceptance of Episode source 4601f334e32cdf17c812ad9adaed5f0eabaca63c, merged as canonical main cd940e13ea80dacdfe0467eb4d327c247832aa0b, user-global plugin apply/check with zero conflicts and default drift preservation, then one full restart (daemon 47407 → 59626). The resumed owning Conversation, exact Episode, and designated GStack ordinary session passed bounded read-only consumer UAT. The owner retained the evidence as primeclaw64-plugin-install-20261121T215149Z/post-restart-owner-evidence.json. Both recovery paths and safeguards were read from the installed skill; this is not dispatch or historical-case recovery proof, nor Backlog 1.55.3 activation proof. The maintenance hold is cleared. Backlog remains 1.53.0; no lifecycle or rollout acceptance criteria advanced on this evidence.\n\nNext accepted scope: native plan steps 2–3 only, on the same retained Episode. Reread and preserve both actual distinct 1.53.0 binaries (canonical primary dist and installed user binary) with verified bytes/modes in durable out-of-worktree rollback storage and report the paths before any dist overwrite. Build and smoke exact unmodified v1.55.3 in the Episode only, using the verified release tag and command-local checksum-verified Bun 1.4.4, isolated cache and cleared build overrides. Keep primary/global and live snapshot resources untouched; record source/toolchain/artifact identity, raw failures separately, and report the nonterminal checkpoint for owner review. Inventory and deployment are not this slice.\n\nStep 2 fallback checkpoint (before any dist overwrite): verified the two real Mach-O arm64 Backlog 1.53.0 executables and their durable copies by native --version, SHA-256, byte count and mode. /Users/jlanders/code/prime-claw/deps/backlog/dist/backlog → /Users/jlanders/.prime/agent/session-artifacts/01a20001-5a66-75c9-9899-a9f743e43903/primeclaw64-off-global-20261121T221527Z/rollback/backlog-1.53.0-primary-dist (96044ce2319e84112b9490257f2b8a47a4458754a3c48472fb17452e511ffa00, mode 0755); /Users/jlanders/.local/bin/backlog → /Users/jlanders/.prime/agent/session-artifacts/01a20001-5a66-75c9-9899-a9f743e43903/primeclaw64-off-global-20261121T221527Z/rollback/backlog-1.53.0-user-installed (0da86f0edf37e11955e600da94754add2ea75718a47dcd7ea7c2420aa7de8511, mode 0755). Owner notified with exact paths before build. Primary main observed at 3f5fd0729db6918b6d2ac7a65d4892bd3cb9004c; it and Episode code 4601f334e32cdf17c812ad9adaed5f0eabaca63c both record gitlink 0cf4fdbc70020327f4366a29d3f405f83d180301. The Episode submodule directory is initially empty; prepare an independent checkout there so the canonical submodule repository and global runtime remain untouched.\n\nSteps 2–3 executed off-global. The pinned and clean Episode source `0cf4fdbc70020327f4366a29d3f405f83d180301` matched its gitlink and the only fetched upstream tag `v1.55.3`; origin matched `.gitmodules` (`https://github.com/MrLesk/Backlog.md.git`). Darwin arm64/macOS 26.7.3 build 25G342, official pinned Bun 1.4.4+38afee6c8 (archive SHA-256 c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510), command-local PATH/cache/temp, all four specified build overrides unset. `scripts/build-backlog.sh` exited 0 with frozen install and upstream compiled smoke passed; no failed build attempt. Artifact `/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-64-episode-8608a32d/deps/backlog/dist/backlog` reports 1.55.3, Mach-O arm64, 106150754 bytes, mode 0755, SHA-256 169976d4a37230e4e650cac3dfa15a03436809fc97dfb7551354e63a9808c586. Exact commands, raw build log, exit receipt, and manifest (SHA-256 c87964b18a7e500dbabde8003e425fc2afd20a1b8a013627c408139f9529f382) retained in `/Users/jlanders/.prime/agent/session-artifacts/01a20001-5a66-75c9-9899-a9f743e43903/primeclaw64-off-global-20261121T221527Z`; tracked evidence: `docs/evidence/primeclaw64-off-global-build-20261121.md`. The original and preserved fallback hashes/modes still match. User-global Backlog remains 1.53.0, general Bun/Node unchanged. No activation, inventory, reconciliation, new restart, or terminal decision. Stop for the owner to review this slice before the next native plan step.\n\nSteps 2–3 reviewed and accepted as a nonterminal build slice. The owner independently verified the evidence commit c1e4c66ec4672b80c78039f128004feca1894d67, task checkpoint 329905c5abae4ce84ec8d989929136a3b56f7d74, exact source/tag, official Bun, manifest digests, artifact and compiled smoke, and both original and rollback binary hashes/modes. Review evidence: /Users/jlanders/.prime/agent/session-artifacts/01a1a90b-0fba-7778-b1e5-0087bdaf8fec/primeclaw64-plugin-install-20261121T215149Z/off-global-build-owner-review.json. The later published descendant 385ee964e5db6183f0c56fad8ff49a3081ffe653 changed only an unrelated ticket. This acceptance does not activate 1.55.3; Backlog remains 1.53.0 globally and only criterion #2 is checked.\n\nNext accepted slice: native plan steps 4–5 only. Using known registered/managed contexts and delivery evidence, inventory consumers and actual guidance, distinguish stale active resources needing owner action from inactive/deferred or excluded contexts, and preserve all customized/unknown assets and live snapshots. For safely inspectable affected Backlog projects only, run the absolute reviewed Episode 1.55.3 binary with plain text doctor from each project CWD; record raw output, exit, before/after evidence or the exact inspection limit without repair. Beads-authoritative projects are not Backlog conversion targets. Preserve archived-draft physical evidence and do not investigate deliberately deleted finished sessions. Draft bounded, privacy-safe deployment/reconciliation documentation and evidence, with concrete owner actions, the completed plugin-only maintenance distinguished from pending Backlog activation, and the owner-only quiescence/install/restart/UAT procedure. Stop for owner review; no initializer run, activation, project/fleet mutation, restart, or lifecycle change.\n\nSteps 4–5 intermediate evidence: reviewed exact pinned doctor path. Plain doctor does not enter requested repairs, but before diagnosis ContentStore.loadInitialData calls ensureBacklogStructure (recursive mkdir). The selected primary is missing archive/tasks; the isolated Episode also lacks required directories. Skipped doctor on both rather than allow directory creation. Retained physical archived-draft bytes/modes/history evidence separately; this is a source-backed inspection limit, not a native doctor pass or a reason to move legacy records. Consumer inventory and rollout docs still being completed.\n\nSteps 4–5 complete as bounded preparation; not activation. Published docs-only Episode fe9e7dfe44f91b691e5dee5483635f7f92bbdb62 (docs/backlog.md, docs/project-initialization.md, docs/evidence/primeclaw64-rollout-preparation.md). Native registered/ownership/manifest inventory: 34 local roots (14 Backlog including six linked snapshots, eight Beads markers without Backlog config, 12 without either marker); nine paired paths metadata-only (incompatible_runtime for paired session listing). Exact reviewed 1.55.3 plain doctor ran once from a safely inspectable managed local project, exit 0 with no duplicate ID/self-dependency/cycle findings; captured path/mode/content and Git evidence matched. Skipped other 13 Backlog roots for exact startup mkdir or remote ref-refresh limits, including selected primary missing archive/tasks. Private evidence retained in Episode session artifacts. No affirmative removed completion recipe in bounded guidance; preserve custom design/prepare/spec-it-out/plan-task and live/uncertain snapshots. Selected managed conversation-after-handoff is a normal refresh candidate; blocked/execute/handoff have baseline drift and fresh reconciliation alone is expected not to install their newer interruption guidance, so owner must make an exact content decision if that route is required, or defer it. No provider switch, repair, global/project deployment, restart, activation UAT, stable-pointer update or terminal summary. Stop for owner review and separately approved cutover.\n\nOwner reviewed steps 4–5 and accepted actual host cutover and all three live UAT contexts (steps 6–7); hold cleared. PATH Backlog 1.55.3 (Mach-O arm64, 0755, SHA-256 169976d4a37230e4e650cac3dfa15a03436809fc97dfb7551354e63a9808c586) is installed; primary dist remains the separate 1.53.0 fallback, and both rollback copies are intact. Accepted plugin source 30bd6c53a349113944bda48a69f8a0f2c5963bb5 passed Docker Tier 1 run 20261121T225811Z-75113-41d80e86 and canonical user-global apply/check. Selected reconcile on main 5af4e912a6641eac13c11522817dfc471b2ed5a0 updated managed conversation-after-handoff and recovered metadata only, with nine customizations and all snapshots preserved and the native root alias pointing to the same config. One coordinated actual cutover restart (65235 → 88168) preceded passed resumed-owner, exact retained Episode and ordinary GStack UAT; this is distinct from earlier plugin-only UAT. Installed CLI/browser/MCP and a disposable lifecycle fixture passed; retain the input refusals separately. Private receipts: owner primeclaw64-plugin-install-20261121T215149Z/actual-backlog155-cutover (installation-evidence.json, post-restart-uat-owner.json, installed-binary-smoke.log, installed-lifecycle-fixture-results.json). No claim of public registry hash/count, dispatch/recovery proof, or all-project health. Paired remote, preserved snapshots’ new interruption route, TASK2 name collision, and frozen Beads PVA are excluded.\n\nNext accepted slice: step 8 only in this exact Episode. Update narrow tracked rollout docs with dated verified outcomes, fallback and limits; update native criteria/notes and candidate Final Summary truthfully after verifying evidence, and publish/report candidate for independent review. Backlog.md Expert evidence message was queued; verify actual receipt before criterion #7 and do not claim/advance its pointer. Keep In Progress and preserve resources. No repeat install/reconcile/restart/UAT, source changes, integration, lifecycle transition or cleanup.",
+          "comments": [
+            {
+              "index": 1,
+              "body": "Joe authorized ONE NEW execute-only continuation in response to the owning Conversation's informed interruption brief: \"Yes, authorized. Do it.\"\nThe original 2026-11-21T23:11:29Z handoff had native first admission, completed factual observation callback and native execute-follow-up admission. Its durable handoff preparation checkpoint was published at 327d72ce689ccd8d03206ae0467c09b6ae9277b2. A subsequent daemon change 88168 to 511 cancelled the closing compaction/turn boundary. No saved final handoff response or execute turn establishes normal turn completion or historical execute-start/non-admission; that history remains unknown, not rewritten. Selected code/task/workspace inspection and the receiver report found no final step8 implementation effects. This is a NEW continuation decision, never replay of either old prompt, callback or assignment.\nCurrent runtime serves the same durable Episode at route59eee354dc65, with unchanged owner/provider/task/operation/worktree/branch/host/base/integration identities. Fresh native post-report state is idle, zero unfinished/queued actions and no running Episode children. Two explicitly linked completed/inactive inventory children have zero queues; absent live fields remain absent. The clean pushed Episode remains fe9e7dfe44f91b691e5dee5483635f7f92bbdb62. Current full native task remains active In Progress, 3/7 with meaningful living plan. No status round-trip is needed.\nAccepted scope is ONLY existing step8: finish narrow verified rollout docs/evidence and native implementation criteria/summary, publish the final candidate, then stop for independent review. Actual activation and three-context UAT remain verified, maintenance holds released; no repeat installation/reconcile/restart/UAT, source/policy expansion, new resources or lifecycle/cleanup authority. Backlog Expert evidence receipt/pointer decision must remain truthful rather than assumed. Original code/task basis and all resources are preserved. This comment records the decision and current evidence before any new send, not admission or completion.",
+              "createdAt": "2026-11-21T23:30:00Z",
+              "author": "Prime Claw owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec"
+            }
+          ],
+          "finalSummary": null
+        }
+      },
+      "baseRef": "a256c46afed7146dc4209831b5ee08b5474f8baa",
+      "createdAt": "2026-11-21T21:26:41.142Z",
+      "updatedAt": "2026-11-21T23:31:19.889Z",
+      "integrationBranch": "main",
+      "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
+      "worktreeName": "prime-claw-primeclaw-64-episode-8608a32d",
+      "worktreeId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf::/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-64-episode-8608a32d",
+      "worktreeIdentity": "wt2:local:ad0f756b-8bff-4c0c-a255-c97034d4213c",
+      "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-64-episode-8608a32d",
+      "branch": "JLanders/prime-claw-primeclaw-64-episode-8608a32d",
+      "head": "fe9e7dfe44f91b691e5dee5483635f7f92bbdb62",
+      "launchAutomationName": "prime-claw-launch-8608a32d-4a3e-4686-a558-84e531dcc94a",
+      "episodeId": "01a20001-5a66-75c9-9899-a9f743e43903",
+      "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a20001-5a66-75c9-9899-a9f743e43903.jsonl",
+      "episodeActiveSessionId": "c0acb7c94e46",
+      "terminalHandle": "term_afe8aedd-8552-4779-aa2b-5e4402124342",
+      "terminalHandles": [
+        "term_773d597e-3017-4b3b-a47c-0d23119c8bdd",
+        "term_afe8aedd-8552-4779-aa2b-5e4402124342"
+      ]
+    },
     "01a1ac67-8d52-702d-aa29-0c3be8a7a3d2": {
       "version": 2,
       "provider": "backlog",

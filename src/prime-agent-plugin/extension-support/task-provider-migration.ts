@@ -66,6 +66,7 @@ import {
 const RECEIPT_TITLE = "Prime Claw task-provider migration receipt";
 const RECEIPT_MARKER = "prime-claw-task-provider-migration-receipt-v1";
 const SOURCE_MARKER = "prime-claw-task-provider-migration-source-v1";
+const SOURCE_RELATIONSHIP_MARKER = "prime-claw-task-provider-migration-relationships-v1";
 const BEADS_CUSTOM_STATUSES = "in_design:active,in_planning:active,ready_for_merge:wip,done:done";
 const BACKLOG_TASK_DIRS = ["tasks", "completed", "archive/tasks", "drafts", "archive/drafts"] as const;
 const GIT_OID = /^[0-9a-f]{40,64}$/;
@@ -321,6 +322,46 @@ function canonical(value: unknown): string {
   return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`).join(",")}}`;
 }
 
+function updateCanonicalHash(
+  hash: ReturnType<typeof createHash>,
+  value: unknown,
+  context: "root" | "array" | "object" = "root",
+): void {
+  if (value === null || typeof value !== "object") {
+    const encoded = JSON.stringify(value);
+    if (encoded !== undefined) hash.update(encoded);
+    else if (context === "object") hash.update("undefined");
+    else if (context === "root") throw new TypeError("canonical SHA-256 requires a serializable root value");
+    return;
+  }
+  if (Array.isArray(value)) {
+    hash.update("[");
+    for (let index = 0; index < value.length; index += 1) {
+      if (index > 0) hash.update(",");
+      updateCanonicalHash(hash, value[index], "array");
+    }
+    hash.update("]");
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  hash.update("{");
+  const keys = Object.keys(record).sort();
+  for (let index = 0; index < keys.length; index += 1) {
+    if (index > 0) hash.update(",");
+    const key = keys[index];
+    hash.update(JSON.stringify(key));
+    hash.update(":");
+    updateCanonicalHash(hash, record[key], "object");
+  }
+  hash.update("}");
+}
+
+export function canonicalSha256(value: unknown): string {
+  const hash = createHash("sha256");
+  updateCanonicalHash(hash, value);
+  return hash.digest("hex");
+}
+
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -512,7 +553,7 @@ function captureBacklog(
     archived: tasks.filter((task) => task.classification === "archived").length,
     total: tasks.length,
   };
-  const digest = sha256(canonical(tasks));
+  const digest = canonicalSha256(tasks);
   return {
     provider: "backlog", projectRoot, evidence, revision, digest, repositoryRoot,
     ...(publication ? { publicationRemote: publication.remote, publicationRef: publication.ref } : {}),
@@ -635,7 +676,7 @@ function captureBeads(
     archived: tasks.filter((task) => task.classification === "archived").length,
     total: tasks.length,
   };
-  const digest = sha256(canonical({ sourceIdentity, sourceVersion, statusCatalog, tasks, memories }));
+  const digest = canonicalSha256({ sourceIdentity, sourceVersion, statusCatalog, tasks, memories });
   return {
     provider: "beads", projectRoot, evidence, sourceIdentity,
     sourceVersion, statusCatalog,
@@ -649,7 +690,7 @@ function validateBeadsRelationshipTargets(tasks: BeadsTaskPackage[]): void {
   const problems: string[] = [];
   for (const pkg of tasks) {
     const parent = typeof pkg.nativeView.parent === "string" ? pkg.nativeView.parent : pkg.exportRow.parent;
-    const targets = [...dependencyIds(pkg).map((id) => ({ id, kind: "dependency" })),
+    const targets = [...beadsRelationships(pkg).map(({ id, type }) => ({ id, kind: `${type} relationship` })),
       ...(typeof parent === "string" && parent ? [{ id: parent, kind: "parent" }] : [])];
     for (const { id, kind } of targets) {
       if (id === pkg.sourceTaskId) problems.push(`${pkg.sourceTaskId} ${kind} ${id}: self target`);
@@ -1394,7 +1435,7 @@ function migrateBacklogToBeads(
     assertSameIds(relationshipIds(targetView.dependencies, id), expectedRelationships, `Beads destination relationships for ${pkg.sourceTaskId}`);
     return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskEvidence: targetView };
   });
-  const destinationDataDigest = sha256(canonical(destinationTasks.map((task) => task.taskEvidence)));
+  const destinationDataDigest = canonicalSha256(destinationTasks.map((task) => task.taskEvidence));
   const transitions = ownershipRows.map((row) => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));
   if (transitions.some((row) => !row.destinationTaskId)) throw new Error("active ownership has no Beads destination mapping");
   const receiptBase = migrationReceiptBase(source, "beads", dataTransport.evidence.publishedRevision, destinationDataDigest,
@@ -1413,7 +1454,7 @@ function migrateBacklogToBeads(
       if (!Array.isArray(view) || view.length !== 1) throw new Error(`Beads task ${task.destinationTaskId} is not exactly readable after receipt`);
       return { ...task, taskEvidence: asObject(view[0], `Beads task ${task.destinationTaskId}`) };
     });
-    return { revision: proof.evidence.publishedRevision, digest: sha256(canonical(refreshedTasks.map((task) => task.taskEvidence))), tasks: refreshedTasks, receiptTaskId };
+    return { revision: proof.evidence.publishedRevision, digest: canonicalSha256(refreshedTasks.map((task) => task.taskEvidence)), tasks: refreshedTasks, receiptTaskId };
   };
   const final = refresh();
   return {
@@ -1826,9 +1867,40 @@ function createBacklogTaskFromBeads(pkg: BeadsTaskPackage, source: BeadsSnapshot
   return id;
 }
 
+interface BeadsRelationship {
+  id: string;
+  type: string;
+}
+
+function beadsRelationships(pkg: BeadsTaskPackage): BeadsRelationship[] {
+  const dependencies = Array.isArray(pkg.nativeView.dependencies)
+    ? pkg.nativeView.dependencies
+    : Array.isArray(pkg.exportRow.dependencies) ? pkg.exportRow.dependencies : [];
+  return dependencies.map((dep: any): BeadsRelationship => {
+    const id = typeof dep === "string" ? dep : String(dep.depends_on_id ?? dep.id ?? dep.issue_id ?? "");
+    const rawType = typeof dep === "string" ? "blocks" : String(dep.dependency_type ?? dep.type ?? "blocks");
+    return { id, type: rawType.trim().toLowerCase().replace(/_/g, "-") || "blocks" };
+  }).filter(({ id }) => Boolean(id));
+}
+
+/** Backlog dependencies are hard ordering edges; other Beads types retain their own meaning. */
 function dependencyIds(pkg: BeadsTaskPackage): string[] {
-  const dependencies = Array.isArray(pkg.nativeView.dependencies) ? pkg.nativeView.dependencies : Array.isArray(pkg.exportRow.dependencies) ? pkg.exportRow.dependencies : [];
-  return dependencies.map((dep: any) => typeof dep === "string" ? dep : String(dep.depends_on_id ?? dep.id ?? dep.issue_id ?? "")).filter(Boolean);
+  return beadsRelationships(pkg).filter(({ type }) => type === "blocks").map(({ id }) => id);
+}
+
+function beadsRelationshipComment(
+  pkg: BeadsTaskPackage,
+  mapping: Record<string, string>,
+  semanticPlacement: string,
+): string | undefined {
+  const relationships = beadsRelationships(pkg).filter(({ type }) => type !== "blocks" && type !== "parent-child");
+  if (!relationships.length) return undefined;
+  const lines = relationships.map(({ id, type }) => `- ${type}: ${id} -> ${mapping[id] ?? id}`);
+  return `${SOURCE_RELATIONSHIP_MARKER}
+Source Beads relationships with no native Backlog dependency equivalent:
+${lines.join("\n")}
+
+Semantic placement: ${semanticPlacement}`;
 }
 
 function commitBacklogDestination(runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace, message: string): string {
@@ -2087,7 +2159,7 @@ function freshBacklogMigrationReplay(
     assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
     return view;
   });
-  if (sha256(canonical({ preserved: [], imported: tasks, ...(source.memories.length ? { memory } : {}) })) !== receipt.destinationDataDigest) throw new Error("same-migration replay native destination digest differs from its complete receipt");
+  if (canonicalSha256({ preserved: [], imported: tasks, ...(source.memories.length ? { memory } : {}) }) !== receipt.destinationDataDigest) throw new Error("same-migration replay native destination digest differs from its complete receipt");
   runRequired(runner, "git", ["-C", storeDir, "merge-base", "--is-ancestor", receipt.destinationDataRevision, head], storeDir, "verify replay receipt data ancestry");
   const receiptPath = relative(storeDir, resolve(source.projectRoot, String(receiptView!.task.path))).replace(/\\/g, "/");
   const laterFiles = runRequired(runner, "git", ["-C", storeDir, "diff", "--name-only", "-z", receipt.destinationDataRevision, head], storeDir, "verify replay receipt-only native changes").stdout.split("\0").filter(Boolean);
@@ -2139,7 +2211,7 @@ function migrationCodeProjection(projectRoot: string, runner: CommandRunner, all
   if (foreign.length) throw new Error(`migration layout encountered unrelated code changes: ${foreign.join(", ")}`);
   const diff = allowed.length ? runRequired(runner, "git", ["-C", projectRoot, "diff", "--binary", "HEAD", "--", ...allowed], projectRoot, "capture migration layout diff").stdout : "";
   const index = runRequired(runner, "git", ["-C", projectRoot, "ls-files", "--stage", "-z"], projectRoot, "capture migration layout index").stdout;
-  return sha256(canonical({ diff, index, files: untracked.filter(layoutPath).map((path) => [path, backlogFileBytes(join(projectRoot, path))]) }));
+  return canonicalSha256({ diff, index, files: untracked.filter(layoutPath).map((path) => [path, backlogFileBytes(join(projectRoot, path))]) });
 }
 
 function migrateBeadsToBacklog(
@@ -2184,6 +2256,8 @@ function migrateBeadsToBacklog(
   for (const pkg of source.tasks) {
     const id = mapping[pkg.sourceTaskId];
     if (reusedDestinationIds.has(id)) continue;
+    const relationshipComment = beadsRelationshipComment(pkg, mapping, semanticPlacement);
+    if (relationshipComment) nativeBacklogComment(runner, source.projectRoot, id, relationshipComment, "prime-claw-migration");
     const deps = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId);
     if (deps.length) runRequired(runner, "backlog", ["task", "edit", "--depends-on", deps.join(","), "--plain", "--", id], source.projectRoot, `migrate dependencies for ${pkg.sourceTaskId}`);
     const status = statusFromBeads(pkg.nativeView.status ?? pkg.exportRow.status);
@@ -2231,12 +2305,18 @@ function migrateBeadsToBacklog(
     if (expectedParent !== actualParent) throw new Error(`Backlog destination parent mapping mismatch for ${pkg.sourceTaskId}`);
     const expectedDependencies = dependencyIds(pkg).map((sourceId) => mapping[sourceId] ?? sourceId).sort();
     assertSameIds(relationshipIds(view.task.dependencies, id), expectedDependencies, `Backlog destination dependencies for ${pkg.sourceTaskId}`);
+    const expectedRelationshipComment = beadsRelationshipComment(pkg, mapping, semanticPlacement);
+    if (expectedRelationshipComment) {
+      const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
+      const matches = comments.filter((comment: JsonObject) => String(comment.text ?? comment.content ?? comment.body ?? "") === expectedRelationshipComment);
+      if (matches.length !== 1) throw new Error(`Backlog destination relationship placement mismatch for ${pkg.sourceTaskId}`);
+    }
     return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath, taskEvidence: view };
   });
   const destinationDigest = (tasks: DestinationTask[]) => {
     const memory = backlogMemoryEvidence(source, memoryOutputs, runner);
-    return sha256(canonical({ preserved: [...baseline.records], imported: tasks.map((task) => task.taskEvidence),
-      ...(source.memories.length ? { memory } : {}) }));
+    return canonicalSha256({ preserved: [...baseline.records], imported: tasks.map((task) => task.taskEvidence),
+      ...(source.memories.length ? { memory } : {}) });
   };
   const destinationDataDigest = destinationDigest(destinationTasks);
   const transitions = ownershipRows.map((row) => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));
