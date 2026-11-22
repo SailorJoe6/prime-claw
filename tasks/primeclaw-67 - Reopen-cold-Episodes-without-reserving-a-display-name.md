@@ -8,6 +8,8 @@ updated_date: '2026-11-22T07:55:00Z'
 labels: []
 dependencies: []
 references:
+  - PRIMECLAW-15
+  - PRIMECLAW-57
   - >-
     https://github.com/SailorJoe6/prime-claw/commit/5ffb2e7942ea16bf53f97f88513b14a120d67839
 priority: p1
