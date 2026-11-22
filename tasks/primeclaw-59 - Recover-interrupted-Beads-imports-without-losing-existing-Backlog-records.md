@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T16:20:00Z'
+updated_date: '2026-11-22T16:26:00Z'
 labels: []
 dependencies: []
 references:
@@ -286,6 +286,11 @@ The final-source probe and all four affected suites are complete on the preserve
 
 ### Step 3 / AC5 revision — independent review pending
 The bounded two-fix candidate and its evidence are published. Stop here until the owning Conversation records the independent review and decides the next step. No further slice, merge, live migration, or lifecycle transition is authorized by this checkpoint.
+
+### Step 3 / AC5 revision — Backlog frontmatter compatibility only
+1. Extend the existing title-only same-ID positive with supported unquoted `@` handle metadata. Use pinned Backlog 1.55.3 (`0cf4fdbc70020327f4366a29d3f405f83d180301`), `src/markdown/frontmatter.ts` (`preprocessFrontmatter`) and `src/test/markdown.test.ts:197–240` for the supported scalar, inline assignee list and reporter syntax. Show the regression against published `7cf8657` in disposable focused Docker.
+2. Match this Backlog-compatible handling in the read-only inspection of actual `references`. Do not rewrite task records, suppress parse errors as no references, widen marker detection or alter native allocation, receipt checks, protection, or dependencies. Keep genuine-reference refusal, exact physical paths/bytes/modes and native history, native allocation of the next free ID, and receipt-bound USER refusal before destination writes or retirement.
+3. Pass corrected focused Docker and the required final-source tier-1 probe. Keep the before/after evidence distinct; reuse unaffected prior evidence as prior-source evidence and retain both the unknown earlier `F` and static-only ownership #83 qualifications. Publish one correction on the same Episode branch and separate native evidence, then stop for focused independent review. No scope beyond this finding, no reopening `e4878f1`, and no live/PVA access, deployment, merge, cleanup or source retirement outside disposable tests. The PVA-only sequencing decision remains intact and grants no live action here.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -601,4 +606,7 @@ Joe approved: “I approve the PVA-Only migration gate. You can finish the bigge
 Before PVA cutover: independently review and accept the tested importer, including current-only readable native delivery and complete readback, and preservation of the parked configuration, bootstrap ancestry and original same-ID live/archive paths, bytes, modes and history. Use approved main for global apply/check, coordinated full restart and loaded-generation UAT. Rehearse a disposable representative fresh import and measure elapsed time with large/comment-heavy current data, actual comments, statuses, relationships and memories where present; no historical chunks. Verify one native import per source, preserved originals, exact readback and published receipt/ownership before any source retirement. Show basic readable progress and prove a stop/failure procedure that preserves Beads authority and partial destination, with no further writes, automatic retry or deletion.
 
 Generic automated resume/protected reset, richer progress UI, exhaustive benchmarking and general completion remain open for after PVA. Joe accepts that a failed or stalled run may leave Backlog unavailable pending a separate explicit recovery decision. PVA owner handles exact source preflight/counts and separate informed cutover confirmation, including source deletion, only once ready. No live PVA access or mutation is authorized by this note.
+
+### Independent review finding — Backlog-supported unquoted handles
+The owning Conversation recorded one material Codex Astra finding on code `7cf86574295956543663ac7d007ecc48833c03a3` and native evidence `1465f30b31688427d418c4aa82aa2c55ccb1803b`: `task-provider-migration.ts:1737` parses the complete frontmatter with generic YAML, which rejects Backlog-supported unquoted `@` assignee metadata on an unrelated live/archive pair. Compare the pinned Backlog reader and coverage cited in the plan. Canonical execute is to correct only this parser compatibility, with focused Docker red/green and the final-source probe, then stop after separately publishing code and native evidence. The compatible owner-authored PVA-only sequencing note in `c6e0a3d` remains unchanged. `In Progress`, 0/9 criteria checked, and null Final Summary are unchanged. No product code or test execution in this handoff.
 <!-- SECTION:NOTES:END -->
