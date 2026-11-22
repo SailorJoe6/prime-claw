@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T18:33:00Z'
+updated_date: '2026-11-22T21:07:00Z'
 labels: []
 dependencies: []
 references:
@@ -27,6 +27,8 @@ documentation:
   - docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md
   - docs/evidence/primeclaw-59-pva-gate-rehearsal-20261122.md
   - docs/evidence/primeclaw-59-operator-stop-20261122.md
+  - docs/evidence/primeclaw-59-representative-rehearsal-20261122.md
+  - docs/evidence/primeclaw-59-representative-rehearsal-20261122.jsonl
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -58,6 +60,9 @@ modified_files:
   - tests/container/operator_migration_stop_extension.ts
   - tests/test_operator_migration_stop.py
   - docs/evidence/primeclaw-59-operator-stop-20261122.md
+  - tests/test_pva_gate_scale_rehearsal.py
+  - docs/evidence/primeclaw-59-representative-rehearsal-20261122.md
+  - docs/evidence/primeclaw-59-representative-rehearsal-20261122.jsonl
 priority: p1
 type: bug
 ordinal: 144000
@@ -335,6 +340,9 @@ Under `c6e0a3d`, run one timed fresh-path rehearsal on exactly `ceaf02004fbd5716
 Record actual fixture shape and bytes, timing for setup and separate inspection, confirmation to actual settlement, operator-visible phases and gaps, and independent post-result checks. Prove parked configuration/bootstrap ancestry and original live/archive same-ID paths/IDs/bytes/modes/history, one readable native record per source, native allocation, actual authored comments, relationships, statuses and memories, no encoded history chunks, and verified publication/readback and ownership ordering before synthetic retirement. State local/embedded/offline scale limits; if the run hits a limit or defect, preserve the actual diagnostic and report the blocker, not a guessed window. No unrelated product changes or repeated capacity sweeps; do not rerun accepted abort/failure proofs without a concrete evidence gap.
 
 Publish only the rehearsal test/evidence and a separate selected-task checkpoint, then stop for owner assessment. Still In Progress, 0/9 checked, null Final Summary. No live migration, merge, deployment, installation, restart, or cleanup outside disposable fixtures. Initialize PVA owns the separate live preflight and exact cutover confirmation.
+
+### PVA-only gate — stop after the incomplete representative rehearsal
+The single authorized run ended without a terminal migration result or runtime teardown proof. Stop for owner assessment. No retry, live-size/window inference, product repair, or live preflight is authorized by this record. Preserve the saved diagnostic gap and the exact disposable-run evidence. A terminal/teardown diagnosis or further rehearsal requires separate owner authority. Earlier reviewed increments and the Initialize PVA preflight and exact-confirmation boundary remain unchanged.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -697,4 +705,9 @@ The owner accepted only the operator-stop increment `ceaf02004fbd571603e3c51a0e2
 
 ### Representative-volume rehearsal — admitted fixture checkpoint
 The sole canonical execute was admitted on the original Episode. The reviewed product remains frozen at `ceaf02004fbd571603e3c51a0e245957607726e6`. Prepared an opt-in offline Docker test for 406 synthetic Beads tickets, 3,800 actual authored comments with skew, 349 closed tickets, and substantial varied UTF-8 fields. It uses the parked/same-ID fixture, a disposable local remote, new explicit scale inspection, phase and terminal evidence, receipt-backed ownership guard and separate native readback. Syntax/collection only verified so far; the single runtime attempt is not yet evidence. No accepted stop/failure replay, live data, lifecycle change, or product change.
+
+### Representative-volume rehearsal — incomplete; exact evidence gap
+Published fixture and evidence `b168101744a0806a29d4e5caf2d49c4506f91de0` (product parent `ceaf02004fbd571603e3c51a0e245957607726e6`, no product changes). Run `20261122T183325Z-58413-f5098cc6`: offline embedded synthetic Beads, 406 tickets (57 unclosed/349 closed), 3,800 actual authored comments, 29,493,492 export bytes, 20,581,716 comment-body bytes and 7,655,666 description/design/notes bytes. Setup 1,663.019 s; separate native inspection ready at 392.514 s. Confirmation phase notices at 0.007 s, 399.508 s and 403.127 s; one expected browser observed at 403.195 s with exact fixture BACKLOG_CWD. Last saved event: Web write attempt 4,200 at 4,656.532 s (77m 36.532s) from confirmation, not verified writes or completions. Product phase callback did not record a subsequent phase.
+
+Exact blocker: saved host output ends at pytest `F`; tracked shell/pytest PIDs were absent, with no wrapper exit, TAP, terminal migration result, or final runtime teardown/manifest. Cause is unknown. Matching progress copies retained, SHA-256 `04f5f4619260efd4bf8836d95014005d91aa227446e8a89a5fd37a1eb57a5074`; saved network check passed and source builder had clean teardown and unchanged upstream inventory, not runtime teardown proof. No verified full native readback, parked preservation, receipt publication, ownership cutover or retirement; absence of evidence is not proof of absent effects. No retry or cleanup, no product changes or live action, no production time bound. See `docs/evidence/primeclaw-59-representative-rehearsal-20261122.md` and its exact progress trace. Stopped for owner assessment under `c6e0a3d`; In Progress, 0/9, Final Summary null.
 <!-- SECTION:NOTES:END -->
