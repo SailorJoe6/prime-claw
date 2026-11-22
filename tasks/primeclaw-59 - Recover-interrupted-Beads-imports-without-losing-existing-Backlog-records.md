@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T21:07:00Z'
+updated_date: '2026-11-22T21:10:00Z'
 labels: []
 dependencies: []
 references:
@@ -343,6 +343,11 @@ Publish only the rehearsal test/evidence and a separate selected-task checkpoint
 
 ### PVA-only gate — stop after the incomplete representative rehearsal
 The single authorized run ended without a terminal migration result or runtime teardown proof. Stop for owner assessment. No retry, live-size/window inference, product repair, or live preflight is authorized by this record. Preserve the saved diagnostic gap and the exact disposable-run evidence. A terminal/teardown diagnosis or further rehearsal requires separate owner authority. Earlier reviewed increments and the Initialize PVA preflight and exact-confirmation boundary remain unchanged.
+
+### PVA-only gate — integrate the reviewed importer with exact main for review
+Joe waived another representative-volume rehearsal and authorized one Episode integration, not landing, deployment, or task completion. On canonical execute only, integrate reviewed importer `ceaf02004fbd571603e3c51a0e245957607726e6` with exact canonical main `5ffb2e7942ea16bf53f97f88513b14a120d67839`. Verify the exact main target before using it; report material drift instead of broadening scope. Do not touch the primary checkout or its pending ownership edits. Preserve published incomplete rehearsal evidence `b168101744a0806a29d4e5caf2d49c4506f91de0` without reset, rebase, or force. Explicitly invert or otherwise exclude the unreviewed scale-only fixture and artifacts from the deployable Episode tree; report its retained ancestry.
+
+Resolve the known migration source/test conflicts semantically. Preserve main’s typed Beads relationships (including native readback and receipt replay as affected) and streaming canonical digest, alongside the reviewed importer’s native Web writes/readback, authored content, same-ID preservation and digest, config/history, receipt and guarded cutover ordering, and operator stop. Do not restore legacy CLI authoring, take either conflict side wholesale, or expand into harness work. Run focused offline Docker regressions for the integrated behavior and a final exact-source Tier 1 probe as needed. No scale rerun. Publish the exact clean Episode and separate selected task, verify the scale-only delta is excluded, and report the exact target, both parents and candidate, concrete differences from both sides, test evidence and limitations. Stop for independent review. In Progress, 0/9 checked, Final Summary null. No main merge/push, install, restart, or live PVA action; Initialize PVA owns the switch.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -710,4 +715,7 @@ The sole canonical execute was admitted on the original Episode. The reviewed pr
 Published fixture and evidence `b168101744a0806a29d4e5caf2d49c4506f91de0` (product parent `ceaf02004fbd571603e3c51a0e245957607726e6`, no product changes). Run `20261122T183325Z-58413-f5098cc6`: offline embedded synthetic Beads, 406 tickets (57 unclosed/349 closed), 3,800 actual authored comments, 29,493,492 export bytes, 20,581,716 comment-body bytes and 7,655,666 description/design/notes bytes. Setup 1,663.019 s; separate native inspection ready at 392.514 s. Confirmation phase notices at 0.007 s, 399.508 s and 403.127 s; one expected browser observed at 403.195 s with exact fixture BACKLOG_CWD. Last saved event: Web write attempt 4,200 at 4,656.532 s (77m 36.532s) from confirmation, not verified writes or completions. Product phase callback did not record a subsequent phase.
 
 Exact blocker: saved host output ends at pytest `F`; tracked shell/pytest PIDs were absent, with no wrapper exit, TAP, terminal migration result, or final runtime teardown/manifest. Cause is unknown. Matching progress copies retained, SHA-256 `04f5f4619260efd4bf8836d95014005d91aa227446e8a89a5fd37a1eb57a5074`; saved network check passed and source builder had clean teardown and unchanged upstream inventory, not runtime teardown proof. No verified full native readback, parked preservation, receipt publication, ownership cutover or retirement; absence of evidence is not proof of absent effects. No retry or cleanup, no product changes or live action, no production time bound. See `docs/evidence/primeclaw-59-representative-rehearsal-20261122.md` and its exact progress trace. Stopped for owner assessment under `c6e0a3d`; In Progress, 0/9, Final Summary null.
+
+### Owner disposition — incomplete evidence retained; one integration authorized
+Owner verified the incomplete trace and publications `b168101744a0806a29d4e5caf2d49c4506f91de0` / `67d2666e21cef487e6faa71ff4b505a1feeb8e59` and the restored original idle Episode. The scale attempt remains incomplete, with no terminal migration result or runtime teardown proof and no production window. Joe’s direction relayed by Initialize PVA waives another scale rehearsal; it authorizes only the exact main integration recorded in the living plan. This handoff records scope, not implementation, full-task acceptance or any live/merge/deployment decision. `c6e0a3d` remains in effect.
 <!-- SECTION:NOTES:END -->
