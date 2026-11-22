@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T07:29:00Z'
+updated_date: '2026-11-22T08:59:00Z'
 labels: []
 dependencies: []
 references:
@@ -271,6 +271,13 @@ Joe accepted the parked-store increment as-is and directed the owner to continue
 
 ### Step 3 / AC5 coexistence candidate delivered
 One tested same-ID coexistence candidate `7b2e386ea9b6ad8109996f8feb431e36735ce623` is published for independent owner review. This does not close AC5 or the task. Retain earlier accepted increments and deferred scope; do not automatically start another slice.
+
+### Step 3 / AC5 revision — two owner-confirmed Codex Astra findings only
+Revise the published but unaccepted coexistence candidate `7b2e386ea9b6ad8109996f8feb431e36735ce623` (native evidence `6e9e0e849ea5a31c068b1a579fda564c1009a796`) in this exact Episode. Preserve the accepted parked-store increment `e4878f1`; do not reopen its findings.
+
+1. For a clean selected-store replay with a native receipt, establish read-only whether the receipt-bound memory USER task ID is ambiguous before destination preparation or any layout/Git/native writes. The initial scan cannot infer that target from import references: the USER task has none. Use actual receipt binding, not a guessed ID or title. Keep the existing later checks and guarded retirement. Disposable Docker red/green must expose the old ordering and prove corrected refusal leaves the exact destination layout, Git state and native publication unchanged, with zero retirement.
+2. Count Beads migration references as evidence only in the actual references field; a title merely mentioning a marker must not make the pair a migration target. Preserve genuine reference, receipt and mapping refusals. Prove in disposable Docker that the title-only case migrates unrelated tickets, leaves both originals and native history intact by path and exact content, and reserves the occupied ID via native allocation. Keep genuine targeted refusal passing.
+3. Validate only this revision with affected Docker regressions and required final-source tier 1. Retain exact inputs and distinguish old ordering effects, fixture failures, final results and limits. Publish one code candidate and separate native evidence; then stop for independent owner review. Earlier ownership #83 is not a runtime baseline and remains qualified unless actually rerun. In Progress, 0/9, null Final Summary. No other scope, live migration, PVA access, merge, install, restart, lifecycle, ownership/resource changes or cleanup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -553,4 +560,9 @@ Code `7b2e386ea9b6ad8109996f8feb431e36735ce623` was committed and non-force push
 Disposable selected and parked cases each performed 6 native Web task writes and one fixture-only retirement after publication/verification; both preserved the two physical originals and native BASE-13 allocation. Targeted receipt-mapped ambiguity refused without writes or retirement. Focused 20261122T065632Z-17433-5026d075: 11 native pass. Required final-source probe 20261122T070125Z-29792-dfe18848: pass. Final Docker 20261122T070325Z-33358-7d5fa1a0: 4 pytest pass (1479.79 s); 216 native pass / 12 retired reverse skips (migration 97, current 20, Web 10, workspace 89). Static migration checks: 2 pass. Verified 223 final input hashes and 78 artifact hashes across five retained runs, both teardown layers clean/offline/upstream source inventory unchanged. See `docs/evidence/primeclaw-59-same-id-coexistence-20261122.md` and ignored `.test-results/primeclaw59-same-id-coexistence/final-manifest-audit.json` for exact evidence and prior red/fixture limitations. Prior ownership suite #83 remains documented separately (not repaired or rerun, no runtime baseline or project-wide green claim).
 
 Stop for independent owner review of this increment. Nothing merged, activated, or run against live/private data; no cleanup or ownership/resource changes. Whole-task acceptance remains ungranted. In Progress, 0/9 checked, null Final Summary. Later recovery/disposability, cancellation/progress and scale are not included.
+
+### Ordinary revision handoff — two accepted findings, candidate not accepted
+Owner confirmed two material Codex Astra findings within approved coexistence scope. Static inspection confirms why they are actionable: at current task-provider-migration.ts:2331–2357, response to a receipt-bound memory USER task collision is after destination workspace preparation, which can change layout, stage or commit config and push native history at task-history-workspace.ts:1388–1403. The initial per-pair marker scan does not identify the USER target; the receipt does. Current task-provider-migration.ts:1731–1737 matches source/current markers anywhere in frontmatter, so an ordinary title mention can cause a false refusal. No reproduction or fix has been run during this handoff. Only the two bounded fixes and affected tests are in the next execute focus.
+
+Exact owner journal entry `82a82608` (parent `7290cab4`, SHA-256 `c99b5e101aff3a2b9133ea90a2352dc74c587dff9738f580da5303fd1fdfbc15`) matched the existing Episode binding. The current native observation/readback at `8497a6472948911511b28c2bc768e7928344fafa` matches the candidate's selected task; intervening native changes since `6e9e0e8` are unrelated. Code remains clean and published at `7b2e386`. Prior validation and evidence limits remain as recorded and do not waive the findings. Handoff records this scope only. No code, test, registry, resource, lifecycle, or execute-send action was taken.
 <!-- SECTION:NOTES:END -->
