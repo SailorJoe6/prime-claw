@@ -28,6 +28,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { setImmediate as yieldToOperator } from "node:timers/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   type CommandRunner,
@@ -157,6 +158,8 @@ export interface ProviderMigrationOptions {
   beadsNativePlacements?: BeadsNativePlacement[];
   runner?: CommandRunner;
   now?: () => string;
+  signal?: AbortSignal;
+  onProgress?: (phase: string) => void;
   deleteSource?: (snapshot: SourceSnapshot, runner: CommandRunner) => void;
   verifyActiveRuntime?: (records: readonly TaskEpisodeOwnershipRecord[]) => Promise<Array<{
     ownerSessionId: string;
@@ -164,6 +167,12 @@ export interface ProviderMigrationOptions {
     verifiedCurrentEpisodeActiveSessionId: string;
   }>>;
 }
+
+class PreCutoverStop extends Error {
+  constructor() { super("Operator stop requested before ownership cutover."); }
+}
+
+type MigrationCheckpoint = (phase?: string) => Promise<void>;
 
 type NativeCommand = { stdout: string; stderr: string; status: number; errorCode?: string | number; nativeStatus?: number | null; signal?: string | null };
 type JsonObject = Record<string, any>;
@@ -2385,6 +2394,7 @@ async function migrateBeadsToBacklog(
   semanticPlacement: string,
   ownershipRows: Array<{ ownerSessionId: string; taskId: string; worktree: string; verifyCodeProjection?: () => void }>,
   openWeb: OpenBeadsMigrationWeb,
+  checkpoint: MigrationCheckpoint,
 ): Promise<DestinationCandidate> {
   assertSelectedBacklogMemoryTargetBeforePreparation(source, runner);
   const parked = reconcileParkedBacklogMigrationStore(source.projectRoot, runner, content => {
@@ -2426,6 +2436,7 @@ async function migrateBeadsToBacklog(
   // Existing receipt/import reuse never triggers automatic config repairs.
   const expectedStatuses = !existingReceiptId && !reusedDestinationIds.size
     ? prepareRequiredBacklogMigrationStatuses(source, prepared, baseline, runner) : undefined;
+  await checkpoint("Importing and verifying Backlog tasks");
   const web = await openWeb(storeDir);
   let configuration: BeadsCurrentConfiguration;
   try {
@@ -2471,6 +2482,7 @@ async function migrateBeadsToBacklog(
         await web.updateTask(id, { dependencies: projection.payload.dependencies });
       }
       if (pkg.classification === "archived") {
+        await checkpoint();
         runRequired(runner, "backlog", ["task", "archive", id], source.projectRoot, `archive evidenced Backlog task ${id}`);
       }
     }
@@ -2486,6 +2498,7 @@ async function migrateBeadsToBacklog(
     // any ownership/source cutover. No provider records are cleaned up here.
     await web.close();
   }
+  await checkpoint("Publishing verified data and receipt");
   const bookkeepingType = configuration.types.find((value) => value.trim().toLowerCase() === "task")
     ?? configuration.types[0] ?? "task";
   const reservedReceiptId = ensureBacklogReceiptPlaceholder(runner, source.projectRoot, source, existingReceiptId, bookkeepingType, assertUnambiguousTarget);
@@ -2493,6 +2506,7 @@ async function migrateBeadsToBacklog(
   backlogMemoryEvidence(source, memoryOutputs, runner);
   assertPreservedBacklogBaseline(baseline, storeDir, runner);
   const dataRevision = commitBacklogDestination(runner, prepared, "prime-claw: migrate Beads task history");
+  await checkpoint();
   assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [dataRevision], runner);
   const dataViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "data");
   const dataPaths = backlogPhysicalTaskPaths(storeDir);
@@ -2522,6 +2536,7 @@ async function migrateBeadsToBacklog(
     destinationTasks.map(({ sourceTaskId, destinationTaskId }) => ({ sourceTaskId, destinationTaskId })), transitions, actor, timestamp, semanticPlacement);
   receiptBase.beadsSourceIdentity = source.sourceIdentity;
   if (source.memories.length) receiptBase.backlogMemoryOutputs = memoryOutputs;
+  await checkpoint();
   const receiptTaskId = createOrUpdateBacklogReceipt(runner, source.projectRoot, receiptBase, reservedReceiptId);
   assertPreservedBacklogBaseline(baseline, storeDir, runner);
   const receiptRevision = commitBacklogDestination(runner, prepared, "prime-claw: record task-provider migration receipt");
@@ -2925,6 +2940,13 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
   let ownershipSwitch: ActiveTaskProviderOwnershipSwitchResult | undefined;
   let backlogWeb: BeadsMigrationWeb | undefined;
   let backlogWebStore: string | undefined;
+  const checkpoint: MigrationCheckpoint = async (phase) => {
+    // Synchronous native commands cannot see an RPC/keyboard abort while the
+    // event loop is blocked. Let the operator input run before the next phase.
+    if (options.signal && !options.signal.aborted) await yieldToOperator();
+    if (options.signal?.aborted) throw new PreCutoverStop();
+    if (phase) options.onProgress?.(phase);
+  };
   // Fresh replay and forward import share this one migration-owned browser.
   // Allocation happens only after the caller proves/prepares its exact store.
   const openBacklogWeb: OpenBeadsMigrationWeb = async (storeDir) => {
@@ -2935,7 +2957,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       return backlogWeb;
     }
     backlogWebStore = exactStore;
-    backlogWeb = await startMigrationBacklogWeb({ cwd: source.projectRoot, backlogDirectory: exactStore });
+    backlogWeb = await startMigrationBacklogWeb({ cwd: source.projectRoot, backlogDirectory: exactStore, signal: options.signal });
     return backlogWeb;
   };
   try {
@@ -2943,6 +2965,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     if (!options.confirmedSwitch) return blocked("confirmation-required", "provider switch requires explicit operator confirmation", "inspect the migration, present the exact source revision and semantic placement, then call switch-confirm with confirmedSwitch=true", { targetProvider: options.targetProvider });
     if (!options.actor.trim()) return blocked("actor-required", "provider switch receipt requires an exact actor", "supply the operator-approved actor identifier", { targetProvider: options.targetProvider });
     if (!options.semanticPlacement.trim()) return blocked("placement-required", "provider switch requires managed semantic-placement prose for non-equivalent fields", "inspect exact source fields and supply concise placement prose without omitting any value", { targetProvider: options.targetProvider });
+    await checkpoint("Checking source and migration prerequisites");
     const project = resolveNearestProjectRoot(options.cwd, process.env.HOME ?? "", runner);
     if (project.kind === "linked-worktree") return blocked("primary-required", "provider migration must run from the canonical primary checkout", "rerun from the canonical primary Conversation", { targetProvider: options.targetProvider });
     const codeHead = runRequired(runner, "git", ["-C", project.root, "rev-parse", "HEAD"], project.root, "read current migration code HEAD").stdout.trim();
@@ -2952,6 +2975,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     source = captureConfirmedSource(project.root, options.targetProvider, options.expectedSourceRevision, runner);
     if (source.provider === options.targetProvider) return blocked("same-provider", `the selected provider is already ${source.provider}`, "choose the other supported provider", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     if (source.revision !== options.expectedSourceRevision) return blocked("source-revision-changed", `confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`, "quiesce mutations, request a fresh inspection, and confirm that exact revision", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
+    await checkpoint();
     const replayProjection = initialCodeStatus && source.provider === "beads" ? await freshBacklogMigrationReplay(source, runner, openBacklogWeb) : undefined;
     if (initialCodeStatus && !replayProjection) throw new Error(`source task history is not clean: ${initialCodeStatus.trim()}`);
     const verifyInitialProjection = replayProjection?.(project.root);
@@ -2968,12 +2992,14 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     const missing = ownershipRows.filter((row) => !sourceIds.has(row.taskId));
     if (missing.length) throw new Error(`active ownership references source tasks absent from the complete snapshot: ${missing.map((row) => row.taskId).join(", ")}`);
     await proveActiveRuntimeContinuity(ownershipRows, options.verifyActiveRuntime);
+    await checkpoint("Preparing the destination");
     const timestamp = (options.now ?? (() => new Date().toISOString()))();
     if (Number.isNaN(Date.parse(timestamp))) throw new Error("migration timestamp is not RFC3339");
     verifyInitialProjection?.();
     const candidate = source.provider === "backlog"
       ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), beadsPlacements, ownershipRows)
-      : await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb);
+      : await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, checkpoint);
+    await checkpoint("Rechecking the receipt, source and ownership before cutover");
     for (const owner of ownershipRows) {
       candidate.prepareActiveWorktree(owner.worktree);
       owner.verifyCodeProjection = candidate.activeCodeProjections?.get(owner.worktree);
@@ -2992,6 +3018,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       verifyActiveSourceWorkspace(source, owner, runner);
     }
     const runtimeProofs = await proveActiveRuntimeContinuity(ownershipRows, options.verifyActiveRuntime);
+    await checkpoint();
     const destinationAtSwitch = candidate.refreshAfterReceipt();
     if (destinationAtSwitch.revision !== candidate.revision || destinationAtSwitch.digest !== candidate.digest) throw new Error("destination changed at ownership cutover");
     candidate.verifyCodeProjection?.();
@@ -3002,6 +3029,10 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       verifyActiveSourceWorkspace(source, owner, runner);
     }
     const destinations = ownershipDestinations(candidate);
+    // Give any stop queued during synchronous verification one last chance.
+    // Once cutover begins, keep the existing ownership compare-and-switch and
+    // the source/destination rechecks under its lock; never cancel halfway.
+    await checkpoint("Guarded cutover starting; stop no longer interrupts this phase");
     ownershipSwitch = switchActiveTaskProviderOwnership(project.root, {
       sourceProvider: source.provider,
       targetProvider: candidate.provider,
@@ -3080,7 +3111,11 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     // Fresh replay can fail before the forward writer's finally is entered.
     // A failed owned-stop proof is itself the reported uncertainty; no retry.
     try { await backlogWeb?.close(); } catch (stopError) { error = stopError; }
-    const message = (error instanceof Error ? error.message : String(error))
+    const stopped = !ownershipSwitch && (error instanceof PreCutoverStop ||
+      (options.signal?.aborted && error instanceof MigrationBacklogWebError &&
+        error.stage !== "owned-process-stop-unproved"));
+    const message = (stopped ? "Migration stopped before cutover; owned writers settled. " : "")
+      + (error instanceof Error ? error.message : String(error))
       + (error instanceof MigrationBacklogWebError && error.artifactDirectory
         ? ` Private transport evidence: ${error.artifactDirectory}` : "");
     const sourcePath = source?.evidence.storeDir ?? "the exact inspected source store";
@@ -3088,7 +3123,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       ? join(source.projectRoot, options.targetProvider === "beads" ? ".beads" : ".backlog")
       : `the existing ${options.targetProvider} destination`;
     return blocked(
-      ownershipSwitch ? "cutover-incomplete" : "pre-cutover-failed",
+      ownershipSwitch ? "cutover-incomplete" : stopped ? "pre-cutover-stopped" : "pre-cutover-failed",
       message,
       ownershipSwitch
         ? `stop all task mutation and recover the exact source ${sourcePath}, destination ${destinationPath}, and ownership evidence; do not create another destination`

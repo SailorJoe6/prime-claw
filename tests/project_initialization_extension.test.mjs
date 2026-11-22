@@ -1421,6 +1421,59 @@ test("initialization UX separates read-only provider-switch inspection from exac
   assert.equal(commands.size,0);
 });
 
+test("switch-confirm forwards the host abort signal and notifies the settled migration result", async () => {
+  const tools = new Map();
+  const controller = new AbortController();
+  const phase = "Checking source and migration prerequisites";
+  const stopped = {
+    status: "blocked", code: "pre-cutover-stopped", targetProvider: "backlog",
+    detail: "Stopped before guarded cutover", remediation: "Preserve the authoritative Beads source",
+  };
+  const summary = `Prime Claw provider switch blocked (${stopped.code}): ${stopped.detail}; ${stopped.remediation}`;
+  const elapsed = /\b\d+(?:\.\d+)?\s*(?:ms|s|seconds?)\b/;
+  let finishMigration;
+  const migrationResult = new Promise((resolve) => { finishMigration = resolve; });
+  let migrationSignal;
+  createProjectInitializationExtension({
+    migrationRunner({ signal, onProgress }) {
+      migrationSignal = signal;
+      onProgress?.(phase);
+      return migrationResult;
+    },
+  })({ registerTool(tool) { tools.set(tool.name, tool); }, on() {} });
+  const notices = [];
+  const ctx = { cwd: "/fixture", ui: { notify(message) { notices.push(message); } } };
+  const execution = tools.get("initialize_prime_claw").execute("confirm-aborted", {
+    action: "switch-confirm", targetProvider: "backlog", expectedSourceRevision: "a".repeat(40),
+    confirmedSwitch: true, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
+  }, controller.signal, undefined, ctx);
+  let settled = false;
+  const markSettled = () => { settled = true; };
+  void execution.then(markSettled, markSettled);
+
+  try {
+    await new Promise(setImmediate);
+    assert.equal(migrationSignal, controller.signal);
+    const progress = notices.find((message) => message.includes(phase));
+    assert.ok(progress, "the migration phase must be visible before settlement");
+    assert.match(progress, elapsed);
+
+    controller.abort();
+    await new Promise(setImmediate);
+    assert.equal(migrationSignal.aborted, true);
+    assert.equal(settled, false, "abort must not settle the host call before the migration runner returns");
+    assert.ok(notices.every((message) => !message.includes(summary)), "the final summary must wait for settlement");
+  } finally {
+    finishMigration(stopped);
+  }
+  const result = await execution;
+  assert.deepEqual(result.details, stopped);
+  assert.equal(result.content[0].text, summary);
+  const final = notices.at(-1);
+  assert.ok(final?.includes(summary), `expected the stopped result as the final notification, got: ${final}`);
+  assert.match(final, elapsed);
+});
+
 test("retired command and reverse direction cannot invoke migration mechanics", async () => {
   const commands=new Map(),tools=new Map(),calls=[];
   createProjectInitializationExtension({

@@ -325,8 +325,7 @@ managed prose chooses readable placement of non-equivalent current content,
 not whether to import revision archives. Source capture omits historical reads.
 The forward importer and complete-receipt replay now use the accepted readable
 current-content projection and full native verification, not encoded packages
-or chunk comments. Recovery/cancellation and complete-task acceptance remain
-unfinished. This candidate is not permission to retry a live migration. See the
+or chunk comments. Recovery and complete-task acceptance remain unfinished. This candidate is not permission to retry a live migration. See the
 [source-capture evidence](evidence/primeclaw-59-current-state-capture-20261121.md)
 and [integration evidence and limits](evidence/primeclaw-59-current-integration-20261121.md).
 
@@ -351,10 +350,26 @@ for bounded inspection. Public errors contain stage/outcome metadata, never
 provider responses or payload-bearing stderr. A failed or uncertain write fences
 further writes and shuts down only owned process groups, with bounded TERM/KILL
 escalation and observed exit. There is no automatic resend, CLI fallback,
-rollback, provider cleanup or source retirement. Transport AbortSignal support
-is not full importer cancellation: the responsive migration worker and existing
-orchestration still need integration and their own acceptance evidence. See the
+rollback, provider cleanup or source retirement. See the
 [owned transport evidence and limits](evidence/primeclaw-59-owned-web-transport-20261121.md).
+
+Before guarded cutover, use the ordinary Prime Agent stop (Escape in the
+interactive UI, or `abort` in RPC). Progress notices show major phases and
+elapsed time. Prime Agent may acknowledge the abort or show an idle turn before
+migration has settled. Wait for the switch outcome notice: `pre-cutover-stopped`
+means the importer and its owned writers have stopped. A stop that cannot prove
+writer exit is reported as a failure, not a confirmed stop. Beads stays
+authoritative and any partial Backlog state and diagnostics stay in place. An
+in-flight native write may already have committed; do not retry, roll back or
+clean up on the strength of an abort alone.
+
+Stop is cooperative. Synchronous source, layout, CLI, and Git work cannot be
+preempted; a queued stop takes effect at the next cancellable phase boundary.
+After the "Guarded cutover starting" notice, the existing verified ownership,
+source retirement and code publication sequence runs to its guarded outcome.
+An ordinary abort does not interrupt that sequence. Keep task mutation quiesced
+until the actual outcome is known. See the
+[public operator-stop evidence](evidence/primeclaw-59-operator-stop-20261122.md).
 
 The pair-specific readable-content helper is integrated from
 `extension-support/beads-backlog-current.ts`. It builds one current-ticket

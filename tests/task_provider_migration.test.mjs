@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { once } from "node:events";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
+import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
@@ -1560,6 +1563,215 @@ test("current native migration and replay preserve configured type priority and 
   assert.equal(readFileSync(configPath, "utf8"), config);
   assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
   assert.equal(git(destination.store, "status", "--porcelain=v1"), "");
+});
+
+
+const OPERATOR_STOP_AGENT = process.env.PRIME_CLAW_STOP_AGENT;
+test("public Prime Agent RPC abort stops actual migration after an accepted native PUT", {
+  skip: !OPERATOR_STOP_AGENT, timeout: 170_000,
+}, async (t) => {
+  assert.ok(process.platform === "linux" && existsSync("/.dockerenv"));
+  const fixture = repository(t, "public-operator-stop");
+  bd(fixture.root, "init", "--skip-hooks", "--skip-agents", "--prefix", "STOP", "--quiet", "--non-interactive");
+  bd(fixture.root, "dolt", "remote", "remove", "origin");
+  const parent = JSON.parse(bd(fixture.root, "create", "First native task", "--json")).id;
+  bd(fixture.root, "create", "Later native child", "--parent", parent, "--json");
+  bd(fixture.root, "comments", "add", parent, "accepted native comment Ω", "--author", "native-source");
+  git(fixture.root, "add", "-A");
+  if (git(fixture.root, "status", "--porcelain=v1")) git(fixture.root, "commit", "-qm", "seed operator stop fixture");
+  git(fixture.root, "push", "-q");
+  const codeHead = git(fixture.root, "rev-parse", "HEAD");
+  const sourceFiles = sourceAuthorityFiles(fixture.root);
+  const sourceExport = bd(fixture.root, "--readonly", "export", "--all");
+  const ownership = join(fixture.root, ".prime-claw", "ownership.json");
+  assert.equal(existsSync(ownership), false);
+
+  const evidence = join(fixture.outer, "evidence");
+  const bin = join(fixture.outer, "bin");
+  mkdirSync(evidence, { mode: 0o700 });
+  mkdirSync(bin, { mode: 0o700 });
+  for (const [name, executable] of Object.entries({ backlog: BACKLOG, bd: "/usr/local/bin/bd", git: "/usr/bin/git", dolt: "/usr/local/bin/dolt" })) {
+    const browserPid = name === "backlog"
+      ? 'if [ "${1-}" = browser ]; then printf "%s\\n" "$$" > "$PRIME_CLAW_STOP_FIXTURE/browser.pid"; fi\n'
+      : "";
+    writeFileSync(join(bin, name), `#!/bin/sh\nset -eu\nprintf '%s\\n' '${name} '"$*" >> "$PRIME_CLAW_STOP_FIXTURE/native.log"\n${browserPid}exec "${executable}" "$@"\n`, { mode: 0o700 });
+  }
+  const rows = (name) => {
+    const path = join(evidence, `${name}.jsonl`);
+    // Ignore a trailing incomplete line while the daemon appends evidence.
+    return existsSync(path) ? readFileSync(path, "utf8").split("\n").slice(0, -1).map(JSON.parse) : [];
+  };
+  let accepted, downstreamClosed = false, relayError;
+  const relay = http.createServer((req, res) => {
+    const url = req.headers["x-fixture-native-url"];
+    if (req.method !== "PUT" || typeof url !== "string" || !/^http:\/\/127\.0\.0\.1:\d+\/api\/tasks\/[^/?]+$/.test(url)) {
+      relayError = new Error(`unexpected fixture relay request: ${req.method} ${url}`);
+      res.writeHead(400).end();
+      return;
+    }
+    res.once("close", () => { downstreamClosed = true; });
+    const headers = { "content-type": req.headers["content-type"], "content-length": req.headers["content-length"] };
+    const upstream = http.request(url, { method: "PUT", headers, agent: false }, (response) => {
+      response.on("error", (error) => { relayError = error; });
+      response.once("end", () => { accepted = { url, status: response.statusCode }; });
+      response.resume();
+      // Deliberately send no headers/body to the native migration client.
+      // Its request stays pending until the real operator RPC abort destroys it.
+    });
+    upstream.on("error", (error) => { relayError = error; });
+    req.pipe(upstream);
+  });
+  relay.listen(0, "127.0.0.1");
+  await once(relay, "listening");
+  const rpc = spawn("/workspace/scripts/run-prime-agent-probe.sh", [
+    OPERATOR_STOP_AGENT, "--mode", "rpc", "--offline", "--no-session", "--no-extensions",
+    "--no-context-files", "--no-skills", "--no-prompt-templates", "--no-builtin-tools",
+    "-e", "/workspace/tests/container/operator_migration_stop_extension.ts",
+    "--provider", "migration-stop-fixture", "--model", "fixture",
+  ], {
+    cwd: fixture.root,
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, DO_NOT_TRACK: "1",
+      PRIME_CLAW_STOP_FIXTURE: evidence, PRIME_CLAW_STOP_RELAY: `http://127.0.0.1:${relay.address().port}/hold` },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stderr = "", exited = false;
+  rpc.stderr.setEncoding("utf8").on("data", (value) => { stderr += value; });
+  rpc.stdin.on("error", (error) => { stderr += `\n${error.message}`; });
+  const exit = once(rpc, "close").then(([code, signal]) => { exited = true; return { code, signal }; });
+  const frames = [];
+  const frameTimes = new Map();
+  const lines = createInterface({ input: rpc.stdout });
+  lines.on("line", (line) => {
+    try {
+      const frame = JSON.parse(line);
+      frameTimes.set(frame, performance.now());
+      frames.push(frame);
+    } catch { stderr += `\nstdout: ${line}`; }
+  });
+  const send = (frame) => rpc.stdin.write(`${JSON.stringify(frame)}\n`);
+  const pollIntervalMs = 25;
+  const wait = async (label, predicate, timeoutMs = 60_000, started = performance.now()) => {
+    const end = started + timeoutMs;
+    do {
+      if (relayError) throw relayError;
+      const value = predicate();
+      if (value) return value;
+      if (exited) break;
+      await delay(pollIntervalMs);
+    } while (performance.now() < end);
+    assert.fail(`${label} not observed; frames: ${JSON.stringify(frames.slice(-12))}; stderr: ${stderr}`);
+  };
+  const response = (id) => frames.find((frame) => frame.type === "response" && frame.id === id);
+  try {
+    send({ id: "inspect", type: "prompt", message: "Inspect this disposable Beads-to-Backlog migration only." });
+    const inspection = await wait("actual switch-request result", () => rows("switch-request")[0]);
+    assert.equal(inspection.status, "ready", JSON.stringify(inspection));
+    assert.equal((await wait("inspection RPC response", () => response("inspect"))).success, true);
+    await wait("inspection turn end", () => frames.some((frame) => frame.type === "agent_end"));
+    const turnStart = frames.length;
+    send({ id: "confirm", type: "prompt", message: `I approve this one-way migration and Beads deletion for exact revision ${inspection.sourceRevision}. All task mutation is quiesced.` });
+    const put = await wait("real native PUT response held by relay", () => {
+      assert.deepEqual(rows("switch-confirm"), [], "migration must not settle before the native write barrier");
+      return accepted;
+    });
+    assert.equal(put.status, 200);
+    assert.equal(downstreamClosed, false, "native 200 has not reached the migration client");
+    const browserPid = Number(readFileSync(join(evidence, "browser.pid"), "utf8"));
+    assert.ok(Number.isSafeInteger(browserPid) && browserPid > 1);
+    process.kill(-browserPid, 0);
+    const store = join(fixture.root, ".backlog");
+    const partial = physicalDestinationRecords(store);
+    assert.equal(Object.keys(partial).length, 1);
+    const markdown = Buffer.from(Object.values(partial)[0], "base64").toString("utf8");
+    assert.match(markdown, /First native task/);
+    assert.match(markdown, /accepted native comment Ω/);
+    const requests = rows("http");
+    assert.deepEqual(requests.map(({ method }) => method), ["POST", "PUT"]);
+    assert.equal(requests[1].url, put.url);
+    const commandTrace = readFileSync(join(evidence, "native.log"), "utf8");
+    const taskHistory = git(fixture.remote, "for-each-ref", "--format=%(objectname)", TASK_HISTORY_REF);
+
+    const stopDeadlineMs = 15_000;
+    const stopSentAt = performance.now();
+    send({ id: "stop", type: "abort" }); // The only cancellation trigger.
+    const observeStop = (label, predicate) => wait(label, predicate, stopDeadlineMs, stopSentAt);
+    const notification = (severity, pattern) => frames.slice(turnStart).find((frame) =>
+      frame.type === "extension_ui_request" && frame.method === "notify" &&
+      frame.notifyType === severity && pattern.test(frame.message));
+    const [ack, settled, reaped, progress, finalNotice] = await Promise.all([
+      observeStop("public abort acknowledgement", () => response("stop")),
+      observeStop("actual initializer settlement independent of agent turn", () => {
+        const result = rows("switch-confirm")[0];
+        return result && { result, at: performance.now() };
+      }),
+      observeStop("owned browser group ESRCH before RPC teardown", () => {
+        try { process.kill(-browserPid, 0); }
+        catch (error) {
+          if (error.code !== "ESRCH") throw error;
+          return { at: performance.now() };
+        }
+      }),
+      observeStop("RPC progress notification", () => notification("info", /Importing and verifying Backlog tasks \(\d+\.\d+ s elapsed\)$/)),
+      observeStop("RPC final stop notification", () => notification("warning", /blocked \(pre-cutover-stopped\):.*\(\d+\.\d+ s elapsed\)$/)),
+      observeStop("aborted agent turn end", () => frames.slice(turnStart).some((frame) => frame.type === "agent_end")),
+      observeStop("relay observes client disconnect", () => downstreamClosed),
+    ]);
+    assert.equal(ack.success, true);
+    const { result } = settled;
+    assert.equal(result.status, "blocked", JSON.stringify(result));
+    assert.equal(result.code, "pre-cutover-stopped");
+    assert.match(result.detail, /uncertain/);
+    assert.match(result.remediation, /source remains authoritative/);
+    assert.match(finalNotice.message, /source remains authoritative/);
+    const abortOutput = frames.slice(turnStart).find((frame) => frame.type === "tool_execution_end"
+      && frame.toolName === "initialize_prime_claw" && frame.isError)?.result?.content
+      ?.find(({ text }) => text === "Tool execution aborted")?.text ?? null;
+    const available = http.createServer();
+    available.listen(Number(new URL(put.url).port), "127.0.0.1");
+    await once(available, "listening");
+    await new Promise((resolve) => available.close(resolve));
+    assert.deepEqual(rows("http"), requests, "no later native request or resend");
+    assert.equal(readFileSync(join(evidence, "native.log"), "utf8"), commandTrace, "no later native CLI command");
+    assert.deepEqual(physicalDestinationRecords(store), partial, "no later task, receipt, rewrite, or cleanup");
+    const taskId = decodeURIComponent(new URL(put.url).pathname.split("/").at(-1));
+    const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", taskId));
+    assert.equal(view.kind, "task-view");
+    assert.equal(view.task.id, taskId);
+    assert.equal(view.task.title, "First native task");
+    assert.equal(view.task.comments.length, 1);
+    assert.equal(view.task.comments[0].author, "native-source");
+    assert.equal(view.task.comments[0].body.split("\n")[0], "accepted native comment Ω");
+    assert.deepEqual(view.task.references, [
+      `prime-claw-beads-source:${parent}`,
+      `prime-claw-beads-current:${JSON.stringify({ sourceTaskId: parent,
+        sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest }, null, 2)}`,
+    ]);
+    assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceFiles);
+    assert.equal(bd(fixture.root, "--readonly", "export", "--all"), sourceExport);
+    assert.equal(existsSync(ownership), false, "no ownership cutover");
+    assert.equal(git(fixture.root, "rev-parse", "HEAD"), codeHead);
+    assert.equal(git(fixture.remote, "rev-parse", "refs/heads/main"), codeHead);
+    assert.equal(git(fixture.remote, "for-each-ref", "--format=%(objectname)", TASK_HISTORY_REF), taskHistory);
+    const sinceAbortMs = (observedAt) => Number((observedAt - stopSentAt).toFixed(3));
+    const observations = {
+      rpcAckMs: sinceAbortMs(frameTimes.get(ack)),
+      toolSettlementObservedMs: sinceAbortMs(settled.at),
+      groupEsrchObservedMs: sinceAbortMs(reaped.at),
+    };
+    assert.ok(Object.values(observations).every((ms) => ms >= 0 && ms <= stopDeadlineMs), JSON.stringify(observations));
+    t.diagnostic(JSON.stringify({ event: "operator-migration-stop", ...observations, pollIntervalMs,
+      stopDeadlineMs, nativePutStatus: put.status, browserPgid: browserPid, taskId,
+      code: result.code, progressNotification: progress.message, finalNotification: finalNotice.message, abortOutput }));
+  } finally {
+    // Failure-only teardown can break the relay, but no positive assertion above
+    // is run after teardown and cannot mistake this for successful RPC abort.
+    relay.closeAllConnections();
+    await new Promise((resolve) => relay.close(resolve));
+    rpc.stdin.end();
+    const end = await Promise.race([exit, delay(12_000, undefined, { ref: false })]);
+    if (!end) rpc.kill("SIGTERM");
+    assert.equal(end?.code, 0, `${JSON.stringify(end)}; ${stderr}`);
+  }
 });
 
 test("current native importer stops after an accepted comment response failure and never duplicates a partial allocation", { timeout: 240_000 }, async (t) => {

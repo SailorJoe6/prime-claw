@@ -131,7 +131,9 @@ function productionReconcileOptions(dependencies: ProjectInitializationDependenc
   };
 }
 
-async function executeAction(action: Action, args: ActionArguments, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies) {
+async function executeAction(action: Action, args: ActionArguments, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies,
+  signal?: AbortSignal, onProgress?: (phase: string) => void,
+) {
   switch (action) {
     case "reconcile": return reconcilePrimeClawProject({
       ...productionReconcileOptions(dependencies, args.unpublishedLocalOnly), cwd: ctx.cwd, registerOrca: true, legacyInventoryMode: "initialize",
@@ -163,6 +165,8 @@ async function executeAction(action: Action, args: ActionArguments, ctx: Extensi
         actor: args.actor ?? "",
         semanticPlacement: args.semanticPlacement ?? "",
         runner: dependencies.runner,
+        signal,
+        onProgress,
         verifyActiveRuntime: dependencies.migrationRuntimeVerifier ?? ((records) => {
           const project = resolveNearestProjectRoot(ctx.cwd, process.env.HOME ?? "", dependencies.runner);
           return verifyActiveTaskEpisodeContinuity(project.root, records);
@@ -205,7 +209,15 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
         required: ["action"],
         additionalProperties: false,
       } as any,
-      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+        const switching = params.action === "switch-confirm";
+        const started = performance.now();
+        const notify = (message: string, type: "info" | "warning") => {
+          const elapsed = ((performance.now() - started) / 1000).toFixed(1);
+          // Notification is display only. A disconnected UI must not change
+          // which native writes are executed or how a result is classified.
+          try { ctx.ui.notify(`${message} (${elapsed} s elapsed)`, type); } catch { /* UI unavailable */ }
+        };
         try {
           const value = await executeAction(params.action as Action, {
             assetId: params.assetId,
@@ -215,11 +227,18 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
             actor: params.actor,
             semanticPlacement: params.semanticPlacement,
             unpublishedLocalOnly: params.unpublishedLocalOnly === true,
-          }, ctx, dependencies);
-          return toolResult(value, actionSummary(value));
+          }, ctx, dependencies, switching ? signal : undefined,
+            switching ? (phase) => notify(`Prime Claw provider switch: ${phase}`, "info") : undefined);
+          const summary = actionSummary(value);
+          // The host can stop waiting for the tool before its Promise settles.
+          // Use the independent extension UI notification for its real outcome.
+          if (switching && signal?.aborted) notify(summary, "warning");
+          return toolResult(value, summary);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          return toolResult({ error: message }, `Prime Claw initialization failed: ${message}`, true);
+          const summary = `Prime Claw initialization failed: ${message}`;
+          if (switching && signal?.aborted) notify(summary, "warning");
+          return toolResult({ error: message }, summary, true);
         }
       },
     });
