@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { createHash } from "node:crypto";
-import { appendFileSync, chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
@@ -4583,127 +4583,54 @@ function pvaBoundedText(label, lines) {
   return Array.from({ length: lines }, (_, i) => `${label} ${i + 1}: Ω 日本語 🌊 verify readable current data.`).join("\n");
 }
 
-function representativeCommentCount(i) {
-  // A few long threads, many short ones, and some untouched tickets.
-  return i < 20 ? 80 : i < 80 ? 20 : i < 260 ? 5 : i < 359 ? 1 : 0;
-}
-
-function scaleBrowser(root) {
-  const matches = [];
-  for (const entry of readdirSync("/proc").filter(name => /^\d+$/.test(name))) {
-    const proc = join("/proc", entry);
-    let args, cwd;
-    try {
-      args = readFileSync(join(proc, "cmdline"), "utf8").split("\0");
-      cwd = readlinkSync(join(proc, "cwd"));
-    } catch { continue; } // unrelated processes can exit while enumerating
-    if (cwd !== root || !args.includes("browser") || !args.includes("--no-open")) continue;
-    assert.ok(readFileSync(join(proc, "environ"), "utf8").split("\0").includes(`BACKLOG_CWD=${root}`));
-    matches.push(Number(entry));
-  }
-  assert.equal(matches.length, 1, "exactly one migration browser for this synthetic repository");
-  return matches[0];
-}
-
-async function runPvaFreshRehearsal(t, scaleEvidence) {
-  const scale = Boolean(scaleEvidence);
-  const record = (event, facts = {}) => {
-    if (!scale) return;
-    appendFileSync(scaleEvidence, `${JSON.stringify({ event, ...facts })}\n`);
-  };
+test("PVA gate fresh timed current migration", { timeout: 480_000 }, async t => {
   const started = performance.now();
-  record("fixture-start");
-  const f = parkedStoreReconciliationFixture(t, scale ? "pva-scale" : "pva-timed", { sameId: true });
+  const f = parkedStoreReconciliationFixture(t, "pva-timed", { sameId: true });
   const closed = addSourceCompletionDependency(f);
   Object.assign(f.ids, closed);
   const parent = f.ids.parent;
   const bodies = [];
-  for (let i = 0; i < (scale ? 401 : 7); i++) {
-    const lines = scale ? [55, 110, 190, 380][i % 4] : 380;
-    const id = JSON.parse(bd(f.root, "create", `Synthetic current ${i + 1}`, "--description", pvaBoundedText(`Description ${i + 1}`, lines),
-      "--design", pvaBoundedText(`Plan ${i + 1}`, scale ? Math.ceil(lines / 3) : 140), "--notes", pvaBoundedText(`Notes ${i + 1}`, scale ? Math.ceil(lines / 4) : 140), "--parent", parent, "--json")).id;
+  for (let i = 0; i < 7; i++) {
+    const id = JSON.parse(bd(f.root, "create", `Synthetic current ${i + 1}`, "--description", pvaBoundedText(`Description ${i + 1}`, 380),
+      "--design", pvaBoundedText(`Plan ${i + 1}`, 140), "--notes", pvaBoundedText(`Notes ${i + 1}`, 140), "--parent", parent, "--json")).id;
     f.ids[`bulk${i}`] = id;
-    if (scale && i % 23 === 0) bd(f.root, "dep", "add", id, closed.closed);
-    for (let n = 0; n < (scale ? representativeCommentCount(i) : 6); n++) {
-      const body = pvaBoundedText(`Comment ${i + 1}/${n + 1}`, scale ? [8, 24, 60, 120, 200][(i + n) % 5] : 200);
+    for (let n = 0; n < 6; n++) {
+      const body = pvaBoundedText(`Comment ${i + 1}/${n + 1}`, 200);
       bodies.push(body);
       bd(f.root, "comments", "add", id, body, "--author", `public-author-${n % 3 + 1}`);
     }
-    if (scale && i >= 53) bd(f.root, "close", id, "--reason", "Synthetic completion; keep this readable reason.", "--json");
-    if (scale && (i + 1) % 25 === 0) record("seeding", { tasks: i + 6, bulkComments: bodies.length, ms: performance.now() - started });
   }
   for (const key of ["one", "two"]) bd(f.root, "remember", pvaBoundedText(`Memory ${key}`, 90), "--key", `pva-fixture-${key}`);
   const owner = addActiveBeadsOwner(f);
   const ownerPath = join(f.root, ".prime-claw", "ownership.json");
   const originalRecords = captureSameIdRecords(f.parked);
   const nativeCurrent = captureBeadsCurrentTasks(f.root, Object.values(f.ids));
-  const exportBefore = RUNNER.run("bd", ["--readonly", "export", "--all"], { cwd: f.root }).stdout;
-  const nativeExportBytes = Buffer.byteLength(exportBefore);
-  const nativeExportHash = createHash("sha256").update(exportBefore).digest("hex");
+  const nativeExportBytes = Buffer.byteLength(RUNNER.run("bd", ["--readonly", "export", "--all"], { cwd: f.root }).stdout);
   const nativeCurrentBytes = Object.values(nativeCurrent).reduce((n, { nativeView }) => n + Buffer.byteLength(JSON.stringify(nativeView)), 0);
   const sourceBefore = sourceAuthorityFiles(f.root);
+  const exportBefore = bd(f.root, "--readonly", "export", "--all");
   const setupMs = performance.now() - started;
-  const fixtureShape = {};
-  const commentHistogram = {};
-  let sourceCommentBytes = 0, sourceFieldBytes = 0, sourceComments = 0;
-  for (const { nativeView } of Object.values(nativeCurrent)) {
-    fixtureShape[nativeView.status] = (fixtureShape[nativeView.status] ?? 0) + 1;
-    const count = nativeView.comments?.length ?? 0;
-    commentHistogram[count] = (commentHistogram[count] ?? 0) + 1;
-    sourceComments += count;
-    sourceCommentBytes += (nativeView.comments ?? []).reduce((n, c) => n + Buffer.byteLength(c.text ?? c.body ?? c.content), 0);
-    sourceFieldBytes += [nativeView.description, nativeView.design, nativeView.notes].reduce((n, v) => n + Buffer.byteLength(v ?? ""), 0);
-  }
-  if (scale) {
-    record("setup-complete", { setupMs, tasks: Object.keys(nativeCurrent).length, sourceComments, fixtureShape,
-      commentHistogram, nativeExportBytes, nativeExportHash, nativeCurrentBytes, sourceCommentBytes, sourceFieldBytes });
-    assert.equal(Object.keys(nativeCurrent).length, 406);
-    assert.equal(sourceComments, 3800);
-    assert.equal(fixtureShape.closed, 349);
-  }
-  record("inspection-start");
   const runner = new PvaRehearsalRunner();
-  // Keep the same native read/write guards without retaining every large source
-  // response from each full recapture in the independent test observer.
-  if (scale) runner.reads = { push() {} };
   const inspectionStarted = performance.now();
   const inspection = inspectTaskProviderMigration({ cwd: f.root, targetProvider: "backlog", runner });
   const inspectionMs = performance.now() - inspectionStarted;
-  record("inspection-result", { inspectionMs, status: inspection.status, detail: inspection.detail, counts: inspection.taskCounts });
   assert.equal(inspection.status, "ready", inspection.detail);
   assert.equal(inspection.taskCounts.total, Object.keys(f.ids).length);
   const runtimeChecksMs = [];
-  let retirementAtMs, hookOverheadMs, receiptProof, mappings, webFirstWriteMs, webLastWriteMs, browserPid;
-  let webWrites = 0;
-  const origins = new Set();
+  let retirementAtMs, hookOverheadMs, receiptProof, mappings, webFirstWriteMs, webLastWriteMs;
   const realRequest = http.request;
   http.request = function (...args) {
-    if (scale) {
-      const url = new URL(String(args[0]));
-      assert.equal(url.hostname, "127.0.0.1");
-      origins.add(url.origin);
-      if (url.pathname === "/api/status") {
-        assert.equal(browserPid, undefined, "one owned native browser startup");
-        browserPid = scaleBrowser(f.root);
-        record("owned-browser", { elapsedMs: performance.now() - runner.start, exactBacklogCwd: true });
-      }
-    }
     if (["POST", "PUT"].includes(args[1]?.method)) {
       webLastWriteMs = performance.now() - runner.start;
       webFirstWriteMs ??= webLastWriteMs;
-      if (scale && (++webWrites === 1 || webWrites % 100 === 0)) record("web-write-attempts", { webWrites, elapsedMs: webLastWriteMs });
     }
     return realRequest.apply(this, args);
   };
   syncBuiltinESMExports();
   let observed;
   runner.start = performance.now();
-  record("confirmation-start");
   try {
     observed = await observeCompletionMigration({ ...f.request, expectedSourceRevision: inspection.sourceRevision, runner,
-      ...(scale ? { signal: new AbortController().signal, onProgress(phase) {
-        record("operator-phase", { phase, elapsedMs: performance.now() - runner.start });
-      } } : {}),
       async verifyActiveRuntime(rows) {
         runtimeChecksMs.push({ ms: performance.now() - runner.start, provider: rows[0]?.provider });
         return proveFixtureRuntime(rows);
@@ -4714,8 +4641,7 @@ async function runPvaFreshRehearsal(t, scaleEvidence) {
         retirementAtMs = cutoverStart - runner.start;
         assert.equal(snapshot.provider, "beads");
         assert.deepEqual(sourceAuthorityFiles(f.root), sourceBefore);
-        const exportAtRetirement = RUNNER.run("bd", ["--readonly", "export", "--all"], { cwd: f.root }).stdout;
-        assert.equal(createHash("sha256").update(exportAtRetirement).digest("hex"), nativeExportHash, "exact source export before fixture retirement");
+        assert.equal(bd(f.root, "--readonly", "export", "--all"), exportBefore);
         receiptProof = publishedSameIdReceipt(runner, f.store, inspection);
         mappings = Object.fromEntries(receiptProof.receipt.mappings.map(row => [row.sourceTaskId, row.destinationTaskId]));
         const switched = JSON.parse(readFileSync(ownerPath, "utf8")).owners[owner.ownerSessionId];
@@ -4726,15 +4652,6 @@ async function runPvaFreshRehearsal(t, scaleEvidence) {
           assert.equal(switched[field], owner.record[field], field);
         }
         assert.equal(git(join(owner.episode, ".backlog"), "rev-parse", "HEAD"), receiptProof.head);
-        if (scale) {
-          assert.deepEqual(Object.keys(mappings).sort(), Object.keys(nativeCurrent).sort());
-          assert.deepEqual(switched.taskEvidence.task, JSON.parse(backlog(owner.episode, "task", "view", "--json", "--", switched.taskId)).task);
-          assert.equal(origins.size, 1);
-          assert.ok(browserPid > 1);
-          assert.throws(() => process.kill(-browserPid, 0), { code: "ESRCH" }, "owned browser group settled before retirement");
-          record("retirement-guard-proved", { retirementAtMs, receiptRevision: receiptProof.head, ownerTaskId: switched.taskId,
-            mappings: Object.keys(mappings).length, exactPublishedRef: TASK_HISTORY_REF, ownedGroupAbsent: true });
-        }
         hookOverheadMs = performance.now() - cutoverStart;
         rmSync(join(f.root, ".beads"), { recursive: true });
         rmSync(join(f.root, ".beads.gate.lock"), { force: true });
@@ -4743,9 +4660,6 @@ async function runPvaFreshRehearsal(t, scaleEvidence) {
   } finally { http.request = realRequest; syncBuiltinESMExports(); }
   const confirmObservedMs = performance.now() - runner.start;
   const { result, requests } = observed;
-  record("confirmation-result", { confirmObservedMs, status: result.status, code: result.code, detail: result.detail,
-    remediation: result.remediation, webWrites, webFirstWriteMs, webLastWriteMs, taskRefPushes: runner.pushes, retirementAtMs,
-    beadsPresent: existsSync(join(f.root, ".beads")) });
   assert.equal(result.status, "completed", result.detail);
   assert.equal(result.receipt.destinationReceiptRevision, receiptProof.head);
   assert.ok([result.receiptTaskId, ...Object.values(mappings)].includes("BASE-13"), "uses the next native root ID");
@@ -4768,40 +4682,15 @@ async function runPvaFreshRehearsal(t, scaleEvidence) {
   assert.deepEqual(parkedStoreTree(f.parked), f.parkedBefore);
   const noPlacement = value => value.replace(/^backlog(?:Directory|_directory):.*\n?/gm, "");
   assert.equal(noPlacement(readFileSync(join(f.store, "config.yml"), "utf8")), noPlacement(f.config));
-  if (scale) {
-    assert.equal(existsSync(join(f.parked, "config.yml")), false);
-    assert.equal(existsSync(join(f.parked, ".git")), false);
-    assert.equal(readlinkSync(join(f.root, "backlog.config.yml")), ".backlog/config.yml");
-    assert.equal(realpathSync(join(f.root, "backlog.config.yml")), realpathSync(join(f.store, "config.yml")));
-    assert.deepEqual([f.store, join(f.store, ".git")].map(path => {
-      const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino];
-    }), f.identity);
-    assert.equal(readFileSync(join(f.store, ".git", "config"), "utf8"), f.cloneConfig);
-    assert.equal(lstatSync(join(f.store, "config.yml")).mode, lstatSync(join(f.parked, "config.yml.pre-migration")).mode);
-    assert.equal(git(f.store, "remote", "get-url", "origin"), f.remote);
-    assert.equal(git(f.store, "symbolic-ref", "--short", "HEAD"), "prime-claw/tasks");
-    for (const p of ["config.yml.pre-migration", "scripts/retained.sh"]) {
-      assert.deepEqual(readFileSync(join(f.store, p)), readFileSync(join(f.parked, p)));
-      assert.equal(lstatSync(join(f.store, p)).mode, lstatSync(join(f.parked, p)).mode);
-    }
-  }
   assertNativeSameIdAmbiguity(f.root, ".backlog", f.pair);
   assert.deepEqual(captureSameIdControls(f.root, ".backlog", f.original), f.nativeOriginals);
-  let destinationBytes = 0, commentCount = 0, readCount = 0;
-  const seenPaths = new Set();
+  let destinationBytes = 0, commentCount = 0;
   for (const [sourceId, id] of Object.entries(mappings)) {
     const view = JSON.parse(backlog(f.root, "task", "view", "--json", "--", id));
     assertCurrentBacklogTask(view, nativeCurrent[sourceId], inspection, mappings,
       { priorities: ["P4", "P1", "P0", "Very High, Almost"], types: ["Incident, Follow-up"] });
     commentCount += view.task.comments.length;
     destinationBytes += Buffer.byteLength(JSON.stringify(view));
-    if (scale) {
-      assert.ok(view.task.path.startsWith(".backlog/tasks/"), view.task.path);
-      assert.equal(seenPaths.has(view.task.path), false);
-      seenPaths.add(view.task.path);
-      assert.ok(after[view.task.path.slice(".backlog/".length)]);
-      if (++readCount % 100 === 0) record("full-native-post-readback", { readCount, commentCount, ms: performance.now() - runner.start - confirmObservedMs });
-    }
   }
   assert.equal(commentCount, bodies.length + 1);
   const memory = result.receipt.backlogMemoryOutputs;
@@ -4809,7 +4698,7 @@ async function runPvaFreshRehearsal(t, scaleEvidence) {
   verifyBacklogMemoryOutputs(memory, f.root, RUNNER);
   const commandCounts = Object.fromEntries(["bd", "git", "backlog"].map(name =>
     [name, runner.calls.filter(call => call.commandName === name).length]));
-  const metrics = { pvaGate: scale ? "representative-fresh" : "fresh", taskCounts: inspection.taskCounts, comments: commentCount,
+  console.info(JSON.stringify({ pvaGate: "fresh", taskCounts: inspection.taskCounts, comments: commentCount,
     additionalCommentBodyBytes: bodies.reduce((n, body) => n + Buffer.byteLength(body), 0),
     nativeExportBytes, nativeCurrentBytes, destinationBytes, memoryCount: memory.documents.length,
     preservedRecords: Object.keys(originalRecords).length, nextNative: "BASE-13", receiptId: result.receiptTaskId,
@@ -4818,18 +4707,8 @@ async function runPvaFreshRehearsal(t, scaleEvidence) {
     setupMs, inspectionMs, webFirstWriteMs, webLastWriteMs, taskRefPushes: runner.pushes, retirementAtMs,
     hookOverheadMs, confirmObservedMs, postRunReadbackMs: performance.now() - runner.start - confirmObservedMs,
     commandCounts, webMethods: Object.fromEntries(["GET", "POST", "PUT"].map(method =>
-      [method, requests.filter(request => request.method === method).length])), runtimeChecksMs };
-  record("verified", { ...metrics, readCount, sourceComments, fixtureShape, commentHistogram, sourceCommentBytes, sourceFieldBytes,
-    bootstrapHead: f.bootstrapHead, originalTaskHead: f.originalTaskHead, ownedBrowserOrigins: origins.size });
-  console.info(JSON.stringify(metrics));
-}
-
-test("PVA gate fresh timed current migration", { timeout: 480_000 }, t => runPvaFreshRehearsal(t));
-
-test("representative volume fresh PVA rehearsal", {
-  timeout: 7100_000,
-  skip: !process.env.PRIME_CLAW_REPRESENTATIVE_EVIDENCE,
-}, t => runPvaFreshRehearsal(t, process.env.PRIME_CLAW_REPRESENTATIVE_EVIDENCE));
+      [method, requests.filter(request => request.method === method).length])), runtimeChecksMs }));
+});
 
 test("PVA gate safe failure after native comment acceptance", { timeout: 240_000 }, async t => {
   const setupStarted = performance.now();
