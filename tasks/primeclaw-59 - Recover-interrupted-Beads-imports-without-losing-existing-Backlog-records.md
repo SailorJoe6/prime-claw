@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T06:38:00Z'
+updated_date: '2026-11-22T06:43:00Z'
 labels: []
 dependencies: []
 references:
@@ -535,4 +535,7 @@ Joe explicitly accepted only the parked-store increment at code `e4878f10489ab09
 The accepted record retains the broader result of 10 pytest PASS / 1 FAIL. The additional ownership suite was 82 PASS / 1 FAIL (#83: selected Episode journal identity does not match); static inspection found an unchanged placeholder journal header rejected before append/delivery. The diagnostic baseline attempt stopped before the test due to a missing project mount. No runtime baseline or full all-green claim. The 325 core native PASS / 12 retired reverse SKIP, 20 focused native PASS, required final-source probe PASS, and their documented limits remain unchanged.
 
 Verified exact native observation `5434ab72` against its referenced bytes and active registry binding. Episode CLI readback matched the observed current contract; the published task ref at `08e654fff0309388ee87b860c391730502a0cac2` descends from `b410b99` with only unrelated-task changes. Code stays at `e4878f1`. This handoff only records the accepted boundary and the new step-3/AC5 focus. It changes no implementation, runs no tests or migration, and sends no execute. The existing canonical transport alone owns the continuation.
+
+### Canonical coexistence execute admitted — pinned native behavior verified
+Exact owner, Episode, source observation `5434ab72` and published handoff were verified. Code remains at the accepted `e4878f1`; no product code changed. Offline disposable Docker with pinned Backlog 1.55.3 (`0cf4fdbc70020327f4366a29d3f405f83d180301`) reproduced distinct archived/live `PAIR-12`. Native task view rejects the ID as ambiguous and does not resolve either physical path as a selector; a unique original reads normally, and native allocation wrote `PAIR-13` with both original paths and bytes unchanged. Retained the probe and log under `.test-results/primeclaw59-same-id-coexistence/`. This proves native behavior only, not migration success. Next: one migration-only distinction between physically preserved originals and genuinely targetable native views, keep receipt/import identification safe, and verify focused old/new behavior and final-source Docker tier 1. No relocation, editing, or repair of the originals is authorized. Two inherited-provider children are doing synthetic fixture authoring and a read-only target-path audit; neither is an independent acceptance reviewer. Status In Progress, 0/9, null Final Summary.
 <!-- SECTION:NOTES:END -->
