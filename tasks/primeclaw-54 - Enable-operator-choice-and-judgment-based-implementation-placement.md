@@ -4,7 +4,7 @@ title: Enable operator choice and judgment-based implementation placement
 status: In Progress
 assignee: []
 created_date: 2026-11-03 02:59
-updated_date: '2026-11-21T23:49:00Z'
+updated_date: '2026-11-22T04:42:00Z'
 labels: []
 dependencies: []
 references:
@@ -104,6 +104,8 @@ Implemented the placement-routing candidate in the Episode: injected entry guida
 Owner-authorized revision on published code 363f96b, limited to two placement findings. Replace duplicated injected lifecycle guidance with a short pointer to the editable implement-task skill (REQUIREMENTS.md G2) and update the stale Backlog workflow and reviewed-plan code assertions while preserving native eligibility protections. Scope planning and implement_task statements in README.md, docs/future-specification-bundles.md, and docs/backlog.md to Episode work and link docs/implementation-placement.md for direct work. Run affected checks in Docker with PyYAML and mandatory Tier 1 --probe after plugin source changes. Leave retained v1, unrelated failures, transport, lifecycle status, merge, activation and cleanup untouched.
 
 Bounded owner revision on 363f96b completed: implement_task metadata points to the editable implement-task skill, with no handler, native eligibility-policy, or Episode mechanics change. Updated stale assertions and scoped docs in README.md, docs/future-specification-bundles.md, and docs/backlog.md to make the direct route clear. Docker Tier 1 --probe passed (20261121T234740Z-26762-2452bada). Offline PyYAML policy run (Backlog workflow, reviewed-plan and placement tests): revision 22 passed, 1 failed, 10 deselected; 363f96b 20 passed, 3 failed, 10 deselected. Both targeted Python regressions now pass; remaining failure test_operator_guidance_creates_new_work_explicitly_in_design (stale generic claim assertion against unchanged AGENTS.md) reproduced on 363f96b. Offline Node reviewed_plan_extension.test.mjs: 68/69 on both; existing tool guidance preserves operator authority and fixed fresh assignment failure unchanged. Matched read-only snapshots used committed Backlog config from 014208e237516015f73c23c2f9fff25480c0dfba for Python. No runtime/transport changes, live UAT, merge, or activation.
+
+Owner-authorized integration checkpoint after verified coordinated restart and hold release: continue from published Episode head 938211797c7134b2827dcd65de1080297fa03ded. On canonical execute, fetch and verify latest origin/main (observed db19bb804091aa77c7828c0e23fb243cc0769a29); merge it into this exact Episode with ordinary Git, no rebase or force. Reconcile .prime-claw/templates.json against actual merged bytes, preserving unrelated entries and main customizations. Preserve both placement behavior and newer main Backlog/model-discovery guidance, especially in docs/backlog.md and ROLE_KERNEL.md; stop for a genuine scope/content decision. Validate in Docker with Tier 1 --probe and affected placement checks against appropriate baselines. Publish only the clean Episode branch and report exact main parent, candidate head, resolutions, and evidence or concrete blocker. Leave canonical main, other owners, lifecycle status, installed assets, runtime and cleanup untouched; no Episode-to-main merge, activation, restart, or assignment.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
