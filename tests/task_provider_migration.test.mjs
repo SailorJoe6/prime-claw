@@ -4349,3 +4349,274 @@ test("parked-store reconciliation retains uncertain native allocation when auto-
     }
   }
 });
+
+
+// Synthetic, offline-only PVA gate. Timings are observations, not thresholds.
+class PvaRehearsalRunner extends SameIdPublicationRunner {
+  constructor() { super(); this.pushes = []; }
+  run(commandName, args, options = {}) {
+    const taskPush = commandName === "git" && args.includes("push") && args.includes(`HEAD:${TASK_HISTORY_REF}`);
+    try {
+      const result = super.run(commandName, args, options);
+      if (taskPush) this.pushes.push({ ms: performance.now() - this.start, status: result.status, index: this.calls.length });
+      return result;
+    } catch (error) {
+      if (taskPush) this.pushes.push({ ms: performance.now() - this.start, status: "threw", index: this.calls.length });
+      throw error;
+    }
+  }
+}
+
+function pvaBoundedText(label, lines) {
+  return Array.from({ length: lines }, (_, i) => `${label} ${i + 1}: Ω 日本語 🌊 verify readable current data.`).join("\n");
+}
+
+test("PVA gate fresh timed current migration", { timeout: 480_000 }, async t => {
+  const started = performance.now();
+  const f = parkedStoreReconciliationFixture(t, "pva-timed", { sameId: true });
+  const closed = addSourceCompletionDependency(f);
+  Object.assign(f.ids, closed);
+  const parent = f.ids.parent;
+  const bodies = [];
+  for (let i = 0; i < 7; i++) {
+    const id = JSON.parse(bd(f.root, "create", `Synthetic current ${i + 1}`, "--description", pvaBoundedText(`Description ${i + 1}`, 380),
+      "--design", pvaBoundedText(`Plan ${i + 1}`, 140), "--notes", pvaBoundedText(`Notes ${i + 1}`, 140), "--parent", parent, "--json")).id;
+    f.ids[`bulk${i}`] = id;
+    for (let n = 0; n < 6; n++) {
+      const body = pvaBoundedText(`Comment ${i + 1}/${n + 1}`, 200);
+      bodies.push(body);
+      bd(f.root, "comments", "add", id, body, "--author", `public-author-${n % 3 + 1}`);
+    }
+  }
+  for (const key of ["one", "two"]) bd(f.root, "remember", pvaBoundedText(`Memory ${key}`, 90), "--key", `pva-fixture-${key}`);
+  const owner = addActiveBeadsOwner(f);
+  const ownerPath = join(f.root, ".prime-claw", "ownership.json");
+  const originalRecords = captureSameIdRecords(f.parked);
+  const nativeCurrent = captureBeadsCurrentTasks(f.root, Object.values(f.ids));
+  const nativeExportBytes = Buffer.byteLength(RUNNER.run("bd", ["--readonly", "export", "--all"], { cwd: f.root }).stdout);
+  const nativeCurrentBytes = Object.values(nativeCurrent).reduce((n, { nativeView }) => n + Buffer.byteLength(JSON.stringify(nativeView)), 0);
+  const sourceBefore = sourceAuthorityFiles(f.root);
+  const exportBefore = bd(f.root, "--readonly", "export", "--all");
+  const setupMs = performance.now() - started;
+  const runner = new PvaRehearsalRunner();
+  const inspectionStarted = performance.now();
+  const inspection = inspectTaskProviderMigration({ cwd: f.root, targetProvider: "backlog", runner });
+  const inspectionMs = performance.now() - inspectionStarted;
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.equal(inspection.taskCounts.total, Object.keys(f.ids).length);
+  const runtimeChecksMs = [];
+  let retirementAtMs, hookOverheadMs, receiptProof, mappings, webFirstWriteMs, webLastWriteMs;
+  const realRequest = http.request;
+  http.request = function (...args) {
+    if (["POST", "PUT"].includes(args[1]?.method)) {
+      webLastWriteMs = performance.now() - runner.start;
+      webFirstWriteMs ??= webLastWriteMs;
+    }
+    return realRequest.apply(this, args);
+  };
+  syncBuiltinESMExports();
+  let observed;
+  runner.start = performance.now();
+  try {
+    observed = await observeCompletionMigration({ ...f.request, expectedSourceRevision: inspection.sourceRevision, runner,
+      async verifyActiveRuntime(rows) {
+        runtimeChecksMs.push({ ms: performance.now() - runner.start, provider: rows[0]?.provider });
+        return proveFixtureRuntime(rows);
+      },
+      deleteSource(snapshot) {
+        assert.equal(retirementAtMs, undefined);
+        const cutoverStart = performance.now();
+        retirementAtMs = cutoverStart - runner.start;
+        assert.equal(snapshot.provider, "beads");
+        assert.deepEqual(sourceAuthorityFiles(f.root), sourceBefore);
+        assert.equal(bd(f.root, "--readonly", "export", "--all"), exportBefore);
+        receiptProof = publishedSameIdReceipt(runner, f.store, inspection);
+        mappings = Object.fromEntries(receiptProof.receipt.mappings.map(row => [row.sourceTaskId, row.destinationTaskId]));
+        const switched = JSON.parse(readFileSync(ownerPath, "utf8")).owners[owner.ownerSessionId];
+        assert.equal(switched.provider, "backlog");
+        assert.equal(switched.providerRevision, receiptProof.head);
+        assert.equal(switched.taskId, mappings[parent]);
+        for (const field of ["operationId", "worktree", "branch", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
+          assert.equal(switched[field], owner.record[field], field);
+        }
+        assert.equal(git(join(owner.episode, ".backlog"), "rev-parse", "HEAD"), receiptProof.head);
+        hookOverheadMs = performance.now() - cutoverStart;
+        rmSync(join(f.root, ".beads"), { recursive: true });
+        rmSync(join(f.root, ".beads.gate.lock"), { force: true });
+      },
+    });
+  } finally { http.request = realRequest; syncBuiltinESMExports(); }
+  const confirmObservedMs = performance.now() - runner.start;
+  const { result, requests } = observed;
+  assert.equal(result.status, "completed", result.detail);
+  assert.equal(result.receipt.destinationReceiptRevision, receiptProof.head);
+  assert.ok([result.receiptTaskId, ...Object.values(mappings)].includes("BASE-13"), "uses the next native root ID");
+  assert.equal(existsSync(join(f.root, ".beads")), false);
+  assert.equal(Object.keys(mappings).length, inspection.taskCounts.total);
+  assert.equal(new Set(Object.values(mappings)).size, inspection.taskCounts.total);
+  const after = captureSameIdRecords(f.store);
+  for (const [path, record] of Object.entries(originalRecords)) {
+    assert.deepEqual(after[path], record, path);
+    assert.equal(git(f.store, "diff", f.originalTaskHead, "HEAD", "--", path), "", path);
+  }
+  for (const [path, history] of Object.entries(f.sourceHistory)) {
+    assert.equal(git(f.root, "log", "--follow", "--format=fuller", "--binary", "-p", "--", `backlog/${path}`), history, path);
+    assert.equal(command(f.store, "git", ["show", `${f.originalTaskHead}:${path}`]), readFileSync(join(f.parked, path), "utf8"), path);
+  }
+  assert.equal(Object.keys(after).length, Object.keys(originalRecords).length + inspection.taskCounts.total + 2);
+  for (const ancestor of [f.originalTaskHead, f.bootstrapHead, result.receipt.destinationDataRevision]) {
+    git(f.store, "merge-base", "--is-ancestor", ancestor, receiptProof.head);
+  }
+  assert.deepEqual(parkedStoreTree(f.parked), f.parkedBefore);
+  const noPlacement = value => value.replace(/^backlog(?:Directory|_directory):.*\n?/gm, "");
+  assert.equal(noPlacement(readFileSync(join(f.store, "config.yml"), "utf8")), noPlacement(f.config));
+  assertNativeSameIdAmbiguity(f.root, ".backlog", f.pair);
+  assert.deepEqual(captureSameIdControls(f.root, ".backlog", f.original), f.nativeOriginals);
+  let destinationBytes = 0, commentCount = 0;
+  for (const [sourceId, id] of Object.entries(mappings)) {
+    const view = JSON.parse(backlog(f.root, "task", "view", "--json", "--", id));
+    assertCurrentBacklogTask(view, nativeCurrent[sourceId], inspection, mappings,
+      { priorities: ["P4", "P1", "P0", "Very High, Almost"], types: ["Incident, Follow-up"] });
+    commentCount += view.task.comments.length;
+    destinationBytes += Buffer.byteLength(JSON.stringify(view));
+  }
+  assert.equal(commentCount, bodies.length + 1);
+  const memory = result.receipt.backlogMemoryOutputs;
+  assert.equal(memory.documents.length, 2);
+  verifyBacklogMemoryOutputs(memory, f.root, RUNNER);
+  const commandCounts = Object.fromEntries(["bd", "git", "backlog"].map(name =>
+    [name, runner.calls.filter(call => call.commandName === name).length]));
+  console.info(JSON.stringify({ pvaGate: "fresh", taskCounts: inspection.taskCounts, comments: commentCount,
+    additionalCommentBodyBytes: bodies.reduce((n, body) => n + Buffer.byteLength(body), 0),
+    nativeExportBytes, nativeCurrentBytes, destinationBytes, memoryCount: memory.documents.length,
+    preservedRecords: Object.keys(originalRecords).length, nextNative: "BASE-13", receiptId: result.receiptTaskId,
+    dataRevision: result.receipt.destinationDataRevision, receiptRevision: receiptProof.head,
+    sameId: f.pair.id, pairPaths: f.pair.paths, pairModes: f.pair.paths.map(p => originalRecords[p].mode & 0o777),
+    setupMs, inspectionMs, webFirstWriteMs, webLastWriteMs, taskRefPushes: runner.pushes, retirementAtMs,
+    hookOverheadMs, confirmObservedMs, postRunReadbackMs: performance.now() - runner.start - confirmObservedMs,
+    commandCounts, webMethods: Object.fromEntries(["GET", "POST", "PUT"].map(method =>
+      [method, requests.filter(request => request.method === method).length])), runtimeChecksMs }));
+});
+
+test("PVA gate safe failure after native comment acceptance", { timeout: 240_000 }, async t => {
+  const setupStarted = performance.now();
+  const fixture = repository(t, "pva-safe-failure");
+  bd(fixture.root, "init", "--skip-hooks", "--skip-agents", "--prefix", "PART", "--quiet", "--non-interactive");
+  bd(fixture.root, "dolt", "remote", "remove", "origin");
+  const parent = JSON.parse(bd(fixture.root, "create", "First current task", "--description", "Current readable description Ω", "--json")).id;
+  const child = JSON.parse(bd(fixture.root, "create", "Later current child", "--parent", parent, "--json")).id;
+  bd(fixture.root, "comments", "add", parent, "First actual current comment Ω", "--author", "partial-source-author");
+  fixture.ids = { parent, child };
+  git(fixture.root, "add", "-A");
+  if (git(fixture.root, "status", "--porcelain=v1")) git(fixture.root, "commit", "-qm", "seed bounded native partial-write fixture");
+  git(fixture.root, "push", "-q");
+  const owner = addActiveBeadsOwner(fixture);
+  const runner = new AdmissionRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const foreign = repository(t, "pva-safe-failure-foreign-context");
+  backlog(foreign.root, "init", "foreign", "--defaults", "--backlog-dir", "backlog", "--config-location", "folder", "--integration-mode", "none");
+  canonicalBacklogConfig(foreign.root);
+  backlog(foreign.root, "task", "create", "Untouched foreign task", "--status", "In Design", "--plain");
+  git(foreign.root, "add", "-A");
+  git(foreign.root, "commit", "-qm", "seed foreign native context");
+  const foreignHead = git(foreign.root, "rev-parse", "HEAD");
+  const foreignRecords = physicalDestinationRecords(join(foreign.root, "backlog"));
+  const foreignConfig = readFileSync(join(foreign.root, "backlog", "config.yml"), "utf8");
+  const sourceBefore = sourceAuthorityFiles(fixture.root);
+  const exportBefore = bd(fixture.root, "--readonly", "export", "--all");
+  const registryPath = join(fixture.root, ".prime-claw", "ownership.json");
+  const ownershipBefore = readFileSync(registryPath, "utf8");
+  const requests = [];
+  let originalNativeStatus, failureAtMs, callsAtFailure, publishedAtFailure;
+  let deletions = 0;
+  const request = {
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "partial-write-fixture", semanticPlacement: "Preserve complete readable current ticket content.",
+    verifyActiveRuntime: proveFixtureRuntime,
+    deleteSource() { deletions += 1; },
+  };
+  // Transparent wrapper around REAL native HTTP operations: the first actual
+  // comment has persisted and native returned200 before this fixture changes
+  // only the response status seen by the client. No second tracker or fake
+  // persistence is involved. This is controlled response failure, not proof of
+  // ordinary importer cancellation or a real transport losing its response.
+  const setupMs = performance.now() - setupStarted;
+  const originalRequest = http.request;
+  http.request = function (...args) {
+    const url = String(args[0]);
+    const method = args[1]?.method ?? "GET";
+    if (method === "POST" || method === "PUT") requests.push({ method, url });
+    const callback = args.at(-1);
+    if (method === "PUT" && originalNativeStatus === undefined && typeof callback === "function") {
+      args[args.length - 1] = (response) => {
+        originalNativeStatus = response.statusCode;
+        publishedAtFailure = command(fixture.remote, "git", ["rev-parse", "--verify", TASK_HISTORY_REF], true);
+        callsAtFailure = runner.calls.length;
+        failureAtMs = performance.now() - started;
+        response.statusCode = 503;
+        callback(response);
+      };
+    }
+    return originalRequest.apply(this, args);
+  };
+  syncBuiltinESMExports();
+  let first;
+  const previousBacklogCwd = process.env.BACKLOG_CWD;
+  let observedAmbient;
+  const started = performance.now();
+  let returnedAtMs;
+  try {
+    process.env.BACKLOG_CWD = foreign.root;
+    first = await migrateTaskProvider(request);
+    returnedAtMs = performance.now() - started;
+    observedAmbient = process.env.BACKLOG_CWD;
+  } finally {
+    if (previousBacklogCwd === undefined) delete process.env.BACKLOG_CWD;
+    else process.env.BACKLOG_CWD = previousBacklogCwd;
+    http.request = originalRequest; syncBuiltinESMExports();
+  }
+  assert.equal(observedAmbient, foreign.root, "migration-local synchronous context pinning restores the foreign ambient value");
+  assert.deepEqual(physicalDestinationRecords(join(foreign.root, "backlog")), foreignRecords);
+  assert.equal(readFileSync(join(foreign.root, "backlog", "config.yml"), "utf8"), foreignConfig);
+  assert.equal(git(foreign.root, "rev-parse", "HEAD"), foreignHead);
+  assert.equal(git(foreign.root, "status", "--porcelain=v1"), "");
+  assert.equal(originalNativeStatus, 200, "real native comment write succeeded before the controlled response failure");
+  assert.equal(first.status, "blocked", first.detail);
+  assert.equal(first.code, "pre-cutover-failed");
+  assert.match(first.detail, /http-status-503; outcome=uncertain/);
+  assert.match(first.remediation, /STOP and preserve/);
+  assert.match(first.remediation, /Do not automatically resend/);
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "PUT"], "no next source task or resend after uncertain comment response");
+  const artifactDirectory = first.detail.match(/Private transport evidence: ([^\n]+)$/)?.[1];
+  assert.ok(artifactDirectory && existsSync(artifactDirectory), "private transport failure evidence is retained");
+  t.after(() => rmSync(artifactDirectory, { recursive: true, force: true }));
+  const store = join(fixture.root, ".backlog");
+  const partial = physicalDestinationRecords(store);
+  assert.equal(Object.keys(partial).length, 1, "no child, receipt, or replacement allocation follows the failed write");
+  const markdown = Buffer.from(Object.values(partial)[0], "base64").toString("utf8");
+  const id = markdown.match(/^id: (.+)$/m)[1];
+  const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id));
+  assert.equal(view.task.title, "First current task");
+  assert.equal(view.task.description, "Current readable description Ω");
+  assert.deepEqual(view.task.references, [
+    `prime-claw-beads-source:${parent}`,
+    `prime-claw-beads-current:${JSON.stringify({ sourceTaskId: parent,
+      sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest }, null, 2)}`,
+  ], "the initial native allocation already has complete source identity before any comment response");
+  assert.equal(view.task.comments.length, 1, "actual comment persisted despite uncertain client outcome");
+  assert.equal(view.task.comments[0].author, "partial-source-author");
+  assert.ok(view.task.comments[0].body.includes("First actual current comment Ω"));
+  assert.equal(deletions, 0);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
+  assert.equal(bd(fixture.root, "--readonly", "export", "--all"), exportBefore);
+  assert.equal(readFileSync(registryPath, "utf8"), ownershipBefore);
+  assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
+  assert.equal(command(fixture.remote, "git", ["rev-parse", "--verify", TASK_HISTORY_REF], true), publishedAtFailure);
+  assert.deepEqual(runner.calls.slice(callsAtFailure), [], "no later native commands after the uncertain write");
+  console.info(JSON.stringify({ pvaGate: "in-flight native response failure", setupMs, failureAtMs, returnedAtMs,
+    observedStopLatencyMs: returnedAtMs - failureAtMs, actualResponse: originalNativeStatus, exposedResponse: 503,
+    writes: requests.map(row => row.method), laterNativeCommands: runner.calls.length - callsAtFailure,
+    retainedRecords: Object.keys(partial).length, retainedComments: view.task.comments.length, publishedAtFailure,
+    retainedTransportEvidence: existsSync(artifactDirectory), deleteCalls: deletions, sourceAuthority: "Beads", result: first.code }));
+});
