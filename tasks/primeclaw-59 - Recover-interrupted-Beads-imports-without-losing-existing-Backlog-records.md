@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T18:02:00Z'
+updated_date: '2026-11-22T18:09:00Z'
 labels: []
 dependencies: []
 references:
@@ -665,4 +665,7 @@ Remaining blocker: no supported ordinary migration stop on the frozen build, so 
 
 ### Owner disposition — bounded rehearsal and controlled failure accepted
 The owner accepted rehearsal evidence only: Episode `68a70b11de3b9e757998c2bae4419d250c037466`, native `020188bb7cdcaee6ccd5b809be254e3e3cd37b28`, unchanged product `f141d1cab8993fa620404c580f163f8a575e3df3`. The owner verified both direct refs, the full native contract, 45 artifact hashes, both teardown layers and the idle original Episode. The 66.568 s / 12-task observation is not a PVA-scale estimate; the 34.47 ms observation is a controlled failed response after native acceptance, not operator cancellation. The smallest supported operator-stop correction alone is admitted for the next canonical execute under `c6e0a3d`; see the living plan. The rehearsal acceptance is not whole-task acceptance or any live/merge/deployment decision. This handoff makes no tests or product changes. In Progress, 0/9 checked and null Final Summary stay unchanged.
+
+### Operator-stop increment — draft, pending Docker evidence
+The Episode admitted the sole canonical execute for the recorded PVA-only scope. The Prime Claw draft passes the registered tool signal to the migration and its owned Web transport, checkpoints before pre-cutover synchronous groups, and sends phase/elapsed and post-abort outcome notices through public extension UI. The existing guarded ownership/deletion/publication sequence remains non-interruptible once entered. This is unvalidated source, not stop proof: the required disposable RPC test must observe real native persistence before the operator sends abort, verify explicit owned-writer settlement apart from generic acknowledgement, inspect the unchanged Beads authority and exact readable Backlog state, and exclude any later writes, retries, rollback or retirement. Focused regression and final-source Tier 1 remain pending. Accepted frozen evidence is unchanged; no live action or lifecycle change.
 <!-- SECTION:NOTES:END -->
