@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: Done
 assignee: []
 created_date: 2026-11-21 20:38
-updated_date: '2026-11-22T04:44:00Z'
+updated_date: '2026-11-22T04:59:00Z'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -178,6 +178,15 @@ created: 2026-11-22T04:44:00Z
 ---
 
 Post-merge rollout closure: accepted canonical primary main db19bb804091aa77c7828c0e23fb243cc0769a29 passed its fresh Docker Tier1 probe (20261122T042223Z-99399-c3667a26; offline/network absent/clean teardown), then supported user-global apply/check passed with zero conflicts and default preservation. No initializer reset or accepted override was used. Existing expert-review guidance cfd5e243c2a491cb741fa7ee699b314fae9e98cbd12946af48cc0bcff7c3618b and role-kernel d972867fedd0dd553269632fa385efc0251102b2e48e09bcf06f3d935a43e5a4 are preserved in canonical source and installed guidance. All28 selected project/custom/oldEpisode snapshot facts stayed unchanged. One coordinated full restart replaced daemon511 with21760 (same PrimeAgent0.9.8/protocol7/build6cd28f90e). Actual resumed owningConversation01a1a90b-0fba-7778-b1e5-0087bdaf8fec, exact retainedEpisode01a20001-5a66-75c9-9899-a9f743e43903 and designated ordinaryGStack01a1fa70-89c4-7564-a875-fa11880a68cc independently passed bounded live/report-only UAT. Actual PATH Backlog remains1.55.3/0755/106150754bytes/SHA169976d4a37230e4e650cac3dfa15a03436809fc97dfb7551354e63a9808c586; activeDone64 is7/7, legacycompleted1 stillDone/archivedtrue, and PVA remains Beads-authoritative/frozen. File hashes and live tool-context visibility are separate observations, not registry hash/count, full-log absence, lifecycle dispatch or historical-recovery proof. Both distinct1.53 rollback copies and all customizations are intact. Eleven affected maintenance holds were released; the old rate-limited RalphPVA owner could not send readiness, and its independent native quiescence/checkpoint evidence was recorded without fabricating an acknowledgement or changing provider/schedules. Normal merged64Episode cleanup follows under the existing terminal authority. Keep this Done task active, not archived. Detailed private evidence: owningConversation session artifacts, primeclaw64-plugin-install-20261121T215149Z/actual-backlog155-cutover/final-merged-plugin-refresh/resumed-original-rollout.
+
+---
+
+author: Owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-22T04:59:00Z
+
+---
+
+Merged Episode cleanup completed through finalize_task_episode for exact code1b7ebc5fa500719b4d14cef3278677879cce37ad. Native session and two explicitly linked children, saved Episode file, worktree, local/remote Episode branch, owned Orca terminals and launch automation are absent. Only this owner entry was removed; bookkeeping acc136856839fd758b9aa9fcf3a60963266c0851 is pushed on main and foreign54/59 ownership was preserved. The active Done task stays unarchived. Correction to retention: before cleanup, 32974 ignored worktree files/symlinks were archived and byte/mode/link verified outside the Episode, but I failed to relocate the separate Episode-scoped global session-artifacts directory. PrimeAgent deleteSessionFile permanently deleted that directory, including both rollback copies and other original off-global artifact files. The unchanged primary1.53.0 binary (SHA96044ce2319e84112b9490257f2b8a47a4458754a3c48472fb17452e511ffa00/70810466bytes/0755) remains and an exact copy is now retained under the owning Conversation final-refresh evidence/retained-rollbacks. The old installed1.53.0 variant SHA0da86f0edf37e11955e600da94754add2ea75718a47dcd7ea7c2420aa7de8511/70793954bytes was not recovered by bounded owner/BacklogExpert searches. Exact original build-manifest bytes were recovered from the previously observed parsed data and match SHA c87964b18a7e500dbabde8003e425fc2afd20a1b8a013627c408139f9529f382, but complete original artifact-directory preservation is NOT claimed. Official npm/GitHub1.53.0 has the same size but different SHAa91540000c49834a0cf6baa7b498442976b388c515e68951f1294618fc1f2877; it is not accepted as the lost binary. One isolated ad-hoc-signing recovery experiment also did not match and was rejected; no credentials, installed binary, runtime, task/session or source were changed by it. Current installed1.55.3 and all three successful live UAT observations remain valid. Exact old-installed fallback loss is disclosed for operator disposition; no deleted Episode/session, task, workflow or backup-path identity will be recreated.
 
 ---
 <!-- COMMENTS:END -->
