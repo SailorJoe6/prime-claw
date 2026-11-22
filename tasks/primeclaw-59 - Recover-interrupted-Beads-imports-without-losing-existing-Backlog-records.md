@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T11:18:00Z'
+updated_date: '2026-11-22T16:20:00Z'
 labels: []
 dependencies: []
 references:
@@ -593,4 +593,12 @@ Observation `4ceb1208` binds the same durable Episode on current route `0f14a57a
 Code `7cf86574295956543663ac7d007ecc48833c03a3` is the direct published Episode branch head, one commit after `7b2e386`. It limits the initial import-reference check to actual references and refuses receipt-bound memory USER ambiguity before destination preparation. The four candidate paths are listed in the code commit. All three tested draft files and all 223 recorded inputs match the verified final source. The [revision evidence](docs/evidence/primeclaw-59-coexistence-revision-20261122.md) is the only additional file.
 
 Final probe `20261122T100827Z-23721-ebe2b56a` passed. Final migration `20261122T104351Z-60571-f58046a4` and helpers `20261122T110528Z-85930-ae9b0837`: 218 native passes and 12 retired reverse-migration skips across four passing pytest bridges. The final manifests agree on repository digest `d3ae77d4b48719b37890cc735931651d1036dfc50a84143d6d5587c0603fe18f`, offline operation and clean runtime/builder teardown. The earlier incomplete combined run remains unexplained and separate; no cleanup or rerun during publication. Ownership #83 remains static-only and outside this revision. This evidence does not close AC5 or qualify the whole project.
+
+### Operator decision — PVA-only migration readiness
+
+Joe approved: “I approve the PVA-Only migration gate. You can finish the bigger plan after the PVA migration.” This changes sequencing for PVA only. PRIMECLAW-59 remains In Progress, with all broader requirements open; this is not candidate acceptance, deployment or live-switch confirmation.
+
+Before PVA cutover: independently review and accept the tested importer, including current-only readable native delivery and complete readback, and preservation of the parked configuration, bootstrap ancestry and original same-ID live/archive paths, bytes, modes and history. Use approved main for global apply/check, coordinated full restart and loaded-generation UAT. Rehearse a disposable representative fresh import and measure elapsed time with large/comment-heavy current data, actual comments, statuses, relationships and memories where present; no historical chunks. Verify one native import per source, preserved originals, exact readback and published receipt/ownership before any source retirement. Show basic readable progress and prove a stop/failure procedure that preserves Beads authority and partial destination, with no further writes, automatic retry or deletion.
+
+Generic automated resume/protected reset, richer progress UI, exhaustive benchmarking and general completion remain open for after PVA. Joe accepts that a failed or stalled run may leave Backlog unavailable pending a separate explicit recovery decision. PVA owner handles exact source preflight/counts and separate informed cutover confirmation, including source deletion, only once ready. No live PVA access or mutation is authorized by this note.
 <!-- SECTION:NOTES:END -->
