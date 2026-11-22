@@ -69,6 +69,7 @@ import {
 
 import { projectBeadsCurrentTask, authorBeadsCurrentTask, assertBeadsCurrentTask } from "./beads-backlog-current.ts";
 import { startMigrationBacklogWeb, MigrationBacklogWebError } from "./migration-backlog-web.ts";
+import yaml from "./vendor/yaml/yaml.cjs";
 
 type BeadsMigrationWeb = Awaited<ReturnType<typeof startMigrationBacklogWeb>>;
 type OpenBeadsMigrationWeb = (storeDir: string) => Promise<BeadsMigrationWeb>;
@@ -1731,7 +1732,11 @@ function backlogPhysicalIdentity(id: string): string {
 function assertBacklogPairIsNotMigrationTarget(id: string, members: { path: string; markdown: string }[]): void {
   if (members.some(({ markdown }) => {
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown)?.[1] ?? "";
-    return /prime-claw-beads-(?:source|current):/.test(frontmatter)
+    // Only native reference entries are import evidence. Do not treat title,
+    // other metadata or prose as an initial source binding.
+    const references: unknown = yaml.parse(frontmatter, { version: "1.1", strict: false })?.references;
+    return (Array.isArray(references) && references.some(value => typeof value === "string"
+      && /^prime-claw-beads-(?:source|current):/.test(value)))
       || markdown.split(/\r?\n/).some(line => line === RECEIPT_MARKER || line.startsWith(`${SOURCE_MARKER} mapping `)
         || /^\s*"marker"\s*:\s*"prime-claw-task-provider-migration-receipt-v1"\s*[,]?\s*$/.test(line));
   })) throw new Error(`Backlog migration target ${id} is ambiguous: ${members.map(({ path }) => path).join(", ")}`);
@@ -1754,6 +1759,37 @@ function backlogPhysicalTaskPaths(storeDir: string): Map<string, string[]> {
     assertBacklogPairIsNotMigrationTarget(id, matches.map(path => ({ path: rel(path), markdown: readFileSync(path, "utf8") })));
   }
   return paths;
+}
+
+function backlogAmbiguityGuard(physicalPaths: Map<string, string[]>, storeDir: string): (id: string) => void {
+  const pairedIds = new Map([...physicalPaths].filter(([, paths]) => paths.length > 1)
+    .map(([id, paths]) => [backlogPhysicalIdentity(id), paths]));
+  return (id: string) => {
+    const paths = pairedIds.get(backlogPhysicalIdentity(id));
+    if (paths) throw new Error(`Backlog migration target ${id} is ambiguous: ${paths.map(path => relative(storeDir, path)).join(", ")}`);
+  };
+}
+
+function readBacklogMemoryReceipt(views: Map<string, JsonObject>, receiptId: string | undefined): JsonObject | undefined {
+  const view = receiptId ? backlogDestinationViewById(views, receiptId) : undefined;
+  const payload = view && /^```json\n([\s\S]+)\n```$/.exec(String(view.task.implementationNotes ?? ""))?.[1];
+  return payload ? asObject(parseJson(payload, "Backlog memory replay receipt"), "Backlog memory replay receipt") : undefined;
+}
+
+/** Refusal only; keep native receipt/reuse validation after preparation. */
+function assertSelectedBacklogMemoryTargetBeforePreparation(source: BeadsSnapshot, runner: CommandRunner): void {
+  const selected = detectExplicitTaskProvider(source.projectRoot, "backlog", runner);
+  if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || !selected.evidence.storeDir) return;
+  const store = selected.evidence.storeDir;
+  const paths = backlogPhysicalTaskPaths(store);
+  if (![...paths.values()].some(matches => matches.length > 1)) return;
+  checkBacklogMigrationConfiguration(source.projectRoot, runner);
+  const views = backlogDestinationViews(runner, source.projectRoot, store, "receipt-bound memory preflight");
+  const receipt = readBacklogMemoryReceipt(views, backlogReceiptId(views));
+  if (receipt?.schemaVersion !== 1 || receipt.marker !== RECEIPT_MARKER || receipt.sourceProvider !== "beads"
+      || receipt.targetProvider !== "backlog" || receipt.sourceRevision !== source.revision || receipt.sourceDigest !== source.digest) return;
+  const taskId: unknown = receipt.backlogMemoryOutputs?.userTask?.taskId;
+  if (typeof taskId === "string") backlogAmbiguityGuard(paths, store)(taskId);
 }
 
 function backlogPairPaths(paths: Map<string, string[]>): string[] {
@@ -2321,6 +2357,7 @@ async function migrateBeadsToBacklog(
   ownershipRows: Array<{ ownerSessionId: string; taskId: string; worktree: string; verifyCodeProjection?: () => void }>,
   openWeb: OpenBeadsMigrationWeb,
 ): Promise<DestinationCandidate> {
+  assertSelectedBacklogMemoryTargetBeforePreparation(source, runner);
   const parked = reconcileParkedBacklogMigrationStore(source.projectRoot, runner, content => {
     const statuses = editableBacklogStatuses(content);
     if (statuses) assertBeadsCompletionStatus(source, statuses);
@@ -2337,18 +2374,11 @@ async function migrateBeadsToBacklog(
     if (migrationCodeProjection(source.projectRoot, runner, prepared.codePaths) !== codeProjection) throw new Error("code layout projection changed during provider migration");
   };
   const originalPaths = backlogPhysicalTaskPaths(storeDir);
-  const pairedIds = new Map([...originalPaths].filter(([, paths]) => paths.length > 1)
-    .map(([id, paths]) => [backlogPhysicalIdentity(id), paths]));
-  const assertUnambiguousTarget = (id: string) => {
-    const paths = pairedIds.get(backlogPhysicalIdentity(id));
-    if (paths) throw new Error(`Backlog migration target ${id} is ambiguous: ${paths.map(path => relative(storeDir, path)).join(", ")}`);
-  };
+  const assertUnambiguousTarget = backlogAmbiguityGuard(originalPaths, storeDir);
   const originalViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "pre-import baseline");
   const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source, originalViews);
   const existingReceiptId = backlogReceiptId(originalViews);
-  const existingReceiptView = existingReceiptId ? backlogDestinationViewById(originalViews, existingReceiptId) : undefined;
-  const existingPayload = existingReceiptView && /^```json\n([\s\S]+)\n```$/.exec(String(existingReceiptView.task.implementationNotes ?? ""))?.[1];
-  const existingReceipt = existingPayload ? asObject(parseJson(existingPayload, "Backlog memory replay receipt"), "Backlog memory replay receipt") : undefined;
+  const existingReceipt = readBacklogMemoryReceipt(originalViews, existingReceiptId);
   const reusedMemoryOutputs = existingReceipt?.backlogMemoryOutputs as BacklogMemoryOutputs | undefined;
   if (source.memories.length && (existingReceiptId || Object.keys(mapping).length) && !reusedMemoryOutputs) {
     throw new Error("existing migration has no complete receipt-bound memory outputs; preserve source and inspect the partial destination without retrying import");

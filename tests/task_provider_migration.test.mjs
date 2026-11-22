@@ -3201,10 +3201,12 @@ function seedSameIdFixtureRecord(root, placement, task, id, mode) {
   return path;
 }
 
-function seedSameIdOriginals(root, placement) {
+function seedSameIdOriginals(root, placement, liveTitle = "High live original") {
   const id = "BASE-12";
   const archive = createSameIdFixtureTask(root, "High archived original", "Distinct archive content Ω", true);
-  const live = createSameIdFixtureTask(root, "High live original", "Distinct live content λ");
+  const live = createSameIdFixtureTask(root, liveTitle, "Distinct live content λ");
+  assert.equal(live.title, liveTitle);
+  assert.deepEqual(live.references ?? [], []);
   assert.notEqual(live.id, archive.id);
   return { id, paths: [seedSameIdFixtureRecord(root, placement, live, id, 0o640),
     seedSameIdFixtureRecord(root, placement, archive, id, 0o750)] };
@@ -3275,10 +3277,14 @@ for (const variant of ["existing selected store", "parked originals in selected 
     const original = parked?.original ?? selected.destination;
     const store = parked?.store ?? original.store;
     const originals = parked?.parked ?? store;
-    const pair = parked?.pair ?? seedSameIdOriginals(fixture.root, ".backlog");
+    // A title can mention the exact source marker without claiming a source reference.
+    const pair = parked?.pair ?? seedSameIdOriginals(fixture.root, ".backlog",
+      `Document prime-claw-beads-source:${fixture.ids.parent} in the operator guide`);
     const originalHead = parked?.originalTaskHead ?? publishSameIdFixtureChanges(store, "seed high live/archive pair in existing native history");
     const nativeOriginals = parked?.nativeOriginals ?? captureSameIdControls(fixture.root, ".backlog", original);
     const records = captureSameIdRecords(originals);
+    const selectedHistory = parked ? {} : Object.fromEntries(Object.keys(records).map(path => [path,
+      git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path)]));
     assert.notEqual(records[pair.paths[0]].bytes, records[pair.paths[1]].bytes);
     assert.notEqual(records[pair.paths[0]].mode, records[pair.paths[1]].mode);
     if (!parked) assertNativeSameIdAmbiguity(fixture.root, ".backlog", pair);
@@ -3325,6 +3331,8 @@ for (const variant of ["existing selected store", "parked originals in selected 
     for (const [path, original] of Object.entries(records)) {
       assert.deepEqual(after[path], original, `exact original path, bytes and mode: ${path}`);
       assert.equal(git(store, "diff", originalHead, "HEAD", "--", path), "", `unchanged original Git path: ${path}`);
+      if (!parked) assert.equal(git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path),
+        selectedHistory[path], `unchanged original Git history: ${path}`);
     }
     assert.equal(Object.keys(after).length, Object.keys(records).length + inspection.taskCounts.total + 1);
     assertNativeSameIdAmbiguity(fixture.root, ".backlog", pair);
@@ -3345,6 +3353,45 @@ for (const variant of ["existing selected store", "parked originals in selected 
     assert.equal(Math.min(...roots), 13, "native allocation reserves the high pre-existing pair");
   });
 }
+
+test("same-ID coexistence refuses genuine migration references without a receipt", { timeout: 180_000 }, async t => {
+  const f = selectedMigrationConfigFixture(t, "same-id-native-references");
+  const { root, remote, ids } = f.fixture, { store } = f.destination;
+  const runner = new AdmissionRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.equal(inspection.sourceRevision, f.request.expectedSourceRevision);
+  // Author an actual native source reference, without a receipt that could
+  // independently trigger the ambiguity refusal.
+  const archive = createSameIdFixtureTask(root, "Unrelated archive", "Distinct archive content", true);
+  const live = createSameIdFixtureTask(root, "Partially imported live task", "Distinct live content");
+  const ref = `prime-claw-beads-source:${ids.parent}`;
+  backlog(root, "task", "edit", live.id, "--ref", ref, "--plain");
+  assert.deepEqual(JSON.parse(backlog(root, "task", "view", "--json", "--", live.id)).task.references, [ref]);
+  const id = "BASE-12";
+  const pair = { id, paths: [seedSameIdFixtureRecord(root, ".backlog", live, id, 0o640),
+    seedSameIdFixtureRecord(root, ".backlog", archive, id, 0o750)] };
+  const head = publishSameIdFixtureChanges(store, "publish genuine native migration references on one same-ID member");
+  assertNativeSameIdAmbiguity(root, ".backlog", pair);
+  const records = captureSameIdRecords(store), remoteRefs = git(root, "ls-remote", "--refs", remote);
+  const source = sourceAuthorityFiles(root), sourceExport = bd(root, "--readonly", "export", "--all");
+  let retirementCalls = 0;
+  const result = await migrateTaskProvider({ ...f.request, runner, deleteSource() {
+    retirementCalls++;
+    throw new Error("genuine same-ID reference reached source retirement");
+  } });
+  assert.equal(result.status, "blocked", result.detail);
+  assert.ok(result.detail.includes(`Backlog migration target ${pair.id} is ambiguous`), result.detail);
+  for (const path of pair.paths) assert.ok(result.detail.includes(path), result.detail);
+  assert.equal(retirementCalls, 0);
+  assertNoAdmissionWrites(runner);
+  assert.deepEqual(captureSameIdRecords(store), records);
+  assert.deepEqual(sourceAuthorityFiles(root), source);
+  assert.equal(bd(root, "--readonly", "export", "--all"), sourceExport);
+  assert.equal(git(store, "rev-parse", "HEAD"), head);
+  assert.equal(git(store, "status", "--porcelain=v1"), "");
+  assert.equal(git(root, "ls-remote", "--refs", remote), remoteRefs);
+});
 
 test("same-ID coexistence refuses replay targeting an ambiguous receipt-mapped import", { timeout: 300_000 }, async t => {
   const f = selectedMigrationConfigFixture(t, "same-id-targeted-replay");
@@ -3398,6 +3445,102 @@ test("same-ID coexistence refuses replay targeting an ambiguous receipt-mapped i
   assert.equal(git(root, "ls-remote", "--refs", remote), refs);
   assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
   assert.equal(git(root, "ls-files", "--stage"), codeIndex);
+});
+
+test("same-ID coexistence refuses a receipt-bound memory USER pair before selected layout preparation", { timeout: 300_000 }, async t => {
+  const f = selectedMigrationConfigFixture(t, "same-id-memory-user-replay");
+  const { root, remote } = f.fixture, { store } = f.destination;
+  const archive = createSameIdFixtureTask(root, "Unrelated archive for memory replay", "No native migration references", true);
+  assert.deepEqual(archive.references ?? [], []);
+  publishSameIdFixtureChanges(store, "publish unrelated archived original before memory migration");
+  bd(root, "remember", "A disposable public memory for the replay regression.", "--key", "public-replay-memory");
+  const runner = new SameIdPublicationRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const request = { ...f.request, expectedSourceRevision: inspection.sourceRevision };
+  const source = sourceAuthorityFiles(root), sourceExport = bd(root, "--readonly", "export", "--all");
+  let verified;
+  const first = await migrateTaskProvider({ ...request, runner, deleteSource() {
+    assert.deepEqual(sourceAuthorityFiles(root), source);
+    verified = publishedSameIdReceipt(runner, store, inspection);
+    throw new Error("fixture retains source after verified memory receipt publication");
+  } });
+  assert.equal(first.status, "blocked", first.detail);
+  assert.match(first.detail, /fixture retains source after verified memory receipt publication/);
+  const { documents, index, userTask } = verified.receipt.backlogMemoryOutputs;
+  assert.equal(documents.length, 1);
+  assert.ok(index && userTask);
+  const id = userTask.taskId;
+  assert.notEqual(id, verified.task.id);
+  assert.ok(verified.receipt.mappings.every(row => row.destinationTaskId !== id));
+  const user = JSON.parse(backlog(root, "task", "view", "--json", "--", id)).task;
+  assert.equal(user.path, userTask.path);
+  assert.match(user.title, /^USER:/);
+  assert.deepEqual(user.references ?? [], []);
+  assert.deepEqual(user.documentation, [index.path]);
+  const livePath = user.path.slice(".backlog/".length);
+  assert.ok(livePath.startsWith("tasks/"));
+  const archivePath = seedSameIdFixtureRecord(root, ".backlog", archive, id, 0o640);
+  for (const path of [livePath, archivePath]) {
+    assert.doesNotMatch(readFileSync(join(store, path), "utf8"), /prime-claw-beads-(?:source|current):/);
+  }
+  const driftHead = publishSameIdFixtureChanges(store, "publish same-ID archival claimant of receipt-bound memory USER task");
+
+  // This clean, selected root config legitimately differs from the in-store
+  // config. Unfixed confirmation adopts it (writes/publishes a new native
+  // config and replaces the regular root file with a link) before rejecting
+  // the receipt's ambiguous USER ID. The receipt itself is never forged.
+  const rootConfig = join(root, "backlog.config.yml");
+  assert.equal(readlinkSync(rootConfig), ".backlog/config.yml");
+  rmSync(rootConfig);
+  const nestedConfig = readFileSync(f.path, "utf8").replace(/^(?:backlog_directory|backlogDirectory):[^\r\n]*(?:\r?\n|$)/gm, "");
+  writeFileSync(rootConfig, `${nestedConfig.trimEnd()}\nbacklog_directory: ".backlog"\n# Preserve selected root authority.\n`);
+  chmodSync(rootConfig, 0o640);
+  git(root, "add", "backlog.config.yml");
+  git(root, "commit", "-qm", "publish independent regular root authority for selected replay");
+  git(root, "push", "-q");
+  assert.equal(existsSync(join(store, "backlog.config.yml")), false);
+  const selected = detectExplicitTaskProvider(root, "backlog", RUNNER);
+  assert.equal(selected.kind, "selected", selected.detail);
+  assert.equal(selected.evidence.configSource, "root");
+  assert.equal(selected.evidence.storeDir, store);
+  assertNativeSameIdAmbiguity(root, ".backlog", { id, paths: [livePath, archivePath] });
+  const readReceipt = () => JSON.parse(backlog(root, "task", "view", "--json", "--", verified.task.id)).task.implementationNotes;
+  assert.equal(readReceipt(), verified.task.implementationNotes);
+
+  const identity = path => { const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino, stat.mode]; };
+  const snapshot = () => ({
+    rootConfig: readFileSync(rootConfig), rootConfigIdentity: identity(rootConfig),
+    layout: parkedStoreTree(store), storeIdentity: identity(store), storeGitIdentity: identity(join(store, ".git")),
+    codeIgnore: readFileSync(join(root, ".gitignore")), codeExclude: readFileSync(join(root, ".git", "info", "exclude")),
+    codeHead: git(root, "rev-parse", "HEAD"), codeIndex: git(root, "ls-files", "--stage"),
+    codeRefs: git(root, "show-ref"), codeStatus: git(root, "status", "--porcelain=v1"),
+    storeHead: git(store, "rev-parse", "HEAD"), storeIndex: git(store, "ls-files", "--stage"),
+    storeRefs: git(store, "show-ref"), storeStatus: git(store, "status", "--porcelain=v1"),
+    storeGitConfig: readFileSync(join(store, ".git", "config")), remoteRefs: git(root, "ls-remote", "--refs", remote),
+  });
+  const before = snapshot();
+  assert.equal(before.codeStatus, "", "must exercise clean selected-store replay, not dirty-layout replay");
+  assert.equal(before.storeStatus, "");
+  assert.equal(before.storeHead, driftHead);
+  assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], driftHead);
+  let retirementCalls = 0;
+  const replayRunner = new AdmissionRunner();
+  const { result, requests } = await observeCompletionMigration({ ...request, runner: replayRunner, deleteSource() {
+    retirementCalls++;
+    throw new Error("unsafe memory USER replay reached source retirement");
+  } });
+  assert.equal(result.status, "blocked", result.detail);
+  assert.ok(result.detail.includes(`Backlog migration target ${id} is ambiguous`), result.detail);
+  for (const path of [livePath, archivePath]) assert.ok(result.detail.includes(path), result.detail);
+  assert.equal(retirementCalls, 0);
+  assert.ok(lstatSync(rootConfig).isFile(), "refusal must precede relocation of the regular root configuration");
+  assert.deepEqual(snapshot(), before, "refusal must leave code layout, native files, Git indexes and both publications exact");
+  assert.ok(requests.every(row => row.method === "GET"), "no Web writes in memory USER replay");
+  assertNoAdmissionWrites(replayRunner);
+  assert.equal(readReceipt(), verified.task.implementationNotes);
+  assert.deepEqual(sourceAuthorityFiles(root), source);
+  assert.equal(bd(root, "--readonly", "export", "--all"), sourceExport);
 });
 
 function addSourceCompletionDependency(fixture) {

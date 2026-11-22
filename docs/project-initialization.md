@@ -513,8 +513,12 @@ Concrete file, mode, configuration, placement, ancestry or publication
 conflicts stop with both sides retained. An existing unrelated live/archive
 pair with a shared ID is preserved by exact physical path, content, mode, and
 native history; the importer does not choose either record or make a new pair.
-Native allocation reserves the ID, and an ambiguous migration target is
-refused. See [same-ID coexistence evidence](evidence/primeclaw-59-same-id-coexistence-20261122.md).
+Native allocation reserves the ID. A marker in a title is not an import
+reference. On clean selected-store replay, the native receipt identifies the
+memory USER task even if it carries no import references. If that target has a
+live/archive pair, migration refuses before destination layout changes or
+publication. See the [coexistence baseline](evidence/primeclaw-59-same-id-coexistence-20261122.md)
+and [revision tests](evidence/primeclaw-59-coexistence-revision-20261122.md).
 Only a non-force published descendant is
 materialized by an ordinary fast-forward or initial clone. A pre-reconciliation
 in-memory preservation check continues through the existing original baseline,
