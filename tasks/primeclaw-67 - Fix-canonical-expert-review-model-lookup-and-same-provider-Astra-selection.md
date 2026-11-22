@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-67
 title: Fix canonical expert-review model lookup and same-provider Astra selection
-status: In Design
+status: In Planning
 assignee: []
 created_date: '2026-11-22T03:41:00Z'
+updated_date: '2026-11-22T03:43:00Z'
 labels: []
 dependencies: []
 references:
@@ -40,3 +41,12 @@ Owning Conversation is 01a20155-e0e9-7185-96a8-998c0dca989c, distinct from the e
 - [ ] #4 Proportional focused regression coverage and a fresh Docker Tier 1 probe or documented container suite pass for the changed exact inputs, or failures are truthfully reported without live installation.
 - [ ] #5 The isolated Episode publishes coherent source commits and native evidence for independent read-only review; installed bytes, foreign tasks/owners/resources and deployment remain untouched.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. In the separately admitted PRIMECLAW-67 Episode, reread the current canonical skill and installed semantic evidence. Replace only the obsolete model-selection guidance with CLI `prime-agent model list [search]` lookup (quoted provider/family search), exact requested provider/model-id or newest requested same-provider family, latest same-provider Astra default, and disclosure of the actual choice. Preserve compatible intervening skill content; do not modify installed bytes or deployment metadata.
+2. Separate CLI catalog lookup from native RLM eligibility: require the exact CLI-selected selector in `await rlm.find_models(...)` before a different-model child launch. Distinguish missing discovery from an actual launch error; forbid provider fallback or silent explicit-model replacement, and ask before a non-Astra default. Preserve strongest supported reasoning, bootstrap-only spawn, one real task delivery, explicit reply, normal read-only review, and lifecycle boundaries. Adjust nearby wording/example comments only where needed to avoid contradicting these rules; add no runtime enforcement or alternate launch mechanism.
+3. Update the obsolete assertions in tests/test_expert_review_skill.py and add proportional Markdown contract checks for CLI lookup/quoted search, exact-versus-latest selection, parent-provider retention, CLI/discovery/launch separation, no silent substitution, and consultation. Keep existing review/authority/delivery coverage. Run the focused suite and fresh scripts/test-tier1.sh --probe (or the documented container suite) against the final changed inputs. Record exact commands, source/input hashes, outcomes and real failures separately; never run candidate host/global plugin operations. These static checks guard shipped guidance, not runtime model availability.
+4. Commit and push coherent Episode source changes and native progress/evidence promptly. Report exact candidate/base/task revisions, changed files, tests and remaining limits to the owner. The owner obtains independent normal read-only same-provider Astra review using the selected-model discovery rules; accepted concrete in-scope findings return to the same Episode through its normal continuation. Stop at the reviewed pushed Ready for Merge tuple. No merge, live refresh/restart/UAT, foreign-resource mutation or cleanup is included. No new task dependency or general documentation change is needed unless the bounded source edit reveals an actual consistency defect.
+<!-- SECTION:PLAN:END -->
