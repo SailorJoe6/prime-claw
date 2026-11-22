@@ -36,6 +36,7 @@ import {
 } from "./project-initialization.ts";
 import {
   prepareExistingBacklogTaskHistoryWorkspace,
+  reconcileParkedBacklogMigrationStore,
   checkBacklogMigrationConfiguration,
   prepareExistingBacklogEpisodeProjection,
   TASK_HISTORY_REF,
@@ -1922,6 +1923,7 @@ interface BacklogDestinationBaseline {
   records: Map<string, JsonObject>;
   files: Map<string, { bytes: string; history: string; repository: string; relativePath: string }>;
   statusChanges?: Map<string, { bytes: string; content: string; fileHistoryMayAdvance: boolean }>;
+  verifyPreparation?: () => void;
 }
 
 function backlogFileBytes(path: string): string {
@@ -1944,7 +1946,7 @@ function backlogFileHistory(runner: CommandRunner, repository: string, relativeP
 
 function captureBacklogDestinationBaseline(
   projectRoot: string, prepared: ExplicitBacklogMigrationWorkspace, runner: CommandRunner, views: Map<string, JsonObject>,
-  memoryOutputs: BacklogMemoryOutputs,
+  memoryOutputs: BacklogMemoryOutputs, verifyPreparation?: () => void,
 ): BacklogDestinationBaseline {
   const records = new Map([...views].filter(([, view]) => {
     const comments = Array.isArray(view.task.comments) ? view.task.comments : [];
@@ -1981,12 +1983,13 @@ function captureBacklogDestinationBaseline(
     }
     files.set(path, { bytes: backlogFileBytes(path), history, repository, relativePath });
   }
-  return { head: prepared.head, cloneIdentity: backlogCloneIdentity(prepared.storeDir), records, files };
+  return { head: prepared.head, cloneIdentity: backlogCloneIdentity(prepared.storeDir), records, files, verifyPreparation };
 }
 
 function assertPreservedBacklogBaseline(
   baseline: BacklogDestinationBaseline, storeDir: string, runner: CommandRunner, views?: Map<string, JsonObject>,
 ): void {
+  baseline.verifyPreparation?.();
   if (backlogCloneIdentity(storeDir) !== baseline.cloneIdentity) throw new Error("Backlog destination original clone identity changed");
   runRequired(runner, "git", ["-C", storeDir, "merge-base", "--is-ancestor", baseline.head, "HEAD"], storeDir, "Backlog baseline ancestry");
   for (const [path, original] of baseline.files) {
@@ -2284,13 +2287,19 @@ async function migrateBeadsToBacklog(
   ownershipRows: Array<{ ownerSessionId: string; taskId: string; worktree: string; verifyCodeProjection?: () => void }>,
   openWeb: OpenBeadsMigrationWeb,
 ): Promise<DestinationCandidate> {
+  const parked = reconcileParkedBacklogMigrationStore(source.projectRoot, runner, content => {
+    const statuses = editableBacklogStatuses(content);
+    if (statuses) assertBeadsCompletionStatus(source, statuses);
+  });
   const originalLayout = originalBacklogLayout(source.projectRoot, runner);
   const activeCodeProjections = new Map<string, () => void>();
   const activeLayoutPublishers = new Map<string, () => string>();
   const prepared = prepareExplicitBacklogMigrationWorkspace(source.projectRoot, runner);
+  prepared.codePaths = [...new Set([...prepared.codePaths, ...(parked?.codePaths ?? [])])];
   const storeDir = prepared.storeDir;
   const codeProjection = migrationCodeProjection(source.projectRoot, runner, prepared.codePaths);
   const verifyCodeProjection = () => {
+    parked?.verifyPreserved();
     if (migrationCodeProjection(source.projectRoot, runner, prepared.codePaths) !== codeProjection) throw new Error("code layout projection changed during provider migration");
   };
   const originalViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "pre-import baseline");
@@ -2308,7 +2317,7 @@ async function migrateBeadsToBacklog(
     assertCommittedBacklogMemoryOutputs(reusedMemoryOutputs, source.projectRoot, storeDir,
       [String(existingReceipt!.destinationDataRevision), prepared.head], runner);
   }
-  const baseline = captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, originalViews, reusedMemoryOutputs ?? { documents: [] });
+  const baseline = captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, originalViews, reusedMemoryOutputs ?? { documents: [] }, parked?.verifyPreserved);
   const expectedCount = baseline.records.size + source.counts.total + 1 + (source.memories.length ? 1 : 0);
   const reusedDestinationIds = new Set(Object.values(mapping));
   // Prepare additions before starting the ONE owned browser. Its native config

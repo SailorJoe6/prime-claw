@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync,
-  realpathSync, existsSync, lstatSync, readlinkSync, symlinkSync, renameSync, rmSync } from "node:fs";
+  realpathSync, existsSync, lstatSync, readlinkSync, symlinkSync, renameSync, rmSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, relative, basename } from "node:path";
 import test from "node:test";
@@ -281,10 +281,23 @@ for (const layout of [layouts[0], layouts[3]]) {
     const originalRootConfig = existsSync(oldRootPath)
       ? { bytesBase64: readFileSync(oldRootPath).toString("base64"), mode: lstatSync(oldRootPath).mode }
       : null;
-    const originalFiles = Object.entries(files(join(f.root, f.store)))
-      .map(([path, bytesBase64]) => ({ path, bytesBase64, mode: lstatSync(join(f.root, f.store, path)).mode }));
+    // Full POSIX modes are not Git's executable bit. Preserve these native
+    // source settings through both fresh projection and existing-clone FF.
+    chmodSync(join(f.root, f.activePath), 0o640);
+    chmodSync(f.configPath, 0o640);
+    const scriptRelative = "scripts/mode-proof.sh";
+    mkdirSync(join(f.root, f.store, "scripts"), { recursive: true });
+    writeFileSync(join(f.root, f.store, scriptRelative), "#!/bin/sh\nprintf 'retained native mode\\n'\n");
+    chmodSync(join(f.root, f.store, scriptRelative), 0o750);
+    git(f.root, "add", `${f.store}/${scriptRelative}`);
+    git(f.root, "commit", "-qm", "seed executable attachment for full native projection modes"); git(f.root, "push", "-q");
     const primary = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: f.root });
     assert.equal(primary.status, "prepared", JSON.stringify(primary));
+    // This test targets Episode projection, not independent primary adoption.
+    chmodSync(join(primary.storeDir, "config.yml"), 0o640);
+    const nativeFiles = store => Object.entries(files(store)).filter(([path]) => !path.startsWith(".git/"))
+      .map(([path, bytesBase64]) => ({ path, bytesBase64, mode: lstatSync(join(store, path)).mode }));
+    const originalFiles = nativeFiles(primary.storeDir);
     const finalRel = relative(f.root, primary.storeDir);
     // Existing migration's common private ignore protects the older Episode
     // without altering its code/index just to install the independent clone.
@@ -305,6 +318,51 @@ for (const layout of [layouts[0], layouts[3]]) {
     assert.ok(changed.every(path => result.codePaths.includes(path)));
     assert.ok(result.codePaths.includes("backlog.config.yml"));
     assert.ok(result.codePaths.includes(f.activePath));
+    const activeRelative = f.activePath.slice(`${f.store}/`.length);
+    const modePaths = [activeRelative, "config.yml", scriptRelative];
+    const assertNativeModes = () => {
+      for (const path of modePaths) {
+        assert.equal(readFileSync(join(result.storeDir, path)).toString("base64"), readFileSync(join(primary.storeDir, path)).toString("base64"), `current projected bytes: ${path}`);
+        assert.equal(lstatSync(join(result.storeDir, path)).mode & 0o777, path === scriptRelative ? 0o750 : 0o640, `full projected mode: ${path}`);
+      }
+    };
+    assertNativeModes(); // fresh materialization branch
+    const cloneIdentity = [result.storeDir, join(result.storeDir, ".git")].map(path => {
+      const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino];
+    });
+    const cloneConfig = readFileSync(join(result.storeDir, ".git", "config"), "utf8");
+    // Publish only this fixture's exact initial layout, as the migration does
+    // before a later existing-clone continuation. First-call HEAD/index checks
+    // above remain independent from this explicit native fixture publication.
+    const detached = git(target, "ls-files", "-z", "--", f.store).split("\0").filter(Boolean);
+    if (detached.length) git(target, "rm", "--cached", "--", ...detached);
+    git(target, "add", "backlog.config.yml");
+    git(target, "commit", "-qm", "publish exact initial Episode task projection");
+    const ffCodeHead = git(target, "rev-parse", "HEAD"), ffCodeIndex = git(target, "ls-files", "--stage", "-z");
+    // Advance native current bytes on the same published task history. The
+    // Episode clone remains clean: chmod changes no Git executable bits.
+    backlog(f.root, "task", "edit", f.active, "--description", "current native content after projection", "--plain");
+    chmodSync(join(primary.storeDir, activeRelative), 0o640);
+    git(primary.storeDir, "add", activeRelative);
+    git(primary.storeDir, "-c", "user.name=Mode Fixture", "-c", "user.email=mode@example.invalid", "commit", "-qm", "native task advance for mode-preserving FF projection");
+    git(primary.storeDir, "push", "-q");
+    const nextHead = git(primary.storeDir, "rev-parse", "HEAD");
+    for (const path of modePaths) chmodSync(join(result.storeDir, path), path === scriptRelative ? 0o700 : 0o600);
+    const rootLink = join(f.root, "backlog.config.yml");
+    const ff = prepareExistingBacklogEpisodeProjection({ primaryRoot: f.root, targetWorktree: target,
+      expectedRevision: nextHead, remoteName: primary.remote, remoteUrl: primary.remoteUrl,
+      originalStoreRelative: finalRel, originalFiles: nativeFiles(primary.storeDir),
+      originalRootConfig: { bytesBase64: readFileSync(rootLink).toString("base64"), mode: lstatSync(rootLink).mode, linkTarget: readlinkSync(rootLink) },
+    });
+    assert.equal(ff.status, "prepared", JSON.stringify(ff)); assert.equal(ff.head, nextHead);
+    assert.equal(ff.storeDir, result.storeDir); assertNativeModes();
+    assert.deepEqual([ff.storeDir, join(ff.storeDir, ".git")].map(path => {
+      const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino];
+    }), cloneIdentity, "fast-forward retains the same independent clone and Git directory");
+    assert.equal(readFileSync(join(ff.storeDir, ".git", "config"), "utf8"), cloneConfig);
+    assert.equal(git(target, "rev-parse", "HEAD"), ffCodeHead); assert.equal(git(target, "ls-files", "--stage", "-z"), ffCodeIndex);
+    assert.equal(view(target, f.active).description, "current native content after projection");
+    assert.equal(git(ff.storeDir, "status", "--porcelain"), "");
   });
 }
 

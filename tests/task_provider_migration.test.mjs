@@ -12,7 +12,7 @@ import test from "node:test";
 import { completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { checkBeadsCapabilities, detectExplicitTaskProvider, detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
-import { prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
+import { initialTaskStoreConfig, prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 import { projectBeadsCurrentTask, assertBeadsCurrentTask } from "../src/prime-agent-plugin/extension-support/beads-backlog-current.ts";
 
 const BACKLOG_CANDIDATE = "deps/backlog/dist/backlog";
@@ -2809,6 +2809,263 @@ function publishedPopulatedBacklogDestination(fixture) {
   return { store, active, completed, archived, legacy, draft, baseline };
 }
 
+
+// Parked originals remain inactive code-owned history. Reconciliation must copy
+// into the exact selected native store without replacing either task ancestry.
+function parkedStoreTree(path) {
+  if (!existsSync(path)) return null;
+  const tree = {};
+  for (const entry of readdirSync(path, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name === ".git") continue;
+    const file = join(path, entry.name), stat = lstatSync(file);
+    tree[entry.name] = { mode: stat.mode, ...(entry.isDirectory() ? { children: parkedStoreTree(file) }
+      : entry.isSymbolicLink() ? { link: readlinkSync(file) } : { bytes: readFileSync(file).toString("base64") }) };
+  }
+  return tree;
+}
+
+function parkedStoreReconciliationFixture(t, name, { selected = ".backlog", clone = true } = {}) {
+  const fixture = embeddedBeadsSource(t, `parked-${name}`);
+  const original = coexistenceDestination(fixture, "backlog");
+  const parked = join(fixture.root, "backlog"), configPath = join(parked, "config.yml");
+  const config = readFileSync(configPath, "utf8")
+    .replace(/^statuses:.*$/m, 'statuses: ["Triage", "In Design", "In Progress", "Blocked", "In Planning", "Done"]')
+    .replace(/^default_status:.*$/m, 'default_status: "Triage"')
+    .replace(/^auto_commit:.*$/m, "auto_commit: true")
+    .replace(/^(?:types|priorities):.*\n/gm, "")
+    + '\n# Retain parked operator customization, not bootstrap defaults.\noperator_extension: {opaque: [null, false, "Ω"]}\n'
+    + 'types: ["Incident, Follow-up"]\npriorities: ["P4", "P1", "P0", "Very High, Almost"]\n';
+  writeFileSync(configPath, config); chmodSync(configPath, 0o640);
+  const recordPaths = Object.keys(physicalDestinationRecords(parked));
+  for (const path of recordPaths) chmodSync(join(parked, path), 0o640);
+  mkdirSync(join(parked, "scripts"));
+  writeFileSync(join(parked, "scripts", "retained.sh"), "#!/bin/sh\nprintf 'original attachment Ω\\n'\n");
+  chmodSync(join(parked, "scripts", "retained.sh"), 0o750);
+  renameSync(configPath, join(parked, "config.yml.pre-migration"));
+  git(fixture.root, "add", "backlog"); git(fixture.root, "commit", "-qm", "park original native configuration without discarding history");
+  git(fixture.root, "push", "-q");
+  const codeHead = git(fixture.root, "rev-parse", "HEAD");
+  // Native subtree split is only a task-only ancestry expectation; the original
+  // code commits must not become ancestors of the independent task branch.
+  const originalTaskHead = git(fixture.root, "subtree", "split", "--prefix=backlog", codeHead);
+  assert.ok(git(fixture.root, "log", "--format=%H", originalTaskHead, "--", original.activePath.slice("backlog/".length)).split(/\r?\n/).length >= 2,
+    "fixture carries two real revisions of the original active task");
+  const sourceHistory = Object.fromEntries([...recordPaths, "config.yml.pre-migration", "scripts/retained.sh"].map(path => [path,
+    git(fixture.root, "log", "--follow", "--format=fuller", "--binary", "-p", "--", `backlog/${path}`)]));
+  const originalBlobs = Object.fromEntries(recordPaths.map(path => [path, command(fixture.root, "git", ["show", `${originalTaskHead}:${path}`])]));
+  const seed = join(fixture.outer, "published-bootstrap"); mkdirSync(seed);
+  command(seed, "git", ["init", "-q", "-b", "prime-claw/tasks"]);
+  git(seed, "config", "user.name", "prime-claw"); git(seed, "config", "user.email", "prime-claw@localhost");
+  writeFileSync(join(seed, "TASKS.md"), "# Prime Claw task history\n\nThis disconnected branch carries the provider-native Backlog task store.\n");
+  const bootstrapConfig = initialTaskStoreConfig("repo") + (selected === ".backlog" ? "" : `backlog_directory: ${JSON.stringify(selected)}\n`);
+  writeFileSync(join(seed, "config.yml"), bootstrapConfig);
+  git(seed, "add", "TASKS.md", "config.yml"); git(seed, "commit", "-qm", "prime-claw: initialize task history");
+  git(seed, "remote", "add", "origin", fixture.remote); git(seed, "push", "-qu", "origin", TASK_HISTORY_REF);
+  const bootstrapHead = git(seed, "rev-parse", "HEAD"), store = join(fixture.root, selected);
+  if (clone) {
+    mkdirSync(join(store, ".."), { recursive: true });
+    command(fixture.root, "git", ["clone", "-q", "--branch", "prime-claw/tasks", "--single-branch", fixture.remote, store]);
+    git(store, "config", "user.name", "Existing Clone Author"); git(store, "config", "user.email", "existing-clone@example.invalid");
+    symlinkSync(`${selected}/config.yml`, join(fixture.root, "backlog.config.yml"));
+  }
+  const ignorePath = join(fixture.root, ".gitignore"), ignore = readFileSync(ignorePath, "utf8");
+  writeFileSync(ignorePath, `${ignore}${ignore.endsWith("\n") ? "" : "\n"}/${selected}/\n`);
+  git(fixture.root, "add", ".gitignore", ...(clone ? ["backlog.config.yml"] : []));
+  git(fixture.root, "commit", "-qm", "retain exact destination placement alongside parked originals"); git(fixture.root, "push", "-q");
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const identity = clone ? [store, join(store, ".git")].map(path => {
+    const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino];
+  }) : null;
+  return { ...fixture, selected, store, seed, parked, original, config, recordPaths, codeHead, originalTaskHead, bootstrapHead,
+    sourceHistory, originalBlobs, identity, inspection, parkedBefore: parkedStoreTree(parked),
+    cloneConfig: clone ? readFileSync(join(store, ".git", "config"), "utf8") : null,
+    request: { cwd: fixture.root, targetProvider: "backlog", expectedSourceRevision: inspection.sourceRevision, confirmedSwitch: true,
+      actor: "parked-store-fixture", semanticPlacement: "Retain inactive parked originals and both native task ancestries in the exact selected destination." } };
+}
+
+for (const variant of [
+  { name: "published bootstrap without local clone", clone: false },
+  { name: "existing hidden bootstrap clone", clone: true, activeOwner: true },
+  { name: "existing custom bootstrap clone", clone: true, selected: "planning/task store" },
+]) {
+  test(`parked-store reconciliation preserves originals and both ancestries: ${variant.name}`, { timeout: 360_000 }, async t => {
+    const f = parkedStoreReconciliationFixture(t, variant.name.replaceAll(" ", "-"), variant);
+    const owner = variant.activeOwner ? addActiveBeadsOwner(f) : null;
+    if (owner) {
+      f.inspection = inspectTaskProviderMigration({ cwd: f.root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+      assert.equal(f.inspection.status, "ready", f.inspection.detail);
+      f.request.expectedSourceRevision = f.inspection.sourceRevision;
+    }
+    const ownerBefore = owner ? {
+      worktree: [realpathSync(owner.episode), lstatSync(owner.episode).dev, lstatSync(owner.episode).ino],
+      session: readFileSync(owner.record.episodeSessionFile).toString("base64"),
+      codeIndex: git(owner.episode, "ls-files", "--stage", "--", "README.md"),
+      parked: parkedStoreTree(join(owner.episode, "backlog")),
+    } : null;
+    const nativeCurrent = captureBeadsCurrentTasks(f.root, Object.values(f.ids));
+    const source = sourceAuthorityFiles(f.root);
+    let retirementCalls = 0;
+    const nativeIdentity = variant.clone ? null : {
+      GIT_AUTHOR_NAME: "Synthetic Parked Store Author", GIT_AUTHOR_EMAIL: "parked-store-author@example.invalid",
+      GIT_COMMITTER_NAME: "Synthetic Parked Store Committer", GIT_COMMITTER_EMAIL: "parked-store-committer@example.invalid",
+    };
+    const previousIdentity = nativeIdentity ? Object.fromEntries(Object.keys(nativeIdentity).map(key => [key, process.env[key]])) : null;
+    let observed;
+    try {
+      if (nativeIdentity) Object.assign(process.env, nativeIdentity);
+      observed = await observeCompletionMigration({ ...f.request, runner: new AsIsBeadsRunner(),
+      ...(owner ? { verifyActiveRuntime: proveFixtureRuntime } : {}), deleteSource(snapshot) {
+      retirementCalls++;
+      assert.equal(snapshot.provider, "beads");
+      assert.deepEqual(sourceAuthorityFiles(f.root), source, "source remains authoritative through destination proof");
+      assert.deepEqual(parkedStoreTree(f.parked), f.parkedBefore, "inactive originals stay byte/mode/path exact before retirement");
+      for (const path of f.recordPaths) assert.equal(readFileSync(join(f.store, path)).toString("base64"),
+        readFileSync(join(f.parked, path)).toString("base64"), `original is consolidated before retirement: ${path}`);
+      git(f.store, "merge-base", "--is-ancestor", f.bootstrapHead, "HEAD");
+      git(f.store, "merge-base", "--is-ancestor", f.originalTaskHead, "HEAD");
+      assert.equal(git(f.store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], git(f.store, "rev-parse", "HEAD"));
+      rmSync(join(f.root, ".beads"), { recursive: true, force: true });
+      rmSync(join(f.root, ".beads.gate.lock"), { force: true }); // this synthetic native source owns its adjacent lock
+      } });
+    } finally {
+      if (previousIdentity) for (const [key, value] of Object.entries(previousIdentity)) {
+        if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      }
+    }
+    const { result, requests } = observed;
+    console.info(JSON.stringify({ parkedStoreCase: variant.name, status: result.status, detail: result.detail, retirementCalls,
+      nativeWrites: requests.filter(row => ["POST", "PUT"].includes(row.method)).length }));
+    assert.equal(result.status, "completed", result.detail); assert.equal(retirementCalls, 1);
+    assert.deepEqual(parkedStoreTree(f.parked), f.parkedBefore, "parked store stays inactive and unchanged, never moved or deleted");
+    assert.equal(existsSync(join(f.parked, "config.yml")), false); assert.equal(existsSync(join(f.parked, ".git")), false);
+    assert.equal(git(f.root, "ls-files", "--", "backlog"), git(f.root, "ls-tree", "-r", "--name-only", f.codeHead, "--", "backlog"),
+      "parked original paths remain code-owned, not detached or replaced");
+    for (const [path, history] of Object.entries(f.sourceHistory)) {
+      assert.equal(git(f.root, "log", "--follow", "--format=fuller", "--binary", "-p", "--", `backlog/${path}`), history, path);
+      assert.equal(readFileSync(join(f.store, path)).toString("base64"), readFileSync(join(f.parked, path)).toString("base64"), path);
+      assert.equal(lstatSync(join(f.store, path)).mode, lstatSync(join(f.parked, path)).mode, path);
+    }
+    git(f.store, "merge-base", "--is-ancestor", f.bootstrapHead, "HEAD");
+    git(f.store, "merge-base", "--is-ancestor", f.originalTaskHead, "HEAD");
+    assert.notEqual(new CandidateRunner().run("git", ["merge-base", "--is-ancestor", f.codeHead, "HEAD"],
+      { cwd: f.store, allowFailure: true }).status, 0, "original code commits do not become task authority");
+    assert.equal(command(f.store, "git", ["show", `${f.bootstrapHead}:TASKS.md`]), readFileSync(join(f.seed, "TASKS.md"), "utf8"));
+    for (const [path, bytes] of Object.entries(f.originalBlobs)) assert.equal(command(f.store, "git", ["show", `${f.originalTaskHead}:${path}`]), bytes, path);
+    const finalConfig = readFileSync(join(f.store, "config.yml"), "utf8");
+    const withoutPlacement = value => value.replace(/^backlog(?:Directory|_directory):.*\n?/gm, "");
+    assert.equal(withoutPlacement(finalConfig), withoutPlacement(f.config), "activate a copy of parked custom config, changing only native placement");
+    assert.equal(lstatSync(join(f.store, "config.yml")).mode, lstatSync(join(f.parked, "config.yml.pre-migration")).mode);
+    assert.equal(readlinkSync(join(f.root, "backlog.config.yml")), `${f.selected}/config.yml`);
+    assert.equal(realpathSync(join(f.root, "backlog.config.yml")), realpathSync(join(f.store, "config.yml")));
+    assert.equal(git(f.store, "remote"), "origin"); assert.equal(git(f.store, "remote", "get-url", "origin"), f.remote);
+    assert.equal(git(f.store, "symbolic-ref", "--short", "HEAD"), "prime-claw/tasks");
+    if (f.identity) {
+      assert.deepEqual([f.store, join(f.store, ".git")].map(path => {
+        const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino];
+      }), f.identity, "reuse the exact selected clone, not a new clone");
+      assert.equal(readFileSync(join(f.store, ".git", "config"), "utf8"), f.cloneConfig);
+    }
+    if (f.selected !== ".backlog") assert.equal(existsSync(join(f.root, ".backlog")), false, "no second destination");
+    const mappings = Object.fromEntries(result.receipt.mappings.map(row => [row.sourceTaskId, row.destinationTaskId]));
+    for (const row of result.receipt.mappings) {
+      const view = JSON.parse(backlog(f.root, "task", "view", "--json", "--", row.destinationTaskId));
+      assertCurrentBacklogTask(view, nativeCurrent[row.sourceTaskId], f.inspection, mappings,
+        { priorities: ["P4", "P1", "P0", "Very High, Almost"], types: ["Incident, Follow-up"] });
+      assert.equal(view.task.type, "Incident, Follow-up");
+      assert.ok(!Object.values(f.original).includes(row.destinationTaskId), "native allocation reserves original task IDs");
+    }
+    const originalView = JSON.parse(backlog(f.root, "task", "view", "--json", "--", f.original.active)).task;
+    assert.equal(originalView.path.startsWith(`${f.selected}/`), true); assert.match(originalView.implementationNotes, /preserved second native revision/);
+    assert.equal(git(f.store, "status", "--porcelain=v1"), "");
+    assert.equal(git(f.store, "rev-parse", "HEAD"), result.receipt.destinationReceiptRevision);
+    assert.equal(existsSync(join(f.root, ".beads")), false);
+    assert.equal(existsSync(join(f.root, ".beads.gate.lock")), false);
+    if (owner) {
+      const current = JSON.parse(readFileSync(join(f.root, ".prime-claw", "ownership.json"), "utf8")).owners[owner.ownerSessionId];
+      assert.equal(current.provider, "backlog"); assert.equal(current.taskId, mappings[f.ids.parent]);
+      for (const field of ["status", "ownerSessionId", "operationId", "engine", "baseRef", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
+        assert.deepEqual(current[field], owner.record[field], `same Episode resource: ${field}`);
+      }
+      assert.deepEqual([realpathSync(owner.episode), lstatSync(owner.episode).dev, lstatSync(owner.episode).ino], ownerBefore.worktree);
+      assert.equal(readFileSync(owner.record.episodeSessionFile).toString("base64"), ownerBefore.session);
+      assert.equal(git(owner.episode, "ls-files", "--stage", "--", "README.md"), ownerBefore.codeIndex);
+      assert.deepEqual(parkedStoreTree(join(owner.episode, "backlog")), ownerBefore.parked, "Episode's inactive parked tree is not adopted or rewritten");
+      const episodeStore = join(owner.episode, f.selected);
+      for (const path of [...f.recordPaths, "config.yml.pre-migration", "scripts/retained.sh", "config.yml"]) {
+        assert.equal(readFileSync(join(episodeStore, path)).toString("base64"), readFileSync(join(f.store, path)).toString("base64"), `Episode current bytes: ${path}`);
+        assert.equal(lstatSync(join(episodeStore, path)).mode, lstatSync(join(f.store, path)).mode, `Episode full native mode: ${path}`);
+      }
+      assert.equal(lstatSync(join(episodeStore, "config.yml")).mode & 0o777, 0o640);
+      assert.equal(lstatSync(join(episodeStore, "scripts/retained.sh")).mode & 0o777, 0o750);
+      assert.equal(readlinkSync(join(owner.episode, "backlog.config.yml")), `${f.selected}/config.yml`);
+      assert.equal(git(episodeStore, "rev-parse", "HEAD"), result.receipt.destinationReceiptRevision);
+      assert.equal(git(episodeStore, "remote", "get-url", "origin"), f.remote);
+      for (const row of result.receipt.mappings) {
+        const nativeView = JSON.parse(backlog(owner.episode, "task", "view", "--json", "--", row.destinationTaskId));
+        assertCurrentBacklogTask(nativeView, nativeCurrent[row.sourceTaskId], f.inspection, mappings,
+          { priorities: ["P4", "P1", "P0", "Very High, Almost"], types: ["Incident, Follow-up"] });
+      }
+      const episodeOriginal = JSON.parse(backlog(owner.episode, "task", "view", "--json", "--", f.original.active)).task;
+      assert.deepEqual(episodeOriginal, originalView, "same selected-store native original view");
+      const episodeHead = git(owner.episode, "rev-parse", "HEAD");
+      git(owner.episode, "merge-base", "--is-ancestor", owner.episodeHead, episodeHead);
+      assert.equal(git(owner.episode, "ls-remote", "--refs", "origin", "refs/heads/episode-beads-owner").split(/\s+/)[0], episodeHead);
+      assert.equal(git(owner.episode, "status", "--porcelain=v1"), "");
+      assert.equal(git(episodeStore, "status", "--porcelain=v1"), "");
+    }
+  });
+}
+
+for (const conflict of ["configuration", "physical path", "code ancestry"]) {
+  test(`parked-store reconciliation refuses unresolved ${conflict} without changing either side`, { timeout: 240_000 }, async t => {
+    const f = parkedStoreReconciliationFixture(t, `conflict-${conflict.replaceAll(" ", "-")}`);
+    if (conflict === "configuration") {
+      const path = join(f.store, "config.yml");
+      writeFileSync(path, readFileSync(path, "utf8") + '\noperator_extension: "different selected user setting"\n');
+      git(f.store, "add", "config.yml"); git(f.store, "commit", "-qm", "selected non-bootstrap configuration must not be overwritten");
+    } else if (conflict === "physical path") {
+      // Resolve configuration equivalence first, so this fixture isolates the
+      // conflicting attachment rather than a separate custom-config choice.
+      const selectedConfig = f.config.replace(/^backlog(?:Directory|_directory):.*\n?/gm, "")
+        + `backlog_directory: ${JSON.stringify(f.selected)}\n`;
+      writeFileSync(join(f.store, "config.yml"), selectedConfig);
+      chmodSync(join(f.store, "config.yml"), lstatSync(join(f.parked, "config.yml.pre-migration")).mode & 0o777);
+      mkdirSync(join(f.store, "scripts")); writeFileSync(join(f.store, "scripts", "retained.sh"), "different selected attachment\n");
+      git(f.store, "add", "config.yml", "scripts/retained.sh"); git(f.store, "commit", "-qm", "equivalent config with selected physical path conflict, not a duplicate task ID");
+    } else {
+      git(f.store, "fetch", "-q", f.root, f.codeHead);
+      const mixed = git(f.store, "commit-tree", `${f.bootstrapHead}^{tree}`, "-p", f.bootstrapHead, "-p", f.codeHead, "-m", "fixture task ref incorrectly shares code ancestry");
+      git(f.store, "update-ref", TASK_HISTORY_REF, mixed, f.bootstrapHead);
+    }
+    git(f.store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+    const before = { parked: parkedStoreTree(f.parked), selected: parkedStoreTree(f.store), head: git(f.store, "rev-parse", "HEAD"),
+      index: git(f.store, "ls-files", "--stage"), codeHead: git(f.root, "rev-parse", "HEAD"), codeIndex: git(f.root, "ls-files", "--stage"),
+      refs: git(f.root, "ls-remote", "--refs", f.remote), config: readFileSync(join(f.store, ".git", "config"), "utf8"),
+      source: sourceAuthorityFiles(f.root), sourceExport: bd(f.root, "--readonly", "export", "--all"), link: readlinkSync(join(f.root, "backlog.config.yml")) };
+    const runner = new AdmissionRunner(); let retirementCalls = 0;
+    const { result, requests } = await observeCompletionMigration({ ...f.request, runner,
+      deleteSource() { retirementCalls++; throw new Error("conflict must not reach source retirement"); } });
+    assert.equal(result.status, "blocked", result.detail);
+    if (conflict === "configuration") {
+      assert.match(result.detail, /parked[\s\S]*config|config[\s\S]*parked/i);
+      assert.match(result.detail, /conflict|disagree|different|overwrite|custom|bootstrap/i, "refuse the actual unresolved config choice");
+    }
+    else if (conflict === "physical path") assert.match(result.detail, /scripts\/retained\.sh/);
+    else assert.match(result.detail, /shared[\s\S]*ancestry|code[\s\S]*ancestry|history[\s\S]*conflict/i);
+    assert.equal(retirementCalls, 0); assert.equal(requests.some(row => ["POST", "PUT"].includes(row.method)), false);
+    assert.equal(runner.calls.some(({ commandName, args }) => commandName === "backlog" && ["create", "edit", "archive", "delete", "init"].includes(args[1] ?? args[0])), false);
+    assert.deepEqual(parkedStoreTree(f.parked), before.parked); assert.deepEqual(parkedStoreTree(f.store), before.selected);
+    assert.equal(git(f.store, "rev-parse", "HEAD"), before.head); assert.equal(git(f.store, "ls-files", "--stage"), before.index);
+    assert.equal(git(f.root, "rev-parse", "HEAD"), before.codeHead); assert.equal(git(f.root, "ls-files", "--stage"), before.codeIndex);
+    assert.equal(git(f.root, "ls-remote", "--refs", f.remote), before.refs);
+    assert.equal(readFileSync(join(f.store, ".git", "config"), "utf8"), before.config);
+    assert.equal(readlinkSync(join(f.root, "backlog.config.yml")), before.link);
+    assert.deepEqual(sourceAuthorityFiles(f.root), before.source); assert.equal(bd(f.root, "--readonly", "export", "--all"), before.sourceExport);
+    assert.equal(existsSync(join(f.root, ".beads")), true);
+  });
+}
+
 // Selected-existing configuration must not become a fresh canonical bootstrap.
 function selectedMigrationConfigFixture(t, name, { missing = false, block = false, autoCommit = false, statuses: selectedStatuses } = {}) {
   const fixture = embeddedBeadsSource(t, name), destination = publishedPopulatedBacklogDestination(fixture);
@@ -3652,4 +3909,52 @@ test("default migration capture is file-backed for every native read and reports
   assert.deepEqual(sourceAuthorityFiles(fixture.root), before);
   assert.equal(readFileSync(ownershipPath, "utf8"), ownership);
   assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+});
+
+
+test("parked-store reconciliation retains uncertain native allocation when auto-commit has no Git identity", { timeout: 360_000 }, async t => {
+  const f = parkedStoreReconciliationFixture(t, "missing-native-git-identity", { clone: false });
+  const source = sourceAuthorityFiles(f.root);
+  const overrides = {
+    GIT_AUTHOR_NAME: undefined, GIT_AUTHOR_EMAIL: undefined,
+    GIT_COMMITTER_NAME: undefined, GIT_COMMITTER_EMAIL: undefined,
+    GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "user.useConfigOnly", GIT_CONFIG_VALUE_0: "true",
+  };
+  const before = Object.fromEntries(Object.keys(overrides).map(key => [key, process.env[key]]));
+  let retirementCalls = 0;
+  try {
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+    const { result, requests } = await observeCompletionMigration({ ...f.request, runner: new AsIsBeadsRunner(),
+      deleteSource() { retirementCalls++; throw new Error("missing native identity must not retire source"); } });
+    assert.equal(result.status, "blocked");
+    assert.match(result.detail, /http-status-400; outcome=uncertain/);
+    assert.equal(retirementCalls, 0);
+    assert.equal(requests.filter(row => ["POST", "PUT"].includes(row.method)).length, 1,
+      "one uncertain allocation must not be resent or followed by another write");
+    assert.deepEqual(sourceAuthorityFiles(f.root), source);
+    assert.deepEqual(parkedStoreTree(f.parked), f.parkedBefore);
+    assert.equal(command(f.store, "git", ["config", "--get", "user.name"], true), null);
+    const privateDirectory = /Private transport evidence: ([^\r\n]+)/.exec(result.detail)?.[1];
+    assert.ok(privateDirectory);
+    const responseName = readdirSync(privateDirectory).filter(name => name.endsWith("response.json")).sort().at(-1);
+    assert.ok(responseName);
+    const responsePath = join(privateDirectory, responseName), responseBytes = readFileSync(responsePath);
+    assert.equal(lstatSync(responsePath).mode & 0o777, 0o600);
+    const response = JSON.parse(responseBytes.toString("utf8"));
+    assert.match(JSON.stringify(response), /Author identity unknown|unable to auto-detect email|no (?:email|name) was given|empty ident/i,
+      "synthetic native error must prove missing Git identity, not an unrelated HTTP400");
+    git(f.store, "merge-base", "--is-ancestor", f.bootstrapHead, "HEAD");
+    git(f.store, "merge-base", "--is-ancestor", f.originalTaskHead, "HEAD");
+    assert.equal(git(f.store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], git(f.store, "rev-parse", "HEAD"));
+    console.info(JSON.stringify({ parkedStoreDiagnostic: "missing-native-auto-commit-identity", status: result.status,
+      nativeWrites: 1, retirementCalls, nativeIdentityErrorMatched: true,
+      privateResponseSha256: createHash("sha256").update(responseBytes).digest("hex"), privateResponseMode: "0600" }));
+  } finally {
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
 });

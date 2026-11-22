@@ -472,6 +472,56 @@ ambiguous duplicate records, repair partial imports, or complete the remaining
 cancellation/progress/scale work. Validation and limits are recorded in
 [configuration evidence](evidence/primeclaw-59-config-preservation-20261121.md).
 
+### Parked configuration and original history reconciliation (bounded increment)
+
+This bounded candidate awaits independent review. Its focused parked/layout
+checks and seven core migration/shared suites pass. An additional ownership test
+still fails: its unchanged fixture writes a placeholder rather than the native
+journal identity required by the unchanged handoff guard. No guard or fixture
+was changed to hide the failure. See the linked evidence for exact results and
+limits; the full project test selection is not all-green.
+
+The confirmed migration path recognizes the inactive
+`backlog/config.yml.pre-migration` without changing ordinary provider discovery
+or fresh initialization. It keeps that original parked tree and its code index
+unchanged and inactive. It copies original records, IDs, relative paths, bytes,
+full permission modes and configuration into the exact native-selected hidden
+or custom destination. With no selected destination it uses the normal
+`.backlog/` target. An existing selected clone keeps its directory/`.git`
+identity, branch, remote, transport and Git configuration; it is not replaced.
+
+Reconciliation first builds a disposable ordinary-Git candidate. For
+code-owned originals, native `git subtree split` retains the task-only history;
+the original code commits remain unchanged in the code DAG, not as task-branch
+ancestors. A non-squashed merge retains both that native task ancestry and the
+existing published task ancestry. A published bootstrap is reused, not replaced
+by a second destination or rewritten history. Existing compatible non-bootstrap
+data is not itself a conflict.
+
+The parked configuration remains byte/mode exact at its original path and as
+`config.yml.pre-migration` in the selected store. Activating a copy changes only
+native directory placement, followed by the already documented missing-status
+edits. An untouched generated bootstrap may yield to the parked customization
+only after checking its whole one-commit history, exact two-file tree and
+configuration/marker identity (including the selected placement). Otherwise the
+two active configurations must already agree after placement adjustment; a
+meaningful disagreement stops without choosing a winner. Missing native startup
+fields still refuse before a read can normalize custom settings. The existing
+actual-source-completion and one-owned-server checks remain in effect.
+
+Concrete file, mode, ID, configuration, placement, ancestry or publication
+conflicts stop with both sides retained. Same-ID live/archive coexistence is
+still deferred, not silently resolved. Only a non-force published descendant is
+materialized by an ordinary fast-forward or initial clone. A pre-reconciliation
+in-memory preservation check continues through the existing original baseline,
+receipt refresh and cutover checks. It does not replace those checks or add a
+recovery journal. An uncertain native operation is not resent or rolled back.
+
+This increment does not authorize live migration, original cleanup, partial
+import recovery, disposability, responsive cancellation/progress, scale or
+whole-task acceptance. The focused fixtures and evidence limits are recorded in
+[parked-store evidence](evidence/primeclaw-59-parked-store-reconciliation-20261122.md).
+
 The confirmed maintenance window is one linear operation:
 
 1. capture every source task's current provider-native rows and long view,

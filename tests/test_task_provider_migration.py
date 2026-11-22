@@ -22,6 +22,17 @@ def test_task_provider_migration_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_parked_store_reconciliation_node_suite(tier1_container) -> None:
+    result = tier1_container.run(
+        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
+        "parked-store reconciliation", WS_NODE_SUITE, timeout=1800,
+    )
+    (tier1_container.share.parent / "parked-store-reconciliation-node.tap").write_text(
+        result.stdout + result.stderr
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_completion_status_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", "--test-name-pattern",
