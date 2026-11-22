@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T21:10:00Z'
+updated_date: '2026-11-22T21:18:00Z'
 labels: []
 dependencies: []
 references:
@@ -718,4 +718,7 @@ Exact blocker: saved host output ends at pytest `F`; tracked shell/pytest PIDs w
 
 ### Owner disposition — incomplete evidence retained; one integration authorized
 Owner verified the incomplete trace and publications `b168101744a0806a29d4e5caf2d49c4506f91de0` / `67d2666e21cef487e6faa71ff4b505a1feeb8e59` and the restored original idle Episode. The scale attempt remains incomplete, with no terminal migration result or runtime teardown proof and no production window. Joe’s direction relayed by Initialize PVA waives another scale rehearsal; it authorizes only the exact main integration recorded in the living plan. This handoff records scope, not implementation, full-task acceptance or any live/merge/deployment decision. `c6e0a3d` remains in effect.
+
+### Exact-main integration — conflict resolution validation started
+Canonical execute revalidated exact main `5ffb2e7942ea16bf53f97f88513b14a120d67839`, reviewed importer `ceaf02004fbd571603e3c51a0e245957607726e6`, and incomplete checkpoint `b168101744a0806a29d4e5caf2d49c4506f91de0`. Episode inverse `ee183c1ada4a99846dcc67cd4ff369a2e341a370` preserves that checkpoint in ancestry but restores the exact reviewed importer tree before the merge. Resolved migration source/test conflicts in staged tree `29252a1d4ca88b4a19da3f4003f9db0ae9fd73cf`: typed edges through native Web authoring/readback and receipt-bound replay; retained streaming hash with the preserved-pair digest payload. Focused offline Docker validation is running; no candidate or result yet. No live access or scale rerun.
 <!-- SECTION:NOTES:END -->
