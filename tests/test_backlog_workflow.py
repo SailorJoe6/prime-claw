@@ -176,10 +176,29 @@ def test_active_skill_and_workflow_guidance_has_no_removed_completion_invocation
 
 def test_operator_guidance_creates_new_work_explicitly_in_design() -> None:
     for path in (AGENT_GUIDANCE, BACKLOG_DOC, BACKLOG_SKILL):
-        text = normalized(path)
-        assert 'backlog task create "' in text
-        assert '--status "In Design"' in text
-        assert 'generic claim' in text
+        create_commands = [
+            line for line in path.read_text().splitlines()
+            if line.strip().startswith('backlog task create "')
+        ]
+        assert create_commands, path
+        assert all('--status "In Design"' in command for command in create_commands), path
+
+    entry = normalized(AGENT_GUIDANCE)
+    assert "Episode readiness requires `In Planning` and a meaningful plan" in entry
+    assert "the owning Conversation controls lifecycle status" in entry
+    assert "Direct tracked work uses its own native `In Progress` and `Done` procedure" in entry
+
+    backlog = normalized(BACKLOG_SKILL)
+    assert "no same-task Episode" in backlog
+    assert "publish `In Progress` before implementation edits" in backlog
+    assert (
+        "publish `Done` only after required checks and code commit/publication, "
+        "unless there is a review hold"
+    ) in backlog
+
+    docs = normalized(BACKLOG_DOC)
+    assert "`implement_task` for authorized Episode readiness" in docs
+    assert "The owning Conversation controls an Episode task's lifecycle transitions" in docs
 
 
 def test_execute_and_handoff_keep_backlog_authority_while_prepare_discovers_native_tracker() -> None:
