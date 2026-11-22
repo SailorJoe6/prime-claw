@@ -3,11 +3,11 @@ id: PRIMECLAW-15
 title: >-
   Episode handoff must identify durable session by immutable ID, not mutable
   name
-status: In Progress
+status: Done
 assignee:
   - Joe Landers
-created_date: '2026-10-12 01:01'
-updated_date: '2026-10-12 01:14'
+created_date: 2026-10-12 01:01
+updated_date: '2026-11-22T07:54:00Z'
 labels: []
 dependencies: []
 references:
