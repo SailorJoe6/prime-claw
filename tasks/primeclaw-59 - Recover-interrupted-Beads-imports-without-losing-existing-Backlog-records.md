@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T18:24:00Z'
+updated_date: '2026-11-22T18:33:00Z'
 labels: []
 dependencies: []
 references:
@@ -694,4 +694,7 @@ Focused `20261122T181039Z-96738-d5844880`: 89 initialization and one guarded for
 
 ### Owner disposition — independently reviewed operator-stop increment accepted
 The owner accepted only the operator-stop increment `ceaf02004fbd571603e3c51a0e245957607726e6` / `ce6e25779c3c6064eaa5d6bbd41751e8f88f412b` after independent Codex Astra review found no material defect. The owner verified both publications, eight input hashes, 46 artifacts, teardown, and the original idle Episode. The supported public RPC stop proves actual pre-cutover writer settlement apart from the host ACK, with no later writes/retry/rollback/deletion/retirement. The observed 53.202 ms tool return is one fixture measurement, not a bound; synchronous stage and guarded cutover limits still apply. Under `c6e0a3d`, the next bounded execute is the representative-volume fresh rehearsal on this exact reviewed product, not a product change or live assessment. Accepted prior rehearsal/failure evidence remains qualified. This handoff makes no code, test, lifecycle or live change; In Progress, 0/9 checked, null Final Summary remain unchanged.
+
+### Representative-volume rehearsal — admitted fixture checkpoint
+The sole canonical execute was admitted on the original Episode. The reviewed product remains frozen at `ceaf02004fbd571603e3c51a0e245957607726e6`. Prepared an opt-in offline Docker test for 406 synthetic Beads tickets, 3,800 actual authored comments with skew, 349 closed tickets, and substantial varied UTF-8 fields. It uses the parked/same-ID fixture, a disposable local remote, new explicit scale inspection, phase and terminal evidence, receipt-backed ownership guard and separate native readback. Syntax/collection only verified so far; the single runtime attempt is not yet evidence. No accepted stop/failure replay, live data, lifecycle change, or product change.
 <!-- SECTION:NOTES:END -->
