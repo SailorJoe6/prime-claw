@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T06:43:00Z'
+updated_date: '2026-11-22T07:01:00Z'
 labels: []
 dependencies: []
 references:
@@ -538,4 +538,7 @@ Verified exact native observation `5434ab72` against its referenced bytes and ac
 
 ### Canonical coexistence execute admitted — pinned native behavior verified
 Exact owner, Episode, source observation `5434ab72` and published handoff were verified. Code remains at the accepted `e4878f1`; no product code changed. Offline disposable Docker with pinned Backlog 1.55.3 (`0cf4fdbc70020327f4366a29d3f405f83d180301`) reproduced distinct archived/live `PAIR-12`. Native task view rejects the ID as ambiguous and does not resolve either physical path as a selector; a unique original reads normally, and native allocation wrote `PAIR-13` with both original paths and bytes unchanged. Retained the probe and log under `.test-results/primeclaw59-same-id-coexistence/`. This proves native behavior only, not migration success. Next: one migration-only distinction between physically preserved originals and genuinely targetable native views, keep receipt/import identification safe, and verify focused old/new behavior and final-source Docker tier 1. No relocation, editing, or repair of the originals is authorized. Two inherited-provider children are doing synthetic fixture authoring and a read-only target-path audit; neither is an independent acceptance reviewer. Status In Progress, 0/9, null Final Summary.
+
+### Same-ID coexistence — focused Docker passed; final validation pending
+Unchanged accepted code rejected both otherwise-valid selected and parked fixtures before writes or retirement (20261122T064708Z-4594-5a14038a, native 9 pass / 2 fail). The candidate separates exact physical preservation from native views for the pre-existing unrelated live/archive pair only. Targeted import/receipt ambiguity still refuses; no native policy or draft change. First candidate completed both synthetic migrations but failed the top-level-only ID assertion (20261122T065203Z-10352-80fb1b53). With only that fixture corrected to accept dotted subtask IDs and still require native BASE-13, focused run 20261122T065632Z-17433-5026d075 passed all 11 native checks. Both success variants used 6 Web task writes and one synthetic retirement only after exact original physical/native and publication assertions; targeted replay and other collision refusals pass. Final-source tier-1 probe is running. No code publication, acceptance, live migration, or change to status/criteria/Final Summary.
 <!-- SECTION:NOTES:END -->
