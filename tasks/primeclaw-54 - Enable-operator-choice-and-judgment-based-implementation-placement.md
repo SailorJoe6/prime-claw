@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-54
 title: Enable operator choice and judgment-based implementation placement
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: 2026-11-03 02:59
-updated_date: '2026-11-22T07:04:00Z'
+updated_date: '2026-11-22T07:08:00Z'
 labels: []
 dependencies: []
 references:
