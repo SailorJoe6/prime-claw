@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T17:39:00Z'
+updated_date: '2026-11-22T17:59:00Z'
 labels: []
 dependencies: []
 references:
@@ -25,6 +25,7 @@ documentation:
   - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
   - docs/evidence/primeclaw-59-coexistence-revision-20261122.md
   - docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md
+  - docs/evidence/primeclaw-59-pva-gate-rehearsal-20261122.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -49,6 +50,8 @@ modified_files:
   - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
   - docs/evidence/primeclaw-59-coexistence-revision-20261122.md
   - docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md
+  - tests/test_pva_gate_rehearsal.py
+  - docs/evidence/primeclaw-59-pva-gate-rehearsal-20261122.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -306,6 +309,9 @@ Under the operator sequencing decision in `c6e0a3d`, take one bounded evidence i
 1. Rehearse the representative fresh migration path. Include parked config and published bootstrap lineage, unrelated original live/archive same-ID paths/IDs/bytes/modes/history, and native next-free allocation. Include substantial UTF-8 current content and actual authored comments with metadata, statuses, relationships, and memories. Verify one complete readable native task per source, exact readback, no historical chunks, and published receipt and ownership before any synthetic source retirement. Record fixture counts/bytes and limits, elapsed time and phase observations, and what progress the operator can actually see. Separate harness setup/teardown and fixture overhead from migration timing.
 2. In a separate disposable run, exercise the supported operator stop/failure path at a proven in-flight boundary. Verify the observed stop and latency, no later provider writes, retry, deletion or retirement, Beads still authoritative, and partial destination retained. Do not substitute daemon shutdown or an artificial harness stop for product proof.
 3. Use available supported behavior first. If a required behavior is missing, quantify the concrete gap; limit any necessary change to this gate, validate in Docker, and put the tested candidate up separately for review. No generic reset/resume, rich progress UI, or exhaustive benchmarks. Publish native evidence and report measured limits and a concrete remaining blocker or evidence of readiness for the reviewed build. Keep earlier 218/12 evidence tied to its source, the incomplete `F` unexplained, and #83 static-only. No lifecycle changes, merge, install, restart, deploy, or live cutover. Initialize PVA owns later source preflight and obtaining separate exact cutover confirmation.
+
+### PVA-only gate — rehearsal recorded; operator stop remains unproven
+The fresh-path rehearsal and distinct in-flight provider failure proof are complete for the frozen product build. Do not replay them or proceed to live PVA. An ordinary operator stop remains unavailable: the registered switch-confirm discards its AbortSignal, and an upstream tool-abort response can precede migration settlement. Clear the gap in a separate reviewable gate-only candidate by proving supported operator stop at a verified in-flight boundary, actual settlement and no later writes/retries/rollback/deletion/retirement, retained partial destination and Beads authority. Confirm the operator-visible outcome and qualify any uninterruptible synchronous stage. No generic recovery/resume, full-task acceptance or live cutover; Initialize PVA retains later live preflight and exact cutover confirmation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -640,4 +646,13 @@ No tests were replayed for publication. The previous 218 passes/12 skips qualify
 
 ### Owner disposition — Backlog frontmatter correction accepted
 The owning Conversation accepted exact code `f141d1cab8993fa620404c580f163f8a575e3df3` and native evidence `a074286bd12c166d7f3c7c8ddf67b05ba2aeb42d` for the bounded Backlog frontmatter correction after independent Codex Astra review found no material defect. This supersedes the focused-review-pending checkpoint for that correction only. It is not whole-task acceptance or permission to merge, install, restart, deploy, or perform a live cutover. The owner authorized the next bounded Docker-only rehearsal and safe-stop evidence increment under the PVA-only sequencing decision `c6e0a3d`; see the living plan. This handoff records the disposition and scope only: no rehearsal, test, or product code edit was performed. In Progress, 0/9 criteria checked, and null Final Summary remain unchanged.
+
+### Bounded rehearsal results and concrete PVA stop blocker
+Frozen product `f141d1cab8993fa620404c580f163f8a575e3df3`. Evidence-only Episode commit `68a70b11de3b9e757998c2bae4419d250c037466` adds the two fixture files and `docs/evidence/primeclaw-59-pva-gate-rehearsal-20261122.md`; no product code changed. Final offline Tier-1 run `20261122T175416Z-52868-3149fc02` passed both Node cases (1 pytest, 200.13 s including Docker overhead). Snapshot digest `2d5f048248677564c33e81f7c7f922b5d10421720fe401a58fdb5f0df0370866`; all 45 manifest artifacts across three runs matched, offline/runtime and builder teardown proved clean, upstream inventories unchanged.
+
+Fresh isolated embedded Beads path: 12 tasks (11 open, 1 closed), 43 authored comments, two memories, 873,408 export bytes, 865,995 compact current-view bytes, 903,061 compact Backlog view bytes. 66.568 s confirmation, separately 5.486 s read-only inspection and 22.127 s fixture setup/baseline. First/last Web writes at 9.184/19.640 s; final receipt push at 27.811 s; synthetic deletion callback entered at 61.999 s after direct receipt publication and ownership cutover. Seven original records, same-ID BASE-12 live/archive pair bytes/modes/paths/history, parked config/bootstrap ancestry, BASE-13 native allocation, exact current/status/relationship/comment readback, memory documents and no history chunks verified. Timings describe a small offline local-remote fixture, not 406-ticket, server/remote or live runtime performance. Timing is harness-visible; registered tool has inspection/result output, no in-flight phase/elapsed stream.
+
+Separate safe failure: first real comment PUT persisted and returned HTTP 200, harness exposed 503 to the caller. It returned pre-cutover-failed 34.47 ms after observed failure; only POST/PUT, no later native commands, resend, deletion or retirement; one readable partial task with its persisted comment; unchanged Beads, task ref, ownership and Episode code head; transport evidence retained until fixture teardown. Not operator cancellation or a natural HTTP fault. Intermediate Git hook and lock runs missed the intended rejection and prove no stop behavior; no synthetic source deletion occurred in those runs. Prior 218/12 is older-source only, incomplete F remains unknown, #83 static only.
+
+Remaining blocker: no supported ordinary migration stop on the frozen build, so no valid operator stop latency or cutover readiness. Use the bounded unblock condition above, not daemon shutdown or an artificial stop. Stopped after this evidence increment. No live PVA, activation, merge, install, restart or deployment. Keep In Progress, 0/9 checked, null Final Summary and c6e0a3d sequencing unchanged.
 <!-- SECTION:NOTES:END -->
