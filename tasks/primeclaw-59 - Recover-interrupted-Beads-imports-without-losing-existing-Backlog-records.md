@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T18:09:00Z'
+updated_date: '2026-11-22T18:19:00Z'
 labels: []
 dependencies: []
 references:
@@ -26,6 +26,7 @@ documentation:
   - docs/evidence/primeclaw-59-coexistence-revision-20261122.md
   - docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md
   - docs/evidence/primeclaw-59-pva-gate-rehearsal-20261122.md
+  - docs/evidence/primeclaw-59-operator-stop-20261122.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -52,6 +53,11 @@ modified_files:
   - docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md
   - tests/test_pva_gate_rehearsal.py
   - docs/evidence/primeclaw-59-pva-gate-rehearsal-20261122.md
+  - src/prime-agent-plugin/extensions/project-initialization.ts
+  - tests/project_initialization_extension.test.mjs
+  - tests/container/operator_migration_stop_extension.ts
+  - tests/test_operator_migration_stop.py
+  - docs/evidence/primeclaw-59-operator-stop-20261122.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -319,6 +325,9 @@ Under `c6e0a3d`, start from the published rehearsal checkpoint and correct only 
 Use a separate disposable offline Docker test with a real supported operator stop at a proven mid-import boundary after a native write. Record latency to actual settlement, owned process settlement, unchanged Beads authority, precise readable partial destination and no subsequent writes, retry, rollback, deletion or retirement. Document what the operator sees and provide basic readable phase/elapsed progress only as needed by this gate; state synchronous and cutover limits. If the available plugin surfaces cannot provide a safe result, report the specific constraint and stop. Do not patch Prime Agent or dependencies, add generic resume/reset, or build a rich progress UI.
 
 Run focused regression and the required final-source tier 1, publish a tested code candidate and separate selected-task evidence, and stop for independent review. Do not replay the accepted small rehearsal and controlled failure solely to repeat evidence. A representative-volume timed fresh-path rehearsal remains required on the reviewed frozen product after this correction; no PVA-scale estimate follows from 12 tasks. No live PVA access, merge, install, restart, deployment, cleanup, lifecycle or full-task promotion. Keep the owner-authored PVA-first sequencing and separate live preflight/cutover authority.
+
+### PVA-only gate — operator-stop candidate ready for independent review
+The bounded, separately tested stop correction is published. Stop this Episode here for independent review of the exact code/evidence pair. Do not treat the prior 12-task fresh rehearsal or the separate response-failure timing as operator-stop evidence or production-scale throughput. On the independently reviewed frozen build, a representative-volume timed fresh-path rehearsal is still required before any live preflight and separate exact cutover confirmation by Initialize PVA. No lifecycle, activation, restart, merge, deployment or live migration is authorized here.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -668,4 +677,11 @@ The owner accepted rehearsal evidence only: Episode `68a70b11de3b9e757998c2bae44
 
 ### Operator-stop increment — draft, pending Docker evidence
 The Episode admitted the sole canonical execute for the recorded PVA-only scope. The Prime Claw draft passes the registered tool signal to the migration and its owned Web transport, checkpoints before pre-cutover synchronous groups, and sends phase/elapsed and post-abort outcome notices through public extension UI. The existing guarded ownership/deletion/publication sequence remains non-interruptible once entered. This is unvalidated source, not stop proof: the required disposable RPC test must observe real native persistence before the operator sends abort, verify explicit owned-writer settlement apart from generic acknowledgement, inspect the unchanged Beads authority and exact readable Backlog state, and exclude any later writes, retries, rollback or retirement. Focused regression and final-source Tier 1 remain pending. Accepted frozen evidence is unchanged; no live action or lifecycle change.
+
+### Published operator-stop candidate and native Docker proof
+Code `ceaf02004fbd571603e3c51a0e245957607726e6` (parent `68a70b11de3b9e757998c2bae4419d250c037466`), [measured evidence](docs/evidence/primeclaw-59-operator-stop-20261122.md). Prime Claw-only correction: the registered `switch-confirm` forwards the supported operator abort into the running migration and its owned Backlog Web transport. Cooperative checks protect pre-cutover writes; progress and elapsed notifications and a separate outcome notice report what actually happens even after the host stops awaiting the tool. The existing guarded cutover is not interruptible once entered. Synchronous source/layout/Git/CLI groups cannot be preempted; the next cancellable boundary handles pending input.
+
+Final offline public JSONL RPC proof `20261122T181352Z-5792-0259fd66`: first task and authored comment deliberately persisted via native Backlog (PUT HTTP 200); the relay held the response while the only stop trigger was the ordinary Prime Agent `abort`. Host acknowledgement 8.345 ms; owned browser group observed absent 25.529 ms; actual tool return observed 53.202 ms from abort send (25 ms polling for process and settlement; single fixture, not a bound). The result and UI notice distinguish pre-cutover-stopped from uncertain native request effects. One natively readable partial task with exact source references and authored comment remained; unchanged bytes, source export/config, ownership and Git refs; no later writes/native commands, retry, rollback, deletion or retirement. Beads remained authoritative. Actual RPC notice reported importing/verifying (1.7 s elapsed) and stopped with owned writers settled (1.9 s). RPC measured; Escape maps to the same signal by static source inspection only. TAP `6312785c066d9418e9b6963ea82d365da10c6e59a5aae99199e76fb5b7ee0f3e`, repository digest `29f0071952953e4b8c0f55c3d14f5842f9961ca18fde29de02a2b330f27ae8f4`; one Node/one pytest pass (107.61 s).
+
+Focused `20261122T181039Z-96738-d5844880`: 89 initialization and one guarded forward retirement tests passed (two pytest; 126.26 s), before completion of the RPC test fixture, same final product bytes. Final-source Tier 1 `--probe` `20261122T181646Z-13184-d47b7143` passed, repository digest `e3900c744e641aca346b1391bb09ec690af8a4ad7a965d0c6c97252a364db849`. All 46 listed artifacts verified over three runs, offline with both teardown layers clean and unchanged upstream source inventories. The earlier malformed pytest marker selected no tests and did not run Docker. No work on historical cases or live PVA; the accepted small rehearsal and separate response-failure proof remain untouched. Task remains In Progress, 0/9, Final Summary null, and owner-authored sequencing `c6e0a3d` intact. Stopped for independent review.
 <!-- SECTION:NOTES:END -->
