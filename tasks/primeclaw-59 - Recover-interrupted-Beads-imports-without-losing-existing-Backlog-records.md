@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T08:59:00Z'
+updated_date: '2026-11-22T09:06:00Z'
 labels: []
 dependencies: []
 references:
@@ -565,4 +565,7 @@ Stop for independent owner review of this increment. Nothing merged, activated, 
 Owner confirmed two material Codex Astra findings within approved coexistence scope. Static inspection confirms why they are actionable: at current task-provider-migration.ts:2331–2357, response to a receipt-bound memory USER task collision is after destination workspace preparation, which can change layout, stage or commit config and push native history at task-history-workspace.ts:1388–1403. The initial per-pair marker scan does not identify the USER target; the receipt does. Current task-provider-migration.ts:1731–1737 matches source/current markers anywhere in frontmatter, so an ordinary title mention can cause a false refusal. No reproduction or fix has been run during this handoff. Only the two bounded fixes and affected tests are in the next execute focus.
 
 Exact owner journal entry `82a82608` (parent `7290cab4`, SHA-256 `c99b5e101aff3a2b9133ea90a2352dc74c587dff9738f580da5303fd1fdfbc15`) matched the existing Episode binding. The current native observation/readback at `8497a6472948911511b28c2bc768e7928344fafa` matches the candidate's selected task; intervening native changes since `6e9e0e8` are unrelated. Code remains clean and published at `7b2e386`. Prior validation and evidence limits remain as recorded and do not waive the findings. Handoff records this scope only. No code, test, registry, resource, lifecycle, or execute-send action was taken.
+
+### Bounded revision execute admitted — two disposable regressions underway
+Verified canonical observation `82a82608`, unchanged Episode binding, and published native handoff `55e0c27` separately from clean candidate base `7b2e386`. The two fixture scenarios now run against a verified snapshot of the published code: one clean selected-store replay with a real receipt-bound USER collision, one unrelated title-only marker on a live/archive pair. The local draft puts the receipt-bound check before workspace preparation and narrows import evidence to actual references. This draft is not tested or published. Next verify baseline failures, run affected Docker regressions and required final-source tier 1, and only publish a tested revision for review. No live migration, PVA, or status/criteria/Final Summary changes.
 <!-- SECTION:NOTES:END -->
