@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T17:34:00Z'
+updated_date: '2026-11-22T17:39:00Z'
 labels: []
 dependencies: []
 references:
@@ -299,6 +299,13 @@ Joe directed continuation after the PA-TASK5-20261122-MAC hold was lifted. The f
 
 ### Step 3 / AC5 — focused independent review pending
 The frontmatter compatibility correction is published on the Episode branch at `f141d1cab8993fa620404c580f163f8a575e3df3`. Review only this increment against `7cf8657`: the read-only `references` inspection accepts Backlog-supported unquoted handles in assignee/reporter metadata without rewriting records or changing native allocation, protection or retirement rules. Review the focused evidence in `docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md`. Stop here pending the owning Conversation's independent review. The PVA-only sequencing note remains in force; it does not authorize rehearsal, live migration or cutover in this slice.
+
+### PVA-only gate — timed fresh-path rehearsal and safe-stop proof
+Under the operator sequencing decision in `c6e0a3d`, take one bounded evidence increment after the accepted parser correction. Start from exact frozen code `f141d1cab8993fa620404c580f163f8a575e3df3`. Use Docker-only synthetic disposable fixtures and an isolated local test remote. No live PVA access, private incident artifacts, or host/global mutation.
+
+1. Rehearse the representative fresh migration path. Include parked config and published bootstrap lineage, unrelated original live/archive same-ID paths/IDs/bytes/modes/history, and native next-free allocation. Include substantial UTF-8 current content and actual authored comments with metadata, statuses, relationships, and memories. Verify one complete readable native task per source, exact readback, no historical chunks, and published receipt and ownership before any synthetic source retirement. Record fixture counts/bytes and limits, elapsed time and phase observations, and what progress the operator can actually see. Separate harness setup/teardown and fixture overhead from migration timing.
+2. In a separate disposable run, exercise the supported operator stop/failure path at a proven in-flight boundary. Verify the observed stop and latency, no later provider writes, retry, deletion or retirement, Beads still authoritative, and partial destination retained. Do not substitute daemon shutdown or an artificial harness stop for product proof.
+3. Use available supported behavior first. If a required behavior is missing, quantify the concrete gap; limit any necessary change to this gate, validate in Docker, and put the tested candidate up separately for review. No generic reset/resume, rich progress UI, or exhaustive benchmarks. Publish native evidence and report measured limits and a concrete remaining blocker or evidence of readiness for the reviewed build. Keep earlier 218/12 evidence tied to its source, the incomplete `F` unexplained, and #83 static-only. No lifecycle changes, merge, install, restart, deploy, or live cutover. Initialize PVA owns later source preflight and obtaining separate exact cutover confirmation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -630,4 +637,7 @@ Exact observation `7705801b` and route `462e40a7e24c` identify the same durable 
 Code `f141d1cab8993fa620404c580f163f8a575e3df3` is the single code increment on the same Episode branch, directly verified at `refs/heads/JLanders/prime-claw-primeclaw-59-episode-277260cb`. It contains the exact three validated files and adds the linked evidence document. The extended fixture reproduced the published-code refusal in `20261122T163034Z-23926-fd54ef3c` (12 native passes, one intended YAML `@` failure and zero writes/retirements in that case). The intermediate `20261122T163542Z-36806-617ecc6a` (12 passes, one missing exported error-class failure) never reached its probe. The corrected focused `20261122T164036Z-59588-91a2e016` passed all 13 native checks (one pytest pass in 281.63 s); final-source tier-1 probe `20261122T164518Z-74575-99adf60c` passed. Shared source digest `8e772ad95d886e24cff667c188fe5f811eaaa7fb21e65959359c7f1d021c8897`; all 30 final artifacts and 223 recorded inputs match, both runs went offline and tore down cleanly at runtime and builder layers, and upstream inventories did not change. Original paths, bytes, modes and history, native singleton/import views and next free ID, genuine reference refusal and receipt-bound USER refusal before writes or retirement remain covered by the focused suite.
 
 No tests were replayed for publication. The previous 218 passes/12 skips qualify the previous source only; incomplete `F` remains unexplained and ownership #83 remains static-only and out of scope. No live/PVA action, source retirement, merge, activation or cleanup. This is a focused review candidate only. In Progress, 0/9 criteria checked, null Final Summary and the owner-authored PVA-only note are unchanged.
+
+### Owner disposition — Backlog frontmatter correction accepted
+The owning Conversation accepted exact code `f141d1cab8993fa620404c580f163f8a575e3df3` and native evidence `a074286bd12c166d7f3c7c8ddf67b05ba2aeb42d` for the bounded Backlog frontmatter correction after independent Codex Astra review found no material defect. This supersedes the focused-review-pending checkpoint for that correction only. It is not whole-task acceptance or permission to merge, install, restart, deploy, or perform a live cutover. The owner authorized the next bounded Docker-only rehearsal and safe-stop evidence increment under the PVA-only sequencing decision `c6e0a3d`; see the living plan. This handoff records the disposition and scope only: no rehearsal, test, or product code edit was performed. In Progress, 0/9 criteria checked, and null Final Summary remain unchanged.
 <!-- SECTION:NOTES:END -->
