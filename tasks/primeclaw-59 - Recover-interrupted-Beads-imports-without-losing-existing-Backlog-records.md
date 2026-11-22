@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T18:19:00Z'
+updated_date: '2026-11-22T18:24:00Z'
 labels: []
 dependencies: []
 references:
@@ -328,6 +328,13 @@ Run focused regression and the required final-source tier 1, publish a tested co
 
 ### PVA-only gate — operator-stop candidate ready for independent review
 The bounded, separately tested stop correction is published. Stop this Episode here for independent review of the exact code/evidence pair. Do not treat the prior 12-task fresh rehearsal or the separate response-failure timing as operator-stop evidence or production-scale throughput. On the independently reviewed frozen build, a representative-volume timed fresh-path rehearsal is still required before any live preflight and separate exact cutover confirmation by Initialize PVA. No lifecycle, activation, restart, merge, deployment or live migration is authorized here.
+
+### PVA-only gate — representative-volume fresh rehearsal on reviewed product
+Under `c6e0a3d`, run one timed fresh-path rehearsal on exactly `ceaf02004fbd571603e3c51a0e245957607726e6`. Keep product frozen; add only disposable fixture/bridge and evidence. Use offline Docker, synthetic embedded Beads and a disposable local Git remote. Size to the authorized rough historical workload (~406 tasks, ~3,800 actual comments) with realistic skew and substantial UTF-8 current payloads; do not inspect live PVA or private incident artifacts, infer live shape, or extrapolate from the accepted 12-task pilot.
+
+Record actual fixture shape and bytes, timing for setup and separate inspection, confirmation to actual settlement, operator-visible phases and gaps, and independent post-result checks. Prove parked configuration/bootstrap ancestry and original live/archive same-ID paths/IDs/bytes/modes/history, one readable native record per source, native allocation, actual authored comments, relationships, statuses and memories, no encoded history chunks, and verified publication/readback and ownership ordering before synthetic retirement. State local/embedded/offline scale limits; if the run hits a limit or defect, preserve the actual diagnostic and report the blocker, not a guessed window. No unrelated product changes or repeated capacity sweeps; do not rerun accepted abort/failure proofs without a concrete evidence gap.
+
+Publish only the rehearsal test/evidence and a separate selected-task checkpoint, then stop for owner assessment. Still In Progress, 0/9 checked, null Final Summary. No live migration, merge, deployment, installation, restart, or cleanup outside disposable fixtures. Initialize PVA owns the separate live preflight and exact cutover confirmation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -684,4 +691,7 @@ Code `ceaf02004fbd571603e3c51a0e245957607726e6` (parent `68a70b11de3b9e757998c2b
 Final offline public JSONL RPC proof `20261122T181352Z-5792-0259fd66`: first task and authored comment deliberately persisted via native Backlog (PUT HTTP 200); the relay held the response while the only stop trigger was the ordinary Prime Agent `abort`. Host acknowledgement 8.345 ms; owned browser group observed absent 25.529 ms; actual tool return observed 53.202 ms from abort send (25 ms polling for process and settlement; single fixture, not a bound). The result and UI notice distinguish pre-cutover-stopped from uncertain native request effects. One natively readable partial task with exact source references and authored comment remained; unchanged bytes, source export/config, ownership and Git refs; no later writes/native commands, retry, rollback, deletion or retirement. Beads remained authoritative. Actual RPC notice reported importing/verifying (1.7 s elapsed) and stopped with owned writers settled (1.9 s). RPC measured; Escape maps to the same signal by static source inspection only. TAP `6312785c066d9418e9b6963ea82d365da10c6e59a5aae99199e76fb5b7ee0f3e`, repository digest `29f0071952953e4b8c0f55c3d14f5842f9961ca18fde29de02a2b330f27ae8f4`; one Node/one pytest pass (107.61 s).
 
 Focused `20261122T181039Z-96738-d5844880`: 89 initialization and one guarded forward retirement tests passed (two pytest; 126.26 s), before completion of the RPC test fixture, same final product bytes. Final-source Tier 1 `--probe` `20261122T181646Z-13184-d47b7143` passed, repository digest `e3900c744e641aca346b1391bb09ec690af8a4ad7a965d0c6c97252a364db849`. All 46 listed artifacts verified over three runs, offline with both teardown layers clean and unchanged upstream source inventories. The earlier malformed pytest marker selected no tests and did not run Docker. No work on historical cases or live PVA; the accepted small rehearsal and separate response-failure proof remain untouched. Task remains In Progress, 0/9, Final Summary null, and owner-authored sequencing `c6e0a3d` intact. Stopped for independent review.
+
+### Owner disposition — independently reviewed operator-stop increment accepted
+The owner accepted only the operator-stop increment `ceaf02004fbd571603e3c51a0e245957607726e6` / `ce6e25779c3c6064eaa5d6bbd41751e8f88f412b` after independent Codex Astra review found no material defect. The owner verified both publications, eight input hashes, 46 artifacts, teardown, and the original idle Episode. The supported public RPC stop proves actual pre-cutover writer settlement apart from the host ACK, with no later writes/retry/rollback/deletion/retirement. The observed 53.202 ms tool return is one fixture measurement, not a bound; synchronous stage and guarded cutover limits still apply. Under `c6e0a3d`, the next bounded execute is the representative-volume fresh rehearsal on this exact reviewed product, not a product change or live assessment. Accepted prior rehearsal/failure evidence remains qualified. This handoff makes no code, test, lifecycle or live change; In Progress, 0/9 checked, null Final Summary remain unchanged.
 <!-- SECTION:NOTES:END -->
