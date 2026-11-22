@@ -12,7 +12,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
+import { canonicalSha256, completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { checkBeadsCapabilities, detectExplicitTaskProvider, detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { initialTaskStoreConfig, prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
@@ -26,6 +26,31 @@ const BACKLOG = process.platform === "linux" && existsSync(RUNTIME_BACKLOG)
 const CUSTOM = "in_design:active,in_planning:active,ready_for_merge:wip,done:done";
 const BEADS_INVENTORY = ["--readonly", "list", "--all", "--limit", "0", "--include-infra",
   "--include-templates", "--include-gates", "--include-ephemeral", "--json"];
+
+function legacyCanonical(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => legacyCanonical(item)).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${legacyCanonical(value[key])}`).join(",")}}`;
+}
+
+test("streaming canonical migration digest matches the legacy canonical bytes", () => {
+  const values = [
+    null,
+    true,
+    42,
+    -0,
+    1.25,
+    "line\n雪",
+    [3, { z: null, a: ["x", false] }],
+    [undefined, , { undefinedValue: undefined }],
+    { z: "last", a: "first", nested: { beta: 2, alpha: [1, null, "three"] } },
+  ];
+  for (const value of values) {
+    const expected = createHash("sha256").update(legacyCanonical(value)).digest("hex");
+    assert.equal(canonicalSha256(value), expected);
+  }
+  assert.equal(canonicalSha256({ b: 2, a: 1 }), canonicalSha256({ a: 1, b: 2 }));
+});
 
 class CandidateRunner extends ProcessCommandRunner {
   run(commandName, args, options = {}) {
@@ -264,16 +289,24 @@ function captureBeadsCurrentTasks(root, ids) {
   }));
 }
 
+// Independent fixture oracle: parent-child and other typed links are not blockers.
+function nativeBlockingTargets(pkg) {
+  const rows = pkg.nativeView.dependencies ?? pkg.exportRow.dependencies ?? [];
+  return rows.flatMap(row => {
+    if (typeof row === "string") return [row];
+    const kind = String(row.dependency_type ?? row.type ?? "blocks").trim().toLowerCase();
+    return !kind || kind === "blocks" ? [row.depends_on_id ?? row.id ?? row.issue_id] : [];
+  }).filter(Boolean);
+}
+
 function assertCurrentBacklogTask(view, pkg, inspection, mapping, configuration = {}) {
   const parent = pkg.nativeView.parent ?? pkg.exportRow.parent;
-  const dependencies = pkg.nativeView.dependencies ?? pkg.exportRow.dependencies ?? [];
   const context = {
     sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest,
     status: ({ open: "In Design", deferred: "In Design", in_design: "In Design", in_planning: "In Planning",
       in_progress: "In Progress", blocked: "Blocked", ready_for_merge: "Ready for Merge", done: "Done", closed: "Done" })[pkg.nativeView.status],
     ...(parent ? { parentTaskId: mapping[parent] ?? parent } : {}),
-    dependencies: dependencies.map((value) => typeof value === "string" ? value : value.depends_on_id ?? value.id ?? value.issue_id)
-      .filter(Boolean).map((id) => mapping[id] ?? id),
+    dependencies: nativeBlockingTargets(pkg).map(id => mapping[id] ?? id),
     priorities: ["high", "medium", "low"], types: ["bug", "feature", "enhancement", "task", "chore", "docs", "spike"],
     ...configuration,
   };
@@ -1536,8 +1569,7 @@ test("current native migration and replay preserve configured type priority and 
   for (const [sourceId, id] of Object.entries(mapping)) {
     const pkg = current[sourceId];
     const parent = pkg.nativeView.parent ?? pkg.exportRow.parent;
-    const dependencies = (pkg.nativeView.dependencies ?? pkg.exportRow.dependencies ?? []).map((value) =>
-      typeof value === "string" ? value : value.depends_on_id ?? value.id ?? value.issue_id).map((sourceId) => mapping[sourceId] ?? sourceId);
+    const dependencies = nativeBlockingTargets(pkg).map(sourceId => mapping[sourceId] ?? sourceId);
     const projection = projectBeadsCurrentTask(pkg, {
       sourceRevision: inspection.sourceRevision, sourceDigest: inspection.sourceDigest,
       status: ({ open: "In Design", in_progress: "In Progress", blocked: "Blocked" })[pkg.nativeView.status],
@@ -1962,6 +1994,7 @@ test("used unsupported Beads statuses and ambiguous archive records aggregate be
 
 test("native Beads deferred tasks project to In Design without active deferral and replay preserves source authority", { timeout: 300_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "embedded-deferred");
+  bd(fixture.root, "dep", "add", fixture.ids.child, fixture.ids.blocked, "--type", "discovered-from");
   const cases = [
     { title: "DEFERRED: Decide + enable web search provider", until: "2026-08-01T00:00:00Z" },
     { title: "Future deferred ordinary task", until: "2099-08-01T00:00:00Z" },
@@ -2055,7 +2088,13 @@ test("native Beads deferred tasks project to In Design without active deferral a
       Object.fromEntries(firstReceipt.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId])));
   }
   const destinationPaths = Object.keys(physicalDestinationRecords(store)).sort();
-  const replay = await migrateTaskProvider(request);
+  const typedMapping = Object.fromEntries(firstReceipt.receipt.mappings.map(row => [row.sourceTaskId, row.destinationTaskId]));
+  const typedChild = () => JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", typedMapping[fixture.ids.child])).task;
+  const typedBefore = typedChild();
+  assert.deepEqual(typedBefore.dependencies, []);
+  assert.equal(typedBefore.comments.length, 1);
+  assert.ok(typedBefore.comments[0].body.includes(`- discovered-from: ${fixture.ids.blocked} -> ${typedMapping[fixture.ids.blocked]}`));
+  const replay = await migrateTaskProvider({ ...request, semanticPlacement: "Do not rewrite the receipt-bound relationship placement." });
   assert.equal(replay.status, "blocked", replay.detail);
   assert.equal(replay.code, "pre-cutover-failed");
   assert.match(replay.detail, /fixture refuses deferred source retirement/);
@@ -2064,6 +2103,9 @@ test("native Beads deferred tasks project to In Design without active deferral a
     "confirmation and same-destination replay must not read source history/provenance");
   const replayReceipt = readReceipt();
   assert.equal(replayReceipt.id, firstReceipt.id);
+  assert.equal(replayReceipt.receipt.semanticPlacement, request.semanticPlacement);
+  assert.equal(replayReceipt.receipt.destinationDataDigest, firstReceipt.receipt.destinationDataDigest);
+  assert.deepEqual(typedChild(), typedBefore);
   assert.deepEqual(replayReceipt.receipt.mappings, firstReceipt.receipt.mappings, "replay must reuse all destination identities");
   assert.deepEqual(Object.keys(physicalDestinationRecords(store)).sort(), destinationPaths);
   for (const [path, markdown] of Object.entries(importedRecords)) assert.equal(readFileSync(join(store, path), "utf8"), markdown);
@@ -4353,6 +4395,50 @@ for (const kind of ["independent-hidden", "independent-default", "independent-cu
     }
   });
 }
+
+test("typed Beads relationships preserve meaning without false dependency cycles", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "typed-relationship-migration");
+  bd(fixture.root, "dep", "relate", fixture.ids.parent, fixture.ids.blocked);
+  bd(fixture.root, "dep", "add", fixture.ids.child, fixture.ids.blocked, "--type", "discovered-from");
+  const destination = publishedPopulatedBacklogDestination(fixture);
+  const runner = new AsIsBeadsRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const semanticPlacement = "Place non-blocking typed Beads relationships in readable migration comments; preserve current native content.";
+  const result = await migrateTaskProvider({ cwd: fixture.root, targetProvider: "backlog", runner,
+    expectedSourceRevision: inspection.sourceRevision, confirmedSwitch: true, actor: "operator",
+    semanticPlacement, verifyActiveRuntime: proveFixtureRuntime });
+  assert.equal(result.status, "completed", result.detail);
+  const mappings = Object.fromEntries(result.receipt.mappings.map((row) => [row.sourceTaskId, row.destinationTaskId]));
+  const view = (sourceId) => JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", mappings[sourceId])).task;
+  const parent = view(fixture.ids.parent), child = view(fixture.ids.child), blocked = view(fixture.ids.blocked);
+  assert.deepEqual(parent.dependencies, []);
+  assert.deepEqual(child.dependencies, []);
+  assert.deepEqual(blocked.dependencies, [mappings[fixture.ids.child]]);
+  const relationComment = (task) => task.comments.map((comment) => String(comment.text ?? comment.content ?? comment.body ?? ""))
+    .find((text) => text.startsWith("prime-claw-task-provider-migration-relationships-v1\n"));
+  assert.equal(relationComment(parent), `prime-claw-task-provider-migration-relationships-v1\nSource Beads relationships with no native Backlog dependency equivalent:\n- relates-to: ${fixture.ids.blocked} -> ${mappings[fixture.ids.blocked]}\n\nSemantic placement: ${semanticPlacement}`);
+  assert.equal(relationComment(child), `prime-claw-task-provider-migration-relationships-v1\nSource Beads relationships with no native Backlog dependency equivalent:\n- discovered-from: ${fixture.ids.blocked} -> ${mappings[fixture.ids.blocked]}\n\nSemantic placement: ${semanticPlacement}`);
+  assert.equal(relationComment(blocked), `prime-claw-task-provider-migration-relationships-v1\nSource Beads relationships with no native Backlog dependency equivalent:\n- relates-to: ${fixture.ids.parent} -> ${mappings[fixture.ids.parent]}\n\nSemantic placement: ${semanticPlacement}`);
+  assert.equal(child.parentTaskId, mappings[fixture.ids.parent]);
+  assert.ok(parent.comments.some(comment => comment.author === "source-author" && comment.body.includes("embedded native comment Ω")));
+  for (const task of [parent, child, blocked]) {
+    assert.equal(task.comments.filter(comment => comment.author === "prime-claw-migration"
+      && comment.body.startsWith("prime-claw-task-provider-migration-relationships-v1\n")).length, 1);
+  }
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  for (const [path, expected] of Object.entries(destination.baseline)) assert.equal(readFileSync(join(destination.store, path)).toString("base64"), expected.bytes, path);
+});
+
+test("true Beads blocking cycles still fail before destination mutation", { timeout: 120_000 }, (t) => {
+  const fixture = beadsSource(t, "blocking-cycle-preflight");
+  bd(fixture.root, "dep", "add", fixture.ids.parent, fixture.ids.archived);
+  bd(fixture.root, "sql", `INSERT INTO dependencies (id, issue_id, type, created_by, depends_on_issue_id) VALUES ('00000000-0000-0000-0000-000000000062', '${fixture.ids.archived}', 'blocks', 'fixture', '${fixture.ids.parent}')`);
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+  assert.equal(inspection.status, "blocked");
+  assert.match(inspection.detail, /dependency cycle/);
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+});
 
 test("native archived-target source graph preserves mapped dependencies through migration", { timeout: 240_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "archived-target-migration");

@@ -581,8 +581,9 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
     pi.registerTool({
       name: "implement_task",
       label: "Review task implementation readiness",
-      description: "Queue the canonical implementation-readiness workflows for one provider-native task ID and optional placement.",
-      promptSnippet: "Queue task-native implementation-readiness workflows",
+      description: "Queue isolated Episode implementation readiness for one provider-native task ID and optional Episode host. Not for direct implementation.",
+      promptSnippet: "Queue isolated task Episode readiness (not direct implementation)",
+      promptGuidelines: ["Follow the implement-task skill for placement and readiness."],
       executionMode: "sequential",
       parameters: {
         type: "object",

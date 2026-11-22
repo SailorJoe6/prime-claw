@@ -3155,7 +3155,7 @@ test("active task-native allocation replay retains a non-main target and exact b
 });
 
 
-test("active task-native replay reopens the durable session with the task-derived name", async () => {
+test("active task-native replay reopens the exact durable session without requesting a name", async () => {
   const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });
   bindTaskOrcaHead(f);
   await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
@@ -3172,10 +3172,59 @@ test("active task-native replay reopens the durable session with the task-derive
   const result = await allocateReservedTaskEpisode("PRIMECLAW-10.38", f.ctx, f.deps);
   assert.equal(result.reused, true);
   const reopen = f.calls.find((call) => call[0] === "reopen");
-  assert.equal(reopen[1].sessionName, "primeclaw-10-38-episode");
+  assert.deepEqual({ ...reopen[1], model: undefined }, { sessionId: "episode", sessionFile: join(f.root, "episode.jsonl"), worktree: f.worktree, model: undefined });
   assert.equal(f.calls.some((call) => ["orca-create", "auto-create", "auto-run", "execute"].includes(call[0])), false);
 });
 
+
+test("resident reopen omits name but still requires exact returned identity and a usable route", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-resident-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const saved = { sessionId: "saved-id", sessionFile: join(root, "saved.jsonl"), worktree: root };
+  writeFileSync(saved.sessionFile, "fixture");
+  const expected = { activeSessionId: "route", sessionId: saved.sessionId, sessionFile: saved.sessionFile };
+  const native = { ...expected, cwd: root, sessionName: "user-chosen name" };
+  let response = native;
+  const publisher = new PrimeSessionPublisher({
+    async request(command) {
+      assert.equal(command.type, "create");
+      assert.equal(command.sessionPath, saved.sessionFile);
+      assert.equal(command.config.cwd, saved.worktree);
+      assert.equal(command.lifecycle, "resident");
+      assert.equal(Object.hasOwn(command, "name"), false);
+      return { success: true, data: response };
+    },
+  });
+  assert.deepEqual(await publisher.reopen(saved), expected);
+  for (const mismatch of [
+    { sessionId: "foreign" }, { sessionFile: join(root, "foreign.jsonl") }, { cwd: dirname(root) },
+  ]) {
+    response = { ...native, ...mismatch };
+    await assert.rejects(publisher.reopen(saved), (error) =>
+      error instanceof EpisodeStateUncertainError && /mismatched identity/.test(error.cause?.message));
+  }
+  response = { ...native, activeSessionId: undefined };
+  await assert.rejects(publisher.reopen(saved), (error) =>
+    error instanceof EpisodeStateUncertainError && /without a usable active-session identity/.test(error.cause?.message));
+});
+
+test("fresh resident publication still requests and verifies its name", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-fresh-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const sessionFile = join(root, "fresh.jsonl");
+  const requested = "fresh-episode";
+  let returned = requested;
+  const publisher = new PrimeSessionPublisher({
+    async request(command) {
+      assert.equal(command.name, requested);
+      return { success: true, data: { activeSessionId: "route", sessionId: "fresh-id", sessionFile, cwd: root, sessionName: returned } };
+    },
+  }, { create: () => ({ getSessionId: () => "fresh-id", getSessionFile: () => sessionFile, flushNow: () => writeFileSync(sessionFile, "fixture") }) });
+  const fresh = { worktree: root, sessionName: requested };
+  assert.equal((await publisher.createFresh(fresh)).activeSessionId, "route");
+  returned = "unexpected name";
+  await assert.rejects(publisher.createFresh(fresh), (error) => error instanceof EpisodeStateUncertainError && /mismatched identity/.test(error.cause?.message));
+});
 
 test("active task-native replay rejects the durable session in a foreign checkout", async () => {
   const f = harness({ record: taskReservation({ engine: "orca", projectSetupId: "setup-local" }) });

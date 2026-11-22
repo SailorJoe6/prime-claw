@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -179,6 +179,21 @@ test("plan_task steers prep, queues sole phase follow-up, and returns canonical 
   assert.equal(result.details.admitted, true); assert.equal(result.details.taskId, "PRIMECLAW-10.38");
   assert.deepEqual(f.sent[0].options, { deliverAs: "steer" }); assert.deepEqual(f.sent[1].options, { deliverAs: "followUp" });
   assert.match(result.content[0].text, /Planning admitted for PRIMECLAW-10\.38/);
+});
+
+test("implementation admission advertises isolation and leaves placement policy in the skill", () => {
+  const f = fixture();
+  const entry = f.tools.get("implement_task");
+  const skill = readFileSync(new URL("../src/prime-agent-plugin/skills/implement-task/SKILL.md", import.meta.url), "utf8").replace(/\s+/g, " ");
+  assert.match(entry.description, /isolated Episode.*Not for direct implementation/);
+  assert.match(skill, /Explicit placement wins.*“here”.*“on main”.*direct implementation/i);
+  assert.match(skill, /explicit Episode request uses the isolated path/);
+  assert.match(skill, /planning status.*meaningful Implementation Plan or Beads `design` normally points to an Episode/);
+  assert.match(skill, /small unplanned fix normally stays direct; `In Design` alone does not disqualify it/);
+  assert.match(skill, /substantial work still in design.*unclear\/conflicting evidence, ask one focused question/);
+  assert.match(skill, /Preserve explicit placement through planning/);
+  assert.match(skill, /Planning alone grants no implementation authority/);
+  assert.deepEqual(f.sent, []);
 });
 
 test("task planning rejects a missing task without workflow admission", async () => {
@@ -614,11 +629,13 @@ test("retained planning keeps its existing semantic and conditional skill guidan
   assert.doesNotMatch(guidance, /never search for, select/);
 });
 
-test("task entry tool metadata is mechanical and has no duplicate prompt policy", () => {
+test("task entry schemas stay mechanical; implementation points to the editable skill", () => {
   const f = fixture();
   for (const name of ["plan_task", "implement_task", "create_task_episode"]) {
     const tool = f.tools.get(name);
-    assert.equal(tool.promptGuidelines, undefined, name);
+    assert.deepEqual(tool.promptGuidelines, name === "implement_task"
+      ? ["Follow the implement-task skill for placement and readiness."]
+      : undefined, name);
     const descriptions = [tool.description, tool.promptSnippet, ...Object.values(tool.parameters.properties).map(({ description }) => description)].join(" ");
     assert.doesNotMatch(descriptions, /In Design|In Planning|implementation-ready|readiness succeeds|approved by|operator authority|bounded delegation|terminal routing/i, name);
     assert.deepEqual(tool.parameters.required, ["taskId"]);

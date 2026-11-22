@@ -17,6 +17,7 @@ export interface BeadsCurrentTaskContext {
   status: string;
   parentTaskId?: string;
   dependencies: string[];
+  relationshipComment?: string;
   priorities: string[];
   types: string[];
 }
@@ -27,6 +28,7 @@ export interface BeadsCurrentTaskProjection {
   comments: Array<{ body: string; author: string }>;
   /** Authored state in the full CLI task-view vocabulary. Generated dates are not source dates. */
   expected: Record<string, unknown>;
+  relationshipComment?: { body: string; author: string };
 }
 
 /** Structural dependency: the existing native Web transport owns all I/O. */
@@ -244,6 +246,10 @@ export function projectBeadsCurrentTask(pkg: BeadsCurrentTaskPackage, context: B
     }
     const implementationNotes = [originalNotes, ...notes].filter(Boolean).join("\n\n");
     const comments = projectComments(pkg);
+    const relationshipComment = context.relationshipComment
+      ? { body: prose(context.relationshipComment, "Beads typed relationships"), author: "prime-claw-migration" }
+      : undefined;
+    if (relationshipComment) comments.push(relationshipComment);
     const references = [
       `prime-claw-beads-source:${pkg.sourceTaskId}`,
       `prime-claw-beads-current:${readableJson({ sourceTaskId: pkg.sourceTaskId, sourceRevision: context.sourceRevision, sourceDigest: context.sourceDigest })}`,
@@ -268,7 +274,7 @@ export function projectBeadsCurrentTask(pkg: BeadsCurrentTaskPackage, context: B
       definitionOfDone: [], reporter: null, project: null, milestone: null, dueDate: null,
       documentation: [], modifiedFiles: [],
     };
-    return { payload, comments, expected };
+    return { payload, comments, expected, ...(relationshipComment ? { relationshipComment } : {}) };
   } catch { fail("projection"); }
 }
 

@@ -11,7 +11,9 @@ native admission. Verify that the bound provider remains the sole unambiguous
 live provider, but never reselect or substitute it. Do not guess or search for a
 task, invent a task path, or leave the exact root.
 
-Preserve the operator's actual instruction and approved scope. Explicit
+Preserve the operator's actual instruction, approved scope, and explicit
+implementation placement (direct checkout or Episode, including any selected
+Episode host). Explicit
 conditional “plan this task, then implement it when ready” authority survives
 planning, preparation, and compaction; planning alone does not authorize
 implementation. An explicitly delegated task selection must already be bound
@@ -84,7 +86,8 @@ a concise `focus_hint` to plan the selected task. Keep the selected provider,
 project root, canonical ID, native status, relevant specification context, and
 complete provider-native observation for either provider. Provider observations
 are factual context, not semantic acceptance. Preserve the exact binding,
-approved scope, actual operator instruction, and any conditional implementation authority.
+approved scope, actual operator instruction including explicit placement, and
+any conditional implementation authority.
 A planning-only request must remain planning-only. Use your judgment to decide
 what context will be most useful for that mission.
 

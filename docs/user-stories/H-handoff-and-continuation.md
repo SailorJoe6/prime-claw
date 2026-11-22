@@ -56,8 +56,9 @@ empty queues alone do not prove non-admission. Preserve preparation effects and
 evidence gaps in existing native task fields/history. Uncertain first admission,
 callback failure, and refused/uncertain second delivery remain distinct stopped
 cases with no generic replay or chat steering. A demonstrably completed handoff
-can instead reach the separate informed-owner
-[new execute-only continuation decision](../handoff-chain.md#new-execute-only-continuation-after-completed-handoff).
+with failed or historically unproved execute, or a verified pre-work runtime
+interruption of both received prompts, can instead reach the separate informed-owner
+[execute-only continuation decision](../handoff-chain.md#new-execute-only-continuation).
 It is ONE NEW request on the same version-2 resources, not a replay. It can reach
 authorization without historical sender IDs/ACK/callback proof, but known pending
 work or unproved current idleness stops it. The source candidate supports

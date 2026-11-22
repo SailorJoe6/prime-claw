@@ -380,7 +380,12 @@ Actual authored comments remain comments, with readable source author/time.
 The initial native task write includes a small source-ID/reference binding;
 that marker alone never proves complete content. Configured type/priority options
 are inputs to this projection, not settings it replaces. Deferral-only fields
-are dropped under the existing deferral mapping.
+are dropped under the existing deferral mapping. Only Beads `blocks` edges
+become Backlog dependencies; the parent hierarchy stays in the native parent
+field. Once all destination IDs are known, other relationship types are written
+as one labeled migration comment per affected task, separate from source
+comments. Native readback and receipt replay verify the type, source endpoint,
+and mapped destination ID using the receipt’s recorded placement.
 
 A source comment heading named `Final Summary` is content, not task closure.
 The pinned native Markdown reader can otherwise interpret it as a legacy task
@@ -796,6 +801,53 @@ perform one coordinated full Prime Agent restart. Keep every resource the old
 generation may read, including retained active plan pairs, until resumed
 owner/Episode and designated ordinary-session UAT prove the new skills/tools.
 Copy success, `/reload`, and a fresh probe alone do not establish cutover.
+
+## Selected-project boundary for Backlog 1.55.3
+
+On 2026-11-21 UTC the owner reconciled canonical prime-claw once, recorded in
+`5af4e912a6641eac13c11522817dfc471b2ed5a0`. The managed
+`conversation-after-handoff.md` was refreshed, one metadata entry was
+recovered, and nine customized assets and all Episode snapshots were
+preserved. The native `backlog.config.yml` alias points to the same
+`.backlog/config.yml`, not another store. The newer pre-work interruption
+route remains deferred for the preserved `blocked`, `execute`, and `handoff`
+copies. See the [rollout evidence](evidence/primeclaw64-rollout-preparation.md#verified-host-cutover-and-live-uat)
+for the restart and test limits. No repeated reconciliation is needed here.
+
+For a future separately authorized update, reconcile only the selected canonical
+prime-claw project via `initialize_prime_claw(action="reconcile")`. First
+identify the loaded initializer generation and read the current comparison and
+manifest evidence; copied code is not loaded code. If the loaded initializer is
+older than the accepted generation, defer reconciliation until after restart
+and before declaring UAT complete. Confirm the selected root, provider, task
+history, index and legacy allowlist before and after. The initializer does not
+commit. Inspect and preserve unrelated staged and unstaged work.
+
+Refresh only proven untouched managed assets, including
+`conversation-after-handoff.md` if fresh evidence still classifies it that way.
+Preserve the customized `design`, `prepare`, `spec-it-out`, and `plan-task`
+files, accepted overrides, unknown files and all active or uncertain Episode
+snapshots. If a customized asset is in active use and issues incompatible
+commands, its owner must update the exact asset or explicitly exclude that
+consumer from cutover. Inactive customizations can wait. A plain Backlog project
+needs no Prime Claw initializer just because the host binary changes. Other
+projects and Beads-authoritative contexts are outside the selected reconciliation;
+there is no provider switch, record relocation, or fleet refresh in this rollout.
+
+Use the [host cutover](backlog.md#owner-only-v1553-host-cutover) after operators
+have agreed on quiescence. The maintenance coordinator performs one supported
+full restart and records the old/new daemon identity, start time, and loaded
+source/install generation. Do not use `/reload` or a second daemon. Resume the
+same owning Conversation and exact Episode, and check a designated ordinary
+session. Through their actual routes and CWDs, verify the resolved Backlog
+executable (1.55.3 and the accepted hash) and loaded plugin/workflow generation.
+Use bounded representative native reads: exact active task/status and recorded
+owner/Episode identity; complete unwindowed identity sets where a consumer needs
+one; native reads of existing archived tasks at their real paths where available.
+Check unattended invocation assumptions without making generic task, archive,
+or lifecycle edits. Archive semantics and installation alone are not live UAT.
+Record which sessions and behavior passed and which were not tested. A failed or
+uncertain result stops the rollout for owner inspection, not a generic retry.
 
 ## Validation and migration boundary
 

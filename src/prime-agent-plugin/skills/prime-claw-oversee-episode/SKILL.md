@@ -96,21 +96,31 @@ Missing observed actions or empty queues alone do not prove non-admission.
 The last three cases have no generic replay permission, even on operator
 request under this refusal exception. Inspect missing supported evidence without
 sending work, remain paused, or seek a separately authorized normal terminal
-disposition. If handoff is demonstrably completed, the separate NEW continuation
-policy below may apply; historical uncertainty alone does not exclude it. Never
+disposition. The separate NEW continuation policy below may apply if its
+conditions are met; it is not a replay of a refused or uncertain send. Never
 invent a safe resend of the old chain, use ordinary handoff/chat steering or
 replace resources. Record findings, gaps and disposition in existing native
 fields/history and publish normally. Neither exception adds routine permission
 to ordinary successful handoffs or authorizes a live historical recovery itself.
 
-### New execute-only continuation after completed handoff
+### New execute-only continuation after a verified runtime interruption
 
-For the same active version-2 task-native Episode only: original canonical
-handoff must be demonstrably received and completed; following execute may have
-failed or remain historically unproved. Preserve exact owner/provider/task,
-operation, durable session, worktree/branch, host/placement, original code basis
-and integration target. Resolve a changed route through supported native facts
-to that SAME durable session, never by name/CWD alone. No allocation or rebinding.
+For the same active version-2 task-native Episode only, use either of these paths:
+
+- The original canonical handoff demonstrably completed; the following execute
+  failed or remains historically unproved.
+- Both canonical prompts demonstrably reached the exact Episode, but a verified
+  model/runtime failure stopped both before task work. Reconcile native history,
+  code and observed effects; a bounded report-only coordination turn can confirm
+  recovery, the current checkpoint and the next already-authorized step. It is
+  neither task steering nor replay. A cleared runtime interruption is not an
+  ongoing task blocker. Do not use this path for uncertain delivery or possible
+  unaccounted task effects. Idle or an empty queue alone does not qualify.
+
+Preserve exact owner/provider/task, operation, durable session, worktree/branch,
+host/placement, original code basis and integration target. Resolve a changed
+route through supported native facts to that SAME durable session, never by
+name/CWD alone. No allocation or rebinding.
 
 Read current published full native task/history and meaningful living plan,
 accepted bounded focus, code/head/publication/worktree facts, available historical
@@ -127,7 +137,8 @@ current evidence or unproved current idleness stops. Known pending/running execu
 or unfinished admitted work stops. Do not cancel work to qualify. Cancellation,
 terminal disposition and scope boundaries stand.
 
-Brief the operator: completed handoff; known failed/refused/not-attempted versus
+Brief the operator: actual handoff completion or the proven pre-work interruption;
+known failed/refused/not-attempted versus
 unknown historical execute admission; known callback/partial effects; receiver
 report plus fresh native idle/empty-queue facts; current progress, accepted next
 scope and remaining uncertainty/possible prior effects. A no-execute/no-pending

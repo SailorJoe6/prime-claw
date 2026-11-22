@@ -121,7 +121,8 @@ def test_beads_status_archive_preflight_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test",
         "--test-name-pattern",
-        "native Beads deferred|used unsupported Beads statuses|Beads closed reasons and categories",
+        "native Beads deferred|used unsupported Beads statuses|Beads closed reasons and categories|"
+        "typed Beads relationships|true Beads blocking cycles|streaming canonical migration digest|native archived-target source graph",
         WS_NODE_SUITE, timeout=900,
     )
     (tier1_container.share.parent / "beads-status-archive-preflight-node.tap").write_text(

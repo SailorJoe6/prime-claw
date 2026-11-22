@@ -3,6 +3,23 @@ name: implement-task
 description: Review one exact operator-approved provider-native task and create its isolated implementation Episode only when it is implementation-ready.
 ---
 
+This workflow is only for isolated Episode readiness; ordinary direct work uses
+the direct path in the `implement-task` skill. If the operator chose direct
+placement, stop this queued Episode workflow without allocation or Episode
+lifecycle changes and follow the authorized direct path.
+
+## Preserve the launching session's LLM provider
+
+Every new Episode, subagent, reviewer, sibling session, or other new session
+must retain the launching session's current LLM provider (the model/authentication
+route), unless the operator explicitly directs a provider change. Model choices
+may change only the model, not the provider. Use native session facts and
+supported same-provider selection or inheritance; never fall back to another
+provider because a model is unavailable, discovery omits it, or quota is exhausted.
+If the launch surface cannot preserve that provider, report the constraint
+instead of switching. This does not change the selected Backlog/Beads task provider,
+creation authority, recovery path, or existing Episode identity.
+
 ## Select fresh admission or existing creation
 
 Before fresh provider/status/readiness checks, inspect canonical-primary

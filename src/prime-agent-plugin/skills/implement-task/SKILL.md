@@ -1,18 +1,83 @@
 ---
 name: implement-task
-description: Start an implementation-readiness review and isolated Episode for one approved provider-native task through the agent-callable implement_task tool.
+description: Route authorized task implementation by operator placement and task evidence; work directly or enter isolated Episode readiness.
 ---
 # Implement an approved task
 
-Use `implement_task(taskId, host?)` for task-native implementation. The operator
-can request this conversationally; no custom slash command is a prerequisite.
-This global entry skill routes to the project's customizable
-`.prime-claw/workflows/implement-task-prep.md` and `implement-task.md` policies.
-Do not copy their detailed procedures here or implement in the Conversation.
-Read `/skill:goals-and-heartbeats` unless it is already in context.
-Before fresh resource creation, follow that workflow's native pre-allocation
-checks. An already owned operation follows its continuation/failure guidance;
-entry admission is not a request to reserve or allocate replacement resources.
+Read `/skill:goals-and-heartbeats` unless it is already in context. Bind the
+exact canonical task and approved scope before proceeding. Never substitute a
+task or select work beyond explicitly delegated bounds. An EXPERT stays read-only.
+
+## Choose placement
+
+- Explicit placement wins. “Here”, “in this checkout”, or “on main” means
+  direct implementation in that checkout. Verify the actual branch and checkout
+  match the request; do not silently switch, substitute a location, or stack a
+  branch. An explicit Episode request uses the isolated path below.
+- If placement is unspecified, read the exact native ticket and use judgment.
+  Appropriate planning status (`In Planning` / Beads `in_planning`) plus a
+  meaningful Implementation Plan or Beads `design` normally points to an
+  Episode. An obvious small unplanned fix normally stays direct; `In Design`
+  alone does not disqualify it. For substantial work still in design that would
+  benefit from formal planning, or genuinely unclear/conflicting evidence, ask
+  one focused question before starting a workflow. Do not always ask or turn
+  size/status into a programmatic classifier.
+- Preserve explicit placement through planning, preparation, and compaction.
+  Planning alone grants no implementation authority. Even a newly published plan
+  does not turn “plan it, then implement it here” into an Episode request.
+
+## Direct tracked implementation
+
+Use ordinary editing, tests, and Git in the verified checkout. Do not call
+`implement_task` or any Episode tool, allocate an Episode or ownership record,
+load the Episode `execute` workflow, or require Episode identity or a formal
+plan. A small change still needs exact task identity, scope, and safe Git state.
+
+1. Read the exact task through the project's selected provider. Verify its
+   canonical identity, current native status, and the requested placement.
+   Locate the canonical primary checkout via Git worktree metadata and check its
+   `.prime-claw/ownership.json` for a non-inactive Episode bound to this task,
+   including provisioning or uncertain ownership. Inspect the registry for
+   conflicts only, never to select or adopt an owner. If a same-task Episode
+   exists or the collision check is inconclusive, stop for operator resolution.
+   Do not mutate another owner's task or resources.
+2. Before editing implementation files, publish and verify the exact task's
+   native `In Progress` (Beads `in_progress`), even for a quick fix. Use only
+   supported native task operations and the selected task-history topology.
+   Re-read the task and prove the status in committed history, published when
+   a remote exists. Do not overwrite concurrent task changes or bypass another
+   lifecycle authority. If native identity, transition, or publication is
+   unsafe or uncertain, report it and stop rather than editing code or retrying.
+3. Implement the approved change. Run required project checks, commit only the
+   intended changes, and push the authorized branch without force when a remote
+   exists. Preserve unrelated edits, staging, history, and credentials. If
+   there is no remote, prove the local commit instead.
+4. Only after required checks and code commit/publication are proven, recheck
+   exact native task and ownership facts and publish and verify native `Done`
+   (Beads `done`). No separate approval is needed solely for this status.
+   Honor explicit review holds; do not mark incomplete, blocked, or
+   publication-uncertain work `Done`. Report exact code and task publication
+   evidence. This grants no separate merge, deployment, or activation authority.
+
+Backlog uses `backlog task view --json -- TASK-ID` and `backlog task edit`
+with the native status. Keep task edits in exact-path-only commits, in the
+independent task clone/ref when selected, or on the code branch for a
+branch-local store, and verify the exact native view and publication after
+writes. Beads uses `bd show --json --long --include-comments` for the exact ID
+and a supported guarded `bd update` status transition; inspect native pending
+and staged work before an update, commit, or push. Auto-commit can include
+unrelated pending work. Consult if not authorized or clear; verify actual task
+history and native publication, not just command success. Do not change
+providers, migrate storage, force publication, or reset another writer's work.
+
+## Isolated Episode implementation
+
+Only this path calls `implement_task(taskId, host?)`. This global entry skill
+routes to the project's customizable `.prime-claw/workflows/implement-task-prep.md`
+and `implement-task.md` policies. The Conversation supervises; the Episode
+implements. Before fresh resource creation, follow the workflow's native
+pre-allocation checks. An already owned operation follows its
+continuation/failure guidance, not replacement allocation.
 
 ## Bind scope and authority
 

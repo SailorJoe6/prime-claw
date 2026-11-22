@@ -9,7 +9,10 @@ threshold_percent: 60
 A canonical Episode handoff through `handoff_spec_episode` or
 `handoff_task_episode` was just admitted successfully from this Conversation.
 That admission is final for this pass: nothing in this workflow reverses it,
-repeats it, or dispatches the Episode again.
+repeats it, or dispatches the Episode again. Complete the goal for that
+admitted dispatch phase; do not keep it active while the Episode's separately
+assigned work runs. This workflow neither proves Episode compaction nor execute
+completion.
 
 Compose `focus_hint` yourself from your current context. Keep what you need to
 supervise the exact owned Episode to completion: its task or source identity,
@@ -36,7 +39,10 @@ In every case, end the turn after reporting. Normal heartbeat-driven
 supervision of the same owned Episode continues; the existing post-compaction
 handler re-primes this Conversation with the exact Episode identity if
 compaction runs. Do not wait for compaction events, do not run an Episode
-phase, and do not pause supervision for operator input.
+phase, and do not pause supervision for operator input. Goal or post-compaction
+reminders are advisory background guidance, not another assignment or a request
+for an acknowledgement. Do not let them create an extra reporting turn or a
+second compaction; use the existing authorized supervision workflow.
 
 ## Configuration
 

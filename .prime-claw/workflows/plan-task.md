@@ -15,7 +15,9 @@ For Backlog, run the `prepare` skill normally. For Beads, perform `prepare`'s
 repository-orientation reads but skip its Backlog-only queue inventory. That
 unrelated queue is not Beads planning authority and must not mix providers.
 
-Preserve the operator's actual instruction and approved scope. Explicit
+Preserve the operator's actual instruction, approved scope, and explicit
+implementation placement (direct checkout or Episode, including any selected
+Episode host). Explicit
 conditional “plan this task, then implement it when ready” authority survives
 planning, preparation, and compaction; planning alone does not authorize
 implementation. An explicitly delegated task selection must already be bound
@@ -188,9 +190,14 @@ authorize implementation. For a planning-only request, explicitly ask the
 operator to review the plan and stop without creating Episode resources.
 If the operator already gave explicit conditional plan-then-implement authority
 within this scope, do not stop solely to request the same approval again.
-After successful publication, load the `implement-task` entry skill and invoke
-`implement_task` for this exact ID. Implementation requires native `In Planning`
-(Beads `in_planning`) after design and planning and the full semantic readiness
-review; dependency readiness alone is insufficient. No separate phase-history
-receipt is required. Any failed or uncertain publication, material ambiguity,
-missing authority, blocker, or new scope stops advancement without retry.
+After successful publication, load the `implement-task` entry skill for this
+exact ID. Preserve the explicit placement: “plan it, then implement it here”
+continues via the direct path in the verified checkout, without calling
+`implement_task`. An explicit Episode request uses Episode readiness and keeps
+any selected host. Only when placement was unspecified, apply the skill's
+judgment-based default to the current evidence. The Episode path alone calls
+`implement_task` and requires native `In Planning` (Beads `in_planning`) and
+full semantic readiness; dependency readiness alone is insufficient. No
+separate phase-history receipt is required. Any failed or uncertain publication,
+material ambiguity, missing authority, blocker, or new scope stops advancement
+without retry.

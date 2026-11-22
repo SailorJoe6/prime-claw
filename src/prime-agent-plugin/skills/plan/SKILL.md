@@ -25,11 +25,13 @@ unclear to plan, explain the observed gap and stop without mutation or admission
 These are your decisions under editable guidance, not an entry-tool eligibility
 check. A readable task or a queued workflow is not approval or readiness.
 
-Preserve the operator's actual instruction, exact task, and approved scope
-through preparation and compaction. Explicit conditional authority such as
+Preserve the operator's actual instruction, exact task, approved scope, and
+explicit implementation placement through preparation and compaction. Explicit conditional authority such as
 “plan this task, then implement it when ready” may authorize that sequence;
 fresh approval is not needed solely because planning ended. Planning alone
-does not authorize implementation. Implementation still requires native
+does not authorize implementation. After authorized planning, use the
+`implement-task` skill to preserve explicit direct or Episode placement and
+judge the default only when unspecified. Episode readiness still requires native
 `In Planning` after design and planning plus semantic readiness, not dependency
 readiness alone or a separate phase-history receipt. Clarify material ambiguity,
 missing authority, or new scope.

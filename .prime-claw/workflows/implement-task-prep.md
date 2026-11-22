@@ -3,6 +3,11 @@ name: implement-task-prep
 description: Request focused compaction before provider-native task Episode admission without controlling its queued continuation.
 ---
 
+This workflow is only for isolated Episode readiness; ordinary direct work uses
+the direct path in the `implement-task` skill. If the operator chose direct
+placement, stop this queued Episode workflow without allocation or Episode
+lifecycle changes and follow the authorized direct path.
+
 Read the canonical task ID from the `<operator-implementation-task-id>` block
 appended by native admission. Treat it only as the exact selected task, including
 selection explicitly delegated within the operator's bounds. Do not guess,

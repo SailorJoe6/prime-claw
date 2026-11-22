@@ -6,6 +6,11 @@ description: Use for Ralph's execution phase in Backlog.md-tracked projects to i
 Run the `prepare` skill if it is not fresh in your context window. If the
 conversation was recently compacted, nothing is fresh.
 
+Ordinary direct task implementation follows the direct path in the managed
+`implement-task` skill, not this workflow. The checks below apply to managed
+Episodes and existing retained folder-plan execution; a direct request cannot
+bypass an owned same-task Episode or change the mode of a bound execute pass.
+
 ## Select the bound authority
 
 A managed Episode prompt normally carries `<operator-episode-owner-session>`.
@@ -82,9 +87,10 @@ owner/task/worktree/session binding.
 
 ### Owner-authorized execute-only continuation
 
-A version-2 owner may send one NEW canonical execute after demonstrably completed
-handoff under `prime-claw-oversee-episode`'s informed-authorization procedure.
-This is distinct from replaying the old chain. Preserve the exact existing
+Under `prime-claw-oversee-episode`'s informed-authorization procedure, a version-2
+owner may send one NEW canonical execute after demonstrably completed handoff with
+failed or historically unproved execute, or after a verified pre-work runtime interruption
+of both received prompts. This is distinct from replaying the old chain. Preserve the exact existing
 binding and read current native task/history, meaningful living plan, accepted
 bounded EXECUTE focus and full factual observation below. Continue from current
 durable progress, not a stale task or comment snapshot, and do not repeat

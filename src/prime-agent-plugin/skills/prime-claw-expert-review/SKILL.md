@@ -83,11 +83,35 @@ retargeting or replacement resources.
 
 ## Select and start the reviewer
 
-Use `await rlm.find_models(...)` to resolve an operator-selected model. Without
-an override, look for the exact selector `openai-codex/gpt-6-astra`. If it is
-unavailable, select a reasonably strong available review model and tell the
-caller which model will be used. Consult the operator only if no suitable model
-is available.
+First determine the parent session's actual current LLM provider from native
+session/model facts. Keep that same provider (the model/authentication route)
+for this reviewer and every subagent, sibling Episode, sibling session, or other
+new session unless the operator explicitly directs a provider change. Selecting
+a model does not authorize changing providers; `openai-codex` and `openai` are
+different providers even when both offer the same model name.
+
+Use `prime-agent model list [search]` to look up a requested model. Quote a
+multi-word search to include both the provider and model family:
+
+```sh
+prime-agent model list "openai-codex astra"
+```
+
+Use the exact `provider/model-id` the operator named. If the operator asks for
+the latest in a family, choose the newest matching model on the required
+provider. For example, choose `openai-codex/gpt-6.2-astra` over
+`openai-codex/gpt-6-astra` when both are listed and latest Astra is requested.
+Without an override, prefer the latest Astra available on the parent's provider.
+State the actual provider and model choice before the review.
+
+Catalog presence is not launch authorization or proof that the running session
+can start the model. For an RLM child using a different model, use
+`await rlm.find_models(...)` to confirm the exact CLI-selected selector is
+returned before spawning. If it is not returned, report the discovery gap. If
+launch fails, report the actual error rather than inferring its cause. Never
+substitute a different provider or silently replace an explicitly requested
+model. If no model was requested and no same-provider Astra is selectable,
+ask before using a different model for the independent review.
 
 Request `thinking="max"`. If the selected fallback model does not support that
 setting, use its strongest supported reasoning level. Use an ordinary unique
@@ -101,7 +125,7 @@ the real task exactly once:
 handle = await rlm.spawn(
     "Bootstrap only. Wait for the review task from your parent.",
     name="expert-review-<short-unique-name>",
-    model=selected_model,
+    model=selected_model,  # same provider as parent; omit to inherit both
     thinking="max",
 )
 await agent_message.send(

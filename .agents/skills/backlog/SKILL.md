@@ -48,18 +48,20 @@ auditable.
 - The `plan` skill calls `plan_task` for one exact task. Its canonical workflow
   writes the native Implementation Plan and publishes `In Planning` through one
   supported task edit.
-- The `implement-task` skill calls `implement_task` for one exact implementation-ready
+- The Episode path in `implement-task` calls `implement_task` for one exact implementation-ready
   `In Planning` task. The owning Conversation publishes `In Progress` before
   Episode allocation. Planning alone does not authorize implementation; an explicit
   conditional plan-then-implement instruction may remain valid within approved scope.
 - Later `Blocked`, resumed `In Progress`, `Ready for Merge`, and terminal `Done`
   transitions belong to the owning Conversation under the reviewed lifecycle.
 
-There is no generic claim edit that may bypass planning or admission. Only the
-owning Conversation closes a task through `backlog task edit <id> --status Done`.
-The task stays active through `finalize_task_episode`; optional archive follows
-only after merged cleanup. Do not change status or archive without the exact
-reviewed lifecycle and operator authority.
+Do not use a generic claim edit to bypass Episode planning or admission. For
+an owned Episode, only its Conversation closes the task, which stays active
+through `finalize_task_episode`; optional archive follows merged cleanup. For
+ordinary direct work follow the `implement-task` skill: verify exact placement
+and no same-task Episode, publish `In Progress` before implementation edits,
+and publish `Done` only after required checks and code commit/publication, unless
+there is a review hold. Direct work does not confer archive authority.
 
 Archive is reversible, read-only, reserves the ID, and preserves the original
 status and relationships. Restore with `backlog task restore <id>` before any
