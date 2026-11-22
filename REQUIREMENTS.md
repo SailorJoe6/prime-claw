@@ -207,8 +207,11 @@ status and relationships; restore before editing. Canonical `archive/tasks/`
 and legacy `completed/` are both archived history regardless of status. Only an
 explicit archived-only native delete vacates identity and cleans relationships.
 Use native archived/draft dependency eligibility. Physical identity conflicts
-across source/destination live, draft and archive records refuse before writes, without
-repair or a parallel index/graph policy. Read archived tasks natively in place.
+refuse before writes, without repair or a parallel index/graph policy. During
+Beads-to-Backlog migration, an existing unrelated live/archive pair with a shared
+ID does not block the import: preserve both originals, let native allocation
+reserve their ID, and refuse ambiguous targeting. Read unambiguous archived
+tasks natively in place.
 Unavailable archived-draft native views alone do not block migration; preserve
 their exact bytes, paths, history and physical identity checks instead.
 

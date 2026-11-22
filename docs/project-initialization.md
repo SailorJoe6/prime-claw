@@ -509,9 +509,13 @@ meaningful disagreement stops without choosing a winner. Missing native startup
 fields still refuse before a read can normalize custom settings. The existing
 actual-source-completion and one-owned-server checks remain in effect.
 
-Concrete file, mode, ID, configuration, placement, ancestry or publication
-conflicts stop with both sides retained. Same-ID live/archive coexistence is
-still deferred, not silently resolved. Only a non-force published descendant is
+Concrete file, mode, configuration, placement, ancestry or publication
+conflicts stop with both sides retained. An existing unrelated live/archive
+pair with a shared ID is preserved by exact physical path, content, mode, and
+native history; the importer does not choose either record or make a new pair.
+Native allocation reserves the ID, and an ambiguous migration target is
+refused. See [same-ID coexistence evidence](evidence/primeclaw-59-same-id-coexistence-20261122.md).
+Only a non-force published descendant is
 materialized by an ordinary fast-forward or initial clone. A pre-reconciliation
 in-memory preservation check continues through the existing original baseline,
 receipt refresh and cutover checks. It does not replace those checks or add a

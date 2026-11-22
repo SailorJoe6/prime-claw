@@ -290,7 +290,7 @@ export function assertBeadsCurrentTask(view: unknown, projection: BeadsCurrentTa
 }
 
 /** One POST, one sequential PUT per actual source comment, then full CLI verification. */
-export async function authorBeadsCurrentTask(web: BeadsCurrentTaskWeb, projection: BeadsCurrentTaskProjection): Promise<string> {
+export async function authorBeadsCurrentTask(web: BeadsCurrentTaskWeb, projection: BeadsCurrentTaskProjection, assertTarget?: (id: string) => void): Promise<string> {
   let created: unknown;
   try { created = await web.createTask(projection.payload); }
   catch (error) {
@@ -299,6 +299,7 @@ export async function authorBeadsCurrentTask(web: BeadsCurrentTaskWeb, projectio
   }
   if (!object(created) || typeof created.id !== "string" || !created.id || /\s/.test(created.id) || created.id.startsWith("-")) fail("native-create-response; effects may be partial");
   const id = created.id;
+  assertTarget?.(id);
   for (const comment of projection.comments) {
     try { await web.updateTask(id, { commentsAppend: [comment.body], commentAuthor: comment.author }); }
     catch (error) {

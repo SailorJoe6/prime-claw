@@ -2657,17 +2657,25 @@ test("migration admission refuses contested Backlog IDs across active archive le
   const destination = coexistenceDestination(fixture, "backlog");
   const initial = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
   assert.equal(initial.status, "ready", initial.detail);
-  const activeBytes = readFileSync(join(fixture.root, destination.activePath));
+  const archived = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", destination.archived)).task;
+  const legacy = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", destination.legacy)).task;
   const source = { authority: sourceAuthorityFiles(fixture.root),
     export: bd(fixture.root, "--readonly", "export", "--all"),
     currentView: bd(fixture.root, "--readonly", "show", fixture.ids.parent, "--json", "--long", "--include-comments") };
-  for (const [folder, taskId] of [["tasks", destination.active], ["archive/tasks", destination.active],
-    ["completed", destination.active], ["drafts", destination.active], ["archive/drafts", destination.active], ["archive/tasks", "BASE-01"]]) {
+  for (const [folder, taskId, originalId, originalPath] of [
+    ["tasks", destination.active, destination.active, destination.activePath],
+    ["archive/tasks", archived.id, archived.id, archived.path],
+    ["completed", archived.id, archived.id, archived.path],
+    ["completed", legacy.id, legacy.id, legacy.path],
+    ["drafts", destination.active, destination.active, destination.activePath],
+    ["archive/drafts", destination.active, destination.active, destination.activePath],
+    ["tasks", "BASE-01", destination.active, destination.activePath],
+  ]) {
     await t.test(`${folder} ${taskId}`, async () => {
       const relativePath = `backlog/${folder}/${taskId.toLowerCase()} - contested-copy.md`;
       const collisionPath = join(fixture.root, relativePath);
       mkdirSync(join(fixture.root, "backlog", folder), { recursive: true });
-      writeFileSync(collisionPath, activeBytes.toString("utf8").replace(/^id:.*$/m, `id: ${taskId}`));
+      writeFileSync(collisionPath, readFileSync(join(fixture.root, originalPath), "utf8").replace(/^id:.*$/m, `id: ${taskId}`));
       git(fixture.root, "add", relativePath);
       git(fixture.root, "commit", "-qm", `seed contested ${folder} identity`);
       git(fixture.root, "push", "-q");
@@ -2683,8 +2691,8 @@ test("migration admission refuses contested Backlog IDs across active archive le
       assert.equal(inspection.status, "ready", inspection.detail);
       assert.equal(inspection.sourceRevision, initial.sourceRevision, "inspection captures the outgoing Beads source as-is");
       assert.equal(confirmation.status, "blocked");
-      const conflictPaths = [relativePath, destination.activePath].map((path) => path.slice("backlog/".length)).sort();
-      const firstClaimId = conflictPaths[0] === relativePath.slice("backlog/".length) ? taskId : destination.active;
+      const conflictPaths = [relativePath, originalPath].map((path) => path.slice("backlog/".length)).sort();
+      const firstClaimId = conflictPaths[0] === relativePath.slice("backlog/".length) ? taskId : originalId;
       assert.equal(confirmation.detail,
         `Backlog destination repeats canonical task IDs: ${firstClaimId}: ${conflictPaths.join(", ")}`);
       assertNoAdmissionWrites(runner);
@@ -2824,7 +2832,7 @@ function parkedStoreTree(path) {
   return tree;
 }
 
-function parkedStoreReconciliationFixture(t, name, { selected = ".backlog", clone = true } = {}) {
+function parkedStoreReconciliationFixture(t, name, { selected = ".backlog", clone = true, sameId = false } = {}) {
   const fixture = embeddedBeadsSource(t, `parked-${name}`);
   const original = coexistenceDestination(fixture, "backlog");
   const parked = join(fixture.root, "backlog"), configPath = join(parked, "config.yml");
@@ -2836,8 +2844,10 @@ function parkedStoreReconciliationFixture(t, name, { selected = ".backlog", clon
     + '\n# Retain parked operator customization, not bootstrap defaults.\noperator_extension: {opaque: [null, false, "Ω"]}\n'
     + 'types: ["Incident, Follow-up"]\npriorities: ["P4", "P1", "P0", "Very High, Almost"]\n';
   writeFileSync(configPath, config); chmodSync(configPath, 0o640);
+  const pair = sameId ? seedSameIdOriginals(fixture.root, "backlog") : undefined;
+  const nativeOriginals = sameId ? captureSameIdControls(fixture.root, "backlog", original) : undefined;
   const recordPaths = Object.keys(physicalDestinationRecords(parked));
-  for (const path of recordPaths) chmodSync(join(parked, path), 0o640);
+  for (const path of recordPaths) if (!pair?.paths.includes(path)) chmodSync(join(parked, path), 0o640);
   mkdirSync(join(parked, "scripts"));
   writeFileSync(join(parked, "scripts", "retained.sh"), "#!/bin/sh\nprintf 'original attachment Ω\\n'\n");
   chmodSync(join(parked, "scripts", "retained.sh"), 0o750);
@@ -2878,7 +2888,7 @@ function parkedStoreReconciliationFixture(t, name, { selected = ".backlog", clon
     const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino];
   }) : null;
   return { ...fixture, selected, store, seed, parked, original, config, recordPaths, codeHead, originalTaskHead, bootstrapHead,
-    sourceHistory, originalBlobs, identity, inspection, parkedBefore: parkedStoreTree(parked),
+    pair, nativeOriginals, sourceHistory, originalBlobs, identity, inspection, parkedBefore: parkedStoreTree(parked),
     cloneConfig: clone ? readFileSync(join(store, ".git", "config"), "utf8") : null,
     request: { cwd: fixture.root, targetProvider: "backlog", expectedSourceRevision: inspection.sourceRevision, confirmedSwitch: true,
       actor: "parked-store-fixture", semanticPlacement: "Retain inactive parked originals and both native task ancestries in the exact selected destination." } };
@@ -3163,6 +3173,232 @@ for (const variant of [
     assert.equal(existsSync(join(f.fixture.root, ".beads")), false);
   });
 }
+
+// Native authoring supplies distinct records; only disposable fixture setup
+// seeds a grandfathered ID which today's allocator cannot produce.
+function createSameIdFixtureTask(root, title, description, archived = false) {
+  const id = backlog(root, "task", "create", title, "--description", description,
+    "--no-dod-defaults", "--plain").match(/\bBASE-\d+\b/)[0];
+  if (archived) backlog(root, "task", "archive", id);
+  const task = JSON.parse(backlog(root, "task", "view", "--json", "--", id)).task;
+  assert.equal(task.archived, archived);
+  return task;
+}
+
+function seedSameIdFixtureRecord(root, placement, task, id, mode) {
+  const oldFile = join(root, task.path), oldPrefix = `${task.id.toLowerCase()} - `;
+  const filename = task.path.split("/").at(-1);
+  assert.ok(filename.startsWith(oldPrefix));
+  const folder = task.archived ? "archive/tasks" : "tasks";
+  assert.equal(task.path, `${placement}/${folder}/${filename}`);
+  const path = `${folder}/${id.toLowerCase()} - ${filename.slice(oldPrefix.length)}`;
+  const file = join(root, placement, path);
+  const text = readFileSync(oldFile, "utf8"), oldIdLine = `id: ${task.id}\n`;
+  assert.ok(text.includes(oldIdLine)); assert.equal(existsSync(file), false);
+  renameSync(oldFile, file);
+  writeFileSync(file, text.replace(oldIdLine, `id: ${id}\n`));
+  chmodSync(file, mode);
+  return path;
+}
+
+function seedSameIdOriginals(root, placement) {
+  const id = "BASE-12";
+  const archive = createSameIdFixtureTask(root, "High archived original", "Distinct archive content Ω", true);
+  const live = createSameIdFixtureTask(root, "High live original", "Distinct live content λ");
+  assert.notEqual(live.id, archive.id);
+  return { id, paths: [seedSameIdFixtureRecord(root, placement, live, id, 0o640),
+    seedSameIdFixtureRecord(root, placement, archive, id, 0o750)] };
+}
+
+function assertNativeSameIdAmbiguity(root, placement, { id, paths }) {
+  const result = RUNNER.run("backlog", ["task", "view", "--json", "--", id], { cwd: root, allowFailure: true });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /ambiguous/);
+  assert.ok(result.stderr.includes(id));
+  for (const path of paths) assert.ok(result.stderr.includes(`${placement}/${path}`), path);
+}
+
+function captureSameIdControls(root, placement, original) {
+  const views = [original.active, original.completed, original.archived, original.legacy].map(id => {
+    const view = JSON.parse(backlog(root, "task", "view", "--json", "--", id));
+    assert.ok(view.task.path.startsWith(`${placement}/`), view.task.path);
+    return { ...view, task: { ...view.task, path: view.task.path.slice(placement.length + 1) } };
+  });
+  const draft = backlog(root, "draft", "view", original.draft, "--plain");
+  assert.ok(draft.includes(`File: ${join(root, placement)}/`));
+  return { views, draft: draft.replace(`File: ${join(root, placement)}/`, "File: ") };
+}
+
+function captureSameIdRecords(store) {
+  return Object.fromEntries(Object.entries(physicalDestinationRecords(store)).map(([path, bytes]) =>
+    [path, { bytes, mode: lstatSync(join(store, path)).mode }]));
+}
+
+function publishSameIdFixtureChanges(store, message) {
+  git(store, "add", "-A", "--", "tasks", "archive/tasks");
+  git(store, "commit", "-qm", message);
+  git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  return git(store, "rev-parse", "HEAD");
+}
+
+class SameIdPublicationRunner extends AdmissionRunner {
+  run(commandName, args, options = {}) {
+    const result = super.run(commandName, args, options);
+    if (commandName === "backlog" && args[0] === "task" && args[1] === "view" && result.status === 0) {
+      const task = JSON.parse(result.stdout).task;
+      if (task.title === "Prime Claw task-provider migration receipt" && task.status === "Done") this.completeReceiptTask = task;
+    }
+    return result;
+  }
+}
+
+function publishedSameIdReceipt(runner, store, inspection) {
+  const head = git(store, "rev-parse", "HEAD");
+  assert.equal(git(store, "status", "--porcelain=v1"), "");
+  assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], head);
+  const task = runner.completeReceiptTask;
+  assert.ok(task, "migration read back the completed native receipt before retirement");
+  const receipt = JSON.parse(task.implementationNotes.match(/^```json\n([\s\S]+)\n```$/)[1]);
+  assert.equal(receipt.sourceRevision, inspection.sourceRevision);
+  assert.equal(receipt.sourceDigest, inspection.sourceDigest);
+  assert.equal(receipt.mappings.length, inspection.taskCounts.total);
+  return { head, task, receipt };
+}
+
+for (const variant of ["existing selected store", "parked originals in selected bootstrap"]) {
+  test(`same-ID coexistence preserves unrelated originals and imports: ${variant}`, { timeout: 300_000 }, async t => {
+    const parked = variant.startsWith("parked") ? parkedStoreReconciliationFixture(t, "same-id-pair", { sameId: true }) : null;
+    const selected = parked ? null : selectedMigrationConfigFixture(t, "same-id-pair", {
+      statuses: ["Triage", "In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"],
+    });
+    const fixture = parked ?? selected.fixture;
+    const original = parked?.original ?? selected.destination;
+    const store = parked?.store ?? original.store;
+    const originals = parked?.parked ?? store;
+    const pair = parked?.pair ?? seedSameIdOriginals(fixture.root, ".backlog");
+    const originalHead = parked?.originalTaskHead ?? publishSameIdFixtureChanges(store, "seed high live/archive pair in existing native history");
+    const nativeOriginals = parked?.nativeOriginals ?? captureSameIdControls(fixture.root, ".backlog", original);
+    const records = captureSameIdRecords(originals);
+    assert.notEqual(records[pair.paths[0]].bytes, records[pair.paths[1]].bytes);
+    assert.notEqual(records[pair.paths[0]].mode, records[pair.paths[1]].mode);
+    if (!parked) assertNativeSameIdAmbiguity(fixture.root, ".backlog", pair);
+    const source = sourceAuthorityFiles(fixture.root);
+    const nativeCurrent = captureBeadsCurrentTasks(fixture.root, Object.values(fixture.ids));
+    const runner = new SameIdPublicationRunner();
+    const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+    assert.equal(inspection.status, "ready", inspection.detail);
+    const request = parked?.request ?? selected.request;
+    assert.equal(request.expectedSourceRevision, inspection.sourceRevision);
+    let retirementCalls = 0, receiptAtRetirement;
+    const { result, requests } = await observeCompletionMigration({ ...request, runner, deleteSource(snapshot) {
+      retirementCalls++;
+      assert.equal(snapshot.provider, "beads");
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
+      receiptAtRetirement = publishedSameIdReceipt(runner, store, inspection);
+      const recordsAtRetirement = captureSameIdRecords(store);
+      for (const [path, original] of Object.entries(records)) assert.deepEqual(recordsAtRetirement[path], original, path);
+      git(store, "merge-base", "--is-ancestor", originalHead, receiptAtRetirement.head);
+      git(store, "merge-base", "--is-ancestor", receiptAtRetirement.receipt.destinationDataRevision, receiptAtRetirement.head);
+      if (parked) git(store, "merge-base", "--is-ancestor", parked.bootstrapHead, receiptAtRetirement.head);
+      const mapping = Object.fromEntries(receiptAtRetirement.receipt.mappings.map(row => [row.sourceTaskId, row.destinationTaskId]));
+      assert.deepEqual(Object.keys(mapping).sort(), Object.values(fixture.ids).sort());
+      for (const [sourceId, id] of Object.entries(mapping)) {
+        const view = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", id));
+        assertCurrentBacklogTask(view, nativeCurrent[sourceId], inspection, mapping,
+          { priorities: ["P4", "P1", "P0", "Very High, Almost"], types: ["Incident, Follow-up"] });
+      }
+      rmSync(join(fixture.root, ".beads"), { recursive: true, force: true });
+      rmSync(join(fixture.root, ".beads.gate.lock"), { force: true });
+    } });
+    console.info(JSON.stringify({ sameIdCase: variant, status: result.status, detail: result.detail, retirementCalls,
+      nativeWrites: requests.filter(row => row.method !== "GET").length }));
+    assert.equal(result.status, "completed", result.detail);
+    assert.equal(retirementCalls, 1);
+    assert.equal(existsSync(join(fixture.root, ".beads")), false);
+    assert.equal(existsSync(join(fixture.root, ".beads.gate.lock")), false);
+    assert.equal(receiptAtRetirement.head, result.receipt.destinationReceiptRevision);
+    assert.equal(receiptAtRetirement.task.id, result.receiptTaskId);
+    assert.deepEqual(receiptAtRetirement.receipt.mappings, result.receipt.mappings);
+    if (parked) assert.deepEqual(parkedStoreTree(originals), parked.parkedBefore);
+
+    const after = captureSameIdRecords(store);
+    for (const [path, original] of Object.entries(records)) {
+      assert.deepEqual(after[path], original, `exact original path, bytes and mode: ${path}`);
+      assert.equal(git(store, "diff", originalHead, "HEAD", "--", path), "", `unchanged original Git path: ${path}`);
+    }
+    assert.equal(Object.keys(after).length, Object.keys(records).length + inspection.taskCounts.total + 1);
+    assertNativeSameIdAmbiguity(fixture.root, ".backlog", pair);
+    assert.deepEqual(captureSameIdControls(fixture.root, ".backlog", original), nativeOriginals);
+    for (const id of [original.active, original.completed, original.archived, original.legacy, original.draft,
+      ...result.receipt.mappings.map(row => row.destinationTaskId)]) {
+      assert.ok(runner.calls.some(({ commandName, args }) => commandName === "backlog" && args[1] === "view" && args.includes(id)),
+        `migration still requires exact native evidence for unambiguous ${id}`);
+    }
+    const allocated = [result.receiptTaskId, ...result.receipt.mappings.map(row => row.destinationTaskId)];
+    assert.equal(new Set(allocated).size, inspection.taskCounts.total + 1);
+    const roots = allocated.map(id => {
+      const match = /^BASE-(\d+)(?:\.\d+)*$/.exec(id);
+      assert.ok(match, `native allocation must use the selected BASE prefix: ${allocated.join(", ")}`);
+      return Number(match[1]);
+    });
+    assert.ok(allocated.includes("BASE-13"), `native allocation must issue the next top-level ID: ${allocated.join(", ")}`);
+    assert.equal(Math.min(...roots), 13, "native allocation reserves the high pre-existing pair");
+  });
+}
+
+test("same-ID coexistence refuses replay targeting an ambiguous receipt-mapped import", { timeout: 300_000 }, async t => {
+  const f = selectedMigrationConfigFixture(t, "same-id-targeted-replay");
+  const { root, remote, ids } = f.fixture, { store } = f.destination;
+  const original = createSameIdFixtureTask(root, "Unrelated archive for replay", "Never a migration output", true);
+  publishSameIdFixtureChanges(store, "publish unrelated archived original before first migration");
+  const runner = new SameIdPublicationRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.equal(f.request.expectedSourceRevision, inspection.sourceRevision);
+  const source = sourceAuthorityFiles(root);
+  const sourceExport = bd(root, "--readonly", "export", "--all");
+  let verified;
+  const first = await migrateTaskProvider({ ...f.request, runner, deleteSource() {
+    assert.deepEqual(sourceAuthorityFiles(root), source);
+    verified = publishedSameIdReceipt(runner, store, inspection);
+    throw new Error("fixture retains source at verified publication before targeted replay");
+  } });
+  assert.equal(first.status, "blocked", first.detail);
+  assert.match(first.detail, /fixture retains source at verified publication before targeted replay/);
+  const id = verified.receipt.mappings.find(row => row.sourceTaskId === ids.parent).destinationTaskId;
+  const imported = JSON.parse(backlog(root, "task", "view", "--json", "--", id)).task;
+  assert.ok(imported.references.includes(`prime-claw-beads-source:${ids.parent}`));
+  const livePath = imported.path.slice(".backlog/".length);
+  assert.ok(livePath.startsWith("tasks/"));
+  const archivePath = seedSameIdFixtureRecord(root, ".backlog", original, id, 0o640);
+  const driftHead = publishSameIdFixtureChanges(store, "seed an archival claimant of an exact receipt-mapped ID");
+  assertNativeSameIdAmbiguity(root, ".backlog", { id, paths: [livePath, archivePath] });
+  assert.deepEqual(JSON.parse(backlog(root, "task", "view", "--json", "--", verified.task.id)).task, verified.task);
+  const records = captureSameIdRecords(store), config = readFileSync(f.path);
+  const codeHead = git(root, "rev-parse", "HEAD"), codeIndex = git(root, "ls-files", "--stage");
+  const refs = git(root, "ls-remote", "--refs", remote);
+  let retirementCalls = 0;
+  const replayRunner = new AdmissionRunner();
+  const { result, requests } = await observeCompletionMigration({ ...f.request, runner: replayRunner, deleteSource() {
+    retirementCalls++;
+    throw new Error("unsafe ambiguous target reached source retirement");
+  } });
+  assert.equal(result.status, "blocked", result.detail);
+  assert.match(result.detail, /ambiguous|repeats canonical task IDs/i);
+  for (const value of [id, livePath, archivePath]) assert.ok(result.detail.includes(value), result.detail);
+  assert.equal(retirementCalls, 0);
+  assert.ok(requests.every(row => row.method === "GET"), "no Web writes in targeted replay");
+  assertNoAdmissionWrites(replayRunner);
+  assert.deepEqual(captureSameIdRecords(store), records);
+  assert.deepEqual(readFileSync(f.path), config);
+  assert.deepEqual(sourceAuthorityFiles(root), source);
+  assert.equal(bd(root, "--readonly", "export", "--all"), sourceExport);
+  assert.equal(git(store, "rev-parse", "HEAD"), driftHead);
+  assert.equal(git(store, "status", "--porcelain=v1"), "");
+  assert.equal(git(root, "ls-remote", "--refs", remote), refs);
+  assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
+  assert.equal(git(root, "ls-files", "--stage"), codeIndex);
+});
 
 function addSourceCompletionDependency(fixture) {
   const closed = JSON.parse(bd(fixture.root, "create", "Source completion C", "--description", "Complete current source ticket C.", "--json")).id;

@@ -1413,6 +1413,12 @@ export function prepareExistingBacklogTaskHistoryWorkspace(
 
 
 
+/** Existing migration records only: neither a draft nor a second record in either lifecycle location. */
+export function isBacklogMigrationLiveArchivePair(paths: string[]): boolean {
+  return paths.length === 2 && paths.some(path => path.startsWith("tasks/"))
+    && paths.some(path => path.startsWith("archive/tasks/") || path.startsWith("completed/"));
+}
+
 /** Migration-only reconciliation of the one known inactive parked Backlog store.
  * All merge/conflict work occurs in a disposable ordinary Git repository. The
  * parked tree is never activated, detached, rewritten or removed.
@@ -1421,6 +1427,7 @@ export function reconcileParkedBacklogMigrationStore(
   primaryRoot: string,
   runner: CommandRunner = new ProcessCommandRunner(),
   validateCandidateConfig?: (content: string) => void,
+  validatePreservedPair?: (id: string, members: { path: string; markdown: string }[]) => void,
 ): { storeDir: string; head: string; codePaths: string[]; verifyPreserved: () => void } | undefined {
   const root = realpathSync(resolve(primaryRoot));
   const parked = join(root, "backlog"), parkedConfig = join(parked, "config.yml.pre-migration");
@@ -1622,18 +1629,26 @@ export function reconcileParkedBacklogMigrationStore(
       }
     }
     const merged = snapshot(temp);
-    // Match the existing migration physical-ID check; this does not resolve or
-    // accept the separately deferred same-ID live/archive coexistence case.
-    const identities = new Map<string, string>();
-    for (const [path, file] of new Map([...merged, ...sourceFiles])) {
-      if (ignored.has(path) || !/^(?:tasks|drafts|completed|archive\/tasks|archive\/drafts)\//.test(path) || !path.endsWith(".md")) continue;
-      const id = /^id:\s*['"]?([^'"\r\n]+)['"]?\s*$/m.exec(file.bytes.toString("utf8"))?.[1]?.trim();
+    // Match the migration physical-ID check. Carry forward an existing pair,
+    // but do not create a new one by merging two previously distinct stores.
+    const identities = new Map<string, { id: string; path: string; markdown: string }[]>();
+    for (const [path, file] of new Map([...merged, ...sourceFiles, ...selectedFiles])) {
+      if (!/^(?:tasks|drafts|completed|archive\/tasks|archive\/drafts)\//.test(path) || !path.endsWith(".md")) continue;
+      const markdown = file.bytes.toString("utf8");
+      const id = /^id:\s*['"]?([^'"\r\n]+)['"]?\s*$/m.exec(markdown)?.[1]?.trim();
       if (!id || /\s/.test(id) || id.startsWith("-")) fail(`physical task ${path} has no exact canonical ID`);
       const key = id.toUpperCase().replace(/^([A-Z]+)-([0-9]+(?:\.[0-9]+)*)$/, (_all, prefix: string, body: string) =>
         `${prefix}-${body.split(".").map(part => part.replace(/^0+(?=[0-9])/, "")).join(".")}`);
-      const prior = identities.get(key);
-      if (prior && prior !== path) fail(`canonical task ID ${id} collides at ${prior} and ${path}; same-ID coexistence is deferred`);
-      identities.set(key, path);
+      identities.set(key, [...(identities.get(key) ?? []), { id, path, markdown }]);
+    }
+    for (const members of identities.values()) {
+      if (members.length === 1) continue;
+      const paths = members.map(({ path }) => path);
+      if (!validatePreservedPair || !isBacklogMigrationLiveArchivePair(paths)
+          || !(paths.every(path => sourceFiles.has(path)) || paths.every(path => publishedFiles.has(path)))) {
+        fail(`canonical task ID ${members[0].id} collides at ${paths.join(" and ")}`);
+      }
+      validatePreservedPair(members[0].id, members);
     }
     for (const [path, file] of sourceFiles) {
       const incoming = merged.get(path);
