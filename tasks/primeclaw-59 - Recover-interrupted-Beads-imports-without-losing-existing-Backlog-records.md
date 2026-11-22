@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T21:18:00Z'
+updated_date: '2026-11-22T21:37:00Z'
 labels: []
 dependencies: []
 references:
@@ -721,4 +721,11 @@ Owner verified the incomplete trace and publications `b168101744a0806a29d4e5caf2
 
 ### Exact-main integration — conflict resolution validation started
 Canonical execute revalidated exact main `5ffb2e7942ea16bf53f97f88513b14a120d67839`, reviewed importer `ceaf02004fbd571603e3c51a0e245957607726e6`, and incomplete checkpoint `b168101744a0806a29d4e5caf2d49c4506f91de0`. Episode inverse `ee183c1ada4a99846dcc67cd4ff369a2e341a370` preserves that checkpoint in ancestry but restores the exact reviewed importer tree before the merge. Resolved migration source/test conflicts in staged tree `29252a1d4ca88b4a19da3f4003f9db0ae9fd73cf`: typed edges through native Web authoring/readback and receipt-bound replay; retained streaming hash with the preserved-pair digest payload. Focused offline Docker validation is running; no candidate or result yet. No live access or scale rerun.
+
+### Exact-main integration — published candidate; independent review next
+Episode candidate `1f359e99ac2338134bab8b244bb64a49e0236f22` (tree `02dc2c9c58ad8317a44d7d9adb553fe4801f7cf1`), parents `ee183c1ada4a99846dcc67cd4ff369a2e341a370` and exact authorized `main` `5ffb2e7942ea16bf53f97f88513b14a120d67839`. The first parent is an explicit inverse of the single incomplete scale-only commit `b168101744a0806a29d4e5caf2d49c4506f91de0` and has exactly the tree of reviewed importer `ceaf02004fbd571603e3c51a0e245957607726e6`. The incomplete evidence stays reachable; its fixture, trace and report are absent from the deployable tree and scale-only changes are absent from the shared test file. Primary and direct remote main stayed at the authorized target. No primary file/index/ownership write.
+
+Main’s typed semantics now reach native task authoring and all native readbacks: only `blocks` is a hard dependency, the native parent stays separate, and non-equivalent typed edges use one readable native Web comment after ID allocation with source and mapped destination endpoints. Actual authored comments stay separate. Both replay paths check typed placement with the existing receipt prose. Streaming canonical SHA-256 retains the main byte contract and still includes importer preserved-pair and memory evidence. The native Web transport, same-ID/parked preservation, layout/config/history, receipt/guarded cutover and operator-stop code remain on the reviewed path; no legacy CLI authoring was restored for the imported task or typed relationships.
+
+Corrected offline focus `20261122T212617Z-32013-2f98e268`: 4 pytest bridges, 48 Node cases, no skips/failures; mixed typed edges/real cycles, archived targets, replay and current-content drift refusals, same-ID coexistence and readable projection. The first run disclosed stale test dependency expectations; the rerun changed only the test oracle. Final offline Tier 1 probe `20261122T213358Z-47629-055e79b4` passed. Both green inputs share repository digest `20d8f1f2018113c43b2c098ec2a021d03312383c54ec79b50900c69d6755aa3b` and the recorded tested tree matches the published candidate. Verified 51 manifest-listed artifact hashes across all three runs, offline network and clean builder/runtime teardown, with unchanged pinned Prime Agent source. Local proof: `.test-results/primeclaw59-exact-main-integration/`. No new scale run, public abort timing run, full regression suite, production maintenance estimate, install, restart or live cutover. Independent review is pending; no merge/push of main and no task lifecycle change. PVA-first `c6e0a3d` retained.
 <!-- SECTION:NOTES:END -->
