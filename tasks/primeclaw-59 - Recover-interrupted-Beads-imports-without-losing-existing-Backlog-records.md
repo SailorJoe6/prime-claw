@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T11:12:00Z'
+updated_date: '2026-11-22T11:18:00Z'
 labels: []
 dependencies: []
 references:
@@ -23,6 +23,7 @@ documentation:
   - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
   - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
   - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
+  - docs/evidence/primeclaw-59-coexistence-revision-20261122.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -45,6 +46,7 @@ modified_files:
   - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
   - tests/backlog_destination_layout.test.mjs
   - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
+  - docs/evidence/primeclaw-59-coexistence-revision-20261122.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -281,6 +283,9 @@ Revise the published but unaccepted coexistence candidate `7b2e386ea9b6ad8109996
 
 ### Step 3 / AC5 revision — publish verified candidate for review only
 The final-source probe and all four affected suites are complete on the preserved draft. Reuse this evidence and preserve the incomplete first final run separately; do not rerun settled tests unless an evidence gap is identified. Publish only the tested two-fix draft and its linked documentation, plus a separate native evidence commit. Then stop for independent owner review, with In Progress, 0/9 checked, and null Final Summary unchanged.
+
+### Step 3 / AC5 revision — independent review pending
+The bounded two-fix candidate and its evidence are published. Stop here until the owning Conversation records the independent review and decides the next step. No further slice, merge, live migration, or lifecycle transition is authorized by this checkpoint.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -583,4 +588,9 @@ The required final-source probe `20261122T100827Z-23721-ebe2b56a` passed. The in
 The owner completed the affected tests on the same preserved draft. Migration `20261122T104351Z-60571-f58046a4`: 99 native passes, 12 retired reverse skips, one pytest pass. Helpers `20261122T110528Z-85930-ae9b0837`: 20 current, 10 Web, and 89 workspace native passes, three pytest passes. The original `F` did not reproduce. All three completed runs share repository content digest `d3ae77d4b48719b37890cc735931651d1036dfc50a84143d6d5587c0603fe18f`. Verified 47 manifest artifacts, matching before/after upstream inventories, offline execution, both teardown layers, and all 223 recorded inputs against the worktree. Retained logs and TAP are under `.test-results/primeclaw59-coexistence-revision/owner-diagnostic/`; earlier baseline and intermediate evidence remain distinct. The 218 native passes and 12 skips cover four affected suites, not the entire project. Ownership #83 remains static-only and out of scope.
 
 Observation `4ceb1208` binds the same durable Episode on current route `0f14a57a3576`. On canonical execute, preserve the three tested draft files, add the linked revision evidence document, publish one code increment on the existing branch and separate native evidence, confirm direct refs and full task readback, then stop for independent owner review. No test replay or cleanup, new product slice, live migration, PVA access, merge, install, lifecycle, acceptance criteria, or Final Summary change.
+
+### Two-fix coexistence candidate published for independent review
+Code `7cf86574295956543663ac7d007ecc48833c03a3` is the direct published Episode branch head, one commit after `7b2e386`. It limits the initial import-reference check to actual references and refuses receipt-bound memory USER ambiguity before destination preparation. The four candidate paths are listed in the code commit. All three tested draft files and all 223 recorded inputs match the verified final source. The [revision evidence](docs/evidence/primeclaw-59-coexistence-revision-20261122.md) is the only additional file.
+
+Final probe `20261122T100827Z-23721-ebe2b56a` passed. Final migration `20261122T104351Z-60571-f58046a4` and helpers `20261122T110528Z-85930-ae9b0837`: 218 native passes and 12 retired reverse-migration skips across four passing pytest bridges. The final manifests agree on repository digest `d3ae77d4b48719b37890cc735931651d1036dfc50a84143d6d5587c0603fe18f`, offline operation and clean runtime/builder teardown. The earlier incomplete combined run remains unexplained and separate; no cleanup or rerun during publication. Ownership #83 remains static-only and outside this revision. This evidence does not close AC5 or qualify the whole project.
 <!-- SECTION:NOTES:END -->
