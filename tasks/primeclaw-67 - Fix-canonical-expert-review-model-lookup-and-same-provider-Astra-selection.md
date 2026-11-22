@@ -4,11 +4,14 @@ title: Fix canonical expert-review model lookup and same-provider Astra selectio
 status: In Progress
 assignee: []
 created_date: '2026-11-22T03:41:00Z'
-updated_date: '2026-11-22T03:48:00Z'
+updated_date: '2026-11-22T03:50:00Z'
 labels: []
 dependencies: []
 references:
   - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
+modified_files:
+  - src/prime-agent-plugin/skills/prime-claw-expert-review/SKILL.md
+  - tests/test_expert_review_skill.py
 priority: p0
 type: bug
 ordinal: 151000
@@ -50,3 +53,9 @@ Owning Conversation is 01a20155-e0e9-7185-96a8-998c0dca989c, distinct from the e
 3. Update the obsolete assertions in tests/test_expert_review_skill.py and add proportional Markdown contract checks for CLI lookup/quoted search, exact-versus-latest selection, parent-provider retention, CLI/discovery/launch separation, no silent substitution, and consultation. Keep existing review/authority/delivery coverage. Run the focused suite and fresh scripts/test-tier1.sh --probe (or the documented container suite) against the final changed inputs. Record exact commands, source/input hashes, outcomes and real failures separately; never run candidate host/global plugin operations. These static checks guard shipped guidance, not runtime model availability.
 4. Commit and push coherent Episode source changes and native progress/evidence promptly. Report exact candidate/base/task revisions, changed files, tests and remaining limits to the owner. The owner obtains independent normal read-only same-provider Astra review using the selected-model discovery rules; accepted concrete in-scope findings return to the same Episode through its normal continuation. Stop at the reviewed pushed Ready for Merge tuple. No merge, live refresh/restart/UAT, foreign-resource mutation or cleanup is included. No new task dependency or general documentation change is needed unless the bounded source edit reveals an actual consistency defect.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation checkpoint: compared canonical base skill SHA-256 62baf066197c4c9c477bb6388521b112b7db6651f6bba99f60b6865c159e0742 with installed semantic evidence SHA-256 cfd5e243c2a491cb741fa7ee699b314fae9e98cbd12946af48cc0bcff7c3618b. Candidate edits are limited to model selection guidance and focused static contract coverage. Quoted `prime-agent model list "openai-codex astra"` returned `openai-codex/gpt-6-astra` and `openai-codex/gpt-6.2-astra`; catalog evidence only. Validation underway; installed copy untouched.
+<!-- SECTION:NOTES:END -->
