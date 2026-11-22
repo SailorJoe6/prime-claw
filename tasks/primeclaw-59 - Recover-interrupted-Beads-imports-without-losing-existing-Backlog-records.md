@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T07:01:00Z'
+updated_date: '2026-11-22T07:29:00Z'
 labels: []
 dependencies: []
 references:
@@ -22,6 +22,7 @@ documentation:
   - docs/evidence/primeclaw-59-config-preservation-20261121.md
   - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
   - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
+  - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -43,6 +44,7 @@ modified_files:
   - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
   - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
   - tests/backlog_destination_layout.test.mjs
+  - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -266,6 +268,9 @@ Joe accepted the parked-store increment as-is and directed the owner to continue
 2. Prove that an otherwise valid unrelated migration can proceed with the same selected destination. Preserve both records by their physical paths, identities, exact bytes, and relevant existing native history. Use native allocation to reserve occupied IDs. Keep exact native readback for unambiguous originals and all imports. Refuse an actually ambiguous targeted operation; do not pick a winner, fabricate an ID-only view, renumber, delete, overwrite, or globally block unrelated imports because the pair exists. Do not enable future duplicates, change archive or draft policy, or add general duplicate handling.
 3. Keep accepted parked-store, additive-status and actual-source-completion behavior, exact current-content checks, original preservation, one owned Web transport with exact context, no resend, publication and guarded retirement. Do not implement the three declined Astra repairs, revisit draft handling, reconstruct tickets removed from Git, or pursue years-old migration recovery.
 4. Run focused disposable regressions and required final-source Docker tier 1; report tested inputs and evidence limits. Publish one tested code increment separately from native evidence, then stop for independent owner review. Keep In Progress, 0/9 checked, null Final Summary. Recovery/disposability, cancellation/progress/scale, whole-task acceptance, live migration, merge, activation/restart, lifecycle/resource/ownership edits, cleanup and upstream changes are out of scope. Any delegates must inherit the actual provider/auth route; review model remains exact Codex Astra at high.
+
+### Step 3 / AC5 coexistence candidate delivered
+One tested same-ID coexistence candidate `7b2e386ea9b6ad8109996f8feb431e36735ce623` is published for independent owner review. This does not close AC5 or the task. Retain earlier accepted increments and deferred scope; do not automatically start another slice.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -541,4 +546,11 @@ Exact owner, Episode, source observation `5434ab72` and published handoff were v
 
 ### Same-ID coexistence — focused Docker passed; final validation pending
 Unchanged accepted code rejected both otherwise-valid selected and parked fixtures before writes or retirement (20261122T064708Z-4594-5a14038a, native 9 pass / 2 fail). The candidate separates exact physical preservation from native views for the pre-existing unrelated live/archive pair only. Targeted import/receipt ambiguity still refuses; no native policy or draft change. First candidate completed both synthetic migrations but failed the top-level-only ID assertion (20261122T065203Z-10352-80fb1b53). With only that fixture corrected to accept dotted subtask IDs and still require native BASE-13, focused run 20261122T065632Z-17433-5026d075 passed all 11 native checks. Both success variants used 6 Web task writes and one synthetic retirement only after exact original physical/native and publication assertions; targeted replay and other collision refusals pass. Final-source tier-1 probe is running. No code publication, acceptance, live migration, or change to status/criteria/Final Summary.
+
+### ONE same-ID coexistence candidate published — stop for independent owner review
+Code `7b2e386ea9b6ad8109996f8feb431e36735ce623` was committed and non-force pushed separately to the exact existing Episode branch; direct remote verified and the code worktree is clean. This candidate lets an already existing unrelated live/archive pair survive Beads-to-Backlog migration without picking a native winner, while exact native readback continues for unambiguous originals and imports. Both pair paths/bytes/modes/native histories are in the preservation proof. Native allocation reserves the shared ID; a pair with prior migration target evidence refuses, as do other tested collision shapes. No general archive/draft, layout-recovery or lifecycle change.
+
+Disposable selected and parked cases each performed 6 native Web task writes and one fixture-only retirement after publication/verification; both preserved the two physical originals and native BASE-13 allocation. Targeted receipt-mapped ambiguity refused without writes or retirement. Focused 20261122T065632Z-17433-5026d075: 11 native pass. Required final-source probe 20261122T070125Z-29792-dfe18848: pass. Final Docker 20261122T070325Z-33358-7d5fa1a0: 4 pytest pass (1479.79 s); 216 native pass / 12 retired reverse skips (migration 97, current 20, Web 10, workspace 89). Static migration checks: 2 pass. Verified 223 final input hashes and 78 artifact hashes across five retained runs, both teardown layers clean/offline/upstream source inventory unchanged. See `docs/evidence/primeclaw-59-same-id-coexistence-20261122.md` and ignored `.test-results/primeclaw59-same-id-coexistence/final-manifest-audit.json` for exact evidence and prior red/fixture limitations. Prior ownership suite #83 remains documented separately (not repaired or rerun, no runtime baseline or project-wide green claim).
+
+Stop for independent owner review of this increment. Nothing merged, activated, or run against live/private data; no cleanup or ownership/resource changes. Whole-task acceptance remains ungranted. In Progress, 0/9 checked, null Final Summary. Later recovery/disposability, cancellation/progress and scale are not included.
 <!-- SECTION:NOTES:END -->
