@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T16:36:00Z'
+updated_date: '2026-11-22T17:29:00Z'
 labels: []
 dependencies: []
 references:
@@ -291,6 +291,9 @@ The bounded two-fix candidate and its evidence are published. Stop here until th
 1. Extend the existing title-only same-ID positive with supported unquoted `@` handle metadata. Use pinned Backlog 1.55.3 (`0cf4fdbc70020327f4366a29d3f405f83d180301`), `src/markdown/frontmatter.ts` (`preprocessFrontmatter`) and `src/test/markdown.test.ts:197–240` for the supported scalar, inline assignee list and reporter syntax. Show the regression against published `7cf8657` in disposable focused Docker.
 2. Match this Backlog-compatible handling in the read-only inspection of actual `references`. Do not rewrite task records, suppress parse errors as no references, widen marker detection or alter native allocation, receipt checks, protection, or dependencies. Keep genuine-reference refusal, exact physical paths/bytes/modes and native history, native allocation of the next free ID, and receipt-bound USER refusal before destination writes or retirement.
 3. Pass corrected focused Docker and the required final-source tier-1 probe. Keep the before/after evidence distinct; reuse unaffected prior evidence as prior-source evidence and retain both the unknown earlier `F` and static-only ownership #83 qualifications. Publish one correction on the same Episode branch and separate native evidence, then stop for focused independent review. No scope beyond this finding, no reopening `e4878f1`, and no live/PVA access, deployment, merge, cleanup or source retirement outside disposable tests. The PVA-only sequencing decision remains intact and grants no live action here.
+
+### Step 3 / AC5 — publish the validated frontmatter correction only
+Joe directed continuation after the PA-TASK5-20261122-MAC hold was lifted. The focused corrected Docker suite and required tier-1 probe passed on the preserved three-file draft. On canonical execute, add the linked evidence document, publish only the exact tested correction on the existing Episode branch and publish separate task evidence. Verify both direct refs and full native readback, notify the owning Conversation, then stop for focused independent review. Do not replay tests unless a concrete evidence gap appears. No new slice, disposable rehearsal, live/PVA access, source retirement, merge, activation, or cleanup. Preserve the PVA-only sequencing note, In Progress, 0/9 criteria checked, and null Final Summary.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -612,4 +615,9 @@ The owning Conversation recorded one material Codex Astra finding on code `7cf86
 
 ### Parser compatibility — published-code regression reproduced
 Disposable focused Docker `20261122T163034Z-23926-fd54ef3c` ran published product code `7cf86574295956543663ac7d007ecc48833c03a3` with only the extended fixture changed. The selected same-ID positive returned `blocked` on the archive record’s native unquoted `@` list (YAML reserved-character error), with zero native writes or retirements. The fixture also includes an unquoted scalar assignee and reporter on the live record. The other 12 native checks passed, including genuine reference and receipt-bound USER refusal. Runtime network absence, both teardown layers, unchanged upstream inventory and listed artifact hashes verified. Repository digest `a1cd4401a3f26119729fffd3b80dfc86b00e057e6e8789b25e7229fd4b6a0f4f`. Final focused Docker and the required tier-1 probe are pending on the correction. Code remains unpublished.
+
+### Post-maintenance checkpoint — parser compatibility validation passed
+The published-code red `20261122T163034Z-23926-fd54ef3c` and intermediate `20261122T163542Z-36806-617ecc6a` are separate failed runs. The first reproduced rejection of a native unquoted handle; the second isolated the bundle’s missing YAML error-class export, so its chained probe did not run. The final guard uses the error fields exposed by the unchanged bundle. Final focused `20261122T164036Z-59588-91a2e016` passed 13 native checks (one pytest pass, 281.63 s) and final-source tier-1 probe `20261122T164518Z-74575-99adf60c` passed. Both used repository digest `8e772ad95d886e24cff667c188fe5f811eaaa7fb21e65959359c7f1d021c8897` with verified offline operation, clean runtime and builder teardown, and unchanged upstream inventories. After restart, all 30 final manifest artifacts and all 223 recorded inputs still match. Logs, input hashes, and the maintenance record are under `.test-results/primeclaw59-frontmatter-compatibility`. The prior four-suite results remain prior-source evidence; the unexplained earlier `F` and static-only #83 are unchanged.
+
+Exact observation `7705801b` and route `462e40a7e24c` identify the same durable Episode. Code `7cf86574295956543663ac7d007ecc48833c03a3` and task `b7996973ddcb8a3d8a5e02b043b4c3719b1cb996` were published separately before this handoff. The three tested code-worktree files remain unstaged and unchanged; the parser correction itself is unpublished. No product edits or tests in this handoff.
 <!-- SECTION:NOTES:END -->
