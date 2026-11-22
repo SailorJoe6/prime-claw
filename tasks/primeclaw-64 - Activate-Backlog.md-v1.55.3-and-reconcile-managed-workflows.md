@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: Done
 assignee: []
 created_date: 2026-11-21 20:38
-updated_date: '2026-11-22T04:59:00Z'
+updated_date: '2026-11-22T05:53:00Z'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -187,6 +187,15 @@ created: 2026-11-22T04:59:00Z
 ---
 
 Merged Episode cleanup completed through finalize_task_episode for exact code1b7ebc5fa500719b4d14cef3278677879cce37ad. Native session and two explicitly linked children, saved Episode file, worktree, local/remote Episode branch, owned Orca terminals and launch automation are absent. Only this owner entry was removed; bookkeeping acc136856839fd758b9aa9fcf3a60963266c0851 is pushed on main and foreign54/59 ownership was preserved. The active Done task stays unarchived. Correction to retention: before cleanup, 32974 ignored worktree files/symlinks were archived and byte/mode/link verified outside the Episode, but I failed to relocate the separate Episode-scoped global session-artifacts directory. PrimeAgent deleteSessionFile permanently deleted that directory, including both rollback copies and other original off-global artifact files. The unchanged primary1.53.0 binary (SHA96044ce2319e84112b9490257f2b8a47a4458754a3c48472fb17452e511ffa00/70810466bytes/0755) remains and an exact copy is now retained under the owning Conversation final-refresh evidence/retained-rollbacks. The old installed1.53.0 variant SHA0da86f0edf37e11955e600da94754add2ea75718a47dcd7ea7c2420aa7de8511/70793954bytes was not recovered by bounded owner/BacklogExpert searches. Exact original build-manifest bytes were recovered from the previously observed parsed data and match SHA c87964b18a7e500dbabde8003e425fc2afd20a1b8a013627c408139f9529f382, but complete original artifact-directory preservation is NOT claimed. Official npm/GitHub1.53.0 has the same size but different SHAa91540000c49834a0cf6baa7b498442976b388c515e68951f1294618fc1f2877; it is not accepted as the lost binary. One isolated ad-hoc-signing recovery experiment also did not match and was rejected; no credentials, installed binary, runtime, task/session or source were changed by it. Current installed1.55.3 and all three successful live UAT observations remain valid. Exact old-installed fallback loss is disclosed for operator disposition; no deleted Episode/session, task, workflow or backup-path identity will be recreated.
+
+---
+
+author: Owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-22T05:53:00Z
+
+---
+
+Joe accepted closure after the owner explicitly disclosed the rollback retention error and asked whether to close with the exact old-installed1.53 variant recorded as lost and the separate primary1.53 fallback retained. His response: "yes its fine". This accepts that disclosed retention outcome, not a claim of recovered bytes. The exact primary fallback SHA96044ce2319e84112b9490257f2b8a47a4458754a3c48472fb17452e511ffa00 remains retained; old-installed SHA0da86f0edf37e11955e600da94754add2ea75718a47dcd7ea7c2420aa7de8511 remains lost. No official alternative was substituted, no deleted Episode/session was recreated, and no additional task, source work, installation or restart is authorized or needed. Original rollout, all three live checks, merged Episode cleanup and ownership bookkeeping are closed. PRIMECLAW-64 stays active Done7/7, not archived.
 
 ---
 <!-- COMMENTS:END -->
