@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-67
 title: Reopen cold Episodes without reserving a display name
-status: In Design
+status: In Progress
 assignee: []
 created_date: '2026-11-22T07:44:00Z'
+updated_date: '2026-11-22T07:44:00Z'
 labels: []
 dependencies: []
 references:
