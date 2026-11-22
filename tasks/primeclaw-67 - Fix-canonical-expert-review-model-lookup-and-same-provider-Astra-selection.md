@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-67
 title: Fix canonical expert-review model lookup and same-provider Astra selection
-status: In Planning
+status: In Progress
 assignee: []
 created_date: '2026-11-22T03:41:00Z'
-updated_date: '2026-11-22T03:43:00Z'
+updated_date: '2026-11-22T03:48:00Z'
 labels: []
 dependencies: []
 references:
