@@ -3280,6 +3280,18 @@ for (const variant of ["existing selected store", "parked originals in selected 
     // A title can mention the exact source marker without claiming a source reference.
     const pair = parked?.pair ?? seedSameIdOriginals(fixture.root, ".backlog",
       `Document prime-claw-beads-source:${fixture.ids.parent} in the operator guide`);
+    if (!parked) {
+      // Backlog 1.55.3 accepts these native spellings without YAML quotes.
+      for (const [index, metadata] of [
+        'assignee: @live-owner\nreporter: @task-reporter',
+        'assignee: [@archive-owner, "@second-owner"] # native inline list',
+      ].entries()) {
+        const file = join(store, pair.paths[index]);
+        const markdown = readFileSync(file, "utf8");
+        assert.match(markdown, /^assignee: \[\]$/m);
+        writeFileSync(file, markdown.replace(/^assignee: \[\]$/m, metadata));
+      }
+    }
     const originalHead = parked?.originalTaskHead ?? publishSameIdFixtureChanges(store, "seed high live/archive pair in existing native history");
     const nativeOriginals = parked?.nativeOriginals ?? captureSameIdControls(fixture.root, ".backlog", original);
     const records = captureSameIdRecords(originals);

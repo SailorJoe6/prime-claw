@@ -518,7 +518,8 @@ reference. On clean selected-store replay, the native receipt identifies the
 memory USER task even if it carries no import references. If that target has a
 live/archive pair, migration refuses before destination layout changes or
 publication. See the [coexistence baseline](evidence/primeclaw-59-same-id-coexistence-20261122.md)
-and [revision tests](evidence/primeclaw-59-coexistence-revision-20261122.md).
+the [revision tests](evidence/primeclaw-59-coexistence-revision-20261122.md), and
+[Backlog handle compatibility tests](evidence/primeclaw-59-frontmatter-compatibility-20261122.md).
 Only a non-force published descendant is
 materialized by an ordinary fast-forward or initial clone. A pre-reconciliation
 in-memory preservation check continues through the existing original baseline,

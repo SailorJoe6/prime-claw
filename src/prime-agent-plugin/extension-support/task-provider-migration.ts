@@ -1729,12 +1729,41 @@ function backlogPhysicalIdentity(id: string): string {
 
 // Refusal-only: a prior import or receipt cannot become invisible just because
 // its native view is ambiguous. Never interpret Markdown as proof of reuse.
+function readBacklogMigrationReferences(frontmatter: string): unknown {
+  const parse = (text: string) => yaml.parse(text, { version: "1.1", strict: false })?.references;
+  try {
+    return parse(frontmatter);
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== "YAMLParseError"
+        || !("code" in error) || error.code !== "BAD_SCALAR_START"
+        || !("pos" in error) || !Array.isArray(error.pos) || typeof error.pos[0] !== "number"
+        || frontmatter[error.pos[0]] !== "@") throw error;
+    // Backlog 1.55.3 preprocesses bare handles on assignee/reporter lines.
+    // Retry only this syntax on a read-only copy; other parse errors still fail.
+    const compatible = frontmatter.split(/\r?\n/).map(line => {
+      const match = /^(\s*(?:assignee|reporter):\s*)(.*)$/.exec(line);
+      if (!match) return line;
+      const [, prefix, raw] = match;
+      const value = raw.trim();
+      if (value.startsWith("@")) return prefix + JSON.stringify(value);
+      const list = /^\[(.*)\]\s*(#.*)?$/.exec(value);
+      if (!list) return line;
+      const items = list[1].split(",").map(item => item.trim()).filter(Boolean);
+      if (!items.some(item => item.startsWith("@"))) return line;
+      const normalized = items.map(item => item.startsWith("@") ? JSON.stringify(item) : item);
+      return `${prefix}[${normalized.join(", ")}]${list[2] ? ` ${list[2]}` : ""}`;
+    }).join("\n");
+    if (compatible === frontmatter) throw error;
+    return parse(compatible);
+  }
+}
+
 function assertBacklogPairIsNotMigrationTarget(id: string, members: { path: string; markdown: string }[]): void {
   if (members.some(({ markdown }) => {
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown)?.[1] ?? "";
     // Only native reference entries are import evidence. Do not treat title,
     // other metadata or prose as an initial source binding.
-    const references: unknown = yaml.parse(frontmatter, { version: "1.1", strict: false })?.references;
+    const references = readBacklogMigrationReferences(frontmatter);
     return (Array.isArray(references) && references.some(value => typeof value === "string"
       && /^prime-claw-beads-(?:source|current):/.test(value)))
       || markdown.split(/\r?\n/).some(line => line === RECEIPT_MARKER || line.startsWith(`${SOURCE_MARKER} mapping `)
