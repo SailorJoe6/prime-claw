@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T16:26:00Z'
+updated_date: '2026-11-22T16:36:00Z'
 labels: []
 dependencies: []
 references:
@@ -609,4 +609,7 @@ Generic automated resume/protected reset, richer progress UI, exhaustive benchma
 
 ### Independent review finding — Backlog-supported unquoted handles
 The owning Conversation recorded one material Codex Astra finding on code `7cf86574295956543663ac7d007ecc48833c03a3` and native evidence `1465f30b31688427d418c4aa82aa2c55ccb1803b`: `task-provider-migration.ts:1737` parses the complete frontmatter with generic YAML, which rejects Backlog-supported unquoted `@` assignee metadata on an unrelated live/archive pair. Compare the pinned Backlog reader and coverage cited in the plan. Canonical execute is to correct only this parser compatibility, with focused Docker red/green and the final-source probe, then stop after separately publishing code and native evidence. The compatible owner-authored PVA-only sequencing note in `c6e0a3d` remains unchanged. `In Progress`, 0/9 criteria checked, and null Final Summary are unchanged. No product code or test execution in this handoff.
+
+### Parser compatibility — published-code regression reproduced
+Disposable focused Docker `20261122T163034Z-23926-fd54ef3c` ran published product code `7cf86574295956543663ac7d007ecc48833c03a3` with only the extended fixture changed. The selected same-ID positive returned `blocked` on the archive record’s native unquoted `@` list (YAML reserved-character error), with zero native writes or retirements. The fixture also includes an unquoted scalar assignee and reporter on the live record. The other 12 native checks passed, including genuine reference and receipt-bound USER refusal. Runtime network absence, both teardown layers, unchanged upstream inventory and listed artifact hashes verified. Repository digest `a1cd4401a3f26119729fffd3b80dfc86b00e057e6e8789b25e7229fd4b6a0f4f`. Final focused Docker and the required tier-1 probe are pending on the correction. Code remains unpublished.
 <!-- SECTION:NOTES:END -->
