@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T17:29:00Z'
+updated_date: '2026-11-22T17:34:00Z'
 labels: []
 dependencies: []
 references:
@@ -24,6 +24,7 @@ documentation:
   - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
   - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
   - docs/evidence/primeclaw-59-coexistence-revision-20261122.md
+  - docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md
 modified_files:
   - REQUIREMENTS.md
   - docs/project-initialization.md
@@ -47,6 +48,7 @@ modified_files:
   - tests/backlog_destination_layout.test.mjs
   - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
   - docs/evidence/primeclaw-59-coexistence-revision-20261122.md
+  - docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md
 priority: p1
 type: bug
 ordinal: 144000
@@ -294,6 +296,9 @@ The bounded two-fix candidate and its evidence are published. Stop here until th
 
 ### Step 3 / AC5 — publish the validated frontmatter correction only
 Joe directed continuation after the PA-TASK5-20261122-MAC hold was lifted. The focused corrected Docker suite and required tier-1 probe passed on the preserved three-file draft. On canonical execute, add the linked evidence document, publish only the exact tested correction on the existing Episode branch and publish separate task evidence. Verify both direct refs and full native readback, notify the owning Conversation, then stop for focused independent review. Do not replay tests unless a concrete evidence gap appears. No new slice, disposable rehearsal, live/PVA access, source retirement, merge, activation, or cleanup. Preserve the PVA-only sequencing note, In Progress, 0/9 criteria checked, and null Final Summary.
+
+### Step 3 / AC5 — focused independent review pending
+The frontmatter compatibility correction is published on the Episode branch at `f141d1cab8993fa620404c580f163f8a575e3df3`. Review only this increment against `7cf8657`: the read-only `references` inspection accepts Backlog-supported unquoted handles in assignee/reporter metadata without rewriting records or changing native allocation, protection or retirement rules. Review the focused evidence in `docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md`. Stop here pending the owning Conversation's independent review. The PVA-only sequencing note remains in force; it does not authorize rehearsal, live migration or cutover in this slice.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -620,4 +625,9 @@ Disposable focused Docker `20261122T163034Z-23926-fd54ef3c` ran published produc
 The published-code red `20261122T163034Z-23926-fd54ef3c` and intermediate `20261122T163542Z-36806-617ecc6a` are separate failed runs. The first reproduced rejection of a native unquoted handle; the second isolated the bundle’s missing YAML error-class export, so its chained probe did not run. The final guard uses the error fields exposed by the unchanged bundle. Final focused `20261122T164036Z-59588-91a2e016` passed 13 native checks (one pytest pass, 281.63 s) and final-source tier-1 probe `20261122T164518Z-74575-99adf60c` passed. Both used repository digest `8e772ad95d886e24cff667c188fe5f811eaaa7fb21e65959359c7f1d021c8897` with verified offline operation, clean runtime and builder teardown, and unchanged upstream inventories. After restart, all 30 final manifest artifacts and all 223 recorded inputs still match. Logs, input hashes, and the maintenance record are under `.test-results/primeclaw59-frontmatter-compatibility`. The prior four-suite results remain prior-source evidence; the unexplained earlier `F` and static-only #83 are unchanged.
 
 Exact observation `7705801b` and route `462e40a7e24c` identify the same durable Episode. Code `7cf86574295956543663ac7d007ecc48833c03a3` and task `b7996973ddcb8a3d8a5e02b043b4c3719b1cb996` were published separately before this handoff. The three tested code-worktree files remain unstaged and unchanged; the parser correction itself is unpublished. No product edits or tests in this handoff.
+
+### Published parser compatibility correction — focused review candidate
+Code `f141d1cab8993fa620404c580f163f8a575e3df3` is the single code increment on the same Episode branch, directly verified at `refs/heads/JLanders/prime-claw-primeclaw-59-episode-277260cb`. It contains the exact three validated files and adds the linked evidence document. The extended fixture reproduced the published-code refusal in `20261122T163034Z-23926-fd54ef3c` (12 native passes, one intended YAML `@` failure and zero writes/retirements in that case). The intermediate `20261122T163542Z-36806-617ecc6a` (12 passes, one missing exported error-class failure) never reached its probe. The corrected focused `20261122T164036Z-59588-91a2e016` passed all 13 native checks (one pytest pass in 281.63 s); final-source tier-1 probe `20261122T164518Z-74575-99adf60c` passed. Shared source digest `8e772ad95d886e24cff667c188fe5f811eaaa7fb21e65959359c7f1d021c8897`; all 30 final artifacts and 223 recorded inputs match, both runs went offline and tore down cleanly at runtime and builder layers, and upstream inventories did not change. Original paths, bytes, modes and history, native singleton/import views and next free ID, genuine reference refusal and receipt-bound USER refusal before writes or retirement remain covered by the focused suite.
+
+No tests were replayed for publication. The previous 218 passes/12 skips qualify the previous source only; incomplete `F` remains unexplained and ownership #83 remains static-only and out of scope. No live/PVA action, source retirement, merge, activation or cleanup. This is a focused review candidate only. In Progress, 0/9 criteria checked, null Final Summary and the owner-authored PVA-only note are unchanged.
 <!-- SECTION:NOTES:END -->
