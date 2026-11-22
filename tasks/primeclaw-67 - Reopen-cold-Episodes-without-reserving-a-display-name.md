@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-67
 title: Reopen cold Episodes without reserving a display name
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-22T07:44:00Z'
-updated_date: '2026-11-22T07:55:00Z'
+updated_date: '2026-11-22T07:59:00Z'
 labels: []
 dependencies: []
 references:
@@ -38,3 +38,9 @@ Docker-only Tier 1, verified Prime Agent TypeScript `cwd-fix-v0.9.8-r1` (0.9.8),
 
 Held open for Joe's review. Independent Astra review not performed: native RLM did not list an Astra selector under the launching openai-codex provider. This is fixture delivery evidence, not live UAT, activation, or recovery permission. No merge, restart, global install, or optionbacktesting Episode operations.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Joe approved the source merge. Fast-forwarded main from 7e13fd54924615986cfb49435d45e9fe80cde274 to the exact Docker-tested commit 5ffb2e7942ea16bf53f97f88513b14a120d67839 and verified origin/main. This closes the direct code change only; the installed plugin, runtime, and TASK-2 were not touched. No activation, restart, or live UAT.
+<!-- SECTION:FINAL_SUMMARY:END -->
