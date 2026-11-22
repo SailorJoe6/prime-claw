@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T09:06:00Z'
+updated_date: '2026-11-22T10:04:00Z'
 labels: []
 dependencies: []
 references:
@@ -568,4 +568,9 @@ Exact owner journal entry `82a82608` (parent `7290cab4`, SHA-256 `c99b5e101aff3a
 
 ### Bounded revision execute admitted — two disposable regressions underway
 Verified canonical observation `82a82608`, unchanged Episode binding, and published native handoff `55e0c27` separately from clean candidate base `7b2e386`. The two fixture scenarios now run against a verified snapshot of the published code: one clean selected-store replay with a real receipt-bound USER collision, one unrelated title-only marker on a live/archive pair. The local draft puts the receipt-bound check before workspace preparation and narrows import evidence to actual references. This draft is not tested or published. Next verify baseline failures, run affected Docker regressions and required final-source tier 1, and only publish a tested revision for review. No live migration, PVA, or status/criteria/Final Summary changes.
+
+### Post-maintenance handoff — preserve the tested draft and finish validation
+The previously admitted execute ran both disposable regressions against published `7b2e386`. Baseline `20261122T090523Z-56458-459fd1f4` passed 10 native checks and failed the two intended assertions: an ordinary title blocked an unrelated import, and the regular root config had already been relocated before the exact receipt-bound USER refusal. The baseline snapshot did not yet include the standalone genuine-reference negative. Intermediate fix `20261122T090940Z-68401-1dec25b5` passed 13 native checks (1 pytest pass, 315.74 s), including that negative, exact selected replay no-write/no-retirement assertions, and the unrelated title success/preservation check. Test teardown and network absence verified. Exact snapshots and logs are retained in `.test-results/primeclaw59-coexistence-revision/` and their tier-1 run directories.
+
+The owner confirmed the maintenance hold ended. Exact observation `b6616541` and the three draft hashes match the preserved Episode checkpoint. Code HEAD and direct publication remain `7b2e386`; task checkpoint `ba172608` was published separately. The current product draft includes a small indexed-lookup refactor after the intermediate snapshot, so that run is not final-source evidence. Preserve all three draft files and prior red/green evidence. On canonical execute, finish only the remaining affected Docker validation and required final-source tier-1 probe, retain exact inputs, then publish one tested code revision and separate native evidence. Stop for independent owner review. No scope, status, criteria or Final Summary change, no prior work replay, no live migration, global activation, cleanup or PVA access.
 <!-- SECTION:NOTES:END -->
