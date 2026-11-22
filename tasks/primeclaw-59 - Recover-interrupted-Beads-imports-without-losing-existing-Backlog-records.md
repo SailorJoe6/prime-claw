@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-22T17:59:00Z'
+updated_date: '2026-11-22T18:02:00Z'
 labels: []
 dependencies: []
 references:
@@ -312,6 +312,13 @@ Under the operator sequencing decision in `c6e0a3d`, take one bounded evidence i
 
 ### PVA-only gate — rehearsal recorded; operator stop remains unproven
 The fresh-path rehearsal and distinct in-flight provider failure proof are complete for the frozen product build. Do not replay them or proceed to live PVA. An ordinary operator stop remains unavailable: the registered switch-confirm discards its AbortSignal, and an upstream tool-abort response can precede migration settlement. Clear the gap in a separate reviewable gate-only candidate by proving supported operator stop at a verified in-flight boundary, actual settlement and no later writes/retries/rollback/deletion/retirement, retained partial destination and Beads authority. Confirm the operator-visible outcome and qualify any uninterruptible synchronous stage. No generic recovery/resume, full-task acceptance or live cutover; Initialize PVA retains later live preflight and exact cutover confirmation.
+
+### PVA-only gate — one supported operator-stop correction
+Under `c6e0a3d`, start from the published rehearsal checkpoint and correct only the supported Prime Claw stop path for `switch-confirm`. Connect the actual operator abort route to the running migration and prove that the migration itself and its owned writers settle. Prime Agent’s generic abort acknowledgement, idle UI, or a standalone transport test does not prove settlement. Preserve existing destination verification, receipt publication, ownership and guarded-cutover semantics.
+
+Use a separate disposable offline Docker test with a real supported operator stop at a proven mid-import boundary after a native write. Record latency to actual settlement, owned process settlement, unchanged Beads authority, precise readable partial destination and no subsequent writes, retry, rollback, deletion or retirement. Document what the operator sees and provide basic readable phase/elapsed progress only as needed by this gate; state synchronous and cutover limits. If the available plugin surfaces cannot provide a safe result, report the specific constraint and stop. Do not patch Prime Agent or dependencies, add generic resume/reset, or build a rich progress UI.
+
+Run focused regression and the required final-source tier 1, publish a tested code candidate and separate selected-task evidence, and stop for independent review. Do not replay the accepted small rehearsal and controlled failure solely to repeat evidence. A representative-volume timed fresh-path rehearsal remains required on the reviewed frozen product after this correction; no PVA-scale estimate follows from 12 tasks. No live PVA access, merge, install, restart, deployment, cleanup, lifecycle or full-task promotion. Keep the owner-authored PVA-first sequencing and separate live preflight/cutover authority.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -655,4 +662,7 @@ Fresh isolated embedded Beads path: 12 tasks (11 open, 1 closed), 43 authored co
 Separate safe failure: first real comment PUT persisted and returned HTTP 200, harness exposed 503 to the caller. It returned pre-cutover-failed 34.47 ms after observed failure; only POST/PUT, no later native commands, resend, deletion or retirement; one readable partial task with its persisted comment; unchanged Beads, task ref, ownership and Episode code head; transport evidence retained until fixture teardown. Not operator cancellation or a natural HTTP fault. Intermediate Git hook and lock runs missed the intended rejection and prove no stop behavior; no synthetic source deletion occurred in those runs. Prior 218/12 is older-source only, incomplete F remains unknown, #83 static only.
 
 Remaining blocker: no supported ordinary migration stop on the frozen build, so no valid operator stop latency or cutover readiness. Use the bounded unblock condition above, not daemon shutdown or an artificial stop. Stopped after this evidence increment. No live PVA, activation, merge, install, restart or deployment. Keep In Progress, 0/9 checked, null Final Summary and c6e0a3d sequencing unchanged.
+
+### Owner disposition — bounded rehearsal and controlled failure accepted
+The owner accepted rehearsal evidence only: Episode `68a70b11de3b9e757998c2bae4419d250c037466`, native `020188bb7cdcaee6ccd5b809be254e3e3cd37b28`, unchanged product `f141d1cab8993fa620404c580f163f8a575e3df3`. The owner verified both direct refs, the full native contract, 45 artifact hashes, both teardown layers and the idle original Episode. The 66.568 s / 12-task observation is not a PVA-scale estimate; the 34.47 ms observation is a controlled failed response after native acceptance, not operator cancellation. The smallest supported operator-stop correction alone is admitted for the next canonical execute under `c6e0a3d`; see the living plan. The rehearsal acceptance is not whole-task acceptance or any live/merge/deployment decision. This handoff makes no tests or product changes. In Progress, 0/9 checked and null Final Summary stay unchanged.
 <!-- SECTION:NOTES:END -->
