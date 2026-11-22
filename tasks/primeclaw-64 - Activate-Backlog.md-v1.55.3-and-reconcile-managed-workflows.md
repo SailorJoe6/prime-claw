@@ -4,7 +4,7 @@ title: Activate Backlog.md v1.55.3 and reconcile managed workflows
 status: Done
 assignee: []
 created_date: 2026-11-21 20:38
-updated_date: '2026-11-22T03:25:00Z'
+updated_date: '2026-11-22T04:44:00Z'
 labels: []
 dependencies:
   - PRIMECLAW-45
@@ -169,6 +169,15 @@ created: 2026-11-22T03:25:00Z
 ---
 
 Joe approved the exact final merge tuple (PRIMECLAW-64, main, target37ad10dd9ea2f0d6af9cd82a3d7fe8bc480945b5, candidate1b7ebc5fa500719b4d14cef3278677879cce37ad) with "merge it, install the plugin and coordinate a restart of prime-agent". Fresh ownership/runtime/publication checks passed; primary main was fast-forwarded and non-force published at exact candidate1b7ebc5fa500719b4d14cef3278677879cce37ad, verified local/upstream/directremote. Independent review found no material defect; reviewed doc blobs were unchanged by ordinary target integration. This native terminal publication records Done for the accepted implementation and already-verified Backlog1.55.3 cutover, keeping the task active and preserving all Episode content/fields. The separately requested post-merge accepted-main plugin refresh and coordinated full restart remain in progress; exact Episode resources, old-generation evidence and both rollback copies are retained until resumed owner/this Episode/designated ordinary-session live checks pass. No archive or cleanup has occurred.
+
+---
+
+author: Owning Conversation 01a1a90b-0fba-7778-b1e5-0087bdaf8fec
+created: 2026-11-22T04:44:00Z
+
+---
+
+Post-merge rollout closure: accepted canonical primary main db19bb804091aa77c7828c0e23fb243cc0769a29 passed its fresh Docker Tier1 probe (20261122T042223Z-99399-c3667a26; offline/network absent/clean teardown), then supported user-global apply/check passed with zero conflicts and default preservation. No initializer reset or accepted override was used. Existing expert-review guidance cfd5e243c2a491cb741fa7ee699b314fae9e98cbd12946af48cc0bcff7c3618b and role-kernel d972867fedd0dd553269632fa385efc0251102b2e48e09bcf06f3d935a43e5a4 are preserved in canonical source and installed guidance. All28 selected project/custom/oldEpisode snapshot facts stayed unchanged. One coordinated full restart replaced daemon511 with21760 (same PrimeAgent0.9.8/protocol7/build6cd28f90e). Actual resumed owningConversation01a1a90b-0fba-7778-b1e5-0087bdaf8fec, exact retainedEpisode01a20001-5a66-75c9-9899-a9f743e43903 and designated ordinaryGStack01a1fa70-89c4-7564-a875-fa11880a68cc independently passed bounded live/report-only UAT. Actual PATH Backlog remains1.55.3/0755/106150754bytes/SHA169976d4a37230e4e650cac3dfa15a03436809fc97dfb7551354e63a9808c586; activeDone64 is7/7, legacycompleted1 stillDone/archivedtrue, and PVA remains Beads-authoritative/frozen. File hashes and live tool-context visibility are separate observations, not registry hash/count, full-log absence, lifecycle dispatch or historical-recovery proof. Both distinct1.53 rollback copies and all customizations are intact. Eleven affected maintenance holds were released; the old rate-limited RalphPVA owner could not send readiness, and its independent native quiescence/checkpoint evidence was recorded without fabricating an acknowledgement or changing provider/schedules. Normal merged64Episode cleanup follows under the existing terminal authority. Keep this Done task active, not archived. Detailed private evidence: owningConversation session artifacts, primeclaw64-plugin-install-20261121T215149Z/actual-backlog155-cutover/final-merged-plugin-refresh/resumed-original-rollout.
 
 ---
 <!-- COMMENTS:END -->
