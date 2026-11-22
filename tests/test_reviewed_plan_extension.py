@@ -79,21 +79,9 @@ export default function proof(pi){{pi.on('session_start',async()=>{{
 
 
 
-def test_native_creation_session_assignment_and_saved_session_reuse(tier1_container, ctmp) -> None:
-    """Real daemon component proof; no claim of Orca or whole-creation recovery."""
-    repo = ctmp / "session-component"
-    repo.mkdir()
-    worktree = ctmp / "allocated-worktree"
-    for args in (("init", "-q", "-b", "main"),
-                 ("-c", "user.name=Fixture", "-c", "user.email=fixture@example.test",
-                  "commit", "--allow-empty", "-qm", "Native session fixture"),
-                 ("worktree", "add", "-q", "-b", "episode/native-component", str(worktree))):
-        command = tier1_container.run("git", "-C", str(repo), *args, workdir=None)
-        assert command.returncode == 0, command.stdout + command.stderr
-    inventory = tier1_container.run("git", "-C", str(repo), "worktree", "list", "--porcelain").stdout
-    # An inert local provider permits real native message admission/completion offline.
-    # It neither implements recovery judgment nor contacts a provider service.
-    provider = worktree / ".prime/agent/extensions/native-component-provider.ts"
+def _write_native_component_provider(cwd: Path) -> Path:
+    # Real native delivery and completion without contacting a model provider.
+    provider = cwd / ".prime/agent/extensions/native-component-provider.ts"
     provider.parent.mkdir(parents=True)
     provider.write_text(r"""import {createAssistantMessageEventStream} from '@earendil-works/pi-ai';
 export default function fixture(pi){pi.registerProvider('native-component',{
@@ -106,6 +94,22 @@ stream.push({type:'start',partial:m});stream.push({type:'done',reason:'stop',mes
 return stream;},models:[{id:'m',name:'Fixture',reasoning:false,input:['text'],
 cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:100000,maxTokens:1000}]});}
 """)
+    return provider
+
+
+def test_native_creation_session_assignment_and_saved_session_reuse(tier1_container, ctmp) -> None:
+    """Real daemon component proof; no claim of Orca or whole-creation recovery."""
+    repo = ctmp / "session-component"
+    repo.mkdir()
+    worktree = ctmp / "allocated-worktree"
+    for args in (("init", "-q", "-b", "main"),
+                 ("-c", "user.name=Fixture", "-c", "user.email=fixture@example.test",
+                  "commit", "--allow-empty", "-qm", "Native session fixture"),
+                 ("worktree", "add", "-q", "-b", "episode/native-component", str(worktree))):
+        command = tier1_container.run("git", "-C", str(repo), *args, workdir=None)
+        assert command.returncode == 0, command.stdout + command.stderr
+    inventory = tier1_container.run("git", "-C", str(repo), "worktree", "list", "--porcelain").stdout
+    _write_native_component_provider(worktree)
     result_path = ctmp / "native-component-result.json"
     driver = ctmp / "native-component.ts"
     driver.write_text(r"""import {existsSync,readFileSync,writeFileSync} from 'node:fs';
@@ -134,7 +138,7 @@ const beforeKill=await publisher.getState(published.activeSessionId);
 if(beforeKill.sessionId!==published.sessionId||beforeKill.cwd!==worktree)throw new Error('native state identity drift');
 await publisher.kill(published.activeSessionId);
 const saved=JSON.parse(readFileSync(published.sessionFile,'utf8').split('\n').find(Boolean));
-const reopened=await publisher.reopen({worktree,sessionName:'native-component-episode',
+const reopened=await publisher.reopen({worktree,
 sessionFile:published.sessionFile,sessionId:published.sessionId,model:{provider:'native-component',id:'m'}});
 const reused=await publisher.getMessages(reopened.activeSessionId);
 const after=(await publisher.list()).filter(s=>s.cwd===worktree);
@@ -175,6 +179,55 @@ finally{publisher?.close();}
     assert proof["extraAssignmentOnReopen"] is False
     assert tier1_container.run("git", "-C", str(repo), "worktree", "list", "--porcelain").stdout == inventory
     (tier1_container.share.parent / "creation-native-session-component.json").write_text(json.dumps(proof, indent=2) + "\n")
+
+
+def test_native_task_episode_handoff_reopens_exact_saved_session(tier1_container, ctmp) -> None:
+    """Ordinary handoff through PrimeSessionPublisher and a real offline daemon."""
+    repo = ctmp / "owner"
+    repo.mkdir()
+    worktree = ctmp / "episode"
+    foreign = ctmp / "foreign"
+    foreign.mkdir()
+    result_path = ctmp / "native-cold-handoff-result.json"
+
+    def git(*args):
+        command = tier1_container.run("git", "-C", str(repo), *args, workdir=None)
+        assert command.returncode == 0, command.stdout + command.stderr
+        return command.stdout
+
+    git("init", "-q", "-b", "main")
+    for path, content in (
+        (".prime-claw/workflows/handoff.md", "Fixture canonical handoff. Reply only with acknowledgement."),
+        (".agents/skills/execute/SKILL.md", "Fixture canonical execute. Reply only with acknowledgement."),
+    ):
+        workflow = repo / path
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text(content + "\n")
+    git("add", ".")
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-qm", "Native handoff fixture")
+    git("worktree", "add", "-q", "-b", "episode/cold-handoff", str(worktree))
+    worktrees_before = git("worktree", "list", "--porcelain")
+    provider = _write_native_component_provider(repo)
+    _write_native_component_provider(worktree)
+    _write_native_component_provider(foreign)
+
+    command = tier1_container.run(
+        "/workspace/scripts/run-prime-agent-probe.sh", tier1_container.prime_agent,
+        "--mode", "rpc", "--offline", "--no-tools", "--no-skills", "--no-prompt-templates",
+        "--no-context-files", "--no-extensions", "--cwd", str(repo), "-e", str(provider),
+        "-e", "/workspace/tests/container/native_cold_episode_handoff.mts",
+        "--provider", "native-component", "--model", "m",
+        env={"PRIME_CLAW_COLD_HANDOFF_FIXTURE": json.dumps({
+            "worktree": str(worktree), "foreign": str(foreign), "resultPath": str(result_path),
+            "head": git("rev-parse", "HEAD").strip(),
+        })},
+        input_text=json.dumps({"id": "commands", "type": "get_commands"}) + "\n", timeout=90, workdir=None,
+    )
+    assert command.returncode == 0 and result_path.is_file(), command.stdout + command.stderr
+    proof = json.loads(result_path.read_text())
+    assert proof.get("result") == "passed", proof
+    assert git("worktree", "list", "--porcelain") == worktrees_before
+    (tier1_container.share.parent / "cold-episode-handoff-native.json").write_text(json.dumps(proof, indent=2) + "\n")
 
 
 def test_native_orca_packaged_runtime_and_terminal_boundary(tier1_container) -> None:

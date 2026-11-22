@@ -216,7 +216,7 @@ export interface SessionPublisher {
   kill?(activeSessionId: string): Promise<void>;
   deleteSaved?(sessionFile: string): Promise<void>;
   createFresh(options: { worktree: string; sessionName: string; model?: { provider: string; id: string }; onAllocated?: (identity: { sessionId: string; sessionFile: string }) => void | Promise<void> }): Promise<PublishedSession>;
-  reopen(options: { sessionFile: string; sessionId: string; worktree: string; sessionName: string; model?: { provider: string; id: string } }): Promise<PublishedSession>;
+  reopen(options: { sessionFile: string; sessionId: string; worktree: string; model?: { provider: string; id: string } }): Promise<PublishedSession>;
   deliverExecute(activeSessionId: string, prompt: string): Promise<void | ExecuteDeliveryObservation>;
   deliverHandoff(activeSessionId: string, handoffPrompt: string, executePrompt: string, onHandoffAdmitted?: () => void | Promise<void>, queueHandoffIfBusy?: boolean): Promise<void | HandoffDeliveryObservation>;
   close(): void;
@@ -805,12 +805,13 @@ export class PrimeSessionPublisher implements SessionPublisher {
     if (!existsSync(sessionFile)) throw new Error("Prime Agent did not persist the allocated Episode session");
     try { await options.onAllocated?.({ sessionId, sessionFile }); }
     catch (error) { rmSync(sessionFile, { force: true }); throw error; }
-    try { return await this.openResident({ ...options, sessionFile, sessionId }); }
+    try { return await this.openResident({ ...options, sessionFile, sessionId }, options.sessionName); }
     catch (error) {
       throw new EpisodeStateUncertainError(`Fresh Episode publication did not complete. Preserved allocated session ${sessionFile} for exact reconciliation.`, { cause: error });
     }
   }
-  async reopen(options: { sessionFile: string; sessionId: string; worktree: string; sessionName: string; model?: { provider: string; id: string } }): Promise<PublishedSession> {
+  async reopen(options: { sessionFile: string; sessionId: string; worktree: string; model?: { provider: string; id: string } }): Promise<PublishedSession> {
+    // A saved session is selected by file, not by a mutable name that may be reserved elsewhere.
     try { return await this.openResident(options); }
     catch (error) {
       if (isUncertainMutation(error)) throw new EpisodeStateUncertainError("Episode route publication may have succeeded; durable resources were preserved.", { cause: error });
@@ -902,15 +903,15 @@ export class PrimeSessionPublisher implements SessionPublisher {
     throw new HandoffFollowUpRejectedError(`Handoff was admitted, but canonical execute follow-up could not be queued: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
   }
   close(): void { this.client.close(); }
-  private async openResident(options: { sessionFile: string; sessionId: string; worktree: string; sessionName: string; model?: { provider: string; id: string } }): Promise<PublishedSession> {
+  private async openResident(options: { sessionFile: string; sessionId: string; worktree: string; model?: { provider: string; id: string } }, freshName?: string): Promise<PublishedSession> {
     const data = requireSuccess(await this.client.request({
-      type: "create", sessionPath: options.sessionFile, lifecycle: "resident", name: options.sessionName,
+      type: "create", sessionPath: options.sessionFile, lifecycle: "resident", ...(freshName === undefined ? {} : { name: freshName }),
       launchEnv: daemonLaunchEnvironment(), config: { cwd: options.worktree, ...(options.model ? { provider: options.model.provider, model: options.model.id } : {}) },
     }, 120_000), "episode publication") as SessionSummary | undefined;
     const activeSessionId = data?.activeSessionId ?? data?.id;
     if (!activeSessionId) throw new EpisodeStateUncertainError("Episode publication succeeded without a usable active-session identity");
     const matches = data?.sessionId === options.sessionId && samePath(data.sessionFile, options.sessionFile)
-      && samePath(data.cwd, options.worktree) && data.sessionName === options.sessionName;
+      && samePath(data.cwd, options.worktree) && (freshName === undefined || data.sessionName === freshName);
     if (!matches) throw new EpisodeStateUncertainError("Episode publication returned mismatched identity; resources were preserved");
     return { activeSessionId, sessionId: data.sessionId!, sessionFile: data.sessionFile! };
   }
@@ -1464,8 +1465,7 @@ async function reopenIfNeeded<T extends EpisodeOwnershipRecord>(
   let current = record;
   if (!activeSessionId) {
     const model = ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
-    const label = isLegacyEpisodeOwnership(record) ? record.slug : safeTaskLabel(record.taskId);
-    const reopened = await publisher.reopen({ sessionFile: record.episodeSessionFile!, sessionId: record.episodeId!, worktree: record.worktree!, sessionName: `${label}-episode`, model });
+    const reopened = await publisher.reopen({ sessionFile: record.episodeSessionFile!, sessionId: record.episodeId!, worktree: record.worktree!, model });
     activeSessionId = reopened.activeSessionId;
   }
   if (!activeSessionId) throw new EpisodeStateUncertainError("Episode has no usable active routing identity");
