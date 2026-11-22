@@ -4,7 +4,7 @@ title: Fix canonical expert-review model lookup and same-provider Astra selectio
 status: In Progress
 assignee: []
 created_date: '2026-11-22T03:41:00Z'
-updated_date: '2026-11-22T03:50:00Z'
+updated_date: '2026-11-22T04:02:00Z'
 labels: []
 dependencies: []
 references:
@@ -59,3 +59,11 @@ Owning Conversation is 01a20155-e0e9-7185-96a8-998c0dca989c, distinct from the e
 <!-- SECTION:NOTES:BEGIN -->
 Implementation checkpoint: compared canonical base skill SHA-256 62baf066197c4c9c477bb6388521b112b7db6651f6bba99f60b6865c159e0742 with installed semantic evidence SHA-256 cfd5e243c2a491cb741fa7ee699b314fae9e98cbd12946af48cc0bcff7c3618b. Candidate edits are limited to model selection guidance and focused static contract coverage. Quoted `prime-agent model list "openai-codex astra"` returned `openai-codex/gpt-6-astra` and `openai-codex/gpt-6.2-astra`; catalog evidence only. Validation underway; installed copy untouched.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Prime Claw abandonment: task PRIMECLAW-67; pushed Episode head 901cc3ba163438bebbac3d4a44835152f46accaa; code was not merged.
+
+Joe explicitly stopped and ordered removal of this extra task/Episode workflow. No independent review or merge occurred. Existing validation finished before removal: focused tests 19 passed; Docker Tier 1 probe exited 0 and verified teardown. Validation artifacts preserved outside the Episode worktree at /Users/jlanders/code/prime-claw/.test-results/abandoned-primeclaw-67-f766d0f0. The parent will handle the originally requested Markdown change directly; this Episode code and test changes are not being merged.
+<!-- SECTION:FINAL_SUMMARY:END -->
