@@ -2704,7 +2704,7 @@ export async function publishIsolatedBeadsImport(options: {
 }) {
   const { projectRoot: root, localRemote, expectedSourceRevision, expectedBaseline, actor, semanticPlacement } = options;
   const storeDir = join(root, ".backlog"), scope = dirname(root), remoteName = "origin";
-  const runner = options.runner ?? new ProcessCommandRunner();
+  const runner = migrationRunner(options.runner);
   const fail = (why: string): never => { throw new Error(`isolated publish-only: ${why}; stop and preserve both stores`); };
   const git = (path: string, ...args: string[]) => runRequired(runner, "git", ["-C", path, ...args], path).stdout;
   const paths = (output: string) => output.split("\0").filter(Boolean).sort();

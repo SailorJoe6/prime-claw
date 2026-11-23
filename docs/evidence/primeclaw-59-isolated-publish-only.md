@@ -48,3 +48,29 @@ Select `^isolated publish-only` in `tests/task_provider_migration.test.mjs`.
 This does not establish live capture safety, scale performance, or behavior on
 already-present memory outputs or an existing receipt. No live migration was
 run or authorized.
+
+## Two-fix review revision
+
+The publish-only entry now uses the existing file-backed migration adapter by
+default. The regression calls the default entry without supplying a runner.
+Its observer forwards the actual commands and output unchanged. A real native
+Beads current view with authored comments was 1,370,039 bytes on all five reads,
+above the earlier 1 MiB pipe limit. The same three-ticket no-receipt boundary,
+pre-write refusal, exact memory and mapped-file checks, and separate local
+publication/readback passed on the corrected code. This was not a scale test.
+
+- Source: `capture-sha256:15a5c3b3f40a011982ca62b7a31d0e2df4e72051975cac37a55e0b33c9b320d3`
+- Original baseline: `d2306fd695b066b1672771b3df77ef71fe90e1bd`
+- Data: `1a28b740071f82d9e780ef07adcc250baaf707a0`; digest `58df60ea92d29360fdc51f69fbff3a26dc87b706866e19a09a95582130a884dd`
+- Receipt: `65027acc4cc4936c6b3ea7c9f2e10684cf14e4c4`
+- Default-runner TAP SHA-256: `268fb7be1d27bde9878e29c80ce8556d2cb1aa7d44b4bfc9d43c2e501df2b923` (one pass, no skips)
+- Parked-store TAP SHA-256: `d882851552d752b0b9c902ce0ce8cecc7c3d0b410d2c35eebf00355191e65300` (one pass, no skips)
+
+The separate existing-`clone: true` case used the selector
+`^parked-store reconciliation preserves originals and both ancestries: existing hidden bootstrap clone$`.
+It exercised the restored ordinary clone command in a disposable synthetic
+fixture, including its synthetic source-retirement callback. The isolated
+publication fixture still uses `--no-hardlinks` and does not retire its source.
+Both runs used Node 22.23.5, Beads 1.3.1 and Backlog 1.55.3 in an offline,
+read-only Docker container with private tmpfs; both containers were removed.
+Neither run had access to a live source or destination.

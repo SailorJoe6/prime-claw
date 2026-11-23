@@ -3128,7 +3128,7 @@ function parkedStoreReconciliationFixture(t, name, { selected = ".backlog", clon
   const bootstrapHead = git(seed, "rev-parse", "HEAD"), store = join(fixture.root, selected);
   if (clone) {
     mkdirSync(join(store, ".."), { recursive: true });
-    command(fixture.root, "git", ["clone", "-q", ...(noHardlinks ? ["--no-hardlinks"] : []), "--branch", "prime-claw/tasks", "--single-branch", fixture.remote, store]);
+    command(fixture.root, "git", ["clone", "-q", "--branch", "prime-claw/tasks", "--single-branch", fixture.remote, store]);
     git(store, "config", "user.name", "Existing Clone Author"); git(store, "config", "user.email", "existing-clone@example.invalid");
     symlinkSync(`${selected}/config.yml`, join(fixture.root, "backlog.config.yml"));
   }
@@ -4930,13 +4930,19 @@ test("isolated publish-only verifies an untracked post-Web import before separat
   const { root, remote, ids, outer } = f.fixture, { store } = f.destination;
   const stale = f.request.expectedSourceRevision;
   bd(root, "dep", "relate", ids.parent, ids.blocked);
+  // One real native current view must exceed the piped 1 MiB output cap.
+  // Keep the fixture at three tickets and each authored comment argv small.
+  for (let i = 1; i <= 28; i++) {
+    bd(root, "comments", "add", ids.parent, pvaBoundedText(`Large current comment ${i}`, 620), "--author", "source-author");
+  }
   const memoryText = "Synthetic native memory Ω for the post-Web boundary";
   bd(root, "remember", memoryText, "--key", "isolated-publish-only-memory");
   const inspection = inspectTaskProviderMigration({ cwd: root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
   assert.equal(inspection.status, "ready", inspection.detail);
   assert.notEqual(inspection.sourceRevision, stale);
   const head = git(store, "rev-parse", "HEAD"), sourceViews = captureBeadsCurrentTasks(root, Object.values(ids));
-  const codeAndSource = () => ({ metadata: sourceAuthorityFiles(root), export: bd(root, "--readonly", "export", "--all"),
+  const codeAndSource = () => ({ metadata: sourceAuthorityFiles(root),
+    export: RUNNER.run("bd", ["--readonly", "export", "--all"], { cwd: root }).stdout,
     working: git(root, "--no-optional-locks", "status", "--porcelain=v1"), code: git(root, "rev-parse", "HEAD"),
     index: git(root, "ls-files", "--stage"), codeRef: git(remote, "rev-parse", "refs/heads/main"),
     owner: existsSync(join(root, ".prime-claw", "ownership.json")) });
@@ -4970,35 +4976,46 @@ test("isolated publish-only verifies an untracked post-Web import before separat
   const before = () => ({ files: physicalDestinationRecords(store), index: readFileSync(join(store, ".git", "index")).toString("base64"),
     head: git(store, "rev-parse", "HEAD"), ref: git(remote, "rev-parse", TASK_HISTORY_REF), source: codeAndSource() });
   const snapshot = before();
-  const mutations = [], updates = [];
-  class RecoveryRunner extends CandidateRunner {
-    run(name, args, options = {}) {
-      if (name === "bd") assert.ok(args[0] === "--readonly" || args[0] === "--version"
-        || JSON.stringify(args) === '["config","get","no-db"]', "Beads must be read-only");
-      const nativeWrite = name === "backlog" && ["create", "edit", "archive", "complete", "init"].includes(args[1]);
-      const gitWrite = name === "git" && args.some(arg => ["add", "commit", "push", "init", "checkout", "clone", "update-ref"].includes(arg));
-      if (nativeWrite || gitWrite) mutations.push([name, args[1], args[2]]);
-      if (nativeWrite && args[0] === "task" && args[1] === "edit") assert.ok(args.includes("--"));
-      const result = super.run(name, args, options);
-      if (name === "git" && args.includes("push")) updates.push(git(remote, "rev-parse", TASK_HISTORY_REF));
-      if (name === "backlog" && args[0] === "task" && args[1] === "create" && args[2] === "Prime Claw task-provider migration receipt") {
-        assert.equal(updates.length, 1, "data was published before receipt reservation");
+  const mutations = [], updates = [], currentViewBytes = [];
+  const runFileBacked = ProcessCommandRunner.prototype.runFileBacked;
+  // Observe only. Both calls use the actual default runner, native binaries,
+  // unmodified argv and file-backed transport. No command output is replaced.
+  ProcessCommandRunner.prototype.runFileBacked = function (name, args, options) {
+    if (name === "bd") assert.ok(args[0] === "--readonly" || args[0] === "--version"
+      || JSON.stringify(args) === '["config","get","no-db"]', "Beads must be read-only");
+    const nativeWrite = name === "backlog" && ["create", "edit", "archive", "complete", "init"].includes(args[1]);
+    const gitWrite = name === "git" && args.some(arg => ["add", "commit", "push", "init", "checkout", "clone", "update-ref"].includes(arg));
+    if (nativeWrite || gitWrite) mutations.push([name, args[1], args[2]]);
+    if (nativeWrite && args[0] === "task") {
+      assert.equal(args.some(arg => Object.values(mapping).includes(arg)), false, "no mapped task may be written");
+      if (args[1] === "edit") assert.ok(args.includes("--"));
+      else assert.ok(args[2] === "Prime Claw task-provider migration receipt" || args[2].startsWith("USER:"));
+      if (args[1] === "create" && args[2] === "Prime Claw task-provider migration receipt") {
+        assert.deepEqual(updates, [git(remote, "rev-parse", TASK_HISTORY_REF)], "data was published before receipt reservation");
         assert.ok(git(remote, "diff", "--name-only", head, updates[0]).includes(imported[0]));
       }
-      if (nativeWrite && args[0] === "task") {
-        assert.equal(args.some(arg => Object.values(mapping).includes(arg)), false, "no mapped task may be written");
-        assert.ok(args[1] === "edit" || args[2] === "Prime Claw task-provider migration receipt" || args[2].startsWith("USER:"));
-      }
-      return result;
     }
-  }
+    const result = runFileBacked.call(this, name, args, options);
+    if (name === "git" && args.includes("push")) updates.push(git(remote, "rev-parse", TASK_HISTORY_REF));
+    if (name === "bd" && args[0] === "--readonly" && args[1] === "show" && args[2] === ids.parent) {
+      const bytes = Buffer.byteLength(result.stdout);
+      assert.ok(bytes > 1024 * 1024, `native current view must exceed 1 MiB; got ${bytes} bytes`);
+      assert.deepEqual(JSON.parse(result.stdout)[0], sourceViews[ids.parent].nativeView);
+      currentViewBytes.push(bytes);
+    }
+    return result;
+  };
+  t.after(() => { ProcessCommandRunner.prototype.runFileBacked = runFileBacked; });
   const request = { projectRoot: root, localRemote: remote, expectedBaseline: head,
-    actor: f.request.actor, semanticPlacement: f.request.semanticPlacement, runner: new RecoveryRunner() };
+    actor: f.request.actor, semanticPlacement: f.request.semanticPlacement };
   await assert.rejects(publishIsolatedBeadsImport({ ...request, expectedSourceRevision: stale }), /source revision drift/);
   assert.deepEqual(mutations, []);
   assert.deepEqual(updates, []);
   assert.deepEqual(before(), snapshot, "source drift refusal leaves index, work, source and local refs intact");
+  const refusalReads = currentViewBytes.length;
+  assert.ok(refusalReads > 0, "default runner must read the large native view before drift refusal");
   const result = await publishIsolatedBeadsImport({ ...request, expectedSourceRevision: inspection.sourceRevision });
+  assert.ok(currentViewBytes.length > refusalReads, "default runner must read the large native view on success");
   assert.deepEqual(updates, [result.dataRevision, result.receiptRevision]);
   assert.equal(git(remote, "rev-parse", `${result.dataRevision}^`), head);
   assert.equal(git(remote, "rev-parse", `${result.receiptRevision}^`), result.dataRevision);
@@ -5043,5 +5060,5 @@ test("isolated publish-only verifies an untracked post-Web import before separat
       assert.deepEqual(JSON.parse(backlog(reader, "task", "view", "--json", "--", outputs.userTask.taskId)), outputs.userTask.nativeView);
     }
   }
-  console.info(JSON.stringify({ stopped: imported.length, sourceDriftMutations: 0, baseline: head, ...result }));
+  console.info(JSON.stringify({ stopped: imported.length, sourceDriftMutations: 0, currentViewBytes, baseline: head, ...result }));
 });
