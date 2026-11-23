@@ -12,7 +12,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { canonicalSha256, completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
+import { canonicalSha256, completeBeadsExport, importBeadsMemoryDocuments, verifyBacklogMemoryOutputs, inspectTaskProviderMigration, migrateTaskProvider, publishIsolatedBeadsImport } from "../src/prime-agent-plugin/extension-support/task-provider-migration.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { checkBeadsCapabilities, detectExplicitTaskProvider, detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { initialTaskStoreConfig, prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
@@ -3033,7 +3033,7 @@ test("migration admission refuses absent Beads even when Backlog is selected", {
 
 // Independent native destination published before any migration attempt. Native
 // allocation reserves IDs across active, canonical archive, legacy archive and drafts.
-function publishedPopulatedBacklogDestination(fixture) {
+function publishedPopulatedBacklogDestination(fixture, noHardlinks = false) {
   const seed = join(fixture.outer, "native-allocation-seed");
   mkdirSync(seed);
   command(seed, "git", ["init", "-q", "-b", "main"]);
@@ -3061,7 +3061,7 @@ function publishedPopulatedBacklogDestination(fixture) {
   git(history, "remote", "add", "origin", fixture.remote);
   git(history, "push", "-qu", "origin", TASK_HISTORY_REF);
   const store = join(fixture.root, ".backlog");
-  command(fixture.root, "git", ["clone", "-q", "--branch", "prime-claw/tasks", "--single-branch", fixture.remote, store]);
+  command(fixture.root, "git", ["clone", "-q", ...(noHardlinks ? ["--no-hardlinks"] : []), "--branch", "prime-claw/tasks", "--single-branch", fixture.remote, store]);
   const exclude = join(fixture.root, ".git", "info", "exclude");
   writeFileSync(exclude, readFileSync(exclude, "utf8") + "\n.backlog/\n");
   const baseline = Object.fromEntries(git(store, "ls-files").split(/\r?\n/).map((path) => [path, {
@@ -3128,7 +3128,7 @@ function parkedStoreReconciliationFixture(t, name, { selected = ".backlog", clon
   const bootstrapHead = git(seed, "rev-parse", "HEAD"), store = join(fixture.root, selected);
   if (clone) {
     mkdirSync(join(store, ".."), { recursive: true });
-    command(fixture.root, "git", ["clone", "-q", "--branch", "prime-claw/tasks", "--single-branch", fixture.remote, store]);
+    command(fixture.root, "git", ["clone", "-q", ...(noHardlinks ? ["--no-hardlinks"] : []), "--branch", "prime-claw/tasks", "--single-branch", fixture.remote, store]);
     git(store, "config", "user.name", "Existing Clone Author"); git(store, "config", "user.email", "existing-clone@example.invalid");
     symlinkSync(`${selected}/config.yml`, join(fixture.root, "backlog.config.yml"));
   }
@@ -3331,8 +3331,8 @@ for (const conflict of ["configuration", "physical path", "code ancestry"]) {
 }
 
 // Selected-existing configuration must not become a fresh canonical bootstrap.
-function selectedMigrationConfigFixture(t, name, { missing = false, block = false, autoCommit = false, statuses: selectedStatuses } = {}) {
-  const fixture = embeddedBeadsSource(t, name), destination = publishedPopulatedBacklogDestination(fixture);
+function selectedMigrationConfigFixture(t, name, { missing = false, block = false, autoCommit = false, statuses: selectedStatuses, noHardlinks = false } = {}) {
+  const fixture = embeddedBeadsSource(t, name), destination = publishedPopulatedBacklogDestination(fixture, noHardlinks);
   const path = join(destination.store, "config.yml");
   git(destination.store, "config", "user.name", "Config Fixture"); git(destination.store, "config", "user.email", "config@example.invalid");
   const statuses = selectedStatuses ?? (missing ? [block ? "Triage" : "Triage, Carefully", "In Planning", "Done"]
@@ -3345,7 +3345,9 @@ function selectedMigrationConfigFixture(t, name, { missing = false, block = fals
     .replace(/^(?:types|priorities):.*\n/gm, "")
     + '# Keep operator extension keys and comments verbatim.\noperator_extension: {opaque: [null, false, "Ω"]}\n'
     + 'types: ["Incident, Follow-up"]\npriorities: ["P4", "P1", "P0", "Very High, Almost"]\n';
-  writeFileSync(path, config); chmodSync(path, 0o640);
+  const isolatedConfig = noHardlinks ? config.replace(/^remote_operations:.*$/m, "remote_operations: false")
+    .replace(/^auto_open_browser:.*$/m, "auto_open_browser: false") : config;
+  writeFileSync(path, isolatedConfig); chmodSync(path, 0o640);
   git(destination.store, "add", "config.yml");
   git(destination.store, "-c", "user.name=Config Fixture", "-c", "user.email=config@example.invalid", "commit", "-qm", "publish selected native configuration");
   git(destination.store, "push", "-q");
@@ -4917,4 +4919,129 @@ test("PVA gate safe failure after native comment acceptance", { timeout: 240_000
     writes: requests.map(row => row.method), laterNativeCommands: runner.calls.length - callsAtFailure,
     retainedRecords: Object.keys(partial).length, retainedComments: view.task.comments.length, publishedAtFailure,
     retainedTransportEvidence: existsSync(artifactDirectory), deleteCalls: deletions, sourceAuthority: "Beads", result: first.code }));
+});
+
+
+test("isolated publish-only verifies an untracked post-Web import before separate data and receipt publication", {
+  timeout: 300_000, skip: process.env.PRIME_CLAW_ISOLATED_PUBLICATION_TEST !== "1",
+}, async t => {
+  const f = selectedMigrationConfigFixture(t, "isolated-publication", { noHardlinks: true,
+    statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"] });
+  const { root, remote, ids, outer } = f.fixture, { store } = f.destination;
+  const stale = f.request.expectedSourceRevision;
+  bd(root, "dep", "relate", ids.parent, ids.blocked);
+  const memoryText = "Synthetic native memory Ω for the post-Web boundary";
+  bd(root, "remember", memoryText, "--key", "isolated-publish-only-memory");
+  const inspection = inspectTaskProviderMigration({ cwd: root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.notEqual(inspection.sourceRevision, stale);
+  const head = git(store, "rev-parse", "HEAD"), sourceViews = captureBeadsCurrentTasks(root, Object.values(ids));
+  const codeAndSource = () => ({ metadata: sourceAuthorityFiles(root), export: bd(root, "--readonly", "export", "--all"),
+    working: git(root, "--no-optional-locks", "status", "--porcelain=v1"), code: git(root, "rev-parse", "HEAD"),
+    index: git(root, "ls-files", "--stage"), codeRef: git(remote, "rev-parse", "refs/heads/main"),
+    owner: existsSync(join(root, ".prime-claw", "ownership.json")) });
+  const authority = codeAndSource(), initial = physicalDestinationRecords(store);
+  const stop = "synthetic precise stop after native Web GET, before receipt reservation";
+  const stopped = await migrateTaskProvider({ ...f.request, expectedSourceRevision: inspection.sourceRevision,
+    runner: new AsIsBeadsRunner(), deleteSource() { assert.fail("source retirement not allowed"); },
+    onProgress(phase) { if (phase === "Publishing verified data and receipt") throw new Error(stop); } });
+  assert.equal(stopped.code, "pre-cutover-failed", stopped.detail);
+  assert.ok(stopped.detail.includes(stop), stopped.detail);
+  assert.deepEqual(codeAndSource(), authority);
+  assert.equal(git(remote, "rev-parse", TASK_HISTORY_REF), head);
+  assert.equal(git(store, "rev-parse", "HEAD"), head);
+  const files = physicalDestinationRecords(store);
+  const imported = Object.keys(files).filter(path => !Object.hasOwn(initial, path));
+  assert.equal(imported.length, 3);
+  assert.deepEqual(git(store, "--no-optional-locks", "status", "--porcelain=v1", "-z", "--untracked-files=all").split("\0").filter(Boolean).sort(),
+    imported.map(path => `?? ${path}`).sort());
+  const taskAt = (project, bytes) => JSON.parse(backlog(project, "task", "view", "--json", "--",
+    /^id: (.+)$/m.exec(Buffer.from(bytes, "base64").toString("utf8"))[1]));
+  const readback = imported.map(path => taskAt(root, files[path]));
+  const mapping = Object.fromEntries(readback.map(({ task }) => [task.references.find(ref => ref.startsWith("prime-claw-beads-source:")).split(":")[1], task.id]));
+  for (const [id, view] of Object.entries(sourceViews)) {
+    const current = readback.find(x => x.task.id === mapping[id]);
+    const authored = current.task.comments.filter(comment => !comment.body.startsWith("prime-claw-task-provider-migration-relationships-v1\n"));
+    assertCurrentBacklogTask({ ...current, task: { ...current.task, comments: authored } }, view, inspection, mapping,
+      { priorities: ["P4", "P1", "P0", "Very High, Almost"], types: ["Incident, Follow-up"] });
+  }
+  assert.ok(readback.find(x => x.task.id === mapping[ids.parent]).task.comments.some(comment =>
+    comment.author === "prime-claw-migration" && comment.body.includes(`relates-to: ${ids.blocked} -> ${mapping[ids.blocked]}`)));
+  const before = () => ({ files: physicalDestinationRecords(store), index: readFileSync(join(store, ".git", "index")).toString("base64"),
+    head: git(store, "rev-parse", "HEAD"), ref: git(remote, "rev-parse", TASK_HISTORY_REF), source: codeAndSource() });
+  const snapshot = before();
+  const mutations = [], updates = [];
+  class RecoveryRunner extends CandidateRunner {
+    run(name, args, options = {}) {
+      if (name === "bd") assert.ok(args[0] === "--readonly" || args[0] === "--version"
+        || JSON.stringify(args) === '["config","get","no-db"]', "Beads must be read-only");
+      const nativeWrite = name === "backlog" && ["create", "edit", "archive", "complete", "init"].includes(args[1]);
+      const gitWrite = name === "git" && args.some(arg => ["add", "commit", "push", "init", "checkout", "clone", "update-ref"].includes(arg));
+      if (nativeWrite || gitWrite) mutations.push([name, args[1], args[2]]);
+      if (nativeWrite && args[0] === "task" && args[1] === "edit") assert.ok(args.includes("--"));
+      const result = super.run(name, args, options);
+      if (name === "git" && args.includes("push")) updates.push(git(remote, "rev-parse", TASK_HISTORY_REF));
+      if (name === "backlog" && args[0] === "task" && args[1] === "create" && args[2] === "Prime Claw task-provider migration receipt") {
+        assert.equal(updates.length, 1, "data was published before receipt reservation");
+        assert.ok(git(remote, "diff", "--name-only", head, updates[0]).includes(imported[0]));
+      }
+      if (nativeWrite && args[0] === "task") {
+        assert.equal(args.some(arg => Object.values(mapping).includes(arg)), false, "no mapped task may be written");
+        assert.ok(args[1] === "edit" || args[2] === "Prime Claw task-provider migration receipt" || args[2].startsWith("USER:"));
+      }
+      return result;
+    }
+  }
+  const request = { projectRoot: root, localRemote: remote, expectedBaseline: head,
+    actor: f.request.actor, semanticPlacement: f.request.semanticPlacement, runner: new RecoveryRunner() };
+  await assert.rejects(publishIsolatedBeadsImport({ ...request, expectedSourceRevision: stale }), /source revision drift/);
+  assert.deepEqual(mutations, []);
+  assert.deepEqual(updates, []);
+  assert.deepEqual(before(), snapshot, "source drift refusal leaves index, work, source and local refs intact");
+  const result = await publishIsolatedBeadsImport({ ...request, expectedSourceRevision: inspection.sourceRevision });
+  assert.deepEqual(updates, [result.dataRevision, result.receiptRevision]);
+  assert.equal(git(remote, "rev-parse", `${result.dataRevision}^`), head);
+  assert.equal(git(remote, "rev-parse", `${result.receiptRevision}^`), result.dataRevision);
+  assert.deepEqual(codeAndSource(), authority);
+  assert.equal(git(store, "status", "--porcelain=v1"), "");
+  for (const [path, original] of Object.entries(f.files)) {
+    assert.equal(readFileSync(join(store, path)).toString("base64"), original.bytes, path);
+    assert.equal(lstatSync(join(store, path)).mode, original.mode, path);
+    assert.equal(git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path), original.history, path);
+  }
+  const memoryPaths = git(remote, "diff", "--name-only", head, result.dataRevision).split("\n").filter(path => path.startsWith("docs/"));
+  assert.equal(memoryPaths.length, 2);
+  assert.ok(memoryPaths.some(path => git(remote, "show", `${result.dataRevision}:${path}`).includes(memoryText)));
+  const receiptPaths = git(remote, "diff", "--name-only", result.dataRevision, result.receiptRevision).split("\n");
+  assert.equal(receiptPaths.length, 1);
+  for (const phase of ["data", "receipt"]) {
+    const reader = join(outer, `reader-${phase}`);
+    mkdirSync(reader); git(reader, "init", "-q");
+    const readerStore = join(reader, ".backlog");
+    git(reader, "clone", "-q", "--no-hardlinks", "--single-branch", "-b", "prime-claw/tasks", remote, readerStore);
+    const revision = phase === "data" ? result.dataRevision : result.receiptRevision;
+    git(readerStore, "checkout", "--detach", revision);
+    symlinkSync(".backlog/config.yml", join(reader, "backlog.config.yml"));
+    assert.equal(git(readerStore, "rev-parse", "HEAD"), revision);
+    for (const path of imported) {
+      const bytes = readFileSync(join(readerStore, path)).toString("base64");
+      assert.equal(bytes, files[path]);
+      assert.deepEqual(taskAt(reader, bytes), readback.find(({ task }) => task.path === `.backlog/${path}`));
+    }
+    assert.equal(existsSync(join(readerStore, receiptPaths[0])), phase === "receipt");
+    if (phase === "receipt") {
+      const receiptTask = JSON.parse(backlog(reader, "task", "view", "--json", "--", result.receiptId)).task;
+      const receipt = JSON.parse(receiptTask.implementationNotes.split("\n").slice(1, -1).join("\n"));
+      assert.equal(receipt.destinationDataRevision, result.dataRevision);
+      assert.equal(receipt.destinationDataDigest, result.dataDigest);
+      assert.equal(receipt.sourceRevision, inspection.sourceRevision);
+      assert.deepEqual(receipt.ownershipTransitions, []);
+      assert.equal(receiptTask.status, "Done");
+      const outputs = receipt.backlogMemoryOutputs;
+      assert.equal(outputs.documents.length, 1);
+      verifyBacklogMemoryOutputs(outputs, reader, RUNNER);
+      assert.deepEqual(JSON.parse(backlog(reader, "task", "view", "--json", "--", outputs.userTask.taskId)), outputs.userTask.nativeView);
+    }
+  }
+  console.info(JSON.stringify({ stopped: imported.length, sourceDriftMutations: 0, baseline: head, ...result }));
 });

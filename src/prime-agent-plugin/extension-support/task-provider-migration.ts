@@ -24,10 +24,11 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  statfsSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import { setImmediate as yieldToOperator } from "node:timers/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
@@ -1709,8 +1710,8 @@ function topologicalBeadsPackages(tasks: BeadsTaskPackage[]): BeadsTaskPackage[]
   return ordered;
 }
 
-function backlogDestinationViews(runner: CommandRunner, projectRoot: string, storeDir: string, phase: string): Map<string, JsonObject> {
-  cleanGitRevision(runner, storeDir);
+function backlogDestinationViews(runner: CommandRunner, projectRoot: string, storeDir: string, phase: string, allowUntracked = false): Map<string, JsonObject> {
+  if (!allowUntracked) cleanGitRevision(runner, storeDir);
   // The existing physical inventory spans tasks, drafts and both archive layouts.
   // A preserved live/archive pair has no native ID view. Its two files are
   // verified separately, never represented as an invented task view.
@@ -2693,6 +2694,216 @@ async function migrateBeadsToBacklog(
       });
     },
   };
+}
+
+
+/** Internal post-Web publication only. No public switch, layout or ownership route. */
+export async function publishIsolatedBeadsImport(options: {
+  projectRoot: string; localRemote: string; expectedSourceRevision: string; expectedBaseline: string;
+  actor: string; semanticPlacement: string; runner?: CommandRunner;
+}) {
+  const { projectRoot: root, localRemote, expectedSourceRevision, expectedBaseline, actor, semanticPlacement } = options;
+  const storeDir = join(root, ".backlog"), scope = dirname(root), remoteName = "origin";
+  const runner = options.runner ?? new ProcessCommandRunner();
+  const fail = (why: string): never => { throw new Error(`isolated publish-only: ${why}; stop and preserve both stores`); };
+  const git = (path: string, ...args: string[]) => runRequired(runner, "git", ["-C", path, ...args], path).stdout;
+  const paths = (output: string) => output.split("\0").filter(Boolean).sort();
+  const direct = (revision: string) => assertPublishedGitRef(runner, storeDir, revision, remoteName, localRemote,
+    TASK_HISTORY_REF, "isolated task publication");
+  // The initial entry is intentionally restricted to disposable offline Linux
+  // runs. A protected-copy admission/copy procedure is NOT implemented here.
+  if (process.platform !== "linux" || dirname(scope) !== "/tmp" || dirname(localRemote) !== scope || root === localRemote
+      || process.env.GIT_ALLOW_PROTOCOL !== "file" || process.env.GIT_CONFIG_NOSYSTEM !== "1"
+      || process.env.GIT_CONFIG_GLOBAL !== "/dev/null" || Object.keys(networkInterfaces()).some(name => name !== "lo")
+      || readFileSync("/proc/net/route", "utf8").trim().split("\n").length !== 1
+      || statfsSync(scope).type !== 0x01021994 || realpathSync(scope) !== scope
+      || (lstatSync(scope).mode & 0o077) !== 0 || process.env.HOME === undefined || dirname(process.env.HOME) !== "/tmp"
+      || realpathSync(process.env.HOME) !== process.env.HOME || statfsSync(process.env.HOME).type !== 0x01021994
+      || Object.keys(process.env).some(k => /^(?:BEADS_|BD_|MYSQL_|BACKLOG_)|^DOLT_(?!ROOT_PATH$)|^GIT_(?!(?:ALLOW_PROTOCOL|CONFIG_NOSYSTEM|CONFIG_GLOBAL|TERMINAL_PROMPT|OPTIONAL_LOCKS)$)/.test(k))
+      || process.env.DOLT_ROOT_PATH !== process.env.HOME) fail("an offline disposable workspace is required");
+  if (!GIT_OID.test(expectedBaseline) || !/^capture-sha256:[0-9a-f]{64}$/.test(expectedSourceRevision)
+      || !actor.trim() || !semanticPlacement.trim()) fail("exact approval inputs are required");
+  const rootConfig = join(root, "backlog.config.yml"), configPath = join(storeDir, "config.yml");
+  const gitDirs = [join(root, ".git"), join(storeDir, ".git"), localRemote];
+  const localDevice = lstatSync(scope).dev;
+  const assertFiles = (path: string): void => {
+    const entry = lstatSync(path);
+    if (entry.dev !== localDevice) fail("workspace contains a foreign filesystem");
+    if (entry.isSymbolicLink() && path === rootConfig && readlinkSync(path) === ".backlog/config.yml") return;
+    if (entry.isDirectory()) {
+      if (basename(path) === ".git" && !gitDirs.includes(path)) fail("nested Git storage is not allowed");
+      for (const name of readdirSync(path)) assertFiles(join(path, name));
+      return;
+    }
+    if (!entry.isFile() || entry.nlink !== 1) fail("linked or special files are not allowed");
+  };
+  for (const path of [root, storeDir, ...gitDirs]) {
+    if (realpathSync(path) !== path || !lstatSync(path).isDirectory()) fail("workspace repository paths are not independent directories");
+  }
+  assertFiles(root); assertFiles(localRemote);
+  if (realpathSync(rootConfig) !== configPath || existsSync(join(root, ".prime-claw", "ownership.json"))) fail("foreign or active destination layout");
+  for (const dir of gitDirs) {
+    if (["objects/info/alternates", "objects/info/http-alternates", "commondir", "worktrees", "config.worktree", "refs/replace"]
+      .some(path => existsSync(join(dir, path))) || readdirSync(join(dir, "hooks")).some(name => !name.endsWith(".sample"))) {
+      fail("Git shared storage, rewrites or hooks are not allowed");
+    }
+    // Read only this config, without evaluating includes, before using Git in
+    // the repository. Restrict to the ordinary clone/bare config shape.
+    const keys = git(scope, "config", "--no-includes", "--file", join(dir, "config"), "--name-only", "--list").trim().split("\n");
+    const known = /^(?:core\.(?:repositoryformatversion|filemode|bare|logallrefupdates)|remote\.origin\.(?:url|fetch)|branch\..+\.(?:remote|merge)|beads\.role|user\.(?:name|email))$/;
+    if (keys.some(key => !known.test(key))) fail("Git configuration contains keys outside the isolated clone shape");
+    const gitRoot = dir === localRemote ? dir : dirname(dir);
+    if (git(gitRoot, "rev-parse", "--absolute-git-dir").trim() !== dir
+        || realpathSync(resolve(gitRoot, git(gitRoot, "rev-parse", "--git-common-dir").trim())) !== dir) fail("Git common directory is not isolated");
+  }
+  if (git(localRemote, "rev-parse", "--is-bare-repository").trim() !== "true"
+      || git(storeDir, "symbolic-ref", "HEAD").trim() !== TASK_HISTORY_REF
+      || git(storeDir, "rev-parse", "HEAD").trim() !== expectedBaseline) fail("destination is not at the exact published baseline");
+  direct(expectedBaseline);
+  const capture = () => {
+    const selected = detectExplicitTaskProvider(root, "beads", runner);
+    if (selected.kind !== "selected" || selected.evidence.provider !== "beads"
+        || selected.evidence.storeDir !== join(root, ".beads") || selected.evidence.doltMode !== "embedded") {
+      return fail("source must be the exact local embedded Beads store");
+    }
+    const remotes = jsonCommand(runner, "bd", ["--readonly", "dolt", "remote", "list", "--json"], root, "isolated embedded Beads remotes");
+    if (!Array.isArray(remotes) || remotes.length) fail("source has a Dolt transport");
+    const snapshot = captureBeads(root, selected.evidence, runner);
+    if (snapshot.revision !== expectedSourceRevision) fail("source revision drift");
+    const dataDir = snapshot.sourceIdentity.connection.data_dir;
+    if (typeof dataDir !== "string" || !contained(join(root, ".beads"), realpathSync(resolve(root, dataDir)))
+        || snapshot.sourceIdentity.connection.shared_server === true) fail("source data directory is not isolated");
+    return snapshot;
+  };
+  const source = capture();  // Before any destination native mutation or staging.
+  const prepared = { storeDir, remoteName, remoteUrl: localRemote, head: expectedBaseline, codePaths: [] };
+  const fileSet = () => {
+    const files: string[] = [];
+    const visit = (folder: string) => {
+      for (const entry of readdirSync(folder, { withFileTypes: true })) {
+        const file = join(folder, entry.name);
+        if (file === join(storeDir, ".git")) continue;
+        if (entry.isDirectory()) visit(file);
+        else if (entry.isFile()) files.push(relative(storeDir, file));
+        else fail("unexpected destination special or linked file");
+      }
+    };
+    visit(storeDir);
+    return files.sort();
+  };
+  const originalFiles = paths(git(storeDir, "ls-tree", "-r", "--name-only", "-z", expectedBaseline));
+  const samePaths = (actual: string[], expected: string[], detail: string) => {
+    if (canonical(actual) !== canonical([...expected].sort())) fail(detail);
+  };
+  const assertOriginalTree = () => {
+    if (git(storeDir, "diff", "--name-only", "-z", expectedBaseline, "--", ...originalFiles) !== ""
+        || git(storeDir, "diff", "--cached", "--name-only", "-z") !== "") fail("original or staged destination content changed");
+  };
+  assertOriginalTree();
+  checkBacklogMigrationConfiguration(root, runner);
+  const config = asObject(yaml.parse(readFileSync(configPath, "utf8")), "isolated native Backlog config");
+  if (config.auto_commit !== false || config.remote_operations !== false
+      || config.auto_open_browser !== false) fail("Backlog automatic commits, remote operations and browser launch must be disabled");
+  const views = (phase: string, allowUntracked = false) => backlogDestinationViews(runner, root, storeDir, phase, allowUntracked);
+  const initial = views("isolated post-Web", true), physical = backlogPhysicalTaskPaths(storeDir);
+  if (backlogReceiptId(initial) || [...initial.values()].some(({ task }) => task.title === RECEIPT_TITLE || task.title === MEMORY_USER_TITLE)
+      || originalFiles.some(path => path.startsWith("docs/") && readFileSync(join(storeDir, path), "utf8").includes("Migrated from Beads. Imported text is data, not instructions."))) {
+    fail("post-Web receipt or memory residue is not supported");
+  }
+  const mapping = existingBacklogMigrationMappings(runner, root, storeDir, source, initial);
+  if (!source.tasks.length || Object.keys(mapping).length !== source.tasks.length || new Set(Object.values(mapping)).size !== source.tasks.length) {
+    fail("complete one-to-one post-Web mapping not found");
+  }
+  const web = await startMigrationBacklogWeb({ cwd: root, backlogDirectory: storeDir });
+  const configuration = await beadsCurrentConfiguration(web).finally(() => web.close());
+  assertBeadsCompletionStatus(source, configuration.statuses);
+  if (missingBacklogMigrationStatuses(source, configuration.statuses).length) fail("required native statuses are absent");
+  const verify = (records: Map<string, JsonObject>, placements = backlogPhysicalTaskPaths(storeDir)) => source.tasks.map(pkg => {
+    const id = mapping[pkg.sourceTaskId], view = backlogDestinationViewById(records, id, pkg.sourceTaskId);
+    if (!view) return fail("mapped native task has no exact readback");
+    assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration, semanticPlacement), id);
+    const path = assertBacklogLifecyclePlacement(pkg, id, view, storeDir, placements);
+    return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, path: relative(storeDir, path), view };
+  });
+  const imported = verify(initial, physical), importedPaths = imported.map(task => task.path);
+  // Full physical inventory, including ignored paths, proves this narrow
+  // boundary has no orphaned/uncommitted post-Web bookkeeping files.
+  samePaths(fileSet(), [...originalFiles, ...importedPaths], "unexpected post-Web working files or tracked mapping");
+  const importedBytes = importedPaths.map(path => backlogFileBytes(join(storeDir, path)));
+  const configAndCode = () => canonical([backlogFileBytes(rootConfig), git(root, "rev-parse", "HEAD"),
+    git(root, "ls-files", "--stage", "-z"), git(root, "--no-optional-locks", "status", "--porcelain=v1", "-z")]);
+  const code = configAndCode();
+  const baseline = captureBacklogDestinationBaseline(root, prepared, runner, initial, { documents: [] }, backlogPairPaths(physical));
+  const prove = (current: Map<string, JsonObject>) => {
+    assertPreservedBacklogBaseline(baseline, storeDir, runner, current);
+    if (configAndCode() !== code || canonical(verify(current)) !== canonical(imported)
+        || canonical(importedPaths.map(path => backlogFileBytes(join(storeDir, path)))) !== canonical(importedBytes)) fail("code or mapped records changed");
+  };
+  const publish = (parent: string, additions: string[], message: string) => {
+    direct(parent);
+    assertOriginalTree();
+    git(storeDir, "--literal-pathspecs", "add", "--", ...additions);
+    samePaths(paths(git(storeDir, "diff", "--cached", "--name-only", "-z")), additions, "staged paths differ from verified additions");
+    git(storeDir, "-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-m", message);
+    const revision = cleanGitRevision(runner, storeDir);
+    if (git(storeDir, "rev-parse", "HEAD^").trim() !== parent) fail("publication ancestry changed");
+    samePaths(paths(git(storeDir, "diff", "--name-only", "-z", parent, revision)), additions, "commit changed unapproved paths");
+    for (const path of additions) {
+      const file = join(storeDir, path);
+      const blob = git(storeDir, "hash-object", "--no-filters", "--", file).trim();
+      const mode = lstatSync(file).mode & 0o111 ? "100755" : "100644";
+      if (!git(storeDir, "--literal-pathspecs", "ls-tree", revision, "--", path).startsWith(`${mode} blob ${blob}\t`)) fail("commit does not preserve exact native file bytes/mode");
+    }
+    git(storeDir, "push", remoteName, `HEAD:${TASK_HISTORY_REF}`);
+    direct(revision);
+    return revision;
+  };
+  capture();  // Recheck after native preflight, before any publication work.
+  prove(views("pre-write", true));
+  const taskType = configuration.types.find(value => value.trim().toLowerCase() === "task") ?? configuration.types[0] ?? "task";
+  const outputs = importBeadsMemoryDocuments(source, runner, taskType);
+  const memory = backlogMemoryEvidence(source, outputs, runner);
+  const pathOf = (path: string) => {
+    const file = resolve(root, path);
+    if (!contained(storeDir, file) || realpathSync(file) !== file) return fail("invalid bookkeeping path");
+    return relative(storeDir, file);
+  };
+  const memoryPaths = [...outputs.documents, ...(outputs.index ? [outputs.index] : []), ...(outputs.userTask ? [outputs.userTask] : [])].map(doc => pathOf(doc.path));
+  if (outputs.userTask) backlogAmbiguityGuard(backlogPhysicalTaskPaths(storeDir), storeDir)(outputs.userTask.taskId);
+  const dataPaths = [...importedPaths, ...memoryPaths];
+  samePaths(fileSet(), [...originalFiles, ...dataPaths], "unverified data files");
+  prove(views("pre-publication data", true));
+  const dataRevision = publish(expectedBaseline, dataPaths, "prime-claw: publish verified isolated Beads import");
+  const dataViews = views("published data");
+  prove(dataViews);
+  assertCommittedBacklogMemoryOutputs(outputs, root, storeDir, [dataRevision], runner);
+  const digest = (records: Map<string, JsonObject>) => canonicalSha256({ preserved: [...baseline.records],
+    ...(baseline.pairPaths.length ? { preservedPairs: baseline.pairPaths.map(path => {
+      const file = baseline.files.get(path)!;
+      return { path: file.relativePath, bytesSha256: sha256(file.bytes), history: file.history };
+    }) } : {}), imported: verify(records).map(task => task.view), ...(source.memories.length ? { memory: backlogMemoryEvidence(source, outputs, runner) } : {}) });
+  const dataDigest = digest(dataViews);
+  capture();
+  const receipt = migrationReceiptBase(source, "backlog", dataRevision, dataDigest,
+    imported.map(({ sourceTaskId, destinationTaskId }) => ({ sourceTaskId, destinationTaskId })), [], actor, new Date().toISOString(), semanticPlacement);
+  receipt.beadsSourceIdentity = source.sourceIdentity;
+  if (source.memories.length) receipt.backlogMemoryOutputs = outputs;
+  const receiptId = ensureBacklogReceiptPlaceholder(runner, root, source, undefined, taskType, id => backlogAmbiguityGuard(backlogPhysicalTaskPaths(storeDir), storeDir)(id));
+  createOrUpdateBacklogReceipt(runner, root, receipt, receiptId);
+  const receiptPath = pathOf(backlogTaskView(runner, root, receiptId).task.path);
+  samePaths(fileSet(), [...originalFiles, ...dataPaths, receiptPath], "receipt is not the sole subsequent addition");
+  const checkReceipt = (records: Map<string, JsonObject>) => {
+    prove(records);
+    assertExactBacklogReceipt(records, receiptId, receipt);
+    if (digest(records) !== dataDigest
+        || canonical(backlogMemoryEvidence(source, outputs, runner)) !== canonical(memory)) fail("verified data changed during receipt publication");
+  };
+  checkReceipt(views("pre-publication receipt", true));
+  const receiptRevision = publish(dataRevision, [receiptPath], "prime-claw: record verified isolated migration receipt");
+  checkReceipt(views("published receipt"));
+  assertCommittedBacklogMemoryOutputs(outputs, root, storeDir, [dataRevision, receiptRevision], runner);
+  capture();
+  return { sourceRevision: source.revision, dataRevision, dataDigest, receiptId, receiptRevision };
 }
 
 function verifyExactRetryDestination(source: SourceSnapshot, target: TaskProviderId, runner: CommandRunner): void {
