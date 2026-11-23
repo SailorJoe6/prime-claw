@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-23T22:24:00Z'
+updated_date: '2026-11-23T22:30:00Z'
 labels: []
 dependencies: []
 references:
@@ -369,6 +369,11 @@ On the sole canonical execute for the newly authorized implementation advance, s
 Prove first in offline Docker on a disposable synthetic fixture with a directly published original baseline and fully mapped untracked ticket files, no receipt placeholder, native memory, authored comments, and relationships. Bind the exact source revision and full native projection to unique physical paths, preserve original bytes, modes, paths, configuration and ancestry, and verify exact memory outputs and USER identity. Handle demonstrably absent post-Web outputs without rewriting imported tickets; do not guess ambiguous identities or fabricate a receipt. Show source drift refusal before any write, including staging, commit or push. Verify data on the disposable local ref before creating a verification-derived receipt; publish and reread the receipt separately. Prove no authority change and unchanged source. Run required tier-1 validation and retain exact candidate and digests. Report the candidate or concrete blocker, with private-safe evidence, to the owning Conversation for independent read-only same-provider Astra high review; stop there.
 
 No live PVA or retained transport access, live capture, service action, deployment, live migration publication, deletion, cutover or hold release. Keep PVA-first sequencing, In Progress, 0/9 checked and Final Summary null.
+
+### Next canonical execute — two accepted review fixes only
+Revise exact Episode candidate `a99386091df99840d1e5a6e900d844ff29b5a12f` in place on its Episode branch. Use the existing `migrationRunner` adapter for the default `publishIsolatedBeadsImport` path. Prove in offline Docker that the actual default (no injected runner) reads a valid native current view larger than the 1 MiB piped cap. This is a focused regression, not a scale rehearsal. Restore the original clone command in `parkedStoreReconciliationFixture` so default `clone: true` cannot reference undeclared `noHardlinks`; keep no-hardlink cloning in the separate isolated fixture and exercise an existing parked-store clone case.
+
+Revalidate exact dirty, fully mapped, no-receipt success and pre-write drift refusal on corrected code, plus Tier 1. Preserve all guards, data-before-receipt publication, native memory identity, original file/history evidence, and absence of mapped-ticket writes, cutover and retirement. Keep PVA-first, In Progress, 0/9 checked and null Final Summary. Send exact revised candidate and private-safe evidence or blocker to the owning Conversation for independent review, then stop. No rerun of the prior refusal-only diagnostic, second writer, live PVA or retained transport access, capture, outage, deployment, live migration publication, cutover, deletion or hold release.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -776,4 +781,7 @@ Offline Docker on the new internal publish-only path passed. Three fully mapped 
 
 ### Isolated publication candidate — independent review boundary
 Candidate `a99386091df99840d1e5a6e900d844ff29b5a12f` (tree `4508b6d574aaeccde999c9039ca8b5df9c628c85`, parent `1f359e9`) passed tier-1 source mode with offline apply/check/RPC probe on a clean exact candidate. Run `20261123T221829Z-44317-30914f2e`, manifest SHA-256 `becdf9b9bfb8f6578a9478fc37a809199e2674051f03deec4e31ba7674db0bf4`, clean teardown. Candidate patch SHA-256 `991ddc8b534bdf0016d3a4010f57fc1db6bf0a5dc4774590910655c0f09324d0`; focused offline rehearsal TAP SHA-256 `b5d241d2b7bc11fcc2b8a5a930ea176c162d50cfec3e60f77e3661561ba08850`. Evidence in `docs/evidence/primeclaw-59-isolated-publish-only.md`. This is only a post-Web rehearsal with no existing receipt or imported memory outputs. No protected/live capture, production publication, cutover, retirement, deployment or hold release. Stop for owning Conversation's independent read-only same-provider Astra high review; lifecycle unchanged.
+
+### Accepted findings from independent Astra high review
+The independent `openai-codex/gpt-6.2-astra` high review of published `a99386091df99840d1e5a6e900d844ff29b5a12f` and native `84e094e845493d90ef5833e1156d3fec53f0e79d` found two accepted defects. The new default calls the piped `ProcessCommandRunner.run` with Node’s 1 MiB limit, violating M2 for larger native current views; the first positive rehearsal injected a file-backed runner and did not exercise this default. Separately, an unrelated parked-store clone fixture accidentally references an undeclared `noHardlinks` variable in its default clone branch. The previous passing rehearsal and Tier 1 evidence remain historical evidence for that exact candidate, not proof that these two defects are absent. No broader finding or lifecycle change is authorized.
 <!-- SECTION:NOTES:END -->
