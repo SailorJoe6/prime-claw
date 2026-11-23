@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-23T22:01:00Z'
+updated_date: '2026-11-23T22:18:00Z'
 labels: []
 dependencies: []
 references:
@@ -768,4 +768,7 @@ Stopped before capture: no live DB connection, task-data capture or copy, Docker
 
 ### Offline diagnostic — deployed refusal established
 A disposable offline Docker test against deployed `1f359e9` passed. It exercised real native writes and local data publication for three mapped tasks and native memory outputs, then intercepted the final receipt edit. The deployed path refused with `pre-cutover-failed` because complete receipt-bound memory outputs were unavailable. The pending native placeholder was not a final receipt. Preparation staged identical config and attempted a no-op local push; neither the published ref nor native records changed. No recovery task writes, cutover or retirement. This was a published synthetic data boundary with a pending placeholder, not the next fixture’s unpublished untracked mapping with no placeholder. No positive recovery or separate drift test was claimed. Raw evidence remains private; the owning Conversation received exact code, diff and test proof.
+
+### Isolated post-Web publication — focused proof
+Offline Docker on the new internal publish-only path passed. Three fully mapped untracked tickets and no receipt at stop; published baseline unchanged. Earlier exact source capture refused before native writes or Git staging/commit/push. With the current capture, data then a receipt-only descendant were published to a disposable local ref and separately read back from clones, with native memory doc/index/USER, comments, typed relationships, native parent and blocker exact. Original files/config and source preserved; no mapped ticket writes, cutover or ownership changes. Focused TAP SHA-256 `b5d241d2b7bc11fcc2b8a5a930ea176c162d50cfec3e60f77e3661561ba08850`; evidence `docs/evidence/primeclaw-59-isolated-publish-only.md`. Scope remains offline post-Web boundary only; required tier-1 probe pending, then exact candidate for independent review. No live PVA access or hold release.
 <!-- SECTION:NOTES:END -->
