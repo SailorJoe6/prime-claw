@@ -323,7 +323,7 @@ def test_apply_copies_the_complete_allowlist_and_check_accepts_it(
     assert manifest["schemaVersion"] == 2
     assert manifest["selectedContext"] == "AGENTS.md"
     discovered = {path.parent.name for path in (destination / "skills").glob("*/SKILL.md")}
-    assert discovered == {"goals-and-heartbeats", "prime-claw-oversee-episode", "prime-claw-expert-review", "initialize-prime-claw", "plan", "plan-spec", "implement-task", "implement-spec", "handoff"}
+    assert discovered == {"goals-and-heartbeats", "prime-claw-oversee-episode", "prime-claw-expert-review", "prime-claw-migrate-backlog-task-prefix", "initialize-prime-claw", "plan", "plan-spec", "implement-task", "implement-spec", "handoff"}
     assert not list((destination / "skills/project-templates").rglob("SKILL.md"))
     # Internal startup guidance is globally delivered before any project setup,
     # but it is not a separate discoverable skill or project-local asset.
@@ -671,6 +671,7 @@ def test_delivery_retirement_refuses_unproven_or_unsafe_paths_before_mutation(
     "workflows",
     "skills/prime-claw-oversee-episode",
     "skills/prime-claw-expert-review",
+    "skills/prime-claw-migrate-backlog-task-prefix",
     "skills/initialize-prime-claw",
     "skills/implement-task",
     "skills/implement-spec",
@@ -775,7 +776,7 @@ def test_apply_preflights_all_managed_destinations_before_mutation(
         assert unsafe.resolve().read_bytes() == b"outside remains untouched\n"
 
 
-@pytest.mark.parametrize("skill_name", ["prime-claw-expert-review", "initialize-prime-claw", "implement-task", "implement-spec"])
+@pytest.mark.parametrize("skill_name", ["prime-claw-expert-review", "prime-claw-migrate-backlog-task-prefix", "initialize-prime-claw", "implement-task", "implement-spec"])
 def test_check_rejects_stale_managed_skill(tier1_container, ctmp, skill_name) -> None:
     destination = ctmp / "agent"
     applied = _run_script(tier1_container, WS_APPLY, destination)
