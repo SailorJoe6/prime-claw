@@ -4,8 +4,8 @@ title: Assess and plan Prime Agent v0.10 Rust migration
 status: Blocked
 assignee:
   - Joe Landers
-created_date: '2026-10-12 01:01'
-updated_date: '2026-11-01 15:13'
+created_date: 2026-10-12 01:01
+updated_date: '2026-11-23T21:55:00Z'
 labels: []
 dependencies: []
 priority: p1
@@ -70,3 +70,9 @@ The recorded exit gate remains: released saved-CWD fixes, supported lifecycle/id
 Existing tracking: Orca issue https://github.com/stablyai/orca/issues/27282 and Prime Agent discussion https://github.com/PrimeIntellect-ai/prime-agent/discussions/3484. These are the recorded blockers and gates, not a new claim about their current upstream status; no fresh upstream compatibility investigation or probe was performed for this bookkeeping update. Preserve the existing assessment, historical decisions and unchecked acceptance criterion.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded by the operator decision to target Prime Agent Pi, the independent TypeScript/Python continuation, rather than migrate Prime Claw to upstream Prime Agent Rust. The Rust compatibility assessment is retained as history. No Rust migration, cutover, or acceptance was completed. Track any concrete Prime Agent Pi compatibility gaps separately. Product contract: https://github.com/SailorJoe6/prime-agent-pi/blob/main/docs/product-contract.md
+<!-- SECTION:FINAL_SUMMARY:END -->
