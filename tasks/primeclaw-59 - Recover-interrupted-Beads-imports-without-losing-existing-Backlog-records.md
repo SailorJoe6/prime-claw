@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-23T21:34:00Z'
+updated_date: '2026-11-23T21:42:00Z'
 labels: []
 dependencies: []
 references:
@@ -753,4 +753,9 @@ No Docker test ran; full projection, isolation, data publication, receipt/readba
 
 ### Owner evidence — scoped writer holds reported
 Initialize PVA reports explicit holds on both providers from Ralph PVA and GStack, no active or queued writes/launches under their control, and no GStack scheduled tracker writer. A contemporaneous targeted process/listener check found no matching migration listener/browser or PVA Beads/Dolt process; other Backlog processes were attributed to other projects. These are reported, scoped observations, not fresh verification by this Episode or capture proof. No live PVA access, capture or testing in this handoff. The prior static no-receipt reuse blocker remains to be addressed within the approved publish-only scope or reported. No process action, live write, deployment, switch, hold release, retry, scale run or lifecycle change. PVA-first `c6e0a3d` remains in effect.
+
+### Protected-copy preflight — stopped on unresolved virtualization access
+The fresh read-only preflight resolved the embedded Beads database, both Backlog layouts, relevant Git storage and retained migration evidence. Passive host TCP inspection found no listener on the recorded migration and Dolt ports. The recorded Dolt PID was absent and both named Backlog processes had working directories in other projects. This does not prove that no writer can reach the stores. `lsof` reported incomplete visibility; its visible results included a macOS virtualization process with read-marked handles inside the embedded database, Backlog and Git storage. Read-marked host handles do not establish active writes or guest-side write exclusion. The Ralph PVA and GStack holds cover their stated writers, not this access path. Snapshot consistency therefore could not be established. No historical owned-process settlement claim.
+
+Stopped before capture: no live DB connection, task-data capture or copy, Docker test, migration invocation, process action, PVA write, hold release, retry, switch or retirement. Raw preflight evidence stays in restricted local storage. Before any separately authorized continuation, Initialize PVA must account for the virtualization/shared-filesystem access and establish adequate host and guest open-file/process visibility and writer exclusion over the capture window, then require a supported offline capture and matching pre/post inventories. The deployed no-receipt publish-only reuse blocker remains independently unproved against a copy; no verification-derived data or receipt was published or tested. The observed integration branch advanced with workflow and Backlog prefix skill changes, not the migration implementation; reviewed deployed `1f359e9` was not replaced. In Progress, 0/9 checked, Final Summary null; PVA-first `c6e0a3d` retained.
 <!-- SECTION:NOTES:END -->
