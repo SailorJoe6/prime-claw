@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-23T22:18:00Z'
+updated_date: '2026-11-23T22:24:00Z'
 labels: []
 dependencies: []
 references:
@@ -29,40 +29,42 @@ documentation:
   - docs/evidence/primeclaw-59-operator-stop-20261122.md
   - docs/evidence/primeclaw-59-representative-rehearsal-20261122.md
   - docs/evidence/primeclaw-59-representative-rehearsal-20261122.jsonl
+  - docs/evidence/primeclaw-59-isolated-publish-only.md
 modified_files:
   - REQUIREMENTS.md
-  - docs/project-initialization.md
-  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
-  - tests/task_provider_migration.test.mjs
-  - tests/test_task_provider_migration.py
-  - docs/evidence/primeclaw-59-current-state-capture-20261121.md
-  - docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md
-  - src/prime-agent-plugin/extension-support/migration-backlog-web.ts
-  - src/prime-agent-plugin/asset-inventory.json
-  - tests/migration_backlog_web.test.mjs
-  - docs/evidence/primeclaw-59-owned-web-transport-20261121.md
-  - src/prime-agent-plugin/extension-support/beads-backlog-current.ts
-  - tests/beads_backlog_current.test.mjs
-  - docs/evidence/primeclaw-59-readable-current-projection-20261121.md
-  - docs/evidence/primeclaw-59-current-integration-20261121.md
-  - src/prime-agent-plugin/extension-support/task-history-workspace.ts
-  - docs/evidence/primeclaw-59-config-preservation-20261121.md
-  - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
-  - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
-  - tests/backlog_destination_layout.test.mjs
-  - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
   - docs/evidence/primeclaw-59-coexistence-revision-20261122.md
+  - docs/evidence/primeclaw-59-completion-status-repair-20261121.md
+  - docs/evidence/primeclaw-59-config-preservation-20261121.md
+  - docs/evidence/primeclaw-59-current-integration-20261121.md
+  - docs/evidence/primeclaw-59-current-state-capture-20261121.md
   - docs/evidence/primeclaw-59-frontmatter-compatibility-20261122.md
-  - tests/test_pva_gate_rehearsal.py
-  - docs/evidence/primeclaw-59-pva-gate-rehearsal-20261122.md
-  - src/prime-agent-plugin/extensions/project-initialization.ts
-  - tests/project_initialization_extension.test.mjs
-  - tests/container/operator_migration_stop_extension.ts
-  - tests/test_operator_migration_stop.py
+  - docs/evidence/primeclaw-59-isolated-publish-only.md
   - docs/evidence/primeclaw-59-operator-stop-20261122.md
-  - tests/test_pva_gate_scale_rehearsal.py
-  - docs/evidence/primeclaw-59-representative-rehearsal-20261122.md
+  - docs/evidence/primeclaw-59-owned-web-transport-20261121.md
+  - docs/evidence/primeclaw-59-parked-store-reconciliation-20261122.md
+  - docs/evidence/primeclaw-59-pva-gate-rehearsal-20261122.md
+  - docs/evidence/primeclaw-59-readable-current-projection-20261121.md
+  - docs/evidence/primeclaw-59-readable-destination-input-blocker-20261121.md
   - docs/evidence/primeclaw-59-representative-rehearsal-20261122.jsonl
+  - docs/evidence/primeclaw-59-representative-rehearsal-20261122.md
+  - docs/evidence/primeclaw-59-same-id-coexistence-20261122.md
+  - docs/project-initialization.md
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/beads-backlog-current.ts
+  - src/prime-agent-plugin/extension-support/migration-backlog-web.ts
+  - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
+  - src/prime-agent-plugin/extensions/project-initialization.ts
+  - tests/backlog_destination_layout.test.mjs
+  - tests/beads_backlog_current.test.mjs
+  - tests/container/operator_migration_stop_extension.ts
+  - tests/migration_backlog_web.test.mjs
+  - tests/project_initialization_extension.test.mjs
+  - tests/task_provider_migration.test.mjs
+  - tests/test_operator_migration_stop.py
+  - tests/test_pva_gate_rehearsal.py
+  - tests/test_pva_gate_scale_rehearsal.py
+  - tests/test_task_provider_migration.py
 priority: p1
 type: bug
 ordinal: 144000
@@ -771,4 +773,7 @@ A disposable offline Docker test against deployed `1f359e9` passed. It exercised
 
 ### Isolated post-Web publication — focused proof
 Offline Docker on the new internal publish-only path passed. Three fully mapped untracked tickets and no receipt at stop; published baseline unchanged. Earlier exact source capture refused before native writes or Git staging/commit/push. With the current capture, data then a receipt-only descendant were published to a disposable local ref and separately read back from clones, with native memory doc/index/USER, comments, typed relationships, native parent and blocker exact. Original files/config and source preserved; no mapped ticket writes, cutover or ownership changes. Focused TAP SHA-256 `b5d241d2b7bc11fcc2b8a5a930ea176c162d50cfec3e60f77e3661561ba08850`; evidence `docs/evidence/primeclaw-59-isolated-publish-only.md`. Scope remains offline post-Web boundary only; required tier-1 probe pending, then exact candidate for independent review. No live PVA access or hold release.
+
+### Isolated publication candidate — independent review boundary
+Candidate `a99386091df99840d1e5a6e900d844ff29b5a12f` (tree `4508b6d574aaeccde999c9039ca8b5df9c628c85`, parent `1f359e9`) passed tier-1 source mode with offline apply/check/RPC probe on a clean exact candidate. Run `20261123T221829Z-44317-30914f2e`, manifest SHA-256 `becdf9b9bfb8f6578a9478fc37a809199e2674051f03deec4e31ba7674db0bf4`, clean teardown. Candidate patch SHA-256 `991ddc8b534bdf0016d3a4010f57fc1db6bf0a5dc4774590910655c0f09324d0`; focused offline rehearsal TAP SHA-256 `b5d241d2b7bc11fcc2b8a5a930ea176c162d50cfec3e60f77e3661561ba08850`. Evidence in `docs/evidence/primeclaw-59-isolated-publish-only.md`. This is only a post-Web rehearsal with no existing receipt or imported memory outputs. No protected/live capture, production publication, cutover, retirement, deployment or hold release. Stop for owning Conversation's independent read-only same-provider Astra high review; lifecycle unchanged.
 <!-- SECTION:NOTES:END -->
