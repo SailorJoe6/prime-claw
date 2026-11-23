@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-23T22:38:00Z'
+updated_date: '2026-11-23T22:42:00Z'
 labels: []
 dependencies: []
 references:
@@ -787,4 +787,7 @@ The independent `openai-codex/gpt-6.2-astra` high review of published `a99386091
 
 ### Accepted review revision — focused publication proof
 The default internal publish-only entry now uses the existing file-backed migration adapter. Offline Docker verified five reads of a real 1,370,039-byte native current view through the actual default (no injected runner; observation did not change commands or output). The stopped Web import left three mapped untracked files and no receipt. Genuine source drift refused before any task or Git write; the current capture published data before separately reserving and publishing a verification-derived receipt. Native readback, memory identity, mapped bytes, original configuration and history, and source preservation passed. TAP SHA-256 `268fb7be1d27bde9878e29c80ce8556d2cb1aa7d44b4bfc9d43c2e501df2b923`; one pass, no skips, container removed. The parked-store fixture command has also been restored without changing the separate no-hardlink helper; the existing clone case and Tier 1 are separate checks. Nothing live was run.
+
+### Two-fix candidate — independent review boundary
+Candidate `2b4ab225244607731ffd92bd14a046c2a6259dfd`, tree `21a1193a8579be9d20c275fc29f53a3131968b72`, parent `a99386091df99840d1e5a6e900d844ff29b5a12f`, patch SHA-256 `c3c98f64ce66d77fb6eb8ed72df65fc809c7da8943b8dce5894346ffb9ae74df`. Default file-backed publish-only regression passed on 1,370,039 native bytes, including pre-write stale refusal, data-before-receipt publication, exact mapped/original/native-memory preservation, and no cutover or retirement on that path. Focused TAP SHA-256 `268fb7be1d27bde9878e29c80ce8556d2cb1aa7d44b4bfc9d43c2e501df2b923`. The existing hidden parked-store clone case passed on the restored fixture, TAP SHA-256 `d882851552d752b0b9c902ce0ce8cecc7c3d0b410d2c35eebf00355191e65300`. Each offline run passed once, no skips, with teardown verified. Tier 1 source-mode apply/check/RPC probe `20261123T223944Z-41179-1626e81a` passed on the clean exact candidate with network absence and both teardowns verified; manifest SHA-256 `8366d4a9131bb84bf52a37f4e76101c5bf886e32d98cc8a6a1f3d8773330e281`. Splits and limits are documented in `docs/evidence/primeclaw-59-isolated-publish-only.md`. No broader scale/diagnostic rerun or live action. Stop for the owning Conversation's independent read-only `openai-codex/gpt-6.2-astra` high review. Preserve PVA-first, In Progress, 0/9 checked and null Final Summary.
 <!-- SECTION:NOTES:END -->
