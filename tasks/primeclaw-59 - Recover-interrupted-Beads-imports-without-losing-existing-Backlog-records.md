@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-23T21:24:00Z'
+updated_date: '2026-11-23T21:30:00Z'
 labels: []
 dependencies: []
 references:
@@ -738,4 +738,11 @@ Corrected offline focus `20261122T212617Z-32013-2f98e268`: 4 pytest bridges, 48 
 
 ### Owner disposition — protected-copy preparation only
 Joe via Initialize PVA authorized one protected-copy publish-only preparation/test phase, not live recovery. The owner observed 406 unique mapped records (349 Done, 42 In Design, 9 In Progress, 6 Blocked), 20 authored comments, 8 distinct typed comments, 104 hard blocking edges, three original records with bytes and executable modes checked, and no receipt. For one source record, four parent-child endpoints were observed with one native parent and all four endpoints in readable notes. These are observations, not full native projection, memory, publication, or settled-writer proof. The exact private source and evidence bindings stay local. The Episode code was not changed in this handoff. PVA-first `c6e0a3d` remains in effect.
+
+### Protected-copy publish-only phase — stopped before capture
+Canonical execute revalidated the bound Episode and exact handoff. Direct canonical `main` at `c0fdf55c809fa58e385c1adebdffae2c14c2cc0f` is one commit ahead of reviewed deployed `1f359e99ac2338134bab8b244bb64a49e0236f22`; its delta is only the blocked/execute/handoff workflow text, not importer code. No code integration or product change. The independent task ref advanced through an unrelated new task; the selected native view retained the approved plan and lifecycle fields.
+
+Blocker: the available stopped-state observations did not establish that the migration writer had settled and that source and destination writer holds cover the capture window. No PVA data was opened or copied. Initialize PVA must provide evidence of that settlement and both holds before any consistent protected snapshot can be relied on. Static inspection of the deployed importer (`task-provider-migration.ts`, `freshBacklogMigrationReplay` and `migrateBeadsToBacklog`) also found that its reuse routes require an existing complete receipt; the observed no-receipt state does not qualify. The normal switch path can proceed to guarded cutover/retirement and is not a publish-only test entry point. An independently reviewed publish-only path must verify all existing records, relationships, native memory, and original records before publication and derive a new receipt from that verification. No bypass, reconstructed receipt, or ordinary switch is a substitute.
+
+No Docker test ran; full projection, isolation, data publication, receipt/readback and mismatch refusal remain unproved. No PVA operation, retry, cleanup, authority switch, retirement, deployment, or lifecycle change. Stop for owner review; no automatic continuation. In Progress, 0/9 checked, Final Summary null; PVA-first `c6e0a3d` retained.
 <!-- SECTION:NOTES:END -->
