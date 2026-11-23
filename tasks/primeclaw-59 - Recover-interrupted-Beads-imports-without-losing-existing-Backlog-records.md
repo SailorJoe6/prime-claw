@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-23T22:30:00Z'
+updated_date: '2026-11-23T22:38:00Z'
 labels: []
 dependencies: []
 references:
@@ -784,4 +784,7 @@ Candidate `a99386091df99840d1e5a6e900d844ff29b5a12f` (tree `4508b6d574aaeccde999
 
 ### Accepted findings from independent Astra high review
 The independent `openai-codex/gpt-6.2-astra` high review of published `a99386091df99840d1e5a6e900d844ff29b5a12f` and native `84e094e845493d90ef5833e1156d3fec53f0e79d` found two accepted defects. The new default calls the piped `ProcessCommandRunner.run` with Node’s 1 MiB limit, violating M2 for larger native current views; the first positive rehearsal injected a file-backed runner and did not exercise this default. Separately, an unrelated parked-store clone fixture accidentally references an undeclared `noHardlinks` variable in its default clone branch. The previous passing rehearsal and Tier 1 evidence remain historical evidence for that exact candidate, not proof that these two defects are absent. No broader finding or lifecycle change is authorized.
+
+### Accepted review revision — focused publication proof
+The default internal publish-only entry now uses the existing file-backed migration adapter. Offline Docker verified five reads of a real 1,370,039-byte native current view through the actual default (no injected runner; observation did not change commands or output). The stopped Web import left three mapped untracked files and no receipt. Genuine source drift refused before any task or Git write; the current capture published data before separately reserving and publishing a verification-derived receipt. Native readback, memory identity, mapped bytes, original configuration and history, and source preservation passed. TAP SHA-256 `268fb7be1d27bde9878e29c80ce8556d2cb1aa7d44b4bfc9d43c2e501df2b923`; one pass, no skips, container removed. The parked-store fixture command has also been restored without changing the separate no-hardlink helper; the existing clone case and Tier 1 are separate checks. Nothing live was run.
 <!-- SECTION:NOTES:END -->
