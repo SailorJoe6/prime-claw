@@ -1,5 +1,5 @@
 import { readBacklogCreationIdentity, type BacklogCreationIdentity } from "./backlog-creation-identity.ts";
-import { makeBacklogGitEvidence, referenceCommittedBacklogTask } from "./backlog-git-evidence.ts";
+import { makeBacklogGitEvidence, observeCommittedBacklogTask, referenceCommittedBacklogTask, type BacklogGitEvidence, type SelectedBacklogRepository } from "./backlog-git-evidence.ts";
 import {
   cpSync,
   existsSync,
@@ -2963,28 +2963,20 @@ function verifyTaskCleanupResources(
   }
 }
 
-function backlogStoreRelativePath(projectRoot: string, storeDir: string, taskPath: string): string {
-  const prefix = relative(projectRoot, storeDir).split("\\").join("/").replace(/\/$/, "");
-  const normalized = taskPath.split("\\").join("/");
-  if (!prefix || !normalized.startsWith(`${prefix}/`)) {
-    throw new Error(`Independent Backlog task path ${taskPath} is outside exact store ${storeDir}`);
-  }
-  const storePath = normalized.slice(prefix.length + 1);
-  if (!storePath || storePath.startsWith("/") || storePath.split("/").includes("..")) {
-    throw new Error("Independent Backlog task path does not resolve to a safe store-relative path");
-  }
-  return storePath;
+function backlogStoreRelativePath(projectRoot: string, storeDir: string, taskPath: string): string | undefined {
+  const prefix = relative(projectRoot, storeDir).split("\\").join("/");
+  if (!prefix || !taskPath.startsWith(`${prefix}/`)) return undefined;
+  return taskPath.slice(prefix.length + 1);
 }
 
-function observeTaskEpisodeTerminalState(
+async function observeTaskEpisodeTerminalState(
   projectRoot: string,
   record: TaskEpisodeOwnershipRecord,
   episodeHead: string,
   outcome: TaskEpisodeCleanupOutcome,
-  resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null,
   runner: CommandRunner,
   dependencies: TaskEpisodeCleanupDependencies,
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const run = (args: string[]) => runner.run("git", args, { cwd: projectRoot, allowFailure: true });
   const branch = run(["branch", "--show-current"]);
   const upstreamRemote = run(["config", "--get", `branch.${branch.stdout.trim()}.remote`]);
@@ -3007,25 +2999,36 @@ function observeTaskEpisodeTerminalState(
     }
     return { ...prior, code, preparation, currentTask: task.nativeView };
   }
-  const history = isPublishedBacklogTaskEpisodeOwnership(record)
+  const independent = isPublishedBacklogTaskEpisodeOwnership(record);
+  const history = independent
     ? (dependencies.observeTaskHistory ?? observePrimaryTaskHistory)({ primaryRoot: projectRoot, taskId: record.taskId, runner })
     : undefined;
+  const repository: SelectedBacklogRepository | undefined = independent
+    ? history?.status !== "blocked" && typeof history?.storeDir === "string" && typeof history.remote === "string"
+      ? { root: history.storeDir, topology: "independent", remote: history.remote }
+      : undefined
+    : { root: projectRoot, topology: "branch-local", remote: null };
+  const observedHead = independent ? history?.head : code.head;
+  const commit = observedHead && typeof observedHead === "object" && "status" in observedHead
+    && observedHead.status === 0 && "stdout" in observedHead && typeof observedHead.stdout === "string"
+    ? observedHead.stdout.trim() : undefined;
+  const previous = record.taskEvidence;
+  const expectedRepository = previous && typeof previous === "object" && "kind" in previous && previous.kind === "backlog-git"
+    ? (previous as BacklogGitEvidence).repository : undefined;
+  const observePath = async (taskPath: string) => {
+    if (!repository || !commit) return { availability: "unavailable" };
+    const path = repository.topology === "independent"
+      ? backlogStoreRelativePath(projectRoot, repository.root, taskPath) : taskPath;
+    if (!path) return { availability: "unavailable" };
+    return observeCommittedBacklogTask(repository, commit, path, record.taskId, expectedRepository);
+  };
+  const active = await observePath(record.taskPath);
   if (outcome === "abandoned") {
     const archivePath = expectedArchivedTaskPath(record.taskPath);
-    if (history && typeof history.storeDir !== "string") return { ...prior, code, history };
-    const storeDir = history ? history.storeDir as string : projectRoot;
-    const archivedPath = history ? backlogStoreRelativePath(projectRoot, storeDir, archivePath) : archivePath;
-    const activePath = history ? backlogStoreRelativePath(projectRoot, storeDir, record.taskPath) : record.taskPath;
-    return { ...prior, code, history, archivePath,
-      active: runner.run("git", ["show", `HEAD:${activePath}`], { cwd: storeDir, allowFailure: true }),
-      archived: runner.run("git", ["show", `HEAD:${archivedPath}`], { cwd: storeDir, allowFailure: true }),
-    };
+    return { previousProviderRevision: record.providerRevision, code, history, archivePath,
+      active, archived: await observePath(archivePath) };
   }
-  const task = resolveTask(projectRoot, record.taskId);
-  if (task && (task.taskId !== record.taskId || !samePath(task.projectRoot, projectRoot) || task.taskPathRelative !== record.taskPath)) {
-    throw new Error("Task Episode cleanup native Backlog read targets a different task or path");
-  }
-  return { ...prior, code, history, currentTask: task?.nativeView ?? task };
+  return { previousProviderRevision: record.providerRevision, code, history, active };
 }
 
 export async function finalizeTaskEpisodeCleanup(
@@ -3052,8 +3055,6 @@ export async function finalizeTaskEpisodeCleanup(
   const git = dependencies.cleanupGit ?? new CliTaskEpisodeCleanupGit();
   const store = dependencies.ownership ?? { read: readEpisodeOwnership, removeTask: removeTaskEpisodeOwnership };
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? defaultEpisodeTaskResolver(runner);
   const projectRoot = git.repositoryRoot(ctx.cwd);
   if (!samePath(projectRoot, ctx.cwd)) {
     throw new Error("Task Episode cleanup must run from the recorded project root");
@@ -3073,8 +3074,8 @@ export async function finalizeTaskEpisodeCleanup(
     return snapshot;
   };
   let snapshot = await inspect();
-  const providerTaskObservation = observeTaskEpisodeTerminalState(
-    projectRoot, record, episodeHead, outcome, resolveTask, runner, dependencies,
+  const providerTaskObservation = await observeTaskEpisodeTerminalState(
+    projectRoot, record, episodeHead, outcome, runner, dependencies,
   );
 
   providerTaskObservation.resources = snapshot;

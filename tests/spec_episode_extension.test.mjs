@@ -2173,42 +2173,10 @@ test("independent Backlog cleanup returns unpublished primary facts without appr
   h.deps.cleanupTaskHistory = () => ({ status: "cleaned", storeDir: join(h.f.worktree, "backlog") });
   const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "merged", h.f.ctx, h.deps);
   assert.deepEqual(result.providerTaskObservation.history, observation);
-  assert.equal(result.providerTaskObservation.currentTask.status ?? result.providerTaskObservation.currentTask.task?.status, "Blocked");
+  assert.deepEqual(result.providerTaskObservation.active, { availability: "unavailable" });
+  assert.equal("archived" in result.providerTaskObservation, false);
   assert.equal(h.record, undefined);
   assert.equal(h.calls.some(([kind]) => kind === "clean"), false);
-});
-
-test("independent Backlog abandonment verifies the published archive without active-task resolution", async () => {
-  const taskPath = "backlog/tasks/primeclaw-10.38.md";
-  const h = cleanupHarness("abandoned", { record: {
-    provider: "backlog", providerRevision: "e".repeat(40), integrationBranch: TASK_INTEGRATION_BRANCH,
-    taskEvidence: { task: { id: "PRIMECLAW-10.38", path: taskPath, status: "In Progress", title: "Task-native lifecycle" } },
-  } });
-  const publishedHead = "f".repeat(40);
-  h.deps.observeTaskHistory = () => ({ status: "ready", storeDir: join(h.f.root, "backlog"), head: publishedHead });
-  h.deps.taskResolver = () => { throw new Error("archived independent task must not use active-task resolution"); };
-  const requiredEvidence = `Prime Claw abandonment: task PRIMECLAW-10.38; pushed Episode head ${h.episodeHead}; code was not merged.`;
-  const summary = `${requiredEvidence}\n\nPreserved operator context explaining why the accepted candidate was abandoned.`;
-  h.deps.taskRunner = { run(command, args) {
-    assert.equal(command, "git");
-    if (args[0] === "show" && args[1].includes(":tasks/")) return { stdout: "", stderr: "missing", status: 128 };
-    if (args[0] === "show" && args[1].includes(":archive/tasks/")) return {
-      stdout: `---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\n\n## Final Summary\n\n<!-- SECTION:FINAL_SUMMARY:BEGIN -->\n${summary}\n<!-- SECTION:FINAL_SUMMARY:END -->\n`,
-      stderr: "", status: 0,
-    };
-    return { stdout: "native observation\n", stderr: "native warning\n", status: 0 };
-  } };
-  h.deps.inspectTaskHistory = (input) => {
-    assert.equal(input.expectedRevision, undefined);
-    return { status: "ready", storeDir: join(h.f.worktree, "backlog"), present: true };
-  };
-  h.deps.cleanupTaskHistory = () => ({ status: "cleaned", storeDir: join(h.f.worktree, "backlog") });
-  const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
-  assert.equal(result.ownershipRemoved, true);
-  assert.equal(h.record, undefined);
-  assert.equal(h.cleanupGit.branch(h.f.root), TASK_INTEGRATION_BRANCH);
-  assert.equal(h.calls.some(([kind]) => ["ancestor", "direct-remote"].includes(kind)), false);
-  assert.equal(h.calls.some(([kind, , descendant]) => kind === "ancestor" && descendant === publishedHead), false, "provider task revision is not code ancestry");
 });
 
 test("cleanup finalization treats the actual upstream as an independent exact resource", async (t) => {
@@ -2434,35 +2402,139 @@ test("both Beads outcomes carry full current native facts without terminal eligi
   });
 });
 
-test("registered Backlog cleanup carries complete native views in both history layouts", async (t) => {
-  for (const independent of [false, true]) await t.test(`independent: ${independent}`, async () => {
-    const taskPath = "backlog/tasks/primeclaw-10.38.md";
-    const h = cleanupHarness("merged", { taskStatus: "Blocked", dirty: true, foreignBase: true, unmerged: true,
-      ...(independent ? { record: { provider: "backlog", providerRevision: "e".repeat(40),
-        taskEvidence: { task: { id: "PRIMECLAW-10.38", path: taskPath, status: "In Progress" } } } } : {}),
+test("registered Backlog cleanup returns bounded committed evidence for both outcomes and history layouts", async (t) => {
+  const backlog = process.platform === "linux" && existsSync("/usr/local/bin/backlog")
+    ? "/usr/local/bin/backlog"
+    : fileURLToPath(new URL("../deps/backlog/dist/backlog", import.meta.url));
+  if (!existsSync(backlog)) { t.skip("managed backlog executable unavailable"); return; }
+  for (const topology of ["branch-local", "independent"]) for (const outcome of ["merged", "abandoned"]) {
+    await t.test(`${topology}, ${outcome}`, async (t) => {
+      const independent = topology === "independent";
+      const h = cleanupHarness(outcome);
+      const { root } = h.f;
+      const remote = mkdtempSync(join(tmpdir(), "prime-claw-terminal-remote-"));
+      t.after(() => { rmSync(root, { recursive: true, force: true }); rmSync(remote, { recursive: true, force: true }); });
+      const git = (cwd, ...args) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
+      const setGitIdentity = (cwd) => {
+        git(cwd, "config", "user.name", "Terminal fixture");
+        git(cwd, "config", "user.email", "terminal@example.invalid");
+      };
+      git(remote, "init", "-q", "--bare");
+      setGitIdentity(root);
+      git(root, "symbolic-ref", "HEAD", "refs/heads/main");
+      git(root, "commit", "--allow-empty", "-qm", "Code baseline");
+      git(root, "remote", "add", "origin", remote);
+      git(root, "push", "-qu", "origin", "main");
+      const processRunner = new ProcessCommandRunner();
+      let repository = root;
+      let store = join(root, "backlog");
+      if (independent) {
+        const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner: processRunner });
+        assert.equal(prepared.status, "prepared");
+        repository = store = prepared.storeDir;
+        setGitIdentity(store);
+      } else {
+        mkdirSync(store);
+        writeFileSync(join(store, "config.yml"), "project_name: Terminal fixture\nremote_operations: false\ncheck_active_branches: false\n");
+      }
+      const runNative = (...args) => execFileSync(backlog, args, { cwd: root, stdio: ["ignore", "ignore", "pipe"] });
+      runNative("task", "create", "Terminal observation fixture", "--status", "In Progress", "--plain");
+      const taskId = JSON.parse(execFileSync(backlog, ["task", "list", "--json"], { cwd: root, encoding: "utf8" })).tasks[0].id;
+      const task = JSON.parse(execFileSync(backlog, ["task", "view", "--json", "--", taskId], { cwd: root, encoding: "utf8" })).task;
+      const activePath = independent ? task.path.slice(store.slice(root.length + 1).length + 1) : task.path;
+      const archivedPath = activePath.replace(/(^|\/)tasks\//, "$1archive/tasks/");
+      assert.notEqual(activePath, archivedPath);
+      const commitTask = (message) => {
+        git(repository, "add", "-A", "--", independent ? "." : "backlog");
+        git(repository, "commit", "-qm", message);
+        return git(repository, "rev-parse", "HEAD");
+      };
+      const priorHead = commitTask("Record initial task");
+      if (independent) git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+      const ticketSentinel = "TERMINAL_TICKET_BODY_MUST_NOT_BE_IN_TOOL_OUTPUT";
+      // Keep individual argument sizes small, but grow the native ticket beyond the buffered runner's default limit.
+      const chunk = `${ticketSentinel} λ\n`.repeat(2000);
+      for (let i = 0; i < 14; i++) {
+        runNative("task", "edit", "--plain", "--append-notes", chunk, "--", taskId);
+      }
+      const workingSentinel = "UNCOMMITTED_TERMINAL_EDIT_MUST_NOT_BE_RETURNED";
+      let currentPath = activePath;
+      if (outcome === "abandoned") {
+        runNative("task", "edit", "--plain", "--final-summary", "Abandonment's exact committed summary — λ", "--", taskId);
+        runNative("task", "archive", "--", taskId);
+        currentPath = archivedPath;
+      } else {
+        runNative("task", "edit", "--plain", "--status", "Done", "--", taskId);
+      }
+      const localHead = commitTask(`Record ${outcome} ticket`);
+      const expected = readFileSync(join(repository, currentPath));
+      assert.ok(expected.length > 1024 * 1024);
+      if (outcome === "merged") {
+        runNative("task", "edit", "--plain", "--append-notes", workingSentinel, "--", taskId);
+        assert.ok(readFileSync(join(repository, currentPath)).includes(workingSentinel));
+      }
+      const priorSentinel = "LEGACY_OWNER_SNAPSHOT_MUST_NOT_BE_IN_TOOL_OUTPUT";
+      h.records.set("owner", activeTaskRecord(h.f, { taskId, taskPath: task.path,
+        ...(independent ? { provider: "backlog", providerRevision: priorHead,
+          taskEvidence: { kind: "task-view", task: { ...task, description: priorSentinel } } } : {}),
+      }));
+      const guideRoot = join(root, "plugin");
+      mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
+      writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), "EDITED BACKLOG TERMINAL POLICY");
+      const guard = {
+        run(command, args, options) {
+          assert.equal(command, "git", "terminal observation must not buffer native task output");
+          assert.ok(!args.includes("show"), "terminal observation must not buffer a Git ticket blob");
+          assert.ok(!args.includes("cat-file") || args.some(arg => ["-e", "-s", "-t"].includes(arg)), "only Git blob metadata may be buffered");
+          return processRunner.run(command, args, options);
+        },
+      };
+      const tools = new Map();
+      createReviewedPlanExtension({ guideRoot, ownership: h.ownership, taskCleanupGit: h.cleanupGit,
+        taskCleanup: h.cleanup, taskRunner: guard, taskResolver() { assert.fail("terminal observation must not resolve a working native view"); },
+        taskActions: { cleanup: (id, head, request, ctx, deps) => finalizeTaskEpisodeCleanup(id, head, request, ctx, {
+          ...deps, inspectTaskHistory: () => ({ status: "ready", present: false, storeDir: join(h.f.worktree, "backlog") }),
+          cleanupTaskHistory: () => ({ status: "cleaned", storeDir: join(h.f.worktree, "backlog") }),
+        }) },
+      })({ registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {}, sendMessage() {}, sendUserMessage() { throw new Error("no queue"); } });
+      const result = await tools.get("finalize_task_episode").execute("cleanup", { taskId, episodeHead: h.episodeHead, outcome }, undefined, undefined, h.f.ctx);
+      assert.equal(result.isError, undefined, result.content[0].text.slice(0, 1024));
+      const body = result.content[0].text;
+      const details = JSON.stringify(result.details);
+      for (const compact of [body, details]) {
+        assert.ok(Buffer.byteLength(compact) < 64 * 1024);
+        for (const sentinel of [ticketSentinel, workingSentinel, priorSentinel]) assert.ok(!compact.includes(sentinel));
+      }
+      assert.deepEqual(JSON.parse(body.slice(body.indexOf("\n") + 1)), JSON.parse(details));
+      const observed = result.details.result.providerTaskObservation;
+      assert.equal("previousTaskEvidence" in observed, false);
+      assert.equal("currentTask" in observed, false);
+      if (independent) {
+        assert.equal(observed.history.head.status, 0);
+        assert.equal(observed.history.head.stdout.trim(), localHead);
+        assert.equal(observed.history.publication.status, 0);
+        assert.equal(observed.history.publication.stdout.trim(), `${priorHead}\t${TASK_HISTORY_REF}`);
+        assert.notEqual(localHead, priorHead);
+      }
+      if (outcome === "merged") {
+        assert.equal("archived" in observed, false);
+      } else {
+        assert.deepEqual(observed.active, { availability: "absent" });
+      }
+      const entry = outcome === "merged" ? observed.active : observed.archived;
+      assert.deepEqual(entry, { availability: "available", evidence: {
+        kind: "backlog-git", commit: localHead, path: currentPath,
+        repository: { topology, identity: entry.evidence.repository.identity },
+      } });
+      assert.match(entry.evidence.repository.identity, /^[0-9a-f]{64}$/);
+      // Move HEAD and the working checkout independently of the historical evidence.
+      git(repository, "commit", "--allow-empty", "-qm", "Advance after terminal observation");
+      assert.notEqual(git(repository, "rev-parse", "HEAD"), localHead);
+      await assertCommittedContinuationBytes({ root: repository, topology, remote: independent ? "origin" : null }, taskId, entry.evidence, expected);
+      assert.equal(result.details.guidance, "EDITED BACKLOG TERMINAL POLICY");
+      assert.equal(h.record, undefined); assert.ok(h.foreignRecord);
     });
-    const raw = { schemaVersion: 1, kind: "task-view", task: { id: "PRIMECLAW-10.38", path: taskPath, status: "custom_review", implementationPlan: null, unknown: [null, { unicode: "λ" }] }, extraEnvelope: "complete" };
-    let reads = 0;
-    h.deps.taskResolver = () => { reads += 1; return taskSelection(h.f, { nativeView: raw }); };
-    h.deps.observeTaskHistory = () => ({ storeDir: join(h.f.root, "backlog"), head: { status: 0, stdout: "f".repeat(40), stderr: "" }, publication: { status: 0, stdout: "later unrelated descendant", stderr: "warning" } });
-    h.deps.inspectTaskHistory = () => ({ status: "ready", storeDir: join(h.f.worktree, "backlog"), present: false });
-    h.deps.cleanupTaskHistory = () => ({ status: "cleaned", storeDir: join(h.f.worktree, "backlog") });
-    const guideRoot = join(h.f.root, "plugin");
-    mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
-    writeFileSync(join(guideRoot, "skills", "prime-claw-oversee-episode", "SKILL.md"), "EDITED BACKLOG TERMINAL POLICY");
-    const tools = new Map();
-    createReviewedPlanExtension({ guideRoot, ownership: h.ownership, taskCleanupGit: { repositoryRoot: () => h.f.root, branch: () => "main" },
-      taskCleanup: h.cleanup, taskActions: { cleanup: (id, head, outcome, ctx, deps) => finalizeTaskEpisodeCleanup(id, head, outcome, ctx, { ...deps,
-        taskResolver: h.deps.taskResolver, observeTaskHistory: h.deps.observeTaskHistory,
-        inspectTaskHistory: h.deps.inspectTaskHistory, cleanupTaskHistory: h.deps.cleanupTaskHistory }) },
-    })({ registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {}, sendMessage() {}, sendUserMessage() { throw new Error("no queue"); } });
-    const result = await tools.get("finalize_task_episode").execute("cleanup", { taskId: "PRIMECLAW-10.38", episodeHead: h.episodeHead, outcome: "merged" }, undefined, undefined, h.f.ctx);
-    assert.equal(result.isError, undefined);
-    assert.equal(reads, 1); assert.deepEqual(result.details.result.providerTaskObservation.currentTask, raw);
-    assert.deepEqual(JSON.parse(result.content[0].text.slice(result.content[0].text.indexOf("\n") + 1)), JSON.parse(JSON.stringify(result.details)), "outer optional JS fields serialize as absence; the complete native JSON above stays exact");
-    assert.equal(result.details.guidance, "EDITED BACKLOG TERMINAL POLICY");
-    assert.equal(h.record, undefined); assert.ok(h.foreignRecord);
-  });
+  }
 });
 
 test("registered default cleanup returns edited guidance and native facts in actual tool text/details", async () => {
@@ -2587,7 +2659,7 @@ test("cleanup-only task finalization refuses unsafe identity or terminal evidenc
   await t.test("abandonment archive is returned as native evidence, not a coded eligibility rule", async () => {
     const h = cleanupHarness("abandoned", { notArchived: true });
     const result = await finalizeTaskEpisodeCleanup("PRIMECLAW-10.38", h.episodeHead, "abandoned", h.f.ctx, h.deps);
-    assert.ok(result.providerTaskObservation.archived);
+    assert.deepEqual(result.providerTaskObservation.archived, { availability: "unavailable" });
     assert.equal(h.record, undefined);
   });});
 

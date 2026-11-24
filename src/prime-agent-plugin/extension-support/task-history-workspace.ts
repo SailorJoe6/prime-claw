@@ -2943,12 +2943,24 @@ export function observePrimaryTaskHistory(
 ): Record<string, unknown> {
   const runner = input.runner ?? new ProcessCommandRunner();
   const clone = inspectMutationClone({ ...input, targetWorktree: input.primaryRoot, edits: [] }, runner);
-  if ("status" in clone) return clone;
+  if ("status" in clone) return { status: clone.status, code: clone.code };
+  const head = runGit(runner, clone.storeDir, ["--no-replace-objects", "rev-parse", "--verify", "HEAD"]);
+  const workingTree = runGit(runner, clone.storeDir, ["--no-optional-locks", "status", "--porcelain", "--ignored", "--untracked-files=all"]);
+  const publication = runGit(runner, clone.storeDir, ["ls-remote", "--refs", "--", clone.remoteUrl, TASK_HISTORY_REF]);
+  const published = publication.stdout.trimEnd().split("\t");
+  const exact = publication.status === 0 && published.length === 2
+    && /^[0-9a-f]{40}$/.test(published[0]) && published[1] === TASK_HISTORY_REF;
   return {
     storeDir: clone.storeDir,
-    head: runGit(runner, clone.storeDir, ["rev-parse", "--verify", "HEAD"]),
-    workingTree: runGit(runner, clone.storeDir, ["--no-optional-locks", "status", "--porcelain", "--ignored", "--untracked-files=all"]),
-    publication: runGit(runner, clone.storeDir, ["ls-remote", "--refs", "--", clone.remoteUrl, TASK_HISTORY_REF]),
+    remote: clone.remote,
+    head: { status: head.status, stdout: /^[0-9a-f]{40}$/.test(head.stdout.trim()) ? head.stdout.trim() : "" },
+    workingTree,
+    publication: {
+      status: publication.status,
+      stdout: exact ? `${published[0]}\t${TASK_HISTORY_REF}` : "",
+      availability: exact ? "available" : publication.status === 0 && publication.stdout === "" ? "absent" : "unavailable",
+      hasDiagnostics: publication.stderr !== "",
+    },
   };
 }
 

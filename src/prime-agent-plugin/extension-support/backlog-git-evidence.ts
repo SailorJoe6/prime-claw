@@ -44,7 +44,9 @@ function repository(selected: SelectedBacklogRepository): BacklogGitEvidence["re
   return { topology: selected.topology, identity: createHash("sha256").update(identity).digest("hex") };
 }
 
-function committedBlob(root: string, commit: string, path: string): string {
+function committedBlob(root: string, commit: string, path: string): string;
+function committedBlob(root: string, commit: string, path: string, allowAbsent: true): string | undefined;
+function committedBlob(root: string, commit: string, path: string, allowAbsent = false): string | undefined {
   if (!OID.test(commit) || !path.endsWith(".md") || /[\0\r\n\\]/.test(path)
       || path.split("/").some(part => !part || part === "." || part === "..")) {
     throw new Error("Backlog evidence requires a full commit and literal repository-relative ticket path");
@@ -54,6 +56,7 @@ function committedBlob(root: string, commit: string, path: string): string {
   }
   const entry = metadata(root, ["--literal-pathspecs", "ls-tree", "-z", commit, "--", path],
     "Backlog evidence tree unavailable");
+  if (allowAbsent && entry === "") return undefined;
   const match = /^100(?:644|755) blob ([0-9a-f]{40})\t/.exec(entry);
   if (!match || entry.slice(match[0].length) !== `${path}\0`) {
     throw new Error("Backlog evidence path is not an exact regular ticket blob");
@@ -82,6 +85,31 @@ export function referenceCommittedBacklogTask(
     throw new Error("Backlog evidence OID is not a ticket blob");
   }
   return { kind: "backlog-git", repository: selectedRepository, commit, path };
+}
+
+export type BacklogCommittedTaskObservation =
+  | { availability: "available"; evidence: BacklogGitEvidence }
+  | { availability: "absent" | "unavailable" };
+
+/** Absence is a successful literal lookup, not a failed Git/native read. */
+export async function observeCommittedBacklogTask(
+  selected: SelectedBacklogRepository, commit: string, path: string, taskId: string,
+  expectedRepository?: BacklogGitEvidence["repository"],
+): Promise<BacklogCommittedTaskObservation> {
+  try {
+    const selectedRepository = repository(selected);
+    if (expectedRepository && (selectedRepository.topology !== expectedRepository.topology
+        || selectedRepository.identity !== expectedRepository.identity)) {
+      return { availability: "unavailable" };
+    }
+    if (!committedBlob(selected.root, commit, path, true)) return { availability: "absent" };
+    const evidence: BacklogGitEvidence = { kind: "backlog-git", repository: selectedRepository, commit, path };
+    await readBacklogGitEvidence(selected, evidence, taskId);
+    return { availability: "available", evidence };
+  } catch {
+    // Do not return command errors that may contain repository credentials or ticket content.
+    return { availability: "unavailable" };
+  }
 }
 
 /** Stage only the frontmatter for the existing native parser, then replay it in
