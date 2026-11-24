@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T09:09:00Z'
+updated_date: '2026-11-24T09:18:00Z'
 labels: []
 dependencies: []
 references:
@@ -153,6 +153,8 @@ Retained transition revision 178056a62a82964fbb1a7cc7a973d8756ca9cd3b: branch-lo
 Beads→Backlog cutover evidence candidate cf9878eabb53b5d383420c4bd5027ef233bbd0e2: verify the exact independent repository, published receipt commit, regular literal ticket blob and native canonical task ID before switching ownership. Keep full native readback transient and preserve the existing receipt digest, source retirement sequence, Episode bindings and historical evidence. The completed migration result remains receipt-only; internal committed task results carry references rather than copied views. Offline Docker: 11 focused cases passed on a358c61b6896797ed0e005c3d1f82d52ee2ae928, including exact missing-blob refusal before authority or deletion, same-destination retry, archives, and the PVA-shaped fixture. The only failing assertion incorrectly expected the post-switch runtime proof to rewrite the persisted route; only that test assertion changed in cf9878eabb53b5d383420c4bd5027ef233bbd0e2, and its exact-commit rerun passed (.test-results/primeclaw-69-cutover-evidence/candidate-route.log). Clean Tier 1 passed on cf9878eabb53b5d383420c4bd5027ef233bbd0e2, offline with verified teardown (.test-results/20261124T084638Z-73185-24d6b476/tier1/manifest.json). No live switch, source retirement, TASK-2 action, merge, or activation.
 
 Terminal observation candidate 38ff9a9c041172b2d8ed5b770e2f628be2bb79b4: merged Backlog reports the exact committed active task reference; abandoned Backlog reports active and archive path observations separately. Both layouts distinguish absent from unavailable and keep direct publication separate from local evidence. The native canonical ID is verified from committed bytes without copying a full blob or task view. Resource verification, compare-delete, Beads, lifecycle authority and historical records are unchanged. Offline Docker: 526/527 passed; the only Beads continuation fixture failed with the same journal identity error on unchanged baseline cf9878eabb53b5d383420c4bd5027ef233bbd0e2 (.test-results/primeclaw-69-terminal/baseline-beads.log). The real large-ticket tests exercised all four layout/outcome combinations. Clean Tier 1 passed offline and verified teardown (.test-results/20261124T090222Z-1485-88bddfa3/tier1/manifest.json). No live cleanup, TASK-2 action, merge, or activation.
+
+Prior terminal checkpoint candidate ec1b6f4ae9d30dcb187a84b5631cae4922aa4e9e: independent Backlog cleanup observes the exact recorded revision and literal active path in the selected task repository before ownership removal. Verified Git refs and legacy views produce a committed reference. Missing or mismatched evidence produces a bounded unavailable result, with no snapshot, mutable fallback or cleanup gate. Current active/archive observations, Beads and resource checks are unchanged. Offline Docker: 437/437 passed (.test-results/primeclaw-69-prior-terminal/candidate-focused.log), including distinct prior, local and published commits, legacy evidence for both outcomes, absent commit and wrong committed canonical ID. Tier 1 passed offline with verified teardown (.test-results/20261124T091610Z-26339-6fcf05b2/tier1/manifest.json). No live cleanup, TASK-2 action, merge, or activation.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -191,4 +193,6 @@ Retained Backlog transition verifies the Episode store repository and compares t
 The cutover stores verified Backlog Git references instead of ticket copies and stops before switching authority if the committed ticket cannot be proved.
 
 Backlog terminal results now use committed references for active and archived tickets, with availability and publication reported separately.
+
+Independent Backlog cleanup now reports the verified prior checkpoint or an availability gap without changing cleanup eligibility.
 <!-- SECTION:FINAL_SUMMARY:END -->
