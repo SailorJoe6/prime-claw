@@ -2406,84 +2406,56 @@ async function prepareTaskEpisodeWorkspace(
   if (prepared.status !== "prepared") {
     throw new EpisodeStateUncertainError(`Independent Backlog Episode task checkout was not prepared before session start: ${prepared.code}: ${prepared.detail}`);
   }
-  if (record.taskEvidence.kind === "backlog-git") {
+  const reserved = record.taskEvidence.kind === "backlog-git" ? record.taskEvidence : undefined;
+  const storePath = backlogStoreRelativePath(record.worktree!, prepared.storeDir, record.taskPath);
+  if (!storePath) throw new EpisodeStateUncertainError("Independent Backlog reserved task path is outside the prepared store");
+  const repository = { root: prepared.storeDir, topology: "independent" as const, remote: prepared.remote };
+  const verifyCommit = async (label: string, commit: string) => {
+    try {
+      // Legacy reservations must prove the native ID from each committed blob.
+      // Do not read or re-emit their historical native snapshot.
+      return reserved ? referenceCommittedBacklogTask(repository, commit, storePath)
+        : await makeBacklogGitEvidence(repository, commit, storePath, record.taskId);
+    } catch (error) {
+      throw new EpisodeStateUncertainError(`Independent Backlog ${label} evidence at ${commit} is unavailable before session start: ${taskAdmissionError(error)}`);
+    }
+  };
+  if (reserved) {
     const selected = await readBacklogCreationIdentity(record.worktree!, record.taskId);
     if (selected.path !== record.taskPath) throw new EpisodeStateUncertainError("Independent Backlog Episode workspace resolved a different reserved task path");
-    const storePath = relative(prepared.storeDir, resolve(record.worktree!, selected.path)).split("\\").join("/");
-    const repository = { root: prepared.storeDir, topology: "independent" as const, remote: prepared.remote };
-    const previous = record.taskEvidence;
-    const verifyCommit = (label: string, commit: string) => {
-      try { return referenceCommittedBacklogTask(repository, commit, storePath); }
-      catch (error) {
-        throw new EpisodeStateUncertainError(`Independent Backlog ${label} evidence at ${commit} is unavailable before session start: ${taskAdmissionError(error)}`);
-      }
-    };
-    if (previous.commit !== record.providerRevision || previous.path !== storePath) {
+    if (reserved.commit !== record.providerRevision || reserved.path !== storePath) {
       throw new EpisodeStateUncertainError("Independent Backlog Episode workspace does not match the reserved evidence revision/path");
     }
-    const prior = verifyCommit("previous", record.providerRevision);
-    const previousRepository = previous.repository as typeof prior.repository | undefined;
+  }
+  const prior = await verifyCommit("previous", record.providerRevision);
+  if (reserved) {
+    const previousRepository = reserved.repository as typeof prior.repository | undefined;
     if (previousRepository?.topology !== prior.repository.topology || previousRepository?.identity !== prior.repository.identity) {
       throw new EpisodeStateUncertainError("Independent Backlog Episode workspace does not match the reserved evidence repository");
     }
-    const evidence = prepared.publishedHead === prior.commit ? prior : verifyCommit("fetched published", prepared.publishedHead);
-    const localEvidence = prepared.head === evidence.commit ? evidence : verifyCommit("retained local", prepared.head);
+  }
+  const evidence = prepared.publishedHead === prior.commit ? prior : await verifyCommit("fetched published", prepared.publishedHead);
+  const localEvidence = prepared.head === evidence.commit ? evidence : await verifyCommit("retained local", prepared.head);
+  if (reserved) {
     const unchanged = runner.run("git", ["--literal-pathspecs", "--no-optional-locks", "status", "--porcelain", "--", storePath],
       { cwd: prepared.storeDir, allowFailure: true });
     if (unchanged.status !== 0 || unchanged.stdout !== "") {
       throw new EpisodeStateUncertainError("Independent Backlog Episode selected task differs from the committed workspace before session start");
     }
-    const advanced = updated(record, {
-      providerRevision: evidence.commit, taskEvidence: { ...evidence },
-      updatedAt: dependencies.now?.() ?? new Date().toISOString(),
-    });
-    store.write(repo, advanced);
-    if (JSON.stringify(store.read(repo, record.ownerSessionId)) !== JSON.stringify(advanced)) {
-      throw new EpisodeStateUncertainError("Independent Backlog Episode could not verify the current Git evidence before session start");
-    }
-    return { record: advanced, providerTaskObservation: JSON.stringify({
-      previousProviderRevision: record.providerRevision, publishedProviderRevision: evidence.commit,
-      previousTaskEvidence: previous, currentTaskEvidence: evidence,
-      ...(localEvidence.commit !== evidence.commit ? { localTaskEvidence: localEvidence } : {}),
-    }) };
   }
-  // Keep the existing recovery behavior for reservations from earlier generations.
-  const current = runner.run("backlog", ["task", "view", "--json", "--", record.taskId], {
-    cwd: record.worktree!, allowFailure: true,
-  });
-  let evidence: Record<string, unknown>;
-  try {
-    const parsed = JSON.parse(current.stdout) as unknown;
-    if (current.status !== 0 || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(current.stderr.trim() || `exit ${current.status}`);
-    evidence = parsed as Record<string, unknown>;
-  } catch (error) {
-    throw new EpisodeStateUncertainError(`Independent Backlog task was unreadable before Episode session start: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  const rawTask = evidence.task;
-  if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
-      || (rawTask as Record<string, unknown>).id !== record.taskId
-      || (rawTask as Record<string, unknown>).path !== record.taskPath) {
-    throw new EpisodeStateUncertainError("Independent Backlog Episode task checkout resolved a different reserved task identity");
-  }
-  // Current native views/revisions are observations for the Episode LLM. Do
-  // not freeze history around the task read or repeat status/plan eligibility.
-  const providerTaskObservation = JSON.stringify({
-    previousProviderRevision: record.providerRevision,
-    publishedProviderRevision: prepared.head,
-    previousTaskEvidence: record.taskEvidence,
-    currentTaskEvidence: evidence,
-  });
   const advanced = updated(record, {
-    providerRevision: prepared.head,
-    taskEvidence: evidence,
+    providerRevision: evidence.commit, taskEvidence: { ...evidence },
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
   });
   store.write(repo, advanced);
-  const verified = store.read(repo, record.ownerSessionId);
-  if (!verified || JSON.stringify(verified) !== JSON.stringify(advanced)) {
-    throw new EpisodeStateUncertainError("Independent Backlog Episode could not persist current task-history evidence before session start");
+  if (JSON.stringify(store.read(repo, record.ownerSessionId)) !== JSON.stringify(advanced)) {
+    throw new EpisodeStateUncertainError("Independent Backlog Episode could not verify the current Git evidence before session start");
   }
-  return { record: advanced, providerTaskObservation };
+  return { record: advanced, providerTaskObservation: JSON.stringify({
+    previousProviderRevision: record.providerRevision, publishedProviderRevision: evidence.commit,
+    previousTaskEvidence: reserved ?? prior, currentTaskEvidence: evidence,
+    ...(localEvidence.commit !== evidence.commit ? { localTaskEvidence: localEvidence } : {}),
+  }) };
 }
 
 async function startTaskEpisodeInOrcaWorktree(

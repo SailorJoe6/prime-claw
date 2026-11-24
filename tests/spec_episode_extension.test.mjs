@@ -3656,15 +3656,45 @@ test("task-native local mutation failure preserves bound identity as uncertain",
 
 
 
-function allocatedPreSessionFixture() {
+function allocatedPreSessionFixture({ missingPrior = false, oversized = false } = {}) {
   const f = harness();
+  const storeDir = join(f.worktree, "backlog");
+  const storePath = "tasks/primeclaw-45.md";
+  const taskPath = `backlog/${storePath}`;
+  const remote = join(f.root, "task-remote.git");
+  execFileSync("git", ["init", "--bare", "-q", remote]);
+  execFileSync("git", ["init", "-q", "-b", "prime-claw/tasks", storeDir]);
+  const git = (...args) => execFileSync("git", ["-C", storeDir, ...args], { encoding: "utf8" }).trim();
+  git("config", "user.name", "Test"); git("config", "user.email", "test@example.invalid");
+  git("remote", "add", "origin", remote);
+  mkdirSync(join(storeDir, "tasks"));
+  writeFileSync(join(storeDir, "config.yml"), "project_name: Fixture\ntask_prefix: PRIMECLAW\n");
+  const ticket = join(storeDir, storePath);
+  const body = "---\nid: PRIMECLAW-45\ntitle: Existing task\nstatus: In Progress\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\n"
+    + (oversized ? "Large valid task content. \n".repeat(45_000) : "Existing task content.\n")
+    + "<!-- SECTION:DESCRIPTION:END -->\n";
+  writeFileSync(ticket, body);
+  git("add", "."); git("commit", "-qm", "reserved checkpoint");
+  const recorded = missingPrior ? "b".repeat(40) : git("rev-parse", "HEAD");
+  appendFileSync(ticket, "\nPublished fixture marker.\n");
+  git("commit", "-qam", "published checkpoint");
+  git("push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks");
+  const publishedHead = git("rev-parse", "HEAD");
+  appendFileSync(ticket, "\nRetained local fixture marker.\n");
+  git("commit", "-qam", "local checkpoint");
+  const head = git("rev-parse", "HEAD");
+  if (oversized) {
+    const output = execFileSync("backlog", ["task", "view", "--json", "--", "PRIMECLAW-45"],
+      { cwd: f.worktree, maxBuffer: 4 * 1024 * 1024 });
+    assert.ok(output.length > 1024 * 1024);
+  }
   const original = taskReservation({
     provider: "backlog", taskId: "PRIMECLAW-45", status: "uncertain", engine: "orca",
     operationId: "f63a69a7-3e66-4b20-b258-2a599c4160e1", projectSetupId: "setup-local",
     worktreeName: "prime-claw-primeclaw-45-episode-f63a69a7", worktreeId: f.wt.id,
     worktreeIdentity: f.wt.identity, worktree: f.worktree, branch: f.wt.branch, head: TASK_BASE,
-    providerRevision: "b".repeat(40), taskEvidence: { schemaVersion: 1, task: {
-      id: "PRIMECLAW-45", path: "backlog/tasks/primeclaw-10.38.md", status: "In Progress", nativeExtra: { retained: true },
+    taskPath, providerRevision: recorded, taskEvidence: { schemaVersion: 1, task: {
+      id: "PRIMECLAW-45", path: taskPath, status: "In Progress", nativeExtra: { retained: "legacy snapshot marker" },
     } }, uncertaintyReason: "Independent Backlog preparation failed before session start",
   });
   f.ownership.write(f.root, original);
@@ -3672,12 +3702,11 @@ function allocatedPreSessionFixture() {
   f.deps.taskResolver = () => taskSelection(f, { taskId: original.taskId, nativeView: original.taskEvidence });
   f.deps.admissionRunner = { run(command, args, options) {
     if (command === "git") return new ProcessCommandRunner().run(command, args, options);
-    assert.equal(command, "backlog"); assert.deepEqual(args, ["task", "view", "--json", "--", original.taskId]);
-    return { status: 0, stdout: JSON.stringify(original.taskEvidence), stderr: "" };
+    assert.fail(`unexpected native command before initial assignment: ${command}`);
   } };
   f.deps.prepareEpisodeTaskHistory = ({ targetWorktree }) => {
     assert.equal(targetWorktree, f.worktree); f.calls.push(["prepare-existing"]);
-    return { status: "prepared", head: "c".repeat(40) };
+    return { status: "prepared", storeDir, remote: "origin", head, publishedHead };
   };
   f.orca.showWorktree = async () => ({ ...f.wt, head: TASK_BASE });
   const terminal = { handle: "terminal", connected: true, writable: true, agentIdentity: "prime-agent",
@@ -3696,11 +3725,12 @@ function allocatedPreSessionFixture() {
   })({ registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {},
     sendUserMessage() { assert.fail("no second assignment"); } });
   f.calls.length = 0;
-  return { ...f, original, session, terminal, tools, get current() { return f.ownership.read(f.root, "owner"); } };
+  return { ...f, original, session, terminal, tools, gitTask: git, publishedHead, localHead: head, storePath, remote, get current() { return f.ownership.read(f.root, "owner"); } };
 }
 
-test("registered existing-operation continuation reuses recorded allocated worktree and post-worktree launch once", async () => {
-  const f = allocatedPreSessionFixture();
+test("registered existing-operation continuation proves oversized legacy Backlog evidence and launches once", async (t) => {
+  const f = allocatedPreSessionFixture({ oversized: true });
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
   const foreign = structuredClone(f.ownership.read(f.root, "foreign-owner"));
   writeFileSync(join(f.worktree, "foreign.txt"), "preserved working bytes");
   const result = await f.tools.get("create_task_episode").execute("continue-original", {
@@ -3716,12 +3746,38 @@ test("registered existing-operation continuation reuses recorded allocated workt
   assert.equal(f.calls.some(([name]) => ["orca-create", "local-create", "fresh", "execute", "promote", "commit", "setups"].includes(name)), false);
   assert.equal(readFileSync(join(f.worktree, "foreign.txt"), "utf8"), "preserved working bytes");
   assert.deepEqual(f.ownership.read(f.root, "foreign-owner"), foreign);
-  assert.ok(f.calls.find(([name]) => name === "auto-create")[1].prompt.includes("PRIMECLAW-45"));
+  const prompt = f.calls.find(([name]) => name === "auto-create")[1].prompt;
+  assert.ok(prompt.includes("PRIMECLAW-45"));
+  const evidence = JSON.parse(prompt.match(/<provider-task-observation>\n([^\n]+)\n<\/provider-task-observation>/)[1]);
+  const repository = evidence.currentTaskEvidence.repository;
+  const ref = (commit) => ({ kind: "backlog-git", repository, commit, path: f.storePath });
+  assert.deepEqual(repository, { topology: "independent", identity: createHash("sha256").update(`remote:${f.remote}`).digest("hex") });
+  assert.deepEqual(evidence, { previousProviderRevision: f.original.providerRevision, publishedProviderRevision: f.publishedHead,
+    previousTaskEvidence: ref(f.original.providerRevision), currentTaskEvidence: ref(f.publishedHead), localTaskEvidence: ref(f.localHead) });
+  assert.equal(f.current.providerRevision, f.publishedHead);
+  assert.deepEqual(f.current.taskEvidence, evidence.currentTaskEvidence);
+  assert.equal(f.gitTask("rev-parse", "HEAD"), f.localHead);
+  assert.doesNotMatch(prompt, /legacy snapshot marker|Large valid task content/);
   f.calls.length = 0;
   const replay = await f.tools.get("create_task_episode").execute("same-binding", {
     taskId: f.original.taskId, operationId: f.original.operationId,
   }, undefined, undefined, f.ctx);
   assert.equal(replay.details.reused, true);
+  assert.equal(f.calls.some(([name]) => ["auto-create", "auto-run", "execute", "fresh", "orca-create", "local-create"].includes(name)), false);
+});
+
+test("legacy Backlog pre-session recovery refuses missing committed history without launch or replacement", async (t) => {
+  const f = allocatedPreSessionFixture({ missingPrior: true });
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  const stopped = await f.tools.get("create_task_episode").execute("missing-prior", {
+    taskId: f.original.taskId, operationId: f.original.operationId,
+  }, undefined, undefined, f.ctx);
+  assert.equal(stopped.isError, true);
+  assert.ok(stopped.details.error.includes(`previous evidence at ${f.original.providerRevision} is unavailable before session start`));
+  assert.doesNotMatch(JSON.stringify(stopped), /legacy snapshot marker/);
+  for (const key of ["taskEvidence", "providerRevision", "operationId", "worktreeId", "worktree", "branch"])
+    assert.deepEqual(f.current[key], f.original[key], key);
+  assert.equal(f.gitTask("rev-parse", "HEAD"), f.localHead);
   assert.equal(f.calls.some(([name]) => ["auto-create", "auto-run", "execute", "fresh", "orca-create", "local-create"].includes(name)), false);
 });
 

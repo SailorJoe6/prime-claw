@@ -600,6 +600,15 @@ nested clone; both commit only task paths and non-force-push
 removes only its exact Episode clone after owner publication judgment, preserving uncommitted bytes.
 Existing ordinary/root/custom Backlog stores never migrate through these paths.
 
+When resuming an independent Backlog reservation made before Git references
+were stored, pre-session recovery checks the original recorded revision and the
+fetched published revision in the exact Episode task clone. It also checks a
+separate retained local tip when present. Each reference must identify the
+same literal committed ticket and native ID. Missing evidence stops recovery
+before assignment. The saved snapshot is not a fallback; normal advancement
+writes only the verified published reference and the initial assignment receives
+references, not copies of the ticket.
+
 A branch-local Backlog status mutation reads exact native ID and path before
 editing, and checks the resulting status before committing only that ticket.
 The result points to the committed ticket in the code repository. That local
