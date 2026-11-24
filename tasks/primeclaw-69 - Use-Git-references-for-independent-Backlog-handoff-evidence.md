@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T07:51:00Z'
+updated_date: '2026-11-24T07:54:00Z'
 labels: []
 dependencies: []
 references:
@@ -91,6 +91,8 @@ Owner accepted branch-local ordinary handoff and execute-only slice `70101a43` f
 One bounded revision of branch-local creation at `cb59a9e3`. After allocation and the single initial assignment, use the existing bounded native lookup to observe current exact ID, project, path and status rather than returning the earlier read. Preserve the immutable assignment base; report post-delivery mismatch separately from the assignment already sent. No status freeze, replay, rollback or second assignment. Add a focused registered-tool regression. Replace the fixture’s raised maxBuffer/full-response capture with streamed byte counting or fixture-only file output and bounded preservation checks. Run focused offline Docker and Tier 1, publish task and code separately, and stop for review. No other lifecycle wiring, TASK-2, merge or activation.
 
 Owner accepted `5e0a27b8` for branch-local creation. Next bounded slice only: Backlog status mutation/publication results in `task-history-workspace.ts`. Replace copied Backlog ticket evidence in committed results with exact repository/commit/path references using existing mechanics. Distinguish pre-commit and failed or uncertain publication from committed/published results; preserve native authoring, exact path-only commits and compatibility, and leave Beads unchanged. No new state or coded semantic judgment. In the same evidence pass, fix the test-only AC2 gap in the registered independent creation fixture: stream oversized native stdout byte counting or use fixture-only file output and bounded preservation checks instead of the 2 MiB maxBuffer/full JSON capture. Leave transition, cutover, terminal and oversight changes for later. Run focused offline Docker and Tier 1 from the final clean candidate where practical. Publish task notes and code separately and stop for review. No original TASK-2 actions, merge or activation.
+
+One bounded revision of the Backlog mutation/publication slice at `35ad1a88`. Use existing bounded native mechanical reads and avoid capturing full edit output in the fixed buffer. Stop before edit if the last native read fails or returns a different exact ID/path. Keep native push result separate from publication evidence: nonzero plus unavailable or inconclusive remote proof is uncertain, not definite non-publication; no retry. Never copy legacy nativeAfter into a new reservation: use only verifiable exact committed Git references; leave historical records intact. Reuse current Git and Backlog mechanics, preserve native authoring and unrelated staging, leave Beads unchanged. Focused offline Docker coverage for a valid >1 MiB task, pre-edit drift, unclear remote outcome and legacy reservation evidence. No new state, policy classifier, live mutation testing, TASK-2 action, merge or activation. Run Tier 1 from the clean candidate where practical, publish task notes and code separately, then stop for review.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
