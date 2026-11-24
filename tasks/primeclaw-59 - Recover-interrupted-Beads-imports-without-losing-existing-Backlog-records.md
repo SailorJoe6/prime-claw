@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-23T22:42:00Z'
+updated_date: '2026-11-24T01:41:00Z'
 labels: []
 dependencies: []
 references:
@@ -374,6 +374,13 @@ No live PVA or retained transport access, live capture, service action, deployme
 Revise exact Episode candidate `a99386091df99840d1e5a6e900d844ff29b5a12f` in place on its Episode branch. Use the existing `migrationRunner` adapter for the default `publishIsolatedBeadsImport` path. Prove in offline Docker that the actual default (no injected runner) reads a valid native current view larger than the 1 MiB piped cap. This is a focused regression, not a scale rehearsal. Restore the original clone command in `parkedStoreReconciliationFixture` so default `clone: true` cannot reference undeclared `noHardlinks`; keep no-hardlink cloning in the separate isolated fixture and exercise an existing parked-store clone case.
 
 Revalidate exact dirty, fully mapped, no-receipt success and pre-write drift refusal on corrected code, plus Tier 1. Preserve all guards, data-before-receipt publication, native memory identity, original file/history evidence, and absence of mapped-ticket writes, cutover and retirement. Keep PVA-first, In Progress, 0/9 checked and null Final Summary. Send exact revised candidate and private-safe evidence or blocker to the owning Conversation for independent review, then stop. No rerun of the prior refusal-only diagnostic, second writer, live PVA or retained transport access, capture, outage, deployment, live migration publication, cutover, deletion or hold release.
+
+### Next canonical execute — isolated synthetic capture identity only
+On the independently reviewed `2b4ab225244607731ffd92bd14a046c2a6259dfd` basis, first test whether the original path layout can be reproduced entirely inside a disposable offline namespace with the exact migration capture digest, without live mounts/endpoints, guard relaxation or mapping edits. The isolated entry requires Linux private tmpfs under `/tmp`, and the digest binds `repositoryRoot`, `storeDir` and native connection fields. A synthetic `/tmp` result does not prove the host layout.
+
+If exact layout cannot safely represent the original path shape, use only the smallest read-only provenance-bound identity verifier. Bind an independently retained original identity and stopped mapping/source revision to the synthetic capture. Recapture actual restored native data: full export/raw lines, current native views, status, version and memories. Compare all non-relocation connection facts and verify only narrowly constrained path translation. Recompute the exact original digest; verify the native Backlog mapping, exact physical records and original baseline/history. Prove refusal of substituted identity and genuine source drift. Caller-supplied digest/identity alone is not evidence. Do not rewrite mappings, relax current guards, add backup tooling, run switch/publication/retirement or claim APFS transaction consistency.
+
+Same Episode and sole writer. Work only on disposable synthetic fixtures; project plugin execution is Docker-only. Do not touch Docker Desktop settings, existing gbrain/test workloads, APFS snapshots or mounts, live PVA or retained transport, holds, services, deployment, real data copies, migration-data publication, cutover or cleanup. Keep PVA-first, In Progress, 0/9 checked and null Final Summary. Report exact tested proof or the specific remaining blocker to the owner; stop without a further slice.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -790,4 +797,7 @@ The default internal publish-only entry now uses the existing file-backed migrat
 
 ### Two-fix candidate — independent review boundary
 Candidate `2b4ab225244607731ffd92bd14a046c2a6259dfd`, tree `21a1193a8579be9d20c275fc29f53a3131968b72`, parent `a99386091df99840d1e5a6e900d844ff29b5a12f`, patch SHA-256 `c3c98f64ce66d77fb6eb8ed72df65fc809c7da8943b8dce5894346ffb9ae74df`. Default file-backed publish-only regression passed on 1,370,039 native bytes, including pre-write stale refusal, data-before-receipt publication, exact mapped/original/native-memory preservation, and no cutover or retirement on that path. Focused TAP SHA-256 `268fb7be1d27bde9878e29c80ce8556d2cb1aa7d44b4bfc9d43c2e501df2b923`. The existing hidden parked-store clone case passed on the restored fixture, TAP SHA-256 `d882851552d752b0b9c902ce0ce8cecc7c3d0b410d2c35eebf00355191e65300`. Each offline run passed once, no skips, with teardown verified. Tier 1 source-mode apply/check/RPC probe `20261123T223944Z-41179-1626e81a` passed on the clean exact candidate with network absence and both teardowns verified; manifest SHA-256 `8366d4a9131bb84bf52a37f4e76101c5bf886e32d98cc8a6a1f3d8773330e281`. Splits and limits are documented in `docs/evidence/primeclaw-59-isolated-publish-only.md`. No broader scale/diagnostic rerun or live action. Stop for the owning Conversation's independent read-only `openai-codex/gpt-6.2-astra` high review. Preserve PVA-first, In Progress, 0/9 checked and null Final Summary.
+
+### Authorized synthetic-identity follow-up
+Initialize PVA authorized the narrow synthetic identity proof on the reviewed two-fix Episode basis. Prior offline publication and Tier 1 results remain evidence for that exact basis only. No identity experiment, restored-data verifier, host layout claim, live capture or production action has been performed in this handoff. The exact-namespace probe comes before any conditional read-only verifier; preserve mapping and current isolation throughout.
 <!-- SECTION:NOTES:END -->
