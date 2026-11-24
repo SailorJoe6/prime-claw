@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T15:50:00Z'
+updated_date: '2026-11-24T15:53:00Z'
 labels: []
 dependencies: []
 references:
@@ -880,4 +880,11 @@ The owner reports that independent Astra high re-review of `2ff53f96c39d2bdb2336
 
 ### Integration candidate — exact validation started
 The exact owner-approved target `main` was rechecked directly at `12a96f61e1dbcdd796f92ff8dc3c61470f28834f` before composition. Local Episode candidate `482b7d9256d093705eae4a24f99ea9e7c03507e5` (tree `18fa49f6cafd5ee8d411c2843a34c8ed6fdde6e0`, parents reviewed Episode `2ff53f96c39d2bdb23365d90ac93eb7730c83981` and exact target `12a96f61e1dbcdd796f92ff8dc3c61470f28834f`) is not published yet. The target-relative patch SHA-256 is `6801ee8b6b21ee9cd2e7565e7dcd4fc28e83c11e7b624b52b2e088ab9a4ff754`. Only the reviewed receipt completion and pair/ownership fixes, their documentation, and the isolated receipt-completion test differ from main (3 files, +347/−31). Main already includes the Web shutdown change, retained unchanged; no production publish-only or relocation experiments were carried. The checked-in ownership registry is identical to target main and the canonical working registry was not touched. Exact offline focused and Docker Tier 1 checks are running; older validation does not apply to this tree. No merge, activation or live PVA operation.
+
+### Exact integration candidate — published for independent review
+Episode `482b7d9256d093705eae4a24f99ea9e7c03507e5` (tree `18fa49f6cafd5ee8d411c2843a34c8ed6fdde6e0`), verified directly on the original Episode branch. Target `main` `12a96f61e1dbcdd796f92ff8dc3c61470f28834f` was rechecked directly before composition, before publication, and after the Episode push; it did not move. Parent 1 is independently reviewed Episode `2ff53f96c39d2bdb23365d90ac93eb7730c83981`; parent 2 is the exact target. The tree starts from main and changes only `task-provider-migration.ts`, `task_provider_migration.test.mjs`, and `docs/project-initialization.md` (+347/−31, patch SHA-256 `6801ee8b6b21ee9cd2e7565e7dcd4fc28e83c11e7b624b52b2e088ab9a4ff754`). The selected production/docs hunks applied without conflicts; appended the exact reviewed receipt test to main’s existing suite. Main’s existing owned-Web teardown and unrelated files are unchanged. Excluded publish-only and relocation experiments from the tree without rewriting Episode history. The pending primary ownership file was untouched.
+
+Offline focused run `15957` passed 4/4, no skips (TAP SHA-256 `87d53c7d610b0d9d2ddfe73291f50b6f783d5a7768fcce7d1605b08c9fb462d2`). In a disposable fixture, the first switch stopped at the code layout guard after publishing data `2c28886b7f8f422b5ace942a990a995a505ed828` and receipt `03b1cc196e650e2278b933fd8a1a360748c95efc` from baseline `fa059286085ef9b09355ca5f7e6c5a402b9c30b8`. The guarded completion reused them unchanged without re-import, destination task or Git writes, or republication. All seven originals remained, including both BASE-12 records with the same ID, distinct bytes/modes, and preserved paths and history. Unrelated tracked layout drift and ambiguous receipt-mapped import and memory USER targets still refused. A separate normal forward regression preserved the active Episode identity. Fixture retirement is not live retirement evidence.
+
+Exact Docker Tier 1 `--probe` `20261124T155038Z-16023-aca1e340` passed (manifest SHA-256 `2ecf78a121045fe96a6549572c7dfd2de7c4fe64aca328c5976ebc6bdf87a2d6`, 477 input entries, all 15 artifact hashes verified). Owned focused, Tier 1, and builder containers are absent; Tier 1 confirmed the network absent and the watcher was canceled. Await independent read-only review. In Progress, 0/9 checked, null Final Summary, and PVA-first `c6e0a3d` remain. No main merge, deployment, restart, live PVA access, retry, cutover or Beads retirement, Episode closure or hold release.
 <!-- SECTION:NOTES:END -->
