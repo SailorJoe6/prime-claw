@@ -35,6 +35,7 @@ import {
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
+import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 
 const ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), ".."));
@@ -930,6 +931,38 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
 });
 
+test("branch-local status safely commits a native view larger than 1 MiB without publishing", async (t) => {
+  usePinnedBacklogOnPath(t);
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  const { path, id } = f.task;
+  for (let i = 0; i < 18; i++) {
+    execFileSync(BACKLOG, ["task", "edit", id, "--append-notes", "Large native fixture text. ".repeat(2500), "--plain"],
+      { cwd: f.root, stdio: "ignore" });
+  }
+  const output = spawnSync(BACKLOG, ["task", "view", "--json", "--", id], { cwd: f.root, maxBuffer: 4 * 1024 * 1024 });
+  assert.equal(output.status, 0);
+  assert.ok(output.stdout.length > 1024 * 1024);
+  git(f.root, "add", "--", path);
+  git(f.root, "commit", "-qm", "oversized fixture", "--only", "--", path);
+  git(f.root, "add", "--", "unrelated.txt");
+  const staged = git(f.root, "diff", "--cached", "--binary");
+  const result = await commitConversationTaskStatus({ taskId: id, projectRoot: f.root, taskPath: path, status: "Blocked",
+    message: "record branch-local blocker", note: "exact status marker", expectedProvider: "backlog",
+    runner: new ProcessCommandRunner(), git: new CliTaskEpisodeAdmissionGit(),
+    resolveTask() { assert.fail("buffered resolver must not run"); } });
+  assert.equal(result.commit, git(f.root, "rev-parse", "HEAD"));
+  assert.deepEqual(commitPaths(f.root, result.commit), [path]);
+  assert.equal(git(f.root, "diff", "--cached", "--binary"), staged);
+  assert.deepEqual(result.selection, { id, path, status: "Blocked" });
+  assert.deepEqual(result.localTaskEvidence, { kind: "backlog-git", repository: { topology: "branch-local",
+    identity: createHash("sha256").update(`local:${realpathSync(join(f.root, ".git"))}`).digest("hex") }, commit: result.commit, path });
+  const blob = execFileSync("git", ["-C", f.root, "show", `${result.commit}:${path}`], { encoding: "utf8", maxBuffer: 4 * 1024 * 1024 });
+  assert.match(blob.slice(-4096), /exact status marker$/m);
+  assert.ok(!Object.hasOwn(result, "publishedTaskEvidence"));
+  assert.ok(JSON.stringify(result).length < 1024);
+});
+
 test("trusted task admission commits In Progress before reservation and allocation despite push failure", async () => {
   const f = fixture();
   let observed;
@@ -972,6 +1005,8 @@ test("trusted task admission commits In Progress before reservation and allocati
   assert.equal(result.status, "active");
   assert.equal(result.integrationBranch, "main");
   assert.match(result.admissionPushError, /push/i);
+  assert.equal(result.branchLocalStatus.localTaskEvidence.commit, result.baseRef);
+  assert.ok(!Object.hasOwn(result.branchLocalStatus, "publishedTaskEvidence"));
   assert.deepEqual(commitPaths(f.root), [f.task.path]);
   assert.equal(git(f.root, "status", "--short"), "M unrelated.txt");
   assert.deepEqual(f.events.filter(([name]) => name === "ownership-write"), [
@@ -1021,6 +1056,8 @@ test("grandfathered Backlog admission accepts published default master and retai
   assert.equal(view(f.root).implementationPlan, originalTask.implementationPlan);
   assert.equal(git(f.root, "status", "--short"), "M unrelated.txt");
   assert.equal(result.admissionPushError, undefined);
+  assert.deepEqual(result.branchLocalStatus.publishedTaskEvidence, result.branchLocalStatus.localTaskEvidence);
+  assert.equal(result.branchLocalStatus.publishedTaskEvidence.commit, result.baseRef);
 });
 
 test("pre-reservation failure reports the one native admission without choosing a rollback", async () => {
