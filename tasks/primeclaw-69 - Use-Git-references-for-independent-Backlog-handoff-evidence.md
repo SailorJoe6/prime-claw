@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T02:47:00Z'
+updated_date: '2026-11-24T02:48:00Z'
 labels: []
 dependencies: []
 references:
@@ -68,4 +68,6 @@ No bulk rewrite or rollout gate. Read existing records compatibly and leave hist
 
 <!-- SECTION:NOTES:BEGIN -->
 Slice 1 (plan step 1; partial AC1/AC3): Added Backlog Git reference and bounded exact blob reader, with offline Docker coverage for an independent custom store, a >1 MiB blob, old/new commits and tail diff after branch advance, a dirty working file, branch-local/local-only resolution, and wrong repository/ID/path or missing commit. Docker task_history_workspace suite passed 91/91. First source-mode Tier 1 probe stopped at plugin apply because the new asset was missing from asset-inventory.json. Registered the asset; isolated offline apply/check passed and the same source-mode probe is running again. No lifecycle evidence writers/readers switched yet. No acceptance criteria checked. Next slice: production creation pre-allocation and pre-session reads plus one initial execute, with native >1 MiB JSON fixture.
+
+Slice 1 validation follow-up: source-mode scripts/test-tier1.sh --probe passed after asset registration; manifest and offline probe evidence: .test-results/20261124T024702Z-2489-9e179e45/tier1. Offline Node task-history suite: 91 passed, no skips. Published code 9f40c8ac635d718ab4162dc2600f47d643504c9c. No task lifecycle change or end-to-end large-ticket creation/handoff claim.
 <!-- SECTION:NOTES:END -->
