@@ -5467,3 +5467,160 @@ test("isolated capture identity verifies a relocated synthetic stopped mapping",
   console.log(JSON.stringify({ ...proof, mappings: retained.map.size, baseline, originals: Object.keys(baselineRecords).length,
     substitutedIdentityRefused: true, sourceDriftRefused: true }));
 });
+
+test("isolated receipt completion preserves published data and rejects layout drift", {
+  timeout: 300_000, skip: process.env.PRIME_CLAW_ISOLATED_COMPLETION_TEST !== "1",
+}, async t => {
+  assert.equal(process.platform, "linux");
+  assert.equal(tmpdir(), "/tmp");
+  assert.equal(statfsSync("/tmp").type, 0x01021994);
+  assert.deepEqual(Object.keys(networkInterfaces()), ["lo"]);
+  assert.equal(readFileSync("/proc/net/route", "utf8").trim().split("\n").length, 1);
+  assert.equal(process.env.GIT_ALLOW_PROTOCOL, "file");
+  assert.equal(process.env.GIT_CONFIG_NOSYSTEM, "1");
+  assert.equal(process.env.GIT_CONFIG_GLOBAL, "/dev/null");
+  assert.equal(process.env.DOLT_ROOT_PATH, process.env.HOME);
+  assert.equal(dirname(realpathSync(process.env.HOME)), "/tmp");
+  assert.ok(!Object.keys(process.env).some(key => /^(?:BEADS_|BD_|MYSQL_|BACKLOG_)|^DOLT_(?!ROOT_PATH$)|^GIT_(?!(?:ALLOW_PROTOCOL|CONFIG_NOSYSTEM|CONFIG_GLOBAL|TERMINAL_PROMPT|OPTIONAL_LOCKS)$)/.test(key)));
+  const f = selectedMigrationConfigFixture(t, "receipt-completion", { noHardlinks: true,
+    statuses: ["Triage", "In Progress", "In Planning", "Done"] });
+  const { outer, root, remote } = f.fixture, { store } = f.destination;
+  bd(root, "remember", "Disposable public completion memory Ω", "--key", "receipt-completion");
+  git(root, "rm", "--", "backlog.config.yml");
+  git(root, "commit", "-qm", "fixture begins without generated root link");
+  git(root, "push", "-q");
+  const code = git(root, "rev-parse", "HEAD"), index = git(root, "ls-files", "--stage");
+  const baseline = git(store, "rev-parse", "HEAD");
+  assert.equal(git(root, "status", "--porcelain=v1"), "");
+  assert.equal(git(store, "status", "--porcelain=v1"), "");
+  const seen = new Set();
+  function checkTree(path) {
+    const stat = lstatSync(path);
+    assert.equal(stat.dev, lstatSync(outer).dev);
+    if (path === join(root, "backlog.config.yml")) {
+      assert.equal(realpathSync(path), join(store, "config.yml"));
+      return;
+    }
+    assert.equal(realpathSync(path), path);
+    assert.ok(!seen.has(stat.ino), "fixture must not share inodes"); seen.add(stat.ino);
+    if (stat.isDirectory()) for (const entry of readdirSync(path)) checkTree(join(path, entry));
+    else assert.ok(stat.isFile() && stat.nlink === 1, "expected an unlinked regular file in the fixture");
+  }
+  checkTree(root); checkTree(remote);
+  for (const [repo, dir] of [[root, join(root, ".git")], [store, join(store, ".git")], [remote, remote]]) {
+    assert.equal(dirname(realpathSync(remote)), outer);
+    assert.equal(git(repo, "rev-parse", "--absolute-git-dir"), dir);
+    assert.equal(realpathSync(resolve(repo, git(repo, "rev-parse", "--git-common-dir"))), dir);
+    for (const relative of ["commondir", "objects/info/alternates", "objects/info/http-alternates", "worktrees", "config.worktree", "refs/replace"]) {
+      assert.ok(!existsSync(join(dir, relative)), relative);
+    }
+    assert.ok(readdirSync(join(dir, "hooks")).every(sample => sample.endsWith(".sample")));
+    for (const line of git(repo, "config", "--no-includes", "--local", "--list").split("\n")) {
+      const key = line.split("=", 1)[0];
+      assert.match(key, /^(?:core\.(?:repositoryformatversion|filemode|bare|logallrefupdates)|remote\.origin\.(?:url|fetch)|branch\..+\.(?:remote|merge)|beads\.role|user\.(?:name|email))$/);
+      if (key === "remote.origin.url") assert.equal(line, `remote.origin.url=${remote}`);
+    }
+    assert.equal(git(repo, "for-each-ref", "--format=%(refname)", "refs/replace"), "");
+  }
+  const context = JSON.parse(bd(root, "--readonly", "context", "--json"));
+  const connection = JSON.parse(bd(root, "--readonly", "dolt", "show", "--json"));
+  assert.equal(context.beads_dir, join(root, ".beads"));
+  assert.equal(context.dolt_mode, "embedded");
+  assert.equal(context.is_redirected, false);
+  assert.equal(connection.embedded, true);
+  assert.notEqual(connection.shared_server, true);
+  assert.equal(realpathSync(resolve(root, connection.data_dir)), join(root, ".beads", "embeddeddolt"));
+  assert.deepEqual(JSON.parse(bd(root, "--readonly", "dolt", "remote", "list", "--json")), []);
+  const source = sourceAuthorityFiles(root), sourceExport = bd(root, "--readonly", "export", "--all");
+  const inspection = inspectTaskProviderMigration({ cwd: root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const runner = new SameIdPublicationRunner(), phases = [];
+  const request = { ...f.request, expectedSourceRevision: inspection.sourceRevision,
+    onProgress(phase) { phases.push(phase); }, deleteSource() { assert.fail("must not enter retirement on first attempt"); } };
+  const first = await migrateTaskProvider({ ...request, runner });
+  assert.equal(first.status, "blocked", first.detail);
+  assert.equal(first.detail, "code layout projection changed during provider migration");
+  assert.ok(!phases.some(phase => phase.includes("Guarded cutover")));
+  assert.equal(git(root, "status", "--porcelain=v1"), "?? backlog.config.yml");
+  assert.equal(git(root, "rev-parse", "HEAD"), code);
+  assert.equal(git(root, "ls-files", "--stage"), index);
+  assert.equal(readlinkSync(join(root, "backlog.config.yml")), ".backlog/config.yml");
+  const { head, receipt, task } = publishedSameIdReceipt(runner, store, inspection);
+  const data = receipt.destinationDataRevision;
+  assert.equal(git(store, "rev-parse", `${head}^`), data);
+  git(store, "merge-base", "--is-ancestor", baseline, data);
+  assert.equal(git(store, "diff", "--name-only", data, head), task.path.replace(/^\.backlog\//, ""));
+  const baselineConfig = command(store, "git", ["show", `${baseline}:config.yml`]);
+  const publishedConfig = readFileSync(join(root, "backlog.config.yml"), "utf8");
+  const statusLine = publishedConfig.match(/^statuses: (\[.*\]) # retain terminal column$/m);
+  assert.ok(statusLine);
+  const statuses = JSON.parse(statusLine[1]);
+  assert.deepEqual(statuses.slice(0, 3), ["Triage", "In Progress", "In Planning"]);
+  assert.deepEqual(statuses.slice(3, -1).sort(), ["Blocked", "In Design"]);
+  assert.equal(statuses.at(-1), "Done");
+  assert.equal(publishedConfig.replace(/^statuses:.*$/m, ""), baselineConfig.replace(/^statuses:.*$/m, ""));
+  for (const [path, original] of Object.entries(f.files)) {
+    if (path === "config.yml" || path === ".git/config") continue;
+    assert.equal(readFileSync(join(store, path)).toString("base64"), original.bytes, path);
+    assert.equal(lstatSync(join(store, path)).mode, original.mode, path);
+    assert.equal(git(store, "log", "--follow", "--format=fuller", "--binary", "-p", "--", path), original.history, path);
+  }
+  assert.deepEqual(sourceAuthorityFiles(root), source);
+  assert.equal(bd(root, "--readonly", "export", "--all"), sourceExport);
+  const destinationBefore = parkedStoreTree(store);
+  const assertUnchanged = () => {
+    assert.deepEqual(parkedStoreTree(store), destinationBefore);
+    assert.equal(git(store, "rev-parse", "HEAD"), head);
+    assert.equal(git(remote, "rev-parse", TASK_HISTORY_REF), head);
+  };
+  const drift = join(root, ".gitignore");
+  const beforeIgnore = readFileSync(drift);
+  writeFileSync(drift, Buffer.concat([beforeIgnore, Buffer.from("\n# fixture unrelated layout drift\n")]));
+  const rejectRunner = new AdmissionRunner();
+  const rejected = await observeCompletionMigration({ ...request, runner: rejectRunner });
+  assert.equal(rejected.result.status, "blocked", rejected.result.detail);
+  assert.match(rejected.result.detail, /requires only the generated root configuration link/);
+  assert.ok(rejected.requests.every(row => row.method === "GET"));
+  assertNoAdmissionWrites(rejectRunner);
+  assertUnchanged();
+  assert.equal(git(root, "rev-parse", "HEAD"), code);
+  assert.deepEqual(sourceAuthorityFiles(root), source);
+  assert.equal(bd(root, "--readonly", "export", "--all"), sourceExport);
+  writeFileSync(drift, beforeIgnore);
+  let retired = 0;
+  const completionRunner = new AdmissionRunner();
+  const { result: completed, requests } = await observeCompletionMigration({ ...request, runner: completionRunner,
+    deleteSource(snapshot) {
+      assert.equal(snapshot.revision, inspection.sourceRevision);
+      assert.equal(snapshot.evidence.storeDir, join(root, ".beads"));
+      assertUnchanged();
+      assert.deepEqual(sourceAuthorityFiles(root), source);
+      // Observe guarded retirement with a move within the disposable tmpfs;
+      // the old store is still available for proof until fixture teardown.
+      renameSync(join(root, ".beads"), join(outer, "observed-retirement"));
+      const gateLock = join(root, ".beads.gate.lock");
+      if (existsSync(gateLock)) {
+        assert.ok(lstatSync(gateLock).isFile());
+        renameSync(gateLock, join(outer, "observed-retirement.gate.lock"));
+      }
+      retired++;
+    },
+  });
+  assert.equal(completed.status, "completed", completed.detail);
+  assert.equal(completed.selectedProvider, "backlog");
+  assert.equal(completed.sourceAbsent, true);
+  assert.equal(retired, 1);
+  assert.ok(requests.length && requests.every(row => row.method === "GET"));
+  assert.equal(completionRunner.calls.some(({ commandName, args }) => commandName === "backlog"
+    && args.some(arg => ["create", "edit", "complete", "archive", "init"].includes(arg))), false);
+  assert.equal(completionRunner.calls.some(({ commandName, args }) => commandName === "git"
+    && args.includes(store) && args.some(arg => ["add", "commit", "push", "fetch", "merge"].includes(arg))), false);
+  assert.deepEqual(completed.receipt, { ...receipt, destinationReceiptRevision: head });
+  assert.equal(completed.receiptTaskId, task.id);
+  assert.equal(git(root, "status", "--porcelain=v1"), "");
+  assert.equal(git(root, "rev-parse", "HEAD"), git(remote, "rev-parse", "refs/heads/main"));
+  assert.notEqual(git(root, "rev-parse", "HEAD"), code);
+  assertUnchanged();
+  t.diagnostic(JSON.stringify({ baseline, data, receipt: head, originals: Object.keys(f.files).length - 2,
+    mappings: receipt.mappings.length, layoutRefusal: first.detail, driftRefusal: rejected.result.detail, retired }));
+});

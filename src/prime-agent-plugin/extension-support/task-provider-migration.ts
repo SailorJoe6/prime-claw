@@ -2354,10 +2354,68 @@ function originalBacklogLayout(projectRoot: string, runner: CommandRunner) {
   return { originalStoreRelative: relative(projectRoot, store).replace(/\\/g, "/"), originalFiles, originalRootConfig };
 }
 
-/** Read-only proof for the observed fresh-store, explicit same-migration replay. */
-async function freshBacklogMigrationReplay(
-  source: BeadsSnapshot, runner: CommandRunner, openWeb: OpenBeadsMigrationWeb,
-): Promise<(worktree: string) => () => void> {
+/** Prove the narrow stopped-existing-store shape without preparing or publishing it. */
+function provePublishedBacklogCompletion(
+  source: BeadsSnapshot, runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace,
+  receipt: DestinationCandidate["receiptBase"], receiptPath: string, configuration: BeadsCurrentConfiguration,
+  configRelative: string, baseline: BacklogDestinationBaseline, outputPaths: string[],
+): void {
+  const { storeDir, head } = prepared;
+  const data = receipt.destinationDataRevision;
+  const git = (...args: string[]) => runRequired(runner, "git", ["-C", storeDir, ...args], storeDir, "verify published Backlog completion history").stdout;
+  const parents = (revision: string) => git("rev-list", "--parents", "-n", "1", revision).trim().split(" ").slice(1);
+  const [original, ...otherParents] = parents(data);
+  if (!original || otherParents.length || canonical(parents(head)) !== canonical([data])) {
+    throw new Error("published Backlog completion requires the original baseline, data and receipt as consecutive commits");
+  }
+  const diff = (before: string, after: string) => git("diff", "--no-renames", "--name-status", "-z", before, after).split("\0").filter(Boolean);
+  if (canonical(diff(data, head)) !== canonical(["M", receiptPath])) {
+    throw new Error("published Backlog completion requires a receipt-only final delta");
+  }
+  const expected = new Map<string, string>([[configRelative, "M"], ...outputPaths.map(path => [path, "A"] as const)]);
+  const delta = diff(original, data);
+  if (expected.size !== outputPaths.length + 1 || delta.length !== expected.size * 2
+      || delta.some((value, i) => i % 2 === 1 && expected.get(value) !== delta[i - 1])) {
+    throw new Error("published Backlog completion data delta changed original paths or includes unrelated output");
+  }
+  // Hash working files without filters; Git status alone can miss mode/byte
+  // differences under local config or index flags. The original trees must
+  // match the published data tree except for the exact additions above.
+  const tree = new Map(git("ls-tree", "-r", "-z", head).split("\0").filter(Boolean).map(row => {
+    const tab = row.indexOf("\t");
+    return [row.slice(tab + 1), row.slice(0, tab).split(" ")] as const;
+  }));
+  const oldConfigEntry = git("ls-tree", original, "--", configRelative).split(" ")[0];
+  if (oldConfigEntry !== tree.get(configRelative)?.[0]
+      || git("ls-tree", data, "--", receiptPath).split(" ")[0] !== tree.get(receiptPath)?.[0]) {
+    throw new Error("published Backlog completion configuration or receipt mode changed");
+  }
+  if ([...baseline.records.keys()].some(path => !tree.has(path)) || outputPaths.some(path => !tree.has(path))) {
+    throw new Error("published Backlog completion contains a native record outside the published tree");
+  }
+  for (const [path, [mode, kind, oid]] of tree) {
+    const local = join(storeDir, path), entry = lstatSync(local);
+    if (kind !== "blob" || !entry.isFile() || realpathSync(local) !== local
+        || mode !== (entry.mode & 0o111 ? "100755" : "100644")
+        || git("hash-object", "--no-filters", "--", local).trim() !== oid) {
+      throw new Error(`published Backlog completion working bytes or mode differ at ${path}`);
+    }
+  }
+  const before = git("show", `${original}:${configRelative}`);
+  const existing = editableBacklogStatuses(before);
+  if (!existing) throw new Error("published Backlog completion requires a readable original status list");
+  assertBeadsCompletionStatus(source, existing);
+  const missing = missingBacklogMigrationStatuses(source, existing);
+  const expectedStatuses = [...existing.slice(0, -1), ...missing, ...existing.slice(-1)];
+  if (!missing.length || missing.some(status => backlogStatusKey(status) === "done")
+      || canonical(configuration.statuses) !== canonical(expectedStatuses)
+      || git("show", `${head}:${configRelative}`) !== additiveBacklogStatusText(before, existing, missing)) {
+    throw new Error("published Backlog completion config differs from the exact expected additive statuses");
+  }
+}
+
+/** Read-only proof for explicit same-migration replay, with or without original records. */
+async function backlogMigrationReplay(source: BeadsSnapshot, runner: CommandRunner, openWeb: OpenBeadsMigrationWeb) {
   const storeDir = join(source.projectRoot, ".backlog");
   const selected = detectExplicitTaskProvider(source.projectRoot, "backlog", runner);
   if (selected.kind !== "selected" || selected.evidence.provider !== "backlog" || selected.evidence.storeDir !== storeDir
@@ -2393,20 +2451,30 @@ async function freshBacklogMigrationReplay(
   const memoryOutputs = receipt.backlogMemoryOutputs ?? { documents: [] };
   const memory = backlogMemoryEvidence(source, memoryOutputs, runner);
   assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [receipt.destinationDataRevision, head], runner);
-  if (views.size !== source.counts.total + 1 + (source.memories.length ? 1 : 0) || Object.keys(mapping).length !== source.counts.total
-      || canonical(receipt.mappings) !== canonical(expectedMappings)) throw new Error("fresh same-migration replay inventory/mappings do not match the verified receipt");
+  const prepared = { storeDir, head, remoteName: remote.name, remoteUrl: remote.raw, codePaths: [".gitignore", "backlog.config.yml"] };
+  const expectedCount = source.counts.total + 1 + (source.memories.length ? 1 : 0);
+  const baseline = views.size > expectedCount
+    ? captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, views, memoryOutputs, []) : undefined;
+  if (views.size !== expectedCount + (baseline?.records.size ?? 0) || Object.keys(mapping).length !== source.counts.total
+      || canonical(receipt.mappings) !== canonical(expectedMappings)) throw new Error("same-migration replay inventory/mappings do not match the verified receipt");
   const configuration = await beadsCurrentConfiguration(await openWeb(storeDir));
   assertBeadsCompletionStatus(source, configuration.statuses);
-  const paths = backlogPhysicalTaskPaths(storeDir);
-  const tasks = source.tasks.map((pkg) => {
-    const id = mapping[pkg.sourceTaskId];
-    const view = backlogDestinationViewById(views, id, pkg.sourceTaskId);
-    if (!view) throw new Error(`same-migration replay cannot read current task ${pkg.sourceTaskId}`);
-    assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration, receipt.semanticPlacement), id);
-    assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
-    return view;
+  const readTasks = (views: Map<string, JsonObject>) => {
+    const paths = backlogPhysicalTaskPaths(storeDir);
+    return source.tasks.map((pkg) => {
+      const id = mapping[pkg.sourceTaskId];
+      const view = backlogDestinationViewById(views, id, pkg.sourceTaskId);
+      if (!view) throw new Error(`same-migration replay cannot read current task ${pkg.sourceTaskId}`);
+      assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration, receipt.semanticPlacement), id);
+      const path = assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
+      return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath: relative(source.projectRoot, path).replace(/\\/g, "/"), taskEvidence: view };
+    });
+  };
+  const digest = (tasks: DestinationTask[], memory: JsonObject) => canonicalSha256({
+    preserved: baseline ? [...baseline.records] : [], imported: tasks.map(task => task.taskEvidence), ...(source.memories.length ? { memory } : {}),
   });
-  if (canonicalSha256({ preserved: [], imported: tasks, ...(source.memories.length ? { memory } : {}) }) !== receipt.destinationDataDigest) throw new Error("same-migration replay native destination digest differs from its complete receipt");
+  const tasks = readTasks(views);
+  if (digest(tasks, memory) !== receipt.destinationDataDigest) throw new Error("same-migration replay native destination digest differs from its complete receipt");
   runRequired(runner, "git", ["-C", storeDir, "merge-base", "--is-ancestor", receipt.destinationDataRevision, head], storeDir, "verify replay receipt data ancestry");
   const receiptPath = relative(storeDir, resolve(source.projectRoot, String(receiptView!.task.path))).replace(/\\/g, "/");
   const laterFiles = runRequired(runner, "git", ["-C", storeDir, "diff", "--name-only", "-z", receipt.destinationDataRevision, head], storeDir, "verify replay receipt-only native changes").stdout.split("\0").filter(Boolean);
@@ -2420,7 +2488,7 @@ async function freshBacklogMigrationReplay(
   const configRelative = relative(storeDir, resolve(source.projectRoot, link)).replace(/\\/g, "/");
   const publishedConfig = runRequired(runner, "git", ["-C", storeDir, "show", `${head}:${configRelative}`], storeDir, "read exact published replay native configuration").stdout;
   if (publishedConfig !== readFileSync(rootConfig, "utf8")) throw new Error("same-migration replay native configuration differs from the published clone");
-  return (worktree: string) => {
+  const projectLayout = (worktree: string) => {
     const codeHead = runRequired(runner, "git", ["-C", worktree, "rev-parse", "HEAD"], worktree, "read exact replay code HEAD").stdout.trim();
     if (!GIT_OID.test(codeHead)) throw new Error("same-migration replay has no exact code HEAD");
     const previousRoot = runner.run("git", ["-C", worktree, "cat-file", "-e", `${codeHead}:backlog.config.yml`], { cwd: worktree, allowFailure: true });
@@ -2429,7 +2497,10 @@ async function freshBacklogMigrationReplay(
     if (indexChanged) throw new Error("fresh same-migration replay code index differs from HEAD");
     const changed = runRequired(runner, "git", ["-C", worktree, "diff", "--name-only", "-z", codeHead], worktree, "inspect replay code changes").stdout.split("\0").filter(Boolean);
     const untracked = runRequired(runner, "git", ["-C", worktree, "ls-files", "--others", "--exclude-standard", "-z"], worktree, "inspect replay untracked paths").stdout.split("\0").filter(Boolean);
-    if ([...changed, ...untracked].some((path) => path !== ".gitignore" && path !== "backlog.config.yml")) throw new Error("fresh same-migration replay contains unrelated code changes");
+    if ([...changed, ...untracked].some((path) => path !== ".gitignore" && path !== "backlog.config.yml")) throw new Error("same-migration replay contains unrelated code changes");
+    if (baseline && worktree === source.projectRoot && (changed.length || canonical(untracked) !== canonical(["backlog.config.yml"]))) {
+      throw new Error("published Backlog completion requires only the generated root configuration link to differ from code HEAD");
+    }
     const previousIgnore = runner.run("git", ["-C", worktree, "show", `${codeHead}:.gitignore`], { cwd: worktree, allowFailure: true });
     const originalIgnore = previousIgnore.status === 0 ? previousIgnore.stdout : "";
     const ignorePath = join(worktree, ".gitignore");
@@ -2443,9 +2514,43 @@ async function freshBacklogMigrationReplay(
     const projection = migrationCodeProjection(worktree, runner, [".gitignore", "backlog.config.yml"]);
     return () => {
       if (runRequired(runner, "git", ["-C", worktree, "rev-parse", "HEAD"], worktree, "recheck replay code HEAD").stdout.trim() !== codeHead
-          || migrationCodeProjection(worktree, runner, [".gitignore", "backlog.config.yml"]) !== projection) throw new Error("fresh same-migration replay layout projection changed");
+          || migrationCodeProjection(worktree, runner, [".gitignore", "backlog.config.yml"]) !== projection) throw new Error("same-migration replay layout projection changed");
     };
   };
+  let completion: ((rows: ActiveMigrationOwnership[], verifyCodeProjection: () => void) => DestinationCandidate) | undefined;
+  if (baseline) {
+    if (link !== ".backlog/config.yml" || realpathSync(storeDir) !== storeDir
+        || runRequired(runner, "git", ["-C", storeDir, "rev-parse", "--absolute-git-dir"], storeDir, "read completion Git directory").stdout.trim() !== join(storeDir, ".git")
+        || runRequired(runner, "git", ["-C", storeDir, "rev-parse", "--path-format=absolute", "--git-common-dir"], storeDir, "read completion common Git directory").stdout.trim() !== join(storeDir, ".git")) {
+      throw new Error("published Backlog completion requires the exact independent clone and generated root link");
+    }
+    const relativeOutput = (path: string) => relative(storeDir, resolve(source.projectRoot, path)).replace(/\\/g, "/");
+    const outputPaths = [receiptPath, ...tasks.map(task => relativeOutput(task.taskPath)),
+      ...[...memoryOutputs.documents, ...(memoryOutputs.index ? [memoryOutputs.index] : []), ...(memoryOutputs.userTask ? [memoryOutputs.userTask] : [])]
+        .map(row => relativeOutput(row.path))];
+    provePublishedBacklogCompletion(source, runner, prepared, receipt, receiptPath, configuration, configRelative, baseline, outputPaths);
+    completion = (rows, verifyCodeProjection) => {
+      const transitions = rows.map(row => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));
+      if (canonical(transitions) !== canonical(receipt.ownershipTransitions)) throw new Error("published Backlog completion ownership mappings differ from the receipt");
+      const refresh = () => {
+        const exact = cleanGitRevision(runner, storeDir);
+        if (exact !== head) throw new Error("published Backlog completion receipt revision changed");
+        assertPublishedGitRef(runner, storeDir, head, remote.name, remote.raw, TASK_HISTORY_REF, "Backlog completion receipt publication");
+        const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "published completion refresh");
+        if (views.size !== expectedCount + baseline.records.size) throw new Error("published Backlog completion inventory changed");
+        assertPreservedBacklogBaseline(baseline, storeDir, runner, views);
+        assertExactBacklogReceipt(views, receiptId, receipt);
+        const tasks = readTasks(views);
+        assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [receipt.destinationDataRevision, head], runner);
+        const refreshedDigest = digest(tasks, backlogMemoryEvidence(source, memoryOutputs, runner));
+        if (refreshedDigest !== receipt.destinationDataDigest) throw new Error("published Backlog completion content differs from the receipt");
+        return { revision: head, digest: refreshedDigest, tasks, receiptTaskId: receiptId };
+      };
+      return verifiedBacklogCandidate(source, runner, prepared, rows.length ? originalBacklogLayout(source.projectRoot, runner) : null,
+        receipt, verifyCodeProjection, refresh);
+    };
+  }
+  return { projectLayout, completion };
 }
 
 function migrationCodeProjection(projectRoot: string, runner: CommandRunner, allowed: string[]): string {
@@ -2478,8 +2583,6 @@ async function migrateBeadsToBacklog(
     if (statuses) assertBeadsCompletionStatus(source, statuses);
   }, assertBacklogPairIsNotMigrationTarget);
   const originalLayout = originalBacklogLayout(source.projectRoot, runner);
-  const activeCodeProjections = new Map<string, () => void>();
-  const activeLayoutPublishers = new Map<string, () => string>();
   const prepared = prepareExplicitBacklogMigrationWorkspace(source.projectRoot, runner);
   prepared.codePaths = [...new Set([...prepared.codePaths, ...(parked?.codePaths ?? [])])];
   const storeDir = prepared.storeDir;
@@ -2644,9 +2747,20 @@ async function migrateBeadsToBacklog(
     });
     return { revision: exact, digest: destinationDigest(refreshed), tasks: refreshed, receiptTaskId };
   };
-  const final = refresh();
+  return verifiedBacklogCandidate(source, runner, prepared, originalLayout, receiptBase, verifyCodeProjection, refresh);
+}
+
+function verifiedBacklogCandidate(
+  source: BeadsSnapshot, runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace,
+  originalLayout: ReturnType<typeof originalBacklogLayout>, receiptBase: DestinationCandidate["receiptBase"],
+  verifyCodeProjection: () => void, refresh: DestinationCandidate["refreshAfterReceipt"],
+): DestinationCandidate {
+  const { storeDir } = prepared;
+  const final = refresh(), receiptRevision = final.revision;
+  const activeCodeProjections = new Map<string, () => void>();
+  const activeLayoutPublishers = new Map<string, () => string>();
   return {
-    provider: "backlog", revision: final.revision, digest: final.digest, receiptBase, receiptTaskId, tasks: final.tasks,
+    provider: "backlog", revision: final.revision, digest: final.digest, receiptBase, receiptTaskId: final.receiptTaskId, tasks: final.tasks,
     codePaths: prepared.codePaths, verifyCodeProjection, activeCodeProjections,
     publishActiveCodeLayout(worktree: string) {
       const publish = activeLayoutPublishers.get(worktree);
@@ -3286,7 +3400,8 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     if (source.provider === options.targetProvider) return blocked("same-provider", `the selected provider is already ${source.provider}`, "choose the other supported provider", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     if (source.revision !== options.expectedSourceRevision) return blocked("source-revision-changed", `confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`, "quiesce mutations, request a fresh inspection, and confirm that exact revision", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     await checkpoint();
-    const replayProjection = initialCodeStatus && source.provider === "beads" ? await freshBacklogMigrationReplay(source, runner, openBacklogWeb) : undefined;
+    const replay = initialCodeStatus && source.provider === "beads" ? await backlogMigrationReplay(source, runner, openBacklogWeb) : undefined;
+    const replayProjection = replay?.projectLayout;
     if (initialCodeStatus && !replayProjection) throw new Error(`source task history is not clean: ${initialCodeStatus.trim()}`);
     const verifyInitialProjection = replayProjection?.(project.root);
     verifyInitialProjection?.();
@@ -3306,7 +3421,8 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     const timestamp = (options.now ?? (() => new Date().toISOString()))();
     if (Number.isNaN(Date.parse(timestamp))) throw new Error("migration timestamp is not RFC3339");
     verifyInitialProjection?.();
-    const candidate = source.provider === "backlog"
+    if (replay?.completion) await closeVerifiedWeb();
+    const candidate = replay?.completion ? replay.completion(ownershipRows, verifyInitialProjection!) : source.provider === "backlog"
       ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), beadsPlacements, ownershipRows)
       : await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, closeVerifiedWeb, checkpoint);
     await checkpoint("Rechecking the receipt, source and ownership before cutover");
