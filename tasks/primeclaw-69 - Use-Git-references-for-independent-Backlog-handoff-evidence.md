@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T08:10:00Z'
+updated_date: '2026-11-24T08:20:00Z'
 labels: []
 dependencies: []
 references:
@@ -37,6 +37,7 @@ modified_files:
   - tests/test_reviewed_plan_extension.py
   - tests/task_episode_ownership_extension.test.mjs
   - tests/task_providers.test.mjs
+  - tests/test_task_providers.py
 priority: p0
 type: bug
 ordinal: 153000
@@ -133,6 +134,8 @@ Branch-local creation result revision: after the single initial assignment, the 
 Independent Backlog status mutation/publication slice at 35ad1a880d0ba3ff661bf61a5bc28220a626bd5f: committed results carry exact independent repository/commit/literal-path refs bound to native task identity, not copied ticket JSON or diffs. Pre-commit failures do not claim a new committed ticket; failed or interrupted pushes retain verified local evidence separately from publishedHead. Preserved exact-path commits, native auto-commit, legacy reservation inputs, separate remote observation and one push without retry. Beads unchanged. Registered independent oversized creation fixture now streams byte count and checks body hash and bounded frontmatter/tail. Focused offline Docker 458/458 (.test-results/primeclaw-69-mutation-results/candidate-focused.log); Tier 1 passed from the unchanged clean candidate with networking absent and clean teardown (.test-results/20261124T074820Z-17980-bb7c0ca7/tier1/manifest.json). Wider preliminary Beads journal identity failure reproduced on accepted baseline (.test-results/primeclaw-69-mutation-results/ownership-baseline.log). No live status edit, assignment, merge or activation.
 
 Publication revision e51c5121efaf6135541d3e43584e75732fe23177: reuse bounded native identity reads and discard native edit output. A failed or mismatched final pre-edit read stops before edit, commit, or push. Nonzero push with no exact remote proof is uncertain; exact observed publication preserves the nonzero push fact, and neither path retries. New reservations require verified exact committed Git references; legacy nativeAfter is never copied and historical records are unchanged. Exact-path authoring and unrelated staging are preserved. Offline Docker: 461/461 (.test-results/primeclaw-69-mutation-revision/candidate-focused.log) plus 3/3 reservation tests (.test-results/primeclaw-69-mutation-revision/candidate-reservation.log), including a valid >1 MiB native task, ID/path drift, unclear remote outcomes, and historical retention. Tier 1 from clean candidate passed offline with teardown verified (.test-results/20261124T080413Z-74357-68141d19/tier1/manifest.json). Wider Beads journal identity issue and standalone provider import cycle reproduced on baseline; no Beads behavior change. No live mutation test, TASK-2 action, merge or activation.
+
+Retained ownership transition candidate 328d5e96b209f33827492b041834a271f39598d1: both Backlog layouts verify the exact committed ticket in the existing primary and Episode workspaces. Independent Backlog persists the published Git reference; branch-local ownership retains its existing format and reports refs at the reviewed code heads. Historical raw records remain unchanged, and replay reports verified refs instead of copying the old view. Missing or mismatched evidence stops before authority replacement. Offline Docker: 551/551 focused tests and 26/26 ownership tests (.test-results/primeclaw-69-transition/candidate-focused.log and .test-results/primeclaw-69-transition/candidate-ownership.log), including a native task view over 1 MiB, missing or mismatched refs, publication drift, and legacy replay. Tier 1 passed on the clean candidate with offline teardown verified (.test-results/20261124T081755Z-9351-48dbb50d/tier1/manifest.json). No live transition, provider cutover, terminal or oversight work, TASK-2 action, merge, or activation.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -163,4 +166,6 @@ Branch-local creation now reports a fresh post-assignment task observation or a 
 Independent Backlog status publication results now identify exact committed ticket evidence without copying content or confusing a retained local commit with publication.
 
 Backlog publication now uses bounded native reads, stops on pre-edit identity drift, reports uncertain pushes separately from publication proof, and writes only verified committed references to new reservations.
+
+The retained ownership transition now uses verified committed Backlog references in both layouts, without rewriting historical records or replacing Episode resources.
 <!-- SECTION:FINAL_SUMMARY:END -->
