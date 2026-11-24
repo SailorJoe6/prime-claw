@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T07:10:00Z'
+updated_date: '2026-11-24T07:16:00Z'
 labels: []
 dependencies: []
 references:
@@ -85,6 +85,8 @@ No bulk rewrite or rollout gate. Read existing records compatibly and leave hist
 Step 3 revision of `125bcb5b` only: expose a private-safe checkpoint, exact revision and bounded failure category at the registered execute-only tool for invalid previous versus fetched published evidence; test that distinction and the exact pre-delivery/no-resend behavior. Keep the Git reader memory bounded during native verification of committed frontmatter without an arbitrary size gate, independent YAML parsing, persistent state or saved ticket copies. Correct the stale 64 KiB statement in the docs. Preserve bindings, history and delivery sequencing. Validate in focused offline Docker and Tier 1; report the broader-suite limits without adding a new gate. Publish task evidence and code separately, then stop for owner review. No later lifecycle work, TASK-2, merge or activation.
 
 Owner accepted independent Backlog handoff revision `d48fe435`. Next bounded step 3 slice only: branch-local Backlog ordinary handoff and execute-only continuation. Use exact committed code-repository Git references for ticket-state evidence and bounded on-demand reads; preserve branch-local native authority, delivery sequencing, and Beads and independent Backlog behavior. Where a historical checkpoint is required, use only an exact verifiable recorded revision; a legacy path alone is not proof. Report missing or mismatched required evidence before delivery; no fallback to HEAD, mutable files or copied snapshots. No new persistent state, readiness logic, resend or replacement. Prove representative branch-local success and evidence gaps offline in Docker and run the Tier 1 probe. Publish task and code separately and stop for review. No later lifecycle work, original TASK-2 action, merge or activation.
+
+Owner accepted branch-local ordinary handoff and execute-only slice `70101a43` for the reviewed scope; its Tier 1 precommit run is not exact-commit proof. Next bounded slice only: branch-local Backlog creation and its single initial execute assignment, from pre-allocation and existing status publication/reservation through pre-session. Use exact committed code-repository references for ticket-state evidence without copies or full-response buffering. Reuse existing branch-local native authority, exact identity/publication checks and bounded reader mechanics. Preserve the task-only status commit as code base where applicable, same-operation recovery, and no second assignment. No new size limit, persistent state or readiness policy. Prove the registered path in offline Docker with a representative committed ticket and run Tier 1. Leave independent Backlog, Beads, continuation and other lifecycle changes untouched except shared mechanical reuse. No TASK-2 action, merge or activation. Publish task and code evidence separately and stop for review.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
