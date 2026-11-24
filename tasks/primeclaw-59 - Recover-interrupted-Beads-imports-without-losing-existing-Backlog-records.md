@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T14:14:00Z'
+updated_date: '2026-11-24T14:24:00Z'
 labels: []
 dependencies: []
 references:
@@ -844,4 +844,11 @@ Initialize PVA reported that on loaded `12a96f61` the owned Web shutdown uncerta
 
 ### Disposable layout-refusal reproduction — first checkpoint
 Offline native Docker run `99655` on Episode baseline `c334c44d6f55886cc2b28afc1c3c69324d078d9b` reached the exact `code layout projection changed during provider migration` refusal after direct receipt publication and a receipt-only child of the data revision, with the generated root link as the only dirty code path and the original code index unchanged. The subsequent fixture assertion failed because its expected string used pre-isolation config settings and the wrong insertion spacing. TAP SHA-256 `92f3f63eccdedf588f185e809dc05f426ed186078fbe4163f636e4888efe92ab`; owned container absent. This is a reproduction of the synthetic failure boundary, not evidence about the live cause. Stable rerun and guarded completion are pending. No live PVA access or writes.
+
+### Receipt-bound completion — validated candidate for independent review
+Episode code `082570c00ecc0f12335b522e96bb383c3207e73b` (parent `c334c44d6f55886cc2b28afc1c3c69324d078d9b`, tree `d12d2e5f6f046704bc8ad41aa53c1548b826d8b6`, patch SHA-256 `3b132943ef0a35c556847e3b4855aa44cbb3be71e830c610f5542ac674982599`) was published directly on the same Episode branch. The new existing-store completion path requires the exact generated link as the only differing primary code path, the bound source capture, original baseline/data/receipt as consecutive Git commits, and a receipt-only final delta. It checks the expected additive status change, original paths/bytes/Git modes and ancestry, native mappings/content/memory, receipt and ownership bindings, and carries the original data and receipt revisions into the existing guarded cutover. It does not reimport, rewrite or republish the Backlog task branch; other history/layout shapes are not repaired by this path. See `docs/project-initialization.md`.
+
+Exact offline Docker regression (`22858`, 1 passed, 0 skipped, TAP SHA-256 `eb9a360b0aea7d2b8e1699ee7fa9e4c982b5cebf00fb6c63b14dc10143150e68`; owned container absent) used a genuine embedded Beads source and independent Backlog repository with five originals, three issue mappings, and a native public memory. The first call hit `code layout projection changed during provider migration` after direct publication (fixture baseline `4f888ee7d61dbec21b070da5f4bb0a972c739847`, data `ff44107e8da1bd24652d016839c6843da760affa`, receipt `302ca253a9df153820a3f2f1a2a1873ed9e5c9ee`). Tracked `.gitignore` drift then refused before retirement without authoring on either provider. With the fixture drift removed, the exact source and destination passed guarded cutover once; the retirement callback moved only the disposable source and native lock within tmpfs. The Backlog ref and entire task tree were unchanged, with GET-only Web requests and no Backlog authoring or task Git publication. The earlier focused misses were fixture oracles/hook only (isolated config bytes, encounter order of synthetic IDs, adjacent fixture gate lock). Exact `scripts/test-tier1.sh --probe` passed (`20261124T142119Z-25057-170b758f`, manifest SHA-256 `b619bc47ff3facac09457264587a10f863165f2bc1d4f762352237eb3d975e0e`, 444 repository inputs, 15 hash-verified artifacts, offline and both containers absent).
+
+This proves the bounded synthetic stop/remediation, not the live cause, live eligibility, scale, or active-Episode transitions in this fixture. Stop for independent same-provider Astra high review by the owning Conversation. No deployment, live PVA access/retry/switch/deletion, or hold release. Keep In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d`.
 <!-- SECTION:NOTES:END -->
