@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T21:47:00Z'
+updated_date: '2026-11-24T22:32:00Z'
 labels: []
 dependencies: []
 references:
@@ -618,4 +618,9 @@ The owning Conversation relayed Joe’s direct approval and explicitly instructe
 
 ### Fresh-only execute following b7b503ea
 First implementation slice: make fresh-destination eligibility identical for inspection and confirm, refuse local or published installations before writes, and remove the superseded migration recovery/adoption routes used by that boundary. Validate refusal and untouched destination in disposable fixtures; preserve the current-state import and PRIMECLAW-69 immutable receipt-revision ticket evidence. Integrate published main 110e200e in this Episode only. Separately prove retained Beads backup, cutover and remaining simplification before claiming the full task complete.
+
+### Reconciled checkpoint after interruption of b7b503ea
+Saved Episode-only code `3f665a29aaf7ac1d85e640d5df44fb235264cd70` (tree `0425967a81762d3caede8b73b569bb9460ad2ae6`) is clean and not published. It incorporates published main `110e200e5754b2bdb517db3c2c4846cdb7a86c16`, including immutable published ticket evidence, and removes parked-store reconciliation, reuse of existing destination tickets and receipt replay. The saved snapshot passed 13/13 focused disposable Docker tests, including refusal without writes and fresh import with active Episode continuity (TAP SHA-256 `5502deb45d35350d1169a77f7f5c0c260dd9ede47de9619a28993c73fa8d971c`). No final result for Tier 1 run `20261124T215906Z-76499-8c383bb9`: its log records a broken output pipe, the final manifest is absent, and both recorded container IDs are absent. Do not replay or credit that run.
+
+On the separately delivered execute, continue from the saved code within the published fresh-only scope. Implement and prove a retained restorable Beads backup before verified switch and guarded original-source retirement. Prove refusal and active Episode continuity against the resulting tree; run exact-candidate Docker Tier 1 with durable logs and terminal status independent of the worker output pipe. Then publish code and native evidence separately or report a concrete blocker. No change to lifecycle, canonical main, deployment or live systems.
 <!-- SECTION:NOTES:END -->
