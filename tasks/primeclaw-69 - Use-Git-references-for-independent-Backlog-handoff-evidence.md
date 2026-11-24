@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T05:11:00Z'
+updated_date: '2026-11-24T05:17:00Z'
 labels: []
 dependencies: []
 references:
@@ -28,6 +28,7 @@ modified_files:
   - tests/backlog_creation_identity.test.mjs
   - tests/spec_episode_extension.test.mjs
   - tests/task_episode_admission_extension.test.mjs
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
 priority: p0
 type: bug
 ordinal: 153000
@@ -90,6 +91,8 @@ Accepted next slice (plan step 2 only): accept the two reviewed reader fixes at 
 Plan step 2 stopped before implementation (creation portion of AC1/AC2/AC4). Offline Docker, pinned Backlog 1.55.3 (0cf4fdbc), committed TASK-1 fixture: native view succeeded at 1,101,383 JSON bytes with the exact ID/path/status, but Node returned ENOBUFS with its default buffer and the production resolveBacklogTask rejected it. The same valid ticket placed its quoted ID after a 70 KiB YAML comment; makeBacklogGitEvidence refused it at the 64 KiB frontmatter limit. Native task list JSON returned ID/status but no file path; compact native edit output returned only the ID. Plain task view is a human-rendered full detail view, not a structured exact identity projection. Git can prove a path/blob but cannot prove the provider selected that canonical task from an ID by itself. Current creation uses full detail before allocation, inside status publication and reservation, and separately before session assignment. Did not wire the scratch reader, increase buffers, add persistence, or change code. Repro and result: .test-results/primeclaw-69-creation-native-compat/{fixture.sh,result.log}. Unblock by identifying a supported exact native ID/path/status observation without full task-detail JSON or a new ticket size rule, or obtain an explicit owner decision on a revised bounded transport approach. No end-to-end assignment proof and no acceptance criteria checked.
 
 Plan step 2 candidate (partial AC1/AC2/AC4), code 2fa5c80943eae6943891ee900213ff1bedb54f51: fresh independent Backlog creation streams native task-view JSON before allocation, around native status publication and reservation, and before session start in the Episode checkout. Only exact ID/path/status are retained for mechanical checks; new ownership and the initial execute observation contain Git references, not ticket snapshots. Existing reservation recovery stays compatible. No higher buffer, ticket size limit, scratch reader prerequisite, new persistent state, or deterministic readiness. Offline Docker with pinned Backlog 1.55.3 proved the production creation path with a committed native ticket yielding >1 MiB JSON and >64 KiB frontmatter, both checkpoints before session allocation, exact operation ownership, and one initial execute via the fixture session adapter. All 440 tests passed with no skips: .test-results/primeclaw-69-streamed-creation/docker-clean.log. Tier 1 source probe passed offline with verified teardown: .test-results/20261124T050034Z-28113-b8a224bb/tier1/manifest.json. No broader continuation, branch-local, or Beads evidence wiring, original TASK-2 action, AWS, merge or activation. No full acceptance criterion marked complete. Stop for owner review.
+
+Step 2 revision candidate 981871d5e4e7a9d9523c4d4269072283bf57651e: the registered create_task_episode entry streams exact native identity for fresh independent Backlog creation, without changing the existing-operation route or other providers. Before assignment the Episode clone resolves both the reserved and fetched published blobs. A retained local advance is a separate observation, not a published revision; the clone is not reset or pushed. Registered-tool offline tests with pinned Backlog 1.55.3 cover a committed native view over 1 MiB and one initial execute through the test session adapter, a shallow retained clone missing the previous commit (no session or assignment, same operation retained), and a retained local ticket commit ahead of the fetched ref (no push). All 442 tests passed, no skips: .test-results/primeclaw-69-streamed-creation/docker-revision-full.log. Offline Tier 1 source probe passed with verified teardown: .test-results/20261124T051519Z-573-f76b062c/tier1/manifest.json. Step 2 only; no later lifecycle wiring, acceptance checkoffs, merge or activation. Await owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -101,3 +104,9 @@ created: 2026-11-24 04:53
 Operator cleared the creation blocker by choosing option A: stream the native Backlog task-view JSON in chunks for exact identity verification at the independent creation checkpoints and retain only the required facts in memory. This is a narrow exception to the plan wording about requiring the native full-detail command, not permission to buffer or persist its full response. Git references remain the only stored ticket-state evidence. No higher buffer, new ticket-size limit, new persistent state, or scope change. Resume the same Episode; the Episode maintains the living plan.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Step 2 revision published for owner review: registered independent Backlog creation streams native identity and verifies both committed references before assignment. Published and retained local revisions remain distinct. Offline Docker: 442 passed, including the registered large-ticket and retained-clone cases. Later Backlog lifecycle work remains open.
+<!-- SECTION:FINAL_SUMMARY:END -->
