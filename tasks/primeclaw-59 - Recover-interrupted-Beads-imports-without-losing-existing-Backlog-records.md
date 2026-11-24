@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T15:53:00Z'
+updated_date: '2026-11-24T17:42:00Z'
 labels: []
 dependencies: []
 references:
@@ -408,6 +408,11 @@ Pass the verified ownership rows or exact projection lookup from both callers to
 Prepare one minimal combined candidate on this original Episode branch from reviewed source `2ff53f96c39d2bdb23365d90ac93eb7730c83981` and independent task evidence `ea118648b54a8219e753f449a20c0bf9256ddb17`. The owner verified local, upstream and direct remote main at `12a96f61e1dbcdd796f92ff8dc3c61470f28834f`. Recheck main directly before integration and report drift if it changed. Preserve main behavior and unrelated work, carry only the narrow reviewed delta, exclude historical experiments, and preserve Episode branch history without force. Do not modify the primary checkout or its pending `.prime-claw/ownership.json`.
 
 On the exact combined tree run offline disposable tests for completion from already-published data and receipt with the original live/archive same-ID records preserved, no re-import or destination writes/republication, and continued drift refusals. Run the separate existing normal forward active-Episode regression and exact Docker Tier 1. Report the exact main target and tested candidate, the diff and any resolutions, and the validation or concrete blocker for independent review. Publish only the Episode candidate and the exact task evidence normally. Keep In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d`. Stop after reporting. No main merge, deployment, restart, live PVA access/retry/cutover, Beads retirement, Episode closure, hold release or duplicate assignment.
+
+### Next canonical execute — public switch-request inspection only
+Use the existing PRIMECLAW-59 Episode, exact base/current main `482b7d9256d093705eae4a24f99ea9e7c03507e5`, and observed independent task revision `f6ba682919226726a15ed1b8174c6f8672c03595`. Correct only the public inspection path: accept the verified stopped shape with the exact untracked generated `backlog.config.yml -> .backlog/config.yml`, independently published Backlog destination, original records, and bound receipt. Reject unrelated or staged drift and the wrong link or destination. Keep the normal clean path and the confirmed replay, source, and source-retirement guards intact.
+
+Exercise actual public `switch-request` in a genuine stopped disposable fixture. Do not move the link. Prove inspection does not mutate source, destination, refs, layout, or ownership. Use its result for subsequent guarded completion through the internal disposable fixture harness only; prove reuse of unchanged published data and receipt without re-import, destination writes, or republication. Do not invoke public `switch-confirm`. Run exact-candidate Docker Tier 1. Publish only the Episode candidate and exact task evidence, or report a concrete blocker to the owner for independent same-provider Astra high review. Preserve In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d`. No live PVA access or link move, main merge, install, restart, live retirement, hold release, duplicate work, or scope expansion.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -887,4 +892,7 @@ Episode `482b7d9256d093705eae4a24f99ea9e7c03507e5` (tree `18fa49f6cafd5ee8d411c2
 Offline focused run `15957` passed 4/4, no skips (TAP SHA-256 `87d53c7d610b0d9d2ddfe73291f50b6f783d5a7768fcce7d1605b08c9fb462d2`). In a disposable fixture, the first switch stopped at the code layout guard after publishing data `2c28886b7f8f422b5ace942a990a995a505ed828` and receipt `03b1cc196e650e2278b933fd8a1a360748c95efc` from baseline `fa059286085ef9b09355ca5f7e6c5a402b9c30b8`. The guarded completion reused them unchanged without re-import, destination task or Git writes, or republication. All seven originals remained, including both BASE-12 records with the same ID, distinct bytes/modes, and preserved paths and history. Unrelated tracked layout drift and ambiguous receipt-mapped import and memory USER targets still refused. A separate normal forward regression preserved the active Episode identity. Fixture retirement is not live retirement evidence.
 
 Exact Docker Tier 1 `--probe` `20261124T155038Z-16023-aca1e340` passed (manifest SHA-256 `2ecf78a121045fe96a6549572c7dfd2de7c4fe64aca328c5976ebc6bdf87a2d6`, 477 input entries, all 15 artifact hashes verified). Owned focused, Tier 1, and builder containers are absent; Tier 1 confirmed the network absent and the watcher was canceled. Await independent read-only review. In Progress, 0/9 checked, null Final Summary, and PVA-first `c6e0a3d` remain. No main merge, deployment, restart, live PVA access, retry, cutover or Beads retirement, Episode closure or hold release.
+
+### Released switch-request refusal — owner relay and bounded correction
+Initialize PVA reports that the live read-only public `switch-request` on `482b7d9256d093705eae4a24f99ea9e7c03507e5` returned `source task history is not clean: ?? backlog.config.yml` before source inspection. The owner relayed that the existing path is the generated symlink to `.backlog/config.yml`. These are reports, not Episode observations, and prove neither receipt validity nor permission for live access or cutover. The prior exact integration evidence remains scoped to its tested tree. This continuation is for the approved inspection-only correction and disposable proof, not a retry or a workaround on live files. Both PVA tracker-writer holds remain.
 <!-- SECTION:NOTES:END -->
