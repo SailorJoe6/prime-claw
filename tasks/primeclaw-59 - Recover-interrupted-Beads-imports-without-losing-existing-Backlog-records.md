@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T18:24:00Z'
+updated_date: '2026-11-24T18:32:00Z'
 labels: []
 dependencies: []
 references:
@@ -915,4 +915,7 @@ The owner relays Joe’s explicit decision to replace `a021ae71` with the single
 
 ### Direct operator confirmation — target-ID overwrite scope
 The operator confirmed that current Beads content replaces matching Backlog ticket content, including user-edited matches, and unmatched tickets are left untouched. This scope-only revision supersedes the old collision wording. No implementation or live action was started.
+
+### Execute following 5d2325e9 — implementation baseline
+The Episode starts at requirements commit 7ba3b977. The integration branch advanced to 110e200e and changed migration cutover to bind immutable Backlog ticket evidence at the published receipt revision. Preserve that cutover behavior when simplifying the target write/readback path. Validate only selected targets and required publication/ownership evidence; exercise empty, mixed and interrupted/rerun disposable fixtures before Docker Tier 1.
 <!-- SECTION:NOTES:END -->
