@@ -91,7 +91,7 @@ function actionSummary(value: unknown, detailed = true): string {
   }
   if (value && typeof value === "object" && (value as any).status === "completed" && "receipt" in (value as any)) {
     const migration = value as Extract<ProviderMigrationResult, { status: "completed" }>;
-    return `Prime Claw provider switch completed: ${migration.receipt.sourceProvider}->${migration.receipt.targetProvider} source=${migration.receipt.sourceRevision} destination=${migration.receipt.destinationReceiptRevision} receipt=${migration.receiptTaskId} source-absent=true`;
+    return `Prime Claw provider switch completed: ${migration.receipt.sourceProvider}->${migration.receipt.targetProvider} source=${migration.receipt.sourceRevision} destination=${migration.receipt.destinationReceiptRevision} receipt=${migration.receiptTaskId} source-absent=true${(migration.warnings ?? []).map(warning => `\nWarning: ${warning}`).join("")}`;
   }
   if (value && typeof value === "object" && (value as any).status === "blocked" && "code" in (value as any) && "targetProvider" in (value as any)) {
     const migration = value as Extract<ProviderMigrationResult, { status: "blocked" }>;
@@ -132,7 +132,7 @@ function productionReconcileOptions(dependencies: ProjectInitializationDependenc
 }
 
 async function executeAction(action: Action, args: ActionArguments, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies,
-  signal?: AbortSignal, onProgress?: (phase: string) => void,
+  signal?: AbortSignal, onProgress?: (phase: string, level?: "warning") => void,
 ) {
   switch (action) {
     case "reconcile": return reconcilePrimeClawProject({
@@ -228,7 +228,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
             semanticPlacement: params.semanticPlacement,
             unpublishedLocalOnly: params.unpublishedLocalOnly === true,
           }, ctx, dependencies, switching ? signal : undefined,
-            switching ? (phase) => notify(`Prime Claw provider switch: ${phase}`, "info") : undefined);
+            switching ? (phase, level) => notify(`Prime Claw provider switch: ${phase}`, level ?? "info") : undefined);
           const summary = actionSummary(value);
           // The host can stop waiting for the tool before its Promise settles.
           // Use the independent extension UI notification for its real outcome.

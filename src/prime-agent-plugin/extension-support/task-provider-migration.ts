@@ -144,6 +144,7 @@ export interface ProviderMigrationCompleted {
   receiptTaskId: string;
   sourceAbsent: true;
   selectedProvider: TaskProviderId;
+  warnings?: string[];
 }
 
 export type ProviderMigrationResult = ProviderMigrationCompleted | ProviderMigrationBlocked;
@@ -160,7 +161,7 @@ export interface ProviderMigrationOptions {
   runner?: CommandRunner;
   now?: () => string;
   signal?: AbortSignal;
-  onProgress?: (phase: string) => void;
+  onProgress?: (phase: string, level?: "warning") => void;
   deleteSource?: (snapshot: SourceSnapshot, runner: CommandRunner) => void;
   verifyActiveRuntime?: (records: readonly TaskEpisodeOwnershipRecord[]) => Promise<Array<{
     ownerSessionId: string;
@@ -2467,6 +2468,7 @@ async function migrateBeadsToBacklog(
   semanticPlacement: string,
   ownershipRows: Array<{ ownerSessionId: string; taskId: string; worktree: string; verifyCodeProjection?: () => void }>,
   openWeb: OpenBeadsMigrationWeb,
+  closeVerifiedWeb: () => Promise<void>,
   checkpoint: MigrationCheckpoint,
 ): Promise<DestinationCandidate> {
   assertSelectedBacklogMemoryTargetBeforePreparation(source, runner);
@@ -2513,9 +2515,9 @@ async function migrateBeadsToBacklog(
   const expectedStatuses = !existingReceiptId && !reusedDestinationIds.size
     ? prepareRequiredBacklogMigrationStatuses(source, prepared, baseline, runner) : undefined;
   await checkpoint("Importing and verifying Backlog tasks");
-  const web = await openWeb(storeDir);
   let configuration: BeadsCurrentConfiguration;
-  try {
+  {
+    const web = await openWeb(storeDir);
     configuration = await beadsCurrentConfiguration(web);
     if (expectedStatuses && canonical(configuration.statuses) !== canonical(expectedStatuses)) {
       throw new Error("owned native startup status readback mismatch; STOP and retain config without task allocation or resend");
@@ -2574,11 +2576,10 @@ async function migrateBeadsToBacklog(
       assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration, relationshipPlacement), id);
       assertBacklogLifecyclePlacement(pkg, id, view, storeDir, paths);
     }
-  } finally {
-    // Await owned server/readback descendants before synchronous publication or
-    // any ownership/source cutover. No provider records are cleaned up here.
-    await web.close();
   }
+  // No more migration Web operations after this point. Only the verified
+  // import/readback path can treat an unproved stop as a warning.
+  await closeVerifiedWeb();
   await checkpoint("Publishing verified data and receipt");
   const bookkeepingType = configuration.types.find((value) => value.trim().toLowerCase() === "task")
     ?? configuration.types[0] ?? "task";
@@ -3015,12 +3016,29 @@ function exactSelectedTarget(projectRoot: string, target: TaskProviderId, runner
   else checkBeadsCapabilities(projectRoot, runner);
 }
 
+const WEB_STOP_WARNING = "Owned Web shutdown was not proved (owned-process-stop-unproved; outcome=uncertain). Private transport files retained.";
+
+function webStopUnproved(error: unknown): boolean {
+  return error instanceof MigrationBacklogWebError && error.stage === "owned-process-stop-unproved" && error.outcome === "uncertain";
+}
+
 export async function migrateTaskProvider(options: ProviderMigrationOptions): Promise<ProviderMigrationResult> {
   const runner = migrationRunner(options.runner);
   let source: SourceSnapshot | undefined;
   let ownershipSwitch: ActiveTaskProviderOwnershipSwitchResult | undefined;
   let backlogWeb: BeadsMigrationWeb | undefined;
   let backlogWebStore: string | undefined;
+  let closeAttempt: ReturnType<BeadsMigrationWeb["close"]> | undefined;
+  let webWarning: string | undefined;
+  const closeWeb = () => backlogWeb ? (closeAttempt ??= backlogWeb.close()) : undefined;
+  const closeVerifiedWeb = async () => {
+    try { await closeWeb(); }
+    catch (error) {
+      if (!webStopUnproved(error)) throw error;
+      webWarning = WEB_STOP_WARNING;
+      options.onProgress?.(webWarning, "warning");
+    }
+  };
   const checkpoint: MigrationCheckpoint = async (phase) => {
     // Synchronous native commands cannot see an RPC/keyboard abort while the
     // event loop is blocked. Let the operator input run before the next phase.
@@ -3079,7 +3097,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     verifyInitialProjection?.();
     const candidate = source.provider === "backlog"
       ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), beadsPlacements, ownershipRows)
-      : await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, checkpoint);
+      : await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, closeVerifiedWeb, checkpoint);
     await checkpoint("Rechecking the receipt, source and ownership before cutover");
     for (const owner of ownershipRows) {
       candidate.prepareActiveWorktree(owner.worktree);
@@ -3187,16 +3205,22 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       ownershipTransitions: ownershipSwitch.transitions,
       destinationReceiptRevision: candidate.revision,
     };
-    return { status: "completed", receipt, receiptTaskId: candidate.receiptTaskId, sourceAbsent: true, selectedProvider: candidate.provider };
+    return { status: "completed", receipt, receiptTaskId: candidate.receiptTaskId, sourceAbsent: true, selectedProvider: candidate.provider,
+      ...(webWarning ? { warnings: [webWarning] } : {}) };
   } catch (error) {
-    // Fresh replay can fail before the forward writer's finally is entered.
-    // A failed owned-stop proof is itself the reported uncertainty; no retry.
-    try { await backlogWeb?.close(); } catch (stopError) { error = stopError; }
+    // Close the same owned transport on any earlier exit; do not retry shutdown
+    // or replace the primary failure with a rejected close.
+    let teardownError = error instanceof MigrationBacklogWebError ? error.teardownError : undefined;
+    try { await closeWeb(); } catch (stopError) { teardownError ??= stopError; }
+    const teardownWarning = webWarning ?? (webStopUnproved(teardownError) ? WEB_STOP_WARNING
+      : teardownError && teardownError !== error ? "Owned Web teardown also failed; shutdown was not proved." : undefined);
     const stopped = !ownershipSwitch && (error instanceof PreCutoverStop ||
       (options.signal?.aborted && error instanceof MigrationBacklogWebError &&
         error.stage !== "owned-process-stop-unproved"));
-    const message = (stopped ? "Migration stopped before cutover; owned writers settled. " : "")
+    const message = (stopped ? (teardownWarning ? "Migration stopped before cutover. "
+      : "Migration stopped before cutover; owned writers settled. ") : "")
       + (error instanceof Error ? error.message : String(error))
+      + (teardownWarning ? ` Warning: ${teardownWarning}` : "")
       + (error instanceof MigrationBacklogWebError && error.artifactDirectory
         ? ` Private transport evidence: ${error.artifactDirectory}` : "");
     const sourcePath = source?.evidence.storeDir ?? "the exact inspected source store";

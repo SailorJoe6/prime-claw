@@ -349,16 +349,24 @@ transport files; failure keeps them in the error's private `artifactDirectory`
 for bounded inspection. Public errors contain stage/outcome metadata, never
 provider responses or payload-bearing stderr. A failed or uncertain write fences
 further writes and shuts down only owned process groups, with bounded TERM/KILL
-escalation and observed exit. There is no automatic resend, CLI fallback,
+escalation and exit checks. There is no automatic resend, CLI fallback,
 rollback, provider cleanup or source retirement. See the
 [owned transport evidence and limits](evidence/primeclaw-59-owned-web-transport-20261121.md).
+
+After successful import and native readback, `owned-process-stop-unproved`
+is a warning: shutdown was not proved, and private transport files are
+retained. The importer sends no more migration Web writes and still requires
+the usual data publication, receipt verification, and cutover checks. The
+warning does not override a migration error or a stop request. If work and
+teardown both fail, the result reports the primary failure first.
 
 Before guarded cutover, use the ordinary Prime Agent stop (Escape in the
 interactive UI, or `abort` in RPC). Progress notices show major phases and
 elapsed time. Prime Agent may acknowledge the abort or show an idle turn before
 migration has settled. Wait for the switch outcome notice: `pre-cutover-stopped`
-means the importer and its owned writers have stopped. A stop that cannot prove
-writer exit is reported as a failure, not a confirmed stop. Beads stays
+means the importer did not proceed to cutover. If the outcome warns that owned
+Web shutdown was not proved, do not treat it as confirmation that writers have
+stopped. Beads stays
 authoritative and any partial Backlog state and diagnostics stay in place. An
 in-flight native write may already have committed; do not retry, roll back or
 clean up on the strength of an abort alone.
