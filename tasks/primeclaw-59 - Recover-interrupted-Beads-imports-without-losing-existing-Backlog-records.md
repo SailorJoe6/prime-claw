@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T22:39:00Z'
+updated_date: '2026-11-24T22:45:00Z'
 labels: []
 dependencies: []
 references:
@@ -65,6 +65,7 @@ modified_files:
   - tests/test_pva_gate_rehearsal.py
   - tests/test_pva_gate_scale_rehearsal.py
   - tests/test_task_provider_migration.py
+  - src/prime-agent-plugin/skills/initialize-prime-claw/SKILL.md
 priority: p1
 type: bug
 ordinal: 144000
