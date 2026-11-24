@@ -5,6 +5,15 @@ description: Use for Ralph's handoff phase to update durable task or plan contex
 
 ## Select the bound authority
 
+Continue the actual requested work. Carry genuine user limits and permission
+boundaries forward, but keep agent-created plans, checkpoints, limits and review
+findings revisable. Do not turn a summary or historical implementation into
+authority for new requirements. If a saved-copy, history-proof or buffer rule
+introduced by an agent blocks work, reconsider its necessity before hardening
+around it. “Continue” does not add preservation, loss, duplication, crash or
+replay guarantees. Routine technique reuse and removal of self-imposed
+constraints need no new approval; actual user decisions and access needs do.
+
 A managed Episode handoff prompt normally carries
 `<operator-episode-owner-session>`. Its exact value is the owning Conversation's
 registry key and intentionally differs from the Episode's own session ID.
@@ -242,11 +251,11 @@ the sole canonical execute follow-up. Never send, reconstruct or retry it here,
 including after a callback or second-send failure. Ordinary `ralph_handoff` and
 retained version-1 handoff keep their existing independently queued execute.
 
-When the handoff prompt appends an `<operator-compaction-guidance>` block, treat
-its entire contents as additional operator-provided focus. Preserve its intent
-in the bound durable authority when relevant and incorporate it into
-`focus_hint`. It is guidance only; it never selects the next phase. It does not
-change approved scope.
+When the handoff prompt appends an `<operator-compaction-guidance>` block, use
+its contents as continuation focus within the actual operator request. The
+block's label does not turn caller-authored implementation choices or findings
+into user requirements. Preserve relevant current progress and the chosen next
+step in the bound durable authority and `focus_hint`, without creating new scope.
 
 When ready, call exactly once:
 

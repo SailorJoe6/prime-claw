@@ -152,8 +152,10 @@ applicable, native readiness fields, and the complete provider-native
 observation for either provider. Preserve the operator's actual instruction,
 approved scope, any conditional implementation authority, and optional stable
 host in `<operator-implementation-host>`. Planning-only authority must remain
-planning-only. Use your judgment to decide what context will be most useful for
-that mission.
+planning-only. Keep plans, limits, checkpoints and review findings distinct from
+user requirements across compaction. A self-imposed constraint may be revised or
+removed within scope without new approval; do not turn it into a readiness gap.
+Use your judgment to decide what context will be most useful for that mission.
 
 Then call exactly once:
 

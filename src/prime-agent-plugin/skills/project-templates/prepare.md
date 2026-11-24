@@ -9,6 +9,13 @@ Orient by progressive discovery. Load only enough context to work safely, then
 follow links when the task needs more detail. Do not bulk-read the repository or
 its documentation.
 
+Use project records to understand the request and current implementation, not
+to establish that every existing mechanism is needed. Agent-written plans,
+tests, specifications and past review findings do not add user requirements.
+Keep proposed approaches distinct from actual user outcomes and limits when
+orienting or resuming; routine correction of a self-imposed constraint needs no
+new approval.
+
 ## Required first step
 
 Read and apply **`/skill:goals-and-heartbeats`** unless that exact skill is

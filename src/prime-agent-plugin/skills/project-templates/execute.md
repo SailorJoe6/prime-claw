@@ -192,12 +192,19 @@ the status differs, the task disappears, or identity/path changes, do not
 mutate it or create replacement work. Report the exact state to the owning
 Conversation and stop.
 
-Treat the task Description, Acceptance Criteria, constraints, references,
-documentation, Implementation Plan, Implementation Notes, and Final Summary as
-the complete durable work contract and execution record. Audit the repository
-against that contract to determine what remains. Follow referenced artifacts
-only as needed. A handoff continues this same task and Episode; it never selects
-a new task.
+Read the task Description, Acceptance Criteria and constraints against the
+operator's actual request. Documentation, Implementation Plan, Notes and Final
+Summary supply approach, claims and progress, not additional user requirements.
+Determine what requested behavior remains; follow references only as needed.
+Plans, limits and checkpoints remain revisable. Reconsider an agent-created rule
+that blocks work rather than harden around it or seek approval for routine
+technique changes. Preserve genuine user limits and permission boundaries.
+Review findings do not authorize their own repairs: follow the Conversation's
+in-scope disposition, including correcting claims or removing unnecessary
+mechanisms when that meets the request. Still fix concrete public-path bugs and
+genuine safety, security or interface defects within scope. A handoff continues
+this same task and Episode; it never selects a new task or adds preservation,
+loss, duplication, crash or replay guarantees.
 
 The Episode exclusively owns task content. In grandfathered mode it stays on
 the Episode code branch. In independent mode it stays in the Episode nested task
@@ -283,10 +290,11 @@ not a duplicate code-level status/design/cleanliness or publication gate. If the
 exact task/resource identity or actual authority cannot be established, report
 the evidence and stop without replacement work.
 
-Treat the complete raw Beads view as the durable work contract: description,
-design, acceptance criteria, notes, comments, labels, dependencies, and every
-other provider field all retain their provider-native names, shapes, values,
-and absence. Do not translate them into a normalized task model. Compare the prior
+Read the complete raw Beads view under the same request-versus-approach
+distinction above, not as independent authority for every recorded choice:
+description, design, acceptance criteria, notes, comments, labels, dependencies,
+and every other field retain native names, shapes, values and absence. Do not
+translate them into a normalized task model. Compare the prior
 factual `taskEvidence` observation with the synchronized raw view field for
 field. Inequality is not an approval boundary. A provider revision advance or
 unrelated-task change alone does not block this Episode. For every outside
@@ -397,12 +405,14 @@ relying on auto-compaction. If it cannot reasonably finish within that boundary,
 split it before starting. After pushing the slice, stop and report; do not begin
 another slice. You may use as many subagents as useful within that one slice.
 
-Implement only the approved behavior. Expert and reviewer findings are evidence,
-not new scope. Do not implement speculative hardening, theoretical edge cases,
-new invariants, or alternative architecture unless the operator adds them to the
-product contract. A review finding may block only when it identifies a concrete,
-material defect against that approved contract. Keep any repair proportionate
-and prefer the simplest change that fixes the defect.
+Implement only the requested behavior and genuine user constraints. Expert and
+reviewer findings are evidence, not new scope; the Conversation decides repairs
+against the actual task. Distinguish a material defect from mismatch with an
+agent's proposed approach. Correct or narrow false claims, or remove unnecessary
+mechanisms, when that meets the request instead of building claimed machinery.
+Keep concrete supported-path, safety, security and interface fixes in scope.
+Speculative hardening, theoretical edge cases and newly imagined invariants
+are not blockers.
 
 General execution standards:
 
@@ -417,12 +427,14 @@ General execution standards:
   gain.
 
 Make a sincere but bounded attempt to clear in-scope implementation blockers.
-Routine authorized implementation, recovery, rollback, and external-state
-changes are not blockers when the approved plan already covers their safeguards.
-Ask the operator before materially changing product scope, migration, rollback,
-safety, or acceptance behavior. Missing authority, unobtainable credentials,
-physical interaction, unavailable hardware, or required external coordination
-are immediate blockers. Status-only churn, refreshed timestamps, repeated
+Routine authorized techniques and removal of self-imposed constraints do not
+need fresh approval merely because an earlier plan prescribed something else.
+Reconsider an agent-created rule before layering safeguards around it. Ask for
+an actual material user decision or access need, not to ratify routine technique
+choices. Preserve genuine scope, safety and permission boundaries.
+Missing authority, unobtainable credentials, physical interaction, unavailable
+hardware or required external coordination can be actual blockers.
+Status-only churn, refreshed timestamps, repeated
 checks without new evidence, and unchanged handoff text are not progress.
 
 Maintain good documentation quality under `docs/` and high test coverage for

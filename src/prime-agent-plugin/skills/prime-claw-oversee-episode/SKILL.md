@@ -9,6 +9,20 @@ survives compaction within scope. Bind delegated selection to stated limits and
 one canonical `In Planning` task with semantic readiness, not dependency readiness
 or a phase-history receipt. Clarify ambiguity.
 
+Choose how to accomplish the operator's request, not additional outcomes. Plans,
+limits, checkpoints, implementation claims and review findings are revisable
+means, not new requirements. Existing code, tests, specifications and agent-written
+documents do not establish necessity. Preserve genuine user limits and normal
+permission boundaries; routine technique choices and correction of self-imposed
+constraints need no fresh approval.
+
+When your own rule blocks requested work, reconsider or remove it before adding
+guards, journals, receipts or approval steps. “Continue” does not imply new
+saved-copy, history-proof, loss, duplication, crash or replay guarantees. A real
+interface limitation is a fact to work with, not authority to demand every
+guarantee it could support. Ask only for an actual unresolved user decision or
+access need.
+
 Select the `.prime-claw/ownership.json` entry keyed by its exact `ownerSessionId`, accepting direct migration records. Never scan other owners to select recovery. Before active-session or Episode-report checks, an exact top-level owning Conversation's version-2 `provisioning` or `uncertain` entry with incomplete creation returns directly to `## Owner-led creation recovery` in `.prime-claw/workflows/implement-task.md`. If native continuation cannot finish the remaining step, report that constraint; never invent a recovery API. Stop ordinary oversight; do not call `implement_task` recursively or `handoff_task_episode`. Preserve provider, task, code base, host, branch, worktree, durable session, and operation identities unchanged. An absent recorded session is not proof that none exists: inspect native terminal, launch, session, and assignment evidence before continuing. No blind replay or active promotion.
 
 Otherwise use only for this Conversation's active Episode. Version 1 selects retained folder oversight; version 2 selects task-native oversight. Tags never override it.
@@ -17,7 +31,8 @@ Version 2 selects its persisted provider only. Absent provider, or Backlog
 without revision/evidence, binds grandfathered task ID/path. Backlog with both
 fields binds independent task history: `baseRef`/`head` identify code;
 40-hex `providerRevision`/complete native `taskEvidence` identify task history.
-Native fields own the contract, never `.ralph/plans`. The Episode owns content;
+Native fields carry the requested outcome and working context, not independent
+authority for every recorded choice. The Episode owns content;
 the Conversation owns status. Branch-local history stays on its code branches;
 independent history uses ignored clones, never the code DAG.
 
@@ -36,14 +51,35 @@ Use the exceptional `transition_spec_episode_to_task` cutover surface after mark
 
 Follow `.prime-claw/workflows/implement-task.md` for preparation/publication; code supplies facts, not policy. Backlog keeps exact-file commits. Beads v1.3.1 uses touched-table/staged-set multi-issue history, not per-issue isolation. Before consequential native mutation, commit or push, review consequences and consult about unauthorized/unclear pending work. Native pending/concurrent changes can prevent a safe operation. Inspect actual task history/publication before claiming status/note durability; exit-zero/local/push success is insufficient. Commit coherent edits ASAP and publish promptly, not at handoff or session end.
 
-Review one reported slice at a time: check ownership/code/tests/docs and persisted/current native task/history observations. An unrelated-task descendant alone is compatible. Judge same-task changes as in-scope clarification or genuine semantic conflict, authority change, scope expansion, or product decision. Apply before handoff, blockers, terminals and cleanup; no equality gate or classifier replaces judgment.
+Review one reported slice at a time: check ownership/code/tests/docs and
+persisted/current native task/history observations against the actual request.
+An unrelated-task descendant alone is compatible. Judge same-task changes as
+in-scope clarification or genuine semantic conflict, authority change, scope
+expansion, or product decision. Apply before handoff, blockers, terminals and
+cleanup; no equality gate or classifier replaces judgment.
 
-A report, findings, and Review conclusions are evidence, not approval. Choose:
+When assigning implementation or independent review, distinguish requested
+outcomes and genuine constraints from the proposed approach and claims. Ask
+reviewers to assess material supported-path behavior and unnecessary mechanisms,
+not enforce every plan detail. A report or finding is evidence, not approval or
+an implementation order. Decide each finding against the actual task:
 
-- **Accept and advance** when evidence supports scope. For Beads, `handoff_task_episode` supplies exact previous/current native context to the existing Episode LLM. Compatible owner-authored, outside same-task, and unrelated descendant changes continue.
-- **Request an in-scope revision** for a material contract defect. Record it through canonical handoff with `handoff_task_episode`. For Beads, guidance supplies only bounded focus; host supplies facts. In task mode, do not edit, copy, or mirror Episode-owned task content.
-- **Pause** without a product decision.
-- **Consult the operator** for scope, product, merge, abandonment, conflicting evidence, blockers, or cleanup outside task-native authority.
+- **Accept and advance** when evidence supports the requested behavior. For
+  Beads, `handoff_task_episode` supplies exact previous/current native context to
+  the existing Episode LLM. Compatible same-task and unrelated changes continue.
+- **Request an in-scope revision** for a concrete material defect, including
+  public-path bugs and genuine safety, security or interface failures. Choose a
+  targeted fix and verification; do not dismiss real defects as scope creep.
+  A mismatch with your proposed approach alone need not be a product defect.
+  A false claim may need correction or narrowing, or removal of an unnecessary
+  mechanism, rather than construction of the claimed machinery. Record the
+  chosen repair and rationale through canonical `handoff_task_episode`; do not
+  edit, copy or mirror Episode-owned task content.
+- **Pause** when an actual unresolved condition prevents progress, not merely
+  to preserve a self-imposed rule.
+- **Consult the operator** for a real scope/product decision, missing access,
+  merge, abandonment, or cleanup outside task-native authority. Findings do not
+  authorize their own repair scope.
 
 
 Never steer through chat.
@@ -210,8 +246,10 @@ Backlog archive is reversible/read-only, reserves the ID, and preserves status/r
 
 On error reread evidence; absence counts as removed. Re-invoke only for safe progress, never blind retry/reconciliation. Busy/changed/foreign resources or uncommitted bytes block removal. Consult only when safe progress is impossible.
 
-Use `prime-claw-expert-review`; speculative hardening, alternative architecture
-and reviewer-invented invariants are non-blocking. Stop invented-requirement review loops.
+Use `prime-claw-expert-review` for useful independent review. Carry the actual
+request, genuine limits, current progress and chosen next step through
+continuation/compaction. Keep proposed approaches revisable; do not promote old
+plans, findings or summaries into stronger requirements on resume.
 
 Maintain a bounded goal, or one exact heartbeat while waiting for Episode/Expert work.
 

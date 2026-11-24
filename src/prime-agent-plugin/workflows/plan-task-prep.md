@@ -88,8 +88,10 @@ complete provider-native observation for either provider. Provider observations
 are factual context, not semantic acceptance. Preserve the exact binding,
 approved scope, actual operator instruction including explicit placement, and
 any conditional implementation authority.
-A planning-only request must remain planning-only. Use your judgment to decide
-what context will be most useful for that mission.
+A planning-only request must remain planning-only. Preserve proposed approaches
+as revisable choices, not requirements; do not carry agent-created limits or
+review findings across compaction as new user obligations. Use your judgment
+to decide what context will be most useful for that mission.
 
 Then call exactly once:
 

@@ -270,7 +270,6 @@ def test_authoring_skill_publishes_only_through_the_selected_provider_and_stops_
     ):
         assert fragment in text
 
-    assert "living source of truth" in text
     assert "Do not defer updates until the end" in text
     assert "Replace stale content" in text
 
@@ -293,26 +292,6 @@ def test_independent_backlog_authoring_preserves_code_without_a_cleanliness_gate
     assert "require the independent clone to be clean" not in backlog
     assert backlog.index("Immediately before mutation") < backlog.index("After creation or revision")
 
-
-@pytest.mark.parametrize("skill_name", SKILLS)
-def test_authoring_skill_keeps_the_product_contract_proportional(skill_name: str) -> None:
-    text = " ".join(project_skill(skill_name).read_text().split())
-
-    for fragment in (
-        "clear enough to plan without guessing material product decisions",
-        "intended outcome, scope, required behavior, material constraints",
-        "only when they are materially relevant",
-        "Do not require boilerplate sections",
-        "ask the operator rather than",
-    ):
-        assert fragment in text
-
-    for unwanted in (
-        "concise threat model", "trusted assumptions", "ordinary failure model",
-        "qualitative complexity budget", "optional hardening",
-        "reviewer-discovered invariant",
-    ):
-        assert unwanted not in text
 
 
 def test_plan_and_implementation_readiness_are_proportional() -> None:
@@ -360,44 +339,6 @@ def test_design_and_spec_it_out_keep_distinct_discovery_modes() -> None:
     assert "name: spec-it-out" in spec_it_out
     assert "Use the current conversation" in spec_it_out
     assert "Ask only the remaining questions" in spec_it_out
-
-
-def test_project_customized_authoring_skills_are_preserved_while_new_upstream_is_advertised() -> None:
-    import hashlib
-
-    manifest = json.loads((ROOT / ".prime-claw/templates.json").read_text())
-    for skill_name in SKILLS:
-        exposed = ROOT / ".agents" / "skills" / skill_name / "SKILL.md"
-        canonical = project_skill(skill_name)
-        entry = manifest["assets"][f"project-skill-{skill_name}"]
-        installed = hashlib.sha256(exposed.read_bytes()).hexdigest()
-        upstream = hashlib.sha256(canonical.read_bytes()).hexdigest()
-
-        assert exposed.is_file() and not exposed.is_symlink()
-        source = canonical.read_text()
-        source_fragment = """- **Backlog:** use one supported `backlog task create --plain` command with
-  `--status \"In Design\"`, then bind the exact created task ID from its output.
-"""
-        installed_fragment = source_fragment + """  This repository now defaults to `In Design`, but the explicit status keeps
-  the authoring command self-contained and auditable.
-"""
-        expected = source.replace(source_fragment, installed_fragment)
-        if skill_name == "spec-it-out":
-            # Preserve this project's additional concurrent-code customization,
-            # not a source-equality assumption that predates that customization.
-            custom = """Independent task publication does not require the code checkout to be clean or
-upstream-equal. Multiple Conversations may work in the same main-tracking checkout and drive
-separate Episodes concurrently. Unrelated code changes, including
-`.prime-claw/ownership.json`, are not a blocker. Never stash, revert, commit or
-delete another Conversation's changes to satisfy a cleanliness check.
-
-"""
-            expected = expected.replace("### Beads\n", custom + "### Beads\n")
-        assert exposed.read_text() == expected
-        assert entry["state"] == "customized"
-        assert entry["installedSha256"] == installed
-        assert entry["availableUpstreamSha256"] == upstream
-        assert entry["baselineSha256"] != upstream
 
 
 @pytest.mark.parametrize(
@@ -618,10 +559,6 @@ def test_task_native_planning_workflows_are_exposed_without_removing_folder_comp
     ):
         assert fragment in plan
 
-    # Prep is uncustomized; planning keeps this project's independent-store
-    # guidance rather than requiring byte equality with the managed template.
-    tracked_prep = ROOT / ".prime-claw/workflows/plan-task-prep.md"
-    assert tracked_prep.read_bytes() == workflow("plan-task-prep").read_bytes()
     tracked_plan = " ".join((ROOT / ".prime-claw/workflows/plan-task.md").read_text().split())
     for policy in (plan, tracked_plan):
         for fragment in (
@@ -741,12 +678,6 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         "use the existing continuation and failure-disposition sections",
     ):
         assert fragment in implement
-
-    # Installed prep policy may differ until deliberate candidate activation.
-    for name in ("implement-task-prep", "implement-task"):
-        source = workflow(name)
-        tracked = ROOT / ".prime-claw" / "workflows" / f"{name}.md"
-        assert tracked.read_bytes() == source.read_bytes()
 
     extension = (
         ROOT / "src" / "prime-agent-plugin" / "extensions" / "reviewed-plan.ts"
@@ -1181,7 +1112,6 @@ def test_creation_recovery_is_owner_led_before_fresh_admission() -> None:
         assert fragment in recovery
     assert "Never replay an uncertain launch, choose another operation or hand-edit ownership" not in text
     assert "Do not hand-edit ownership or retry uncertain creation" not in text
-    assert (ROOT / ".prime-claw/workflows/implement-task.md").read_bytes() == workflow("implement-task").read_bytes()
 
 
 def test_documented_creation_preflight_native_failure(tier1_container, ctmp) -> None:

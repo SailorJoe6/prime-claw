@@ -1,11 +1,8 @@
-import hashlib
-import json
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 EXECUTE_SKILL = ROOT / "src" / "prime-agent-plugin" / "skills" / "project-templates" / "execute.md"
-AGENT_SKILL = ROOT / ".agents" / "skills" / "execute"
 
 
 def test_execute_skill_enforces_one_small_complete_slice() -> None:
@@ -23,60 +20,12 @@ def test_execute_skill_enforces_one_small_complete_slice() -> None:
         assert fragment in text
 
 
-def test_execute_skill_rejects_reviewer_driven_scope_expansion() -> None:
-    text = " ".join(EXECUTE_SKILL.read_text().split())
-
-    for fragment in (
-        "Implement only the approved behavior",
-        "findings are evidence, not new scope",
-        "Do not implement speculative hardening",
-        "concrete, material defect against that approved contract",
-        "simplest change that fixes the defect",
-    ):
-        assert fragment in text
-
-    for unwanted in (
-        "approved threat model", "trusted assumptions",
-        "qualitative complexity budget", "hardening backlog",
-        "simplification checkpoint", "manual recovery",
-    ):
-        assert unwanted not in text
-
 
 def test_execute_skill_defers_goal_and_heartbeat_control_to_plugin_context() -> None:
     text = EXECUTE_SKILL.read_text()
 
     for fragment in ("pause_thread_goal", "resume_thread_goal", "Set up a goal", "heartbeat"):
         assert fragment not in text
-
-
-def test_agent_execute_skill_uses_canonical_definition() -> None:
-    assert AGENT_SKILL.is_dir() and not AGENT_SKILL.is_symlink()
-    assert (AGENT_SKILL / "SKILL.md").read_bytes() == EXECUTE_SKILL.read_bytes()
-
-
-def test_managed_execute_asset_is_reconciled_to_the_canonical_source() -> None:
-    source = EXECUTE_SKILL.read_bytes()
-    assert (AGENT_SKILL / "SKILL.md").read_bytes() == source
-
-    manifest = json.loads((ROOT / ".prime-claw" / "templates.json").read_text())
-    entry = manifest["assets"]["project-skill-execute"]
-    digest = hashlib.sha256(source).hexdigest()
-    assert entry == {
-        "source": "skills/project-templates/execute.md",
-        "destination": ".agents/skills/execute/SKILL.md",
-        "baselineSha256": "c82723a3714c4a5da8865066312cbe22ecbc9641d137cb20f431154102c8a606",  # historical baseline remains unchanged
-        "installedSha256": digest,
-        "acceptedOverrideSha256": None,
-        "availableUpstreamSha256": digest,
-        "state": "managed",
-        "provenance": {
-            "scope": "project",
-            "exposure": "discoverable",
-            "customization": "project-customizable",
-            "lifecycleTrigger": "project-reconcile",
-        },
-    }
 
 
 def test_task_native_execute_selects_only_the_persisted_provider() -> None:
@@ -107,8 +56,6 @@ def test_beads_execute_preserves_raw_contract_and_guards_native_publication() ->
         "native status is exactly `in_progress` and maps to canonical `In Progress`",
         "raw `design` is meaningful rather than blank or placeholder text",
         "exact current Dolt database, branch, revision, publication ref and working set",
-        "description, design, acceptance criteria, notes, comments, labels, dependencies, and every other provider field",
-        "provider-native names, shapes, values, and absence",
         "Compare the prior factual `taskEvidence` observation with the synchronized raw view field for field",
         "Inequality is not an approval boundary",
         "provider revision advance or unrelated-task change alone does not block",

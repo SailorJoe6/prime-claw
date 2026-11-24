@@ -90,6 +90,13 @@ implementation. Clarify material ambiguity, missing authority, or new scope.
 Neither a prior tool/command invocation nor a stored or turn-scoped receipt is
 approval authority.
 
+Choose how to meet the request without expanding its outcomes. Plans, limits,
+checkpoints, implementation claims and review findings remain revisable means;
+code, tests and agent-written specifications do not establish necessity.
+Reconsider a self-imposed constraint that obstructs work before hardening around
+it. Preserve genuine user limits and permission boundaries; routine technique
+choices and correction of your own rules need no new approval.
+
 Bind one exact canonical task ID before calling the tool. If the operator
 selected a task, do not substitute another. If the operator explicitly delegated
 selection, stay within those stated bounds and inspect the selected provider's

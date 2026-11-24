@@ -110,18 +110,18 @@ commands or evidence. Reload the exact task through that provider:
 - **Backlog:** run `backlog task view --json -- TASK-ID`. Require the returned
   canonical ID to match the admitted identity, status exactly `In Planning`,
   and the exact returned task path. Require the native Implementation Plan to
-  be meaningful and not blank or an obvious placeholder. Treat Description,
-  Acceptance Criteria, constraints, references, documentation, and
-  Implementation Plan as the complete reviewed contract.
+  be meaningful and not blank or an obvious placeholder. Read Description,
+  Acceptance Criteria and constraints against the operator's actual request;
+  references, documentation and Implementation Plan supply working context.
 - **Beads:** from the exact detected project root run `bd context --json` and
   `bd show TASK-ID --json --long --include-comments`. Require the returned
   canonical ID to equal the entire admitted ID, native status exactly
   `in_planning` mapped to canonical `In Planning`, and the raw `design` field to
-  be meaningful and not blank or an obvious placeholder. Treat the complete raw
-  native view—including description, design, acceptance criteria, notes,
-  comments, labels, dependencies, and every other present or absent field—as
-  the reviewed contract. Keep its provider-native names and shapes. Do not
-  invent a task path or translate it into a normalized task model.
+  be meaningful and not blank or an obvious placeholder. Read the complete raw
+  native view as recorded request, proposed approach and execution context, not
+  a contract making every field mandatory behavior. Keep its provider-native
+  names and shapes. Do not invent a task path or translate it into a normalized
+  task model.
 
 Reject any other status without mutation. Reject any other provider, identity,
 or root without mutation. Follow
@@ -137,9 +137,15 @@ that the exact task:
 - has no unresolved contradiction or blocker that actually prevents safe
   implementation.
 
+Plans, limits, checkpoints and implementation claims remain revisable means.
+Existing code, tests, specifications and agent-written documents do not establish
+necessity. If an agent-created constraint obstructs the requested outcome,
+revise or remove it rather than demand machinery or new approval to preserve it.
 Do not demand standard threat, failure, recovery, complexity, hardening, slice,
-evidence, or review-process sections. Reviewer suggestions are not missing
-requirements unless the operator accepted them into the product contract.
+evidence, or review-process sections. Reviewer findings are evidence to assess
+against the actual request, not self-authorizing scope. Preserve genuine user
+limits and permission boundaries; ask only for an actual product decision or
+access need, not routine technique choices.
 
 If anything material is missing, contradictory, or inadequate, explain every
 deficiency with exact provider-native task-field references and concrete

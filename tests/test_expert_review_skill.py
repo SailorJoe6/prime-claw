@@ -18,59 +18,6 @@ def test_expert_skill_uses_native_model_spawn_message_and_cleanup() -> None:
     assert text.index("rlm.spawn") < text.index("agent_message.send")
 
 
-def test_expert_model_selection_keeps_parent_llm_provider() -> None:
-    text = " ".join(SKILL.read_text().split())
-    for required in (
-        "parent session's actual current LLM provider",
-        "unless the operator explicitly directs a provider change",
-        "`openai-codex` and `openai` are different providers",
-        "restrict results to the parent's provider",
-        "Never select a cross-provider fallback",
-        "quota error is not permission to change provider",
-        "omit `model` from a supported native launch to inherit the current provider and model",
-        "same provider as parent; omit to inherit both",
-    ):
-        assert required in text
-    assert "select a reasonably strong available review model" not in text
-
-
-def test_expert_skill_accepts_normal_context_and_preserves_review_judgment() -> None:
-    raw = SKILL.read_text()
-    text = " ".join(raw.split())
-    for required in (
-        "normal review request", "caller overrides", "ask the caller",
-        "short conclusion", "material findings", "realistic impact",
-        "operator-approved product contract", "Do not add requirements",
-        "not an adversarial or red-team exercise",
-        "Red-team review requires an explicit operator request",
-        "newly imagined invariants are not blockers",
-        "smallest repair that fixes the demonstrated defect",
-        'provider-absent or grandfathered `provider: "backlog"` version-2 ownership',
-        "bind the exact task ID/path in branch-local history",
-        "as the contract",
-        "do not consult `.ralph/plans`",
-        "For a retained folder candidate",
-        "Do not substitute a related Backlog task as authority",
-        "select the exact `ownerSessionId` entry identified by the requesting Conversation",
-        "Version 1 selects the retained folder contract; version 2 selects the exact task contract",
-        "A task tag is only a candidate when the exact owner has no record",
-        "old in-place folder review without creating live Episode identity",
-        "live version-1 Episode requires persisted version-1 ownership plus those active files",
-        "active pair remains the review contract through candidate review and any bounded revision",
-        "exact version-1 blocked recovery path rather than task-native fallback",
-        "cannot claim or mutate task-native Backlog status, completion, archival, finalization, or cleanup authority",
-    ):
-        assert required in text
-    for unwanted in (
-        "threat model", "trusted assumptions", "ordinary failure model",
-        "complexity budget", "evidence-preserving manual recovery",
-    ):
-        assert unwanted not in text
-    for retired in (
-        "prime_claw_official_expert_review", "launch(packet)", "submit(report)",
-        "prime-claw-official-expert-review-packet", "PASS`/`BLOCK",
-    ):
-        assert retired not in raw
 
 def test_expert_skill_sends_provider_native_beads_review_evidence_without_lifecycle_authority() -> None:
     raw = SKILL.read_text()

@@ -91,10 +91,14 @@ Create a concise, actionable plan at the level of detail the work needs. Small
 changes may need only a few ordered steps; larger work may use reviewable
 slices. Include tests, documentation, dependencies, and project-state updates
 that are actually relevant. The plan must let a later implementation Episode
-begin without guessing material product decisions, but it must not add process
-sections or hardening work merely to satisfy a template. Expert and reviewer
-suggestions become scope only when the operator accepts them or they expose a
-concrete material defect in the approved contract.
+begin without guessing material product decisions. Separate requested outcomes
+and genuine constraints from proposed techniques, limits and checkpoints; the
+latter remain revisable, not extra acceptance requirements. Existing code, tests
+and agent-written specifications do not establish necessity. When an invented
+constraint blocks work, reconsider or remove it rather than plan machinery to
+preserve it. Review findings are evidence for disposition against the actual
+request, not automatic repair scope. Do not add process sections or hardening
+work merely to satisfy a template, or ask approval for routine technique changes.
 
 ### Backlog publication
 
