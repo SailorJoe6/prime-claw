@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T06:58:00Z'
+updated_date: '2026-11-24T07:01:00Z'
 labels: []
 dependencies: []
 references:
@@ -79,6 +79,8 @@ No bulk rewrite or rollout gate. Read existing records compatibly and leave hist
 5. **Prove the change offline in Docker (AC1–AC4).** Reuse existing offline Docker fixtures and extend the production task Episode admission and handoff integration cases (`tests/task_episode_admission_extension.test.mjs`, `tests/spec_episode_extension.test.mjs` and the Tier 1 native-observation harness). Use disposable local Git remotes and a committed synthetic Backlog task; measure native JSON above 1 MiB via streamed/file output in the fixture only. Exercise pre-allocation and pre-session reads, a single bounded initial assignment, ordinary continuation, execute-only, and same-resource recovery without a second allocation or resend. Advance the task branch and verify complete bounded reads/diffs of both commits, with a late-content marker, and assert no full JSON capture prerequisite or new content copies in persisted/delivered evidence. Cover branch-local committed evidence, legacy compatibility, wrong repository/ID/path and missing or inaccessible revisions; assert failure at the relevant boundary. Extend ownership transition, mutation and cutover cases for references and run unchanged Beads and delivery outcome regressions. Run `scripts/test-tier1.sh --probe`; record Docker results against all four criteria. No original TASK-2 action, AWS work, host activation, or upstream work.
 
 Step 3 revision of `125bcb5b` only: expose a private-safe checkpoint, exact revision and bounded failure category at the registered execute-only tool for invalid previous versus fetched published evidence; test that distinction and the exact pre-delivery/no-resend behavior. Keep the Git reader memory bounded during native verification of committed frontmatter without an arbitrary size gate, independent YAML parsing, persistent state or saved ticket copies. Correct the stale 64 KiB statement in the docs. Preserve bindings, history and delivery sequencing. Validate in focused offline Docker and Tier 1; report the broader-suite limits without adding a new gate. Publish task evidence and code separately, then stop for owner review. No later lifecycle work, TASK-2, merge or activation.
+
+Owner accepted independent Backlog handoff revision `d48fe435`. Next bounded step 3 slice only: branch-local Backlog ordinary handoff and execute-only continuation. Use exact committed code-repository Git references for ticket-state evidence and bounded on-demand reads; preserve branch-local native authority, delivery sequencing, and Beads and independent Backlog behavior. Where a historical checkpoint is required, use only an exact verifiable recorded revision; a legacy path alone is not proof. Report missing or mismatched required evidence before delivery; no fallback to HEAD, mutable files or copied snapshots. No new persistent state, readiness logic, resend or replacement. Prove representative branch-local success and evidence gaps offline in Docker and run the Tier 1 probe. Publish task and code separately and stop for review. No later lifecycle work, original TASK-2 action, merge or activation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
