@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T09:56:00Z'
+updated_date: '2026-11-24T10:00:00Z'
 labels: []
 dependencies: []
 references:
@@ -130,6 +130,8 @@ Accept the reviewed cleanup checkpoint revision ec1b6f4a. Advance one bounded sl
 One bounded revision of lifecycle guidance at 4e648280. Address the three verified review conflicts only. In the blocked skill and matching template, after workspace sync and before a clearance edit, compare the newly selected committed ticket with the one used for the clearance decision; use owner judgment on any change to the unblock condition, not revision equality or a coded gate. In docs/conversation-driven-episode-oversight.md distinguish the independent Backlog ticket revision from the branch-local code commit, and describe cleanup as returning Backlog Git refs or availability facts, not bodies. In docs/handoff-chain.md distinguish bounded committed Backlog refs for execute-only from the full native envelopes retained for Beads and runtime observations. Keep managed copies and inventory aligned. Validate offline in Docker and run Tier 1 on the clean candidate; report known baseline failures separately. Publish task notes and code separately, then stop for review. No runtime wiring, TASK-2 action, merge or activation.
 
 Accept the reviewed Backlog guidance revision a34feb4e. Advance one bounded slice: the remaining branch-local Backlog status mutation/result path in commitConversationTaskStatus and its direct callers. Reuse bounded native identity and edit transport, preserving the final pre-edit exact ID/path check, native status authoring, literal task-only commits, and unrelated staging. Replace any new copied ticket evidence with exact committed code-repository references; distinguish local commit from actually observed publication using existing Git facts, without adding a push, retry, policy gate or persistent state. Keep independent Backlog, Beads, and legacy independent initial workspace recovery out of this slice. Prove with focused disposable offline Docker cases, including large native output, and run Tier 1 on the clean candidate where practical. Publish task and code evidence separately and stop for review. No live lifecycle test, TASK-2 action, merge or activation.
+
+Accept the reviewed branch-local Backlog status evidence at 866988cd. Advance one bounded slice: legacy independent Backlog pre-session recovery in prepareTaskEpisodeWorkspace. Replace the remaining buffered full native view and newly emitted copies with exact Git references. Reuse the existing reference-based recovery mechanics for published/current and distinct retained local evidence. Verify the recorded historical revision, exact repository, literal path and committed canonical ID before initial assignment; do not infer from HEAD, mutable files or the saved snapshot. If required evidence is unavailable, report the boundary without assignment or replacement. Preserve existing historical records until normal advancement, exact operation/resources, and one initial execute with no replay; leave Beads, other lifecycle paths and already reviewed behavior unchanged. No new state, classifier, live recovery test, TASK-2 actions, merge or activation. Prove with focused offline Docker cases including a valid >1 MiB ticket and missing prior evidence, run Tier 1, publish code and task notes separately, then stop for review.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
