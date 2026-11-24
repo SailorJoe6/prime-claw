@@ -90,7 +90,7 @@ def test_every_node_suite_has_a_pytest_bridge():
 UNIT_ENV_BODIES = {
     "watchdog": ("unit_env_watchdog_body.py", 8),
     "npm_onload": ("unit_env_npm_onload_body.py", 1),
-    "launcher_driver": ("unit_env_tier1_driver_body.py", 34),
+    "launcher_driver": ("unit_env_tier1_driver_body.py", 35),
     "launcher_launch_error": ("unit_env_tier1_launch_error_body.py", 1),
     "launcher_fixture": ("unit_env_tier1_fixture_body.py", 3),
     "launcher_image": ("unit_env_tier1_image_body.py", 6),
