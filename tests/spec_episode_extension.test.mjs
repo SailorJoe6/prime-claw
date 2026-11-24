@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -24,6 +24,7 @@ import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
 import { prepareTaskHistoryWorkspace, publishTaskHistoryMutation, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
+import { streamBacklogGitEvidence } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
 
 const LOCATION = ".ralph/plans/future/alpha";
 function diskFixture() {
@@ -770,6 +771,22 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
   });
 });
 
+// Transport-focused mocks do not model a Git store. Only these tests stub the
+// evidence verifier; the committed continuation fixtures exercise the real one.
+function mockedBacklogEvidence(commit, path = "tasks/primeclaw-10.38.md") {
+  return { kind: "backlog-git", repository: { topology: "independent", identity: "1".repeat(64) }, commit, path };
+}
+function mockedBacklogPreparation(f, head) {
+  return { status: "prepared", storeDir: join(f.worktree, "backlog"), remote: "origin", publishedHead: head, head };
+}
+async function mockVerifyBacklogEvidence(selected, commit, path, taskId) {
+  assert.equal(selected.topology, "independent");
+  assert.equal(selected.remote, "origin");
+  assert.equal(path, "tasks/primeclaw-10.38.md");
+  assert.equal(taskId, "PRIMECLAW-10.38");
+  return mockedBacklogEvidence(commit, path);
+}
+
 // Scripted informed-owner invocation. Policy eligibility is not a code classifier.
 function executeOnlyHarness(provider = "backlog", options = {}) {
   const f = harness({ list: (_count, session) => [session] });
@@ -784,7 +801,9 @@ function executeOnlyHarness(provider = "backlog", options = {}) {
     unknownRaw: { nullable: null, nested: [false, 0, "原文", { tail: "z".repeat(40_000) }] },
     ...(phase === "current" ? { currentOnly: null } : { previousOnly: null }),
   } };
-  const previous = raw("previous"), current = raw("current");
+  const rawPrevious = raw("previous"), rawCurrent = raw("current");
+  const previous = provider === "backlog" ? mockedBacklogEvidence("c".repeat(40)) : rawPrevious;
+  const current = provider === "backlog" ? mockedBacklogEvidence("d".repeat(40)) : rawCurrent;
   const initial = provider === "beads" ? activeBeadsTaskRecord(f, { taskEvidence: previous })
     : activeTaskRecord(f, provider === "grandfathered" ? {} : {
       provider: "backlog", providerRevision: "c".repeat(40), taskEvidence: previous,
@@ -804,17 +823,11 @@ function executeOnlyHarness(provider = "backlog", options = {}) {
     now: () => "2026-11-20T19:00:00Z",
     prepareEpisodeTaskHistory(input) {
       events.push("provider-prepared"); assert.equal(input.targetWorktree, f.worktree); assert.equal(input.primaryRoot, f.root);
-      return { status: "prepared", head: "d".repeat(40) };
+      return mockedBacklogPreparation(f, "d".repeat(40));
     },
-    taskRunner: { run(command, args, opts) {
-      if (command === "backlog") {
-        assert.deepEqual(args, ["task", "view", "--json", "--", taskId]);
-        assert.equal(opts.cwd, f.worktree, "independent mode never reads mutable primary task bytes");
-        return { status: 0, stdout: JSON.stringify(current), stderr: "" };
-      }
-      return new ProcessCommandRunner().run(command, args, opts);
-    } },
-    taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd, nativeView: cwd === f.worktree ? current : previous }),
+    verifyBacklogEvidence: mockVerifyBacklogEvidence,
+    taskRunner: noBufferedBacklogRunner(),
+    taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd, nativeView: cwd === f.worktree ? rawCurrent : rawPrevious }),
     advanceBeadsEvidence(input) {
       events.push("provider-prepared");
       const target = parseEpisodeOwnership({ ...initial, providerRevision: "d".repeat(32),
@@ -1238,140 +1251,227 @@ test("registered active Beads handoff delivers compatible outside same-task nati
   assert.equal(f.calls.some((call) => ["execute", "reopen"].includes(call[0])), false);
 });
 
-// These are complete native objects, not the selected fields of a normalized task.
-// Keep this one large case proportional to the observed multi-megabyte failure.
-test("registered Backlog handoff retains complete large native facts once and keeps prompts/results bounded", async () => {
-  const sizes = [];
-  for (const large of [false, true]) {
-    const f = harness();
-    const text = (phase) => `early-${phase}-原文🙂\n${"x".repeat(large ? 850_000 : 8)}middle-${phase}-é-漢字\n${"y".repeat(large ? 850_000 : 8)}late-${phase}-終端🚀`;
-    const previousBody = text("previous"), currentBody = text("current"), queueBody = text("queued");
-    const taskId = "PRIMECLAW-10.38", taskPath = "backlog/tasks/primeclaw-10.38.md";
-    const native = (body, phase) => ({
-      schemaVersion: 1, kind: "task-view", unknownEnvelope: { phase, empty: [], nullable: null },
-      task: {
-        id: taskId, path: taskPath, title: `Native ${phase}`, status: "In Progress", archived: false, type: "task",
-        priority: "p1", project: null, assignees: ["@operator"], reporter: null,
-        createdAt: "2026-11-17T08:00:00Z", updatedAt: "2026-11-18T09:00:00Z", dueDate: null,
-        labels: ["handoff", "原文"], dependencies: ["PRIMECLAW-1"], references: ["docs/reference.md"],
-        modifiedFiles: ["src/implementation.ts"], milestone: null, parentTaskId: null, ordinal: 1,
-        acceptanceCriteriaCompleted: 0, acceptanceCriteriaCount: 1, isReady: true,
-        dependencyGraph: { root: taskId, nodes: [
-          { id: taskId, title: `Native ${phase}`, status: "In Progress", state: "resolved", completed: false,
-            dependencyDepth: 0, dependentDepth: 0 },
-          { id: "PRIMECLAW-1", title: "Published dependency", status: "Done", state: "resolved", completed: true,
-            dependencyDepth: 1, dependentDepth: null },
-        ], edges: [{ from: taskId, to: "PRIMECLAW-1" }] },
-        readiness: { isReady: true, isBlocked: false, blockingDependencies: [], missingDependencies: [] },
-        documentation: ["docs/design.md"], subtasks: [{ id: "PRIMECLAW-10.38.1", title: "Native child" }],
-        description: body, implementationPlan: "One bounded plan.", implementationNotes: "Exact implementation notes.",
-        finalSummary: null, acceptanceCriteria: [{ index: 1, text: "Preserve every field.", checked: false }],
-        definitionOfDone: [{ index: 1, text: "Retain the exact native view.", checked: true }],
-        comments: [{ index: 1, author: "operator", createdAt: "2026-11-18T09:00:00Z", body: `comment-${phase}-終` }],
-        unknownNative: { phase, explicitNull: null, nested: [null, false, 0, "", { Unicode: "𝄞\u0301" }] },
-        ...(phase === "previous" ? { previousOnly: null } : { currentOnly: { value: null } }),
-      },
-      unknownTail: { phase, explicitNull: null, retained: "not a normalized projection" },
-    });
-    const previous = native(previousBody, "previous"), current = native(currentBody, "current");
-    if (large) {
-      assert.ok(JSON.stringify(previous).length >= 1_700_000);
-      assert.ok(JSON.stringify(current).length >= 1_700_000);
-    }
-    const initial = activeTaskRecord(f, { provider: "backlog", providerRevision: "c".repeat(40), taskEvidence: previous });
+function noBufferedBacklogRunner() {
+  const runner = new ProcessCommandRunner();
+  return { run(command, args, options) {
+    assert.notEqual(command, "backlog", "continuation must not request full native task JSON through the command runner");
+    return runner.run(command, args, options);
+  } };
+}
+
+function committedBacklogContinuation(t) {
+  const f = harness({ list: (_count, session) => [session] });
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  const taskId = "PRIMECLAW-1", path = "tasks/primeclaw-1 - Continuation.md";
+  const storeDir = join(f.worktree, ".backlog");
+  const remoteUrl = join(f.root, "fixture-remote.git");
+  const git = (...args) => execFileSync("git", ["-C", storeDir, ...args], { encoding: "utf8" }).trim();
+  execFileSync("git", ["init", "-q", "--bare", remoteUrl]);
+  execFileSync("git", ["init", "-q", "-b", "prime-claw/tasks", storeDir]);
+  git("remote", "add", "origin", remoteUrl);
+  git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+  mkdirSync(join(storeDir, "tasks"));
+  writeFileSync(join(storeDir, "config.yml"), "project_name: Fixture\ntask_prefix: PRIMECLAW\nremote_operations: false\ncheck_active_branches: false\n");
+  writeFileSync(join(f.worktree, "backlog.config.yml"), "project_name: Fixture\ntask_prefix: PRIMECLAW\nbacklog_directory: .backlog\nremote_operations: false\ncheck_active_branches: false\n");
+  const selected = { root: storeDir, topology: "independent", remote: "origin" };
+  const ref = (commit) => ({ kind: "backlog-git", commit, path, repository: {
+    topology: "independent", identity: createHash("sha256").update(`remote:${remoteUrl}`).digest("hex"),
+  } });
+  const publishedHead = () => execFileSync("git", ["--git-dir", remoteUrl, "rev-parse", TASK_HISTORY_REF], { encoding: "utf8" }).trim();
+  const commit = (marker, { large = false, id = taskId, publish = true, at = path } = {}) => {
+    // Put the ID beyond the old fixed window, in a native-parsed YAML header.
+    const header = `---\ntitle: Continuation${large ? ` ${"h".repeat(70_000)}` : ""}\nid: ${id}\nstatus: In Progress\n---\n`;
+    if (large) assert.ok(Buffer.byteLength(header.split("\nid:")[0]) > 64 * 1024);
+    const bytes = Buffer.from(`${header}\n## Description\n\n${marker}-early-原文🙂\n${"x".repeat(large ? 1_100_000 : 10)}\n${marker}-late-終端🚀\n`);
+    if (large) assert.ok(bytes.length > 1024 * 1024);
+    mkdirSync(dirname(join(storeDir, at)), { recursive: true });
+    writeFileSync(join(storeDir, at), bytes);
+    git("add", "."); git("commit", "-qm", marker);
+    const oid = git("rev-parse", "HEAD");
+    if (publish) git("push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+    return { oid, bytes, evidence: ref(oid) };
+  };
+  const dependencies = { ...f.deps, taskRunner: noBufferedBacklogRunner(),
+    prepareEpisodeTaskHistory({ primaryRoot, targetWorktree }) {
+      assert.equal(primaryRoot, f.root); assert.equal(targetWorktree, f.worktree);
+      return { status: "prepared", storeDir, remote: "origin", publishedHead: publishedHead(), head: git("rev-parse", "HEAD") };
+    },
+    conversationAfterHandoff: async () => ({ outcome: "skipped", reason: "fixture" }),
+  };
+  const tools = new Map();
+  createReviewedPlanExtension(dependencies)({ registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); },
+    on() {}, sendUserMessage() {}, async sendMessage() {} });
+  const run = (mode) => tools.get("handoff_task_episode").execute("continuation", {
+    taskId, guidance: "accepted bounded focus", ...(mode ? { mode } : {}),
+  }, undefined, undefined, f.ctx);
+  const bind = (taskEvidence, providerRevision) => {
+    const initial = activeTaskRecord(f, { taskId, taskPath: `.backlog/${path}`, provider: "backlog", providerRevision, taskEvidence });
     f.ownership.write(f.root, initial);
-    const summary = { ...transitionSession(f), queuedCount: 1,
-      queuedPrompts: [{ prompt: queueBody, unknown: null }], unknownSummary: { raw: ["原文", null] } };
-    const state = { ...summary, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
-      unfinishedActionCount: 1, sessionActions: { queuedCount: 1, steering: [],
-        followUps: [{ prompt: queueBody, source: "native", unknownQueuedField: { keep: null } }], active: null },
-      unknownState: [null, "終端"] };
-    f.publisher.list = async () => [summary];
-    let stateReads = 0;
-    f.publisher.getState = async () => { stateReads += 1; return state; };
-    // A prior native row can be huge too. It is not the handoff capture.
-    f.deps.appendEntry("unrelated-native-history", { body: queueBody });
     f.calls.length = 0;
-    const events = [];
-    const originalWrite = f.ownership.write;
-    f.ownership.write = (repo, record) => { events.push("evidence"); originalWrite(repo, record); };
-    f.publisher.deliverHandoff = async (_route, handoff, execute, onHandoffAdmitted) => {
-      assert.equal(f.nativeEntries.filter((entry) => entry.customType === "prime-claw-task-handoff-observation").length, 1);
-      assert.equal(f.record.providerRevision, initial.providerRevision);
-      events.push("first-admitted");
-      await onHandoffAdmitted();
-      assert.deepEqual(f.record.taskEvidence, current);
-      events.push("sole-follow-up");
-      f.calls.push(["handoff", handoff, execute]);
-    };
-    const tools = new Map();
-    createReviewedPlanExtension({ ...f.deps,
-      prepareEpisodeTaskHistory: () => ({ status: "prepared", head: "d".repeat(40) }),
-      taskRunner: { run(command, args, options) {
-        if (command === "backlog") {
-          assert.deepEqual(args, ["task", "view", "--json", "--", taskId]);
-          assert.equal(options.cwd, f.worktree);
-          return { status: 0, stdout: JSON.stringify(current), stderr: "" };
-        }
-        return new ProcessCommandRunner().run(command, args, options);
-      } },
-    })({ registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
-      sendUserMessage() {}, async sendMessage() {} });
-    const toolResult = await tools.get("handoff_task_episode").execute(
-      "large-handoff", { taskId, guidance: "accepted bounded focus" }, undefined, undefined, f.ctx,
-    );
-    assert.equal(toolResult.isError, undefined);
-    assert.equal(toolResult.details.admitted, true);
-    assert.deepEqual(events, ["first-admitted", "evidence", "sole-follow-up"]);
-    assert.equal(stateReads, 2, "preflight inspects identity but captures no journal entry");
-    assert.equal(f.calls.filter(([kind]) => kind === "append").length, 1);
-    const deliveries = f.calls.filter(([kind]) => kind === "handoff");
-    assert.equal(deliveries.length, 1);
-    const prompts = deliveries[0].slice(1), reference = toolResult.details.observationReference;
-    assert.ok(toolResult.content[0].text.includes(JSON.stringify(reference)), "normal tool text exposes the same exact reference");
-    const observation = readHandoffObservation(f, reference, prompts);
-    assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence, previous);
-    assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, current);
-    assert.equal(observation.providerTaskObservation.previousProviderRevision, initial.providerRevision);
-    assert.equal(observation.providerTaskObservation.publishedProviderRevision, "d".repeat(40));
-    assert.deepEqual(observation.episodeSessionObservation, { session: summary, state });
-    assert.equal(Object.hasOwn(observation.providerTaskObservation.previousTaskEvidence.task, "currentOnly"), false);
-    assert.equal(Object.hasOwn(observation.providerTaskObservation.currentTaskEvidence.task, "previousOnly"), false);
-    assert.equal(Object.hasOwn(observation.providerTaskObservation.currentTaskEvidence.task, "neverPresent"), false);
-    assert.equal(Object.hasOwn(toolResult.details, "providerTaskObservation"), false);
-    assert.equal(Object.hasOwn(toolResult.details, "episodeSessionObservation"), false);
-    // Reconstruct exact UTF-8 bytes in bounded pieces, including split Unicode.
-    const row = readFileSync(reference.sessionFile, "utf8").split("\n")
-      .find((line) => line && JSON.parse(line).id === reference.entryId);
-    const bytes = Buffer.from(row, "utf8");
-    const unicodeSplit = bytes.indexOf(Buffer.from("🙂", "utf8")) + 1;
-    assert.ok(unicodeSplit > 0, "fixture includes a multi-byte character");
-    const pieces = [];
-    for (let offset = 0; offset < bytes.length;) {
-      let end = Math.min(offset + 4096, bytes.length);
-      if (offset < unicodeSplit && unicodeSplit < end) end = unicodeSplit;
-      pieces.push(bytes.subarray(offset, end));
-      offset = end;
-    }
-    assert.ok(pieces.every((piece) => piece.byteLength <= 4096));
-    if (large) assert.ok(pieces.length > 1000);
-    const reconstructed = Buffer.concat(pieces);
-    assert.equal(createHash("sha256").update(reconstructed).digest("hex"), reference.entrySha256);
-    assert.deepEqual(JSON.parse(reconstructed.toString("utf8")).data, observation);
-    // Later appends cannot change which retained native entry these prompts name.
-    f.deps.appendEntry("later-unrelated-entry", { marker: "not-the-observation" });
-    assert.deepEqual(readHandoffObservation(f, reference), observation);
-    const visible = [...prompts, JSON.stringify(toolResult.content), JSON.stringify(toolResult.details)];
-    for (const output of visible) {
-      assert.ok(Buffer.byteLength(output, "utf8") < 16_384, "normal output must not scale with native evidence");
-      assert.doesNotMatch(output, /early-(?:previous|current|queued)|middle-(?:previous|current|queued)|late-(?:previous|current|queued)/);
-    }
-    sizes.push(visible.map((output) => Buffer.byteLength(output, "utf8")));
-    assert.equal(f.calls.some(([kind]) => ["fresh", "reopen", "execute", "orca-create", "local-create"].includes(kind)), false);
+    return initial;
+  };
+  return { f, storeDir, taskId, path, selected, git, commit, bind, run };
+}
+
+async function assertCommittedContinuationBytes(selected, taskId, evidence, expected) {
+  const windows = [];
+  let offset = 0;
+  for await (const window of streamBacklogGitEvidence(selected, evidence, taskId)) {
+    assert.equal(window.offset, offset);
+    assert.equal(window.totalBytes, expected.length);
+    assert.ok(window.bytes.length > 0 && window.bytes.length <= 4096);
+    offset += window.bytes.length;
+    windows.push(window.bytes);
   }
-  for (let index = 0; index < sizes[0].length; index += 1) {
-    assert.ok(Math.abs(sizes[1][index] - sizes[0][index]) < 256, "raw native history does not inflate prompts or normal registered-tool returns");
+  assert.equal(offset, expected.length);
+  assert.deepEqual(Buffer.concat(windows), expected, "historical evidence includes the exact UTF-8 tail and long line");
+}
+
+function assertNativeContinuationExceedsSyncBuffer(h) {
+  const out = join(h.f.root, "fixture-native-size.json");
+  const fd = openSync(out, "w");
+  try {
+    execFileSync("backlog", ["task", "view", "--json", "--", h.taskId], {
+      cwd: h.f.worktree, stdio: ["ignore", fd, "pipe"],
+    });
+  } finally { closeSync(fd); }
+  assert.ok(statSync(out).size > 1024 * 1024, "real native JSON exceeds the old synchronous buffer");
+  unlinkSync(out);
+}
+
+test("registered independent Backlog handoff and execute-only keep large committed evidence readable after publication advances", async (t) => {
+  const h = committedBacklogContinuation(t), { f } = h;
+  const previous = h.commit("ticket-previous", { large: true });
+  const legacy = { kind: "task-view", task: { id: h.taskId, path: `.backlog/${h.path}`, status: "In Progress", description: "historic snapshot sentinel" } };
+  const initial = h.bind(legacy, previous.oid);
+  f.deps.appendEntry("historic-native-row", { taskEvidence: legacy });
+  const journal = f.ctx.sessionManager.getSessionFile();
+  const oldHistory = readFileSync(journal, "utf8");
+  const current = h.commit("ticket-current", { large: true });
+  assertNativeContinuationExceedsSyncBuffer(h);
+  const firstLocal = h.commit("ticket-local-only", { publish: false });
+  // A mutable edit is neither the published checkpoint nor usable evidence.
+  writeFileSync(join(h.storeDir, h.path), "mutable-file-do-not-read");
+  const summary = { ...transitionSession(f), unknownSummary: { raw: ["原文", null] } };
+  const state = { ...summary, isBashRunning: false, isRunningTools: false, hasRunningRlmChildren: false,
+    unfinishedActionCount: 0, sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null }, unknownState: [null, "終端"] };
+  f.publisher.list = async () => [summary];
+  f.publisher.getState = async () => state;
+  const events = [], prompts = [];
+  const originalWrite = f.ownership.write;
+  f.ownership.write = (repo, record) => { events.push("factual-write"); originalWrite(repo, record); };
+  f.publisher.deliverHandoff = async (_route, handoff, execute, onHandoffAdmitted) => {
+    assert.equal(f.nativeEntries.length, 2);
+    assert.deepEqual(f.record, initial, "legacy ownership stays intact until first admission");
+    prompts.push(handoff);
+    events.push("first-admission");
+    await onHandoffAdmitted();
+    assert.deepEqual(f.record.taskEvidence, current.evidence);
+    events.push("sole-follow-up");
+    prompts.push(execute);
+  };
+  let result = await h.run();
+  assert.equal(result.isError, undefined, result.content[0].text);
+  assert.deepEqual(events, ["first-admission", "factual-write", "sole-follow-up"]);
+  const firstReference = result.details.observationReference;
+  const firstObservation = readHandoffObservation(f, firstReference, prompts);
+  assert.deepEqual(firstObservation.episodeSessionObservation, { session: summary, state });
+  assert.deepEqual(firstObservation.providerTaskObservation.previousTaskEvidence, previous.evidence);
+  assert.deepEqual(firstObservation.providerTaskObservation.currentTaskEvidence, current.evidence);
+  assert.equal(firstObservation.providerTaskObservation.previousProviderRevision, previous.oid);
+  assert.equal(firstObservation.providerTaskObservation.publishedProviderRevision, current.oid);
+  assert.deepEqual(firstObservation.providerTaskObservation.localTaskEvidence, firstLocal.evidence);
+  assert.equal(firstObservation.providerTaskObservation.selectedTaskStatus.status, 0);
+  assert.equal(firstObservation.providerTaskObservation.selectedTaskStatus.stdout, ` M "${h.path}"\n`);
+  assert.equal(f.record.providerRevision, current.oid);
+  const firstVisible = [...prompts, JSON.stringify(result)];
+  const afterFirst = readFileSync(journal, "utf8");
+  assert.ok(afterFirst.startsWith(oldHistory), "legacy native journal bytes are unchanged");
+
+  const latest = h.commit("ticket-latest", { large: true });
+  assertNativeContinuationExceedsSyncBuffer(h);
+  const latestLocal = h.commit("ticket-new-local-only", { publish: false });
+  const executePrompts = [];
+  unlinkSync(join(f.worktree, ".prime-claw/workflows/handoff.md"));
+  f.publisher.deliverExecute = async (route, prompt) => {
+    assert.equal(f.nativeEntries.length, 3);
+    assert.deepEqual(f.record.taskEvidence, current.evidence, "no factual advance before execute admission");
+    events.push("execute-only-admission");
+    executePrompts.push(prompt);
+    return { activeSessionId: route, execute: { outcome: "admitted" } };
+  };
+  result = await h.run("execute-only");
+  assert.equal(result.isError, undefined, result.content[0].text);
+  assert.equal(result.details.delivery.execute.outcome, "admitted");
+  assert.equal(result.details.factualUpdate, "completed");
+  assert.deepEqual(events, ["first-admission", "factual-write", "sole-follow-up", "execute-only-admission", "factual-write"]);
+  const observation = readHandoffObservation(f, result.details.observationReference, executePrompts);
+  assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence, current.evidence);
+  assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, latest.evidence);
+  assert.equal(observation.providerTaskObservation.previousProviderRevision, current.oid);
+  assert.equal(observation.providerTaskObservation.publishedProviderRevision, latest.oid);
+  assert.deepEqual(observation.providerTaskObservation.localTaskEvidence, latestLocal.evidence);
+  assert.equal(observation.providerTaskObservation.selectedTaskStatus.status, 0);
+  assert.equal(observation.providerTaskObservation.selectedTaskStatus.stdout, "");
+  assert.deepEqual(f.record.taskEvidence, latest.evidence);
+  assert.equal(f.record.providerRevision, latest.oid);
+  assert.deepEqual(readHandoffObservation(f, firstReference), firstObservation);
+  for (const key of Object.keys(initial)) {
+    if (!["head", "updatedAt", "providerRevision", "taskEvidence"].includes(key)) assert.deepEqual(f.record[key], initial[key], key);
   }
+  for (const [evidence, expected] of [[firstObservation.providerTaskObservation.previousTaskEvidence, previous.bytes],
+    [firstObservation.providerTaskObservation.currentTaskEvidence, current.bytes],
+    [observation.providerTaskObservation.currentTaskEvidence, latest.bytes]]) {
+    await assertCommittedContinuationBytes(h.selected, h.taskId, evidence, expected);
+  }
+  for (const [capture, from, to] of [[firstObservation, "previous", "current"], [observation, "current", "latest"]]) {
+    const { previousTaskEvidence, currentTaskEvidence } = capture.providerTaskObservation;
+    const diff = h.git("--no-pager", "--literal-pathspecs", "diff", "--no-color", "--no-ext-diff",
+      "--unified=0", previousTaskEvidence.commit, currentTaskEvidence.commit, "--", currentTaskEvidence.path);
+    assert.ok(diff.includes(`-ticket-${from}-late-終端🚀`));
+    assert.ok(diff.includes(`+ticket-${to}-late-終端🚀`));
+    assert.doesNotMatch(diff, /local-only|mutable-file-do-not-read/);
+  }
+  const afterExecute = readFileSync(journal, "utf8");
+  assert.ok(afterExecute.startsWith(afterFirst));
+  for (const output of [...firstVisible, ...executePrompts, JSON.stringify(result), JSON.stringify(f.record), afterExecute.slice(oldHistory.length)]) {
+    assert.ok(Buffer.byteLength(output, "utf8") < 16_384, "new records, prompts and results stay bounded");
+    assert.doesNotMatch(output, /ticket-(?:previous|current|latest|local-only|new-local-only)-(?:early|late)|historic snapshot sentinel|mutable-file-do-not-read/);
+  }
+  assert.equal(f.calls.some(([kind]) => ["fresh", "reopen", "orca-create", "local-create", "auto-run"].includes(kind)), false);
+});
+
+test("independent Backlog continuation stops before observation or delivery on unprovable committed evidence", async (t) => {
+  for (const [label, mode, scenario, reason] of [
+    ["no legacy commit", undefined, "missing", /commit unavailable/i],
+    ["wrong previous repository", "execute-only", "repository", /repository/i],
+    ["wrong previous reference path", undefined, "path", /path/i],
+    ["wrong ID at prior legacy commit", undefined, "prior-id", /task ID|canonical/i],
+    ["wrong ID at published commit", "execute-only", "current-id", /task ID|canonical/i],
+    ["missing path at published commit", undefined, "current-path", /blob|path/i],
+  ]) await t.test(label, async (t) => {
+    const h = committedBacklogContinuation(t), { f } = h;
+    const prior = h.commit("prior", scenario === "prior-id" ? { id: "PRIMECLAW-2" } : {});
+    if (scenario === "current-path") { h.git("rm", "--", h.path); }
+    h.commit("published", scenario === "current-path" ? { at: "tasks/unrelated.md" } :
+      scenario === "current-id" ? { id: "PRIMECLAW-2" } : {});
+    // Both the worktree and any later local commit may have the exact task ID.
+    // Neither may substitute for the prior or published reference.
+    h.commit("local-only", { publish: false });
+    const legacy = { task: { id: h.taskId, path: `.backlog/${h.path}`, status: "In Progress" } };
+    const evidence = scenario === "repository" ? { ...prior.evidence, repository: { topology: "independent", identity: "0".repeat(64) } }
+      : scenario === "path" ? { ...prior.evidence, path: h.path.split("/").at(-1) } : legacy;
+    const initial = h.bind(evidence, scenario === "missing" ? "0".repeat(40) : prior.oid);
+    const result = await h.run(mode);
+    assert.equal(result.isError, true);
+    if (mode === "execute-only") {
+      assert.equal(result.details.stoppedAt, "provider preparation");
+      assert.equal(result.details.executeOutcome, "not_attempted");
+    } else assert.match(result.content[0].text, reason);
+    assert.equal(f.nativeEntries.length, 0);
+    assert.deepEqual(f.record, initial);
+    assert.equal(f.calls.some(([kind]) => ["handoff", "execute", "ownership", "append", "fresh", "reopen", "orca-create", "local-create"].includes(kind)), false);
+  });
 });
 
 test("task handoff stops before delivery and factual commit when native observation evidence is unavailable", async (t) => {
@@ -4409,11 +4509,9 @@ for (const provider of ["backlog", "beads"]) {
       const advanced = parseEpisodeOwnership({ ...initial, head: f.git.head(f.worktree), providerRevision: currentRevision, updatedAt: "2026-11-16T03:00:00Z" });
       const deps = { ...f.deps, publisher,
         taskResolver: boundTaskResolver(f),
-        taskRunner: { run(command, args, options) {
-          if (command === "backlog") return { stdout: JSON.stringify(initial.taskEvidence), stderr: "", status: 0 };
-          return new ProcessCommandRunner().run(command, args, options);
-        } },
-        prepareEpisodeTaskHistory: () => ({ status: "prepared", head: currentRevision }),
+        taskRunner: noBufferedBacklogRunner(),
+        verifyBacklogEvidence: mockVerifyBacklogEvidence,
+        prepareEpisodeTaskHistory: () => mockedBacklogPreparation(f, currentRevision),
         advanceBeadsEvidence: () => ({
           record: advanced, previousProviderRevision: initial.providerRevision,
           currentProviderRevision: currentRevision, previousTaskEvidence: initial.taskEvidence,
@@ -4431,8 +4529,10 @@ for (const provider of ["backlog", "beads"]) {
       assert.equal(f.nativeEntries.length, 1, "identity-only preflight does not capture; actual handoff captures once");
       const reference = handoffReferenceFromPrompt(requests[0].message);
       const observation = readHandoffObservation(f, reference, requests.map((request) => request.message));
-      assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence, initial.taskEvidence);
-      assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, initial.taskEvidence);
+      assert.deepEqual(observation.providerTaskObservation.previousTaskEvidence,
+        provider === "backlog" ? mockedBacklogEvidence(initial.providerRevision) : initial.taskEvidence);
+      assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence,
+        provider === "backlog" ? mockedBacklogEvidence(currentRevision) : initial.taskEvidence);
       assert.equal(f.record.providerRevision, firstFailed || failure === "callback" ? initial.providerRevision : currentRevision);
       assert.match(requests[0].message, /HANDOFF POLICY/);
       if (requests[1]) assert.match(requests[1].message, /EXECUTE POLICY/);
@@ -4711,11 +4811,9 @@ for (const scenario of [
     createReviewedPlanExtension({ ...f.deps, publisher,
       conversationAfterHandoff: async () => ({ outcome: "skipped", reason: "disabled" }),
       taskResolver: boundTaskResolver(f),
-      taskRunner: { run(command, args, options) {
-        if (command === "backlog") return { stdout: JSON.stringify(evidence), stderr: "", status: 0 };
-        return new ProcessCommandRunner().run(command, args, options);
-      } },
-      prepareEpisodeTaskHistory: () => ({ status: "prepared", head: "d".repeat(40) }),
+      taskRunner: noBufferedBacklogRunner(),
+      verifyBacklogEvidence: mockVerifyBacklogEvidence,
+      prepareEpisodeTaskHistory: () => mockedBacklogPreparation(f, "d".repeat(40)),
     })({ registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
       sendUserMessage() {}, async sendMessage() {} });
     const invocationStarted = Date.now();

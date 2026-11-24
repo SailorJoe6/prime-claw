@@ -580,7 +580,10 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   assert.equal(advancedOwner.providerRevision, changedTask.publishedHead);
   assert.equal(advancedOwner.integrationBranch, integrationBranch);
   assert.equal(advancedOwner.baseRef, codeHead);
-  assert.match(advancedOwner.taskEvidence.task.implementationNotes, /accepted handoff advance/);
+  assert.equal(advancedOwner.taskEvidence.kind, "backlog-git");
+  assert.equal(advancedOwner.taskEvidence.commit, changedTask.publishedHead);
+  assert.match(git(join(result.worktree, ".backlog"), "show", `${advancedOwner.taskEvidence.commit}:${advancedOwner.taskEvidence.path}`),
+    /accepted handoff advance/);
   for (const prompt of [deliveredHandoff, deliveredContinuation]) {
     assert.equal(prompt.includes(JSON.stringify(beforeHandoff.taskEvidence)), false);
     assert.equal(prompt.includes(JSON.stringify(advancedOwner.taskEvidence)), false);

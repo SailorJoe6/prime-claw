@@ -14,7 +14,9 @@ const invalid = () => new Error("invalid or unsupported native task-view JSON");
 /** Project only the two envelope fields and three exact task fields. Other
  * strings (including one very long line) are validated and discarded in place.
  */
-export async function projectBacklogCreationIdentity(chunks: AsyncIterable<Uint8Array>): Promise<BacklogCreationIdentity> {
+export async function projectBacklogCreationIdentity(
+  chunks: AsyncIterable<Uint8Array>, { requireStatus = true }: { requireStatus?: boolean } = {},
+): Promise<BacklogCreationIdentity> {
   const source = chunks[Symbol.asyncIterator]();
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let chunk = "", offset = 0, ended = false;
@@ -132,17 +134,27 @@ export async function projectBacklogCreationIdentity(chunks: AsyncIterable<Uint8
     if (field === "schemaVersion") { await take("1"); version = true; }
     else if (field === "kind") kind = await string(true, ["task-view"]) === "task-view";
     else if (field === "task") await object(["id", "path", "status"], async (key) => {
-      if (key === "id" || key === "path" || key === "status") facts[key] = await string(true);
+      if (key === "id" || key === "path" || (key === "status" && requireStatus)) facts[key] = await string(true);
       else await skip();
     });
     else await skip();
   });
   await space();
-  if (await peek() !== undefined || !version || !kind || !facts.id || !facts.path || !facts.status) throw invalid();
-  return { id: facts.id, path: facts.path, status: facts.status };
+  if (await peek() !== undefined || !version || !kind || !facts.id || !facts.path || (requireStatus && !facts.status)) throw invalid();
+  return { id: facts.id, path: facts.path, status: facts.status ?? "" };
 }
 
-export async function readBacklogCreationIdentity(cwd: string, taskId: string): Promise<BacklogCreationIdentity> {
+export function readBacklogCreationIdentity(cwd: string, taskId: string): Promise<BacklogCreationIdentity> {
+  return readNativeBacklogIdentity(cwd, taskId, true);
+}
+
+/** Only for the scratch project containing one exact committed header. */
+export async function readBacklogHeaderIdentity(cwd: string, taskId: string): Promise<Pick<BacklogCreationIdentity, "id" | "path">> {
+  const { id, path } = await readNativeBacklogIdentity(cwd, taskId, false);
+  return { id, path };
+}
+
+async function readNativeBacklogIdentity(cwd: string, taskId: string, requireStatus: boolean): Promise<BacklogCreationIdentity> {
   const child = spawn("backlog", ["task", "view", "--json", "--", taskId], { cwd, stdio: ["ignore", "pipe", "ignore"] });
   let launchError: string | undefined;
   child.once("error", (error: NodeJS.ErrnoException) => { launchError = error.code ?? "spawn failed"; });
@@ -150,7 +162,7 @@ export async function readBacklogCreationIdentity(cwd: string, taskId: string): 
     child.once("close", (code, signal) => resolveClose({ code, signal }));
   });
   let facts: BacklogCreationIdentity | undefined;
-  try { facts = await projectBacklogCreationIdentity(child.stdout); }
+  try { facts = await projectBacklogCreationIdentity(child.stdout, { requireStatus }); }
   catch { child.stdout.resume(); }
   const { code, signal } = await closed;
   if (launchError || code !== 0 || !facts) throw new Error(`Native Backlog identity read failed for ${taskId}: ${launchError ?? (code === 0 ? invalid().message : signal ?? `exit ${code}`)}`);

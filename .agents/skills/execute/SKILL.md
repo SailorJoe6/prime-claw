@@ -49,8 +49,8 @@ instead of switching modes. A valid version-2 ownership record selects
 only from that exact record. A provider-absent record, or `provider: "backlog"`
 without `providerRevision`/`taskEvidence`, is grandfathered branch-local Backlog
 and must retain its exact `taskPath`. An explicit Backlog record with both fields
-selects independent task history: bind its 40-hex revision and complete native
-task view separately from code `baseRef`/`head`. A `provider: "beads"` record
+selects independent task history: bind its 40-hex revision and task evidence
+(Git reference or legacy raw view) separately from code `baseRef`/`head`. A `provider: "beads"` record
 must have no `taskPath` and must retain
 its exact non-empty `providerRevision`, complete raw `taskEvidence`, `baseRef`,
 worktree, branch, and Episode session identity. Any mixed or missing binding
@@ -149,11 +149,16 @@ Load it before judging continuation:
    provider observation and native session/state facts. Preserve provider-native
    envelopes, arrays, keys, unknown fields, nulls, and absent fields; never
    normalize, flatten, truncate, or replace them with a summary.
-4. Enumerate the native structure, then inspect the entire current task contract
-   and all relevant prior/current differences, including fields and comments.
-   Read large collections and individual huge values in bounded chunks of about
-   4096 characters per output, with paths and offsets so no remainder is skipped.
-   A key list, length/digest check, preview or summary is not semantic inspection.
+4. For independent Backlog continuation, if either `previousTaskEvidence` or
+   `currentTaskEvidence` is `kind: "backlog-git"`, require both to be valid
+   references and inspect them as described below. Otherwise inspect the
+   complete legacy raw observations as supplied (for independent Backlog, both
+   must be native task views for the bound task, not malformed references).
+   For raw observations, enumerate their structure and inspect the entire
+   current task contract and relevant prior/current differences, including
+   fields and comments. Read large values
+   and collections in chunks of about 4096 characters, with paths and offsets.
+   A key list, digest, preview or summary cannot replace semantic inspection.
    Do not dump one giant JSON value into model context.
 
 A missing, unreadable, ambiguous, mismatched or inaccessible exact session/entry
@@ -164,6 +169,58 @@ Previously loaded generations may still supply `<provider-task-observation>`
 and `<episode-session-observation>` inline. Read those complete native values
 when no reference was supplied; they never repair a failed reference. Retained
 version-1 folder-plan handling is unchanged.
+
+### Read independent Backlog Git evidence
+
+For ordinary handoff and execute-only continuation, each reference has
+`{kind: "backlog-git", repository: {topology: "independent", identity}, commit, path}`.
+The managed sender verifies both exact committed regular ticket blobs and their
+native canonical task ID from committed frontmatter before delivery. Match the
+previous commit to `previousProviderRevision` and the current commit to
+`publishedProviderRevision`. The current reference is the observed published
+checkpoint. An optional `localTaskEvidence` points to a separately retained
+local head. When it matters to the decision, require the same repository
+identity, topology and literal task path as the current reference. Resolve its
+own commit, verify the bound canonical task ID and read or diff its blob against
+the published blob using the same bounded procedure. If that relevant evidence
+is unavailable or mismatched, report the gap; never guess from local `HEAD`.
+Local evidence is not publication or a substitute for either required reference.
+Use `selectedTaskStatus`, the raw literal-ticket Git status result, as separate
+publication context. It is not an automatic cleanliness gate or a substitute
+for committed content. Do not require these commits or the branch tips to be equal.
+
+1. Use only this Episode's already selected independent task clone at its
+   configured store location (normally `<worktree>/.backlog`), not the code
+   repository or the primary clone. With `git --no-replace-objects -C "$root"
+   rev-parse --show-toplevel`, verify the canonical root matches that exact
+   store. Hash UTF-8 `remote:` followed by the output of `git -C "$root" remote
+   get-url -- "$remote"` with trailing whitespace removed. Use the already
+   selected task remote, not a guessed remote. Compare the lowercase SHA-256
+   digest to both `repository.identity` values; do not print the URL.
+2. For each reference require exactly 40 lowercase hex digits and
+   `git --no-replace-objects -C "$root" cat-file -t "$oid"` to return `commit`.
+   Require a literal `.md` path relative to the nested clone, with no empty,
+   `.` or `..` components, NUL, CR, LF or backslash. Run
+   `git --no-replace-objects -C "$root" --literal-pathspecs ls-tree -z "$oid" -- "$path"`.
+   Require exactly one NUL-terminated entry of mode `100644` or `100755`, type
+   `blob`, and the exact path after the tab. Keep its full blob OID; verify
+   `cat-file -t` returns `blob`. The path and filename alone do not prove the
+   task ID; check the committed header against the bound canonical ID when
+   reading the blob.
+3. In the REPL, stream `git --no-replace-objects -C "$root" cat-file blob "$blob"`
+   for the entire current contract. Compare both verified blob OIDs with
+   `git --no-replace-objects -C "$root" --no-pager diff --no-color --no-ext-diff --no-textconv --text "$old_blob" "$new_blob" --`.
+   Pass arguments separately. Read stdout in successive windows of about 4096
+   bytes, with offsets and incremental UTF-8 decoding. Do not cut at a long
+   line or skip the tail. Check process exit and the blob's `cat-file -s` byte
+   count for a complete blob read. Inspect all relevant changes, including
+   frontmatter, plan, notes and comments. Do not print or save a full snapshot.
+
+If either required reference cannot be bound, read or matched, stop and report
+which evidence is missing or mismatched. Do not substitute `HEAD`, a tracking
+ref, an index/working file, a native live view, or a cached observation. Resume
+from the same task and assess current progress under existing guidance; the
+observed commits do not freeze history or grant approval.
 
 ### Provider-absent or Backlog task authority
 
@@ -217,8 +274,10 @@ primary nested task clone for independent Backlog. The Episode must not pass
 Ordinary execution performs no cross-checkout copy, mirroring, or dual write.
 
 For independent Backlog, prepare and read only this Episode's intended task
-workspace when needed, not another writer's mutable primary clone. Inspect the
-persisted and current complete native task views/history. Incorporate compatible
+workspace when needed, not another writer's mutable primary clone. For a
+continuation, inspect the prior/current committed references and native history
+(or the complete raw observations for an old generation). Keep live native
+reads for authoring distinct from committed evidence. Incorporate compatible
 in-scope clarifications; stop for a real semantic conflict, authority change,
 scope expansion or product decision, not raw inequality or unrelated history.
 Immediately before an authorized content write, synchronize and reread this

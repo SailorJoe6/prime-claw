@@ -1,5 +1,5 @@
 import { readBacklogCreationIdentity, type BacklogCreationIdentity } from "./backlog-creation-identity.ts";
-import { referenceCommittedBacklogTask } from "./backlog-git-evidence.ts";
+import { makeBacklogGitEvidence, referenceCommittedBacklogTask } from "./backlog-git-evidence.ts";
 import {
   cpSync,
   existsSync,
@@ -261,6 +261,7 @@ export interface TaskEpisodeHandoffDependencies extends EpisodeDependencies {
   taskRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   prepareEpisodeTaskHistory?: typeof prepareEpisodeTaskHistoryWorkspace;
+  verifyBacklogEvidence?: typeof makeBacklogGitEvidence;
   advanceBeadsEvidence?: typeof advancePublishedBeadsTaskEpisodeEvidence;
   now?: () => string;
 }
@@ -1819,13 +1820,13 @@ function samePublishedHandoffIdentity(
   return JSON.stringify(beforeBinding) === JSON.stringify(afterBinding);
 }
 
-function preparePublishedBacklogHandoffEvidence(
+async function preparePublishedBacklogHandoffEvidence(
   record: PublishedBacklogTaskEpisodeOwnershipRecord,
   repo: string,
   runner: CommandRunner,
   dependencies: TaskEpisodeHandoffDependencies,
   episodeHead: string,
-): { record: PublishedBacklogTaskEpisodeOwnershipRecord; observation: string } {
+): Promise<{ record: PublishedBacklogTaskEpisodeOwnershipRecord; observation: string }> {
   const prepared = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
     primaryRoot: repo,
     targetWorktree: record.worktree!,
@@ -1834,33 +1835,38 @@ function preparePublishedBacklogHandoffEvidence(
   if (prepared.status !== "prepared") {
     throw new Error(`Independent Backlog handoff could not prepare exact task history: ${prepared.code}: ${prepared.detail}`);
   }
-  const current = runner.run("backlog", ["task", "view", "--json", "--", record.taskId], {
-    cwd: record.worktree!, allowFailure: true,
-  });
-  let evidence: Record<string, unknown>;
-  try {
-    const parsed = JSON.parse(current.stdout) as unknown;
-    if (current.status !== 0 || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error(current.stderr.trim() || `exit ${current.status}`);
+  const storePath = relative(prepared.storeDir, resolve(record.worktree!, record.taskPath)).split("\\").join("/");
+  const repository = { root: prepared.storeDir, topology: "independent" as const, remote: prepared.remote };
+  const makeEvidence = dependencies.verifyBacklogEvidence ?? makeBacklogGitEvidence;
+  const verify = async (label: string, commit: string) => {
+    try { return await makeEvidence(repository, commit, storePath, record.taskId); }
+    catch (error) {
+      throw new Error(`Independent Backlog ${label} evidence at ${commit} is unavailable before delivery: ${taskAdmissionError(error)}`);
     }
-    evidence = parsed as Record<string, unknown>;
-  } catch (error) {
-    throw new Error(`Independent Backlog handoff could not read exact native task evidence: ${error instanceof Error ? error.message : String(error)}`);
+  };
+  const previous = await verify("previous", record.providerRevision);
+  if (record.taskEvidence.kind === "backlog-git") {
+    const stored = record.taskEvidence;
+    const storedRepository = stored.repository as typeof previous.repository;
+    if (stored.commit !== previous.commit || stored.path !== previous.path
+        || storedRepository.topology !== previous.repository.topology || storedRepository.identity !== previous.repository.identity) {
+      throw new Error("Independent Backlog previous evidence does not match the bound repository, revision or path");
+    }
   }
-  const rawTask = evidence.task;
-  if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
-      || (rawTask as Record<string, unknown>).id !== record.taskId
-      || (rawTask as Record<string, unknown>).path !== record.taskPath) {
-    throw new Error("Independent Backlog handoff resolved a different owned task identity");
-  }
+  const evidence = prepared.publishedHead === previous.commit ? previous : await verify("fetched published", prepared.publishedHead);
+  const localEvidence = prepared.head === evidence.commit ? evidence
+    : prepared.head === previous.commit ? previous : await verify("retained local", prepared.head);
+  const selectedTaskStatus = runner.run("git", ["--no-optional-locks", "--literal-pathspecs", "status", "--porcelain", "--", storePath], {
+    cwd: prepared.storeDir, allowFailure: true,
+  });
   const upstream = runner.run("git", ["rev-parse", "--verify", "@{upstream}"], {
     cwd: record.worktree!,
     allowFailure: true,
   });
   const advanced = parseEpisodeOwnership({
     ...record,
-    providerRevision: prepared.head,
-    taskEvidence: evidence,
+    providerRevision: evidence.commit,
+    taskEvidence: { ...evidence },
     head: episodeHead,
     updatedAt: dependencies.now?.() ?? new Date().toISOString(),
   }) as PublishedBacklogTaskEpisodeOwnershipRecord;
@@ -1871,9 +1877,11 @@ function preparePublishedBacklogHandoffEvidence(
     record: advanced,
     observation: JSON.stringify({
       previousProviderRevision: record.providerRevision,
-      publishedProviderRevision: prepared.head,
-      previousTaskEvidence: record.taskEvidence,
+      publishedProviderRevision: evidence.commit,
+      previousTaskEvidence: previous,
       currentTaskEvidence: evidence,
+      ...(localEvidence.commit !== evidence.commit ? { localTaskEvidence: localEvidence } : {}),
+      selectedTaskStatus,
       episodeCodeHead: episodeHead,
       episodeUpstream: upstream,
     }),
@@ -2042,7 +2050,7 @@ export async function continueTaskEpisodeExecute(
     } else {
       let target: TaskEpisodeOwnershipRecord;
       if (isPublishedBacklogTaskEpisodeOwnership(record)) {
-        const prepared = preparePublishedBacklogHandoffEvidence(record, repo, runner, dependencies, episodeCode.head);
+        const prepared = await preparePublishedBacklogHandoffEvidence(record, repo, runner, dependencies, episodeCode.head);
         providerTaskObservation = { ...JSON.parse(prepared.observation), episodeCode };
         target = prepared.record;
       } else {
@@ -2227,7 +2235,7 @@ export async function handoffTaskEpisode(
         throw new Error("Independent Backlog ownership changed during idle handoff preflight");
       }
       const preparedRecord = preflight.record;
-      const prepared = preparePublishedBacklogHandoffEvidence(
+      const prepared = await preparePublishedBacklogHandoffEvidence(
         preparedRecord, repo, runner, dependencies, git.head(preparedRecord.worktree!),
       );
       const providerTaskObservation = JSON.stringify({ ...JSON.parse(prepared.observation), episodeCode });
