@@ -207,13 +207,9 @@ status and relationships; restore before editing. Canonical `archive/tasks/`
 and legacy `completed/` are both archived history regardless of status. Only an
 explicit archived-only native delete vacates identity and cleans relationships.
 Use native archived/draft dependency eligibility. Physical identity conflicts
-refuse before writes, without repair or a parallel index/graph policy. During
-Beads-to-Backlog migration, an existing unrelated live/archive pair with a shared
-ID does not block the import: preserve both originals, let native allocation
-reserve their ID, and refuse ambiguous targeting. Read unambiguous archived
-tasks natively in place.
-Unavailable archived-draft native views alone do not block migration; preserve
-their exact bytes, paths, history and physical identity checks instead.
+refuse before writes, without repair or a parallel index/graph policy. Read
+unambiguous archived tasks natively in place. Beads-to-Backlog migration does
+not operate on an existing Backlog installation; see M1.
 
 Sources: [PRIMECLAW-35][T35], [43][T43], [44][T44], [45][T45]; US-28.
 
@@ -516,23 +512,20 @@ Sources: [PRIMECLAW-10.28][T10_28], [26][T26], [30][T30], [33.5][T33_5]; US-25�
 
 ### M1. Make provider changes explicit and complete
 
-Support the separately confirmed one-way Beads-to-Backlog maintenance operation
-through the initialization skill. Inspect first, explain the exact source and
-counts, quiesce the affected task mutation, and obtain confirmation before the
-switch and source deletion. Read retiring Beads as it is; do not require a server
-conversion, remote, custom unused statuses, source publication, or normalization
-just to retire it. Create a missing target Backlog ID for each Beads ticket. At
-an existing matching target ID, replace the ticket’s current content with
-current Beads content, including original or user-edited matches; do not
-require import provenance. Leave unmatched tickets untouched. Rerunning the
-same explicitly confirmed command after interruption converges without duplicate
-tickets or comments. Preserve unrelated records, destination configuration,
-history, archives, and publication identity. Normalize only the native default
-`backlog/` layout into `.backlog/` with its native root configuration link;
-leave existing hidden and explicitly configured custom stores in place.
+Support one separately confirmed one-way operation through the initialization
+skill: import current Beads data into a fresh Backlog installation only. Refuse
+before any destination write if any Backlog installation already exists, even
+an empty or partial one. Do not adopt, resume, overwrite, back up, or clean up
+an existing Backlog installation. Leave it untouched. Do not retain migration
+paths that do not serve the fresh-only import and its required safeguards.
 
-Sources: [PRIMECLAW-44][T44], [46][T46]. Older bidirectional migration plans in
-[43][T43] are superseded.
+Inspect the exact source and counts, quiesce affected task mutations, and obtain
+explicit confirmation of the switch and guarded source retirement. Read Beads
+as it is; do not require server conversion, a remote, unused custom statuses,
+source publication, or normalization just to retire it.
+
+Sources: [PRIMECLAW-44][T44], [46][T46], [59][T59]. The fresh-only decision
+supersedes bidirectional, destination preservation, overwrite, and replay plans.
 
 ### M2. Preserve current ticket meaning, not revision archives
 
@@ -549,18 +542,17 @@ snapshots, database event streams or provenance logs. Do not embed base64 export
 packages or equivalent archive blobs in tasks/comments, or move them to a newly
 invented archive destination. Current source identity and content binding remain
 required; repeated source checks and destination verification concern current
-content, comments, metadata and relationships, not historical revisions. Existing
-destination history remains protected and need not be rewritten or deleted.
-Required current data still has no fixed per-command capture ceiling or silent
-truncation. Report capture/resource failures as transport failures with bounded
-private-data-safe diagnostics, not malformed-source accusations.
+content, comments, metadata and relationships, not historical revisions. A
+restorable backup of the Beads source is separate from the import. Report
+nonfatal losses as warnings; failure to complete or verify the required import
+or switch is fatal. Required current data still has no fixed per-command capture
+ceiling or silent truncation. Report capture or resource failures as transport
+failures with bounded diagnostics that do not expose private data.
 
 Legacy open work becomes In Design; ordinary closed work becomes active `Done`,
 not automatically archived or moved to legacy `completed/`. Archive only from
 explicit source archive/abandonment evidence, preserving the normally mapped
 status and current closure information rather than forcing `In Progress`.
-Preserve both legacy `completed/` and canonical `archive/tasks/` as existing
-archived history, never as an implicit permanent delete.
 Native Beads memories become readable Backlog documents, an origin index, and
 exactly one USER task to curate them; no memories means no empty curation work.
 Do not curate or delete memories automatically, or repeat the whole memory
@@ -572,20 +564,26 @@ special annotation feature. The later current-state-only correction supersedes
 the earlier requirement to retain raw historical deferral evidence.
 
 Sources: [PRIMECLAW-44][T44], [45][T45], [49][T49], [50][T50], [52][T52];
-[PRIMECLAW-59][T59] records Joe's later current-state-only correction. These
-requirements are intent, not a claim that the remaining migration work is done.
+[PRIMECLAW-59][T59] records the current-state-only and fresh-destination
+corrections. These requirements do not claim that the work is implemented.
 
 ### M3. Verify the destination before retiring the source
 
-Keep the source intact and authoritative until complete destination publication,
-readback of complete current ticket state, preserved mappings and existing
-destination history, and active-owner continuity are verified.
-Then leave one active authority, not a mirror or dual-write arrangement. Use the
-existing destination-native migration evidence, not another coordinator/store.
-Failure must state which authority and resources actually remain. Do not retry
-uncertain switches as a new destination or use a live migration as a test fixture.
+Before switching, make and retain a restorable backup of the Beads source.
+Deleting that backup is a separate operation, not part of the migration. Keep
+the original Beads source intact and authoritative through verified current
+Backlog content, publication of the destination and receipt, and verified
+ownership cutover with active Episode continuity. Only then use guarded
+retirement of the original source. Leave one active authority, not a mirror or
+dual-write arrangement. Use existing destination-native migration evidence, not
+another coordinator or store.
 
-Sources: [PRIMECLAW-43][T43], [44][T44], [49][T49], [50][T50].
+Failure must state which authority and resources actually remain. A pre-cutover
+failure or cancellation leaves Beads authoritative and any partial destination
+untouched. Do not automatically retry, resume, clean up, or create another
+destination. Do not use a live migration as a test fixture.
+
+Sources: [PRIMECLAW-43][T43], [44][T44], [49][T49], [50][T50], [59][T59].
 
 ## 5. Runtime and development boundaries
 
@@ -704,6 +702,7 @@ hypothesis, not a requirement to replace Prime Agent.
 | Template review must overwrite the real file and prove a viewer opened | Non-mutating text comparison, P3; PRIMECLAW-44. |
 | Backlog archives vacate IDs or exclude archived/draft dependency targets; closure moves tasks to `completed/` | Native reserved-identity archive/restore, archived-only delete and active final-status closure, P5/P17/M2; PRIMECLAW-45 supersedes the conflicting PRIMECLAW-44 policy. |
 | Migration must support both directions, normalize Beads first, or preserve active deferral | One-way read-as-is migration; M1–2; PRIMECLAW-44/46/52. |
+| Migration must preserve, overwrite, or resume an existing Backlog destination | Fresh Backlog only; existing installations are refused before writes. Keep the Beads backup separate from the import; M1–3; PRIMECLAW-59. |
 | The home Qwen rebuild is still a required Phase 3a gate | PRIMECLAW-7.5 records Joe's 2026-10-08 withdrawal and gateway/1536 choice. Older home-profile docs are dated history, not a reinstated requirement. |
 | Done metadata, checked criteria, old PASS reports, or candidate tests prove live completion | Preserve the exact evidence limits; implementation, deployment and current-runtime proof are distinct. |
 
