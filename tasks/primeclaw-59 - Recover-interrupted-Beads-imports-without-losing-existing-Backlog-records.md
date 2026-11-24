@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T15:43:00Z'
+updated_date: '2026-11-24T15:50:00Z'
 labels: []
 dependencies: []
 references:
@@ -877,4 +877,7 @@ Exact-candidate Docker Tier 1 `--probe` passed (`20261124T143748Z-73940-c9c2e425
 
 ### Independent re-review and bounded integration authorization
 The owner reports that independent Astra high re-review of `2ff53f96c39d2bdb23365d90ac93eb7730c83981` found both corrections addressed and no material regression. Previous focused and Tier 1 evidence remains scoped to that reviewed tree. This authorizes only the exact-target integration-preparation slice above in the existing Episode, not merge or live operation.
+
+### Integration candidate — exact validation started
+The exact owner-approved target `main` was rechecked directly at `12a96f61e1dbcdd796f92ff8dc3c61470f28834f` before composition. Local Episode candidate `482b7d9256d093705eae4a24f99ea9e7c03507e5` (tree `18fa49f6cafd5ee8d411c2843a34c8ed6fdde6e0`, parents reviewed Episode `2ff53f96c39d2bdb23365d90ac93eb7730c83981` and exact target `12a96f61e1dbcdd796f92ff8dc3c61470f28834f`) is not published yet. The target-relative patch SHA-256 is `6801ee8b6b21ee9cd2e7565e7dcd4fc28e83c11e7b624b52b2e088ab9a4ff754`. Only the reviewed receipt completion and pair/ownership fixes, their documentation, and the isolated receipt-completion test differ from main (3 files, +347/−31). Main already includes the Web shutdown change, retained unchanged; no production publish-only or relocation experiments were carried. The checked-in ownership registry is identical to target main and the canonical working registry was not touched. Exact offline focused and Docker Tier 1 checks are running; older validation does not apply to this tree. No merge, activation or live PVA operation.
 <!-- SECTION:NOTES:END -->
