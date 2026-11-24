@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T14:32:00Z'
+updated_date: '2026-11-24T18:12:00Z'
 labels: []
 dependencies: []
 references:
@@ -160,6 +160,8 @@ Joe explicitly approved the bounded readiness repair identified in the acceptanc
 One test-only revision of f14070bc. Independent review found that test_task_native_implementation_policies_are_publicly_activated_with_folder_compatibility in tests/test_future_plan_skills.py still expects the obsolete full native Backlog view and returned-path wording in prep. Update the stale assertions to cover bounded inspection of the exact committed localTaskEvidence and exact canonical ID/literal path; preserve the other readiness, Beads, and retained-folder assertions. Do not restore the old workflow or change runtime code or guidance. Run the affected Python policy test using the project test environment with PyYAML available, and report baseline versus candidate accurately. Publish the test-only branch revision and exact-ticket validation notes separately, then stop for review. No live lifecycle action, merge, activation, cleanup, or TASK-2 retry.
 
 Accept the independently reviewed readiness repair f14070bc and verified test-only revision 57918f84. Resume the previously approved acceptance closeout, not a new implementation slice. Revisit the published AC1 readiness gap at 8657d53d using the reviewed repair, both registered >1 MiB production-path tests, the exact test-only diff, and the passing Python policy test. Map all four native criteria to exact evidence; distinguish Tier 1 on f14070bc from subsequent validation on 57918f84 and the two reproduced baseline failures. If all four criteria are supported, record them and the Final Summary through native Backlog, publish only the exact ticket separately, and report exact code and task refs. Otherwise report the exact material gap and stop for owner review. No code changes, status change, live lifecycle action, TASK-2 retry, merge, activation, or cleanup.
+
+Joe directed landing PRIMECLAW-69 and then coordinating a full restart. Prepare the exact existing Episode for integration, not the merge to main or rollout. Target main 482b7d9256d093705eae4a24f99ea9e7c03507e5; reviewed Episode 57918f84fa99d3035c18061e35379f5e2b1c5db1. The published task history at 16ddd0cd5c44879bfda9137c65c8cf44a70b7659 contains the unchanged PRIMECLAW-69 ticket from accepted 905096ef2fbaf525d320ee2f67d9b0cc0ddbc378. Integrate the exact target into the Episode branch only, preserving both PRIMECLAW-59 receipt-bound migration behavior and PRIMECLAW-69 exact Backlog Git evidence. Read-only merge-tree found conflicts only in task-provider-migration.ts and tests/task_provider_migration.test.mjs. Stop on a real product conflict. Review clean auto-merged docs; preserve registry bytes from main, do not edit ownership or other task files. Run focused Docker migration/evidence validation and Tier 1 on exact clean integration candidate; report any baseline failures distinctly. Publish the Episode candidate normally, report both parents and focused diff/test evidence, and stop for owner review. No status change, merge to main, activation, restart, cleanup, live migration, PVA, or TASK-2 action.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
