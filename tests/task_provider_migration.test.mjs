@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, statfsSync, chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { syncBuiltinESMExports } from "node:module";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { networkInterfaces, tmpdir } from "node:os";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
@@ -16,6 +16,7 @@ import { canonicalSha256, completeBeadsExport, importBeadsMemoryDocuments, verif
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { checkBeadsCapabilities, detectExplicitTaskProvider, detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { initialTaskStoreConfig, prepareTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
+import { startMigrationBacklogWeb } from "../src/prime-agent-plugin/extension-support/migration-backlog-web.ts";
 import { projectBeadsCurrentTask, assertBeadsCurrentTask } from "../src/prime-agent-plugin/extension-support/beads-backlog-current.ts";
 
 const BACKLOG_CANDIDATE = "deps/backlog/dist/backlog";
@@ -5061,4 +5062,265 @@ test("isolated publish-only verifies an untracked post-Web import before separat
     }
   }
   console.info(JSON.stringify({ stopped: imported.length, sourceDriftMutations: 0, currentViewBytes, baseline: head, ...result }));
+});
+
+
+test("isolated capture identity same-path control", { timeout: 120_000, skip: process.env.PRIME_CLAW_ISOLATED_IDENTITY_TEST !== "1" }, t => {
+  assert.equal(tmpdir(), "/tmp");
+  const f = embeddedBeadsSource(t, "identity-control");
+  const restored = join(f.outer, "independent"), parked = join(f.outer, "retained");
+  const capture = root => {
+    const result = inspectTaskProviderMigration({ cwd: root, targetProvider: "backlog", runner: new AsIsBeadsRunner() });
+    assert.equal(result.status, "ready", result.detail);
+    return result.sourceRevision;
+  };
+  assert.deepEqual(JSON.parse(bd(f.root, "--readonly", "dolt", "remote", "list", "--json")), []);
+  const before = capture(f.root);
+  function checkTree(path) {
+    const info = lstatSync(path);
+    assert.equal(realpathSync(path), path);
+    assert.equal(info.dev, lstatSync(f.outer).dev);
+    if (info.isDirectory()) {
+      assert.ok(!["commondir", "alternates", "http-alternates", "worktrees", "config.worktree", "replace"].includes(path.split("/").at(-1)), path);
+      for (const name of readdirSync(path)) checkTree(join(path, name));
+    } else assert.ok(info.isFile() && info.nlink === 1, path);
+  }
+  checkTree(f.root);
+  const options = { recursive: true, preserveTimestamps: true, force: false, errorOnExist: true };
+  cpSync(f.root, restored, options);
+  checkTree(restored);
+  assert.notEqual(lstatSync(join(f.root, ".beads")).ino, lstatSync(join(restored, ".beads")).ino);
+  renameSync(f.root, parked);
+  renameSync(restored, f.root);
+  const samePath = capture(f.root);
+  assert.equal(samePath, before);
+  const admittedPathShape = root => dirname(dirname(root)) === "/tmp";
+  assert.ok(admittedPathShape(f.root));
+  assert.ok(!admittedPathShape("/Users/synthetic/gitlab_local/project"));
+  assert.ok(!admittedPathShape("/tmp/synthetic/Users/synthetic/gitlab_local/project"));
+  console.log(JSON.stringify({ before, samePath, exactPathControl: true, hostShapeAdmitted: false }));
+});
+
+
+test("isolated capture identity verifies a relocated synthetic stopped mapping", {
+  timeout: 120_000, skip: process.env.PRIME_CLAW_ISOLATED_IDENTITY_TEST !== "1",
+}, async t => {
+  assert.equal(process.platform, "linux");
+  assert.equal(tmpdir(), "/tmp");
+  assert.equal(statfsSync("/tmp").type, 0x01021994);
+  assert.deepEqual(Object.keys(networkInterfaces()).filter(name => name !== "lo"), []);
+  assert.equal(readFileSync("/proc/net/route", "utf8").trim().split("\n").length, 1);
+  assert.equal(process.env.GIT_ALLOW_PROTOCOL, "file");
+  assert.equal(process.env.GIT_CONFIG_NOSYSTEM, "1");
+  assert.equal(process.env.GIT_CONFIG_GLOBAL, "/dev/null");
+  assert.equal(process.env.DOLT_ROOT_PATH, process.env.HOME);
+  assert.equal(dirname(realpathSync(process.env.HOME)), "/tmp");
+  assert.equal(statfsSync(process.env.HOME).type, 0x01021994);
+  assert.ok(!Object.keys(process.env).some(key => /^(?:BEADS_|BD_|MYSQL_|BACKLOG_)|^DOLT_(?!ROOT_PATH$)|^GIT_(?!(?:ALLOW_PROTOCOL|CONFIG_NOSYSTEM|CONFIG_GLOBAL|TERMINAL_PROMPT|OPTIONAL_LOCKS)$)/.test(key)));
+
+  const f = selectedMigrationConfigFixture(t, "identity-proof", { noHardlinks: true });
+  const { root, outer, remote, ids } = f.fixture;
+  const storeAt = path => join(path, ".backlog");
+  const restored = join(outer, "restored"), parked = join(outer, "retained"), substitute = join(outer, "substitute");
+  const baseline = git(storeAt(root), "rev-parse", "HEAD");
+  bd(root, "remember", "Offline synthetic identity memory Ω", "--key", "identity-proof");
+
+  function checkTree(path, gitDirs, rootConfig, seen = new Set()) {
+    const info = lstatSync(path);
+    assert.equal(info.dev, lstatSync(outer).dev);
+    if (path === rootConfig && info.isSymbolicLink()) {
+      assert.equal(readlinkSync(path), ".backlog/config.yml");
+      assert.equal(realpathSync(path), join(dirname(path), ".backlog/config.yml"));
+      return seen;
+    }
+    assert.equal(realpathSync(path), path);
+    assert.ok(!seen.has(info.ino), "unexpected shared inode"); seen.add(info.ino);
+    if (info.isDirectory()) {
+      if (basename(path) === ".git") assert.ok(gitDirs.includes(path), "only fixture Git directories are allowed");
+      for (const name of readdirSync(path)) checkTree(join(path, name), gitDirs, rootConfig, seen);
+    } else assert.ok(info.isFile() && info.nlink === 1, "no links or special files");
+    return seen;
+  }
+  function checkGit(path) {
+    assert.equal(dirname(path), outer);
+    const gitDirs = [join(path, ".git"), join(storeAt(path), ".git"), remote];
+    const seen = checkTree(path, gitDirs, join(path, "backlog.config.yml"));
+    checkTree(remote, gitDirs, undefined, seen);
+    for (const dir of gitDirs) {
+      for (const relative of ["objects/info/alternates", "objects/info/http-alternates", "commondir", "worktrees", "config.worktree", "refs/replace"]) {
+        assert.ok(!existsSync(join(dir, relative)), `unexpected Git storage selector: ${relative}`);
+      }
+      assert.ok(readdirSync(join(dir, "hooks")).every(name => name.endsWith(".sample")));
+      const config = git(outer, "config", "--no-includes", "--file", join(dir, "config"), "--list");
+      for (const line of config.split("\n")) {
+        const key = line.split("=", 1)[0];
+        assert.match(key, /^(?:core\.(?:repositoryformatversion|filemode|bare|logallrefupdates)|remote\.origin\.(?:url|fetch)|branch\..+\.(?:remote|merge)|beads\.role|user\.(?:name|email))$/);
+        if (key === "remote.origin.url") assert.equal(line, `remote.origin.url=${remote}`);
+      }
+      const base = dir === remote ? remote : dirname(dir);
+      assert.equal(git(base, "rev-parse", "--absolute-git-dir"), dir);
+      assert.equal(realpathSync(resolve(base, git(base, "rev-parse", "--git-common-dir"))), dir);
+      assert.equal(git(base, "for-each-ref", "--format=%(refname)", "refs/replace"), "");
+    }
+    return seen;
+  }
+
+  // Inspect the real source, recording exactly the output used by the shipping
+  // capture. The runner does not replace command arguments or results.
+  function capture(path) {
+    const ownStore = join(path, ".beads");
+    const read = (...args) => JSON.parse(bd(path, "--readonly", ...args, "--json"));
+    const context = read("context"), connection = read("dolt", "show");
+    assert.equal(context.beads_dir, ownStore);
+    assert.equal(context.repo_root, path);
+    assert.equal(context.cwd_repo_root, path);
+    assert.equal(context.dolt_mode, "embedded");
+    assert.equal(context.is_redirected, false);
+    assert.equal(connection.embedded, true);
+    assert.notEqual(connection.shared_server, true);
+    assert.equal(connection.database, context.database);
+    assert.deepEqual(read("dolt", "remote", "list"), []);
+    assert.equal(realpathSync(resolve(path, connection.data_dir)), join(ownStore, "embeddeddolt"));
+    const runner = new AsIsBeadsRunner();
+    const live = inspectTaskProviderMigration({ cwd: path, targetProvider: "backlog", runner });
+    assert.equal(live.status, "ready", live.detail);
+    assert.deepEqual(live.taskCounts, { open: 3, closed: 0, archived: 0, total: 3 });
+    const output = (...args) => {
+      const reads = runner.reads.filter(row => row.cwd === path && JSON.stringify(row.args) === JSON.stringify(args));
+      assert.equal(reads.length, 1, args.join(" "));
+      return reads[0].stdout;
+    };
+    const src = { repositoryRoot: path, storeDir: ownStore, database: context.database, doltMode: context.dolt_mode,
+      connection: Object.fromEntries(["database", "embedded", "data_dir", "host", "port", "user", "shared_server", "branch"]
+        .filter(key => Object.hasOwn(connection, key)).map(key => [key, connection[key]])) };
+    const tasks = [], memories = [];
+    for (const line of output("--readonly", "export", "--all").split(/\r?\n/).filter(line => line.trim())) {
+      const row = JSON.parse(line), raw = { exportRow: row, exportLineBase64: Buffer.from(line).toString("base64") };
+      if (row._type === "memory") memories.push(raw);
+      else {
+        assert.ok(row._type === "issue" || !Object.hasOwn(row, "_type"));
+        const [nativeView] = JSON.parse(output("--readonly", "show", row.id, "--json", "--long", "--include-comments"));
+        assert.equal(nativeView.id, row.id);
+        tasks.push({ sourceTaskId: row.id, classification: "open", ...raw, nativeView });
+      }
+    }
+    tasks.sort((a, b) => a.sourceTaskId.localeCompare(b.sourceTaskId));
+    assert.deepEqual(tasks.map(row => row.sourceTaskId).sort(), Object.values(ids).sort());
+    assert.ok(tasks.find(row => row.sourceTaskId === ids.parent).nativeView.comments.length);
+    assert.ok(memories.some(row => row.exportRow.key === "identity-proof"));
+    const data = { sourceVersion: output("--version"), statusCatalog: JSON.parse(output("--readonly", "statuses", "--json")), tasks, memories };
+    assert.equal(canonicalSha256({ sourceIdentity: src, ...data }), live.sourceDigest);
+    return { identity: src, data, fullExport: output("--readonly", "export", "--all"), revision: live.sourceRevision, digest: live.sourceDigest };
+  }
+
+  function originals(path) {
+    const store = storeAt(path);
+    assert.equal(git(store, "rev-parse", "HEAD"), baseline);
+    assert.equal(git(remote, "rev-parse", TASK_HISTORY_REF), baseline);
+    assert.equal(git(store, "diff", "--cached", "--name-only"), "");
+    return Object.fromEntries(git(store, "ls-tree", "-r", "--name-only", baseline).split("\n").map(file => [file, {
+      bytes: readFileSync(join(store, file)).toString("base64"), mode: lstatSync(join(store, file)).mode,
+      history: git(store, "--literal-pathspecs", "log", "--follow", "--format=fuller", "--binary", "-p", "--", file),
+    }]));
+  }
+  const pairs = new Map();
+  function stopped(path, source) {
+    const store = storeAt(path), map = new Map();
+    const records = physicalDestinationRecords(store);
+    for (const { sourceTaskId } of source.data.tasks) {
+      const [id, refs] = pairs.get(sourceTaskId);
+      const view = JSON.parse(backlog(path, "task", "view", "--json", "--", id));
+      assert.equal(view.task.id, id);
+      assert.deepEqual(view.task.references, refs);
+      assert.deepEqual(JSON.parse(refs[1].slice("prime-claw-beads-current:".length)), {
+        sourceTaskId, sourceRevision: source.revision, sourceDigest: source.digest,
+      });
+      const paths = Object.keys(records).filter(file => /^id: (.+)$/m.exec(Buffer.from(records[file], "base64").toString("utf8"))?.[1] === id);
+      assert.equal(paths.length, 1);
+      const [file] = paths;
+      assert.ok(file.startsWith("tasks/"));
+      assert.ok(view.task.path.endsWith(file));
+      map.set(sourceTaskId, { id, file, view, mode: lstatSync(join(store, file)).mode, bytes: records[file] });
+    }
+    assert.equal(new Set([...map.values()].map(row => row.id)).size, source.data.tasks.length);
+    assert.deepEqual(git(store, "status", "--porcelain=v1", "-z", "--untracked-files=all").split("\0").filter(Boolean).sort(),
+      [...map.values()].map(({ file }) => `?? ${file}`).sort());
+    return { map, records, originals: originals(path), codeRef: git(remote, "rev-parse", "refs/heads/main"),
+      index: readFileSync(join(store, ".git", "index")).toString("base64") };
+  }
+  checkGit(root);
+  const original = capture(root);
+  const baselineRecords = originals(root);
+  // Seed the stopped shape through native loopback Web without invoking the
+  // switch. CLI --ref splits commas inside the exact JSON binding.
+  const web = await startMigrationBacklogWeb({ cwd: root, backlogDirectory: storeAt(root), backlogCommand: BACKLOG });
+  try {
+    for (const { sourceTaskId, nativeView } of original.data.tasks) {
+      const refs = [`prime-claw-beads-source:${sourceTaskId}`, `prime-claw-beads-current:${JSON.stringify({
+        sourceTaskId, sourceRevision: original.revision, sourceDigest: original.digest,
+      })}`];
+      const created = await web.createTask({ title: nativeView.title, description: nativeView.description ?? "",
+        references: refs, disableDefinitionOfDoneDefaults: true });
+      assert.match(created.id, /^BASE-\d+$/);
+      pairs.set(sourceTaskId, [created.id, refs]);
+    }
+  } finally {
+    await web.close();
+  }
+  const retained = stopped(root, original);
+  assert.deepEqual(retained.originals, baselineRecords);
+  const tree = checkGit(root), remoteInodes = checkTree(remote, [], undefined);
+  const options = { recursive: true, preserveTimestamps: true, verbatimSymlinks: true, force: false, errorOnExist: true };
+  for (const copy of [restored, substitute]) {
+    cpSync(root, copy, options);
+    const copyTree = checkGit(copy);
+    assert.ok([...tree].every(ino => !copyTree.has(ino) || remoteInodes.has(ino)), "only the deliberately separate bare remote may be common");
+  }
+  const identityOf = path => [path, join(path, ".beads"), storeAt(path)].map(dir => {
+    const { dev, ino } = lstatSync(dir);
+    return [realpathSync(dir), dev, ino];
+  });
+  const expectedRestore = identityOf(restored);
+  renameSync(root, parked);
+  assert.ok(!existsSync(root), "readback must not try the original absolute path");
+  function verify(path) {
+    // Both endpoints are fixed by the fixture, not furnished by the restored
+    // data or a caller-supplied digest. Retained native identity stays unchanged.
+    assert.equal(path, restored, "substituted restore path");
+    assert.deepEqual(identityOf(path), expectedRestore, "substituted restore identity");
+    checkGit(path);
+    const current = capture(path);
+    const { repositoryRoot, storeDir, connection } = current.identity;
+    const expectedStore = join(path, ".beads");
+    assert.equal(repositoryRoot, path);
+    assert.equal(storeDir, expectedStore);
+    const beforePath = original.identity.connection.data_dir;
+    const absolute = isAbsolute(beforePath);
+    assert.equal(connection.data_dir, absolute ? join(expectedStore, "embeddeddolt") : beforePath);
+    const translated = { ...current.identity, repositoryRoot: root, storeDir: join(root, ".beads"),
+      connection: { ...connection, data_dir: absolute ? join(root, ".beads", "embeddeddolt") : connection.data_dir } };
+    assert.deepEqual(translated, original.identity, "non-relocation identity changed");
+    assert.deepEqual(current.data, original.data, "real source data drift");
+    assert.equal(current.fullExport, original.fullExport, "complete native export bytes changed");
+    const digest = canonicalSha256({ sourceIdentity: translated, ...current.data });
+    assert.equal(digest, original.digest);
+    assert.equal(`capture-sha256:${digest}`, original.revision);
+    const destination = stopped(path, original);
+    assert.deepEqual(destination, retained);
+    return { current: current.revision, original: original.revision, digest };
+  }
+  const proof = verify(restored);
+  assert.notEqual(proof.current, proof.original, "untranslated native digest must differ");
+  const savedRestore = join(outer, "saved-restore");
+  renameSync(restored, savedRestore);
+  renameSync(substitute, restored);
+  assert.throws(() => verify(restored), /substituted restore identity/);
+  renameSync(restored, substitute);
+  renameSync(savedRestore, restored);
+  bd(restored, "comments", "add", ids.parent, "Real isolated drift", "--author", "synthetic");
+  assert.throws(() => verify(restored), /real source data drift/);
+  assert.deepEqual(stopped(restored, original), retained);
+  assert.deepEqual(stopped(parked, original), retained);
+  console.log(JSON.stringify({ ...proof, mappings: retained.map.size, baseline, originals: Object.keys(baselineRecords).length,
+    substitutedIdentityRefused: true, sourceDriftRefused: true }));
 });

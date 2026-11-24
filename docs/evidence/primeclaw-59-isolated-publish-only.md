@@ -74,3 +74,56 @@ publication fixture still uses `--no-hardlinks` and does not retire its source.
 Both runs used Node 22.23.5, Beads 1.3.1 and Backlog 1.55.3 in an offline,
 read-only Docker container with private tmpfs; both containers were removed.
 Neither run had access to a live source or destination.
+
+## Synthetic capture identity, without publication
+
+The shipping capture matched at the same absolute path after an independent
+synthetic embedded-store copy took that path in private Linux `/tmp`. This
+control yielded `capture-sha256:668e7fee715fb0f37370a2ce57ced31066f65a264a48c1d2e5fd1d8464d60251` both times.
+It does not establish the host layout. The existing publish-only path predicate
+requires `dirname(dirname(projectRoot)) === "/tmp"`. A `/Users/...` checkout and
+an equivalent hierarchy nested under `/tmp` cannot satisfy that predicate. It
+was checked without invoking the publication entry or changing its guard.
+
+The opt-in test then fixed the original native capture and stopped Backlog
+mapping before relocating an independent copy. The stopped fixture was authored
+using native Backlog Web on loopback only; it did not call switch. On the copy,
+the shipping inspector read an embedded Beads store. The test reconciled the
+complete native export (including raw lines and memory), long native task views,
+status catalog, version and non-path connection fields. It verified only the
+repository, `.beads`, and embedded data-directory relocation, then recomputed
+the original digest from that fixed identity and the newly read data. No
+caller-supplied digest or identity was accepted as proof.
+
+| Evidence | Exact result |
+| --- | --- |
+| Native capture at relocated path | `capture-sha256:c6472bfcd0769bd2f41428d68c67348ac191b07d69c240c22b4615f82ba5d34a` |
+| Independently captured original and recomputed result | `capture-sha256:68b65505568802146c57eb00f560bd84246f3e64ee821266c7c185f50b2c50b5` |
+| Existing synthetic task-history baseline | `2ee022ea3559b3a5617210a02c6f4f0498d2e13a` |
+| Backlog records | 3 mapped untracked records; 6 original tracked paths |
+| Refusals | Independent copy substituted at the same path; real Beads comment drift |
+
+The verifier matched native Backlog views, reference pairs, and physical mapped
+paths, bytes and modes. It also matched original bytes, modes, and Git history,
+and found the baseline ref, code ref and destination index unchanged. It did
+not edit mappings, create a receipt, or stage or publish migration data. This
+is a test-only verifier, not a production provenance format, import gate,
+protected-copy procedure or APFS transaction-consistency proof. No live data or
+retained transport was read, mounted or copied.
+
+To exercise the two tests, use the pinned Tier 1 image
+`sha256:4033b1194e72eea0dcfb87e784b65bb301b03f349a692bc4e05c727c27d3b049` with a read-only workspace, read-only root, no Docker network,
+private tmpfs `/tmp`, a private home for Beads and XDG, and file-only Git with
+system/global Git configuration disabled. Set
+`PRIME_CLAW_ISOLATED_IDENTITY_TEST=1` and run:
+
+```sh
+node --experimental-strip-types --test --test-concurrency=1 \
+  --test-name-pattern '^isolated capture identity (?:same-path control|verifies a relocated synthetic stopped mapping)$' \
+  tests/task_provider_migration.test.mjs
+```
+
+Node 22.23.5, Beads 1.3.1, Backlog 1.55.3: **2 pass, 0 skips**; addressed
+interfaces limited to loopback, no route, and container removal verified.
+Focused TAP SHA-256: `a0651d34811b710c6cc95531b167a2eee87345a3709a3730298bf74e39af2329`.
+Test input SHA-256: `f1c940a024813e53350f58354b8c0ed38037a23abf5d19add11e294cd7794c60`.
