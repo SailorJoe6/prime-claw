@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T05:22:00Z'
+updated_date: '2026-11-24T05:34:00Z'
 labels: []
 dependencies: []
 references:
@@ -824,4 +824,11 @@ Unblock only with a native route that preserves the exact deployed capture/hash 
 
 ### Authorized fix boundary — repeated owned Web teardown failure
 Initialize PVA reported that the one separately approved fresh live attempt on deployed `1f359e9`, after restoring a clean published Backlog baseline and inspecting the same source digest as that attempt's confirmation, again returned `pre-cutover-failed / owned-process-stop-unproved (uncertain)`. This reproduces the reported failure after clean restoration, but does not prove an underlying cause, current process state, or a primary error. The `finally` masking risk is a code-level defect. This authorization changes teardown error disposition only for the bounded implementation and disposable tests above. Private live artifacts remain with Initialize PVA; Beads remains authoritative and both attempts and writer holds are preserved. The rejected embedded Dolt no-write witness is separate and is not reopened.
+
+### Owned Web teardown disposition — tested candidate for independent review
+Episode code `c334c44d6f55886cc2b28afc1c3c69324d078d9b` (parent `74b123ea85c7b93bd3b61011f3f819af167c1f12`, tree `0d09ae1a47dd51b454f96c19838135db52a06c41`, patch SHA-256 `7b49e80893261607bf15f71061fa76446a90a11f5e149aeb51ee2866f93933b9`) is directly published on the same Episode branch. An exact `owned-process-stop-unproved` with `outcome=uncertain` after verified import/readback now yields a sanitized warning in progress and the completed tool result. Shutdown is not asserted. Native transport errors keep the original stage and report teardown separately. The closed transport is not reused for writes; existing stop, publication, receipt, drift and cutover checks still apply. See `docs/project-initialization.md`.
+
+Two offline Docker regressions, Node 22.23.5 / Beads 1.3.1 / Backlog 1.55.3, passed with no skips (TAP SHA-256 `4cc773ba5556e33eb25f57e325b5859b959a9335ff50fab9cfda03226c48344f`; container removed). After native readback of all three mapped records, synthetic loss of stop proof produced a warning, separate data and receipt revisions, and guarded cutover only in the disposable fixture. Injection also paired stop uncertainty with a real native PUT whose successful HTTP response was presented to the client as HTTP 503. The primary failure stayed visible and fatal; source export and metadata, code and destination publication were unchanged and cutover was not entered. Both cases observed one teardown attempt, no subsequent migration Web writes, and private artifact retention. This did not reproduce or diagnose the original host shutdown behavior. Required `scripts/test-tier1.sh --probe` passed (`20261124T053124Z-56315-2f525ade`, manifest SHA-256 `d342fb1b2445c3638faac5a89fc7a0aa40bafff9792229c94f41e85d86942d28`, 444 repository inputs and 15 verified evidence artifacts); candidate snapshot matched and both Tier 1 containers were absent on verification.
+
+Stop for exact independent same-provider Astra high review. The physical no-write witness remains closed. This is not merge, deployment, a new live attempt, cleanup, hold release, or a finding on live process state. Keep In Progress, 0/9 checked, null Final Summary, and PVA-first `c6e0a3d`.
 <!-- SECTION:NOTES:END -->
