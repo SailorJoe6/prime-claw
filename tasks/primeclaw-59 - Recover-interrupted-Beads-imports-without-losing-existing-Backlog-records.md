@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T14:24:00Z'
+updated_date: '2026-11-24T14:30:00Z'
 labels: []
 dependencies: []
 references:
@@ -398,6 +398,11 @@ Start at `c334c44d6f55886cc2b28afc1c3c69324d078d9b` in the same reconnected Epis
 Then build the smallest receipt-bound completion path for that stopped state. Verify exact native source identity/revision and digest; published baseline, data and receipt ancestry with a receipt-only final delta; full mappings, current imported content and memory outputs; original paths, bytes, modes and history; and only the expected additive config change. Carry those exact published data and receipt revisions unchanged into existing guarded completion checks. Do not broadly waive the layout guard, reimport, rewrite a receipt, or republish destination data/receipt. Prove drift refusal and positive guarded completion only in genuine offline disposable fixtures, using fixture-only retirement observation. Run required Docker Tier 1. Report the exact validated candidate or concrete blocker to the owning Conversation for independent same-provider Astra high review and stop.
 
 No live PVA access (including retained live artifacts), deployment, retry, live switch, deletion or hold release. Same Episode, sole writer, no duplicate assignment. Keep PVA-first `c6e0a3d`, In Progress, 0/9 checked and null Final Summary.
+
+### Next canonical execute — two receipt-completion review corrections
+Revise only `082570c00ecc0f12335b522e96bb383c3207e73b` in the same original Episode. Use the publisher’s existing physical path, mode, and history checks and its `preservedPairs` digest projection for original live/archive same-ID pairs during receipt-bound completion. Keep imports, receipt and memory targets subject to the existing ambiguity rules. Prove a disposable original-pair completion without changing IDs or rewriting or republishing either data or receipt.
+
+Pass the verified ownership rows or exact projection lookup from both callers to `verifiedBacklogCandidate`; do not change ownership semantics. Run the existing forward active-Episode regression, the focused disposable receipt completion and drift test, and exact-candidate Docker Tier 1. Publish the exact tested revision or record the concrete blocker and report it to the owning Conversation for read-only Astra re-review. No parked-store edge work, live PVA access, retry, deploy, live cutover, deletion, or hold release. Keep In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d`.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -851,4 +856,7 @@ Episode code `082570c00ecc0f12335b522e96bb383c3207e73b` (parent `c334c44d6f55886
 Exact offline Docker regression (`22858`, 1 passed, 0 skipped, TAP SHA-256 `eb9a360b0aea7d2b8e1699ee7fa9e4c982b5cebf00fb6c63b14dc10143150e68`; owned container absent) used a genuine embedded Beads source and independent Backlog repository with five originals, three issue mappings, and a native public memory. The first call hit `code layout projection changed during provider migration` after direct publication (fixture baseline `4f888ee7d61dbec21b070da5f4bb0a972c739847`, data `ff44107e8da1bd24652d016839c6843da760affa`, receipt `302ca253a9df153820a3f2f1a2a1873ed9e5c9ee`). Tracked `.gitignore` drift then refused before retirement without authoring on either provider. With the fixture drift removed, the exact source and destination passed guarded cutover once; the retirement callback moved only the disposable source and native lock within tmpfs. The Backlog ref and entire task tree were unchanged, with GET-only Web requests and no Backlog authoring or task Git publication. The earlier focused misses were fixture oracles/hook only (isolated config bytes, encounter order of synthetic IDs, adjacent fixture gate lock). Exact `scripts/test-tier1.sh --probe` passed (`20261124T142119Z-25057-170b758f`, manifest SHA-256 `b619bc47ff3facac09457264587a10f863165f2bc1d4f762352237eb3d975e0e`, 444 repository inputs, 15 hash-verified artifacts, offline and both containers absent).
 
 This proves the bounded synthetic stop/remediation, not the live cause, live eligibility, scale, or active-Episode transitions in this fixture. Stop for independent same-provider Astra high review by the owning Conversation. No deployment, live PVA access/retry/switch/deletion, or hold release. Keep In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d`.
+
+### Independent review — two accepted corrections
+Astra found that the dirty-layout receipt completion refused all live/archive same-ID pairs even when both records were original and already bound by the publisher’s preserved-pair evidence. Astra also found that `verifiedBacklogCandidate` accesses `ownershipRows` outside its scope on the active-Episode path. Only those two findings are in this revision; the prior disposable proof did not cover either case. Do not treat observed parked-store edge findings as accepted work or this revision as authority for any live replay.
 <!-- SECTION:NOTES:END -->
