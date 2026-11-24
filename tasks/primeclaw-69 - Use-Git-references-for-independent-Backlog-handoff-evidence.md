@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T14:27:00Z'
+updated_date: '2026-11-24T14:32:00Z'
 labels: []
 dependencies: []
 references:
@@ -96,10 +96,10 @@ No bulk rewrite or rollout gate. Read existing records compatibly and leave hist
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Throughout the independent and branch-local Backlog lifecycle, new ticket-state evidence uses only exact Git repository/commit/path references. Complete committed content is readable and diffable in bounded pieces after a branch advances, without new duplicate snapshots or mutable-file fallback.
-- [ ] #2 Offline Docker regressions exercise production independent Backlog creation at both checkpoints and continuation with a committed synthetic ticket whose native JSON exceeds 1 MiB. No larger buffer, truncation, or full JSON capture as a snapshot prerequisite. Representative branch-local evidence resolves from the exact code-repository commit.
-- [ ] #3 Existing records remain readable without a bulk rewrite. Normal operations use verifiable old commits and write references for new evidence. Missing, wrong, or inaccessible required evidence is reported before the relevant delivery without guessing or retrying.
-- [ ] #4 Preserve exact identity, publication and same-resource recovery, separate runtime and delivery facts, one initial assignment, and ordinary first admission → factual callback → one execute follow-up. Verify execute-only and Beads behavior remain unchanged apart from the Backlog evidence representation.
+- [x] #1 Throughout the independent and branch-local Backlog lifecycle, new ticket-state evidence uses only exact Git repository/commit/path references. Complete committed content is readable and diffable in bounded pieces after a branch advances, without new duplicate snapshots or mutable-file fallback.
+- [x] #2 Offline Docker regressions exercise production independent Backlog creation at both checkpoints and continuation with a committed synthetic ticket whose native JSON exceeds 1 MiB. No larger buffer, truncation, or full JSON capture as a snapshot prerequisite. Representative branch-local evidence resolves from the exact code-repository commit.
+- [x] #3 Existing records remain readable without a bulk rewrite. Normal operations use verifiable old commits and write references for new evidence. Missing, wrong, or inaccessible required evidence is reported before the relevant delivery without guessing or retrying.
+- [x] #4 Preserve exact identity, publication and same-resource recovery, separate runtime and delivery facts, one initial assignment, and ordinary first admission → factual callback → one execute follow-up. Verify execute-only and Beads behavior remain unchanged apart from the Backlog evidence representation.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -238,6 +238,18 @@ No live readiness/recovery, TASK-2, AWS, merge, activation or cleanup. Acceptanc
 Test-only readiness revision 57918f84fa99d3035c18061e35379f5e2b1c5db1, on f14070bcadaca465ffc5b6235082f532c382a17b (canonical execute observation aa490ae5). Only tests/test_future_plan_skills.py changed. The prep policy assertions now require bounded inspection of exact committed localTaskEvidence, its full commit OID and literal path, and the canonical task ID/path check. The remaining readiness, Beads, and retained-folder assertions are unchanged. No runtime code or workflow guidance changed.
 
 Python 3.14.4, pytest 9.0.3, PyYAML 6.0.3. Command: PYTHONDONTWRITEBYTECODE=1 python3.14 -m pytest -p no:cacheprovider -q tests/test_future_plan_skills.py::test_task_native_implementation_policies_are_publicly_activated_with_folder_compatibility. Baseline f14070bcadaca465ffc5b6235082f532c382a17b: 1 failed at the obsolete prep assertion for `backlog task view --json -- TASK-ID` (.test-results/primeclaw-69-readiness-policy/baseline.log). Candidate 57918f84fa99d3035c18061e35379f5e2b1c5db1: 1 passed (.test-results/primeclaw-69-readiness-policy/candidate.log). No live lifecycle action, merge, activation, cleanup, or TASK-2 retry. Status remains In Progress.
+
+Acceptance closeout on Episode 57918f84fa99d3035c18061e35379f5e2b1c5db1; exact execute observation bff1646c (parent df5b29bb). This resolves the readiness gap recorded at 8657d53d8fc1174b375eba1d79b687239163751d. The ticket-only scope checkpoint is 420a5e248b4af365f6ad1c2ff3a23472b0a73795; no code was changed in this pass.
+
+AC1 — Supported. The audit at 8657d53d maps the committed evidence reader/writers, status, terminal, retained transition and cutover. The reviewed repair f14070bcadaca465ffc5b6235082f532c382a17b closes the remaining registered readiness gap: reviewed-plan.ts resolveImplementationReadiness uses bounded Backlog identity, task-history-workspace.ts observeBacklogReadiness uses the selected repository and exact committed ticket, and prep-chain.ts supplies only localTaskEvidence and optional separate publishedHead to both Backlog prompts. The independent and branch-local registered implement_task tests (tests/task_episode_admission_extension.test.mjs, final-focused.log checks 261–262) each exercise native JSON over 1 MiB with the default production resolver, no raised buffer, and no ticket body in either prompt. They prove distinct local/published heads for independent history and common-directory identity for branch-local. Both were red on the old production entry and green on the repair. spec_episode_extension tests 128, 154 and 161 in that run prove bounded post-advance reads/diffs, terminal evidence, and exact linked-worktree commits despite mutable decoys. Explicit native authoring/readback and transient migration validation are not stored checkpoints.
+
+AC2 — Supported. The exact 0836643cbcd486e8b60240381eaddd9b8ccc412c audit and 554/554 offline Docker results (.test-results/primeclaw-69-registered-recovery/candidate-focused.log) cover create_task_episode, readBacklogCreationIdentity, prepareTaskEpisodeWorkspace and both continuation helpers. The registered oversized creation (both checkpoints), existing-operation recovery, independent handoff/execute-only after ref advancement and exact branch-local commit cases also passed on f14070bcadaca465ffc5b6235082f532c382a17b (checks 263, 200, 128, 161). No raised buffer, truncated ticket or whole native view is required as a snapshot prerequisite.
+
+AC3 — Supported. spec-episode.ts prepareTaskEpisodeWorkspace and both committed continuation paths resolve retained legacy checkpoints before delivery; task-episode-ownership.ts retains compatibility without bulk rewrite. Checks 162 and 201 on f14070bcadaca465ffc5b6235082f532c382a17b refuse missing/wrong committed evidence before journaling/delivery or assignment. The new evidence writes use verified references; historical raw records and journals are unchanged. No guessed revision, mutable fallback, resend or replacement.
+
+AC4 — Supported. The audited spec-episode.ts assignment, ordinary handoff and execute-only paths preserve exact bindings and distinct publication, runtime, admission, callback and send facts. Same-operation recovery (check 200) preserves one initial assignment. Check 115 verifies execute-only provider shapes and ordering; checks 235–246 and 257 exercise admitted, refused, uncertain and callback paths across Backlog/Beads, including real JSONL callback failure. The readiness repair preserves placement → steer → sole follow-up and the complete Beads native view. The 379 Beads failure below qualifies the suite result; it was reproduced on the unchanged baseline, not treated as a passing case.
+
+Validation attribution: Tier 1 passed on exact clean f14070bcadaca465ffc5b6235082f532c382a17b, with network absence and teardown verified (.test-results/20261124T141142Z-95290-d4581a79/tier1/manifest.json). Broader offline Docker on that revision: 738/740 passed (.test-results/primeclaw-69-readiness/final-focused.log); .test-results/primeclaw-69-readiness/unrelated-baseline.log reproduces both failures on the prior code: stale tool-guidance metadata assertion and Beads continuation reporting “selected Episode journal identity does not match.” The exact diff f14070bcadaca465ffc5b6235082f532c382a17b..57918f84fa99d3035c18061e35379f5e2b1c5db1 changes only the named policy test in tests/test_future_plan_skills.py. With PyYAML it failed on the old assertion and passed after replacement with bounded exact localTaskEvidence and canonical ID/literal path assertions (.test-results/primeclaw-69-readiness-policy/baseline.log and candidate.log). No Tier 1 rerun is claimed on the test-only commit. No live lifecycle, activation, cleanup, merge or TASK-2 action.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -259,33 +271,7 @@ Operator directed removal of copied Backlog ticket evidence from handoff. Resume
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Step 2 revision published for owner review: registered independent Backlog creation streams native identity and verifies both committed references before assignment. Published and retained local revisions remain distinct. Offline Docker: 442 passed, including the registered large-ticket and retained-clone cases. Later Backlog lifecycle work remains open.
+Acceptance closeout candidate for owner review at Episode commit `57918f84fa99d3035c18061e35379f5e2b1c5db1`. All four native criteria are checked with evidence in Implementation Notes. Independent and branch-local Backlog now use exact committed Git references for lifecycle checkpoints, including registered readiness, with bounded on-demand reads and diffs. Legacy evidence remains readable without rewriting history; missing required evidence stops at the relevant boundary. Same-resource recovery, single assignment, delivery sequencing, execute-only behavior and native Beads envelopes are preserved.
 
-Branch-local Backlog creation now cites the verified task-only status commit in its single initial execute; active same-operation recovery sends nothing new.
-
-Branch-local creation now reports a fresh post-assignment task observation or a separate observation failure without changing the assignment base or outcome.
-
-Independent Backlog status publication results now identify exact committed ticket evidence without copying content or confusing a retained local commit with publication.
-
-Backlog publication now uses bounded native reads, stops on pre-edit identity drift, reports uncertain pushes separately from publication proof, and writes only verified committed references to new reservations.
-
-The retained ownership transition now uses verified committed Backlog references in both layouts, without rewriting historical records or replacing Episode resources.
-
-Retained Backlog transition verifies the Episode store repository and compares the complete historical native envelope only on legacy replay.
-
-The cutover stores verified Backlog Git references instead of ticket copies and stops before switching authority if the committed ticket cannot be proved.
-
-Backlog terminal results now use committed references for active and archived tickets, with availability and publication reported separately.
-
-Independent Backlog cleanup now reports the verified prior checkpoint or an availability gap without changing cleanup eligibility.
-
-Editable owner and Expert guidance now reads committed Backlog evidence in both layouts without copied tickets or new runtime gates.
-
-Review revision clarifies post-sync clearance judgment, terminal Backlog evidence and execute-only observation formats.
-
-Branch-local Backlog status results now use exact committed ticket references and distinguish local commit from observed upstream publication.
-
-Legacy independent Backlog pre-session recovery now verifies exact committed ticket references before the one initial assignment.
-
-The registered independent Backlog recovery entry now resolves oversized primary tickets without buffering them or changing the existing operation.
+Tier 1 passed on production repair `f14070bcadaca465ffc5b6235082f532c382a17b`; broader offline Docker was 738/740 with both failures reproduced on the prior baseline. The subsequent test-only commit passed the targeted Python policy test. No Tier 1 rerun is claimed on the test-only commit. Task remains In Progress; nothing was merged, activated or cleaned up.
 <!-- SECTION:FINAL_SUMMARY:END -->
