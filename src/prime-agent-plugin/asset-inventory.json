@@ -31,6 +31,8 @@
     {"id":"plugin-extension-support-task-provider-migration-ts","source":"extension-support/task-provider-migration.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/task-provider-migration.ts"}]},
     {"id":"plugin-extension-support-beads-backlog-current-ts","source":"extension-support/beads-backlog-current.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/beads-backlog-current.ts"}]},
     {"id":"plugin-extension-support-migration-backlog-web-ts","source":"extension-support/migration-backlog-web.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/migration-backlog-web.ts"}]},
+    {"id":"plugin-extension-support-backlog-git-evidence-ts","source":"extension-support/backlog-git-evidence.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/backlog-git-evidence.ts"}]},
+    {"id":"plugin-extension-support-backlog-creation-identity-ts","source":"extension-support/backlog-creation-identity.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/backlog-creation-identity.ts"}]},
     {"id":"plugin-extension-support-task-history-workspace-ts","source":"extension-support/task-history-workspace.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/task-history-workspace.ts"}]},
     {"id":"plugin-extension-support-task-episode-cleanup-ts","source":"extension-support/task-episode-cleanup.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/task-episode-cleanup.ts"}]},
     {"id":"plugin-extension-support-task-episode-ownership-ts","source":"extension-support/task-episode-ownership.ts","targets":[{"class":"plugin-root-exact","destination":"extension-support/task-episode-ownership.ts"}]},

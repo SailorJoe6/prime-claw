@@ -42,6 +42,8 @@ import {
   resolveSynchronizedProviderTask,
 } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
+import { detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
+import { referenceCommittedBacklogTask } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
 
 function git(root, ...args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -193,28 +195,102 @@ function reservePublishedBeads(f, overrides = {}, dependencies = {}) {
   });
 }
 
-function reservePublishedBacklog(f, overrides = {}) {
+function publishedBacklogStatus(f) {
+  const storeDir = join(f.root, "backlog");
+  const path = f.relative.slice("backlog/".length);
+  const remoteDir = mkdtempSync(join(tmpdir(), "prime-claw-backlog-ownership-remote-"));
+  git(remoteDir, "init", "--bare", "-q");
+  git(storeDir, "init", "-q", "-b", "prime-claw/task-history");
+  git(storeDir, "config", "user.name", "Prime Claw Test");
+  git(storeDir, "config", "user.email", "prime-claw@example.invalid");
+  git(storeDir, "remote", "add", "origin", remoteDir);
+  git(storeDir, "commit", "-q", "--allow-empty", "-m", "seed task history");
+  writeFileSync(join(storeDir, "config.yml"), "project_name: Fixture\nremote_operations: false\ncheck_active_branches: false\ntask_prefix: primeclaw\n");
+  writeFileSync(f.taskPath, `---\nid: ${f.selection.taskId}\ntitle: Task-native fixture\nstatus: In Progress\n---\nTicket body\n`);
+  git(storeDir, "add", "--", path);
+  git(storeDir, "commit", "-q", "-m", "admit task on independent history");
+  git(storeDir, "push", "-q", "origin", "HEAD");
+  const publishedHead = git(storeDir, "rev-parse", "HEAD");
+  return {
+    status: "published",
+    taskId: f.selection.taskId,
+    taskPath: f.relative,
+    publishedHead,
+    storeDir,
+    remote: "origin",
+    taskEvidence: referenceCommittedBacklogTask({ root: storeDir, remote: "origin", topology: "independent" }, publishedHead, path),
+  };
+}
+
+function reservePublishedBacklog(f, { publication = publishedBacklogStatus(f), useNativeSelection = false, ...overrides } = {}) {
   return reservePublishedBacklogTaskEpisodeOwnership({
     projectRoot: f.root,
-    publication: {
-      status: "published",
-      taskId: f.selection.taskId,
-      taskPath: f.relative,
-      publishedHead: "e".repeat(40),
-      nativeAfter: JSON.stringify({ task: {
-        id: f.selection.taskId, path: f.relative, status: "In Progress",
-      } }),
-    },
+    publication,
     ownerSessionId: "published-backlog-owner",
     engine: "local",
     baseRef: git(f.root, "rev-parse", "HEAD"),
     operationId: "published-backlog-operation",
     ...overrides,
   }, {
-    taskResolver: () => f.selection,
+    ...(useNativeSelection ? {} : { taskResolver: () => f.selection }),
     now: () => "2026-10-20T16:30:00.000Z",
   });
 }
+
+test("published Backlog reservation stores only the verified committed task reference", async () => {
+  const f = fixture();
+  const publication = publishedBacklogStatus(f);
+  const reference = publication.taskEvidence;
+  publication.taskEvidence = {
+    ...reference, body: "must not be persisted", repository: { ...reference.repository, body: "must not be persisted" },
+  };
+  Object.defineProperty(publication, "nativeAfter", { get() { throw new Error("must not read nativeAfter"); } });
+  const record = await reservePublishedBacklog(f, { publication, useNativeSelection: true });
+  assert.deepEqual(record.taskEvidence, reference);
+  assert.equal(record.providerRevision, publication.publishedHead);
+  assert.notEqual(record.baseRef, record.providerRevision);
+  assert.deepEqual(readEpisodeOwnership(f.root, record.ownerSessionId), record);
+});
+
+test("published Backlog reservation refuses unverified commits and leaves historical native evidence intact", async () => {
+  const f = fixture();
+  const publication = publishedBacklogStatus(f);
+  const taskEvidence = { task: { id: f.selection.taskId, path: f.relative, status: "In Progress", body: "historical task" } };
+  const historical = parseEpisodeOwnership({
+    ...taskOwnership("historical-owner", f.selection.taskId, f.relative),
+    provider: "backlog", providerRevision: publication.publishedHead, taskEvidence,
+  });
+  writeEpisodeOwnership(f.root, historical);
+  const registryPath = join(f.root, ".prime-claw", "ownership.json");
+  const before = readFileSync(registryPath, "utf8");
+  const { taskEvidence: reference, ...legacyPublication } = publication;
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...legacyPublication, nativeAfter: JSON.stringify(taskEvidence) },
+  }), /exact committed task evidence/);
+  const missingCommit = "e".repeat(40);
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...publication, publishedHead: missingCommit, taskEvidence: { ...reference, commit: missingCommit } },
+  }), /commit unavailable/);
+  const missingPathAtCommit = git(publication.storeDir, "rev-parse", "HEAD^");
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...publication, publishedHead: missingPathAtCommit, taskEvidence: { ...reference, commit: missingPathAtCommit } },
+  }), /exact regular ticket blob/);
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...publication, taskEvidence: { ...reference, repository: { ...reference.repository, identity: "0".repeat(64) } } },
+  }), /repository mismatch/);
+  const correct = readFileSync(f.taskPath, "utf8");
+  writeFileSync(f.taskPath, correct.replace(`id: ${f.selection.taskId}`, "id: PRIMECLAW-99"));
+  git(publication.storeDir, "add", "--", reference.path);
+  git(publication.storeDir, "commit", "-q", "-m", "wrong canonical task at the exact path");
+  const wrongIdCommit = git(publication.storeDir, "rev-parse", "HEAD");
+  writeFileSync(f.taskPath, correct);
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...publication, publishedHead: wrongIdCommit, taskEvidence: { ...reference, commit: wrongIdCommit } },
+    useNativeSelection: true,
+  }), /canonical task ID mismatch/);
+  assert.equal(readFileSync(registryPath, "utf8"), before);
+  assert.deepEqual(readAllEpisodeOwnership(f.root), [historical]);
+});
 
 function evidenceAdvancementFixture({ integrationBranch } = {}) {
   const rawRoot = mkdtempSync(join(tmpdir(), "prime-claw-beads-evidence-main-"));
@@ -415,6 +491,18 @@ function makeBeadsTransitionContinuable(f) {
   return f;
 }
 
+function branchTransitionTarget(f, task = f.selection) {
+  return {
+    provider: "backlog", history: "branch-local", task,
+    mainTaskEvidence: referenceCommittedBacklogTask({ root: f.root, topology: "branch-local", remote: null }, f.mainHead, f.relative),
+    episodeTaskEvidence: referenceCommittedBacklogTask({ root: f.episodeRoot, topology: "branch-local", remote: null }, f.episodeHead, f.relative),
+  };
+}
+
+function independentTransitionReference(commit, path) {
+  return { kind: "backlog-git", repository: { topology: "independent", identity: "9".repeat(64) }, commit, path };
+}
+
 function transition(f, overrides = {}, dependencies = {}) {
   return transitionLegacyEpisodeOwnershipToTask({
     projectRoot: f.root,
@@ -428,13 +516,13 @@ function transition(f, overrides = {}, dependencies = {}) {
     confirmedReady: true,
     ...overrides,
   }, {
-    transitionTargetResolver: () => ({ provider: "backlog", history: "branch-local", task: f.selection }),
+    transitionTargetResolver: () => branchTransitionTarget(f),
     now: () => "2026-10-14T09:00:00.000Z",
     ...dependencies,
   });
 }
 
-test("guarded transition replaces only the exact owner's legacy authority and preserves other owners", () => {
+test("guarded transition replaces only the exact owner's legacy authority and preserves other owners", async () => {
   const f = transitionFixture();
   // Exercise the supported operator choice to expose existing state for tracking.
   // First creation now excludes it locally; later owner writes must not repair that rule.
@@ -444,7 +532,7 @@ test("guarded transition replaces only the exact owner's legacy authority and pr
   writeEpisodeOwnership(f.root, other);
   assert.equal(new CliLegacyTaskOwnershipTransitionGit().status(f.root), "?? .prime-claw/ownership.json");
   assert.throws(() => execFileSync("git", ["-C", f.root, "merge-base", "--is-ancestor", f.legacyHead, f.episodeHead], { stdio: "ignore" }));
-  const result = transition(f);
+  const result = await transition(f);
   assert.equal(result.reused, false);
   assert.equal(result.mainHead, f.mainHead);
   assert.equal(result.episodeHead, f.episodeHead);
@@ -454,6 +542,9 @@ test("guarded transition replaces only the exact owner's legacy authority and pr
   assert.equal(result.record.provider, "backlog");
   assert.equal(result.record.taskId, f.selection.taskId);
   assert.equal(result.record.taskPath, f.relative);
+  assert.equal(result.record.taskEvidence, undefined);
+  const { mainTaskEvidence, episodeTaskEvidence } = branchTransitionTarget(f);
+  assert.deepEqual(result.backlogEvidence, { mainTaskEvidence, episodeTaskEvidence });
   assert.equal(result.record.updatedAt, "2026-10-14T09:00:00.000Z");
   for (const removed of ["sourceLocation", "slug", "bundleDigest"]) assert.equal(result.record[removed], undefined);
   for (const preserved of [
@@ -463,34 +554,41 @@ test("guarded transition replaces only the exact owner's legacy authority and pr
   assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), result.record);
   assert.deepEqual(readEpisodeOwnership(f.root, "other-owner"), other);
 
-  const replay = transition(f);
+  const replay = await transition(f);
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.record, result.record);
-  assert.throws(() => transition(f, { sourceLocation: ".ralph/plans/future/different" }), /superseded legacy source binding/);
+  await assert.rejects(() => transition(f, { sourceLocation: ".ralph/plans/future/different" }), /superseded legacy source binding/);
 });
 
-test("guarded transition records published independent Backlog authority without manufacturing task evidence on the code DAG", () => {
+test("missing or malformed paired Backlog references stop before replacing version-1 authority", async () => {
+  const f = transitionFixture();
+  const target = branchTransitionTarget(f);
+  const prior = readFileSync(join(f.root, ".prime-claw/ownership.json"), "utf8");
+  let writes = 0;
+  for (const episodeTaskEvidence of [undefined, { ...target.episodeTaskEvidence, commit: f.mainHead },
+    { ...target.episodeTaskEvidence, repository: { ...target.episodeTaskEvidence.repository, identity: "0".repeat(64) } },
+    { ...target.episodeTaskEvidence, path: `tasks/../${f.relative}` }]) {
+    await assert.rejects(() => transition(f, {}, {
+      transitionTargetResolver: () => ({ ...target, episodeTaskEvidence }),
+      ownership: { read: readEpisodeOwnership, write() { writes++; } },
+    }), /requires exact primary and Episode Backlog Git evidence/);
+  }
+  assert.equal(writes, 0);
+  assert.equal(readFileSync(join(f.root, ".prime-claw/ownership.json"), "utf8"), prior);
+});
+
+test("guarded transition records published independent Backlog authority without manufacturing task evidence on the code DAG", async () => {
   const f = transitionFixture();
   const providerRevision = "7".repeat(40);
-  const taskEvidence = {
-    schemaVersion: 1,
-    kind: "task-view",
-    task: {
-      id: f.selection.taskId,
-      path: f.relative,
-      status: "In Progress",
-      implementationPlan: f.selection.implementationPlan,
-      references: f.selection.references,
-    },
-  };
+  const taskEvidence = independentTransitionReference(providerRevision, f.relative.slice("backlog/".length));
   const providerTarget = {
     provider: "backlog",
     history: "independent",
     task: f.selection,
     providerRevision,
-    taskEvidence,
+    taskEvidence, episodeTaskEvidence: taskEvidence,
   };
-  const result = transition(f, {}, { transitionTargetResolver: () => providerTarget });
+  const result = await transition(f, {}, { transitionTargetResolver: () => providerTarget });
   assert.equal(result.record.provider, "backlog");
   assert.equal(result.record.taskPath, f.relative);
   assert.equal(result.record.providerRevision, providerRevision);
@@ -501,11 +599,11 @@ test("guarded transition records published independent Backlog authority without
   assert.equal(result.record.worktree, f.legacy.worktree);
   assert.equal(result.record.branch, f.legacy.branch);
 
-  const replay = transition(f, {}, { transitionTargetResolver: () => providerTarget });
+  const replay = await transition(f, {}, { transitionTargetResolver: () => providerTarget });
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.record, result.record);
 
-  const refreshed = transition(f, {
+  const refreshed = await transition(f, {
     verifiedCurrentEpisodeActiveSessionId: "later-independent-backlog-route",
   }, { transitionTargetResolver: () => providerTarget });
   assert.equal(refreshed.reused, true);
@@ -513,7 +611,7 @@ test("guarded transition records published independent Backlog authority without
   assert.deepEqual(readEpisodeOwnership(f.root), refreshed.record);
 });
 
-function independentTransitionFixture() {
+function nativeBacklogTransitionFixture({ branchLocal = false } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-")));
   const remote = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-remote-")));
   execFileSync("git", ["init", "-q", "-b", "main", root]);
@@ -525,31 +623,43 @@ function independentTransitionFixture() {
   git(root, "commit", "-qm", "original retained code");
   git(root, "remote", "add", "origin", remote);
   git(root, "push", "-qu", "origin", "main");
-  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root });
-  assert.equal(prepared.status, "prepared");
-  git(root, "add", ".gitignore");
-  git(root, "commit", "-qm", "retain task-store ignore");
-  const baseRef = git(root, "rev-parse", "HEAD");
+  const primaryStore = branchLocal ? join(root, "backlog") : prepareTaskHistoryWorkspace({ primaryRoot: root }).storeDir;
+  assert.ok(primaryStore);
+  if (!branchLocal) {
+    git(root, "add", ".gitignore");
+    git(root, "commit", "-qm", "retain task-store ignore");
+  }
   const taskId = "TASK-BRIDGE";
   const sourceLocation = ".ralph/plans/future/bridge";
   const sourceReference = `legacy-episode-source=${sourceLocation}; superseded-by=${taskId}`;
   const taskFile = "tasks/task-bridge - Bridge.md";
-  mkdirSync(join(prepared.storeDir, "tasks"), { recursive: true });
-  writeFileSync(join(prepared.storeDir, taskFile), [
+  mkdirSync(join(primaryStore, "tasks"), { recursive: true });
+  writeFileSync(join(primaryStore, taskFile), [
     "---", `id: ${taskId}`, "title: Bridge retained authority", "status: In Progress", "assignee: []",
     "created_date: '2026-10-27 00:00'", "updated_date: '2026-10-27 00:00'", "labels: []", "dependencies: []",
     "references:", `  - '${sourceReference}'`, "priority: p2", "type: task", "---", "",
     "## Description", "", "Preserve the reviewed retained specification.", "",
     "## Implementation Plan", "", "Complete bridge candidate plan", "",
   ].join("\n"));
-  git(prepared.storeDir, "add", "--", taskFile);
-  git(prepared.storeDir, "-c", "user.name=Prime Claw Test", "-c", "user.email=prime-claw@example.invalid", "commit", "-qm", "publish retained task");
-  git(prepared.storeDir, "push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks");
-  const providerRevision = git(prepared.storeDir, "rev-parse", "HEAD");
-  const episodeRoot = join(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-episode-")), "episode");
+  if (branchLocal) {
+    writeFileSync(join(primaryStore, "config.yml"), [
+      'project_name: "Bridge fixture"', 'task_prefix: "task"', 'default_status: "In Design"',
+      'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]',
+      "auto_commit: false", "remote_operations: false", "",
+    ].join("\n"));
+    // Let native Backlog normalize configuration before pinning the tracked bytes.
+    assert.equal(resolveSynchronizedProviderTask(root, taskId).taskId, taskId);
+  }
+  git(primaryStore, "add", "--", ...(branchLocal ? ["config.yml", taskFile] : [taskFile]));
+  git(primaryStore, "-c", "user.name=Prime Claw Test", "-c", "user.email=prime-claw@example.invalid", "commit", "-qm", "publish retained task");
+  if (!branchLocal) git(primaryStore, "push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks");
+  const providerRevision = git(primaryStore, "rev-parse", "HEAD");
+  const baseRef = git(root, "rev-parse", "HEAD");
+  const episodeRoot = join(mkdtempSync(join(tmpdir(), "prime-claw-transition-native-episode-")), "episode");
   git(root, "worktree", "add", "-qb", "episode-transition", episodeRoot);
-  const episode = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: episodeRoot });
-  assert.equal(episode.status, "prepared");
+  const episodeStore = branchLocal ? join(episodeRoot, "backlog")
+    : prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: episodeRoot }).storeDir;
+  assert.ok(episodeStore);
   mkdirSync(join(episodeRoot, ".ralph", "plans"), { recursive: true });
   writeFileSync(join(episodeRoot, ".ralph", "plans", "SPECIFICATION.md"), "Preserve the reviewed retained specification.\n");
   writeFileSync(join(episodeRoot, ".ralph", "plans", "EXECUTION_PLAN.md"), "Complete bridge candidate plan\n");
@@ -573,7 +683,11 @@ function independentTransitionFixture() {
   const selection = resolveSynchronizedProviderTask(root, taskId);
   assert.equal(selection.provider, "backlog");
   return { root, remote, episodeRoot: realpathSync(episodeRoot), baseRef, episodeHead, mainHead, transcript,
-    legacy, selection, providerRevision, primaryStore: prepared.storeDir, episodeStore: episode.storeDir };
+    legacy, selection, providerRevision, primaryStore, episodeStore };
+}
+
+function independentTransitionFixture() {
+  return nativeBacklogTransitionFixture();
 }
 
 function retainedTransitionResources(f) {
@@ -588,13 +702,43 @@ function retainedTransitionResources(f) {
   };
 }
 
-test("default retained transition binds matching published independent history without replacing resources", () => {
+test("default retained transition rejects a nested Episode Backlog repository with matching branch-local task bytes", async () => {
+  const f = nativeBacklogTransitionFixture({ branchLocal: true });
+  assert.equal(git(f.primaryStore, "rev-parse", "--show-toplevel"), f.root);
+  assert.equal(git(f.episodeStore, "rev-parse", "--show-toplevel"), f.episodeRoot);
+  git(f.episodeStore, "init", "-q", "-b", "nested");
+  git(f.episodeStore, "add", "--", "config.yml", "tasks");
+  git(f.episodeStore, "-c", "user.name=Prime Claw Test", "-c", "user.email=prime-claw@example.invalid", "commit", "-qm", "same native store bytes, separate repository");
+  assert.equal(git(f.episodeStore, "rev-parse", "--show-toplevel"), f.episodeStore);
+  const selected = detectTaskProvider(f.episodeRoot);
+  assert.equal(selected.kind, "selected");
+  assert.equal(selected.evidence.provider, "backlog");
+  assert.equal(selected.evidence.storeDir, f.episodeStore);
+  const path = f.selection.taskPathRelative;
+  const nestedBlob = git(f.episodeStore, "rev-parse", `HEAD:${path.slice("backlog/".length)}`);
+  assert.equal(git(f.root, "rev-parse", `${f.mainHead}:${path}`), nestedBlob);
+  assert.equal(git(f.episodeRoot, "rev-parse", `${f.episodeHead}:${path}`), nestedBlob);
+  assert.deepEqual(resolveSynchronizedProviderTask(f.episodeRoot, f.selection.taskId).nativeView, f.selection.nativeView);
+  assert.equal(git(f.episodeRoot, "status", "--porcelain"), "");
+  const before = retainedTransitionResources(f);
+  let writes = 0;
+  await assert.rejects(() => transition(f, {}, {
+    transitionTargetResolver: undefined,
+    ownership: { read: readEpisodeOwnership, write(root, record) { writes++; writeEpisodeOwnership(root, record); } },
+  }), /Episode.*(?:branch-local|topology|repository)|branch-local.*Episode/);
+  assert.equal(writes, 0, "topology refusal precedes the authority write");
+  assert.deepEqual(retainedTransitionResources(f), before);
+});
+
+test("default retained transition binds matching published independent history without replacing resources", async () => {
   const f = independentTransitionFixture();
   const before = retainedTransitionResources(f);
-  const evidence = resolveSynchronizedProviderTask(f.episodeRoot, f.selection.taskId).nativeView;
-  const result = transition(f, {}, { transitionTargetResolver: undefined });
+  const evidence = referenceCommittedBacklogTask({ root: f.episodeStore, topology: "independent", remote: "origin" },
+    f.providerRevision, f.selection.taskPathRelative.slice(".backlog/".length));
+  const result = await transition(f, {}, { transitionTargetResolver: undefined });
   assert.equal(result.record.providerRevision, f.providerRevision);
   assert.deepEqual(result.record.taskEvidence, evidence);
+  assert.deepEqual(result.backlogEvidence, { mainTaskEvidence: evidence, episodeTaskEvidence: evidence });
   for (const key of ["operationId", "engine", "ownerSessionId", "baseRef", "head", "createdAt", "worktreeName",
     "worktree", "branch", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
     assert.deepEqual(result.record[key], f.legacy[key]);
@@ -602,11 +746,46 @@ test("default retained transition binds matching published independent history w
   const { owner: _ownerBefore, ...resourcesBefore } = before;
   const { owner: _ownerAfter, ...resourcesAfter } = retainedTransitionResources(f);
   assert.deepEqual(resourcesAfter, resourcesBefore);
-  assert.equal(transition(f, {}, { transitionTargetResolver: undefined }).reused, true);
+  assert.equal((await transition(f, {}, { transitionTargetResolver: undefined })).reused, true);
 });
 
+test("legacy independent transition replay reports committed references without rewriting old raw ownership", async () => {
+  const f = independentTransitionFixture();
+  const completed = await transition(f, {}, { transitionTargetResolver: undefined });
+  const legacyEvidence = resolveSynchronizedProviderTask(f.root, f.selection.taskId).nativeView;
+  writeEpisodeOwnership(f.root, { ...completed.record, taskEvidence: legacyEvidence });
+  const before = retainedTransitionResources(f);
+  const replay = await transition(f, {}, { transitionTargetResolver: undefined });
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.record.taskEvidence, completed.record.taskEvidence);
+  assert.deepEqual(replay.backlogEvidence, completed.backlogEvidence);
+  assert.deepEqual(retainedTransitionResources(f), before);
+});
+
+for (const [field, replacement] of [
+  ["description", "Unreviewed retained specification."],
+  ["acceptanceCriteria", [{ index: 1, text: "Unreviewed criterion.", checked: false }]],
+]) {
+  test(`legacy independent transition replay rejects a saved envelope differing only in ${field}`, async () => {
+    const f = independentTransitionFixture();
+    const completed = await transition(f, {}, { transitionTargetResolver: undefined });
+    const legacyEvidence = resolveSynchronizedProviderTask(f.root, f.selection.taskId).nativeView;
+    assert.notDeepEqual(legacyEvidence.task[field], replacement);
+    const changed = { ...legacyEvidence, task: { ...legacyEvidence.task, [field]: replacement } };
+    writeEpisodeOwnership(f.root, { ...completed.record, taskEvidence: changed });
+    const before = retainedTransitionResources(f);
+    let writes = 0;
+    await assert.rejects(() => transition(f, {}, {
+      transitionTargetResolver: undefined,
+      ownership: { read: readEpisodeOwnership, write() { writes++; } },
+    }), /does not match the completed transition binding/);
+    assert.equal(writes, 0);
+    assert.deepEqual(retainedTransitionResources(f), before);
+  });
+}
+
 for (const driftAt of ["before transition", "during resolver paired proof", "before final provider proof"]) {
-  test(`default retained transition refuses clean local-only Episode history ${driftAt} with identical complete task evidence`, () => {
+  test(`default retained transition refuses clean local-only Episode history ${driftAt} with identical complete task evidence`, async () => {
     const f = independentTransitionFixture();
     const before = retainedTransitionResources(f);
     const nativeBefore = resolveSynchronizedProviderTask(f.episodeRoot, f.selection.taskId).nativeView;
@@ -621,15 +800,14 @@ for (const driftAt of ["before transition", "during resolver paired proof", "bef
     const native = new ProcessCommandRunner();
     let primaryReads = 0;
     const runner = { run(command, args, options) {
-      if (command === "backlog" && args[0] === "task" && args[1] === "view" && options.cwd === f.root) {
-        primaryReads++;
-        if ((driftAt === "during resolver paired proof" && primaryReads === 2)
-          || (driftAt === "before final provider proof" && primaryReads === 3)) drift();
-      }
+      if (command === "git" && args.includes("hash-object") && options.cwd === f.primaryStore && ++primaryReads === 1
+          && driftAt === "during resolver paired proof") drift();
+      if (command === "git" && args.includes("--show-toplevel") && options.cwd === f.primaryStore
+          && primaryReads === 1 && driftAt === "before final provider proof" && !drifted) drift();
       return native.run(command, args, options);
     } };
     let writes = 0;
-    assert.throws(() => transition(f, {}, {
+    await assert.rejects(() => transition(f, {}, {
       transitionTargetResolver: undefined, runner,
       ownership: { read: readEpisodeOwnership, write(root, record) { writes++; writeEpisodeOwnership(root, record); } },
     }), /Episode.*published|independent Backlog publication changed during paired proof/);
@@ -648,7 +826,7 @@ for (const driftAt of ["before transition", "during resolver paired proof", "bef
   });
 }
 
-test("guarded transition records published Beads authority and its first normal handoff remains usable", () => {
+test("guarded transition records published Beads authority and its first normal handoff remains usable", async () => {
   const f = makeBeadsTransitionContinuable(transitionFixture());
   const sourceReference = `legacy-episode-source=${f.legacy.sourceLocation}; superseded-by=${f.selection.taskId}`;
   const taskEvidence = {
@@ -674,7 +852,7 @@ test("guarded transition records published Beads authority and its first normal 
     providerRevision: "m".repeat(32),
     taskEvidence,
   };
-  const result = transition(f, {}, { transitionTargetResolver: () => providerTarget });
+  const result = await transition(f, {}, { transitionTargetResolver: () => providerTarget });
   assert.equal(result.record.provider, "beads");
   assert.equal(result.record.taskId, f.selection.taskId);
   assert.equal(result.record.providerRevision, "m".repeat(32));
@@ -683,7 +861,7 @@ test("guarded transition records published Beads authority and its first normal 
   assert.equal(result.record.baseRef, f.legacy.baseRef);
   assert.equal(result.record.head, f.legacy.head);
 
-  const replay = transition(f, {}, { transitionTargetResolver: () => providerTarget });
+  const replay = await transition(f, {}, { transitionTargetResolver: () => providerTarget });
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.record, result.record);
 
@@ -694,7 +872,7 @@ test("guarded transition records published Beads authority and its first normal 
     task: { ...providerTarget.task, nativeView: advancedEvidence },
     taskEvidence: advancedEvidence,
   };
-  assert.throws(() => transition(f, {}, { transitionTargetResolver: () => advanced }), /does not match the completed transition binding/);
+  await assert.rejects(() => transition(f, {}, { transitionTargetResolver: () => advanced }), /does not match the completed transition binding/);
   assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), result.record);
 
   const firstHandoff = {
@@ -707,7 +885,7 @@ test("guarded transition records published Beads authority and its first normal 
   assert.equal(preparedHandoff.commit().head, f.episodeHead);
 
   const beforeRefresh = readEpisodeOwnership(f.root);
-  const refreshed = transition(f, {
+  const refreshed = await transition(f, {
     verifiedCurrentEpisodeActiveSessionId: "later-beads-route",
   }, { transitionTargetResolver: () => providerTarget });
   assert.equal(refreshed.reused, true);
@@ -719,7 +897,7 @@ test("guarded transition records published Beads authority and its first normal 
   assert.deepEqual(readEpisodeOwnership(f.root), refreshed.record);
 });
 
-test("guarded Beads transition rejects a historical head that its first handoff and cleanup cannot continue", () => {
+test("guarded Beads transition rejects a historical head that its first handoff and cleanup cannot continue", async () => {
   const f = transitionFixture();
   const sourceReference = `legacy-episode-source=${f.legacy.sourceLocation}; superseded-by=${f.selection.taskId}`;
   const taskEvidence = {
@@ -735,15 +913,15 @@ test("guarded Beads transition rejects a historical head that its first handoff 
     providerRevision: "m".repeat(32),
     taskEvidence,
   };
-  assert.throws(() => transition(f, {}, { transitionTargetResolver: () => providerTarget }), /historical Episode head cannot continue/);
+  await assert.rejects(() => transition(f, {}, { transitionTargetResolver: () => providerTarget }), /historical Episode head cannot continue/);
   assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), f.legacy);
 
-  const backlogResult = transition(f);
+  const backlogResult = await transition(f);
   assert.equal(backlogResult.record.provider, "backlog");
   assert.equal(backlogResult.record.head, f.legacyHead);
 });
 
-test("guarded Beads transition rejects a published design that differs from the retained living plan", () => {
+test("guarded Beads transition rejects a published design that differs from the retained living plan", async () => {
   const f = makeBeadsTransitionContinuable(transitionFixture());
   const sourceReference = `legacy-episode-source=${f.legacy.sourceLocation}; superseded-by=${f.selection.taskId}`;
   const taskEvidence = {
@@ -762,73 +940,68 @@ test("guarded Beads transition rejects a published design that differs from the 
     providerRevision: "m".repeat(32),
     taskEvidence,
   };
-  assert.throws(() => transition(f, {}, { transitionTargetResolver: () => providerTarget }), /Beads task plan does not exactly match/);
+  await assert.rejects(() => transition(f, {}, { transitionTargetResolver: () => providerTarget }), /Beads task plan does not exactly match/);
   assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), f.legacy);
 });
 
-test("guarded provider publication failure and paired evidence drift preserve exact version-1 recovery", () => {
+test("guarded provider publication failure and paired evidence drift preserve exact version-1 recovery", async () => {
   const failed = transitionFixture();
-  assert.throws(() => transition(failed, {}, {
+  await assert.rejects(() => transition(failed, {}, {
     transitionTargetResolver: () => { throw new Error("published provider task is unavailable"); },
   }), /published provider task is unavailable/);
   assert.deepEqual(readEpisodeOwnership(failed.root, failed.legacy.ownerSessionId), failed.legacy);
 
   const raced = transitionFixture();
   let calls = 0;
+  const reference = independentTransitionReference("7".repeat(40), raced.relative.slice("backlog/".length));
   const first = {
-    provider: "backlog",
-    history: "independent",
-    task: raced.selection,
-    providerRevision: "7".repeat(40),
-    taskEvidence: { task: {
-      id: raced.selection.taskId, path: raced.relative, status: "In Progress",
-      implementationPlan: raced.selection.implementationPlan, references: raced.selection.references,
-    } },
+    provider: "backlog", history: "independent", task: raced.selection,
+    providerRevision: reference.commit, taskEvidence: reference, episodeTaskEvidence: reference,
   };
-  assert.throws(() => transition(raced, {}, {
+  await assert.rejects(() => transition(raced, {}, {
     transitionTargetResolver: () => (++calls === 1 ? first : { ...first, providerRevision: "8".repeat(40) }),
   }), /publication changed during ownership transition validation/);
   assert.equal(calls, 2);
   assert.deepEqual(readEpisodeOwnership(raced.root, raced.legacy.ownerSessionId), raced.legacy);
 });
 
-test("guarded transition re-proves exact code state after final provider reads and before replay returns", () => {
+test("guarded transition re-proves exact code state after final provider reads and before replay returns", async () => {
   const f = transitionFixture();
   let calls = 0;
-  assert.throws(() => transition(f, {}, {
+  await assert.rejects(() => transition(f, {}, {
     transitionTargetResolver: () => {
       calls += 1;
       if (calls === 2) writeFileSync(join(f.episodeRoot, f.relative), "status: In Progress\nplan: concurrent tracked drift\n");
-      return { provider: "backlog", history: "branch-local", task: f.selection };
+      return branchTransitionTarget(f);
     },
   }), /Git state changed during ownership transition validation/);
   assert.equal(calls, 2);
   assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), f.legacy);
 
   git(f.episodeRoot, "checkout", "--", f.relative);
-  const completed = transition(f);
+  const completed = await transition(f);
   let replayCalls = 0;
-  assert.throws(() => transition(f, {}, {
+  await assert.rejects(() => transition(f, {}, {
     transitionTargetResolver: () => {
       replayCalls += 1;
       writeFileSync(join(f.episodeRoot, f.relative), "status: In Progress\nplan: concurrent replay drift\n");
-      return { provider: "backlog", history: "branch-local", task: f.selection };
+      return branchTransitionTarget(f);
     },
   }), /Git state changed during ownership transition validation/);
   assert.equal(replayCalls, 1);
   assert.deepEqual(readEpisodeOwnership(f.root, f.legacy.ownerSessionId), completed.record);
 });
 
-test("guarded transition atomically replaces an obsolete runtime route with the verified current route", () => {
+test("guarded transition atomically replaces an obsolete runtime route with the verified current route", async () => {
   const f = transitionFixture();
   const currentRoute = "current-active-session-id";
-  assert.throws(() => transition(f, {
+  await assert.rejects(() => transition(f, {
     expectedPreviousEpisodeActiveSessionId: "foreign-previous-route",
     verifiedCurrentEpisodeActiveSessionId: currentRoute,
   }), /previous runtime route drifted/);
   assert.deepEqual(readEpisodeOwnership(f.root), f.legacy);
 
-  const result = transition(f, { verifiedCurrentEpisodeActiveSessionId: currentRoute });
+  const result = await transition(f, { verifiedCurrentEpisodeActiveSessionId: currentRoute });
   assert.equal(result.record.episodeActiveSessionId, currentRoute);
   for (const preserved of [
     "status", "operationId", "engine", "ownerSessionId", "baseRef", "createdAt", "worktreeName",
@@ -836,7 +1009,7 @@ test("guarded transition atomically replaces an obsolete runtime route with the 
   ]) assert.deepEqual(result.record[preserved], f.legacy[preserved]);
   assert.deepEqual(readEpisodeOwnership(f.root), result.record);
 
-  const replay = transition(f, {
+  const replay = await transition(f, {
     expectedPreviousEpisodeActiveSessionId: currentRoute,
     verifiedCurrentEpisodeActiveSessionId: currentRoute,
   });
@@ -844,12 +1017,12 @@ test("guarded transition atomically replaces an obsolete runtime route with the 
   assert.deepEqual(replay.record, result.record);
 });
 
-test("guarded transition replay refreshes a later verified runtime route without changing durable ownership", () => {
+test("guarded transition replay refreshes a later verified runtime route without changing durable ownership", async () => {
   const f = transitionFixture();
   const firstRoute = "first-current-route";
-  const completed = transition(f, { verifiedCurrentEpisodeActiveSessionId: firstRoute });
+  const completed = await transition(f, { verifiedCurrentEpisodeActiveSessionId: firstRoute });
   const nextRoute = "later-current-route";
-  const replay = transition(f, {
+  const replay = await transition(f, {
     expectedPreviousEpisodeActiveSessionId: firstRoute,
     verifiedCurrentEpisodeActiveSessionId: nextRoute,
   });
@@ -857,13 +1030,13 @@ test("guarded transition replay refreshes a later verified runtime route without
   assert.deepEqual(replay.record, { ...completed.record, episodeActiveSessionId: nextRoute });
   assert.deepEqual(readEpisodeOwnership(f.root), replay.record);
 
-  assert.throws(() => transition(f, {
+  await assert.rejects(() => transition(f, {
     expectedPreviousEpisodeActiveSessionId: firstRoute,
     verifiedCurrentEpisodeActiveSessionId: "third-current-route",
   }), /previous runtime route drifted/);
   assert.deepEqual(readEpisodeOwnership(f.root), replay.record);
 
-  const repeated = transition(f, {
+  const repeated = await transition(f, {
     expectedPreviousEpisodeActiveSessionId: nextRoute,
     verifiedCurrentEpisodeActiveSessionId: nextRoute,
   });
@@ -871,43 +1044,43 @@ test("guarded transition replay refreshes a later verified runtime route without
   assert.deepEqual(repeated.record, replay.record);
 });
 
-test("guarded transition route-refresh replay preserves concurrent owner record changes", () => {
+test("guarded transition route-refresh replay preserves concurrent owner record changes", async () => {
   const f = transitionFixture();
-  const completed = transition(f);
+  const completed = await transition(f);
   let calls = 0;
   const changed = { ...completed.record, uncertaintyReason: "concurrent owner observation" };
-  assert.throws(() => transition(f, {
+  await assert.rejects(() => transition(f, {
     verifiedCurrentEpisodeActiveSessionId: "later-current-route",
   }, {
     transitionTargetResolver: () => {
       calls += 1;
       if (calls === 2) writeEpisodeOwnership(f.root, changed);
-      return { provider: "backlog", history: "branch-local", task: f.selection };
+      return branchTransitionTarget(f);
     },
   }), /ownership changed during transition validation/);
   assert.equal(calls, 2);
   assert.deepEqual(readEpisodeOwnership(f.root), changed);
 });
 
-test("guarded transition requires explicit readiness, exact owner, and exact bindings", () => {
+test("guarded transition requires explicit readiness, exact owner, and exact bindings", async () => {
   const unconfirmed = transitionFixture();
-  assert.throws(() => transition(unconfirmed, { confirmedReady: false }), /explicit confirmation/);
+  await assert.rejects(() => transition(unconfirmed, { confirmedReady: false }), /explicit confirmation/);
   assert.deepEqual(readEpisodeOwnership(unconfirmed.root), unconfirmed.legacy);
 
   const foreign = transitionFixture();
-  assert.throws(() => transition(foreign, { ownerSessionId: "foreign-owner" }), /ownership is missing/);
+  await assert.rejects(() => transition(foreign, { ownerSessionId: "foreign-owner" }), /ownership is missing/);
   assert.deepEqual(readEpisodeOwnership(foreign.root), foreign.legacy);
 
   const sourceDrift = transitionFixture();
-  assert.throws(() => transition(sourceDrift, { sourceLocation: ".ralph/plans/future/different" }), /does not match active ownership/);
+  await assert.rejects(() => transition(sourceDrift, { sourceLocation: ".ralph/plans/future/different" }), /does not match active ownership/);
   assert.deepEqual(readEpisodeOwnership(sourceDrift.root), sourceDrift.legacy);
 
   const headDrift = transitionFixture();
-  assert.throws(() => transition(headDrift, { expectedEpisodeHead: headDrift.baseRef }), /Episode HEAD or upstream drifted/);
+  await assert.rejects(() => transition(headDrift, { expectedEpisodeHead: headDrift.baseRef }), /Episode HEAD or upstream drifted/);
   assert.deepEqual(readEpisodeOwnership(headDrift.root), headDrift.legacy);
 
   const mainHeadMismatch = transitionFixture();
-  assert.throws(() => transition(mainHeadMismatch, { expectedMainHead: mainHeadMismatch.baseRef }), /Canonical main HEAD or upstream drifted/);
+  await assert.rejects(() => transition(mainHeadMismatch, { expectedMainHead: mainHeadMismatch.baseRef }), /Canonical main HEAD or upstream drifted/);
   assert.deepEqual(readEpisodeOwnership(mainHeadMismatch.root), mainHeadMismatch.legacy);
 
   const upstreamMismatch = transitionFixture();
@@ -917,39 +1090,39 @@ test("guarded transition requires explicit readiness, exact owner, and exact bin
     const value = target[property];
     return typeof value === "function" ? value.bind(target) : value;
   } });
-  assert.throws(() => transition(upstreamMismatch, {}, { git: gitProxy }), /Canonical main HEAD or upstream drifted/);
+  await assert.rejects(() => transition(upstreamMismatch, {}, { git: gitProxy }), /Canonical main HEAD or upstream drifted/);
   assert.deepEqual(readEpisodeOwnership(upstreamMismatch.root), upstreamMismatch.legacy);
 });
 
-test("guarded transition allows unrelated untracked canonical-main paths", () => {
+test("guarded transition allows unrelated untracked canonical-main paths", async () => {
   const f = transitionFixture();
   writeFileSync(join(f.root, "unrelated-untracked.txt"), "unrelated\n");
   assert.match(new CliLegacyTaskOwnershipTransitionGit().status(f.root), /\?\? unrelated-untracked\.txt/);
-  const result = transition(f);
+  const result = await transition(f);
   assert.equal(result.record.version, 2);
   assert.equal(result.record.taskId, f.selection.taskId);
 });
 
-test("guarded transition fails closed on staged or tracked state, missing evidence, and unsafe ancestry", () => {
+test("guarded transition fails closed on staged or tracked state, missing evidence, and unsafe ancestry", async () => {
   const trackedMain = transitionFixture();
   writeFileSync(join(trackedMain.root, trackedMain.relative), "tracked drift\n");
-  assert.throws(() => transition(trackedMain), /staged or tracked working-tree changes/);
+  await assert.rejects(() => transition(trackedMain), /staged or tracked working-tree changes/);
   assert.deepEqual(readEpisodeOwnership(trackedMain.root), trackedMain.legacy);
 
   const stagedMain = transitionFixture();
   writeFileSync(join(stagedMain.root, "staged.txt"), "staged\n");
   git(stagedMain.root, "add", "staged.txt");
-  assert.throws(() => transition(stagedMain), /staged or tracked working-tree changes/);
+  await assert.rejects(() => transition(stagedMain), /staged or tracked working-tree changes/);
   assert.deepEqual(readEpisodeOwnership(stagedMain.root), stagedMain.legacy);
 
   const dirtyEpisode = transitionFixture();
   writeFileSync(join(dirtyEpisode.episodeRoot, "dirty.txt"), "dirty\n");
-  assert.throws(() => transition(dirtyEpisode), /Episode worktree is dirty/);
+  await assert.rejects(() => transition(dirtyEpisode), /Episode worktree is dirty/);
   assert.deepEqual(readEpisodeOwnership(dirtyEpisode.root), dirtyEpisode.legacy);
 
   const missingSession = transitionFixture();
   unlinkSync(missingSession.transcript);
-  assert.throws(() => transition(missingSession), /session transcript/);
+  await assert.rejects(() => transition(missingSession), /session transcript/);
   assert.deepEqual(readEpisodeOwnership(missingSession.root), missingSession.legacy);
 
   const unsafe = transitionFixture();
@@ -959,11 +1132,11 @@ test("guarded transition fails closed on staged or tracked state, missing eviden
     const value = target[property];
     return typeof value === "function" ? value.bind(target) : value;
   } });
-  assert.throws(() => transition(unsafe, {}, { git: gitProxy }), /ancestry is unsafe/);
+  await assert.rejects(() => transition(unsafe, {}, { git: gitProxy }), /ancestry is unsafe/);
   assert.deepEqual(readEpisodeOwnership(unsafe.root), unsafe.legacy);
 });
 
-test("guarded transition rejects merge, rebase, cherry-pick, and revert state", () => {
+test("guarded transition rejects merge, rebase, cherry-pick, and revert state", async () => {
   for (const marker of ["MERGE_HEAD", "rebase-merge", "CHERRY_PICK_HEAD", "REVERT_HEAD", "sequencer"]) {
     const f = transitionFixture();
     const markerPath = resolve(f.root, git(f.root, "rev-parse", "--git-path", marker));
@@ -971,31 +1144,29 @@ test("guarded transition rejects merge, rebase, cherry-pick, and revert state", 
     else writeFileSync(markerPath, `${f.mainHead}\n`);
     const adapter = new CliLegacyTaskOwnershipTransitionGit();
     assert.equal(adapter.operationInProgress(f.root), true, marker);
-    assert.throws(() => transition(f), /merge, rebase, cherry-pick, or revert in progress/, marker);
+    await assert.rejects(() => transition(f), /merge, rebase, cherry-pick, or revert in progress/, marker);
     assert.deepEqual(readEpisodeOwnership(f.root), f.legacy, marker);
   }
 });
 
-test("guarded transition requires the complete task plan to equal the active execution plan", () => {
+test("guarded transition requires the complete task plan to equal the active execution plan", async () => {
   const f = transitionFixture();
-  assert.throws(() => transition(f, {}, { transitionTargetResolver: () => ({
-    provider: "backlog", history: "branch-local", task: { ...f.selection, implementationPlan: "stale partial plan" },
-  }) }), /does not exactly match/);
+  await assert.rejects(() => transition(f, {}, { transitionTargetResolver: () => branchTransitionTarget(f, { ...f.selection, implementationPlan: "stale partial plan" }) }), /does not exactly match/);
   assert.deepEqual(readEpisodeOwnership(f.root), f.legacy);
 });
 
-test("guarded transition detects ownership drift before its sole write", () => {
+test("guarded transition detects ownership drift before its sole write", async () => {
   const f = transitionFixture();
   let reads = 0, writes = 0;
   const ownership = {
     read() { reads += 1; return reads === 1 ? f.legacy : { ...f.legacy, updatedAt: "concurrent-drift" }; },
     write() { writes += 1; },
   };
-  assert.throws(() => transition(f, {}, { ownership }), /changed during transition validation/);
+  await assert.rejects(() => transition(f, {}, { ownership }), /changed during transition validation/);
   assert.equal(writes, 0);
 });
 
-test("guarded transition rechecks operation state before its sole write", () => {
+test("guarded transition rechecks operation state before its sole write", async () => {
   const f = transitionFixture();
   const baseGit = new CliLegacyTaskOwnershipTransitionGit();
   let operationChecks = 0, writes = 0;
@@ -1008,29 +1179,29 @@ test("guarded transition rechecks operation state before its sole write", () => 
     read() { return structuredClone(f.legacy); },
     write() { writes += 1; },
   };
-  assert.throws(() => transition(f, {}, { git: gitProxy, ownership }), /Git state changed during ownership transition validation/);
+  await assert.rejects(() => transition(f, {}, { git: gitProxy, ownership }), /Git state changed during ownership transition validation/);
   assert.equal(operationChecks, 2);
   assert.equal(writes, 0);
 });
 
-test("guarded transition fails cleanly when an atomic write leaves the exact old record", () => {
+test("guarded transition fails cleanly when an atomic write leaves the exact old record", async () => {
   const f = transitionFixture();
   const ownership = {
     read() { return structuredClone(f.legacy); },
     write() { throw new Error("pre-rename interruption"); },
   };
-  assert.throws(() => transition(f, {}, { ownership }), /did not complete atomically/);
+  await assert.rejects(() => transition(f, {}, { ownership }), /did not complete atomically/);
   assert.deepEqual(ownership.read(), f.legacy);
 });
 
-test("guarded transition treats an atomic write that completed before an error as success", () => {
+test("guarded transition treats an atomic write that completed before an error as success", async () => {
   const f = transitionFixture();
   let current = f.legacy;
   const ownership = {
     read() { return structuredClone(current); },
     write(_root, record) { current = structuredClone(record); throw new Error("post-rename interruption"); },
   };
-  const result = transition(f, {}, { ownership });
+  const result = await transition(f, {}, { ownership });
   assert.equal(result.reused, false);
   assert.equal(result.record.version, 2);
   assert.equal(current.taskId, f.selection.taskId);
@@ -1104,19 +1275,19 @@ test("task integration targets reject malformed explicit branches and never exte
   assert.throws(() => parseEpisodeOwnership({ ...legacy, integrationBranch: "main" }), /unsupported shape/);
 });
 
-test("all three task reservation factories roundtrip explicit integration targets and preserve old callers", () => {
+test("all three task reservation factories roundtrip explicit integration targets and preserve old callers", async () => {
   for (const factory of [reserve, reservePublishedBacklog, reservePublishedBeads]) {
     for (const integrationBranch of [undefined, "main", "feature/stacked-work"]) {
       const f = fixture();
       const input = integrationBranch === undefined ? {} : { integrationBranch };
-      const record = factory(f, input);
+      const record = await factory(f, input);
       assert.equal(record.integrationBranch, integrationBranch);
       assert.equal(effectiveTaskEpisodeIntegrationBranch(record), integrationBranch ?? "main");
       assert.deepEqual(readEpisodeOwnership(f.root, record.ownerSessionId), record);
       if (integrationBranch === undefined) assert.equal(Object.hasOwn(record, "integrationBranch"), false);
     }
     const f = fixture();
-    assert.throws(() => factory(f, { integrationBranch: "invalid..target" }), /unsupported shape/);
+    await assert.rejects(async () => factory(f, { integrationBranch: "invalid..target" }), /unsupported shape/);
     assert.deepEqual(readAllEpisodeOwnership(f.root), []);
   }
 });

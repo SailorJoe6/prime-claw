@@ -595,7 +595,7 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
 
     for fragment in (
         "<operator-implementation-task-id>",
-        "backlog task view --json -- TASK-ID",
+        "inspect the exact committed `localTaskEvidence` in bounded windows",
         "status exactly `In Planning`",
         "meaningful",
         "not blank or an obvious placeholder",
@@ -611,7 +611,8 @@ def test_task_native_implementation_policies_are_publicly_activated_with_folder_
         assert fragment in prep
     for fragment in (
         "Resolve the live provider directly from its native project evidence",
-        "exact returned task path",
+        "Check the canonical ID and exact path",
+        "full `commit` OID, and literal `path`",
         "bd context --json",
         "bd show TASK-ID --json --long --include-comments",
         "native status exactly `in_planning` mapped to canonical `In Planning`",

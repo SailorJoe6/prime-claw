@@ -56,21 +56,24 @@ against that integration target, not a substituted default branch. Keep code
 and provider revisions separate. A switched owner checkout does not authorize
 retargeting or replacement resources.
 
-- For provider-absent or grandfathered `provider: "backlog"` version-2 ownership
-  without revision/evidence, bind the exact task ID/path in branch-local history
-  at the code candidate. For explicit independent Backlog with `providerRevision`
-  and complete `taskEvidence`, bind its exact ID/path and native task-history
-  revision separately from code base/head. Read the committed/published ticket
-  from that existing independent task history through the supported structured
-  interface; never assume it exists at the code candidate commit. Retain the
-  persisted and current complete native views and actual publication facts.
-  Do not synchronize another writer's dirty checkout, copy a task into the code
-  DAG, mutate content/status/ownership or create a store to review it. Treat the
-  native Description, Acceptance Criteria and constraints as the recorded request,
-  checking them against actual operator direction. References, documentation,
-  Implementation Plan, Notes, modified files and Final Summary supply context
-  and claims, not additional user requirements.
-  Verify ID/path/parent identity; do not consult `.ralph/plans` or mix providers.
+- For version-2 Backlog, bind the exact canonical task ID and path. In
+  branch-local history use the literal path in the exact code candidate and,
+  when relevant, the exact observed integration commit. In independent history
+  use the selected task clone and exact published task revision accompanying
+  the candidate; the ownership checkpoint is prior evidence, not necessarily
+  the current published ticket. Never use the code candidate as a task revision
+  in independent history. Follow **Inspect Backlog committed ticket evidence**
+  in `prime-claw-oversee-episode`: verify repository, full OID, literal regular
+  blob and native canonical ID; stream the recorded request and working context
+  (including parent identity) and relevant diffs in bounded ranges. Read
+  Description, Acceptance Criteria and constraints against actual operator
+  direction. References, documentation, Implementation Plan, Notes, modified
+  files and Final Summary supply context and claims, not additional user
+  requirements. Report inaccessible or mismatched evidence and qualify
+  conclusions that require it. No mutable fallback, guessed revision,
+  copied ticket, dirty-checkout synchronization, new store, content or status
+  mutation. Keep publication proof separate and preserve legacy observations
+  unchanged. Do not consult `.ralph/plans` or mix providers.
 - For `provider: "beads"` version-2 ownership, require no `taskPath`. Bind the
   exact canonical task ID, published `providerRevision`, complete raw
   `taskEvidence`, code `baseRef`, candidate head, recorded Episode worktree,
@@ -147,13 +150,16 @@ failure.
 ## Send a self-contained review task
 
 The one ordinary parent-to-child task must state the resolved repository,
-commit, relevant artifact paths or contents, evidence, and focus. Include the recorded integration branch and exact target/candidate heads. For independent
-Backlog and Beads include exact persisted/current complete native task values,
+commit, relevant artifact paths or contents, evidence, and focus. Include the recorded integration branch and exact target/candidate heads. For Backlog, pass the bound task ID, repository and exact Git references (or
+proven commit/path coordinates), plus separate publication facts. Never paste
+Backlog ticket bodies into the review request; the child reads the referenced
+blobs at the selected repository or reports that they are unavailable. For
+Beads include exact persisted/current complete native task values and
 recorded/current task-history revisions and actual publication facts separately
 from code base/head. Beads retains raw names/absence and native refs. Include Episode
 identity, tests, and documentation. An unrelated-task revision descendant alone
-is compatible. For a same-task change, the reviewer must show exact before and
-current fields and use semantic judgment: compatible in-scope clarification and
+is compatible. For a same-task change, the reviewer must cite the exact Backlog evidence for the relevant before and
+current fields, or show the exact before and current Beads fields. Use semantic judgment: compatible in-scope clarification and
 living-plan updates may be incorporated, while genuine semantic conflict,
 authority change, scope expansion, or product choice is escalated. Do not ask a
 fake unit test or deterministic classifier to make that judgment.

@@ -43,7 +43,7 @@ export type LegacySourceAbsentSelectionResolver = (
 ) => { projectRoot: string; location: string } | null;
 export type ProviderTaskResolver = (cwd: string, rawTaskId: string) => ProviderTaskResolution | null;
 
-function planningProviderPromptContext(selection: ProviderTaskResolution): string {
+export function planningProviderPromptContext(selection: ProviderTaskResolution): string {
   const common = `<operator-plan-task-provider>
 ${selection.provider}
 </operator-plan-task-provider>
@@ -253,28 +253,23 @@ export async function admitTaskPrepChain(
 }
 
 /**
- * Admit one exact task through its live provider. The native provider result
- * stays discriminated and raw. Planning also appends the exact provider/root
- * binding to both managed prompts; implementation retains its existing prompt.
+ * Admit one exact provider task with the caller's factual context appended to
+ * both managed prompts. The selection need not carry a native ticket body.
  */
-export async function admitProviderTaskPrepChain(
+export async function admitProviderTaskPrepChain<T extends { projectRoot: string; taskId: string }>(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
   rawTaskId: string,
   workflow: TaskPrepChainWorkflow,
   source: "native" | "tool",
-  taskResolver: ProviderTaskResolver = resolveSynchronizedProviderTask,
-  preflight?: (
-    ctx: ExtensionContext,
-    selection: ProviderTaskResolution,
-  ) => void | Promise<void>,
+  taskResolver: (cwd: string, taskId: string) => T | null | Promise<T | null>,
+  preflight?: (ctx: ExtensionContext, selection: T) => void | Promise<void>,
   phasePreamble?: string,
-  purpose: "planning" | "implementation" = "implementation",
-  promptContext?: (selection: ProviderTaskResolution) => string | undefined,
-): Promise<ProviderTaskPrepChainAdmissionResult> {
-  let selected: ProviderTaskResolution | null;
+  promptContext?: (selection: T) => string | undefined,
+): Promise<({ ok: true } & T) | Extract<ProviderTaskPrepChainAdmissionResult, { ok: false }>> {
+  let selected: T | null;
   try {
-    selected = taskResolver(ctx.cwd, rawTaskId);
+    selected = await taskResolver(ctx.cwd, rawTaskId);
   } catch (error) {
     return {
       ok: false,
@@ -283,6 +278,7 @@ export async function admitProviderTaskPrepChain(
     };
   }
   if (!selected) return { ok: false, message: workflow.usage, level: "warning" };
+  const task = selected;
   if (preflight) {
     try {
       await preflight(ctx, selected);
@@ -303,7 +299,7 @@ export async function admitProviderTaskPrepChain(
     source,
     undefined,
     phasePreamble,
-    purpose === "planning" ? planningProviderPromptContext(selected) : promptContext?.(selected),
+    () => promptContext?.(task),
   );
   return result.ok ? { ok: true, ...selected } : result;
 }

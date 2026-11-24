@@ -11,6 +11,7 @@
  * identity lives once in the existing receipt, not in per-ticket archives.
  */
 import { createHash } from "node:crypto";
+import { makeBacklogGitEvidence } from "./backlog-git-evidence.ts";
 import {
   appendFileSync,
   existsSync,
@@ -2531,7 +2532,7 @@ async function backlogMigrationReplay(source: BeadsSnapshot, runner: CommandRunn
           || migrationCodeProjection(worktree, runner, [".gitignore", "backlog.config.yml"]) !== projection) throw new Error("same-migration replay layout projection changed");
     };
   };
-  let completion: ((rows: ActiveMigrationOwnership[], verifyCodeProjection: () => void) => DestinationCandidate) | undefined;
+  let completion: ((rows: ActiveMigrationOwnership[], verifyCodeProjection: () => void) => Promise<DestinationCandidate>) | undefined;
   if (baseline) {
     if (link !== ".backlog/config.yml" || realpathSync(storeDir) !== storeDir
         || runRequired(runner, "git", ["-C", storeDir, "rev-parse", "--absolute-git-dir"], storeDir, "read completion Git directory").stdout.trim() !== join(storeDir, ".git")
@@ -2558,10 +2559,10 @@ async function backlogMigrationReplay(source: BeadsSnapshot, runner: CommandRunn
         assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [receipt.destinationDataRevision, head], runner);
         const refreshedDigest = digest(tasks, backlogMemoryEvidence(source, memoryOutputs, runner));
         if (refreshedDigest !== receipt.destinationDataDigest) throw new Error("published Backlog completion content differs from the receipt");
-        return { revision: head, digest: refreshedDigest, tasks, receiptTaskId: receiptId };
+        return { revision: head, digest: refreshedDigest, receiptTaskId: receiptId };
       };
       return verifiedBacklogCandidate(source, runner, prepared, rows.length ? originalBacklogLayout(source.projectRoot, runner) : null,
-        receipt, verifyCodeProjection, refresh, rows);
+        receipt, verifyCodeProjection, refresh, tasks, rows);
     };
   }
   return { projectLayout, completion };
@@ -2712,21 +2713,24 @@ async function migrateBeadsToBacklog(
   const dataPaths = backlogPhysicalTaskPaths(storeDir);
   if (dataViews.size !== expectedCount) throw new Error(`Backlog destination count mismatch: expected ${baseline.records.size} preserved records + ${source.counts.total} issue imports + one receipt + ${source.memories.length ? 1 : 0} USER task, found ${dataViews.size}`);
   assertPreservedBacklogBaseline(baseline, storeDir, runner, dataViews);
-  const destinationTasks: DestinationTask[] = source.tasks.map((pkg) => {
+  const importedNativeViews: JsonObject[] = [];
+  const destinationTasks = source.tasks.map((pkg) => {
     const id = mapping[pkg.sourceTaskId];
     const view = backlogDestinationViewById(dataViews, id, pkg.sourceTaskId);
     if (!view) throw new Error(`Backlog destination task ${id} is not exactly readable`);
     assertBeadsCurrentTask(view, beadsCurrentProjection(pkg, source, mapping, configuration, relationshipPlacement), id);
     const taskPath = relative(source.projectRoot, assertBacklogLifecyclePlacement(pkg, id, view, storeDir, dataPaths)).replace(/\\/g, "/");
-    return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath, taskEvidence: view };
+    importedNativeViews.push(view);
+    return { sourceTaskId: pkg.sourceTaskId, destinationTaskId: id, taskPath };
   });
-  const destinationDigest = (tasks: DestinationTask[]) => {
+  // Receipt digests cover complete native readback, not Git references.
+  const destinationDigest = (nativeViews: JsonObject[]) => {
     const memory = backlogMemoryEvidence(source, memoryOutputs, runner);
     const preservedPairs = preservedBacklogPairEvidence(baseline);
-    return canonicalSha256({ preserved: [...baseline.records], ...(preservedPairs.length ? { preservedPairs } : {}), imported: tasks.map((task) => task.taskEvidence),
+    return canonicalSha256({ preserved: [...baseline.records], ...(preservedPairs.length ? { preservedPairs } : {}), imported: nativeViews,
       ...(source.memories.length ? { memory } : {}) });
   };
-  const destinationDataDigest = destinationDigest(destinationTasks);
+  const destinationDataDigest = destinationDigest(importedNativeViews);
   const transitions = ownershipRows.map((row) => ({ ownerSessionId: row.ownerSessionId, sourceTaskId: row.taskId, destinationTaskId: mapping[row.taskId] }));
   if (transitions.some((row) => !row.destinationTaskId)) throw new Error("active ownership has no Backlog destination mapping");
   const receiptBase = migrationReceiptBase(source, "backlog", dataRevision, destinationDataDigest,
@@ -2737,7 +2741,7 @@ async function migrateBeadsToBacklog(
   const receiptTaskId = createOrUpdateBacklogReceipt(runner, source.projectRoot, receiptBase, reservedReceiptId);
   assertPreservedBacklogBaseline(baseline, storeDir, runner);
   const receiptRevision = commitBacklogDestination(runner, prepared, "prime-claw: record task-provider migration receipt");
-  const refresh = () => {
+  const verifyNativeReceipt = () => {
     const exact = cleanGitRevision(runner, storeDir);
     if (exact !== receiptRevision) throw new Error("Backlog destination revision changed after receipt publication");
     assertPublishedGitRef(runner, storeDir, receiptRevision, prepared.remoteName, prepared.remoteUrl, TASK_HISTORY_REF, "Backlog destination receipt publication");
@@ -2753,26 +2757,40 @@ async function migrateBeadsToBacklog(
       if (!taskEvidence) throw new Error(`Backlog destination task ${task.destinationTaskId} is not exactly readable after receipt`);
       const pkg = sourceById.get(task.sourceTaskId)!;
       assertBeadsCurrentTask(taskEvidence, beadsCurrentProjection(pkg, source, mapping, configuration, relationshipPlacement), task.destinationTaskId);
-      assertBacklogLifecyclePlacement(pkg, task.destinationTaskId, taskEvidence, storeDir, paths);
-      return { ...task, taskEvidence };
+      const path = assertBacklogLifecyclePlacement(pkg, task.destinationTaskId, taskEvidence, storeDir, paths);
+      if (path !== resolve(source.projectRoot, task.taskPath)) {
+        throw new Error(`Backlog destination task ${task.destinationTaskId} changed path after data publication`);
+      }
+      return taskEvidence;
     });
-    return { revision: exact, digest: destinationDigest(refreshed), tasks: refreshed, receiptTaskId };
+    return { revision: exact, digest: destinationDigest(refreshed), receiptTaskId };
   };
-  return verifiedBacklogCandidate(source, runner, prepared, originalLayout, receiptBase, verifyCodeProjection, refresh, ownershipRows);
+  return verifiedBacklogCandidate(source, runner, prepared, originalLayout, receiptBase, verifyCodeProjection, verifyNativeReceipt, destinationTasks, ownershipRows);
 }
 
-function verifiedBacklogCandidate(
+async function verifiedBacklogCandidate(
   source: BeadsSnapshot, runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace,
-  originalLayout: ReturnType<typeof originalBacklogLayout>, receiptBase: DestinationCandidate["receiptBase"],
-  verifyCodeProjection: () => void, refresh: DestinationCandidate["refreshAfterReceipt"],
+  originalLayout: ReturnType<typeof originalBacklogLayout> | null, receiptBase: DestinationCandidate["receiptBase"],
+  verifyCodeProjection: () => void, verifyNativeReceipt: () => Omit<ReturnType<DestinationCandidate["refreshAfterReceipt"]>, "tasks">,
+  destinationTasks: readonly Omit<DestinationTask, "taskEvidence">[],
   ownershipRows: readonly Pick<ActiveMigrationOwnership, "worktree" | "verifyCodeProjection">[],
-): DestinationCandidate {
+): Promise<DestinationCandidate> {
   const { storeDir } = prepared;
-  const final = refresh(), receiptRevision = final.revision;
+  const final = verifyNativeReceipt(), receiptRevision = final.revision;
+  // Bind immutable blobs only at the directly verified receipt revision.
+  // Subsequent synchronous checks still reverify native receipt/readback.
+  const repository = { root: storeDir, topology: "independent" as const, remote: prepared.remoteName };
+  const tasks: DestinationTask[] = [];
+  for (const { sourceTaskId, destinationTaskId, taskPath } of destinationTasks) {
+    const path = relative(storeDir, resolve(source.projectRoot, taskPath));
+    const taskEvidence = await makeBacklogGitEvidence(repository, receiptRevision, path, destinationTaskId);
+    tasks.push({ sourceTaskId, destinationTaskId, taskPath, taskEvidence });
+  }
+  const refresh = () => ({ ...verifyNativeReceipt(), tasks });
   const activeCodeProjections = new Map<string, () => void>();
   const activeLayoutPublishers = new Map<string, () => string>();
   return {
-    provider: "backlog", revision: final.revision, digest: final.digest, receiptBase, receiptTaskId: final.receiptTaskId, tasks: final.tasks,
+    provider: "backlog", revision: final.revision, digest: final.digest, receiptBase, receiptTaskId: final.receiptTaskId, tasks,
     codePaths: prepared.codePaths, verifyCodeProjection, activeCodeProjections,
     publishActiveCodeLayout(worktree: string) {
       const publish = activeLayoutPublishers.get(worktree);
@@ -3224,7 +3242,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     if (Number.isNaN(Date.parse(timestamp))) throw new Error("migration timestamp is not RFC3339");
     verifyInitialProjection?.();
     if (replay?.completion) await closeVerifiedWeb();
-    const candidate = replay?.completion ? replay.completion(ownershipRows, verifyInitialProjection!) : source.provider === "backlog"
+    const candidate = replay?.completion ? await replay.completion(ownershipRows, verifyInitialProjection!) : source.provider === "backlog"
       ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), beadsPlacements, ownershipRows)
       : await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, closeVerifiedWeb, checkpoint);
     await checkpoint("Rechecking the receipt, source and ownership before cutover");

@@ -361,6 +361,35 @@ function retainedBacklogArchivePackage(entityKind) {
   };
 }
 
+function assertOwnedBacklogGitEvidence(record, { root, store, episodeStore, taskId, revision }) {
+  const native = JSON.parse(backlog(root, "task", "view", "--json", "--", taskId)).task;
+  assert.equal(native.id, taskId);
+  const nativePath = resolve(root, native.path);
+  assert.ok(nativePath.startsWith(`${store}/`), native.path);
+  const path = nativePath.slice(store.length + 1);
+  assert.equal(record.provider, "backlog");
+  assert.equal(record.taskId, taskId);
+  assert.equal(record.providerRevision, revision);
+  assert.deepEqual(record.taskEvidence, {
+    kind: "backlog-git",
+    repository: { topology: "independent",
+      identity: createHash("sha256").update(`remote:${git(store, "remote", "get-url", "origin")}`).digest("hex") },
+    commit: revision,
+    path,
+  }, "keep only the exact reference, not a copy of the native view or ticket content");
+  assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], revision);
+  const entry = command(store, "git", ["--literal-pathspecs", "ls-tree", "-z", revision, "--", path]);
+  const [metadata, literal] = entry.split("\t");
+  assert.match(metadata, /^100(?:644|755) blob [0-9a-f]{40}$/);
+  assert.equal(literal, `${path}\0`);
+  const committed = command(store, "git", ["show", `${revision}:${path}`]);
+  assert.equal(committed.split("\n---", 1)[0].match(/^id: (.+)$/m)?.[1], taskId);
+  assert.equal(command(episodeStore, "git", ["show", `${revision}:${path}`]), committed);
+  const copies = Object.entries(physicalDestinationRecords(store)).filter(([, bytes]) =>
+    Buffer.from(bytes, "base64").toString("utf8").split("\n---", 1)[0].match(/^id: (.+)$/m)?.[1] === taskId);
+  assert.deepEqual(copies.map(([file]) => file), [path], "do not allocate a second native ticket for the owner");
+}
+
 function addActiveBeadsOwner(fixture) {
   const episode = join(fixture.outer, "episode-beads");
   git(fixture.root, "worktree", "add", "-q", "-b", "episode-beads-owner", episode, "HEAD");
@@ -1103,8 +1132,11 @@ test("post-switch route replacement preserves active Beads migration continuity"
   assert.equal(result.selectedProvider, "backlog");
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
   const current = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8")).owners[owner.ownerSessionId];
-  assert.equal(current.provider, "backlog");
-  assert.equal(current.taskId, result.receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId);
+  assertOwnedBacklogGitEvidence(current, { root: fixture.root, store: join(fixture.root, ".backlog"),
+    episodeStore: join(owner.episode, ".backlog"), revision: result.receipt.destinationReceiptRevision,
+    taskId: result.receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId });
+  // The later runtime proof confirms reachability; it does not rewrite ownership.
+  assert.equal(current.episodeActiveSessionId, owner.record.episodeActiveSessionId);
   for (const field of ["ownerSessionId", "operationId", "engine", "baseRef", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile"]) {
     assert.deepEqual(current[field], owner.record[field], field);
   }
@@ -1112,6 +1144,74 @@ test("post-switch route replacement preserves active Beads migration continuity"
   assert.equal(git(owner.episode, "status", "--porcelain=v1"), "");
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
   assert.deepEqual(runner.sourcePublicationCommands, []);
+});
+
+test("unavailable committed Backlog owner evidence blocks before ownership or Beads source retirement", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "owner-git-evidence-unavailable");
+  const ownedTitle = "Evidence unavailable owned task";
+  bd(fixture.root, "update", fixture.ids.parent, "--title", ownedTitle);
+  const owner = addActiveBeadsOwner(fixture);
+  const runner = new AsIsBeadsRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const store = join(fixture.root, ".backlog");
+  const registryPath = join(fixture.root, ".prime-claw", "ownership.json");
+  const registry = readFileSync(registryPath);
+  const sourceBefore = sourceAuthorityFiles(fixture.root);
+  const realGit = command(fixture.outer, "sh", ["-c", "command -v git"]).trim();
+  const bin = join(fixture.outer, "evidence-bin");
+  const blockedLookup = join(fixture.outer, "blocked-evidence-lookup");
+  mkdirSync(bin);
+  // Hide only the exact evidence read, not the receipt or native task views.
+  writeFileSync(join(bin, "git"), `#!/bin/sh
+if [ "$1" = --no-replace-objects ] && [ "$2" = -C ] && [ "$3" = "$FIXTURE_EVIDENCE_STORE" ] &&
+   [ "$4" = --literal-pathspecs ] && [ "$5" = ls-tree ] && [ "$6" = -z ] && [ "$8" = -- ] &&
+   "${realGit}" --no-replace-objects -C "$3" show "$7:$9" | grep -Fxq 'title: ${ownedTitle}'; then
+  printf '%s\\n' "$7" "$9" > "$FIXTURE_EVIDENCE_LOG"
+  exit 0
+fi
+exec "${realGit}" "$@"
+`, { mode: 0o755 });
+  const restoreEnv = { PATH: process.env.PATH, FIXTURE_EVIDENCE_STORE: process.env.FIXTURE_EVIDENCE_STORE,
+    FIXTURE_EVIDENCE_LOG: process.env.FIXTURE_EVIDENCE_LOG };
+  let result, deletions = 0, switchedRuntimeProofs = 0;
+  try {
+    process.env.PATH = `${bin}:${restoreEnv.PATH}`;
+    process.env.FIXTURE_EVIDENCE_STORE = store;
+    process.env.FIXTURE_EVIDENCE_LOG = blockedLookup;
+    result = await migrateTaskProvider({
+      cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+      confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve complete native source evidence.",
+      async verifyActiveRuntime(records) {
+        switchedRuntimeProofs += records.filter((row) => row.provider === "backlog").length;
+        return proveFixtureRuntime(records);
+      },
+      deleteSource() { deletions += 1; },
+    });
+  } finally {
+    for (const [key, value] of Object.entries(restoreEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+  assert.equal(result.status, "blocked", result.detail);
+  assert.equal(result.code, "pre-cutover-failed");
+  assert.match(result.detail, /Backlog evidence.*exact regular ticket blob/);
+  assert.equal(switchedRuntimeProofs, 0);
+  assert.equal(deletions, 0);
+  assert.deepEqual(readFileSync(registryPath), registry);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
+  assert.equal(existsSync(join(fixture.root, ".beads")), true);
+  assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
+
+  const [revision, path] = readFileSync(blockedLookup, "utf8").trimEnd().split("\n");
+  assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], revision);
+  const receiptFile = Object.entries(physicalDestinationRecords(store)).find(([, bytes]) =>
+    Buffer.from(bytes, "base64").toString("utf8").includes("title: Prime Claw task-provider migration receipt"))[0];
+  const receiptBlob = command(store, "git", ["show", `${revision}:${receiptFile}`]);
+  const receipt = JSON.parse(receiptBlob.match(/```json\n([\s\S]+?)\n```/)[1]);
+  const taskId = receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId;
+  assert.equal(command(store, "git", ["show", `${revision}:${path}`]).split("\n---", 1)[0].match(/^id: (.+)$/m)?.[1], taskId);
 });
 
 test("post-switch continuity failure and persisted ownership drift still prevent source deletion", { timeout: 480_000 }, async (t) => {
@@ -1381,7 +1481,9 @@ test("active Beads Episode deletion refusal preserves source and exact Backlog d
   assert.notEqual(finalDestinationHead, firstEpisodeDestinationHead);
   assert.equal(git(join(owner.episode, ".backlog"), "rev-parse", "HEAD"), finalDestinationHead);
   const retained = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8").toString()).owners[owner.ownerSessionId];
-  assert.equal(retained.provider, "backlog");
+  assertOwnedBacklogGitEvidence(retained, { root: fixture.root, store,
+    episodeStore: join(owner.episode, ".backlog"), revision: retried.receipt.destinationReceiptRevision,
+    taskId: retried.receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId });
   assert.equal(retained.worktree, owner.episode);
   assert.equal(retained.head, owner.episodeHead);
 });
@@ -4733,9 +4835,8 @@ test("PVA gate fresh timed current migration", { timeout: 480_000 }, async t => 
         receiptProof = publishedSameIdReceipt(runner, f.store, inspection);
         mappings = Object.fromEntries(receiptProof.receipt.mappings.map(row => [row.sourceTaskId, row.destinationTaskId]));
         const switched = JSON.parse(readFileSync(ownerPath, "utf8")).owners[owner.ownerSessionId];
-        assert.equal(switched.provider, "backlog");
-        assert.equal(switched.providerRevision, receiptProof.head);
-        assert.equal(switched.taskId, mappings[parent]);
+        assertOwnedBacklogGitEvidence(switched, { root: f.root, store: f.store,
+          episodeStore: join(owner.episode, ".backlog"), revision: receiptProof.head, taskId: mappings[parent] });
         for (const field of ["operationId", "worktree", "branch", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
           assert.equal(switched[field], owner.record[field], field);
         }
