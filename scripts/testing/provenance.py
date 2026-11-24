@@ -2901,6 +2901,7 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     if run_finished < run_started:
         raise ProvenanceError("run.finished_at precedes run.started_at")
     _validate_repository_shape(repo, "repository")
+    local_image_id = None
     if run["mode"] == "smoke":
         if prime is not None:
             raise ProvenanceError("smoke manifests require prime_agent=null")
@@ -2939,8 +2940,13 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                 raise ProvenanceError(
                     "passed run requested and installed versions differ")
         elif run["mode"] == "pi-archive":
-            _require_keys(prime, {"mode", "requested_sha256", "installed_version",
-                                  "artifact"}, "prime_agent")
+            required = {"mode", "requested_sha256", "installed_version", "artifact"}
+            if "requested_local_image_id" in prime:
+                required.add("requested_local_image_id")
+                local_image_id = prime["requested_local_image_id"]
+                if not isinstance(local_image_id, str) or not _IMAGE_ID_RE.fullmatch(local_image_id):
+                    raise ProvenanceError("invalid requested local image ID")
+            _require_keys(prime, required, "prime_agent")
             if (prime["mode"] != "pi-archive"
                     or not isinstance(prime["requested_sha256"], str)
                     or not _SHA256_RE.fullmatch(prime["requested_sha256"])):
@@ -2976,6 +2982,11 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     if image is None:
         if run["status"] != "failed":
             raise ProvenanceError("passed manifests require image identity")
+    elif local_image_id:
+        _require_keys(image, {"origin", "id", "os", "architecture"}, "image")
+        if (image["origin"] != "prebuilt-local" or image["id"] != local_image_id
+                or image["os"] != "linux" or image["architecture"] not in ("arm64", "amd64")):
+            raise ProvenanceError("invalid prebuilt local image identity")
     else:
         if not isinstance(image, dict):
             raise ProvenanceError("image must be null or an object")
@@ -2999,12 +3010,20 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
             image["build_finished_at"], "image.build_finished_at")
         if build_finished < build_started:
             raise ProvenanceError("image build finish precedes start")
-    _require_keys(network, {"disconnected_at", "verified_absent"}, "network")
+    timestamp_key = "verified_at" if local_image_id else "disconnected_at"
+    keys = {timestamp_key, "verified_absent"}
+    if local_image_id:
+        keys.add("mode")
+    _require_keys(network, keys, "network")
+    if local_image_id and network["mode"] != "none":
+        raise ProvenanceError("prebuilt local image requires network none")
     if not isinstance(network["verified_absent"], bool):
         raise ProvenanceError("network.verified_absent must be boolean")
     if network["verified_absent"]:
-        _utc_timestamp(network["disconnected_at"], "network.disconnected_at")
-    elif run["status"] != "failed" or network["disconnected_at"] is not None:
+        if local_image_id and image is None:
+            raise ProvenanceError("verified network requires image identity")
+        _utc_timestamp(network[timestamp_key], f"network.{timestamp_key}")
+    elif run["status"] != "failed" or network[timestamp_key] is not None:
         raise ProvenanceError("network absence was not verified")
     _require_keys(teardown, {"state", "verified_at", "remove_outcome",
                              "inspect_outcome", "clean"}, "teardown")

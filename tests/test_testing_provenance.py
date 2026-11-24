@@ -146,6 +146,28 @@ class TestManifestValidation(unittest.TestCase):
             with self.assertRaises(provenance.ProvenanceError):
                 provenance.parse_pi_version(malformed)
 
+    def test_prebuilt_pi_evidence_separates_network_none_from_disconnect(self):
+        manifest = _manifest()
+        image_id = manifest["image"]["id"]
+        manifest["run"]["mode"] = "pi-archive"
+        manifest["prime_agent"].update(mode="pi-archive", requested_sha256="d" * 64,
+                                        requested_local_image_id=image_id)
+        del manifest["prime_agent"]["requested_version"]
+        manifest["prime_agent"]["artifact"]["kind"] = "pi-native-binary"
+        manifest["image"] = dict(id=image_id, origin="prebuilt-local",
+                                 os="linux", architecture="arm64")
+        disconnected = manifest["network"]
+        manifest["network"] = dict(mode="none", verified_absent=True,
+                                   verified_at=disconnected["disconnected_at"])
+        provenance.validate_manifest(manifest)
+        manifest["image"]["id"] = "sha256:" + "f" * 64
+        with self.assertRaisesRegex(provenance.ProvenanceError, "local image identity"):
+            provenance.validate_manifest(manifest)
+        manifest["image"]["id"] = image_id
+        manifest["network"] = disconnected
+        with self.assertRaisesRegex(provenance.ProvenanceError, "network"):
+            provenance.validate_manifest(manifest)
+
     def test_smoke_manifest_requires_no_prime_agent_identity(self):
         manifest = _manifest()
         manifest["run"]["mode"] = "smoke"

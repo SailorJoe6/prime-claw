@@ -444,6 +444,12 @@ class TestPiArchiveSelector(unittest.TestCase):
             self.assertIn("Pi-only musl image target tier1_pi_archive", plan.stdout)
             self.assertNotIn(str(archive), plan.stdout + plan.stderr)
             self.assertNotIn("vendor install", plan.stdout)
+            local = "--pi-local-image=" + IMAGE_ID
+            prebuilt = h.run("--dry-run", "--probe", local, env=env)
+            self.assertEqual(prebuilt.returncode, 0, prebuilt.stderr)
+            self.assertIn("--pull=never --network=none", prebuilt.stdout)
+            self.assertNotIn("docker build", prebuilt.stdout)
+            self.assertNotIn("disconnect captured", prebuilt.stdout)
             for args, text in (
                 (("--probe",), path),
                 (("--probe",), digest),
@@ -452,6 +458,11 @@ class TestPiArchiveSelector(unittest.TestCase):
                 (("--probe",), path + digest + "PRIME_AGENT_SOURCE=/fixture\n"),
                 (("--probe",), path + digest + "PRIME_AGENT_PINNED=0.9.8\n"),
                 ((), path + digest),
+                (("--probe", "--pi-local-image=mutable:tag"), path + digest),
+                (("--probe", local, "--rebuild"), path + digest),
+                (("--probe", local, local), path + digest),
+                (("--smoke", local), path + digest),
+                (("--probe", local), "PRIME_AGENT_PINNED=0.9.8\n"),
             ):
                 with self.subTest(args=args, text=text):
                     envf.write_text(text)

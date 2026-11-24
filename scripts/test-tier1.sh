@@ -16,6 +16,7 @@
 #   scripts/test-tier1.sh --probe   selected input plus offline RPC command probe
 #   scripts/test-tier1.sh --dry-run print the plan and contact no Docker daemon
 #   scripts/test-tier1.sh --help    show this help
+#   --pi-local-image=sha256:<id>    Pi --probe only: exact prebuilt image, no build/pull
 
 set -euo pipefail
 
@@ -31,8 +32,9 @@ NO_CACHE=0
 DRY_RUN=0
 SMOKE=0
 PROBE=0
+PI_LOCAL_IMAGE=""
 
-usage() { sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 die() { echo "error: $*" >&2; exit 1; }
 
 for arg in "$@"; do
@@ -42,6 +44,12 @@ for arg in "$@"; do
         --dry-run) DRY_RUN=1 ;;
         --smoke) SMOKE=1 ;;
         --probe) PROBE=1 ;;
+        --pi-local-image=*)
+            [ -z "$PI_LOCAL_IMAGE" ] || die "repeated --pi-local-image"
+            PI_LOCAL_IMAGE="${arg#*=}"
+            [[ "$PI_LOCAL_IMAGE" =~ ^sha256:[0-9a-f]{64}$ ]] \
+                || die "--pi-local-image requires a full lowercase sha256 image ID"
+            ;;
         *) usage >&2; die "unknown argument: $arg" ;;
     esac
 done
@@ -99,6 +107,11 @@ if [ "$SMOKE" -eq 0 ]; then
     elif ! [[ "$PINNED" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         die "PRIME_AGENT_PINNED must be an exact semantic version"
     fi
+fi
+
+if [ -n "$PI_LOCAL_IMAGE" ]; then
+    [ -n "$PI_ARCHIVE" ] && [ "$PROBE" -eq 1 ] && [ "$NO_CACHE" -eq 0 ] \
+        || die "--pi-local-image requires Pi archive --probe and cannot use --rebuild"
 fi
 
 PROBE_DEADLINE="${TIER1_PROBE_DEADLINE:-60}"
@@ -316,6 +329,7 @@ export default function probe(pi) {
 JSEOF
 
 BUILD_INPUT_HASH=""
+DOCKERFILE_HASH=""
 IMAGE_TAG="prime-claw-test-tier1:<captured>"
 echo "tier-1 driver: dockerfile=$DOCKERFILE tag=$IMAGE_TAG"
 if [ "$SMOKE" -eq 1 ]; then
@@ -331,15 +345,24 @@ if [ "$PROBE" -eq 1 ]; then echo "tier-1 driver: offline RPC probe enabled"; fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
     echo "dry-run: allocate .test-results/<run-id>/tier1"
-    echo "dry-run: docker build --iidfile <run>/tier1/image.iid -f <run>/tier1/build-context/Dockerfile -t $IMAGE_TAG <run>/tier1/build-context"
-    echo "dry-run: docker run -d --init --cidfile <run>/tier1/container.cid <captured-image-id> sleep infinity"
+    if [ -n "$PI_LOCAL_IMAGE" ]; then
+        echo "dry-run: inspect exact prebuilt local image; no build or pull"
+        echo "dry-run: docker run --pull=never --network=none with exact prebuilt image ID"
+    else
+        echo "dry-run: docker build --iidfile <run>/tier1/image.iid -f <run>/tier1/build-context/Dockerfile -t $IMAGE_TAG <run>/tier1/build-context"
+        echo "dry-run: docker run -d --init --cidfile <run>/tier1/container.cid <captured-image-id> sleep infinity"
+    fi
     if [ -n "$SOURCE" ]; then
         echo "dry-run: disposable source builder mounts <selected-source>:ro and exports a validated release"
         echo "dry-run: online local-tarball install; runtime network absence precedes product actions"
     elif [ "$SMOKE" -eq 0 ] && [ -z "$PI_ARCHIVE" ]; then
         echo "dry-run: online vendor install for PRIME_AGENT_VERSION=$PINNED"
     fi
-    echo "dry-run: disconnect captured networks; verify empty network set"
+    if [ -n "$PI_LOCAL_IMAGE" ]; then
+        echo "dry-run: verify started container image and network none"
+    else
+        echo "dry-run: disconnect captured networks; verify empty network set"
+    fi
     if [ -n "$PI_ARCHIVE" ]; then
         echo "dry-run: Pi-only musl image target tier1_pi_archive"
         echo "dry-run: offline single-file copy, SHA-256 verification and container-local extraction"
@@ -378,17 +401,19 @@ WORKSPACE_SNAPSHOT="$RESULTS_ROOT/.workspaces/$RUN_ID"
         "$TIER_DIR" "$TIER_BINDING" repository.json)
 WORKSPACE_BINDING="$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance \
     directory-binding "$WORKSPACE_SNAPSHOT")"
-BUILD_CONTEXT="$TIER_DIR/build-context"
-mkdir -p "$BUILD_CONTEXT"
-cp "$WORKSPACE_SNAPSHOT/$DOCKERFILE" "$BUILD_CONTEXT/Dockerfile"
-IFS=$'\t' read -r DOCKERFILE_HASH BUILD_INPUT_HASH <<EOF
-$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance build-input "$BUILD_CONTEXT" Dockerfile)
+if [ -z "$PI_LOCAL_IMAGE" ]; then
+    BUILD_CONTEXT="$TIER_DIR/build-context"
+    mkdir -p "$BUILD_CONTEXT"
+    cp "$WORKSPACE_SNAPSHOT/$DOCKERFILE" "$BUILD_CONTEXT/Dockerfile"
+    IFS=$'\t' read -r DOCKERFILE_HASH BUILD_INPUT_HASH <<EOF
+    $(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance build-input "$BUILD_CONTEXT" Dockerfile)
 EOF
-IMAGE_TAG="prime-claw-test-tier1:${BUILD_INPUT_HASH:0:12}"
-if [ "$MODE" = pi-archive ]; then
-    IMAGE_TAG="prime-claw-test-tier1-pi:${BUILD_INPUT_HASH:0:12}"
+    IMAGE_TAG="prime-claw-test-tier1:${BUILD_INPUT_HASH:0:12}"
+    if [ "$MODE" = pi-archive ]; then
+        IMAGE_TAG="prime-claw-test-tier1-pi:${BUILD_INPUT_HASH:0:12}"
+    fi
+    echo "tier-1 driver: captured-tag=$IMAGE_TAG"
 fi
-echo "tier-1 driver: captured-tag=$IMAGE_TAG"
 IIDFILE="$TIER_DIR/image.iid"
 CIDFILE="$TIER_DIR/container.cid"
 SETUP_LOG="$TIER_DIR/setup.log"
@@ -429,7 +454,7 @@ import json, sys
 from pathlib import Path
 from scripts.testing import provenance as p
 (tier_s, tier_binding, run_id, started, finished, status, mode, requested,
- build_started, build_finished, dockerfile_hash, input_hash, tag, pi_sha256,
+ build_started, build_finished, dockerfile_hash, input_hash, tag, pi_sha256, pi_local_image,
  network_time, teardown_state, teardown_time, remove_outcome,
  inspect_outcome, teardown_clean, failure_codes_raw, expected_raw) = sys.argv[1:]
 failure_codes = [code for code in failure_codes_raw.split(",") if code]
@@ -455,6 +480,8 @@ with p.open_owned_directory(tier, tier_binding) as owned:
         elif mode == "pi-archive":
             prime = {"mode": "pi-archive", "requested_sha256": pi_sha256,
                      "installed_version": installed_version, "artifact": artifact}
+            if pi_local_image:
+                prime["requested_local_image_id"] = pi_local_image
         else:
             try:
                 source_build = p.read_sanitized_json(owned, "source-build.json")
@@ -496,6 +523,9 @@ with p.open_owned_directory(tier, tier_binding) as owned:
                      "clean": teardown_clean == "1"},
         "evidence": {"files": []},
     }
+    if pi_local_image:
+        manifest["network"] = {"mode": "none", "verified_at": network_time or None,
+                               "verified_absent": bool(network_time)}
     manifest["evidence"]["files"] = p.evidence_inventory(owned)
     expected = p.ObjectBinding.decode(expected_raw) if expected_raw else None
     published = p.atomic_write_manifest(
@@ -511,7 +541,7 @@ finalize_manifest() {
     bounded "$PUBLICATION_TIMEOUT" python3 -c "$MANIFEST_PUBLISHER" \
       "$TIER_DIR" "$TIER_BINDING" "$RUN_ID" "$RUN_STARTED" "$FINISHED" "$RUN_STATUS" \
       "$MODE" "$PINNED" "$BUILD_STARTED" "$BUILD_FINISHED" "$DOCKERFILE_HASH" \
-      "$BUILD_INPUT_HASH" "$IMAGE_TAG" "$PI_SHA256" "$NETWORK_TIME" "$TEARDOWN_STATE" \
+      "$BUILD_INPUT_HASH" "$IMAGE_TAG" "$PI_SHA256" "$PI_LOCAL_IMAGE" "$NETWORK_TIME" "$TEARDOWN_STATE" \
       "$TEARDOWN_VERIFIED" "$TEARDOWN_REMOVE_OUTCOME" \
       "$TEARDOWN_INSPECT_OUTCOME" "$TEARDOWN_CLEAN" "$FAILURE_CODES" \
       "$MANIFEST_BINDING"
@@ -792,24 +822,41 @@ if [ "$MODE" = source ]; then
     phase source-builder-passed
 fi
 
-BUILD_ARGS=()
-if [ "$NO_CACHE" -eq 1 ]; then BUILD_ARGS+=(--no-cache); fi
-if [ "$MODE" = pi-archive ]; then BUILD_ARGS+=(--target tier1_pi_archive); fi
-BUILD_STARTED="$(now_utc)"
-phase image-build-started
-bounded "$BUILD_TIMEOUT" docker build ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} --iidfile "$IIDFILE" \
-    -f "$BUILD_CONTEXT/Dockerfile" -t "$IMAGE_TAG" "$BUILD_CONTEXT" \
-    >/dev/null 2>&1
-BUILD_FINISHED="$(now_utc)"
-phase image-built
-[ -s "$IIDFILE" ] || die "docker build did not publish the run-owned iidfile"
-IMAGE_ID="$(cat "$IIDFILE")"
-[[ "$IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]] || die "invalid image ID in iidfile"
-BOUNDED_OUTPUT_POLICY=image-inspect bounded "$DOCKER_TIMEOUT" \
-    docker image inspect "$IMAGE_ID" | \
-    (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance capture-image \
-        "$TIER_DIR" "$TIER_BINDING" image.json "$IMAGE_ID" "$DOCKERFILE" "$DOCKERFILE_HASH" \
-        "$BUILD_INPUT_HASH" "$IMAGE_TAG" "$BUILD_STARTED" "$BUILD_FINISHED")
+if [ -n "$PI_LOCAL_IMAGE" ]; then
+    IMAGE_ID="$PI_LOCAL_IMAGE"
+    local_info="$(bounded "$DOCKER_TIMEOUT" docker image inspect --format \
+        '{{.Id}} {{.Os}} {{.Architecture}} {{if index .Config "Volumes"}}volumes{{else}}no-volumes{{end}}' \
+        "$IMAGE_ID" 2>/dev/null)" || die "requested local image is unavailable; refusing build or pull"
+    case "$local_info" in
+        "$IMAGE_ID linux arm64 no-volumes") local_arch=arm64 ;;
+        "$IMAGE_ID linux amd64 no-volumes") local_arch=amd64 ;;
+        *) die "local image identity or platform does not match, or declares volumes" ;;
+    esac
+    printf '{"origin":"prebuilt-local","id":"%s","os":"linux","architecture":"%s"}\n' \
+        "$IMAGE_ID" "$local_arch" | \
+        (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance write-json \
+            "$TIER_DIR" "$TIER_BINDING" image.json)
+    phase prebuilt-local-image-verified
+else
+    BUILD_ARGS=()
+    if [ "$NO_CACHE" -eq 1 ]; then BUILD_ARGS+=(--no-cache); fi
+    if [ "$MODE" = pi-archive ]; then BUILD_ARGS+=(--target tier1_pi_archive); fi
+    BUILD_STARTED="$(now_utc)"
+    phase image-build-started
+    bounded "$BUILD_TIMEOUT" docker build ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} --iidfile "$IIDFILE" \
+        -f "$BUILD_CONTEXT/Dockerfile" -t "$IMAGE_TAG" "$BUILD_CONTEXT" \
+        >/dev/null 2>&1
+    BUILD_FINISHED="$(now_utc)"
+    phase image-built
+    [ -s "$IIDFILE" ] || die "docker build did not publish the run-owned iidfile"
+    IMAGE_ID="$(cat "$IIDFILE")"
+    [[ "$IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]] || die "invalid image ID in iidfile"
+    BOUNDED_OUTPUT_POLICY=image-inspect bounded "$DOCKER_TIMEOUT" \
+        docker image inspect "$IMAGE_ID" | \
+        (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance capture-image \
+            "$TIER_DIR" "$TIER_BINDING" image.json "$IMAGE_ID" "$DOCKERFILE" "$DOCKERFILE_HASH" \
+            "$BUILD_INPUT_HASH" "$IMAGE_TAG" "$BUILD_STARTED" "$BUILD_FINISHED")
+fi
 
 NAME="prime-claw-tier1-${RUN_ID//[^a-zA-Z0-9_.-]/-}"
 MOUNTS=(-v "$WORKSPACE_SNAPSHOT:/workspace:ro" -v "$SHARE:/test-results")
@@ -817,9 +864,15 @@ if [ "$MODE" = source ]; then
     MOUNTS+=(-v "$SHARE/source-release/artifacts:/stage/releases/v$PA_VERSION:ro")
 fi
 RUN_ATTEMPTED=1
-bounded "$DOCKER_TIMEOUT" docker run -d --init --name "$NAME" --cidfile "$CIDFILE" \
-    ${MOUNTS[@]+"${MOUNTS[@]}"} "$IMAGE_ID" sleep infinity \
-    >/dev/null 2>&1
+if [ -n "$PI_LOCAL_IMAGE" ]; then
+    bounded "$DOCKER_TIMEOUT" docker run -d --init --name "$NAME" --cidfile "$CIDFILE" \
+        --pull=never --network=none --no-healthcheck --entrypoint /usr/bin/sleep \
+        ${MOUNTS[@]+"${MOUNTS[@]}"} "$IMAGE_ID" infinity >/dev/null 2>&1
+else
+    bounded "$DOCKER_TIMEOUT" docker run -d --init --name "$NAME" --cidfile "$CIDFILE" \
+        ${MOUNTS[@]+"${MOUNTS[@]}"} "$IMAGE_ID" sleep infinity \
+        >/dev/null 2>&1
+fi
 [ -s "$CIDFILE" ] || die "docker run did not publish the run-owned cidfile"
 raw_cid="$(cat "$CIDFILE")"
 [[ "$raw_cid" =~ ^[0-9a-f]{64}$ ]] || die "invalid container ID in cidfile"
@@ -841,32 +894,51 @@ elif [ "$MODE" = source ]; then
     phase prime-agent-source-installed
 fi
 
-# Capture only the exact run-owned container's networks. Names are needed for
-# disconnect but are removed before evidence inventory to avoid host identity.
-NETWORK_NAMES="$(BOUNDED_OUTPUT_POLICY=network-list bounded \
-    "$DOCKER_TIMEOUT" docker inspect --format \
-    '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' \
-    "$CONTAINER_ID")"
-while IFS= read -r network; do
-    [ -z "$network" ] || bounded "$DOCKER_TIMEOUT" \
-        docker network disconnect "$network" "$CONTAINER_ID" >/dev/null 2>&1
-done < <(printf '%s\n' "$NETWORK_NAMES")
-unset NETWORK_NAMES
-NETWORK_STATE="$(BOUNDED_OUTPUT_POLICY=network-state bounded \
-    "$DOCKER_TIMEOUT" docker inspect --format \
-    '{{json .NetworkSettings.Networks}}' "$CONTAINER_ID")"
-[ "$NETWORK_STATE" = absent ] || \
-    die "container still has an attached network; refusing offline steps"
-unset NETWORK_STATE
-NETWORK_TIME="$(now_utc)"
-printf '{"verified_absent":true}\n' | \
-    (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance write-json \
-        "$TIER_DIR" "$TIER_BINDING" network.json)
+if [ -n "$PI_LOCAL_IMAGE" ]; then
+    # Docker reports either a loopback-only "none" endpoint or no endpoints.
+    network_proof="$(bounded "$DOCKER_TIMEOUT" docker inspect --format \
+        '{{.Image}} {{.HostConfig.NetworkMode}} {{if not .NetworkSettings.Networks}}none-only{{else if and (eq (len .NetworkSettings.Networks) 1) (index .NetworkSettings.Networks "none")}}none-only{{else}}unexpected{{end}}' \
+        "$CONTAINER_ID" 2>/dev/null)"
+    [ "$network_proof" = "$IMAGE_ID none none-only" ] \
+        || die "started container did not verify exact image and network none"
+    NETWORK_TIME="$(now_utc)"
+    printf '{"mode":"none","verified_absent":true}\n' | \
+        (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance write-json \
+            "$TIER_DIR" "$TIER_BINDING" network.json)
+else
+    # Capture only the exact run-owned container's networks. Names are needed for
+    # disconnect but are removed before evidence inventory to avoid host identity.
+    NETWORK_NAMES="$(BOUNDED_OUTPUT_POLICY=network-list bounded \
+        "$DOCKER_TIMEOUT" docker inspect --format \
+        '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' \
+        "$CONTAINER_ID")"
+    while IFS= read -r network; do
+        [ -z "$network" ] || bounded "$DOCKER_TIMEOUT" \
+            docker network disconnect "$network" "$CONTAINER_ID" >/dev/null 2>&1
+    done < <(printf '%s\n' "$NETWORK_NAMES")
+    unset NETWORK_NAMES
+    NETWORK_STATE="$(BOUNDED_OUTPUT_POLICY=network-state bounded \
+        "$DOCKER_TIMEOUT" docker inspect --format \
+        '{{json .NetworkSettings.Networks}}' "$CONTAINER_ID")"
+    [ "$NETWORK_STATE" = absent ] || \
+        die "container still has an attached network; refusing offline steps"
+    unset NETWORK_STATE
+    NETWORK_TIME="$(now_utc)"
+    printf '{"verified_absent":true}\n' | \
+        (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance write-json \
+            "$TIER_DIR" "$TIER_BINDING" network.json)
+fi
 phase network-absent
 
 PA_COMMAND=prime-agent
 ARTIFACT_ARGS=()
 if [ "$MODE" = pi-archive ]; then
+    if [ -n "$PI_LOCAL_IMAGE" ]; then
+        case "$local_arch" in arm64) musl_arch=aarch64 ;; amd64) musl_arch=x86_64 ;; esac
+        bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" /usr/bin/test \
+            -x "/lib/ld-musl-$musl_arch.so.1" >/dev/null 2>&1 \
+            || die "prebuilt image lacks the Pi musl interpreter"
+    fi
     # Only copy the selected file, never mount its directory. Verify the exact
     # container-local bytes before unpacking, with the runtime already offline.
     bounded "$INSTALL_TIMEOUT" docker cp "$PI_ARCHIVE" "$CONTAINER_ID:/tmp/tier1-pi.tar.gz" \

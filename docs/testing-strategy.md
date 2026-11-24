@@ -432,6 +432,25 @@ PRIME_AGENT_PI_SHA256=<64 lowercase hex digits from trusted provenance>
 TIER1_ENV_FILE=/absolute/path/to/pi-probe.env scripts/test-tier1.sh --probe
 ```
 
+For an offline-from-start run, require an already present, trusted image from
+`docker/test.Dockerfile` target `tier1_pi_archive`. Select its **full image ID**
+(not a tag or registry digest) in the selected local Docker daemon:
+
+```bash
+TIER1_ENV_FILE=/absolute/path/to/pi-probe.env scripts/test-tier1.sh --probe \
+  --pi-local-image=sha256:<64 lowercase hex digits>
+```
+
+This option does not build, pull, or fall back. Docker starts the exact image
+with `--pull=never --network=none`. The driver checks the running container's
+image and loopback-only network mode before copying or running any archive.
+It rejects images that declare volumes and disables image health checks.
+Use only a separately reviewed image with no embedded credentials or live
+state. Evidence records the requested and inspected local image ID, platform,
+and network mode, not a build or post-start disconnect. `--rebuild` is
+incompatible with this option; `--dry-run --probe` makes no Docker calls.
+Without the option, the existing Tier-1 build/disconnect path is unchanged.
+
 Use a regular archive file, not a symlink, and keep it outside the checkout.
 The two fields are required together and cannot be combined with
 `PRIME_AGENT_SOURCE` or `PRIME_AGENT_PINNED`. `--dry-run --probe` checks the
