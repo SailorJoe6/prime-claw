@@ -22,14 +22,14 @@ export interface SelectedBacklogRepository {
   remote: string | null;
 }
 
-const RUNNER = new ProcessCommandRunner();
+let runner: ProcessCommandRunner | undefined;
 const OID = /^[0-9a-f]{40}$/;
 const WINDOW = 4096;
 const HEADER_END = Buffer.from("\n---");
 const gitArgs = (root: string) => ["--no-replace-objects", "-C", root];
 
 function metadata(root: string, args: string[], failure: string): string {
-  const result = RUNNER.run("git", [...gitArgs(root), ...args], { allowFailure: true });
+  const result = (runner ??= new ProcessCommandRunner()).run("git", [...gitArgs(root), ...args], { allowFailure: true });
   if (result.status !== 0) throw new Error(failure);
   return result.stdout;
 }

@@ -277,8 +277,9 @@ function recordedDetectionRunner(extra = {}, options = {}) {
   };
 }
 
-test("legacy transition target proves paired published Beads revision and complete raw native evidence", () => {
-  const { primary, linked } = linkedWorktreeFixture();
+test("legacy transition target proves paired published Beads revision and complete raw native evidence", async (t) => {
+  const { root, primary, linked } = linkedWorktreeFixture();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(primary, ".beads", "dolt"), { recursive: true });
   mkdirSync(join(linked, ".beads", "dolt"), { recursive: true });
   const taskId = "TST-BRIDGE";
@@ -319,7 +320,7 @@ test("legacy transition target proves paired published Beads revision and comple
     },
   };
 
-  const target = resolveLegacyTaskOwnershipTransitionTarget(primary, linked, taskId, runner);
+  const target = await resolveLegacyTaskOwnershipTransitionTarget(primary, linked, taskId, runner);
   assert.equal(target.provider, "beads");
   assert.equal(target.providerRevision, DOLT_REVISION);
   assert.deepEqual(target.taskEvidence, nativeView);

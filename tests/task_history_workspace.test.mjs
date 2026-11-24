@@ -1496,12 +1496,8 @@ function taskMarkdown(id, title, notes = "initial") {
   ].join("\n");
 }
 
-test("legacy transition target proves real independent Backlog publication in both existing native clones", (t) => {
-  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
-  const taskId = "TASK-BRIDGE";
-  const sourceReference = `legacy-episode-source=.ralph/plans/future/bridge; superseded-by=${taskId}`;
-  const taskPath = "tasks/task-bridge - Bridge.md";
-  const markdown = [
+function transitionTaskMarkdown(taskId, sourceReference, description = "") {
+  return [
     "---",
     `id: ${taskId}`,
     "title: Bridge retained authority",
@@ -1520,23 +1516,34 @@ test("legacy transition target proves real independent Backlog publication in bo
     "## Description",
     "",
     "Preserve the reviewed retained specification.",
+    description,
     "",
     "## Implementation Plan",
     "",
     "Complete bridge candidate plan",
     "",
   ].join("\n");
+}
+
+test("legacy transition target proves real independent Backlog publication in both existing native clones for a ticket over 1 MiB", async (t) => {
+  assert.ok(backlogAvailable(), "managed native Backlog is required for this proof");
+  const taskId = "TASK-BRIDGE";
+  const sourceReference = `legacy-episode-source=.ralph/plans/future/bridge; superseded-by=${taskId}`;
+  const taskPath = "tasks/task-bridge - Bridge.md";
+  const markdown = transitionTaskMarkdown(taskId, sourceReference, "x".repeat(1024 * 1024));
   const f = episodeFixture({ taskFiles: { [taskPath]: markdown } });
+  t.after(() => rmSync(f.dir, { recursive: true, force: true }));
+  assert.ok(Buffer.byteLength(markdown) > 1024 * 1024);
   assert.equal(existsSync(f.storeDir), false);
-  assert.throws(
+  await assert.rejects(
     () => resolveLegacyTaskOwnershipTransitionTarget(f.root, f.target, taskId),
     /pre-existing Episode Backlog workspace.*absent/,
   );
   assert.equal(existsSync(f.storeDir), false, "transition proof never creates the Episode task clone");
   const prepared = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: f.root, targetWorktree: f.target });
-  assert.equal(prepared.status, "prepared");
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
 
-  const target = resolveLegacyTaskOwnershipTransitionTarget(f.root, f.target, taskId);
+  const target = await resolveLegacyTaskOwnershipTransitionTarget(f.root, f.target, taskId);
   assert.equal(target.provider, "backlog");
   assert.equal(target.history, "independent");
   assert.equal(target.providerRevision, f.primaryHead);
@@ -1545,11 +1552,67 @@ test("legacy transition target proves real independent Backlog publication in bo
   assert.equal(target.task.status, "In Progress");
   assert.equal(target.task.implementationPlan, "Complete bridge candidate plan");
   assert.deepEqual(target.task.references, [sourceReference]);
-  assert.equal(target.taskEvidence.task.id, taskId);
-  assert.equal(target.taskEvidence.task.path, `.backlog/${taskPath}`);
-  assert.equal(target.taskEvidence.task.status, "In Progress");
+  assert.deepEqual(target.taskEvidence, {
+    kind: "backlog-git",
+    repository: { topology: "independent", identity: target.taskEvidence.repository.identity },
+    commit: f.primaryHead,
+    path: taskPath,
+  });
+  assert.match(target.taskEvidence.repository.identity, /^[0-9a-f]{64}$/);
+  assert.deepEqual(target.episodeTaskEvidence, target.taskEvidence);
+  const primaryRepository = { topology: "independent", root: f.primaryStoreDir, remote: f.remoteName };
+  const episodeRepository = { ...primaryRepository, root: f.storeDir };
+  const offset = Buffer.byteLength(markdown) - 64;
+  for (const [repo, evidence] of [[primaryRepository, target.taskEvidence], [episodeRepository, target.episodeTaskEvidence]]) {
+    const { bytes, totalBytes } = await readBacklogGitEvidence(repo, evidence, taskId, offset);
+    assert.equal(totalBytes, Buffer.byteLength(markdown));
+    assert.deepEqual(bytes, Buffer.from(markdown).subarray(offset));
+  }
   assert.equal(git(f.primaryStoreDir, "status", "--porcelain"), "");
   assert.equal(git(f.storeDir, "status", "--porcelain"), "");
+});
+
+test("legacy transition target proves real branch-local Backlog evidence at both reviewed heads", async (t) => {
+  assert.ok(backlogAvailable(), "managed native Backlog is required for this proof");
+  const { dir, root } = fixtureRepo();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const taskId = "TASK-BRIDGE";
+  const sourceReference = `legacy-episode-source=.ralph/plans/future/bridge; superseded-by=${taskId}`;
+  const path = "backlog/tasks/task-bridge - Bridge.md";
+  const markdown = transitionTaskMarkdown(taskId, sourceReference);
+  mkdirSync(dirname(join(root, path)), { recursive: true });
+  writeFileSync(join(root, "backlog", "config.yml"), FULL_CANONICAL_CONFIG);
+  writeFileSync(join(root, path), markdown);
+  git(root, "add", "backlog");
+  git(root, "commit", "-qm", "Author branch-local transition ticket");
+
+  const episode = join(dir, "episode");
+  git(root, "worktree", "add", "-qb", "episode", episode);
+  git(episode, "commit", "--allow-empty", "-qm", "Reviewed Episode head");
+  const episodeHead = git(episode, "rev-parse", "HEAD");
+  git(root, "merge", "--no-ff", "-qm", "Review Episode on main", "episode");
+  git(root, "push", "-q", "origin", "main");
+  const mainHead = git(root, "rev-parse", "HEAD");
+  assert.notEqual(mainHead, episodeHead);
+
+  const target = await resolveLegacyTaskOwnershipTransitionTarget(root, episode, taskId, undefined, { mainHead, episodeHead });
+  assert.equal(target.provider, "backlog");
+  assert.equal(target.history, "branch-local");
+  assert.equal(target.task.taskId, taskId);
+  assert.equal(target.task.taskPathRelative, path);
+  assert.equal(target.task.status, "In Progress");
+  assert.equal(target.task.implementationPlan, "Complete bridge candidate plan");
+  assert.deepEqual(target.task.references, [sourceReference]);
+  assert.match(target.mainTaskEvidence.repository.identity, /^[0-9a-f]{64}$/);
+  assert.deepEqual(target.mainTaskEvidence, {
+    kind: "backlog-git",
+    repository: { topology: "branch-local", identity: target.mainTaskEvidence.repository.identity },
+    commit: mainHead,
+    path,
+  });
+  assert.deepEqual(target.episodeTaskEvidence, { ...target.mainTaskEvidence, commit: episodeHead });
+  assert.equal(git(root, "status", "--porcelain"), "");
+  assert.equal(git(episode, "status", "--porcelain"), "");
 });
 
 function mutationFixture() {

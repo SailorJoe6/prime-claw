@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { lstatSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep, win32 } from "node:path";
@@ -9,14 +10,27 @@ export interface BacklogCreationIdentity {
   status: string;
 }
 
+interface BacklogTransitionFacts extends BacklogCreationIdentity {
+  nativeDigest?: string;
+  implementationPlan?: string;
+  references?: string[];
+}
+
 const invalid = () => new Error("invalid or unsupported native task-view JSON");
 
 /** Project only the two envelope fields and three exact task fields. Other
  * strings (including one very long line) are validated and discarded in place.
  */
 export async function projectBacklogCreationIdentity(
-  chunks: AsyncIterable<Uint8Array>, { requireStatus = true }: { requireStatus?: boolean } = {},
+  chunks: AsyncIterable<Uint8Array>, options: { requireStatus?: boolean } = {},
 ): Promise<BacklogCreationIdentity> {
+  return projectNativeBacklogFacts(chunks, options);
+}
+
+async function projectNativeBacklogFacts(
+  chunks: AsyncIterable<Uint8Array>,
+  { requireStatus = true, transition = false }: { requireStatus?: boolean; transition?: boolean },
+): Promise<BacklogTransitionFacts> {
   const source = chunks[Symbol.asyncIterator]();
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let chunk = "", offset = 0, ended = false;
@@ -128,20 +142,31 @@ export async function projectBacklogCreationIdentity(
     } else await number();
   }
   let version = false, kind = false;
-  const facts: Partial<BacklogCreationIdentity> = {};
+  const facts: Partial<BacklogTransitionFacts> = {};
   await space();
   await object(["schemaVersion", "kind", "task"], async (field) => {
     if (field === "schemaVersion") { await take("1"); version = true; }
     else if (field === "kind") kind = await string(true, ["task-view"]) === "task-view";
-    else if (field === "task") await object(["id", "path", "status"], async (key) => {
+    else if (field === "task") await object(transition
+      ? ["id", "path", "status", "implementationPlan", "references"]
+      : ["id", "path", "status"], async (key) => {
       if (key === "id" || key === "path" || (key === "status" && requireStatus)) facts[key] = await string(true);
-      else await skip();
+      else if (transition && key === "implementationPlan" && await peek() === '"') {
+        facts.implementationPlan = await string(true);
+      } else if (transition && key === "references" && await peek() === "[") {
+        const references: string[] = [];
+        await sequence("[", "]", async () => {
+          if (await peek() === '"') references.push(await string(true));
+          else await skip();
+        });
+        facts.references = references;
+      } else await skip();
     });
     else await skip();
   });
   await space();
   if (await peek() !== undefined || !version || !kind || !facts.id || !facts.path || (requireStatus && !facts.status)) throw invalid();
-  return { id: facts.id, path: facts.path, status: facts.status ?? "" };
+  return { ...facts, id: facts.id, path: facts.path, status: facts.status ?? "" };
 }
 
 export function readBacklogCreationIdentity(cwd: string, taskId: string): Promise<BacklogCreationIdentity> {
@@ -159,18 +184,33 @@ export function readBacklogMutationIdentity(cwd: string, taskId: string): Promis
   return readNativeBacklogIdentity(cwd, taskId, false, false);
 }
 
-async function readNativeBacklogIdentity(cwd: string, taskId: string, requireStatus: boolean, verifyTarget = true): Promise<BacklogCreationIdentity> {
+/** Only the native fields the existing retained transition validates. */
+export function readBacklogTransitionFacts(cwd: string, taskId: string): Promise<BacklogTransitionFacts> {
+  return readNativeBacklogIdentity(cwd, taskId, true, true, true);
+}
+
+async function readNativeBacklogIdentity(
+  cwd: string, taskId: string, requireStatus: boolean, verifyTarget = true, transition = false,
+): Promise<BacklogTransitionFacts> {
   const child = spawn("backlog", ["task", "view", "--json", "--", taskId], { cwd, stdio: ["ignore", "pipe", "ignore"] });
   let launchError: string | undefined;
   child.once("error", (error: NodeJS.ErrnoException) => { launchError = error.code ?? "spawn failed"; });
   const closed = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(resolveClose => {
     child.once("close", (code, signal) => resolveClose({ code, signal }));
   });
-  let facts: BacklogCreationIdentity | undefined;
-  try { facts = await projectBacklogCreationIdentity(child.stdout, { requireStatus }); }
+  const digest = transition ? createHash("sha256") : undefined;
+  async function* observedChunks() {
+    for await (const chunk of child.stdout) {
+      digest?.update(chunk);
+      yield chunk;
+    }
+  }
+  let facts: BacklogTransitionFacts | undefined;
+  try { facts = await projectNativeBacklogFacts(digest ? observedChunks() : child.stdout, { requireStatus, transition }); }
   catch { child.stdout.resume(); }
   const { code, signal } = await closed;
   if (launchError || code !== 0 || !facts) throw new Error(`Native Backlog identity read failed for ${taskId}: ${launchError ?? (code === 0 ? invalid().message : signal ?? `exit ${code}`)}`);
+  if (digest) facts.nativeDigest = digest.digest("hex");
   if (!verifyTarget) return facts;
   if (facts.id !== taskId) throw new Error(`Native Backlog resolved a different canonical ID for ${taskId}`);
   const inside = (path: string) => path !== "" && !isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`);

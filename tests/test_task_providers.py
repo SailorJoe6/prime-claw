@@ -125,7 +125,8 @@ def test_version_two_ownership_keeps_one_discriminated_provider_native_shape() -
     assert "resolveLegacyTaskOwnershipTransitionTarget" in writer
     assert 'history: "independent"' in writer
     assert "providerRevision: primary.head" in writer
-    assert "taskEvidence: mainTask.nativeView" in writer
+    assert "taskEvidence: main.evidence" in writer
+    assert "taskEvidence: mainTask.nativeView" in writer  # Beads only
     assert "reservePublishedBacklogTaskEpisodeOwnership" in writer
     assert "reservePublishedBacklogTaskEpisodeOwnership" in episode
     assert writer.count("reservePublishedBeadsTaskEpisodeOwnership") == 1

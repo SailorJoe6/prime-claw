@@ -622,3 +622,21 @@ and post-compaction reminders are advisory background guidance, not assignments
 or acknowledgement requests. They do not start another slice, compaction,
 execute pass or recovery turn. Existing authorized supervision may continue
 without extra reminder-driven status chatter.
+
+### Retained folder Episode to Backlog ownership
+
+The guarded transition verifies native task ID, path and status in the primary
+and Episode workspaces. It checks the plan and legacy-source binding before
+changing authority. The native read retains only the fields needed for those
+checks, not a copy of the task view. Both references must resolve to the exact
+committed ticket, and no working file substitutes for a missing commit.
+
+- Branch-local: the transition result reports primary and Episode references at
+  the reviewed code heads. Ownership keeps its existing branch-local shape.
+- Independent: both references point to the directly verified published task
+  revision in the existing clones. New ownership stores that commit and its
+  Git reference. A replay of historical raw ownership leaves those bytes in
+  place and reports Git references rather than returning the old ticket view.
+
+Missing or invalid proof stops the transition before the authority write. This
+changes neither the publication checks nor which Episode resources survive.

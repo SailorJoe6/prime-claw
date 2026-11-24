@@ -90,6 +90,7 @@ import {
   resolveLegacyTaskOwnershipTransitionTarget,
   transitionLegacyEpisodeOwnershipToTask,
   type LegacyTaskOwnershipTransitionGit,
+  type LegacyTaskOwnershipTransitionDependencies,
   type LegacyTaskOwnershipTransitionResult,
   type TaskEpisodeReservationInput,
 } from "./task-episode-ownership.ts";
@@ -270,9 +271,10 @@ export interface EpisodeOwnershipTransitionDependencies extends EpisodeDependenc
   transitionGit?: LegacyTaskOwnershipTransitionGit;
   taskRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
-  transitionTargetResolver?: typeof resolveLegacyTaskOwnershipTransitionTarget;
+  transitionTargetResolver?: NonNullable<LegacyTaskOwnershipTransitionDependencies["transitionTargetResolver"]>;
   transitionNow?: () => string;
-  transitionOwnership?: typeof transitionLegacyEpisodeOwnershipToTask;
+  transitionOwnership?: (...args: Parameters<typeof transitionLegacyEpisodeOwnershipToTask>) =>
+    LegacyTaskOwnershipTransitionResult | Promise<LegacyTaskOwnershipTransitionResult>;
 }
 
 export interface EpisodeCreationOptions { host?: string }
@@ -1784,7 +1786,7 @@ export async function transitionSpecEpisodeToTaskOwnership(
     assertIdleEpisodeState(state, record, currentRoute);
 
     const transition = dependencies.transitionOwnership ?? transitionLegacyEpisodeOwnershipToTask;
-    return transition({
+    return await transition({
       projectRoot: repo,
       sourceLocation,
       taskId,
