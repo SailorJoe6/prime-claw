@@ -233,6 +233,77 @@ function sourceAuthorityFiles(root) {
   ]));
 }
 
+function exportRecoveryRows(root) {
+  return bd(root, "--readonly", "export", "--all").split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line))
+    .sort((a, b) => (a.id ?? a.key).localeCompare(b.id ?? b.key));
+}
+
+function recoveryEvidence(fixture) {
+  return {
+    files: sourceAuthorityFiles(fixture.root), rows: exportRecoveryRows(fixture.root),
+    context: JSON.parse(bd(fixture.root, "--readonly", "context", "--json")),
+    connection: JSON.parse(bd(fixture.root, "--readonly", "dolt", "show", "--json")),
+  };
+}
+
+// Exercise the operator's independent restore after retirement. Nothing from the
+// old .beads tree or its runtime (PID, socket, port, redirects) can be reused.
+function assertRetainedBackupRestores(fixture, result, before, oldTitle) {
+  assert.equal(existsSync(join(fixture.root, ".beads")), false);
+  const backup = realpathSync(result.sourceBackupPath);
+  const scratch = mkdtempSync(join(fixture.outer, "recovery-"));
+  git(scratch, "init", "-q", "-b", "main");
+  const store = join(scratch, ".beads");
+  const server = before.context.dolt_mode === "server";
+  const database = before.context.database;
+  assert.match(database, /^[\w-]+$/);
+  if (server) {
+    // Native init provides the managed-local server scaffolding, not the data
+    // under test. Use a different database so restore never overwrites one.
+    assert.notEqual(database, "RCV");
+    bd(scratch, "init", "--server", "--skip-hooks", "--skip-agents", "--prefix", "RCV", "--quiet", "--non-interactive");
+    bd(scratch, "dolt", "stop");
+  } else {
+    mkdirSync(store, { mode: 0o700 });
+  }
+  for (const [name, original] of Object.entries(before.files)) {
+    const bytes = readFileSync(join(backup, name));
+    assert.equal(bytes.toString("base64"), original, `backup retains original ${name}`);
+    writeFileSync(join(store, name), bytes);
+  }
+  const data = join(store, server ? "dolt" : "embeddeddolt");
+  if (!server) mkdirSync(data, { mode: 0o700 });
+  assert.equal(existsSync(join(data, database)), false);
+  command(data, "dolt", ["backup", "restore", pathToFileURL(join(backup, "dolt")).href, database]);
+  // A current export cannot recreate superseded rows in Dolt commit history.
+  assert.match(fixture.ids.parent, /^[\w.-]+$/);
+  const titles = command(join(data, database), "dolt", ["sql", "-r", "csv", "-q",
+    `SELECT DISTINCT title FROM dolt_history_issues WHERE id = '${fixture.ids.parent}'`]).trim().split(/\r?\n/);
+  assert.ok(titles.includes(oldTitle), `restored history is missing ${oldTitle}`);
+  assert.notEqual(before.rows.find(row => row.id === fixture.ids.parent)?.title, oldTitle);
+  // The controlled fixture uses ordinary per-project defaults. Never reuse an
+  // endpoint or an absolute data directory recorded by the source server.
+  const metadata = JSON.parse(readFileSync(join(store, "metadata.json"), "utf8"));
+  for (const key of ["dolt_server_port", "dolt_server_host", "dolt_server_socket", "dolt_data_dir", "dolt_team_server"]) delete metadata[key];
+  writeFileSync(join(store, "metadata.json"), JSON.stringify(metadata));
+  if (server) bd(scratch, "dolt", "start"); // fresh per-project listener; only the scratch server is stopped below
+  try {
+    const context = JSON.parse(bd(scratch, "--readonly", "context", "--json"));
+    assert.equal(context.beads_dir, store);
+    assert.equal(context.database, database);
+    assert.equal(context.dolt_mode, before.context.dolt_mode);
+    if (server) {
+      const connection = JSON.parse(bd(scratch, "--readonly", "dolt", "show", "--json"));
+      assert.ok(["localhost", "127.0.0.1", "::1"].includes(connection.host));
+      assert.equal(Number(readFileSync(join(store, "dolt-server.port"), "utf8")), Number(connection.port));
+      assert.notEqual(connection.port, before.connection.port);
+    }
+    assert.deepEqual(exportRecoveryRows(scratch), before.rows);
+  } finally {
+    if (server) bd(scratch, "dolt", "stop");
+  }
+}
+
 class AsIsBeadsRunner extends RecordingBeadsRunner {
   constructor() { super(); this.sourcePublicationCommands = []; }
   run(commandName, args, options = {}) {
@@ -868,6 +939,10 @@ test("Beads to Backlog migration preserves the selected non-origin remote for or
 
 test("forward Beads retirement preserves outgoing Dolt history and operator ignores through ordinary Backlog preparation", { timeout: 300_000 }, async (t) => {
   const fixture = beadsSource(t, "forward-publication-retirement");
+  bd(fixture.root, "update", fixture.ids.parent, "--title", "Revised after source publication", "--json");
+  bd(fixture.root, "remember", "Not in the outgoing remote Ω", "--key", "recovery-only-memory");
+  const recovery = recoveryEvidence(fixture);
+  assert.ok(recovery.rows.some(row => row._type === "memory" && row.key === "recovery-only-memory"));
   const operatorIgnore = "operator-cache/\n";
   const nativeIgnore = readFileSync(join(fixture.root, ".gitignore"), "utf8");
   assert.match(nativeIgnore, /\*\.gate\.lock\*/);
@@ -894,6 +969,7 @@ test("forward Beads retirement preserves outgoing Dolt history and operator igno
   assert.equal(existsSync(join(fixture.root, ".beads.gate.lock")), false, "retired native gate lock must not survive cutover");
   assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote, "refs/dolt/data"), sourcePublication,
     "local source retirement must retain outgoing remote history without changing its ref");
+  assertRetainedBackupRestores(fixture, result, recovery, "Beads parent");
   const finalIgnore = readFileSync(join(fixture.root, ".gitignore"), "utf8");
   assert.equal(finalIgnore, retainedIgnore + "/.backlog/\n",
     "cutover preserves exact operator bytes, removes only the native Beads block, and appends only the required Backlog wrapper");
@@ -905,6 +981,47 @@ test("forward Beads retirement preserves outgoing Dolt history and operator igno
   assert.equal(git(fixture.root, "rev-parse", TASK_HISTORY_REF), result.receipt.destinationReceiptRevision);
 });
 
+
+test("forward Beads retirement stops before publication if the retained backup cannot restore", { timeout: 180_000 }, async t => {
+  const fixture = embeddedBeadsSource(t, "backup-restore-refusal");
+  const owner = addActiveBeadsOwner(fixture);
+  const registry = join(fixture.root, ".prime-claw", "ownership.json");
+  const owners = readFileSync(registry);
+  const before = recoveryEvidence(fixture);
+  const remote = git(fixture.root, "ls-remote", "--refs", fixture.remote);
+  const head = git(fixture.root, "rev-parse", "HEAD");
+  let refused = false;
+  class RestoreRefusingRunner extends AsIsBeadsRunner {
+    run(name, args, options = {}) {
+      if (name === "dolt" && args[0] === "backup" && args[1] === "restore") {
+        refused = true;
+        return { status: 1, stdout: "", stderr: "fixture rejects scratch restore" };
+      }
+      return super.run(name, args, options);
+    }
+  }
+  const runner = new RestoreRefusingRunner();
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.equal(refused, false, "inspection must not run a backup restore");
+  const result = await migrateTaskProvider({
+    cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "recovery-fixture", semanticPlacement: "Preserve current native values.",
+    verifyActiveRuntime: proveFixtureRuntime,
+  });
+  assert.equal(refused, true, result.detail);
+  assert.equal(result.status, "blocked");
+  assert.ok(lstatSync(result.sourceBackupPath).isDirectory(), "report the retained artifact even on failed verification");
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), before.files);
+  assert.deepEqual(exportRecoveryRows(fixture.root), before.rows);
+  assert.deepEqual(readFileSync(registry), owners);
+  assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), head);
+  assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote), remote);
+  assert.equal(existsSync(join(fixture.root, ".backlog")), false);
+  assert.equal(existsSync(join(fixture.root, "backlog.config.yml")), false);
+  assert.equal(command(fixture.root, "git", ["rev-parse", "--verify", "--quiet", TASK_HISTORY_REF], true), null);
+});
 
 test("Beads source inspection rejects effective owner-filter omissions before destination creation", { timeout: 120_000 }, (t) => {
   const fixture = embeddedBeadsSource(t, "beads-filtered-source");
@@ -2113,6 +2230,7 @@ test("canonical source inspection reads embedded local-only built-in and partial
 
 test("confirmed embedded local-only migration publishes Backlog before retiring source and preserves compatible active ownership", { timeout: 240_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "embedded-active-retirement");
+  const recovery = recoveryEvidence(fixture);
   const before = sourceAuthorityFiles(fixture.root);
   const native = Object.fromEntries(Object.values(fixture.ids).map((id) => [id, {
     view: JSON.parse(bd(fixture.root, "--readonly", "show", id, "--json", "--long", "--include-comments"))[0],
@@ -2164,6 +2282,7 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
   assert.equal(result.status, "completed", result.detail);
   assert.equal(result.sourceAbsent, true);
   assert.equal(result.selectedProvider, "backlog");
+  assertRetainedBackupRestores(fixture, result, recovery, "Embedded original");
   assert.ok(runtimeProofs >= 3, "active continuity must be proved through ownership cutover");
   assert.deepEqual(result.receipt.taskCounts, { open: 3, closed: 0, archived: 0, total: 3 });
   assert.equal(result.receipt.sourceRevision, inspection.sourceRevision);

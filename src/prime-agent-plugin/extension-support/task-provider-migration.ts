@@ -14,12 +14,17 @@ import { createHash } from "node:crypto";
 import { makeBacklogGitEvidence } from "./backlog-git-evidence.ts";
 import {
   appendFileSync,
+  closeSync,
+  constants,
   existsSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readlinkSync,
+  readSync,
   renameSync,
   readdirSync,
   realpathSync,
@@ -29,6 +34,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { setImmediate as yieldToOperator } from "node:timers/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
@@ -106,6 +112,7 @@ export interface ProviderMigrationBlocked {
   sourceProvider?: TaskProviderId;
   targetProvider?: TaskProviderId;
   sourceRevision?: string;
+  sourceBackupPath?: string;
 }
 
 export interface ProviderMigrationReceipt {
@@ -143,6 +150,7 @@ export interface ProviderMigrationCompleted {
   receipt: ProviderMigrationReceipt;
   receiptTaskId: string;
   sourceAbsent: true;
+  sourceBackupPath: string;
   selectedProvider: TaskProviderId;
   warnings?: string[];
 }
@@ -268,7 +276,7 @@ function blocked(
   code: string,
   detail: string,
   remediation: string,
-  context: Partial<Pick<ProviderMigrationBlocked, "sourceProvider" | "targetProvider" | "sourceRevision">> = {},
+  context: Partial<Pick<ProviderMigrationBlocked, "sourceProvider" | "targetProvider" | "sourceRevision" | "sourceBackupPath">> = {},
 ): ProviderMigrationBlocked {
   return { status: "blocked", code, detail, remediation, ...context };
 }
@@ -2509,6 +2517,116 @@ function deleteBacklogSource(snapshot: BacklogSnapshot, runner: CommandRunner): 
   rmSync(store, { recursive: true, force: false });
 }
 
+interface RetainedBeadsBackup {
+  path: string;
+  digest: string;
+}
+
+function backupDirectory(path: string): void {
+  const info = lstatSync(path);
+  if (!info.isDirectory() || realpathSync(path) !== path) {
+    throw new Error("Beads backup path is not one canonical local directory");
+  }
+}
+
+/** Use the native point-in-time Dolt backup, not a live copy of database files. */
+function retainBeadsBackup(source: BeadsSnapshot, runner: CommandRunner, allocated: (path: string) => void): RetainedBeadsBackup {
+  const { projectRoot, evidence } = source;
+  const database = evidence.doltDatabase;
+  if (!database || database.startsWith("-") || database === "." || database === ".." || /[\\/\x00-\x1f]/.test(database)) {
+    throw new Error("Beads backup requires one safe native database directory name");
+  }
+  const connection = source.sourceIdentity.connection as JsonObject;
+  let databaseDirectory: string;
+  if (evidence.doltMode === "server") {
+    if (connection.shared_server !== false || !["127.0.0.1", "localhost", "::1"].includes(connection.host)) {
+      throw new Error("Beads backup requires the locally owned source server, not a shared or remote endpoint");
+    }
+    const status = asObject(jsonCommand(runner, "bd", ["--readonly", "dolt", "status", "--json"], projectRoot, "Beads backup source server"), "Beads backup source server");
+    if (status.running !== true || status.port !== connection.port || !Number.isSafeInteger(status.pid) || status.pid <= 0 || typeof status.data_dir !== "string") {
+      throw new Error("Beads backup cannot bind the running source server to its selected local database");
+    }
+    databaseDirectory = join(status.data_dir, database);
+  } else if (evidence.doltMode === "embedded" && typeof connection.data_dir === "string") {
+    databaseDirectory = join(connection.data_dir, database);
+  } else {
+    throw new Error("Beads backup cannot bind the selected embedded database directory");
+  }
+  if (!isAbsolute(databaseDirectory) || !contained(evidence.storeDir, databaseDirectory) || databaseDirectory === evidence.storeDir) {
+    throw new Error("Beads backup database directory is not inside the source store");
+  }
+  backupDirectory(databaseDirectory);
+  backupDirectory(join(databaseDirectory, ".dolt"));
+
+  const gitDirectory = realpathSync(runRequired(runner, "git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], projectRoot, "locate private Beads backup parent").stdout.trim());
+  if (contained(evidence.storeDir, gitDirectory) || contained(join(projectRoot, ".backlog"), gitDirectory)) {
+    throw new Error("Beads backup parent would not survive source retirement or is inside the destination");
+  }
+  const path = mkdtempSync(join(gitDirectory, "prime-claw-beads-backup-"));
+  allocated(path);
+  for (const [name, original] of [["metadata.json", evidence.metadataPath], ["config.yaml", evidence.configPath]]) {
+    const info = lstatSync(original);
+    if (!info.isFile() || realpathSync(original) !== original || !contained(evidence.storeDir, original)) {
+      throw new Error(`Beads backup cannot copy unsafe source ${name}`);
+    }
+    writeFileSync(join(path, name), readFileSync(original), { flag: "wx", mode: 0o600 });
+  }
+  mkdirSync(join(path, "dolt"), { mode: 0o700 });
+  const url = pathToFileURL(join(path, "dolt")).href.replace(/'/g, "%27");
+  if (evidence.doltMode === "server") {
+    // Use the existing selected connection. No backup registration, source
+    // commit, server stop, or path inferred from an unrelated SQL endpoint.
+    runRequired(runner, "bd", ["--dolt-auto-commit", "off", "sql", `CALL DOLT_BACKUP('sync-url', '${url}')`], projectRoot, "capture owned Beads server backup");
+  } else {
+    runRequired(runner, "dolt", ["backup", "sync-url", url], databaseDirectory, "capture embedded Beads backup");
+  }
+  const scratch = mkdtempSync(join(realpathSync(tmpdir()), "prime-claw-beads-restore-"));
+  try {
+    runRequired(runner, "dolt", ["backup", "restore", url, database], scratch, "restore Beads backup for verification");
+    const restored = join(scratch, database);
+    backupDirectory(restored);
+    runRequired(runner, "dolt", ["fsck"], restored, "verify restored Beads database");
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+  writeFileSync(join(path, "source.json"), JSON.stringify({ database, mode: evidence.doltMode, sourceRevision: source.revision }) + "\n", { flag: "wx", mode: 0o600 });
+  return { path, digest: beadsBackupDigest(path) };
+}
+
+/** Recheck the same private bytes before retiring the original. */
+function beadsBackupDigest(root: string): string {
+  const hash = createHash("sha256");
+  const buffer = Buffer.allocUnsafe(256 * 1024);
+  const walk = (path: string) => {
+    const info = lstatSync(path);
+    const name = relative(root, path);
+    if (info.isDirectory()) {
+      backupDirectory(path);
+      hash.update(JSON.stringify([name, "directory"]));
+      for (const child of readdirSync(path).sort()) walk(join(path, child));
+    } else if (info.isFile() && info.nlink === 1) {
+      const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      try {
+        const opened = fstatSync(fd);
+        if (opened.dev !== info.dev || opened.ino !== info.ino) throw new Error("Beads backup file changed during verification");
+        hash.update(JSON.stringify([name, "file", info.size]));
+        let offset = 0;
+        for (let n; (n = readSync(fd, buffer, 0, buffer.length, null)) > 0; offset += n) hash.update(buffer.subarray(0, n));
+        const finished = fstatSync(fd);
+        if (offset !== info.size || finished.mtimeMs !== info.mtimeMs || finished.ctimeMs !== info.ctimeMs) {
+          throw new Error("Beads backup file changed during verification");
+        }
+      } finally {
+        closeSync(fd);
+      }
+    } else {
+      throw new Error("Beads backup contains an unsafe file or link");
+    }
+  };
+  walk(root);
+  return hash.digest("hex");
+}
+
 function deleteBeadsSource(snapshot: BeadsSnapshot, runner: CommandRunner): void {
   const store = snapshot.evidence.storeDir;
   if (!existsSync(store)) throw new Error("Beads source store disappeared before guarded deletion");
@@ -2658,6 +2776,7 @@ function webStopUnproved(error: unknown): boolean {
 export async function migrateTaskProvider(options: ProviderMigrationOptions): Promise<ProviderMigrationResult> {
   const runner = migrationRunner(options.runner);
   let source: SourceSnapshot | undefined;
+  let sourceBackupPath: string | undefined;
   let ownershipSwitch: ActiveTaskProviderOwnershipSwitchResult | undefined;
   let backlogWeb: BeadsMigrationWeb | undefined;
   let backlogWebStore: string | undefined;
@@ -2708,10 +2827,8 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     if (source.provider === options.targetProvider) return blocked("same-provider", `the selected provider is already ${source.provider}`, "choose the other supported provider", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     if (source.revision !== options.expectedSourceRevision) return blocked("source-revision-changed", `confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`, "quiesce mutations, request a fresh inspection, and confirm that exact revision", { sourceProvider: source.provider, targetProvider: options.targetProvider, sourceRevision: source.revision });
     await checkpoint();
-    const beadsPlacements = source.provider === "backlog" && options.targetProvider === "beads"
-      ? validateBeadsNativePlacements(source, options.beadsNativePlacements)
-      : {};
-    if (source.provider !== "backlog" && (options.beadsNativePlacements?.length ?? 0) > 0) {
+    if (source.provider !== "beads") throw new Error("fresh Backlog migration requires the exact Beads source");
+    if ((options.beadsNativePlacements?.length ?? 0) > 0) {
       throw new Error("beadsNativePlacements applies only to Backlog-to-Beads migration");
     }
     const ownershipRows = activeOwnership(project.root, source.provider, runner);
@@ -2720,13 +2837,15 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     const missing = ownershipRows.filter((row) => !sourceIds.has(row.taskId));
     if (missing.length) throw new Error(`active ownership references source tasks absent from the complete snapshot: ${missing.map((row) => row.taskId).join(", ")}`);
     await proveActiveRuntimeContinuity(ownershipRows, options.verifyActiveRuntime);
-    await checkpoint("Preparing the destination");
     for (const owner of ownershipRows) assertNoLocalBacklogMigrationDestination(owner.worktree);
+    await checkpoint("Creating and verifying a retained Beads backup");
+    const sourceBackup = retainBeadsBackup(source, runner, (path) => { sourceBackupPath = path; });
+    await checkpoint();
+    exactSnapshotUnchanged(source, captureSameSource(source, runner));
+    await checkpoint("Preparing the destination");
     const timestamp = (options.now ?? (() => new Date().toISOString()))();
     if (Number.isNaN(Date.parse(timestamp))) throw new Error("migration timestamp is not RFC3339");
-    const candidate = source.provider === "backlog"
-      ? migrateBacklogToBeads(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), beadsPlacements, ownershipRows)
-      : await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, closeVerifiedWeb, checkpoint);
+    const candidate = await migrateBeadsToBacklog(source, runner, options.actor.trim(), timestamp, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, closeVerifiedWeb, checkpoint);
     await checkpoint("Rechecking the receipt, source and ownership before cutover");
     for (const owner of ownershipRows) {
       candidate.prepareActiveWorktree(owner.worktree);
@@ -2787,6 +2906,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
           verifyActiveCodeIdentity(project.root, owner, runner);
           verifyActiveSourceWorkspace(source!, owner, runner);
         }
+        if (beadsBackupDigest(sourceBackup.path) !== sourceBackup.digest) throw new Error("retained Beads backup changed before guarded source retirement");
         const activeSourceStores = independentActiveBacklogStores(source!, ownershipRows);
         deleteSource(source!, runner);
         for (const storeDir of activeSourceStores) rmSync(storeDir, { recursive: true, force: false });
@@ -2834,7 +2954,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       ownershipTransitions: ownershipSwitch.transitions,
       destinationReceiptRevision: candidate.revision,
     };
-    return { status: "completed", receipt, receiptTaskId: candidate.receiptTaskId, sourceAbsent: true, selectedProvider: candidate.provider,
+    return { status: "completed", receipt, receiptTaskId: candidate.receiptTaskId, sourceAbsent: true, sourceBackupPath: sourceBackup.path, selectedProvider: candidate.provider,
       ...(webWarning ? { warnings: [webWarning] } : {}) };
   } catch (error) {
     // Close the same owned transport on any earlier exit; do not retry shutdown
@@ -2862,7 +2982,8 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       ownershipSwitch
         ? `stop all task mutation and recover the exact source ${sourcePath}, destination ${destinationPath}, and ownership evidence; do not create another destination`
         : `the source remains authoritative at ${sourcePath}; STOP and preserve source, existing destination ${destinationPath}, ownership and private evidence. Native effects may be partial or unverified. Do not automatically resend, allocate, reconcile, roll back, delete or clean records. ${error instanceof MigrationCommandFailure ? "resolve the reported command/capture or resource failure without trimming required current content or repairing readable source data. " : ""}Inspect the exact stopped state; later recovery requires explicit authority. Required current content must not be trimmed`,
-      { sourceProvider: source?.provider, targetProvider: options.targetProvider, sourceRevision: source?.revision },
+      { sourceProvider: source?.provider, targetProvider: options.targetProvider, sourceRevision: source?.revision,
+        ...(sourceBackupPath ? { sourceBackupPath } : {}) },
     );
   }
 }

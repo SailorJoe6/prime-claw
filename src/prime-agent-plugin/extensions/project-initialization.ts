@@ -91,11 +91,11 @@ function actionSummary(value: unknown, detailed = true): string {
   }
   if (value && typeof value === "object" && (value as any).status === "completed" && "receipt" in (value as any)) {
     const migration = value as Extract<ProviderMigrationResult, { status: "completed" }>;
-    return `Prime Claw provider switch completed: ${migration.receipt.sourceProvider}->${migration.receipt.targetProvider} source=${migration.receipt.sourceRevision} destination=${migration.receipt.destinationReceiptRevision} receipt=${migration.receiptTaskId} source-absent=true${(migration.warnings ?? []).map(warning => `\nWarning: ${warning}`).join("")}`;
+    return `Prime Claw provider switch completed: ${migration.receipt.sourceProvider}->${migration.receipt.targetProvider} source=${migration.receipt.sourceRevision} destination=${migration.receipt.destinationReceiptRevision} receipt=${migration.receiptTaskId} source-absent=true${migration.sourceBackupPath ? `\nRetained Beads backup: ${migration.sourceBackupPath}` : ""}${(migration.warnings ?? []).map(warning => `\nWarning: ${warning}`).join("")}`;
   }
   if (value && typeof value === "object" && (value as any).status === "blocked" && "code" in (value as any) && "targetProvider" in (value as any)) {
     const migration = value as Extract<ProviderMigrationResult, { status: "blocked" }>;
-    return `Prime Claw provider switch blocked (${migration.code}): ${migration.detail}; ${migration.remediation}`;
+    return `Prime Claw provider switch blocked (${migration.code}): ${migration.detail}; ${migration.remediation}${migration.sourceBackupPath ? `\nBeads backup files (may be partial or no longer verified): ${migration.sourceBackupPath}` : ""}`;
   }
   return "Prime Claw initialization action completed";
 }
