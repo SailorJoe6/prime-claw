@@ -252,6 +252,19 @@ the exact commit OIDs in the observation, never historical checkpoints, fresh
 tips, tracking refs, the index, mutable files, or a live task view. If either
 reference cannot be verified or read, report the evidence gap and stop.
 
+### Read branch-local Backlog initial assignment evidence
+
+A fresh branch-local assignment can supply `<provider-task-observation>` with
+only `currentTaskEvidence`, a `backlog-git` reference. This is not a continuation
+pair. Match its commit to the exact owned `baseRef` and its path to the owned
+`taskPath`. Verify the repository identity and committed canonical task ID,
+then stream the exact ticket to inspect the entire contract using the bounded
+blob procedure above. Stop if the reference is missing required fields or
+cannot be verified; a live task view cannot repair it. For this initial
+assignment, judge status and plan from the committed ticket; use a live native
+read separately when authoring. Legacy initial prompts without this reference
+retain the ordinary native reload.
+
 ### Provider-absent or Backlog task authority
 
 First retain the ownership-selected Backlog topology. Provider-absent and
@@ -265,8 +278,8 @@ conflict or unavailable selected-ticket history needs factual recovery; never
 reset or absorb another writer's work to make it clean.
 
 Use the exact task ID and path selected above. Do not use `.ralph/plans` as
-authority in this mode. Reload the exact task through the supported structured
-interface:
+authority in this mode. Except for the committed branch-local initial assignment above,
+reload the exact task through the supported structured interface:
 
 ```sh
 backlog task view --json -- TASK-ID

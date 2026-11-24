@@ -264,6 +264,23 @@ reset or push the retained clone. Creation does not use the scratch header reade
 The editable workflow still decides readiness and interprets the plan.
 An existing operation keeps its own resource binding; this sends no replay.
 
+### Branch-local Backlog creation evidence
+
+The registered creation tool streams native Backlog identity (canonical ID,
+path and status), not the full native response, for selection and around the
+existing status edit. It verifies the exact integration commit's ticket before
+mutation, then verifies the task-only status commit before reservation. That
+status commit remains the Episode code base. The code push retains its existing
+outcome reporting; a Git reference is not proof of remote publication.
+
+Before opening a fresh session, creation verifies the same ticket commit and
+same code repository again in the allocated worktree. The single initial
+execute carries `currentTaskEvidence` in the provider observation. It is a
+branch-local `backlog-git` reference, not a task snapshot or a continuation pair.
+Ownership keeps its existing branch-local shape. Missing committed evidence
+stops before a session or assignment; exact active recovery returns the same
+resources without issuing another execute.
+
 ### Bounded task-native transport observations
 
 The existing JSONL client attaches ephemeral `transport` facts to its local

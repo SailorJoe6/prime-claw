@@ -3048,14 +3048,14 @@ function pushTaskHistoryHead(clone: MutationClone, head: string, runner: Command
   return runGit(runner, clone.storeDir, ["push", "--porcelain", clone.remote, `${head}:${TASK_HISTORY_REF}`]);
 }
 
-async function editBacklogForCreation(clone: MutationClone, args: string[], runner?: CommandRunner): Promise<number | null> {
+export async function editBacklogForCreation(cwd: string, args: string[], runner?: CommandRunner): Promise<number | null> {
   if (runner && !(runner instanceof ProcessCommandRunner)) {
-    return runner.run("backlog", args, { cwd: clone.targetWorktree, allowFailure: true }).status;
+    return runner.run("backlog", args, { cwd, allowFailure: true }).status;
   }
   // Backlog's human-readable result may include task content. Only the native
   // process outcome is needed; do not buffer or persist either output stream.
   return new Promise((resolveStatus, reject) => {
-    const child = spawn("backlog", args, { cwd: clone.targetWorktree, stdio: "ignore" });
+    const child = spawn("backlog", args, { cwd, stdio: "ignore" });
     child.once("error", () => reject(new Error("native Backlog status edit could not start")));
     child.once("close", resolveStatus);
   });
@@ -3091,7 +3091,7 @@ export async function publishBacklogCreationHistory(
     };
     const before = await readExactTask();
     stage = "native edit attempted; no commit or push attempted by this operation";
-    const status = await editBacklogForCreation(clone, nativeTaskEditArgs(input), input.runner);
+    const status = await editBacklogForCreation(clone.targetWorktree, nativeTaskEditArgs(input), input.runner);
     if (status !== 0) throw new Error(`native Backlog status edit ${status === null ? "was interrupted" : `failed (exit ${status})`}`);
     const after = await readExactTask();
     if (after.storePath !== before.storePath || after.status !== expectedStatus) {

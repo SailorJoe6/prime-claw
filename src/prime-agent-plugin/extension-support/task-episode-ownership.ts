@@ -87,7 +87,7 @@ export interface TaskEpisodeReservationInput {
 export interface TaskEpisodeReservationDependencies {
   git?: TaskEpisodeReservationGit;
   ownership?: TaskEpisodeReservationStore;
-  taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
+  taskResolver?: (cwd: string, taskId: string) => Pick<BacklogTaskSelection, "taskId" | "projectRoot" | "taskPath" | "taskPathRelative"> | null;
   now?: () => string;
 }
 

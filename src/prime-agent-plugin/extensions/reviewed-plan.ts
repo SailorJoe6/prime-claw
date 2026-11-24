@@ -8,6 +8,7 @@ import {
   createSpecEpisode,
   createTaskEpisode,
   resolveIndependentBacklogCreationSelection,
+  resolveBranchLocalBacklogCreationSelection,
   episodeResultText,
   finalizeTaskEpisodeCleanup,
   handoffSpecEpisode,
@@ -733,8 +734,10 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           if (!validTaskToolSelection(params.taskId, params.host)) {
             throw new Error("Task Episode creation requires one exact canonical task ID and optional stable id:<project-host-setup-id> host");
           }
-          const streamed = params.operationId === undefined && !dependencies?.providerTaskResolver && !dependencies?.taskResolver
-            ? await resolveIndependentBacklogCreationSelection(ctx.cwd, params.taskId, dependencies)
+          const streamed = !dependencies?.providerTaskResolver && !dependencies?.taskResolver
+            ? (params.operationId === undefined
+                ? await resolveIndependentBacklogCreationSelection(ctx.cwd, params.taskId, dependencies)
+                : null) ?? await resolveBranchLocalBacklogCreationSelection(ctx.cwd, params.taskId, dependencies)
             : null;
           const task = streamed ?? resolver(ctx.cwd, params.taskId);
           if (!task) throw new Error(`Task ${params.taskId} is unavailable through the live provider`);

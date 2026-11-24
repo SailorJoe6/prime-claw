@@ -74,6 +74,7 @@ import {
   prepareEpisodeTaskHistoryWorkspace,
   publishTaskHistoryMutation,
   publishBacklogCreationHistory,
+  editBacklogForCreation,
   resolveSynchronizedProviderTask,
   type EpisodeTaskHistoryMutation,
 } from "./task-history-workspace.ts";
@@ -308,6 +309,8 @@ export interface TaskEpisodeAllocationDependencies extends EpisodeDependencies {
   admissionRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   prepareEpisodeTaskHistory?: typeof prepareEpisodeTaskHistoryWorkspace;
+  /** Ephemeral evidence from fresh branch-local status admission. */
+  branchLocalAdmissionEvidence?: BacklogGitEvidence;
   beadsTransport?: typeof prepareBeadsWorkspaceTransport;
   beadsTaskReader?: typeof readBeadsNativeTask;
   now?: () => string;
@@ -2372,7 +2375,23 @@ async function prepareTaskEpisodeWorkspace(
       }),
     };
   }
-  if (!isPublishedBacklogTaskEpisodeOwnership(record)) return { record };
+  if (!isPublishedBacklogTaskEpisodeOwnership(record)) {
+    const reserved = dependencies.branchLocalAdmissionEvidence;
+    if (!reserved) return { record };
+    try {
+      const worktree = record.worktree!;
+      if (reserved.commit !== record.baseRef || reserved.path !== record.taskPath
+          || record.head !== record.baseRef || (dependencies.git ?? new CliGitAdapter()).head(worktree) !== record.baseRef) {
+        throw new Error("reserved code base or task path changed");
+      }
+      const evidence = await makeBacklogGitEvidence({ root: worktree, topology: "branch-local", remote: null },
+        reserved.commit, record.taskPath, record.taskId);
+      if (evidence.repository.identity !== reserved.repository.identity) throw new Error("code repository changed");
+      return { record, providerTaskObservation: JSON.stringify({ currentTaskEvidence: evidence }) };
+    } catch {
+      throw new EpisodeStateUncertainError(`Branch-local Backlog evidence at ${reserved.commit} is unavailable or mismatched before session start`);
+    }
+  }
   const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
   const prepared = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
     primaryRoot: repo,
@@ -3308,6 +3327,17 @@ export async function resolveIndependentBacklogCreationSelection(
   return { provider: "backlog", projectRoot: provider.projectRoot, taskId: selected.id };
 }
 
+/** The existing-operation entrance also resolves branch-local identity without a snapshot. */
+export async function resolveBranchLocalBacklogCreationSelection(
+  cwd: string, taskId: string, dependencies: TaskEpisodeCreationDependencies = {},
+): Promise<{ provider: "backlog"; projectRoot: string; taskId: string } | null> {
+  const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
+  const provider = (dependencies.providerDetector ?? detectTaskProvider)(cwd, runner);
+  if (provider.kind !== "selected" || provider.evidence.provider !== "backlog" || hasIndependentBacklogStore(provider)) return null;
+  const selected = await readBacklogCreationIdentity(provider.projectRoot, taskId);
+  return { provider: "backlog", projectRoot: provider.projectRoot, taskId: selected.id };
+}
+
 async function admitIndependentBacklogCreation(
   projectRoot: string, integrationBranch: string, taskId: string, ctx: ExtensionContext,
   options: TaskEpisodeAdmissionOptions, dependencies: TaskEpisodeCreationDependencies,
@@ -3398,7 +3428,8 @@ export async function createTaskEpisode(
   const taskId = rawTaskId.trim();
   let projectRoot = "";
   let taskPath = "";
-  let admissionResult: ConversationTaskStatusCommitResult | undefined;
+  let admissionResult: ConversationTaskStatusCommitResult | { selection: BacklogCreationIdentity; commit: string } | undefined;
+  let branchLocalAdmissionEvidence: BacklogGitEvidence | undefined;
   let integrationBranch = "";
   let admissionPushError: string | undefined;
 
@@ -3426,45 +3457,76 @@ export async function createTaskEpisode(
     if (hasIndependentBacklogStore(provider)) {
       return await admitIndependentBacklogCreation(projectRoot, integrationBranch, taskId, ctx, options, dependencies, runner, git, store);
     }
-    const selected = resolveTask(projectRoot, taskId);
-    if (!selected || selected.taskId !== taskId) {
-      throw new Error("Task-native Episode creation requires the exact canonical Backlog task ID");
+    const streamed = provider.kind === "selected" && provider.evidence.provider === "backlog"
+      && !dependencies.taskResolver && !dependencies.providerTaskResolver;
+    if (streamed) {
+      taskPath = (await readBacklogCreationIdentity(projectRoot, taskId)).path;
+    } else {
+      const selected = resolveTask(projectRoot, taskId);
+      if (!selected || selected.taskId !== taskId) {
+        throw new Error("Task-native Episode creation requires the exact canonical Backlog task ID");
+      }
+      if (!samePath(selected.projectRoot, projectRoot)) throw new Error("Task-native Episode task resolved in a different project");
+      taskPath = selected.taskPathRelative;
     }
-    if (!samePath(selected.projectRoot, projectRoot)) throw new Error("Task-native Episode task resolved in a different project");
-    taskPath = selected.taskPathRelative;
     const existing = store.read(projectRoot, ctx.sessionManager.getSessionId());
     if (existing && existing.status !== "inactive") {
       const identity = isTaskEpisodeOwnership(existing) ? existing.taskId : existing.sourceLocation;
       throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
     }
 
-    const admission = await withStreamedEpisodeAdmissionLock(projectRoot, () => {
-      exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
+    const admission = await withStreamedEpisodeAdmissionLock(projectRoot, async () => {
+      if (!streamed) exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
       const lockedExisting = store.read(projectRoot, ctx.sessionManager.getSessionId());
       if (lockedExisting && lockedExisting.status !== "inactive") {
         const identity = isTaskEpisodeOwnership(lockedExisting) ? lockedExisting.taskId : lockedExisting.sourceLocation;
         throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
       }
       taskIntegrationBranch(git, projectRoot, integrationBranch);
-      const admitted = commitConversationTaskStatus({
-        taskId,
-        projectRoot,
-        taskPath,
-        status: "In Progress",
-        expectedProvider: "backlog",
-        message: `chore: admit ${taskId} episode`,
-        runner,
-        git,
-        resolveTask,
-        publishTaskHistory: dependencies.publishTaskHistory,
-      }) as Extract<ConversationTaskStatusCommitResult, { selection: BacklogTaskSelection }>;
-      admissionResult = admitted;
+      const message = `chore: admit ${taskId} episode`;
+      let streamedSelection: BacklogCreationIdentity | undefined;
+      let taskHistory: PublishedBacklogTaskHistoryMutation | undefined;
+      let commit: string;
+      if (streamed) {
+        const currentProvider = detectTaskProvider(projectRoot, runner);
+        if (currentProvider.kind !== "selected" || currentProvider.evidence.provider !== "backlog"
+            || hasIndependentBacklogStore(currentProvider)) {
+          throw new Error("Branch-local Backlog topology changed before admission");
+        }
+        const readExact = async () => {
+          const selected = await readBacklogCreationIdentity(projectRoot, taskId);
+          if (selected.path !== taskPath) throw new Error(`Backlog task ${taskId} changed path during Episode admission`);
+          return selected;
+        };
+        await readExact();
+        const repository = { root: projectRoot, topology: "branch-local" as const, remote: null };
+        await makeBacklogGitEvidence(repository, git.head(projectRoot), taskPath, taskId);
+        const tracked = runner.run("git", ["--literal-pathspecs", "ls-files", "--error-unmatch", "--", taskPath],
+          { cwd: projectRoot, allowFailure: true });
+        if (tracked.status !== 0) throw new Error("Branch-local Backlog creation requires the task path in the code index");
+        taskIntegrationBranch(git, projectRoot, integrationBranch);
+        const editStatus = await editBacklogForCreation(projectRoot,
+          ["task", "edit", "--status", "In Progress", "--plain", "--", taskId], runner);
+        if (editStatus !== 0) throw new Error(`Native Backlog status edit ${editStatus === null ? "was interrupted" : `failed (exit ${editStatus})`}`);
+        streamedSelection = await readExact();
+        if (streamedSelection.status !== "In Progress") throw new Error(`Backlog task ${taskId} did not reach In Progress`);
+        commit = git.commitOnlyPath(projectRoot, taskPath, message);
+        admissionResult = { selection: streamedSelection, commit };
+        branchLocalAdmissionEvidence = await makeBacklogGitEvidence(repository, commit, taskPath, taskId);
+      } else {
+        const admitted = commitConversationTaskStatus({
+          taskId, projectRoot, taskPath, status: "In Progress", expectedProvider: "backlog", message,
+          runner, git, resolveTask, publishTaskHistory: dependencies.publishTaskHistory,
+        }) as Extract<ConversationTaskStatusCommitResult, { selection: BacklogTaskSelection }>;
+        admissionResult = admitted;
+        ({ commit, taskHistory } = admitted);
+      }
       const reservationBase = {
         projectRoot,
         taskId,
         ownerSessionId: ctx.sessionManager.getSessionId(),
         engine: options.engine,
-        baseRef: admitted.commit,
+        baseRef: commit,
         integrationBranch,
         ...(options.projectSetupId ? { projectSetupId: options.projectSetupId } : {}),
         ...(options.routingEnvironmentId ? { routingEnvironmentId: options.routingEnvironmentId } : {}),
@@ -3477,8 +3539,8 @@ export async function createTaskEpisode(
           store.write(root, record);
         },
       };
-      const reservation = admitted.taskHistory
-        ? reservePublishedBacklog({ ...reservationBase, publication: admitted.taskHistory }, {
+      const reservation = taskHistory
+        ? reservePublishedBacklog({ ...reservationBase, publication: taskHistory }, {
             ownership: reservationOwnership,
             taskResolver: resolveTask,
             now: dependencies.now,
@@ -3486,30 +3548,33 @@ export async function createTaskEpisode(
         : reserve(reservationBase as TaskEpisodeReservationInput, {
             git,
             ownership: reservationOwnership,
-            taskResolver: resolveTask,
+            taskResolver: streamedSelection ? () => ({
+              taskId, projectRoot, taskPath: resolve(projectRoot, taskPath), taskPathRelative: taskPath,
+            }) : resolveTask,
             now: dependencies.now,
           });
-      if (reservation.baseRef !== admitted.commit || reservation.integrationBranch !== integrationBranch) {
+      if (reservation.baseRef !== commit || reservation.integrationBranch !== integrationBranch) {
         throw new Error("Task-native Episode reservation did not bind the exact code base and integration branch");
       }
       taskIntegrationBranch(git, projectRoot, integrationBranch);
-      return { admitted, reservation };
+      return { commit, taskHistory, reservation, streamedSelection };
     });
-    const { admitted, reservation } = admission;
+    const { commit, taskHistory, reservation, streamedSelection } = admission;
     taskIntegrationBranch(git, projectRoot, integrationBranch);
-    admissionPushError = admitted.taskHistory ? undefined : bestEffortTaskPush(git, projectRoot);
+    admissionPushError = taskHistory ? undefined : bestEffortTaskPush(git, projectRoot);
 
-    const result = await allocate(taskId, ctx, dependencies);
+    const result = await allocate(taskId, ctx, branchLocalAdmissionEvidence
+      ? { ...dependencies, branchLocalAdmissionEvidence } : dependencies);
     const storedActive = store.read(projectRoot, ctx.sessionManager.getSessionId());
     if (!storedActive) throw new Error("Task-native Episode allocation returned without durable ownership");
     const active = parseEpisodeOwnership(storedActive, "task-native Episode admission result");
     exactOwnedTaskRecord(active, taskId, ctx.sessionManager.getSessionId());
-    if (active.status !== "active" || active.baseRef !== admitted.commit || active.operationId !== reservation.operationId
+    if (active.status !== "active" || active.baseRef !== commit || active.operationId !== reservation.operationId
         || active.integrationBranch !== integrationBranch) {
       throw new Error("Task-native Episode allocation returned without the exact active reservation identity");
     }
     taskIntegrationBranch(git, projectRoot, integrationBranch);
-    const finalTask = exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
+    const finalTask = streamedSelection ?? exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
     return { ...active, reused: result.reused, currentTask: finalTask, ...(admissionPushError ? { admissionPushError } : {}) };
   } catch (error) {
     if (!admissionResult || !projectRoot) throw error;
