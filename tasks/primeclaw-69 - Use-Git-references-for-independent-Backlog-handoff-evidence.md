@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T07:30:00Z'
+updated_date: '2026-11-24T07:38:00Z'
 labels: []
 dependencies: []
 references:
@@ -119,6 +119,8 @@ Step 3 revision of 125bcb5b: registered execute-only distinguishes previous from
 Branch-local step 3 candidate: ordinary handoff and execute-only verify exact integration and Episode code-commit ticket references in the bound code repository. No historical revision inferred from a legacy path, no snapshot or mutable fallback, and missing or mismatched evidence stops before journaling or delivery. Bounded committed reads and diffs, sequence and refusal behavior validated in linked worktrees; independent Backlog and Beads paths unchanged. Offline Docker: 454 passed, zero failures/skips (.test-results/primeclaw-69-branch-local/integrated-final.log); Tier 1 offline probe passed, teardown verified (.test-results/20261124T070708Z-75291-9cfad487/tier1/manifest.json). A separate initialization suite fails at module load with the same ProcessCommandRunner initialization error on accepted baseline d48fe435 (.test-results/primeclaw-69-branch-local/project-init-baseline.log); wider suite not rerun. No live continuation, lifecycle transition, merge or activation. Stop for owner review.
 
 Branch-local creation candidate: streamed native ID/path/status and discarded native edit output; verified exact integration and task-only status commits and reverified the reserved code-repository reference in the allocated worktree before opening a session. One initial execute receives the Git reference, not ticket contents. Offline registered fixture verified >1 MiB of native JSON, preservation of task-only status base and unrelated staging, exact active same-operation recovery without a second execute, and refusal of a staged-only ticket. Focused offline Docker passed 456/456 with no skips (.test-results/primeclaw-69-branch-local-creation/focused.log). Tier 1 passed before commit with networking disabled and teardown verified (.test-results/20261124T072325Z-25457-7229ba8f/tier1/manifest.json); not exact-commit validation. No live assignment, merge, activation or lifecycle status change. Stop for owner review.
+
+Branch-local creation result revision: after the single initial assignment, the registered creation path checks the selected project and rereads exact native ID, path and status with the bounded lookup. A project/path mismatch or lookup failure reports taskObservationFailure separately without returning stale currentTask or changing the delivered assignment, active ownership, or immutable base. Registered offline tests prove a fresh status after delivery, a separately reported path mismatch, one delivery and same-operation recovery. Large fixture streams native bytes and verifies preserved ticket body by streaming hash. Focused offline Docker 457/457, no skips (.test-results/primeclaw-69-creation-result-revision/focused.log). Tier 1 passed precommit with networking disabled and teardown verified (.test-results/20261124T073608Z-62846-462b469f/tier1/manifest.json); not exact-commit proof. No live assignment, lifecycle status change, merge or activation. Stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -143,4 +145,6 @@ Operator directed removal of copied Backlog ticket evidence from handoff. Resume
 Step 2 revision published for owner review: registered independent Backlog creation streams native identity and verifies both committed references before assignment. Published and retained local revisions remain distinct. Offline Docker: 442 passed, including the registered large-ticket and retained-clone cases. Later Backlog lifecycle work remains open.
 
 Branch-local Backlog creation now cites the verified task-only status commit in its single initial execute; active same-operation recovery sends nothing new.
+
+Branch-local creation now reports a fresh post-assignment task observation or a separate observation failure without changing the assignment base or outcome.
 <!-- SECTION:FINAL_SUMMARY:END -->
