@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-69
 title: Use Git references for independent Backlog handoff evidence
-status: Blocked
+status: In Progress
 assignee: []
 created_date: '2026-11-24 01:43'
-updated_date: '2026-11-24 05:25'
+updated_date: '2026-11-24 06:31'
 labels: []
 dependencies: []
 references:
@@ -106,6 +106,12 @@ author: Owning Conversation
 created: 2026-11-24 04:53
 ---
 Operator cleared the creation blocker by choosing option A: stream the native Backlog task-view JSON in chunks for exact identity verification at the independent creation checkpoints and retain only the required facts in memory. This is a narrow exception to the plan wording about requiring the native full-detail command, not permission to buffer or persist its full response. Git references remain the only stored ticket-state evidence. No higher buffer, new ticket-size limit, new persistent state, or scope change. Resume the same Episode; the Episode maintains the living plan.
+---
+
+author: Owning Conversation
+created: 2026-11-24 06:31
+---
+Operator directed removal of copied Backlog ticket evidence from handoff. Resume existing Episode after verified restart/load clearance. Use exact Git references and on-demand reads/diffs; do not preserve the full native snapshot or make it a prerequisite. Keep identity, publication, and delivery mechanics intact.
 ---
 <!-- COMMENTS:END -->
 
