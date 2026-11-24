@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T02:54:00Z'
+updated_date: '2026-11-24T03:00:00Z'
 labels: []
 dependencies: []
 references:
@@ -72,4 +72,6 @@ Slice 1 (plan step 1; partial AC1/AC3): Added Backlog Git reference and bounded 
 Slice 1 validation follow-up: source-mode scripts/test-tier1.sh --probe passed after asset registration; manifest and offline probe evidence: .test-results/20261124T024702Z-2489-9e179e45/tier1. Offline Node task-history suite: 91 passed, no skips. Published code 9f40c8ac635d718ab4162dc2600f47d643504c9c. No task lifecycle change or end-to-end large-ticket creation/handoff claim.
 
 Accepted slice 1 revision before lifecycle wiring: fix two material defects in 9f40c8a. Match the pinned native Backlog frontmatter semantics (including title-first, quoted canonical IDs) without parsing or copying the entire ticket. Use bounded sequential Git inspection without draining the entire blob per 4 KiB window; preserve exact repository/commit/path/ID checks. Add focused regressions and docs and validate offline in Docker. Publish notes and code separately, then stop for review. No new persistent state, lifecycle caller changes, activation or merge in this slice.
+
+Slice 1 reader revision (plan step 1 only): the exact committed header goes through native Backlog 1.55.3 semantics in a private scratch directory, with a 64 KiB header limit and no ticket body copied. Sequential 4096-byte reads use one Git blob process per reference; the complete scan validates length and exit status. Regression fixtures prove title-first quoted ID after the first window, body ID cannot override committed header, and exact old/new coverage through the >1 MiB tails with Git trace proof (two streams, two blob processes). Offline Docker task_history_workspace: 91 passed, no skips. Source-mode Tier 1 probe passed offline with clean teardown; evidence .test-results/20261124T025825Z-70416-4521cddc/tier1/manifest.json. No lifecycle wiring, merge, activation or acceptance criteria marked complete. Stop for owner review.
 <!-- SECTION:NOTES:END -->
