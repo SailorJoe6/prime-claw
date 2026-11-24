@@ -42,6 +42,7 @@ import {
   resolveSynchronizedProviderTask,
 } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
+import { detectTaskProvider } from "../src/prime-agent-plugin/extension-support/task-providers.ts";
 import { referenceCommittedBacklogTask } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
 
 function git(root, ...args) {
@@ -610,7 +611,7 @@ test("guarded transition records published independent Backlog authority without
   assert.deepEqual(readEpisodeOwnership(f.root), refreshed.record);
 });
 
-function independentTransitionFixture() {
+function nativeBacklogTransitionFixture({ branchLocal = false } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-")));
   const remote = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-remote-")));
   execFileSync("git", ["init", "-q", "-b", "main", root]);
@@ -622,31 +623,43 @@ function independentTransitionFixture() {
   git(root, "commit", "-qm", "original retained code");
   git(root, "remote", "add", "origin", remote);
   git(root, "push", "-qu", "origin", "main");
-  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root });
-  assert.equal(prepared.status, "prepared");
-  git(root, "add", ".gitignore");
-  git(root, "commit", "-qm", "retain task-store ignore");
-  const baseRef = git(root, "rev-parse", "HEAD");
+  const primaryStore = branchLocal ? join(root, "backlog") : prepareTaskHistoryWorkspace({ primaryRoot: root }).storeDir;
+  assert.ok(primaryStore);
+  if (!branchLocal) {
+    git(root, "add", ".gitignore");
+    git(root, "commit", "-qm", "retain task-store ignore");
+  }
   const taskId = "TASK-BRIDGE";
   const sourceLocation = ".ralph/plans/future/bridge";
   const sourceReference = `legacy-episode-source=${sourceLocation}; superseded-by=${taskId}`;
   const taskFile = "tasks/task-bridge - Bridge.md";
-  mkdirSync(join(prepared.storeDir, "tasks"), { recursive: true });
-  writeFileSync(join(prepared.storeDir, taskFile), [
+  mkdirSync(join(primaryStore, "tasks"), { recursive: true });
+  writeFileSync(join(primaryStore, taskFile), [
     "---", `id: ${taskId}`, "title: Bridge retained authority", "status: In Progress", "assignee: []",
     "created_date: '2026-10-27 00:00'", "updated_date: '2026-10-27 00:00'", "labels: []", "dependencies: []",
     "references:", `  - '${sourceReference}'`, "priority: p2", "type: task", "---", "",
     "## Description", "", "Preserve the reviewed retained specification.", "",
     "## Implementation Plan", "", "Complete bridge candidate plan", "",
   ].join("\n"));
-  git(prepared.storeDir, "add", "--", taskFile);
-  git(prepared.storeDir, "-c", "user.name=Prime Claw Test", "-c", "user.email=prime-claw@example.invalid", "commit", "-qm", "publish retained task");
-  git(prepared.storeDir, "push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks");
-  const providerRevision = git(prepared.storeDir, "rev-parse", "HEAD");
-  const episodeRoot = join(mkdtempSync(join(tmpdir(), "prime-claw-transition-independent-episode-")), "episode");
+  if (branchLocal) {
+    writeFileSync(join(primaryStore, "config.yml"), [
+      'project_name: "Bridge fixture"', 'task_prefix: "task"', 'default_status: "In Design"',
+      'statuses: ["In Design", "In Planning", "In Progress", "Blocked", "Ready for Merge", "Done"]',
+      "auto_commit: false", "remote_operations: false", "",
+    ].join("\n"));
+    // Let native Backlog normalize configuration before pinning the tracked bytes.
+    assert.equal(resolveSynchronizedProviderTask(root, taskId).taskId, taskId);
+  }
+  git(primaryStore, "add", "--", ...(branchLocal ? ["config.yml", taskFile] : [taskFile]));
+  git(primaryStore, "-c", "user.name=Prime Claw Test", "-c", "user.email=prime-claw@example.invalid", "commit", "-qm", "publish retained task");
+  if (!branchLocal) git(primaryStore, "push", "-q", "origin", "HEAD:refs/heads/prime-claw/tasks");
+  const providerRevision = git(primaryStore, "rev-parse", "HEAD");
+  const baseRef = git(root, "rev-parse", "HEAD");
+  const episodeRoot = join(mkdtempSync(join(tmpdir(), "prime-claw-transition-native-episode-")), "episode");
   git(root, "worktree", "add", "-qb", "episode-transition", episodeRoot);
-  const episode = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: episodeRoot });
-  assert.equal(episode.status, "prepared");
+  const episodeStore = branchLocal ? join(episodeRoot, "backlog")
+    : prepareEpisodeTaskHistoryWorkspace({ primaryRoot: root, targetWorktree: episodeRoot }).storeDir;
+  assert.ok(episodeStore);
   mkdirSync(join(episodeRoot, ".ralph", "plans"), { recursive: true });
   writeFileSync(join(episodeRoot, ".ralph", "plans", "SPECIFICATION.md"), "Preserve the reviewed retained specification.\n");
   writeFileSync(join(episodeRoot, ".ralph", "plans", "EXECUTION_PLAN.md"), "Complete bridge candidate plan\n");
@@ -670,7 +683,11 @@ function independentTransitionFixture() {
   const selection = resolveSynchronizedProviderTask(root, taskId);
   assert.equal(selection.provider, "backlog");
   return { root, remote, episodeRoot: realpathSync(episodeRoot), baseRef, episodeHead, mainHead, transcript,
-    legacy, selection, providerRevision, primaryStore: prepared.storeDir, episodeStore: episode.storeDir };
+    legacy, selection, providerRevision, primaryStore, episodeStore };
+}
+
+function independentTransitionFixture() {
+  return nativeBacklogTransitionFixture();
 }
 
 function retainedTransitionResources(f) {
@@ -684,6 +701,34 @@ function retainedTransitionResources(f) {
     mainIndex: git(f.root, "ls-files", "--stage"), episodeIndex: git(f.episodeRoot, "ls-files", "--stage"),
   };
 }
+
+test("default retained transition rejects a nested Episode Backlog repository with matching branch-local task bytes", async () => {
+  const f = nativeBacklogTransitionFixture({ branchLocal: true });
+  assert.equal(git(f.primaryStore, "rev-parse", "--show-toplevel"), f.root);
+  assert.equal(git(f.episodeStore, "rev-parse", "--show-toplevel"), f.episodeRoot);
+  git(f.episodeStore, "init", "-q", "-b", "nested");
+  git(f.episodeStore, "add", "--", "config.yml", "tasks");
+  git(f.episodeStore, "-c", "user.name=Prime Claw Test", "-c", "user.email=prime-claw@example.invalid", "commit", "-qm", "same native store bytes, separate repository");
+  assert.equal(git(f.episodeStore, "rev-parse", "--show-toplevel"), f.episodeStore);
+  const selected = detectTaskProvider(f.episodeRoot);
+  assert.equal(selected.kind, "selected");
+  assert.equal(selected.evidence.provider, "backlog");
+  assert.equal(selected.evidence.storeDir, f.episodeStore);
+  const path = f.selection.taskPathRelative;
+  const nestedBlob = git(f.episodeStore, "rev-parse", `HEAD:${path.slice("backlog/".length)}`);
+  assert.equal(git(f.root, "rev-parse", `${f.mainHead}:${path}`), nestedBlob);
+  assert.equal(git(f.episodeRoot, "rev-parse", `${f.episodeHead}:${path}`), nestedBlob);
+  assert.deepEqual(resolveSynchronizedProviderTask(f.episodeRoot, f.selection.taskId).nativeView, f.selection.nativeView);
+  assert.equal(git(f.episodeRoot, "status", "--porcelain"), "");
+  const before = retainedTransitionResources(f);
+  let writes = 0;
+  await assert.rejects(() => transition(f, {}, {
+    transitionTargetResolver: undefined,
+    ownership: { read: readEpisodeOwnership, write(root, record) { writes++; writeEpisodeOwnership(root, record); } },
+  }), /Episode.*(?:branch-local|topology|repository)|branch-local.*Episode/);
+  assert.equal(writes, 0, "topology refusal precedes the authority write");
+  assert.deepEqual(retainedTransitionResources(f), before);
+});
 
 test("default retained transition binds matching published independent history without replacing resources", async () => {
   const f = independentTransitionFixture();
@@ -716,6 +761,28 @@ test("legacy independent transition replay reports committed references without 
   assert.deepEqual(replay.backlogEvidence, completed.backlogEvidence);
   assert.deepEqual(retainedTransitionResources(f), before);
 });
+
+for (const [field, replacement] of [
+  ["description", "Unreviewed retained specification."],
+  ["acceptanceCriteria", [{ index: 1, text: "Unreviewed criterion.", checked: false }]],
+]) {
+  test(`legacy independent transition replay rejects a saved envelope differing only in ${field}`, async () => {
+    const f = independentTransitionFixture();
+    const completed = await transition(f, {}, { transitionTargetResolver: undefined });
+    const legacyEvidence = resolveSynchronizedProviderTask(f.root, f.selection.taskId).nativeView;
+    assert.notDeepEqual(legacyEvidence.task[field], replacement);
+    const changed = { ...legacyEvidence, task: { ...legacyEvidence.task, [field]: replacement } };
+    writeEpisodeOwnership(f.root, { ...completed.record, taskEvidence: changed });
+    const before = retainedTransitionResources(f);
+    let writes = 0;
+    await assert.rejects(() => transition(f, {}, {
+      transitionTargetResolver: undefined,
+      ownership: { read: readEpisodeOwnership, write() { writes++; } },
+    }), /does not match the completed transition binding/);
+    assert.equal(writes, 0);
+    assert.deepEqual(retainedTransitionResources(f), before);
+  });
+}
 
 for (const driftAt of ["before transition", "during resolver paired proof", "before final provider proof"]) {
   test(`default retained transition refuses clean local-only Episode history ${driftAt} with identical complete task evidence`, async () => {

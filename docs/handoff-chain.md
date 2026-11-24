@@ -632,11 +632,16 @@ checks, not a copy of the task view. Both references must resolve to the exact
 committed ticket, and no working file substitutes for a missing commit.
 
 - Branch-local: the transition result reports primary and Episode references at
-  the reviewed code heads. Ownership keeps its existing branch-local shape.
+  the reviewed code heads. The Episode’s native-selected Backlog store must
+  resolve to the Episode code repository, not a separate nested repository.
+  Ownership keeps its existing branch-local shape.
 - Independent: both references point to the directly verified published task
   revision in the existing clones. New ownership stores that commit and its
   Git reference. A replay of historical raw ownership leaves those bytes in
-  place and reports Git references rather than returning the old ticket view.
+  place only if the complete saved native envelope matches the verified native
+  view. That exact comparison streams the view without capturing or returning a
+  new snapshot. It applies only to retained transition replay; it does not freeze
+  the native view for ordinary lifecycle operations.
 
 Missing or invalid proof stops the transition before the authority write. This
 changes neither the publication checks nor which Episode resources survive.

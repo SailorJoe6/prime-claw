@@ -12,6 +12,7 @@ export interface BacklogCreationIdentity {
 
 interface BacklogTransitionFacts extends BacklogCreationIdentity {
   nativeDigest?: string;
+  savedEnvelopeMatches?: boolean;
   implementationPlan?: string;
   references?: string[];
 }
@@ -185,12 +186,79 @@ export function readBacklogMutationIdentity(cwd: string, taskId: string): Promis
 }
 
 /** Only the native fields the existing retained transition validates. */
-export function readBacklogTransitionFacts(cwd: string, taskId: string): Promise<BacklogTransitionFacts> {
-  return readNativeBacklogIdentity(cwd, taskId, true, true, true);
+export function readBacklogTransitionFacts(
+  cwd: string, taskId: string, savedEnvelope?: Record<string, unknown>,
+): Promise<BacklogTransitionFacts> {
+  return readNativeBacklogIdentity(cwd, taskId, true, true, true, savedEnvelope);
+}
+
+// Native task views use JSON.stringify(view, null, 2) followed by a newline.
+// Stream the already-loaded historical envelope in that format without ever
+// serializing another full view (or another full Description string).
+function* nativeEnvelopeParts(value: unknown, indent = ""): Generator<string> {
+  if (typeof value === "string") {
+    yield '"';
+    for (let start = 0; start < value.length;) {
+      let end = Math.min(start + 4096, value.length);
+      // Keep a surrogate pair in the same slice so JSON.stringify preserves it.
+      const last = value.charCodeAt(end - 1);
+      if (end < value.length && last >= 0xd800 && last <= 0xdbff) end++;
+      yield JSON.stringify(value.slice(start, end)).slice(1, -1);
+      start = end;
+    }
+    yield '"';
+  } else if (value !== null && typeof value === "object") {
+    const array = Array.isArray(value);
+    const row = value as Record<string, unknown>;
+    const nested = indent + "  ";
+    let first = true;
+    yield array ? "[" : "{";
+    // Historical ownership is parsed JSON, so all own fields are JSON values.
+    for (const key of Object.keys(row)) {
+      yield (first ? "\n" : ",\n") + nested;
+      first = false;
+      if (!array) {
+        yield* nativeEnvelopeParts(key);
+        yield ": ";
+      }
+      yield* nativeEnvelopeParts(row[key], nested);
+    }
+    if (!first) yield "\n" + indent;
+    yield array ? "]" : "}";
+  } else {
+    yield JSON.stringify(value);
+  }
+}
+
+function nativeEnvelopeComparison(saved: Record<string, unknown>) {
+  function* expectedOutput() {
+    yield* nativeEnvelopeParts(saved);
+    yield "\n";
+  }
+  const expected = expectedOutput();
+  let pending = Buffer.alloc(0), offset = 0, equal = true;
+  return {
+    update(chunk: Buffer) {
+      for (let start = 0; equal && start < chunk.length;) {
+        if (offset === pending.length) {
+          const next = expected.next();
+          if (next.done) { equal = false; break; }
+          pending = Buffer.from(next.value);
+          offset = 0;
+        }
+        const length = Math.min(chunk.length - start, pending.length - offset);
+        equal = chunk.subarray(start, start + length).equals(pending.subarray(offset, offset + length));
+        start += length;
+        offset += length;
+      }
+    },
+    matches() { return equal && offset === pending.length && expected.next().done === true; },
+  };
 }
 
 async function readNativeBacklogIdentity(
   cwd: string, taskId: string, requireStatus: boolean, verifyTarget = true, transition = false,
+  savedEnvelope?: Record<string, unknown>,
 ): Promise<BacklogTransitionFacts> {
   const child = spawn("backlog", ["task", "view", "--json", "--", taskId], { cwd, stdio: ["ignore", "pipe", "ignore"] });
   let launchError: string | undefined;
@@ -199,9 +267,11 @@ async function readNativeBacklogIdentity(
     child.once("close", (code, signal) => resolveClose({ code, signal }));
   });
   const digest = transition ? createHash("sha256") : undefined;
+  const comparison = savedEnvelope && nativeEnvelopeComparison(savedEnvelope);
   async function* observedChunks() {
     for await (const chunk of child.stdout) {
       digest?.update(chunk);
+      comparison?.update(chunk);
       yield chunk;
     }
   }
@@ -211,6 +281,7 @@ async function readNativeBacklogIdentity(
   const { code, signal } = await closed;
   if (launchError || code !== 0 || !facts) throw new Error(`Native Backlog identity read failed for ${taskId}: ${launchError ?? (code === 0 ? invalid().message : signal ?? `exit ${code}`)}`);
   if (digest) facts.nativeDigest = digest.digest("hex");
+  if (comparison) facts.savedEnvelopeMatches = comparison.matches();
   if (!verifyTarget) return facts;
   if (facts.id !== taskId) throw new Error(`Native Backlog resolved a different canonical ID for ${taskId}`);
   const inside = (path: string) => path !== "" && !isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`);

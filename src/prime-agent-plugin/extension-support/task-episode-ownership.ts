@@ -211,7 +211,7 @@ export interface LegacyTaskOwnershipTransitionGit {
 
 type TransitionBacklogTask = Pick<BacklogTaskSelection,
   "taskId" | "status" | "implementationPlan" | "references" | "projectRoot" | "taskPath" | "taskPathRelative">
-  & { nativeDigest?: string };
+  & { nativeDigest?: string; savedEnvelopeMatches?: boolean };
 
 type TransitionHeads = { mainHead: string; episodeHead: string };
 
@@ -248,6 +248,7 @@ export interface LegacyTaskOwnershipTransitionDependencies {
     taskId: string,
     runner: CommandRunner,
     heads: TransitionHeads,
+    savedBacklogEnvelope?: Record<string, unknown>,
   ) => LegacyTaskOwnershipTransitionTarget | Promise<LegacyTaskOwnershipTransitionTarget>;
   now?: () => string;
 }
@@ -439,23 +440,19 @@ function exactTransitionBacklogTask(
   return { selection, taskPath: selection.taskPathRelative };
 }
 
-async function readTransitionBacklogTask(root: string, taskId: string, history: BacklogGitEvidence["repository"]["topology"]): Promise<TransitionBacklogTask> {
-  const facts = await readBacklogTransitionFacts(root, taskId);
+async function readTransitionBacklogTask(
+  root: string, taskId: string, history: BacklogGitEvidence["repository"]["topology"],
+  savedEnvelope?: Record<string, unknown>,
+): Promise<TransitionBacklogTask> {
+  const facts = await readBacklogTransitionFacts(root, taskId, savedEnvelope);
   const task = {
     taskId: facts.id, status: facts.status, implementationPlan: facts.implementationPlan ?? null,
     references: facts.references, nativeDigest: facts.nativeDigest, projectRoot: root,
+    ...(savedEnvelope ? { savedEnvelopeMatches: facts.savedEnvelopeMatches } : {}),
     taskPath: resolve(root, facts.path), taskPathRelative: facts.path,
   };
   exactTransitionBacklogTask(root, taskId, task, history);
   return task;
-}
-
-function legacyTransitionBacklogViewMatches(evidence: Record<string, unknown> | undefined, task: TransitionBacklogTask): boolean {
-  const view = evidence?.task as Record<string, unknown> | undefined;
-  // The caller separately proves the exact historical revision in both clones.
-  return view?.id === task.taskId && view.path === task.taskPathRelative && view.status === task.status
-    && view.implementationPlan === task.implementationPlan
-    && JSON.stringify(view.references) === JSON.stringify(task.references);
 }
 
 async function proveTransitionBacklogReference(
@@ -489,6 +486,7 @@ export async function resolveLegacyTaskOwnershipTransitionTarget(
   taskId: string,
   runner: CommandRunner = new ProcessCommandRunner(),
   heads?: TransitionHeads,
+  savedBacklogEnvelope?: Record<string, unknown>,
 ): Promise<LegacyTaskOwnershipTransitionTarget> {
   const detection = detectTaskProvider(projectRoot, runner);
   if (detection.kind !== "selected") {
@@ -507,6 +505,17 @@ export async function resolveLegacyTaskOwnershipTransitionTarget(
       if (!heads) throw new Error("Ownership transition requires exact reviewed Backlog Git evidence checkpoints");
       const task = await readTransitionBacklogTask(projectRoot, taskId, "branch-local");
       const episodeTask = await readTransitionBacklogTask(episodeRoot, taskId, "branch-local");
+      const episodeSelection = detectTaskProvider(episodeRoot, runner);
+      const episodeStore = episodeSelection.kind === "selected" && episodeSelection.evidence.provider === "backlog"
+        ? episodeSelection.evidence.storeDir : null;
+      const episodeStoreRoot = episodeStore && runner.run("git", ["--no-replace-objects", "rev-parse", "--show-toplevel"], {
+        cwd: episodeStore, allowFailure: true,
+      });
+      if (!episodeStore || !episodeStoreRoot || episodeStoreRoot.status !== 0
+          || realpathSync(episodeStoreRoot.stdout.trim()) !== episodeRoot
+          || !containedBy(realpathSync(episodeStore), realpathSync(episodeTask.taskPath))) {
+        throw new Error("Ownership transition native-selected Episode Backlog store does not belong to the Episode code repository");
+      }
       const main = await proveTransitionBacklogReference({ root: projectRoot, topology: "branch-local", remote: null }, heads.mainHead, task, "primary", runner);
       const episode = await proveTransitionBacklogReference({ root: episodeRoot, topology: "branch-local", remote: null }, heads.episodeHead, episodeTask, "Episode", runner);
       if (main.blob !== episode.blob || main.evidence.repository.identity !== episode.evidence.repository.identity
@@ -519,7 +528,7 @@ export async function resolveLegacyTaskOwnershipTransitionTarget(
       throw new Error("Ownership transition Backlog store is neither branch-local nor an independent native history clone");
     }
 
-    const mainTask = await readTransitionBacklogTask(projectRoot, taskId, "independent");
+    const mainTask = await readTransitionBacklogTask(projectRoot, taskId, "independent", savedBacklogEnvelope);
     const primary = inspectPublishedPrimaryTaskHistory({ primaryRoot: projectRoot, taskId, runner });
     if (primary.status !== "ready") {
       throw new Error(`Ownership transition cannot prove published independent Backlog history: ${primary.code}: ${primary.detail}`);
@@ -756,7 +765,12 @@ export async function transitionLegacyEpisodeOwnershipToTask(
   }
 
   const heads = { mainHead: input.expectedMainHead, episodeHead: input.expectedEpisodeHead };
-  const providerTarget = await targetResolver(root, episodeRoot, input.taskId, runner, heads);
+  // Compare the complete saved native view only when replaying old independent
+  // Backlog ownership. Ordinary operations do not freeze the historical view.
+  const savedBacklogEnvelope = isBacklogTaskEpisodeOwnership(initial) && initial.provider === "backlog"
+      && initial.providerRevision !== undefined && initial.taskEvidence?.kind !== "backlog-git"
+    ? initial.taskEvidence : undefined;
+  const providerTarget = await targetResolver(root, episodeRoot, input.taskId, runner, heads, savedBacklogEnvelope);
   const sourceReference = `legacy-episode-source=${input.sourceLocation}; superseded-by=${input.taskId}`;
   let taskPath: string | undefined;
   let backlogEvidence: LegacyTaskOwnershipTransitionResult["backlogEvidence"];
@@ -809,7 +823,7 @@ export async function transitionLegacyEpisodeOwnershipToTask(
           : initial.provider === "backlog" && initial.providerRevision === providerTarget.providerRevision
             && (initial.taskEvidence?.kind === "backlog-git"
               ? JSON.stringify(initial.taskEvidence) === JSON.stringify(providerTarget.taskEvidence)
-              : legacyTransitionBacklogViewMatches(initial.taskEvidence, providerTarget.task)));
+              : providerTarget.task.savedEnvelopeMatches === true));
     if (!sameTarget) throw new Error("Existing task-native ownership does not match the completed transition binding");
   }
 
@@ -889,7 +903,7 @@ export async function transitionLegacyEpisodeOwnershipToTask(
     });
   }
 
-  const pairedProviderTarget = await targetResolver(root, episodeRoot, input.taskId, runner, heads);
+  const pairedProviderTarget = await targetResolver(root, episodeRoot, input.taskId, runner, heads, savedBacklogEnvelope);
   if (JSON.stringify(pairedProviderTarget) !== JSON.stringify(providerTarget)) {
     throw new Error("Selected provider task or publication changed during ownership transition validation");
   }
