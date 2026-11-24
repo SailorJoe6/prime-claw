@@ -426,6 +426,40 @@ class TestSelectorFailClose(unittest.TestCase):
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             list(pool.map(check,values))
 
+class TestPiArchiveSelector(unittest.TestCase):
+    def test_opt_in_and_invalid_inputs_are_decided_without_docker(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td).resolve()
+            h = DriverHarness(tmp)
+            archive = tmp / "private archive.tar.gz"
+            archive.write_bytes(b"not opened by dry run")
+            path = f"PRIME_AGENT_PI_ARCHIVE={archive}\n"
+            digest = f"PRIME_AGENT_PI_SHA256={'a' * 64}\n"
+            envf = tmp / "probe.env"
+            env = h.env(envf)
+            envf.write_text(path + digest)
+            plan = h.run("--dry-run", "--probe", env=env)
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("mode=pi-archive", plan.stdout)
+            self.assertNotIn(str(archive), plan.stdout + plan.stderr)
+            self.assertNotIn("vendor install", plan.stdout)
+            for args, text in (
+                (("--probe",), path),
+                (("--probe",), digest),
+                (("--probe",), path + "PRIME_AGENT_PI_SHA256=short\n"),
+                (("--probe",), path + digest + digest),
+                (("--probe",), path + digest + "PRIME_AGENT_SOURCE=/fixture\n"),
+                (("--probe",), path + digest + "PRIME_AGENT_PINNED=0.9.8\n"),
+                ((), path + digest),
+            ):
+                with self.subTest(args=args, text=text):
+                    envf.write_text(text)
+                    out = h.run(*args, env=env)
+                    self.assertNotEqual(out.returncode, 0)
+                    self.assertNotIn(str(archive), out.stdout + out.stderr)
+                    self.assertFalse(h.calls())
+
+
 class TestSourceBuilderOwnership(unittest.TestCase):
     def _run(self, scenario):
         temporary=tempfile.TemporaryDirectory(); tmp=Path(temporary.name).resolve()

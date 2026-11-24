@@ -1,12 +1,18 @@
 """Tier-0 static contracts for the tier-1 driver."""
+import hashlib
+import io
 import json
 import os
 import re
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from scripts.testing.tier1_pi_archive import unpack
 
 REPO = Path(__file__).resolve().parent.parent
 DRIVER = REPO / "scripts/test-tier1.sh"
@@ -56,9 +62,40 @@ class TestDriverStatics(unittest.TestCase):
 
 
 class TestInformationalStatic(unittest.TestCase):
+    def test_experimental_pi_input_is_documented_but_not_selected(self):
+        selection = ENV_EXAMPLE.read_text().splitlines()
+        self.assertIn("PRIME_AGENT_PI_ARCHIVE=", selection)
+        self.assertIn("PRIME_AGENT_PI_SHA256=", selection)
+
     def test_env_is_gitignored_and_documents_exactly_one(self):
         self.assertIn(".env",[x.strip() for x in (REPO/".gitignore").read_text().splitlines()])
         self.assertRegex(ENV_EXAMPLE.read_text(),re.compile(r"exactly one",re.I))
+
+class TestPiArchiveBytes(unittest.TestCase):
+    def test_checksummed_release_keeps_executable_beside_assets(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            archive = root / "pi.tar.gz"
+            with tarfile.open(archive, "w:gz") as release:
+                for name, contents, mode in (
+                    ("prime-agent", b"#!/bin/sh\nexit 0\n", 0o755),
+                    ("prime-agent-runtime/fixture.txt", b"synthetic runtime", 0o644),
+                ):
+                    member = tarfile.TarInfo(name)
+                    member.size = len(contents)
+                    member.mode = mode
+                    release.addfile(member, io.BytesIO(contents))
+            target = root / "unpacked"
+            with patch("scripts.testing.tier1_pi_archive.tarfile.open") as open_release:
+                with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
+                    unpack(archive, "0" * 64, target)
+                open_release.assert_not_called()
+            self.assertFalse(target.exists())
+            unpack(archive, hashlib.sha256(archive.read_bytes()).hexdigest(), target)
+            self.assertTrue(os.access(target / "prime-agent", os.X_OK))
+            self.assertEqual((target / "prime-agent-runtime/fixture.txt").read_bytes(),
+                             b"synthetic runtime")
+
 
 class TestProbeValidator(unittest.TestCase):
     def setUp(self):
@@ -136,7 +173,7 @@ class TestProbeValidator(unittest.TestCase):
     def test_probe_uses_supported_isolated_discovery_interfaces(self):
         source = DRIVER.read_text()
         self.assertIn("pi.getAllTools()", source)
-        self.assertIn("/workspace/scripts/run-prime-agent-probe.sh prime-agent", source)
+        self.assertIn("/workspace/scripts/run-prime-agent-probe.sh $PA_COMMAND", source)
         for name in ENTRY_SKILLS:
             self.assertIn("--skill /root/.prime/agent/skills/" + name + "/SKILL.md", source)
         self.assertIn("NOT Prime Agent built-ins", source)

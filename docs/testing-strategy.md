@@ -417,6 +417,39 @@ Build, install, inspect/disconnect, apply/check, probe, and teardown use explici
 budgets. A valid cidfile recovered after failed launch is still removed;
 malformed identities never reach a destructive command.
 
+## Experimental Tier-1 Pi archive probe
+
+For an explicitly approved compatibility investigation, select a trusted
+local Linux Prime Agent Pi `.tar.gz` for the Docker engine's architecture.
+Create a separate local selector file (outside the checkout), containing only:
+
+```dotenv
+PRIME_AGENT_PI_ARCHIVE=/absolute/path/to/prime-agent-pi-linux-arm64.tar.gz
+PRIME_AGENT_PI_SHA256=<64 lowercase hex digits from trusted provenance>
+```
+
+```bash
+TIER1_ENV_FILE=/absolute/path/to/pi-probe.env scripts/test-tier1.sh --probe
+```
+
+Use a regular archive file, not a symlink, and keep it outside the checkout.
+The two fields are required together and cannot be combined with
+`PRIME_AGENT_SOURCE` or `PRIME_AGENT_PINNED`. `--dry-run --probe` checks the
+selector and prints the plan without contacting Docker or verifying bytes.
+`--smoke` ignores selectors as before. The pytest fixture does not accept this
+input; it is a standalone probe route only.
+
+After verifying the run-owned container has no networks, the driver copies only
+the selected file. It checks SHA-256 inside Docker before opening the archive,
+extracts regular files and directories into container-local storage, and keeps
+`prime-agent` beside its bundled assets. The existing isolated probe wrapper
+runs the archive executable, with no host home, provider credentials, or live
+agent state. The run manifest records the requested archive digest and, if
+available, the observed executable hash and version, not the host path. A
+matching checksum verifies bytes, not publisher trust, and a passing probe
+is not runtime qualification. The qualified source target and DD-003/DD-005
+remain unchanged. Do not use this route for installation or activation.
+
 ## Tier-1 source run
 
 `PRIME_AGENT_SOURCE` is the only supported *tier-1 candidate* selector. It

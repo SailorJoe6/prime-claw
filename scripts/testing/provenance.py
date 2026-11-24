@@ -461,7 +461,9 @@ def image_identity(raw: dict[str, Any], *, expected_id: str,
     return safe
 
 
-def artifact_identity(version: str, raw: bytes | str) -> dict[str, str]:
+def artifact_identity(
+    version: str, raw: bytes | str, *, kind: str = "vendor-binary",
+) -> dict[str, str]:
     """Validate one sha256sum observation before constructing safe metadata."""
     try:
         text = raw.decode("utf-8", "strict") if isinstance(raw, bytes) else raw
@@ -474,7 +476,7 @@ def artifact_identity(version: str, raw: bytes | str) -> dict[str, str]:
     match = re.fullmatch(r"([0-9a-f]{64})[ \t]+\*?[^\r\n]+", lines[0])
     if match is None:
         raise ProvenanceError("installed artifact observation is invalid")
-    safe = {"kind": "vendor-binary", "version": observed_version,
+    safe = {"kind": kind, "version": observed_version,
             "executable_sha256": match.group(1)}
     _assert_sanitized(safe)
     return safe
@@ -2866,7 +2868,7 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                         "status", "failure_codes"}, "run")
     if (run["tier"] != "tier1"
             or not isinstance(run["mode"], str)
-            or run["mode"] not in {"pinned", "source", "smoke"}
+            or run["mode"] not in {"pinned", "source", "smoke", "pi-archive"}
             or not isinstance(run["status"], str)
             or run["status"] not in {"passed", "failed"}):
         raise ProvenanceError("invalid run tier/mode/status")
@@ -2893,6 +2895,7 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         if not isinstance(prime, dict):
             raise ProvenanceError(
                 "non-smoke manifests require requested selector provenance")
+        artifact_kind = "pi-native-binary" if run["mode"] == "pi-archive" else "vendor-binary"
         installed = prime.get("installed_version")
         artifact = prime.get("artifact")
         if installed is None:
@@ -2908,7 +2911,7 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                 raise ProvenanceError("installed Prime Agent version is invalid")
             if (not isinstance(artifact, dict)
                     or set(artifact) != {"kind", "version", "executable_sha256"}
-                    or artifact.get("kind") != "vendor-binary"
+                    or artifact.get("kind") != artifact_kind
                     or artifact.get("version") != installed
                     or not _SHA256_RE.fullmatch(str(artifact.get("executable_sha256", "")))):
                 raise ProvenanceError("prime_agent.artifact identity is invalid")
@@ -2921,6 +2924,13 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
             if run["status"] == "passed" and installed != requested:
                 raise ProvenanceError(
                     "passed run requested and installed versions differ")
+        elif run["mode"] == "pi-archive":
+            _require_keys(prime, {"mode", "requested_sha256", "installed_version",
+                                  "artifact"}, "prime_agent")
+            if (prime["mode"] != "pi-archive"
+                    or not isinstance(prime["requested_sha256"], str)
+                    or not _SHA256_RE.fullmatch(prime["requested_sha256"])):
+                raise ProvenanceError("invalid Pi archive selector")
         else:
             _require_keys(prime, {"mode", "requested_version", "installed_version",
                                   "artifact", "source", "source_rules",
@@ -3279,6 +3289,8 @@ def _main() -> int:
     capture_artifact.add_argument("binding")
     capture_artifact.add_argument("relative")
     capture_artifact.add_argument("version")
+    capture_artifact.add_argument("--kind", choices=("vendor-binary", "pi-native-binary"),
+                                  default="vendor-binary")
     invalidate_manifest = sub.add_parser("invalidate-green-manifest")
     invalidate_manifest.add_argument("root")
     invalidate_manifest.add_argument("binding")
@@ -3340,7 +3352,7 @@ def _main() -> int:
         raw = __import__("sys").stdin.buffer.read()
         with open_owned_directory(args.root, args.binding) as owned:
             write_sanitized_json(
-                owned, args.relative, artifact_identity(args.version, raw))
+                owned, args.relative, artifact_identity(args.version, raw, kind=args.kind))
     elif args.command == "invalidate-green-manifest":
         with open_owned_directory(args.root, args.binding) as owned:
             expected = (ObjectBinding.decode(args.expected)

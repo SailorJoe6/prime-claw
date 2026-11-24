@@ -13,7 +13,7 @@
 #   scripts/test-tier1.sh           pinned install + offline apply/check
 #   scripts/test-tier1.sh --rebuild build without cache
 #   scripts/test-tier1.sh --smoke   offline toolchain smoke (no .env needed)
-#   scripts/test-tier1.sh --probe   pinned run plus offline RPC command probe
+#   scripts/test-tier1.sh --probe   selected input plus offline RPC command probe
 #   scripts/test-tier1.sh --dry-run print the plan and contact no Docker daemon
 #   scripts/test-tier1.sh --help    show this help
 
@@ -55,24 +55,40 @@ read_selector() {
 
 PINNED=""
 SOURCE=""
+PI_ARCHIVE=""
+PI_SHA256=""
 if [ "$SMOKE" -eq 0 ]; then
     [ -f "$ENV_FILE" ] || die "missing env file: $ENV_FILE (set exactly one selector)"
-    if grep -Ev '^(#.*|[[:space:]]*|PRIME_AGENT_PINNED=.*|PRIME_AGENT_SOURCE=.*)$' "$ENV_FILE" >/dev/null; then
+    if grep -Ev '^(#.*|[[:space:]]*|PRIME_AGENT_(PINNED|SOURCE|PI_ARCHIVE|PI_SHA256)=.*)$' "$ENV_FILE" >/dev/null; then
         die "env file contains unsupported keys or malformed lines"
     fi
-    [ "$(grep -c '^PRIME_AGENT_PINNED=' "$ENV_FILE" || true)" -le 1 ] \
-        || die "env file repeats PRIME_AGENT_PINNED"
-    [ "$(grep -c '^PRIME_AGENT_SOURCE=' "$ENV_FILE" || true)" -le 1 ] \
-        || die "env file repeats PRIME_AGENT_SOURCE"
+    for key in PRIME_AGENT_PINNED PRIME_AGENT_SOURCE PRIME_AGENT_PI_ARCHIVE PRIME_AGENT_PI_SHA256; do
+        [ "$(grep -c "^$key=" "$ENV_FILE" || true)" -le 1 ] || die "env file repeats $key"
+    done
     PINNED="$(read_selector PRIME_AGENT_PINNED)"
     SOURCE="$(read_selector PRIME_AGENT_SOURCE)"
-    if [ -n "$PINNED" ] && [ -n "$SOURCE" ]; then
+    PI_ARCHIVE="$(read_selector PRIME_AGENT_PI_ARCHIVE)"
+    PI_SHA256="$(read_selector PRIME_AGENT_PI_SHA256)"
+    if [ -n "$PI_ARCHIVE" ] || [ -n "$PI_SHA256" ]; then
+        [ -z "$PINNED" ] && [ -z "$SOURCE" ] \
+            || die "Pi archive input cannot be combined with PRIME_AGENT_PINNED or PRIME_AGENT_SOURCE"
+        [ "$PROBE" -eq 1 ] || die "experimental Pi archive input requires --probe"
+        [[ "$PI_SHA256" =~ ^[0-9a-f]{64}$ ]] \
+            || die "PRIME_AGENT_PI_SHA256 must be an explicit lowercase SHA-256"
+        case "$PI_ARCHIVE" in
+            /*) ;;
+            *) die "PRIME_AGENT_PI_ARCHIVE must be an absolute file path" ;;
+        esac
+        case "$PI_ARCHIVE" in
+            *':'*|*$'\n'*|*$'\r'*) die "PRIME_AGENT_PI_ARCHIVE contains unsupported path bytes" ;;
+        esac
+        [ -f "$PI_ARCHIVE" ] && [ ! -L "$PI_ARCHIVE" ] \
+            || die "PRIME_AGENT_PI_ARCHIVE must select a regular file, not a symlink"
+    elif [ -n "$PINNED" ] && [ -n "$SOURCE" ]; then
         die "both PRIME_AGENT_PINNED and PRIME_AGENT_SOURCE are set — set exactly one"
-    fi
-    if [ -z "$PINNED" ] && [ -z "$SOURCE" ]; then
+    elif [ -z "$PINNED" ] && [ -z "$SOURCE" ]; then
         die "neither PRIME_AGENT_PINNED nor PRIME_AGENT_SOURCE is set — set exactly one"
-    fi
-    if [ -n "$SOURCE" ]; then
+    elif [ -n "$SOURCE" ]; then
         case "$SOURCE" in
             /*) ;;
             *) die "PRIME_AGENT_SOURCE must be an absolute path" ;;
@@ -306,6 +322,8 @@ if [ "$SMOKE" -eq 1 ]; then
     echo "tier-1 driver: mode=smoke"
 elif [ -n "$SOURCE" ]; then
     echo "tier-1 driver: mode=source selected checkout=<redacted>"
+elif [ -n "$PI_ARCHIVE" ]; then
+    echo "tier-1 driver: mode=pi-archive (experimental compatibility probe only)"
 else
     echo "tier-1 driver: mode=pinned PRIME_AGENT_VERSION=$PINNED"
 fi
@@ -318,10 +336,13 @@ if [ "$DRY_RUN" -eq 1 ]; then
     if [ -n "$SOURCE" ]; then
         echo "dry-run: disposable source builder mounts <selected-source>:ro and exports a validated release"
         echo "dry-run: online local-tarball install; runtime network absence precedes product actions"
-    elif [ "$SMOKE" -eq 0 ]; then
+    elif [ "$SMOKE" -eq 0 ] && [ -z "$PI_ARCHIVE" ]; then
         echo "dry-run: online vendor install for PRIME_AGENT_VERSION=$PINNED"
     fi
     echo "dry-run: disconnect captured networks; verify empty network set"
+    if [ -n "$PI_ARCHIVE" ]; then
+        echo "dry-run: offline single-file copy, SHA-256 verification and container-local extraction"
+    fi
     if [ "$SMOKE" -eq 1 ]; then
         echo "dry-run: offline toolchain smoke"
     else
@@ -348,6 +369,7 @@ fi
 MODE=pinned
 [ "$SMOKE" -eq 1 ] && MODE=smoke
 [ -n "$SOURCE" ] && MODE=source
+[ -n "$PI_ARCHIVE" ] && MODE=pi-archive
 WORKSPACE_SNAPSHOT="$RESULTS_ROOT/.workspaces/$RUN_ID"
 (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance snapshot \
     "$REPO_ROOT" "$WORKSPACE_SNAPSHOT") | \
@@ -403,7 +425,7 @@ import json, sys
 from pathlib import Path
 from scripts.testing import provenance as p
 (tier_s, tier_binding, run_id, started, finished, status, mode, requested,
- build_started, build_finished, dockerfile_hash, input_hash, tag,
+ build_started, build_finished, dockerfile_hash, input_hash, tag, pi_sha256,
  network_time, teardown_state, teardown_time, remove_outcome,
  inspect_outcome, teardown_clean, failure_codes_raw, expected_raw) = sys.argv[1:]
 failure_codes = [code for code in failure_codes_raw.split(",") if code]
@@ -417,7 +439,7 @@ with p.open_owned_directory(tier, tier_binding) as owned:
     prime = None
     artifact = None
     installed_version = None
-    if mode in {"pinned", "source"}:
+    if mode != "smoke":
         try:
             artifact = p.read_sanitized_json(owned, "installed-artifact.json")
             installed_version = artifact["version"]
@@ -425,6 +447,9 @@ with p.open_owned_directory(tier, tier_binding) as owned:
             pass
         if mode == "pinned":
             prime = {"mode": "pinned", "requested_version": requested,
+                     "installed_version": installed_version, "artifact": artifact}
+        elif mode == "pi-archive":
+            prime = {"mode": "pi-archive", "requested_sha256": pi_sha256,
                      "installed_version": installed_version, "artifact": artifact}
         else:
             try:
@@ -482,7 +507,7 @@ finalize_manifest() {
     bounded "$PUBLICATION_TIMEOUT" python3 -c "$MANIFEST_PUBLISHER" \
       "$TIER_DIR" "$TIER_BINDING" "$RUN_ID" "$RUN_STARTED" "$FINISHED" "$RUN_STATUS" \
       "$MODE" "$PINNED" "$BUILD_STARTED" "$BUILD_FINISHED" "$DOCKERFILE_HASH" \
-      "$BUILD_INPUT_HASH" "$IMAGE_TAG" "$NETWORK_TIME" "$TEARDOWN_STATE" \
+      "$BUILD_INPUT_HASH" "$IMAGE_TAG" "$PI_SHA256" "$NETWORK_TIME" "$TEARDOWN_STATE" \
       "$TEARDOWN_VERIFIED" "$TEARDOWN_REMOVE_OUTCOME" \
       "$TEARDOWN_INSPECT_OUTCOME" "$TEARDOWN_CLEAN" "$FAILURE_CODES" \
       "$MANIFEST_BINDING"
@@ -834,6 +859,21 @@ printf '{"verified_absent":true}\n' | \
         "$TIER_DIR" "$TIER_BINDING" network.json)
 phase network-absent
 
+PA_COMMAND=prime-agent
+ARTIFACT_ARGS=()
+if [ "$MODE" = pi-archive ]; then
+    # Only copy the selected file, never mount its directory. Verify the exact
+    # container-local bytes before unpacking, with the runtime already offline.
+    bounded "$INSTALL_TIMEOUT" docker cp "$PI_ARCHIVE" "$CONTAINER_ID:/tmp/tier1-pi.tar.gz" \
+        >/dev/null 2>&1 || die "Pi archive copy failed"
+    bounded "$INSTALL_TIMEOUT" docker exec "$CONTAINER_ID" python3 \
+        /workspace/scripts/testing/tier1_pi_archive.py "$PI_SHA256" \
+        >/dev/null 2>&1 || die "Pi archive verification or extraction failed"
+    phase pi-archive-installed
+    PA_COMMAND=/opt/tier1-pi/prime-agent
+    ARTIFACT_ARGS=(--kind pi-native-binary)
+fi
+
 if [ "$MODE" = smoke ]; then
     bounded "$CHECK_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc "$SMOKE_CMD" >/dev/null 2>&1
     phase smoke-passed
@@ -843,16 +883,21 @@ else
         INSTALLED_VERSION="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" \
             node -e "$VERSION_COMMAND" 2>/dev/null | \
             (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version))"
+    elif [ "$MODE" = pi-archive ]; then
+        INSTALLED_VERSION="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" \
+            /workspace/scripts/run-prime-agent-probe.sh "$PA_COMMAND" --version 2>/dev/null | \
+            (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version))"
     else
         INSTALLED_VERSION="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" \
             prime-agent --version 2>/dev/null | \
             (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version))"
     fi
     bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc \
-        'sha256sum "$(command -v prime-agent)"' 2>/dev/null | \
+        'sha256sum "$(command -v "$1")"' _ "$PA_COMMAND" 2>/dev/null | \
         (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance capture-artifact \
-            "$TIER_DIR" "$TIER_BINDING" installed-artifact.json "$INSTALLED_VERSION")
-    [ "$INSTALLED_VERSION" = "$PA_VERSION" ] || die "installed Prime Agent version does not match validated requested version"
+            "$TIER_DIR" "$TIER_BINDING" installed-artifact.json "$INSTALLED_VERSION" \
+            ${ARTIFACT_ARGS[@]+"${ARTIFACT_ARGS[@]}"})
+    [ "$MODE" = pi-archive ] || [ "$INSTALLED_VERSION" = "$PA_VERSION" ] || die "installed Prime Agent version does not match validated requested version"
     bounded "$CHECK_TIMEOUT" docker exec \
       -e "PRIME_AGENT_PLUGIN_ROOT=$CONTAINER_PLUGIN_ROOT" \
       "$CONTAINER_ID" /workspace/scripts/apply-prime-agent-plugin.sh >/dev/null 2>&1
@@ -864,7 +909,7 @@ else
     if [ "$PROBE" -eq 1 ]; then
         PROBE_VALIDATOR_B64="$(printf '%s' "$PROBE_VALIDATOR" | base64)"
         PROBE_TOOL_SOURCE_B64="$(printf '%s' "$PROBE_TOOL_SOURCE" | base64)"
-        PROBE_STEP="mkdir -p /tmp/tier1-probe; printf '%s' '$PROBE_TOOL_SOURCE_B64' | base64 -d > /tmp/tier1-probe/tools.ts; set +e; printf '%s\n' '{\"id\":\"loader\",\"type\":\"get_commands\"}' | timeout --kill-after=$PROBE_KILL_GRACE $PROBE_DEADLINE /workspace/scripts/run-prime-agent-probe.sh prime-agent --mode rpc --offline --no-session --no-skills --no-extensions --no-prompt-templates --no-context-files --cwd /tmp/tier1-probe -e /root/.prime/agent/extensions/goal-continuation-nudge.ts -e /root/.prime/agent/extensions/project-initialization.ts -e /root/.prime/agent/extensions/handoff-chain.ts -e /root/.prime/agent/extensions/reviewed-plan.ts -e /tmp/tier1-probe/tools.ts --skill /root/.prime/agent/skills/plan/SKILL.md --skill /root/.prime/agent/skills/plan-spec/SKILL.md --skill /root/.prime/agent/skills/implement-task/SKILL.md --skill /root/.prime/agent/skills/implement-spec/SKILL.md --skill /root/.prime/agent/skills/handoff/SKILL.md > /tmp/tier1-probe/probe.jsonl 2> /tmp/tier1-probe/probe.err; probe_rc=\$?; set -e; if [ \"\$probe_rc\" -ne 0 ]; then tail -c 2000 /tmp/tier1-probe/probe.err || true; exit 1; fi; printf '%s' '$PROBE_VALIDATOR_B64' | base64 -d > /tmp/tier1-probe/validate.py; python3 /tmp/tier1-probe/validate.py /tmp/tier1-probe/probe.jsonl /tmp/tier1-probe/tools.json"
+        PROBE_STEP="mkdir -p /tmp/tier1-probe; printf '%s' '$PROBE_TOOL_SOURCE_B64' | base64 -d > /tmp/tier1-probe/tools.ts; set +e; printf '%s\n' '{\"id\":\"loader\",\"type\":\"get_commands\"}' | timeout --kill-after=$PROBE_KILL_GRACE $PROBE_DEADLINE /workspace/scripts/run-prime-agent-probe.sh $PA_COMMAND --mode rpc --offline --no-session --no-skills --no-extensions --no-prompt-templates --no-context-files --cwd /tmp/tier1-probe -e /root/.prime/agent/extensions/goal-continuation-nudge.ts -e /root/.prime/agent/extensions/project-initialization.ts -e /root/.prime/agent/extensions/handoff-chain.ts -e /root/.prime/agent/extensions/reviewed-plan.ts -e /tmp/tier1-probe/tools.ts --skill /root/.prime/agent/skills/plan/SKILL.md --skill /root/.prime/agent/skills/plan-spec/SKILL.md --skill /root/.prime/agent/skills/implement-task/SKILL.md --skill /root/.prime/agent/skills/implement-spec/SKILL.md --skill /root/.prime/agent/skills/handoff/SKILL.md > /tmp/tier1-probe/probe.jsonl 2> /tmp/tier1-probe/probe.err; probe_rc=\$?; set -e; if [ \"\$probe_rc\" -ne 0 ]; then tail -c 2000 /tmp/tier1-probe/probe.err || true; exit 1; fi; printf '%s' '$PROBE_VALIDATOR_B64' | base64 -d > /tmp/tier1-probe/validate.py; python3 /tmp/tier1-probe/validate.py /tmp/tier1-probe/probe.jsonl /tmp/tier1-probe/tools.json"
         bounded "$PROBE_OUTER_TIMEOUT" docker exec "$CONTAINER_ID" bash -lc "$PROBE_STEP" >/dev/null 2>&1
         phase probe-passed
     fi
