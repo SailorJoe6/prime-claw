@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T07:16:00Z'
+updated_date: '2026-11-24T07:25:00Z'
 labels: []
 dependencies: []
 references:
@@ -16,25 +16,25 @@ references:
 documentation:
   - docs/handoff-chain.md
 modified_files:
+  - .agents/skills/execute/SKILL.md
+  - .prime-claw/workflows/handoff.md
   - docs/handoff-chain.md
   - src/prime-agent-plugin/asset-inventory.json
-  - src/prime-agent-plugin/extension-support/backlog-git-evidence.ts
-  - tests/task_history_workspace.test.mjs
   - src/prime-agent-plugin/extension-support/backlog-creation-identity.ts
+  - src/prime-agent-plugin/extension-support/backlog-git-evidence.ts
   - src/prime-agent-plugin/extension-support/episode-ownership.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
   - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+  - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - src/prime-agent-plugin/skills/project-templates/execute.md
+  - src/prime-agent-plugin/workflows/handoff.md
   - tests/backlog_creation_identity.test.mjs
+  - tests/container/native_cold_episode_handoff.mts
   - tests/spec_episode_extension.test.mjs
   - tests/task_episode_admission_extension.test.mjs
-  - src/prime-agent-plugin/extensions/reviewed-plan.ts
-  - .agents/skills/execute/SKILL.md
-  - .prime-claw/workflows/handoff.md
+  - tests/task_history_workspace.test.mjs
   - tests/test_reviewed_plan_extension.py
-  - tests/container/native_cold_episode_handoff.mts
-  - src/prime-agent-plugin/workflows/handoff.md
-  - src/prime-agent-plugin/skills/project-templates/execute.md
 priority: p0
 type: bug
 ordinal: 153000
@@ -115,6 +115,8 @@ Step 3 independent Backlog continuation slice implemented for ordinary handoff a
 Step 3 revision of 125bcb5b: registered execute-only distinguishes previous from fetched-published required Git evidence verification failures with a fixed category and exact full revision, without exposing native error details. Tests prove no delivery, retry, journal addition or factual update. The Git reader stages only frontmatter for the existing native parser in private scratch, replays it in bounded chunks and cleans it up; no ticket body or persistent snapshot is written and no header size gate was added. The >1 MiB header and existing >1 MiB ticket regressions passed. Focused offline Docker passed 450/450, zero skips (.test-results/primeclaw-69-step3-revision/focused.log). Tier 1 passed with clean teardown (.test-results/20261124T065559Z-99148-2dddc469/tier1/manifest.json). The wider JS suite was not rerun for this bounded revision; the prior step-3 candidate and baseline each had 13 failures (see earlier notes). No live continuation, status transition, merge or activation; stop for owner review.
 
 Branch-local step 3 candidate: ordinary handoff and execute-only verify exact integration and Episode code-commit ticket references in the bound code repository. No historical revision inferred from a legacy path, no snapshot or mutable fallback, and missing or mismatched evidence stops before journaling or delivery. Bounded committed reads and diffs, sequence and refusal behavior validated in linked worktrees; independent Backlog and Beads paths unchanged. Offline Docker: 454 passed, zero failures/skips (.test-results/primeclaw-69-branch-local/integrated-final.log); Tier 1 offline probe passed, teardown verified (.test-results/20261124T070708Z-75291-9cfad487/tier1/manifest.json). A separate initialization suite fails at module load with the same ProcessCommandRunner initialization error on accepted baseline d48fe435 (.test-results/primeclaw-69-branch-local/project-init-baseline.log); wider suite not rerun. No live continuation, lifecycle transition, merge or activation. Stop for owner review.
+
+Branch-local creation candidate: streamed native ID/path/status and discarded native edit output; verified exact integration and task-only status commits and reverified the reserved code-repository reference in the allocated worktree before opening a session. One initial execute receives the Git reference, not ticket contents. Offline registered fixture verified >1 MiB of native JSON, preservation of task-only status base and unrelated staging, exact active same-operation recovery without a second execute, and refusal of a staged-only ticket. Focused offline Docker passed 456/456 with no skips (.test-results/primeclaw-69-branch-local-creation/focused.log). Tier 1 passed before commit with networking disabled and teardown verified (.test-results/20261124T072325Z-25457-7229ba8f/tier1/manifest.json); not exact-commit validation. No live assignment, merge, activation or lifecycle status change. Stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -137,4 +139,6 @@ Operator directed removal of copied Backlog ticket evidence from handoff. Resume
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Step 2 revision published for owner review: registered independent Backlog creation streams native identity and verifies both committed references before assignment. Published and retained local revisions remain distinct. Offline Docker: 442 passed, including the registered large-ticket and retained-clone cases. Later Backlog lifecycle work remains open.
+
+Branch-local Backlog creation now cites the verified task-only status commit in its single initial execute; active same-operation recovery sends nothing new.
 <!-- SECTION:FINAL_SUMMARY:END -->
