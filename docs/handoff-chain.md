@@ -259,8 +259,8 @@ The launch carries Git repository, commit and literal path references, not a
 native task snapshot. Before assignment, creation resolves the exact reserved
 and fetched published ticket blobs in the Episode clone. A retained local tip
 that is ahead is reported separately, never as publication; creation does not
-reset or push the retained clone. Creation does not need the scratch header reader or its 64 KiB
-limit. The editable workflow still decides readiness and interprets the plan.
+reset or push the retained clone. Creation does not use the scratch header reader.
+The editable workflow still decides readiness and interprets the plan.
 An existing operation keeps its own resource binding; this sends no replay.
 
 ### Bounded task-native transport observations
@@ -448,11 +448,12 @@ A local-only reference does not imply publication or portability.
 
 The managed `readBacklogGitEvidence` helper takes the already selected
 repository and canonical task ID. It checks the commit and regular ticket
-blob. It passes only the committed frontmatter (at most 64 KiB) to native
-Backlog in a private scratch directory, removes the directory, and compares
-the returned canonical ID exactly. The body is never passed to Backlog or
-copied into the scratch directory. If the closing delimiter is missing or
-outside the header limit, the reader reports an evidence gap.
+blob. It stages only the committed frontmatter in a private scratch directory
+for the native Backlog parser and compares the returned canonical ID exactly.
+The Git reader writes and replays that frontmatter in bounded chunks, with no
+fixed header size limit. It removes the scratch directory on completion,
+failure, or early return. The body is never passed to Backlog or copied into
+the scratch directory. Missing delimiters or failed verification are evidence gaps.
 
 Use `streamBacklogGitEvidence` to inspect adjacent ranges. One Git blob
 process yields successive windows of up to 4096 raw bytes with their offsets

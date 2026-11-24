@@ -13,6 +13,7 @@ import {
   handoffSpecEpisode,
   handoffTaskEpisode,
   continueTaskEpisodeExecute,
+  ExecuteOnlyBacklogEvidenceError,
   resolveTaskEpisodePlacement,
   restoreBlockedSpecEpisode,
   transitionSpecEpisodeToTaskOwnership,
@@ -949,7 +950,10 @@ ${JSON.stringify(result.observationReference)}` : ""}${result.delivery ? `\n\n${
           const observationReference = executeOnly && error && typeof error === "object" && "observationReference" in error ? error.observationReference : undefined;
           const stoppedAt = executeOnly && error && typeof error === "object" && "stoppedAt" in error ? error.stoppedAt : undefined;
           const executeOutcome = executeOnly && error && typeof error === "object" && "executeOutcome" in error ? error.executeOutcome : undefined;
+          const backlogEvidenceFailure = executeOnly && error instanceof ExecuteOnlyBacklogEvidenceError
+            ? error.backlogEvidenceFailure : undefined;
           const details = { error: message, ...(executeOnly ? { mode: "execute-only" } : {}),
+            ...(backlogEvidenceFailure ? { backlogEvidenceFailure } : {}),
             ...(stoppedAt ? { stoppedAt } : {}), ...(executeOutcome ? { executeOutcome } : {}),
             ...(delivery ? { delivery } : {}), ...(transport ? { transport } : {}),
             ...(factualUpdate ? { factualUpdate } : {}), ...(observationReference ? { observationReference } : {}) };

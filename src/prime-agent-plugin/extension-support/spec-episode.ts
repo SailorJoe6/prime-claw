@@ -1820,12 +1820,33 @@ function samePublishedHandoffIdentity(
   return JSON.stringify(beforeBinding) === JSON.stringify(afterBinding);
 }
 
+/** Public diagnostic for required published evidence only. Never retain the
+ * reader exception, which may contain ticket or repository internals. */
+export class ExecuteOnlyBacklogEvidenceError extends Error {
+  readonly backlogEvidenceFailure: {
+    category: "verification-failed";
+    checkpoint: "previous" | "fetched-published";
+    commit?: string;
+  };
+  readonly stoppedAt = "provider preparation";
+  readonly executeOutcome = "not_attempted";
+  readonly factualUpdate = "not_attempted";
+
+  constructor(checkpoint: ExecuteOnlyBacklogEvidenceError["backlogEvidenceFailure"]["checkpoint"], commit: string) {
+    super("Execute-only provider preparation stopped: required independent Backlog evidence could not be verified. Do not resend.");
+    // Only full Git OIDs belong on the public surface, never arbitrary labels.
+    const fullOid = (commit.length === 40 || commit.length === 64) && !/[^0-9a-f]/.test(commit);
+    this.backlogEvidenceFailure = { category: "verification-failed", checkpoint, ...(fullOid ? { commit } : {}) };
+  }
+}
+
 async function preparePublishedBacklogHandoffEvidence(
   record: PublishedBacklogTaskEpisodeOwnershipRecord,
   repo: string,
   runner: CommandRunner,
   dependencies: TaskEpisodeHandoffDependencies,
   episodeHead: string,
+  mode?: "execute-only",
 ): Promise<{ record: PublishedBacklogTaskEpisodeOwnershipRecord; observation: string }> {
   const prepared = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
     primaryRoot: repo,
@@ -1838,9 +1859,13 @@ async function preparePublishedBacklogHandoffEvidence(
   const storePath = relative(prepared.storeDir, resolve(record.worktree!, record.taskPath)).split("\\").join("/");
   const repository = { root: prepared.storeDir, topology: "independent" as const, remote: prepared.remote };
   const makeEvidence = dependencies.verifyBacklogEvidence ?? makeBacklogGitEvidence;
-  const verify = async (label: string, commit: string) => {
+  const verify = async (checkpoint: "previous" | "fetched-published" | "retained-local", commit: string) => {
     try { return await makeEvidence(repository, commit, storePath, record.taskId); }
     catch (error) {
+      if (mode === "execute-only" && checkpoint !== "retained-local") {
+        throw new ExecuteOnlyBacklogEvidenceError(checkpoint, commit);
+      }
+      const label = checkpoint.replace("-", " ");
       throw new Error(`Independent Backlog ${label} evidence at ${commit} is unavailable before delivery: ${taskAdmissionError(error)}`);
     }
   };
@@ -1850,12 +1875,13 @@ async function preparePublishedBacklogHandoffEvidence(
     const storedRepository = stored.repository as typeof previous.repository;
     if (stored.commit !== previous.commit || stored.path !== previous.path
         || storedRepository.topology !== previous.repository.topology || storedRepository.identity !== previous.repository.identity) {
+      if (mode === "execute-only") throw new ExecuteOnlyBacklogEvidenceError("previous", record.providerRevision);
       throw new Error("Independent Backlog previous evidence does not match the bound repository, revision or path");
     }
   }
-  const evidence = prepared.publishedHead === previous.commit ? previous : await verify("fetched published", prepared.publishedHead);
+  const evidence = prepared.publishedHead === previous.commit ? previous : await verify("fetched-published", prepared.publishedHead);
   const localEvidence = prepared.head === evidence.commit ? evidence
-    : prepared.head === previous.commit ? previous : await verify("retained local", prepared.head);
+    : prepared.head === previous.commit ? previous : await verify("retained-local", prepared.head);
   const selectedTaskStatus = runner.run("git", ["--no-optional-locks", "--literal-pathspecs", "status", "--porcelain", "--", storePath], {
     cwd: prepared.storeDir, allowFailure: true,
   });
@@ -2050,7 +2076,7 @@ export async function continueTaskEpisodeExecute(
     } else {
       let target: TaskEpisodeOwnershipRecord;
       if (isPublishedBacklogTaskEpisodeOwnership(record)) {
-        const prepared = await preparePublishedBacklogHandoffEvidence(record, repo, runner, dependencies, episodeCode.head);
+        const prepared = await preparePublishedBacklogHandoffEvidence(record, repo, runner, dependencies, episodeCode.head, "execute-only");
         providerTaskObservation = { ...JSON.parse(prepared.observation), episodeCode };
         target = prepared.record;
       } else {
@@ -2104,6 +2130,7 @@ export async function continueTaskEpisodeExecute(
       episodeActiveSessionId: activeSessionId, executeDelivery: "followUp",
       observationReference, delivery, factualUpdate: "completed" };
   } catch (error) {
+    if (error instanceof ExecuteOnlyBacklogEvidenceError) throw error;
     const observedDelivery = delivery ?? (error && typeof error === "object" && "delivery" in error ? error.delivery : undefined);
     const message = observedDelivery && factualUpdate === "failed"
       ? "New execute was admitted, but its current factual update failed or may have partial effects; preserve execution and inspect. Do not resend."

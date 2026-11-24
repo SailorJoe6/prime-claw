@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, createReadStream, mkdirSync, mkdtempSync, openSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ProcessCommandRunner } from "./project-initialization.ts";
@@ -84,29 +84,73 @@ export function referenceCommittedBacklogTask(
   return { kind: "backlog-git", repository: selectedRepository, commit, path };
 }
 
-async function verifyTaskHeader(header: Buffer, taskId: string): Promise<void> {
+/** Stage only the frontmatter for the existing native parser, then replay it in
+ * bounded chunks. Never write the body or retain scratch as evidence. */
+async function* verifiedTicketChunks(source: AsyncIterable<Buffer>, taskId: string): AsyncGenerator<Buffer> {
   if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(taskId)) throw new Error("Invalid Backlog evidence task ID");
-  // Backlog has no frontmatter-only command. Give the native parser only the
-  // committed header, in a private scratch project with no Git or task history.
   const scratch = mkdtempSync(join(tmpdir(), "prime-claw-backlog-header-"));
   const filename = `${taskId.toLowerCase()} - evidence.md`;
+  const path = join(scratch, "backlog", "tasks", filename);
+  const input = source[Symbol.asyncIterator]();
   try {
-    mkdirSync(join(scratch, "backlog", "tasks"), { recursive: true });
-    // Native lookup is prefix-scoped. Configure only the expected namespace
-    // from the bound ID; the actual ID still comes from the committed header.
-    const prefix = /^([a-z]+)-/i.exec(taskId)?.[1].toLowerCase() ?? "task";
-    writeFileSync(join(scratch, "backlog", "config.yml"),
-      `project_name: Evidence\nremote_operations: false\ncheck_active_branches: false\ntask_prefix: ${prefix}\n`);
-    writeFileSync(join(scratch, "backlog", "tasks", filename), header);
-    // Reuse the bounded projection on this header-only input, not on a live
-    // task view. Even projected native fields (e.g. a title) can be large.
+    let remainder: Buffer | undefined;
     try {
-      const facts = await readBacklogHeaderIdentity(scratch, taskId);
-      if (facts.path === `backlog/tasks/${filename}`) return;
-    } catch { /* no exact native evidence */ }
-    throw new Error("Backlog evidence canonical task ID mismatch or native header unavailable");
+      mkdirSync(join(scratch, "backlog", "tasks"), { recursive: true });
+      const prefix = /^([a-z]+)-/i.exec(taskId)?.[1].toLowerCase() ?? "task";
+      writeFileSync(join(scratch, "backlog", "config.yml"),
+        `project_name: Evidence\nremote_operations: false\ncheck_active_branches: false\ntask_prefix: ${prefix}\n`);
+      const file = openSync(path, "wx", 0o600);
+      try {
+        let opening = Buffer.alloc(0);
+        let openingChecked = false;
+        let tail = Buffer.alloc(0);
+        for (;;) {
+          const { done, value: chunk } = await input.next();
+          if (done) break;
+          if (!openingChecked) {
+            opening = Buffer.concat([opening, chunk.subarray(0, 8 - opening.length)]);
+            if (opening.length === 8) {
+              if (!/^(?:\xef\xbb\xbf)?---\r?\n/.test(opening.toString("latin1"))) {
+                throw new Error("Backlog evidence frontmatter has no opening delimiter");
+              }
+              openingChecked = true;
+            }
+          }
+          // Only the delimiter overlap is retained between Git chunks; bytes
+          // in the overlap have already been written to the scratch file.
+          const scan = Buffer.concat([tail, chunk]);
+          const close = scan.indexOf(HEADER_END);
+          const end = close < 0 ? chunk.length : close + HEADER_END.length - tail.length;
+          writeFileSync(file, chunk.subarray(0, end));
+          if (close >= 0) {
+            if (!openingChecked && !/^(?:\xef\xbb\xbf)?---\r?\n/.test(opening.toString("latin1"))) {
+              throw new Error("Backlog evidence frontmatter has no opening delimiter");
+            }
+            remainder = chunk.subarray(end);
+            break;
+          }
+          tail = Buffer.from(scan.subarray(-(HEADER_END.length - 1)));
+        }
+      } finally {
+        closeSync(file);
+      }
+      if (!remainder) throw new Error("Backlog evidence frontmatter has no closing delimiter");
+      const facts = await readBacklogHeaderIdentity(scratch, taskId).catch(() => undefined);
+      if (facts?.path !== `backlog/tasks/${filename}`) {
+        throw new Error("Backlog evidence canonical task ID mismatch or native header unavailable");
+      }
+      yield* createReadStream(path, { highWaterMark: WINDOW });
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+    if (remainder.length) yield remainder;
+    for (;;) {
+      const { done, value } = await input.next();
+      if (done) break;
+      yield value;
+    }
   } finally {
-    rmSync(scratch, { recursive: true, force: true });
+    await input.return?.();
   }
 }
 
@@ -124,52 +168,27 @@ export async function* streamBacklogGitEvidence(
   let spawnFailed = false;
   child.once("error", () => { spawnFailed = true; });
   const exited = new Promise<boolean>(resolve => child.once("close", code => resolve(!spawnFailed && code === 0)));
-  let pendingHeader: Buffer[] | undefined = [];
-  let delimiterTail = Buffer.alloc(0);
   let position = 0;
   let length = 0;
   let bytes = Buffer.alloc(WINDOW);
   try {
-    for await (const chunk of child.stdout) {
-      let parts: Buffer[] = [chunk];
-      if (pendingHeader) {
-        // Delimit the header, not the YAML fields. Search only new bytes plus
-        // the overlap needed for a delimiter split across chunks.
-        const scan = Buffer.concat([delimiterTail, chunk]);
-        const close = scan.indexOf(HEADER_END);
-        if (close < 0) {
-          pendingHeader.push(chunk);
-          delimiterTail = Buffer.from(scan.subarray(-(HEADER_END.length - 1)));
-          continue;
-        }
-        const prefix = chunk.subarray(0, close + HEADER_END.length - delimiterTail.length);
-        const header = Buffer.concat([...pendingHeader, prefix]);
-        if (!/^(?:\xef\xbb\xbf)?---\r?\n/.test(header.toString("latin1", 0, 8))) {
-          throw new Error("Backlog evidence frontmatter has no opening delimiter");
-        }
-        await verifyTaskHeader(header, taskId);
-        parts = [...pendingHeader, chunk];
-        pendingHeader = undefined;
-      }
-      for (const part of parts) {
-        let start = Math.min(part.length, Math.max(0, offset - position));
-        position += start;
-        while (start < part.length) {
-          const copied = part.copy(bytes, length, start, start + WINDOW - length);
-          length += copied;
-          position += copied;
-          start += copied;
-          if (position > totalBytes) throw new Error("Backlog evidence blob size mismatch");
-          if (length === WINDOW && position < totalBytes) {
-            yield { offset: position - length, bytes, totalBytes };
-            bytes = Buffer.alloc(WINDOW);
-            length = 0;
-          }
+    for await (const part of verifiedTicketChunks(child.stdout, taskId)) {
+      let start = Math.min(part.length, Math.max(0, offset - position));
+      position += start;
+      while (start < part.length) {
+        const copied = part.copy(bytes, length, start, start + WINDOW - length);
+        length += copied;
+        position += copied;
+        start += copied;
+        if (position > totalBytes) throw new Error("Backlog evidence blob size mismatch");
+        if (length === WINDOW && position < totalBytes) {
+          yield { offset: position - length, bytes, totalBytes };
+          bytes = Buffer.alloc(WINDOW);
+          length = 0;
         }
       }
     }
     if (!await exited) throw new Error("Backlog evidence ticket blob unavailable");
-    if (pendingHeader) throw new Error("Backlog evidence frontmatter has no closing delimiter");
     if (position !== totalBytes) throw new Error("Backlog evidence blob size mismatch");
     if (length) yield { offset: position - length, bytes: bytes.subarray(0, length), totalBytes };
     else yield { offset, bytes: Buffer.alloc(0), totalBytes };

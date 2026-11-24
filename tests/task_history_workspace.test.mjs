@@ -2105,7 +2105,7 @@ test("Backlog Git evidence reads exact independent history after branch advance,
   const { dir, root, remote } = fixtureRepo();
   try {
     const path = "tasks/task-1 - literal [ticket].md";
-    const prefix = Buffer.from(`---\ntitle: literal ticket\n# ${"x".repeat(5000)}\nid: "TASK-1"\nassignee: [@example]\nstatus: In Progress\n---\n\n## Description\n\n`);
+    const prefix = Buffer.from(`---\ntitle: literal ticket\n# ${"x".repeat(1024 * 1024 + 47)}\nid: "TASK-1"\nassignee: [@example]\nstatus: In Progress\n---\n\n## Description\n\n`);
     const longLine = Buffer.from("é".repeat(540_001));
     const old = Buffer.concat([prefix, longLine, Buffer.from("\nOLD TAIL\n")]);
     const next = Buffer.concat([prefix, longLine, Buffer.from("\nNEW TAIL\n")]);
@@ -2150,7 +2150,29 @@ test("Backlog Git evidence reads exact independent history after branch advance,
     }
     assert.equal((readFileSync(trace, "utf8").match(/built-in: git cat-file blob /g) ?? []).length, 2,
       "one blob process per complete ticket, not one per window");
-    await assert.rejects(readBacklogGitEvidence(selected, before, "TASK-2"), /canonical task ID mismatch/);
+    const scratchRoot = join(dir, "private-scratch");
+    mkdirSync(scratchRoot);
+    const priorTmp = process.env.TMPDIR;
+    process.env.TMPDIR = scratchRoot;
+    try {
+      const stream = streamBacklogGitEvidence(selected, before, "TASK-1");
+      try {
+        assert.deepEqual((await stream.next()).value.bytes, old.subarray(0, 4096));
+        const scratchProjects = readdirSync(scratchRoot);
+        assert.equal(scratchProjects.length, 1);
+        const headerFile = join(scratchRoot, scratchProjects[0], "backlog", "tasks", "task-1 - evidence.md");
+        assert.deepEqual(readFileSync(headerFile), prefix.subarray(0, prefix.indexOf("\n---") + 4));
+        assert.equal(lstatSync(headerFile).mode & 0o777, 0o600);
+      } finally {
+        await stream.return();
+      }
+      assert.deepEqual(readdirSync(scratchRoot), [], "early return disposes of scratch");
+      await assert.rejects(readBacklogGitEvidence(selected, before, "TASK-2"), /canonical task ID mismatch/);
+      assert.deepEqual(readdirSync(scratchRoot), [], "failed native verification disposes of scratch");
+    } finally {
+      if (priorTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = priorTmp;
+    }
     await assert.rejects(readBacklogGitEvidence(selected, { ...before, path: "tasks/missing.md" }, "TASK-1"), /exact regular ticket blob/);
     await assert.rejects(readBacklogGitEvidence(selected, { ...before, commit: "f".repeat(40) }, "TASK-1"), /commit unavailable/);
     await assert.rejects(readBacklogGitEvidence({ ...selected, root }, before, "TASK-1"), /commit unavailable/);

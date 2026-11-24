@@ -24,7 +24,7 @@ import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { resolveBacklogTask } from "../src/prime-agent-plugin/extension-support/reviewed-plan-support.ts";
 import { prepareTaskHistoryWorkspace, publishTaskHistoryMutation, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
-import { streamBacklogGitEvidence } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
+import { makeBacklogGitEvidence, streamBacklogGitEvidence } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
 
 const LOCATION = ".ralph/plans/future/alpha";
 function diskFixture() {
@@ -1259,7 +1259,7 @@ function noBufferedBacklogRunner() {
   } };
 }
 
-function committedBacklogContinuation(t) {
+function committedBacklogContinuation(t, overrides = {}) {
   const f = harness({ list: (_count, session) => [session] });
   t.after(() => rmSync(f.root, { recursive: true, force: true }));
   const taskId = "PRIMECLAW-1", path = "tasks/primeclaw-1 - Continuation.md";
@@ -1297,6 +1297,7 @@ function committedBacklogContinuation(t) {
       return { status: "prepared", storeDir, remote: "origin", publishedHead: publishedHead(), head: git("rev-parse", "HEAD") };
     },
     conversationAfterHandoff: async () => ({ outcome: "skipped", reason: "fixture" }),
+    ...overrides,
   };
   const tools = new Map();
   createReviewedPlanExtension(dependencies)({ registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); },
@@ -1444,16 +1445,28 @@ test("registered independent Backlog handoff and execute-only keep large committ
 test("independent Backlog continuation stops before observation or delivery on unprovable committed evidence", async (t) => {
   for (const [label, mode, scenario, reason] of [
     ["no legacy commit", undefined, "missing", /commit unavailable/i],
+    ["no legacy commit (execute-only)", "execute-only", "missing", /commit unavailable/i],
     ["wrong previous repository", "execute-only", "repository", /repository/i],
     ["wrong previous reference path", undefined, "path", /path/i],
     ["wrong ID at prior legacy commit", undefined, "prior-id", /task ID|canonical/i],
     ["wrong ID at published commit", "execute-only", "current-id", /task ID|canonical/i],
     ["missing path at published commit", undefined, "current-path", /blob|path/i],
   ]) await t.test(label, async (t) => {
-    const h = committedBacklogContinuation(t), { f } = h;
+    const privateMarker = "private-reader-stderr-原文";
+    const verificationAttempts = [];
+    const h = committedBacklogContinuation(t, { async verifyBacklogEvidence(...args) {
+      verificationAttempts.push(args[1]);
+      try { return await makeBacklogGitEvidence(...args); }
+      catch (error) {
+        if (mode !== "execute-only") throw error;
+        throw Object.assign(new Error(`${privateMarker}${"x".repeat(96_000)}: ${error.message}`), {
+          transport: { message: privateMarker },
+        });
+      }
+    } }), { f } = h;
     const prior = h.commit("prior", scenario === "prior-id" ? { id: "PRIMECLAW-2" } : {});
     if (scenario === "current-path") { h.git("rm", "--", h.path); }
-    h.commit("published", scenario === "current-path" ? { at: "tasks/unrelated.md" } :
+    const published = h.commit("published", scenario === "current-path" ? { at: "tasks/unrelated.md" } :
       scenario === "current-id" ? { id: "PRIMECLAW-2" } : {});
     // Both the worktree and any later local commit may have the exact task ID.
     // Neither may substitute for the prior or published reference.
@@ -1461,13 +1474,34 @@ test("independent Backlog continuation stops before observation or delivery on u
     const legacy = { task: { id: h.taskId, path: `.backlog/${h.path}`, status: "In Progress" } };
     const evidence = scenario === "repository" ? { ...prior.evidence, repository: { topology: "independent", identity: "0".repeat(64) } }
       : scenario === "path" ? { ...prior.evidence, path: h.path.split("/").at(-1) } : legacy;
-    const initial = h.bind(evidence, scenario === "missing" ? "0".repeat(40) : prior.oid);
+    const previousOid = scenario === "missing" ? "0".repeat(40) : prior.oid;
+    const initial = h.bind(evidence, previousOid);
+    const journal = f.ctx.sessionManager.getSessionFile();
+    const before = readFileSync(journal);
     const result = await h.run(mode);
     assert.equal(result.isError, true);
     if (mode === "execute-only") {
+      const fetched = scenario === "current-id";
+      const failure = { category: "verification-failed",
+        checkpoint: fetched ? "fetched-published" : "previous", commit: fetched ? published.oid : previousOid };
+      assert.deepEqual(result.details.backlogEvidenceFailure, failure);
+      assert.ok(result.content[0].text.includes(JSON.stringify(failure)));
       assert.equal(result.details.stoppedAt, "provider preparation");
       assert.equal(result.details.executeOutcome, "not_attempted");
-    } else assert.match(result.content[0].text, reason);
+      assert.equal(result.details.factualUpdate, "not_attempted");
+      assert.equal(result.details.delivery, undefined);
+      assert.equal(result.details.observationReference, undefined);
+      assert.equal(result.details.transport, undefined);
+      assert.match(result.content[0].text, /Do not resend/);
+      const visible = JSON.stringify(result);
+      assert.ok(Buffer.byteLength(visible) < 2048);
+      for (const value of [privateMarker, h.path, h.storeDir]) assert.equal(visible.includes(value), false);
+      assert.deepEqual(verificationAttempts, fetched ? [previousOid, published.oid] : [previousOid]);
+    } else {
+      assert.match(result.content[0].text, reason);
+      assert.equal(result.details.backlogEvidenceFailure, undefined);
+    }
+    assert.deepEqual(readFileSync(journal), before);
     assert.equal(f.nativeEntries.length, 0);
     assert.deepEqual(f.record, initial);
     assert.equal(f.calls.some(([kind]) => ["handoff", "execute", "ownership", "append", "fresh", "reopen", "orca-create", "local-create"].includes(kind)), false);
