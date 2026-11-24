@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T03:00:00Z'
+updated_date: '2026-11-24T03:02:00Z'
 labels: []
 dependencies: []
 references:
@@ -74,4 +74,6 @@ Slice 1 validation follow-up: source-mode scripts/test-tier1.sh --probe passed a
 Accepted slice 1 revision before lifecycle wiring: fix two material defects in 9f40c8a. Match the pinned native Backlog frontmatter semantics (including title-first, quoted canonical IDs) without parsing or copying the entire ticket. Use bounded sequential Git inspection without draining the entire blob per 4 KiB window; preserve exact repository/commit/path/ID checks. Add focused regressions and docs and validate offline in Docker. Publish notes and code separately, then stop for review. No new persistent state, lifecycle caller changes, activation or merge in this slice.
 
 Slice 1 reader revision (plan step 1 only): the exact committed header goes through native Backlog 1.55.3 semantics in a private scratch directory, with a 64 KiB header limit and no ticket body copied. Sequential 4096-byte reads use one Git blob process per reference; the complete scan validates length and exit status. Regression fixtures prove title-first quoted ID after the first window, body ID cannot override committed header, and exact old/new coverage through the >1 MiB tails with Git trace proof (two streams, two blob processes). Offline Docker task_history_workspace: 91 passed, no skips. Source-mode Tier 1 probe passed offline with clean teardown; evidence .test-results/20261124T025825Z-70416-4521cddc/tier1/manifest.json. No lifecycle wiring, merge, activation or acceptance criteria marked complete. Stop for owner review.
+
+Accepted next slice (plan step 2 only): accept the two reviewed reader fixes at 2fe3e9c4 for the tested cases. Advance independent Backlog creation at pre-allocation and pre-session, with exactly one initial execute on the same operation. Prove the production path offline in Docker with a committed fixture whose native JSON exceeds 1 MiB. No larger buffer, full JSON snapshot prerequisite, copied ticket evidence, deterministic readiness, or new persistent state. Before wiring the reader as a prerequisite, verify that the 64 KiB frontmatter limit and scratch parser do not impose an unsupported refusal or replacement store for valid native tickets; prefer existing exact native/Git facts. If a material criterion cannot be met within the plan boundaries, stop with the evidence. Leave branch-local lifecycle wiring, continuation, Beads, original TASK-2, activation and merge untouched. Publish task notes and code separately and stop after this slice.
 <!-- SECTION:NOTES:END -->
