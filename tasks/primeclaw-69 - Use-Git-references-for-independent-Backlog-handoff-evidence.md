@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T14:25:00Z'
+updated_date: '2026-11-24T14:27:00Z'
 labels: []
 dependencies: []
 references:
@@ -158,6 +158,8 @@ Accept the reviewed registered legacy recovery revision 0836643c. One bounded cl
 Joe explicitly approved the bounded readiness repair identified in the acceptance audit at task revision 8657d53d, against code 0836643c. Fix only registered implement_task readiness for both Backlog layouts: use bounded native identity and existing Git evidence mechanics to supply exact repository/full commit/literal path instead of serializing native ticket bodies into either prompt. Preserve actual local/published distinctions, exact identity and placement, preparation and readiness ordering, and the unchanged full native Beads observation. Keep semantic readiness in editable guidance; teach the relevant workflow/template consumers to inspect the committed reference in bounded pieces. No new state/store, mutable evidence fallback, or broad resolver refactor. Validate the registered production entry offline in Docker with committed native output over 1 MiB, no injected resolver or larger buffer, both prompts free of Backlog copies, correct reference for both layouts, and unchanged Beads/readiness behavior. Run Tier 1 on the exact clean candidate. Publish code and exact-ticket evidence separately and stop for owner review. Leave task status unchanged. No live readiness/recovery, TASK-2, AWS, merge, activation, or cleanup.
 
 One test-only revision of f14070bc. Independent review found that test_task_native_implementation_policies_are_publicly_activated_with_folder_compatibility in tests/test_future_plan_skills.py still expects the obsolete full native Backlog view and returned-path wording in prep. Update the stale assertions to cover bounded inspection of the exact committed localTaskEvidence and exact canonical ID/literal path; preserve the other readiness, Beads, and retained-folder assertions. Do not restore the old workflow or change runtime code or guidance. Run the affected Python policy test using the project test environment with PyYAML available, and report baseline versus candidate accurately. Publish the test-only branch revision and exact-ticket validation notes separately, then stop for review. No live lifecycle action, merge, activation, cleanup, or TASK-2 retry.
+
+Accept the independently reviewed readiness repair f14070bc and verified test-only revision 57918f84. Resume the previously approved acceptance closeout, not a new implementation slice. Revisit the published AC1 readiness gap at 8657d53d using the reviewed repair, both registered >1 MiB production-path tests, the exact test-only diff, and the passing Python policy test. Map all four native criteria to exact evidence; distinguish Tier 1 on f14070bc from subsequent validation on 57918f84 and the two reproduced baseline failures. If all four criteria are supported, record them and the Final Summary through native Backlog, publish only the exact ticket separately, and report exact code and task refs. Otherwise report the exact material gap and stop for owner review. No code changes, status change, live lifecycle action, TASK-2 retry, merge, activation, or cleanup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
