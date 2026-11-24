@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T14:41:00Z'
+updated_date: '2026-11-24T15:43:00Z'
 labels: []
 dependencies: []
 references:
@@ -403,6 +403,11 @@ No live PVA access (including retained live artifacts), deployment, retry, live 
 Revise only `082570c00ecc0f12335b522e96bb383c3207e73b` in the same original Episode. Use the publisher’s existing physical path, mode, and history checks and its `preservedPairs` digest projection for original live/archive same-ID pairs during receipt-bound completion. Keep imports, receipt and memory targets subject to the existing ambiguity rules. Prove a disposable original-pair completion without changing IDs or rewriting or republishing either data or receipt.
 
 Pass the verified ownership rows or exact projection lookup from both callers to `verifiedBacklogCandidate`; do not change ownership semantics. Run the existing forward active-Episode regression, the focused disposable receipt completion and drift test, and exact-candidate Docker Tier 1. Publish the exact tested revision or record the concrete blocker and report it to the owning Conversation for read-only Astra re-review. No parked-store edge work, live PVA access, retry, deploy, live cutover, deletion, or hold release. Keep In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d`.
+
+### Next canonical execute — integration preparation only
+Prepare one minimal combined candidate on this original Episode branch from reviewed source `2ff53f96c39d2bdb23365d90ac93eb7730c83981` and independent task evidence `ea118648b54a8219e753f449a20c0bf9256ddb17`. The owner verified local, upstream and direct remote main at `12a96f61e1dbcdd796f92ff8dc3c61470f28834f`. Recheck main directly before integration and report drift if it changed. Preserve main behavior and unrelated work, carry only the narrow reviewed delta, exclude historical experiments, and preserve Episode branch history without force. Do not modify the primary checkout or its pending `.prime-claw/ownership.json`.
+
+On the exact combined tree run offline disposable tests for completion from already-published data and receipt with the original live/archive same-ID records preserved, no re-import or destination writes/republication, and continued drift refusals. Run the separate existing normal forward active-Episode regression and exact Docker Tier 1. Report the exact main target and tested candidate, the diff and any resolutions, and the validation or concrete blocker for independent review. Publish only the Episode candidate and the exact task evidence normally. Keep In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d`. Stop after reporting. No main merge, deployment, restart, live PVA access/retry/cutover, Beads retirement, Episode closure, hold release or duplicate assignment.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -869,4 +874,7 @@ Published Episode revision `2ff53f96c39d2bdb23365d90ac93eb7730c83981` (parent `0
 Offline focused run `73827` passed 4/4 with zero skips (TAP SHA-256 `59f64176d599fafe43357e6097efa101bed8a7e56065ab8fd951d241e627e79c`; container absent). The genuine disposable fixture preserved all seven original records, including both `BASE-12` members with distinct content and modes and unchanged paths, IDs and history. It first reproduced the exact post-publication layout refusal, then refused unrelated tracked drift. Guarded fixture completion used the same baseline `20f05d6e95a7f52c0ba9bed79c4604c6ae7246ae`, data `154569693b8a2e25a9e85b8d597d4dd3611449db` and receipt `74e04904067bcd2140ddd87f991bbd4e01b8a142` without any destination task or Git publication writes; the test observed retirement only in the fixture. The existing forward active-Episode migration preserved identity and completed. Existing ambiguous receipt-mapped and memory USER target regressions also passed. The original-pair fixture did not contain an active Episode; the forward active-Episode regression is separate, not a combined replay claim.
 
 Exact-candidate Docker Tier 1 `--probe` passed (`20261124T143748Z-73940-c9c2e425`, manifest SHA-256 `364d040b11a02f8f1741f89837aa83d5b7112c10f7fca668c3b6769dc3c9da86`, 444 input entries, all 15 artifact hashes checked, offline, both containers absent). Hold for independent same-provider Astra high re-review. No live PVA access, retry, deployment, cutover, deletion or hold release. In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d` unchanged.
+
+### Independent re-review and bounded integration authorization
+The owner reports that independent Astra high re-review of `2ff53f96c39d2bdb23365d90ac93eb7730c83981` found both corrections addressed and no material regression. Previous focused and Tier 1 evidence remains scoped to that reviewed tree. This authorizes only the exact-target integration-preparation slice above in the existing Episode, not merge or live operation.
 <!-- SECTION:NOTES:END -->
