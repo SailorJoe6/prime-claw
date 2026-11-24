@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-69
 title: Use Git references for independent Backlog handoff evidence
-status: Blocked
+status: In Progress
 assignee: []
 created_date: '2026-11-24 01:43'
-updated_date: '2026-11-24 03:08'
+updated_date: '2026-11-24 04:53'
 labels: []
 dependencies: []
 references:
@@ -79,3 +79,13 @@ Accepted next slice (plan step 2 only): accept the two reviewed reader fixes at 
 
 Plan step 2 stopped before implementation (creation portion of AC1/AC2/AC4). Offline Docker, pinned Backlog 1.55.3 (0cf4fdbc), committed TASK-1 fixture: native view succeeded at 1,101,383 JSON bytes with the exact ID/path/status, but Node returned ENOBUFS with its default buffer and the production resolveBacklogTask rejected it. The same valid ticket placed its quoted ID after a 70 KiB YAML comment; makeBacklogGitEvidence refused it at the 64 KiB frontmatter limit. Native task list JSON returned ID/status but no file path; compact native edit output returned only the ID. Plain task view is a human-rendered full detail view, not a structured exact identity projection. Git can prove a path/blob but cannot prove the provider selected that canonical task from an ID by itself. Current creation uses full detail before allocation, inside status publication and reservation, and separately before session assignment. Did not wire the scratch reader, increase buffers, add persistence, or change code. Repro and result: .test-results/primeclaw-69-creation-native-compat/{fixture.sh,result.log}. Unblock by identifying a supported exact native ID/path/status observation without full task-detail JSON or a new ticket size rule, or obtain an explicit owner decision on a revised bounded transport approach. No end-to-end assignment proof and no acceptance criteria checked.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Owning Conversation
+created: 2026-11-24 04:53
+---
+Operator cleared the creation blocker by choosing option A: stream the native Backlog task-view JSON in chunks for exact identity verification at the independent creation checkpoints and retain only the required facts in memory. This is a narrow exception to the plan wording about requiring the native full-detail command, not permission to buffer or persist its full response. Git references remain the only stored ticket-state evidence. No higher buffer, new ticket-size limit, new persistent state, or scope change. Resume the same Episode; the Episode maintains the living plan.
+---
+<!-- COMMENTS:END -->
