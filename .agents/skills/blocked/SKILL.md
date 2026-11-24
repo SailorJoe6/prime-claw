@@ -98,8 +98,14 @@ unavailable, report it rather than falling back to a live task read. Preserve
 unrelated bytes/staging/history and compatible descendants. Never reset, absorb
 or force another writer's work.
 
-Before an authorized change use `/skill:backlog`, synchronize only this
-Conversation's intended workspace when needed, then use the supported structured
+Before an authorized change use `/skill:backlog` and synchronize only this
+Conversation's intended workspace when needed. Before editing to clear the
+blocker, compare the newly selected committed ticket in bounded ranges with the
+exact committed ticket used for the clearance decision. The owner judges whether
+any change affects the recorded unblock condition. Compatible changes do not
+invalidate clearance; if the decision no longer applies or required evidence is
+unavailable, stop before editing and resolve the decision or evidence gap. Do
+not require revision equality or add a coded gate. Then use the supported structured
 `backlog task view --json -- TASK-ID` to verify exact ID, path, parent and
 `Blocked` status before editing. Verify these facts and the intended status/note
 after the edit. Native authoring readback is not historical evidence. Work with the user to satisfy the recorded unblock condition. After the user or accepted

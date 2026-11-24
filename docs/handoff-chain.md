@@ -142,15 +142,16 @@ one of two cases:
 Neither path re-invokes the old two-stage chain. Known pending/running execute or
 unfinished admitted work stops; never cancel it to qualify.
 
-The exact owner reads current full native task/history, meaningful living plan,
+The exact owner reads current task/history, meaningful living plan,
 accepted bounded focus, code/head/publication/worktree facts and available
 historical observations. Inspect fresh native Episode and explicitly proven
 descendant state/actions/queues. The existing handoff entry captures only the
-selected session/state, not all descendants; do not claim otherwise. Retain full
-raw envelopes, unknown keys, null/absence and observations through bounded exact
-native-entry access and meaningful reads, not giant prompt copies or an idle
-boolean. Semantic judgment accepts compatible current changes and unrelated
-history advances; frozen equality is not approval. Stop real identity/scope
+selected session/state, not all descendants; do not claim otherwise. Read and
+diff the exact committed Backlog references in bounded ranges. Preserve full
+native envelopes for Beads and runtime observations, including unknown keys
+and null/absence, through exact native-entry access and bounded inspection.
+Retain legacy Backlog pairs without recapturing them. Semantic judgment
+accepts compatible current changes and unrelated history advances; frozen equality is not approval. Stop real identity/scope
 conflicts, unsafe current work, unavailable required current evidence or
 unproved idleness. Preserve owner/provider/task/operation, durable session,
 worktree/branch, host/placement, original code basis and integration target.
@@ -187,10 +188,11 @@ execute, use ordinary `ralph_handoff`, or patch upstream.
 The new mode loads only the current canonical execute asset. It carries
 `<operator-execute-guidance>`, exact owner/task tags and one bounded reference to
 the existing native observation entry. That entry retains exact prior/current
-provider observations (Git references for independent Backlog), selected Episode
-session/state, and raw explicitly linked
-descendant session/state facts. Saved descendants without live state keep that
-state absent, not an invented idle boolean. The owner must obtain and judge
+committed Backlog references (independent prior/published or branch-local
+integration/Episode), or full native Beads views and transport facts. It also
+retains the selected Episode session/state and explicitly linked descendant
+session/state facts as full native observations. Saved descendants without
+live state keep that state absent, not an invented idle boolean. The owner must obtain and judge
 required current readiness evidence before invoking. A freshly resolved route
 can differ from the historical ownership route only for the same natively
 verified durable Episode; the operation does not reopen or rebind resources.
