@@ -2007,6 +2007,7 @@ export type EpisodeTaskHistoryWorkspace =
       remoteUrl: string;
       branch: typeof TASK_HISTORY_BRANCH;
       head: string;
+      publishedHead: string;
     }
   | {
       status: "blocked";
@@ -2634,8 +2635,8 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
   // A reused clone gets one ordinary fetch and fast-forward attempt. Git
   // decides whether local changes or history permit that operation. Neither
   // unrelated dirt nor a concurrent remote advance is a separate admission gate.
+  const trackingRef = `refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`;
   if (storeEntry !== null) {
-    const trackingRef = `refs/remotes/${remote}/${TASK_HISTORY_BRANCH}`;
     const fetch = runGit(runner, storeDir, ["fetch", "--no-tags", remote, `${TASK_HISTORY_REF}:${trackingRef}`]);
     if (fetch.status !== 0) {
       return {
@@ -2644,7 +2645,17 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
         remediation: "inspect the retained clone and native fetch result; no reset, force, or retry was attempted",
       };
     }
-    const fastForward = runGit(runner, storeDir, ["merge", "--ff-only", trackingRef]);
+  }
+  const publishedHead = refHead(runner, storeDir, trackingRef);
+  if (!publishedHead) {
+    return {
+      status: "blocked", code: "unreadable",
+      detail: "the fetched Episode task-history revision is unavailable",
+      remediation: "inspect the retained clone and native Git result",
+    };
+  }
+  if (storeEntry !== null) {
+    const fastForward = runGit(runner, storeDir, ["merge", "--ff-only", publishedHead]);
     if (fastForward.status !== 0) {
       return {
         status: "blocked", code: "remote-advanced",
@@ -2665,7 +2676,7 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
       remediation: "inspect the retained clone and native Git result",
     };
   }
-  return { status: "prepared", primaryRoot: input.primaryRoot, targetWorktree: input.targetWorktree, storeDir, remote, remoteUrl, branch: TASK_HISTORY_BRANCH, head };
+  return { status: "prepared", primaryRoot: input.primaryRoot, targetWorktree: input.targetWorktree, storeDir, remote, remoteUrl, branch: TASK_HISTORY_BRANCH, head, publishedHead };
 }
 
 

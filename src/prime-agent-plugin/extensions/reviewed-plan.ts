@@ -7,6 +7,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import {
   createSpecEpisode,
   createTaskEpisode,
+  resolveIndependentBacklogCreationSelection,
   episodeResultText,
   finalizeTaskEpisodeCleanup,
   handoffSpecEpisode,
@@ -731,7 +732,10 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           if (!validTaskToolSelection(params.taskId, params.host)) {
             throw new Error("Task Episode creation requires one exact canonical task ID and optional stable id:<project-host-setup-id> host");
           }
-          const task = resolver(ctx.cwd, params.taskId);
+          const streamed = params.operationId === undefined && !dependencies?.providerTaskResolver && !dependencies?.taskResolver
+            ? await resolveIndependentBacklogCreationSelection(ctx.cwd, params.taskId, dependencies)
+            : null;
+          const task = streamed ?? resolver(ctx.cwd, params.taskId);
           if (!task) throw new Error(`Task ${params.taskId} is unavailable through the live provider`);
           if (task.provider !== "backlog" && task.provider !== "beads") {
             throw new Error("Task Episode creation requires a supported live task provider");

@@ -244,12 +244,15 @@ create mutation results through one initial execute. No new mirror or assignment
 ### Independent Backlog creation evidence
 
 For a new Episode from an existing independent Backlog ticket, creation streams
-`backlog task view --json` before allocation, around status publication and
-reservation, and again in the Episode checkout before starting the session.
+`backlog task view --json` at the registered creation entry, before allocation,
+around status publication and reservation, and again in the Episode checkout
+before starting the session.
 It keeps only the canonical ID, exact path and status needed by those checks.
 The launch carries Git repository, commit and literal path references, not a
-native task snapshot. The committed ticket remains available in the selected
-nested clone. Creation does not need the scratch header reader or its 64 KiB
+native task snapshot. Before assignment, creation resolves the exact reserved
+and fetched published ticket blobs in the Episode clone. A retained local tip
+that is ahead is reported separately, never as publication; creation does not
+reset or push the retained clone. Creation does not need the scratch header reader or its 64 KiB
 limit. The editable workflow still decides readiness and interprets the plan.
 An existing operation keeps its own resource binding; this sends no replay.
 

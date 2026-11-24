@@ -2346,20 +2346,31 @@ async function prepareTaskEpisodeWorkspace(
     const selected = await readBacklogCreationIdentity(record.worktree!, record.taskId);
     if (selected.path !== record.taskPath) throw new EpisodeStateUncertainError("Independent Backlog Episode workspace resolved a different reserved task path");
     const storePath = relative(prepared.storeDir, resolve(record.worktree!, selected.path)).split("\\").join("/");
-    const evidence = referenceCommittedBacklogTask({ root: prepared.storeDir, topology: "independent", remote: prepared.remote }, prepared.head, storePath);
+    const repository = { root: prepared.storeDir, topology: "independent" as const, remote: prepared.remote };
     const previous = record.taskEvidence;
-    const previousRepository = previous.repository as typeof evidence.repository | undefined;
-    if (previous.commit !== record.providerRevision || previous.path !== evidence.path
-        || previousRepository?.topology !== evidence.repository.topology || previousRepository?.identity !== evidence.repository.identity) {
-      throw new EpisodeStateUncertainError("Independent Backlog Episode workspace does not match the reserved evidence repository/path");
+    const verifyCommit = (label: string, commit: string) => {
+      try { return referenceCommittedBacklogTask(repository, commit, storePath); }
+      catch (error) {
+        throw new EpisodeStateUncertainError(`Independent Backlog ${label} evidence at ${commit} is unavailable before session start: ${taskAdmissionError(error)}`);
+      }
+    };
+    if (previous.commit !== record.providerRevision || previous.path !== storePath) {
+      throw new EpisodeStateUncertainError("Independent Backlog Episode workspace does not match the reserved evidence revision/path");
     }
+    const prior = verifyCommit("previous", record.providerRevision);
+    const previousRepository = previous.repository as typeof prior.repository | undefined;
+    if (previousRepository?.topology !== prior.repository.topology || previousRepository?.identity !== prior.repository.identity) {
+      throw new EpisodeStateUncertainError("Independent Backlog Episode workspace does not match the reserved evidence repository");
+    }
+    const evidence = prepared.publishedHead === prior.commit ? prior : verifyCommit("fetched published", prepared.publishedHead);
+    const localEvidence = prepared.head === evidence.commit ? evidence : verifyCommit("retained local", prepared.head);
     const unchanged = runner.run("git", ["--literal-pathspecs", "--no-optional-locks", "status", "--porcelain", "--", storePath],
       { cwd: prepared.storeDir, allowFailure: true });
     if (unchanged.status !== 0 || unchanged.stdout !== "") {
       throw new EpisodeStateUncertainError("Independent Backlog Episode selected task differs from the committed workspace before session start");
     }
     const advanced = updated(record, {
-      providerRevision: prepared.head, taskEvidence: { ...evidence },
+      providerRevision: evidence.commit, taskEvidence: { ...evidence },
       updatedAt: dependencies.now?.() ?? new Date().toISOString(),
     });
     store.write(repo, advanced);
@@ -2367,8 +2378,9 @@ async function prepareTaskEpisodeWorkspace(
       throw new EpisodeStateUncertainError("Independent Backlog Episode could not verify the current Git evidence before session start");
     }
     return { record: advanced, providerTaskObservation: JSON.stringify({
-      previousProviderRevision: record.providerRevision, publishedProviderRevision: prepared.head,
+      previousProviderRevision: record.providerRevision, publishedProviderRevision: evidence.commit,
       previousTaskEvidence: previous, currentTaskEvidence: evidence,
+      ...(localEvidence.commit !== evidence.commit ? { localTaskEvidence: localEvidence } : {}),
     }) };
   }
   // Keep the existing recovery behavior for reservations from earlier generations.
@@ -3243,6 +3255,17 @@ function hasIndependentBacklogStore(provider: ReturnType<typeof detectTaskProvid
   if (provider.kind !== "selected" || provider.evidence.provider !== "backlog") return false;
   try { return lstatSync(join(provider.evidence.storeDir, ".git")).isDirectory(); }
   catch { return false; }
+}
+
+/** Fresh public creation needs only identity and placement, not a native snapshot. */
+export async function resolveIndependentBacklogCreationSelection(
+  cwd: string, taskId: string, dependencies: TaskEpisodeCreationDependencies = {},
+): Promise<{ provider: "backlog"; projectRoot: string; taskId: string } | null> {
+  const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
+  const provider = (dependencies.providerDetector ?? detectTaskProvider)(cwd, runner);
+  if (!hasIndependentBacklogStore(provider) || provider.kind !== "selected") return null;
+  const selected = await readBacklogCreationIdentity(provider.projectRoot, taskId);
+  return { provider: "backlog", projectRoot: provider.projectRoot, taskId: selected.id };
 }
 
 async function admitIndependentBacklogCreation(
