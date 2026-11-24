@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T08:25:00Z'
+updated_date: '2026-11-24T08:33:00Z'
 labels: []
 dependencies: []
 references:
@@ -138,6 +138,8 @@ Independent Backlog status mutation/publication slice at 35ad1a880d0ba3ff661bf61
 Publication revision e51c5121efaf6135541d3e43584e75732fe23177: reuse bounded native identity reads and discard native edit output. A failed or mismatched final pre-edit read stops before edit, commit, or push. Nonzero push with no exact remote proof is uncertain; exact observed publication preserves the nonzero push fact, and neither path retries. New reservations require verified exact committed Git references; legacy nativeAfter is never copied and historical records are unchanged. Exact-path authoring and unrelated staging are preserved. Offline Docker: 461/461 (.test-results/primeclaw-69-mutation-revision/candidate-focused.log) plus 3/3 reservation tests (.test-results/primeclaw-69-mutation-revision/candidate-reservation.log), including a valid >1 MiB native task, ID/path drift, unclear remote outcomes, and historical retention. Tier 1 from clean candidate passed offline with teardown verified (.test-results/20261124T080413Z-74357-68141d19/tier1/manifest.json). Wider Beads journal identity issue and standalone provider import cycle reproduced on baseline; no Beads behavior change. No live mutation test, TASK-2 action, merge or activation.
 
 Retained ownership transition candidate 328d5e96b209f33827492b041834a271f39598d1: both Backlog layouts verify the exact committed ticket in the existing primary and Episode workspaces. Independent Backlog persists the published Git reference; branch-local ownership retains its existing format and reports refs at the reviewed code heads. Historical raw records remain unchanged, and replay reports verified refs instead of copying the old view. Missing or mismatched evidence stops before authority replacement. Offline Docker: 551/551 focused tests and 26/26 ownership tests (.test-results/primeclaw-69-transition/candidate-focused.log and .test-results/primeclaw-69-transition/candidate-ownership.log), including a native task view over 1 MiB, missing or mismatched refs, publication drift, and legacy replay. Tier 1 passed on the clean candidate with offline teardown verified (.test-results/20261124T081755Z-9351-48dbb50d/tier1/manifest.json). No live transition, provider cutover, terminal or oversight work, TASK-2 action, merge, or activation.
+
+Retained transition revision 178056a62a82964fbb1a7cc7a973d8756ca9cd3b: branch-local transition now verifies the native-selected Episode Backlog store resolves to the Episode code Git repository before authority replacement, even if a nested repository has identical ticket bytes. Historical independent replay compares the complete saved Backlog envelope with the validated native output in bounded chunks, without a new snapshot; ordinary lifecycle behavior is unchanged. The disposable nested-store and Description regressions reproduced the prior acceptance at 328d5e96b209f33827492b041834a271f39598d1; the candidate also rejects acceptance-criteria drift and still accepts exact replay. Clean offline Docker: 551/551 focused and 29/29 ownership (.test-results/primeclaw-69-transition-revision); Tier 1 passed and verified teardown (.test-results/20261124T083138Z-40626-a300df68/tier1/manifest.json). No live transition, TASK-2 action, merge, or activation.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -170,4 +172,6 @@ Independent Backlog status publication results now identify exact committed tick
 Backlog publication now uses bounded native reads, stops on pre-edit identity drift, reports uncertain pushes separately from publication proof, and writes only verified committed references to new reservations.
 
 The retained ownership transition now uses verified committed Backlog references in both layouts, without rewriting historical records or replacing Episode resources.
+
+Retained Backlog transition verifies the Episode store repository and compares the complete historical native envelope only on legacy replay.
 <!-- SECTION:FINAL_SUMMARY:END -->
