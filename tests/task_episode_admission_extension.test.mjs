@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { appendFileSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { once } from "node:events";
+import { appendFileSync, createReadStream, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -375,9 +376,28 @@ function registerBranchLocalCreate(root, dir, publisher) {
   return { owner, execute: (id, params) => create.execute(id, params, undefined, undefined, ctx) };
 }
 
-test("registered branch-local Backlog create delivers exact code evidence once and recovers the same operation", async (t) => {
+// The fixture's small YAML header is in the first chunk. Hash the markdown body
+// byte for byte without keeping the oversized native fields in the test process.
+async function branchLocalTicketBody(path) {
+  let status;
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) {
+    if (status === undefined) {
+      const end = chunk.indexOf("\n---\n", 4);
+      assert.ok(end > 0, "fixture frontmatter must fit in the first chunk");
+      status = chunk.subarray(0, end).toString("utf8").match(/^status: (.+)$/m)?.[1];
+      assert.ok(status, "fixture frontmatter must include status");
+      hash.update(chunk.subarray(end + 5));
+    } else {
+      hash.update(chunk);
+    }
+  }
+  return { status, digest: hash.digest("hex") };
+}
+
+test("registered branch-local Backlog create observes live status after one immutable assignment and recovers the same operation", async (t) => {
   if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
-  const { dir, root, planned, taskId, taskPath, description } = branchLocalCreationFixture(t);
+  const { dir, root, taskId, taskPath, description } = branchLocalCreationFixture(t);
   const remote = join(dir, "remote.git");
   execFileSync("git", ["init", "-q", "--bare", remote]);
   const finalNote = "End of oversized branch-local evidence";
@@ -386,13 +406,16 @@ test("registered branch-local Backlog create delivers exact code evidence once a
     execFileSync(BACKLOG, ["task", "edit", "--append-notes", `${noteChunk}\nchunk ${index}\n${index === 19 ? finalNote : ""}`,
       "--plain", "--", taskId], { cwd: root, stdio: "ignore" });
   }
-  const largeNativeView = (worktree) => execFileSync(BACKLOG, ["task", "view", "--json", "--", taskId], {
-    cwd: worktree, encoding: "utf8", maxBuffer: 2 * 1024 * 1024,
+  const native = spawn(BACKLOG, ["task", "view", "--json", "--", taskId], {
+    cwd: root, stdio: ["ignore", "pipe", "inherit"],
   });
-  const nativeView = largeNativeView(root);
-  assert.ok(Buffer.byteLength(nativeView) > 1024 * 1024, "native stdout must exceed Node's default sync buffer");
-  const plannedNotes = JSON.parse(nativeView).task.implementationNotes;
-  assert.ok(plannedNotes.endsWith(finalNote));
+  const nativeClosed = once(native, "close");
+  let nativeBytes = 0;
+  native.stdout.on("data", (chunk) => { nativeBytes += chunk.length; });
+  assert.deepEqual(await nativeClosed, [0, null]);
+  assert.ok(nativeBytes > 1024 * 1024, "native stdout must exceed Node's default sync buffer");
+  const plannedTicket = await branchLocalTicketBody(join(root, taskPath));
+  assert.equal(plannedTicket.status, "In Planning");
   git(root, "--literal-pathspecs", "add", "--", taskPath);
   git(root, "--literal-pathspecs", "commit", "-qm", "plan branch-local task", "--only", "--", taskPath);
   const plannedHead = git(root, "rev-parse", "HEAD");
@@ -403,20 +426,32 @@ test("registered branch-local Backlog create delivers exact code evidence once a
   const stagedBefore = git(root, "diff", "--cached", "--binary");
 
   const calls = [];
-  let session, executePrompt;
+  let session, executePrompt, statusCommit, liveHead;
   const publisher = {
     async createFresh(options) {
       calls.push(["create", options.worktree]);
       const reservation = readEpisodeOwnership(root, owner);
       assert.equal(git(options.worktree, "rev-parse", "HEAD"), reservation.baseRef);
-      assert.equal(JSON.parse(largeNativeView(options.worktree)).task.status, "In Progress");
+      assert.deepEqual(await branchLocalTicketBody(join(options.worktree, taskPath)), {
+        status: "In Progress", digest: plannedTicket.digest,
+      });
       const identity = { sessionId: "branch-local-episode", sessionFile: join(dir, "episode.jsonl") };
       writeFileSync(identity.sessionFile, JSON.stringify({ type: "session", id: identity.sessionId, cwd: options.worktree }) + "\n");
       await options.onAllocated?.(identity);
       session = { ...identity, cwd: options.worktree, activeSessionId: "branch-local-route" };
       return session;
     },
-    async deliverExecute(route, prompt) { calls.push(["execute", route]); executePrompt = prompt; },
+    async deliverExecute(route, prompt) {
+      calls.push(["execute", route]);
+      executePrompt = prompt;
+      statusCommit = git(root, "rev-parse", "HEAD");
+      assert.equal(git(session.cwd, "rev-parse", "HEAD"), statusCommit);
+      execFileSync(BACKLOG, ["task", "edit", "--status", "Blocked", "--plain", "--", taskId], {
+        cwd: root, stdio: "ignore",
+      });
+      git(root, "--literal-pathspecs", "commit", "-qm", "advance live task during execute send", "--only", "--", taskPath);
+      liveHead = git(root, "rev-parse", "HEAD");
+    },
     async list() { return [session]; },
     close() {},
   };
@@ -424,8 +459,8 @@ test("registered branch-local Backlog create delivers exact code evidence once a
   const created = await execute("registered-branch-local-create", { taskId });
   assert.ok(!created.isError, created.details.error);
   const result = created.details;
-  const statusCommit = git(root, "rev-parse", "HEAD");
-  assert.equal(git(root, "rev-parse", "HEAD^"), plannedHead);
+  assert.equal(git(root, "rev-parse", `${statusCommit}^`), plannedHead);
+  assert.equal(git(root, "rev-parse", `${liveHead}^`), statusCommit);
   assert.deepEqual(commitPaths(root, statusCommit), [taskPath]);
   assert.equal(git(remote, "rev-parse", "refs/heads/main"), statusCommit);
   assert.equal(result.baseRef, statusCommit);
@@ -434,11 +469,14 @@ test("registered branch-local Backlog create delivers exact code evidence once a
   assert.equal(result.reused, false);
   assert.equal(git(result.worktree, "show", "HEAD:code.txt"), "code baseline");
   assert.equal(git(root, "diff", "--cached", "--binary"), stagedBefore);
-  const ticket = JSON.parse(largeNativeView(result.worktree)).task;
-  assert.ok(ticket.implementationNotes === plannedNotes, "native notes must survive admission unchanged");
-  assert.equal(ticket.description, description);
-  assert.equal(ticket.implementationPlan, planned.implementationPlan);
+  assert.deepEqual(result.currentTask, { id: taskId, path: taskPath, status: "Blocked" });
+  assert.ok(!Object.hasOwn(result, "taskObservationFailure"));
+  assert.equal(git(result.worktree, "rev-parse", "HEAD"), statusCommit);
+  assert.deepEqual(await branchLocalTicketBody(join(result.worktree, taskPath)), {
+    status: "In Progress", digest: plannedTicket.digest,
+  }, "description, plan, and all native notes must survive admission unchanged");
   const active = readEpisodeOwnership(root, owner);
+  assert.equal(active.baseRef, statusCommit);
   for (const record of [result, active]) {
     assert.ok(!Object.hasOwn(record, "providerRevision"));
     assert.ok(!Object.hasOwn(record, "taskEvidence"));
@@ -447,11 +485,11 @@ test("registered branch-local Backlog create delivers exact code evidence once a
   const recovered = await execute("registered-branch-local-recovery", { taskId, operationId: result.operationId });
   assert.ok(!recovered.isError, recovered.details.error);
   assert.equal(recovered.details.reused, true);
-  for (const field of ["operationId", "worktree", "branch", "head", "episodeId", "episodeActiveSessionId"]) {
+  for (const field of ["operationId", "worktree", "branch", "baseRef", "head", "episodeId", "episodeActiveSessionId"]) {
     assert.equal(recovered.details[field], result[field], field);
   }
   assert.deepEqual(readEpisodeOwnership(root, owner), active);
-  assert.equal(git(root, "rev-parse", "HEAD"), statusCommit);
+  assert.equal(git(root, "rev-parse", "HEAD"), liveHead);
   assert.deepEqual(calls, [["create", result.worktree], ["execute", "branch-local-route"]]);
   const observation = executePrompt.match(/\n<provider-task-observation>\n([^\n]+)\n<\/provider-task-observation>\n$/);
   assert.ok(observation, "initial execute gets exact committed task evidence");
@@ -462,6 +500,48 @@ test("registered branch-local Backlog create delivers exact code evidence once a
     path: taskPath,
   } });
   assert.ok(!executePrompt.includes(description) && !executePrompt.includes(finalNote), "execute gets a compact reference rather than the task body");
+});
+
+test("registered branch-local Backlog create reports path drift without losing the active Episode", async (t) => {
+  if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+  const { dir, root, taskId, taskPath } = branchLocalCreationFixture(t);
+  git(root, "--literal-pathspecs", "add", "--", taskPath);
+  git(root, "--literal-pathspecs", "commit", "-qm", "plan branch-local task", "--only", "--", taskPath);
+  const movedPath = join(dirname(taskPath), `${taskId.toLowerCase()} - Moved ticket.md`);
+  const calls = [];
+  let session, assignmentBase;
+  const { owner, execute } = registerBranchLocalCreate(root, dir, {
+    async createFresh(options) {
+      calls.push("create");
+      const identity = { sessionId: "path-drift-episode", sessionFile: join(dir, "episode.jsonl") };
+      writeFileSync(identity.sessionFile, JSON.stringify({ type: "session", id: identity.sessionId, cwd: options.worktree }) + "\n");
+      await options.onAllocated?.(identity);
+      session = { ...identity, cwd: options.worktree, activeSessionId: "path-drift-route" };
+      return session;
+    },
+    async deliverExecute(route) {
+      calls.push(route);
+      assignmentBase = git(root, "rev-parse", "HEAD");
+      git(root, "--literal-pathspecs", "mv", "--", taskPath, movedPath);
+      git(root, "--literal-pathspecs", "commit", "-qm", "move live task during execute send", "--only", "--", taskPath, movedPath);
+    },
+    async list() { return [session]; },
+    close() {},
+  });
+
+  const created = await execute("registered-branch-local-path-drift", { taskId });
+  assert.ok(!created.isError, created.details.error);
+  const result = created.details;
+  assert.equal(view(root, taskId).path, movedPath, "native Backlog must still resolve the same ID at the new path");
+  assert.equal(result.taskObservationFailure, "path-mismatch");
+  assert.ok(!Object.hasOwn(result, "currentTask"));
+  const active = readEpisodeOwnership(root, owner);
+  assert.equal(active.status, "active");
+  assert.equal(active.operationId, result.operationId);
+  assert.equal(active.baseRef, assignmentBase);
+  assert.equal(result.baseRef, assignmentBase);
+  assert.equal(git(result.worktree, "rev-parse", "HEAD"), assignmentBase);
+  assert.deepEqual(calls, ["create", "path-drift-route"]);
 });
 
 test("registered branch-local Backlog create rejects a staged ticket missing from the code commit", async (t) => {

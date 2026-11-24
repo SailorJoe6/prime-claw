@@ -768,10 +768,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           }
           const actions = { ...DEFAULT_TASK_ACTIONS, ...dependencies?.taskActions };
           const result = await actions.create(task.taskId, toolCallId, ctx, dependencies, placement);
+          const observation = result.taskObservationFailure
+            ? ` Post-allocation Backlog observation unavailable (${result.taskObservationFailure}); this does not change the assignment outcome.`
+            : "";
           return {
             content: [{
               type: "text",
-              text: `Task Episode ${result.reused ? "returned" : "created"} for ${result.taskId}. ${result.reused ? "No new execute assignment was sent." : `One fixed execute assignment was admitted to ${result.episodeId}.`} Exact provider-native result: ${JSON.stringify(result)}`,
+              text: `Task Episode ${result.reused ? "returned" : "created"} for ${result.taskId}. ${result.reused ? "No new execute assignment was sent." : `One fixed execute assignment was admitted to ${result.episodeId}.`}${observation} Exact provider-native result: ${JSON.stringify(result)}`,
             }],
             details: result,
           };

@@ -303,6 +303,8 @@ export type TaskEpisodeCreationResult = TaskEpisodeResult & {
   /** Native mutation/push results; a successful push is not exact-task publication proof. */
   beadsTaskMutation?: PublishedBeadsTaskMutation;
   currentTask?: ProviderTaskResolution | BacklogTaskSelection | BacklogCreationIdentity;
+  /** A post-allocation observation gap, not an assignment or allocation failure. */
+  taskObservationFailure?: "project-mismatch" | "native-lookup-failed" | "path-mismatch";
 };
 
 export interface TaskEpisodeAllocationDependencies extends EpisodeDependencies {
@@ -3557,9 +3559,9 @@ export async function createTaskEpisode(
         throw new Error("Task-native Episode reservation did not bind the exact code base and integration branch");
       }
       taskIntegrationBranch(git, projectRoot, integrationBranch);
-      return { commit, taskHistory, reservation, streamedSelection };
+      return { commit, taskHistory, reservation };
     });
-    const { commit, taskHistory, reservation, streamedSelection } = admission;
+    const { commit, taskHistory, reservation } = admission;
     taskIntegrationBranch(git, projectRoot, integrationBranch);
     admissionPushError = taskHistory ? undefined : bestEffortTaskPush(git, projectRoot);
 
@@ -3573,9 +3575,29 @@ export async function createTaskEpisode(
         || active.integrationBranch !== integrationBranch) {
       throw new Error("Task-native Episode allocation returned without the exact active reservation identity");
     }
+    const creation = { ...active, reused: result.reused, ...(admissionPushError ? { admissionPushError } : {}) };
+    if (streamed) {
+      // Allocation returned after delivery. Observe live task facts without
+      // treating drift as a failed creation or changing the assignment base.
+      try {
+        const liveProvider = detectTaskProvider(projectRoot, runner);
+        if (liveProvider.kind !== "selected" || liveProvider.evidence.provider !== "backlog"
+            || !samePath(liveProvider.projectRoot, projectRoot) || hasIndependentBacklogStore(liveProvider)) {
+          return { ...creation, taskObservationFailure: "project-mismatch" };
+        }
+      } catch {
+        return { ...creation, taskObservationFailure: "project-mismatch" };
+      }
+      try {
+        const currentTask = await readBacklogCreationIdentity(projectRoot, taskId);
+        if (currentTask.path !== taskPath) return { ...creation, taskObservationFailure: "path-mismatch" };
+        return { ...creation, currentTask };
+      } catch {
+        return { ...creation, taskObservationFailure: "native-lookup-failed" };
+      }
+    }
     taskIntegrationBranch(git, projectRoot, integrationBranch);
-    const finalTask = streamedSelection ?? exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
-    return { ...active, reused: result.reused, currentTask: finalTask, ...(admissionPushError ? { admissionPushError } : {}) };
+    return { ...creation, currentTask: exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath) };
   } catch (error) {
     if (!admissionResult || !projectRoot) throw error;
     let ownership: unknown;

@@ -281,6 +281,12 @@ Ownership keeps its existing branch-local shape. Missing committed evidence
 stops before a session or assignment; exact active recovery returns the same
 resources without issuing another execute.
 
+After the initial assignment, creation reads the same branch-local project and
+exact ticket again and returns the current native status separately from the
+committed assignment base. If the project or path no longer matches, or the
+native lookup fails, the result reports `taskObservationFailure` instead of
+`currentTask`. That gap does not invalidate the assignment or trigger a retry.
+
 ### Bounded task-native transport observations
 
 The existing JSONL client attaches ephemeral `transport` facts to its local
