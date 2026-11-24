@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T14:05:00Z'
+updated_date: '2026-11-24T14:15:00Z'
 labels: []
 dependencies: []
 references:
@@ -64,6 +64,14 @@ modified_files:
   - tests/test_blocked_skill.py
   - tests/test_oversee_episode_skill.py
   - docs/conversation-driven-episode-oversight.md
+  - .prime-claw/workflows/implement-task-prep.md
+  - .prime-claw/workflows/implement-task.md
+  - docs/prep-chain.md
+  - src/prime-agent-plugin/extension-support/prep-chain.ts
+  - src/prime-agent-plugin/extension-support/task-providers.ts
+  - src/prime-agent-plugin/workflows/implement-task-prep.md
+  - src/prime-agent-plugin/workflows/implement-task.md
+  - tests/reviewed_plan_extension.test.mjs
 priority: p0
 type: bug
 ordinal: 153000
@@ -214,6 +222,12 @@ AC3 — Supported on reviewed paths: spec-episode.ts:1881/2042 and :2356 bind ex
 AC4 — Supported on reviewed paths: spec-episode.ts:867-905, :2042 and :2180 separate first admission, callback, follow-up and execute-only; the registered existing-operation test verifies one assignment on the same binding. Exact Docker includes Backlog and Beads busy-race callback cases, real JSONL callback-throw diagnostics, and execute-only refusal/uncertainty and factual-write ordering. Beads raw envelopes are not converted.
 
 Exact prior validation reused: 554/554 network-disabled Docker checks (.test-results/primeclaw-69-registered-recovery/candidate-focused.log), Tier 1 passed with teardown (.test-results/20261124T101754Z-34217-35228f7b/tier1/manifest.json). There were no failures in these exact runs. The prepare ready-list reported the known unrelated PRIMECLAW-70 duplicate; the exact PRIMECLAW-69 read worked. Unblock: owner review of the readiness gap, then separately authorized repair and an offline production-entry regression with committed >1 MiB Backlog evidence: no fixed whole-response prerequisite and no raw Backlog checkpoint in either prompt, unchanged Beads envelope and readiness/placement sequencing. No repair, live recovery, cleanup, TASK-2, AWS, merge, or activation in this slice.
+
+Bounded readiness repair candidate f14070bcadaca465ffc5b6235082f532c382a17b for owner review (canonical execute observation 537e7889). Registered implement_task now resolves Backlog identity from streamed native output and supplies a verified repository identity/full commit/literal path in both readiness prompts. Both use localTaskEvidence; independent publication is a separate directly observed publishedHead, not local receipt proof. Branch-local evidence uses the exact code repository and does not assert publication. Missing committed evidence cannot fall back to a mutable ticket. Beads still carries the complete native view. Placement precedes both sends; readiness judgment remains in the managed editable workflows, which inspect committed content in bounded windows and keep current authoring work separate. Admission creates no Episode, dispatches no execute, and changes no lifecycle status.
+
+Offline Docker Backlog 1.55.3: both registered default-resolver >1 MiB fixtures failed against 0836643c at native buffered lookup, then passed on this candidate without resolver injection or buffer increase. Both prompts carry the exact Git reference and no native ticket copy; independent fixture keeps a different local commit from the directly observed published head. Beads envelope, readiness policy/placement and transport-uncertainty cases passed. Final broader suite: 738/740 (.test-results/primeclaw-69-readiness/final-focused.log). The two failures reproduced on unchanged 0836643c (.test-results/primeclaw-69-readiness/unrelated-baseline.log): stale handoff guidance metadata assertion and Beads continuation fixture journal identity mismatch. A supplementary Python collection attempt could not run in the cached image (missing PyYAML); not counted as passing. Tier 1 with offline RPC probe passed on the exact clean candidate, network absence and teardown verified (.test-results/20261124T141142Z-95290-d4581a79/tier1/manifest.json).
+
+No live readiness/recovery, TASK-2, AWS, merge, activation or cleanup. Acceptance checkboxes and Final Summary remain as recorded pending owner review; status remains In Progress.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
