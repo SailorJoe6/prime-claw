@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-69
 title: Use Git references for independent Backlog handoff evidence
-status: In Progress
+status: Blocked
 assignee: []
-created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T03:07:00Z'
+created_date: '2026-11-24 01:43'
+updated_date: '2026-11-24 03:08'
 labels: []
 dependencies: []
 references:
