@@ -45,10 +45,9 @@ def test_expert_skill_accepts_normal_context_and_preserves_review_judgment() -> 
         "Red-team review requires an explicit operator request",
         "newly imagined invariants are not blockers",
         "smallest repair that fixes the demonstrated defect",
-        'provider-absent or grandfathered `provider: "backlog"` version-2 ownership',
-        "bind the exact task ID/path in branch-local history",
-        "as the contract",
-        "do not consult `.ralph/plans`",
+        "For version-2 Backlog, bind the exact canonical task ID and path",
+        "branch-local history use the literal path in the exact code candidate",
+        "Do not consult `.ralph/plans`",
         "For a retained folder candidate",
         "Do not substitute a related Backlog task as authority",
         "select the exact `ownerSessionId` entry identified by the requesting Conversation",
@@ -78,7 +77,6 @@ def test_expert_skill_sends_provider_native_beads_review_evidence_without_lifecy
     for required in (
         "version 2 selects the exact task contract and the provider recorded by that exact owner",
         "With no ownership, require the caller to make any task provider unambiguous",
-        "never assume it exists at the code candidate commit",
         'For `provider: "beads"` version-2 ownership',
         "require no `taskPath`",
         "published `providerRevision`",
@@ -92,7 +90,7 @@ def test_expert_skill_sends_provider_native_beads_review_evidence_without_lifecy
         "exact persisted/current complete native task values",
         "recorded/current task-history revisions and actual publication facts separately from code base/head",
         "An unrelated-task revision descendant alone is compatible",
-        "show exact before and current fields and use semantic judgment",
+        "show the exact before and current Beads fields. Use semantic judgment",
         "compatible in-scope clarification and living-plan updates may be incorporated",
         "genuine semantic conflict, authority change, scope expansion, or product choice is escalated",
         "Do not ask a fake unit test or deterministic classifier to make that judgment",
@@ -104,10 +102,12 @@ def test_expert_skill_sends_provider_native_beads_review_evidence_without_lifecy
     ):
         assert required in text
     for required in (
-        "For explicit independent Backlog with `providerRevision` and complete `taskEvidence`",
-        "native task-history revision separately from code base/head",
-        "Read the committed/published ticket from that existing independent task history",
-        "Do not synchronize another writer's dirty checkout",
+        "Never use the code candidate as a task revision in independent history",
+        "verify repository, full OID, literal regular blob and native canonical ID",
+        "relevant diffs in bounded ranges",
+        "plus separate publication facts",
+        "Never paste Backlog ticket bodies into the review request",
+        "No mutable fallback, guessed revision, copied ticket, dirty-checkout synchronization",
     ):
         assert required in text
     assert text.index("select the exact `ownerSessionId` entry identified by the requesting Conversation") < text.index("provider recorded by that exact owner")

@@ -5,10 +5,10 @@
       "source": "skills/project-templates/blocked.md",
       "destination": ".agents/skills/blocked/SKILL.md",
       "baselineSha256": "1db1d352a1c06955895da70e979a8cb8c4247d63940decce21cfcddb7ff2e729",
-      "installedSha256": "731e95ddf481a18426fd3c547aa958674aadabe6dffb22dcc65c4c475c5abd03",
+      "installedSha256": "cdcc7ee5311356757fab4b991fbe1593d20fdd6849918437822a4f9a3bae3266",
       "acceptedOverrideSha256": null,
-      "availableUpstreamSha256": "b80d743b330392012abfc97ad52f1db5bcc850064a62774098b68061d17ab3f0",
-      "state": "customized",
+      "availableUpstreamSha256": "cdcc7ee5311356757fab4b991fbe1593d20fdd6849918437822a4f9a3bae3266",
+      "state": "managed",
       "provenance": {
         "scope": "project",
         "exposure": "discoverable",

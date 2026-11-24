@@ -411,9 +411,11 @@ Before the one atomic ownership write, the host proves:
   Implementation Plan or Beads design exactly retains the living execution
   plan, and it retains the exact superseded-source marker;
 - branch-local Backlog keeps the existing committed main/Episode blob and exact
-  plan checks; independent Backlog instead proves one clean stable direct
-  `refs/heads/prime-claw/tasks` revision and equal complete native task views in
-  both existing nested clones; Beads proves one clean stable published Dolt
+  plan checks; independent Backlog instead proves the exact directly published
+  `refs/heads/prime-claw/tasks` revision in both existing nested clones, using
+  committed ticket references and native transition facts. Exact comparison of
+  a saved raw envelope is limited to historical transition replay. Beads proves
+  one clean stable published Dolt
   revision/ref and equal complete raw task views in both workspaces;
 - the readable active specification and plan remain tracked at the reviewed
   Episode head; the original legacy `baseRef`, historical recorded head,
@@ -583,12 +585,11 @@ Candidate review is evidence-led. Before merge readiness, the Conversation verif
 
 Backlog version-2 ownership has two compatible topologies. Provider-absent or
 explicit Backlog without revision/evidence remains branch-local. Explicit
-Backlog with both fields binds the disconnected published task head and native
-view separately from code. Admission publishes In Progress in the primary
-nested clone, allocation prepares the Episode nested clone before session
-creation, refreshes current native task facts without treating raw snapshot
-inequality as approval, and gives the initial execute assignment the complete
-previous/current native views and revisions. Handoff prepares and reads only the
+Backlog with both fields binds the independent task revision and Git evidence
+(or retained legacy view) separately from code. Admission publishes In Progress
+in the primary nested clone. Allocation prepares the Episode nested clone
+before session creation and binds committed evidence separately from later native
+observations. Legacy records and older delivery shapes remain readable. Handoff prepares and reads only the
 Episode clone and supplies native/code/session observations for editable-policy
 judgment, recording current evidence only after message admission. Conversation
 lifecycle updates use the primary nested clone and Episode content updates use its own
@@ -597,7 +598,7 @@ nested clone; both commit only task paths and non-force-push
 removes only its exact Episode clone after owner publication judgment, preserving uncommitted bytes.
 Existing ordinary/root/custom Backlog stores never migrate through these paths.
 
-For both providers, `handoff_task_episode` targets the exact canonical-primary owner and recorded task/worktree/branch/durable session. Grandfathered Backlog supplies complete native task views from both selected workspaces. Independent Backlog prepares and reads only the Episode clone; Beads performs one supported native pull/read and retains complete raw task, warning, working-set and local-versus-publication qualifications. Both prompts receive current native/code and session list/state observations. Editable handoff/execute/oversight guidance decides lifecycle status, meaningful plan/design, code publication, idle completion and compatible changes; code does not approve literal-main labels, RLM depth, whole-checkout cleanliness, ancestry or a frozen task/design snapshot. Exact resource collisions, route identity and actual native send results remain mechanical. Only after first-message admission does the callback persist existing factual observations; execute is the sole follow-up. Handoff performs no status, review or terminal work.
+For both providers, `handoff_task_episode` targets the exact canonical-primary owner and recorded task/worktree/branch/durable session. Branch-local Backlog supplies exact integration/Episode ticket references. Independent Backlog prepares only the Episode clone and supplies the exact prior/published pair; separately retained local evidence is not publication. Older Backlog pairs remain readable without copying or recapturing them. For Beads, the sender performs one supported native pull/read and retains complete raw task, warning, working-set and local-versus-publication qualifications. Both prompts receive current native/code and session list/state observations. Editable handoff/execute/oversight guidance decides lifecycle status, meaningful plan/design, code publication, idle completion and compatible changes; code does not approve literal-main labels, RLM depth, whole-checkout cleanliness, ancestry or a frozen task/design snapshot. Exact resource collisions, route identity and actual native send results remain mechanical. Only after first-message admission does the callback persist existing factual observations; execute is the sole follow-up. Handoff performs no status, review or terminal work.
 
 Candidate review is evidence-led and branches only after exact owner/provider selection. For grandfathered branch-local Backlog, an accepted complete pushed candidate keeps the existing task-only path: supported CLI `Ready for Merge`, exact ID/path/parent/status and one-path proof, commit/push as `targetHead`, then ordinary integration of that main head into the idle Episode while preserving Episode task content plus only the authorized status. The refreshed clean branch is pushed as `candidateHead`. For Beads, no task-file or status commit exists: `targetHead` is the current clean pushed canonical code HEAD. The Conversation ordinarily integrates that head into the clean idle Episode when needed, pushes, and proves exact branch/local/upstream/direct-remote `candidateHead` plus `targetHead` ancestry before lifecycle mutation. It then freshly proves the exact active owner/provider/task, current native `in_progress`, meaningful raw design, actual task-history/publication and pending-work consequences under editable guidance; performs one guarded `--if-status in_progress` status-plus-note update to `ready_for_merge`; pushes once without force; and verifies actual native task-history inclusion/publication, raw task, revision, ref, note, preserved unrelated fields and remaining working-set facts. The approved touched-table/staged-set multi-issue semantics require consequence review before mutation/commit/push; no clean-working-set gate or per-issue isolation is implied. Both branches show the operator `(taskId, integrationBranch, targetHead, candidateHead)`; Beads also shows factual native evidence. Neither a provider revision nor raw task equality becomes merge authority, and there is no custom Ready publisher, receipt, snapshot, digest, or replay protocol.
 

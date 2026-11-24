@@ -16,7 +16,7 @@ Otherwise use only for this Conversation's active Episode. Version 1 selects ret
 Version 2 selects its persisted provider only. Absent provider, or Backlog
 without revision/evidence, binds grandfathered task ID/path. Backlog with both
 fields binds independent task history: `baseRef`/`head` identify code;
-40-hex `providerRevision`/complete native `taskEvidence` identify task history.
+40-hex `providerRevision` and `taskEvidence` (Git reference or retained legacy view) identify task history.
 Native fields own the contract, never `.ralph/plans`. The Episode owns content;
 the Conversation owns status. Branch-local history stays on its code branches;
 independent history uses ignored clones, never the code DAG.
@@ -36,7 +36,46 @@ Use the exceptional `transition_spec_episode_to_task` cutover surface after mark
 
 Follow `.prime-claw/workflows/implement-task.md` for preparation/publication; code supplies facts, not policy. Backlog keeps exact-file commits. Beads v1.3.1 uses touched-table/staged-set multi-issue history, not per-issue isolation. Before consequential native mutation, commit or push, review consequences and consult about unauthorized/unclear pending work. Native pending/concurrent changes can prevent a safe operation. Inspect actual task history/publication before claiming status/note durability; exit-zero/local/push success is insufficient. Commit coherent edits ASAP and publish promptly, not at handoff or session end.
 
-Review one reported slice at a time: check ownership/code/tests/docs and persisted/current native task/history observations. An unrelated-task descendant alone is compatible. Judge same-task changes as in-scope clarification or genuine semantic conflict, authority change, scope expansion, or product decision. Apply before handoff, blockers, terminals and cleanup; no equality gate or classifier replaces judgment.
+### Inspect Backlog committed ticket evidence
+
+For read-only oversight, review, block/resume and terminal judgment, use the
+exact `backlog-git` references from the relevant observation or the full commit
+OIDs and literal task paths already established at that boundary. Do not infer
+a historical revision from a current tip. Bind each reference to the canonical
+task ID and the selected repository:
+
+- Branch-local: use the bound code repository and literal repository-relative
+  task path. The identity is SHA-256 of UTF-8 `local:` plus the real canonical
+  Git common directory. Use the exact observed integration/Episode code commits
+  for the comparison in question, not the starting `baseRef` by default.
+- Independent: use the already selected task clone (the owner's for owner
+  publication/cleanup and the Episode's for handoff). The identity is SHA-256
+  of UTF-8 `remote:` plus the selected task remote URL, with trailing whitespace
+  removed. Do not expose the URL. Paths are relative to the nested store;
+  code heads are not task revisions.
+
+Use the bounded Backlog Git procedure in the project's canonical handoff
+workflow. Verify the repository identity, full commit OID and exact literal
+regular blob (`git --no-replace-objects --literal-pathspecs ls-tree -z`); verify
+its committed header's canonical ID with native Backlog, not the filename.
+Stream `git cat-file blob` or a Git diff of the verified blobs (no ext-diff or
+textconv) in roughly 4096-byte windows with offsets and incremental UTF-8
+decoding. Include the relevant fields and tail; check process exit and byte
+count for a complete blob read. Do not dump, copy, or persist ticket snapshots.
+A readable reference is not publication proof: retain direct remote/upstream
+and selected-ticket publication facts separately from code and retained local
+evidence.
+
+Report any missing, mismatched or unreadable evidence at the boundary that
+needs it. Do not substitute `HEAD`, tracking tips, index/working files, live
+native views, or guessed revisions. An unavailable optional historical
+comparison is not a new lifecycle gate. Preserve complete legacy evidence
+already supplied by older generations without rewriting or recapturing it.
+Keep native CLI reads, edits and readbacks for actual authorized authoring
+separate; only the Conversation publishes lifecycle status. Judge semantic
+compatibility, scope and readiness here, not by byte equality or a coded gate.
+
+Review one reported slice at a time: check ownership/code/tests/docs and the exact task/history observations (committed Backlog references or Beads native views). An unrelated-task descendant alone is compatible. Judge same-task changes as in-scope clarification or genuine semantic conflict, authority change, scope expansion, or product decision. Apply before handoff, blockers, terminals and cleanup; no equality gate or classifier replaces judgment.
 
 A report, findings, and Review conclusions are evidence, not approval. Choose:
 
@@ -52,8 +91,9 @@ The remaining lifecycle and cleanup flow applies only to version 2 task-native o
 
 Before merge readiness, verify provider-reported idle completion of the Episode and explicitly proven descendants through Prime Agent list/state responses. Only recursive explicit parent session ID or canonical parent session-file edges prove descendants; require agreement when both exist. CWD/RLM metadata grants no ownership. Active or unprovable-idle sessions block readiness and merge; cleanup independently rechecks before mutation.
 
-Handoff supplies complete native/code and session list/state observations to both
-prompts. Judge status, meaningful plan/design, code publication and idle
+Handoff supplies exact task/code and native session list/state observations to both
+prompts. For Backlog, use the previous/current independent or integration/Episode
+branch-local Git pair; preserve an already-recorded legacy pair unchanged. Judge status, meaningful plan/design, code publication and idle
 completion/children/queues here, not in code-level dirt/upstream/ancestry/role-depth
 checks. Beads prior may be `blocked`; local revisions/success are not publication
 proof. Task-native first delivery uses one `followUp` request with
@@ -122,7 +162,8 @@ host/placement, original code basis and integration target. Resolve a changed
 route through supported native facts to that SAME durable session, never by
 name/CWD alone. No allocation or rebinding.
 
-Read current published full native task/history and meaningful living plan,
+Read the exact published Backlog ticket and relevant committed diffs (or current
+published full native Beads task/history) and meaningful living plan,
 accepted bounded focus, code/head/publication/worktree facts, available historical
 observations and fresh native Episode and explicitly proven descendant
 state/actions/queues. Keep complete raw fields, unknown keys, nulls and absence
@@ -188,7 +229,7 @@ endpoint or classifier. This does not change retained version-1 and
 initial-creation recovery. Global activation/restart/UAT and actual historical
 case recovery require separate authority and loaded-generation proof.
 
-Only the owning Conversation publishes accepted blockers. Grandfathered Backlog uses exact-task code-DAG commits/pushes. Independent Backlog commits/pushes only the task path to `HEAD:refs/heads/prime-claw/tasks`, leaving code HEAD unchanged; synchronize the Conversation's own clone for publication, while handoff prepares only the Episode clone. Preserve unrelated bytes/index/history. Restore `In Progress` before continuation. Judge native prior/current views, code-head/upstream observations, eligibility and compatibility in editable guidance, not equality or frozen-head gates. Record observations after admission.
+Only the owning Conversation publishes accepted blockers. Grandfathered Backlog uses exact-task code-DAG commits/pushes. Independent Backlog commits/pushes only the task path to `HEAD:refs/heads/prime-claw/tasks`, leaving code HEAD unchanged; synchronize the Conversation's own clone for publication, while handoff prepares only the Episode clone. Preserve unrelated bytes/index/history. Restore `In Progress` before continuation. Judge status, blocker/clearance notes and compatible advances from the relevant exact Backlog blobs and diffs. Independent status publication can supply `taskHistory.taskEvidence` at `publishedHead` and optional `taskHistory.previousTaskEvidence` at `baseHead`; use the exact branch-local task-only commits for equivalent comparisons. Treat a missing pre-edit checkpoint as unavailable, not a fresh tip or a required approval predicate. Judge eligibility and code publication separately in editable guidance. Record observations after admission.
 
 For Beads, current synchronized native status—not the older ownership observation—governs. Inspect exact bindings, raw task, native history, working set and publication ref under the consequence procedure above. Only current `in_progress` may receive one guarded `--if-status in_progress` status-plus-note update recording truthful blocker evidence and exact unblock condition; push once without force and verify `blocked` status/note inclusion in native history/publication. Already `blocked` is a no-op; other states or uncertainty stop without retry/force/raw writes. Only cleared operator or accepted evidence permits one guarded `--if-status blocked` update with truthful clearance evidence, one non-force `in_progress` publication, then `handoff_task_episode`. Never write `ownership.json` directly in ordinary oversight or keep an artificial `in_progress` snapshot; semantic meaning remains LLM judgment. Only the owning Conversation's targeted documented creation-recovery exception permits an edit: use its current registry lock, compare before editing the unchanged selected entry, preserve other owners, and reread afterwards. Episode/Expert roles gain no exception.
 
@@ -204,7 +245,12 @@ Apply **Abandon** only after explicit operator confirmation of task and pushed E
 
 **Cleanup** follows after the operator-authorized terminal outcome is committed, pushed and verified; no second confirmation. Judge task/history/code/publication/runtime facts here, not in TypeScript. Backlog needs active Done for merged work or archived non-`Done` with the exact abandonment Final Summary; Beads needs published `done` with merged code or exact-reason `closed` without merged code. Local revisions/exit-zero/push alone are insufficient. Never delete the integration branch.
 
-Call cleanup-only `finalize_task_episode` with exact `taskId`, `episodeHead`, and `merged`/`abandoned` outcome. Raw observations return in text/details. Independent Backlog removes its Episode clone: inspect local commits/publication without frozen-revision/equal-head/classifier gates. Preserve unrelated primary work and uncommitted resource bytes. Exact identity/collision/ref/head compare-delete and supported idle-runtime safety remain mechanical. Remove owned resources/descendants/upstream, verify absence; cleanup atomically removes only the unchanged owner entry. No lifecycle edit/push/shared-store/server removal/progress store.
+Before calling cleanup for Backlog, inspect the proven published terminal ticket
+and the relevant exact active/archive path facts using the procedure above.
+Verify the Episode workspace facts separately; the cleanup observation does not
+prove terminal task publication or report an Episode task-clone publication.
+
+Call cleanup-only `finalize_task_episode` with exact `taskId`, `episodeHead`, and `merged`/`abandoned` outcome. Factual observations return in text/details. Backlog `providerTaskObservation.active` and, on abandonment, `.archived` report `available` with a Git reference, `absent` after a successful empty lookup, or `unavailable` on proof failure. Verify the literal active/archive path and inspect the exact committed content at the observed integration commit (branch-local) or primary task-clone commit (independent). Compare only verified blobs. For independent Backlog, `previousTaskEvidence` is the recorded prior active checkpoint or `unavailable`; report this gap without treating it as a refusal or undoing completed cleanup. Do not infer absence from unavailable evidence or publication from readability. Beads retains raw observations. Independent Backlog removes its Episode clone: inspect local commits/publication without frozen-revision/equal-head/classifier gates. Preserve unrelated primary work and uncommitted resource bytes. Exact identity/collision/ref/head compare-delete and supported idle-runtime safety remain mechanical. Remove owned resources/descendants/upstream, verify absence; cleanup atomically removes only the unchanged owner entry. No lifecycle edit/push/shared-store/server removal/progress store.
 
 Backlog archive is reversible/read-only, reserves the ID, and preserves status/relationships; restore before any edit. Only separately authorized native `backlog task delete TASK-ID` on an archived task permanently deletes it and vacates its identity; it is not archive or ordinary merged cleanup.
 

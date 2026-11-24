@@ -13,7 +13,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
     body = raw.split("---", 2)[-1]
     words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 3300
+    assert 300 <= len(words) <= 3900
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -22,7 +22,7 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Version 1 selects retained folder oversight; version 2 selects task-native oversight",
         "Version 2 selects its persisted provider only",
         "binds grandfathered task ID/path",
-        "40-hex `providerRevision`/complete native `taskEvidence`",
+        "40-hex `providerRevision` and `taskEvidence` (Git reference or retained legacy view)",
         "Native fields own the contract",
         "never `.ralph/plans`",
         "The Episode owns content; the Conversation owns status",
@@ -118,7 +118,7 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "Absent provider, or Backlog without revision/evidence",
         "independent task history",
         "binds grandfathered task ID/path",
-        "40-hex `providerRevision`/complete native `taskEvidence`",
+        "40-hex `providerRevision` and `taskEvidence` (Git reference or retained legacy view)",
         'Beads has no `taskPath`',
         "observed `providerRevision`",
         "raw `taskEvidence`",
@@ -127,8 +127,8 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "`bd show TASK-ID --json --long --include-comments`",
         "no force, uncertain retry, raw Dolt writes",
         "normalized mirror or alternate authority",
-        "persisted/current native task/history observations",
-        "supplies complete native/code and session list/state observations",
+        "exact task/history observations (committed Backlog references or Beads native views)",
+        "supplies exact task/code and native session list/state observations",
         "An unrelated-task descendant alone is compatible",
         "in-scope clarification or genuine semantic conflict",
         "genuine semantic conflict, authority change, scope expansion, or product decision",
@@ -138,8 +138,8 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "Record it through canonical handoff with `handoff_task_episode`",
         "guidance supplies only bounded focus",
         "findings, and Review conclusions are evidence, not approval",
-        "Handoff supplies complete native/code and session list/state observations",
-        "native/code and session list/state observations",
+        "Handoff supplies exact task/code and native session list/state observations",
+        "native session list/state observations",
         "local revisions/success are not publication proof",
         "record only native/code observations",
         "no equality gate or classifier replaces judgment",
@@ -403,3 +403,17 @@ def test_execute_only_continuation_is_new_owner_authority_not_replay():
     for copy in (entry, handoff, execute, blocked):
         assert "verified pre-work runtime interruption" in copy
         assert "prime-claw-oversee-episode" in copy
+
+
+def test_backlog_lifecycle_guidance_uses_bounded_committed_evidence() -> None:
+    text = " ".join(GUIDE.read_text().split())
+    for phrase in (
+        "Inspect Backlog committed ticket evidence",
+        "roughly 4096-byte windows",
+        "Do not dump, copy, or persist ticket snapshots",
+        "`taskHistory.taskEvidence` at `publishedHead`",
+        "optional `taskHistory.previousTaskEvidence` at `baseHead`",
+        "`providerTaskObservation.active` and, on abandonment, `.archived`",
+        "Do not infer absence from unavailable evidence or publication from readability",
+    ):
+        assert phrase in text

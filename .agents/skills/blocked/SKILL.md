@@ -79,29 +79,30 @@ report is unavailable, stop and require recovery of that exact report and
 Episode identity rather than inventing it from task content. Do not inspect or
 move `.ralph/plans`, select replacement work, or start another admission.
 
-For provider-absent/Backlog task mode, use `/skill:backlog`, then reload the
-exact owned task through the supported structured interface:
+For provider-absent/Backlog task mode, read the exact committed `Blocked`
+ticket in the selected owner store. Use **Inspect Backlog committed ticket
+evidence** in `prime-claw-oversee-episode`. In branch-local history use the
+bound literal path and observed integration code commit; in independent history
+use the exact published task revision and nested-store-relative path. A trusted
+prior reference may come from the handoff observation, recorded independent
+ownership checkpoint, or the status publication result. Compare only verified
+committed blobs in bounded ranges. If a prior checkpoint is missing, report that
+comparison gap; do not invent one or use the current ticket twice. Preserve
+already-recorded legacy raw evidence without copying or recapturing it.
 
-```sh
-backlog task view --json -- TASK-ID
-```
+Read the recorded blocker and clearance condition. Judge actual same-task
+changes, conflicts or scope changes, not equality with the older record or
+whole-clone cleanliness. Keep direct remote publication facts separate from
+blob readability. If current committed evidence needed for the decision is
+unavailable, report it rather than falling back to a live task read. Preserve
+unrelated bytes/staging/history and compatible descendants. Never reset, absorb
+or force another writer's work.
 
-Require the returned canonical ID and project-relative task path to match the
-ownership record, and require status to be exactly `Blocked` in the selected
-Backlog store. The task is the sole lifecycle authority in this branch.
-Grandfathered Backlog reads the bound integration-branch task in the primary checkout. Independent Backlog inspects
-and synchronizes only this owning Conversation's intended task workspace when
-needed. Preserve unrelated bytes/staging and compatible history descendants;
-inspect actual native conflicts or unavailable selected-task publication, not
-whole-clone cleanliness or code-upstream equality. Never reset, absorb or force
-another writer's work. Compare the persisted complete
-native `taskEvidence` with the freshly synchronized exact task view. An
-unrelated-task descendant alone is compatible. For an outside same-task change,
-use bounded semantic judgment: preserve a compatible in-scope clarification or
-living-plan update, and stop without mutation for a genuine semantic conflict,
-authority change, scope expansion, or product decision. Raw inequality is not
-an approval gate; never add an equality gate or deterministic classifier. Work
-with the user to satisfy the recorded unblock condition. After the user or accepted
+Before an authorized change use `/skill:backlog`, synchronize only this
+Conversation's intended workspace when needed, then use the supported structured
+`backlog task view --json -- TASK-ID` to verify exact ID, path, parent and
+`Blocked` status before editing. Verify these facts and the intended status/note
+after the edit. Native authoring readback is not historical evidence. Work with the user to satisfy the recorded unblock condition. After the user or accepted
 evidence clears it, only that exact owning Conversation may publish the same
 task as `In Progress`. Grandfathered Backlog preserves the existing one exact-
 task-only integration-branch commit: unrelated code dirt is allowed. Inspect the selected diff
@@ -110,7 +111,9 @@ index entries. Commit each coherent authorized blocker/clearance note ASAP and
 publish promptly; do not wait for handoff or session end. Independent Backlog uses the supported CLI in the primary
 nested clone, commits only the exact task path, pushes
 `HEAD:refs/heads/prime-claw/tasks` without force, proves the direct remote head,
-and proves canonical code HEAD unchanged. Then continue the same ownership, branch, worktree, and session through
+and proves canonical code HEAD unchanged. Verify the resulting `In Progress` ticket from its exact committed reference,
+and prove publication separately. Then continue the same ownership, branch,
+worktree, and session through
 `handoff_task_episode`.
 
 For Beads task mode, current synchronized native state—not the older ownership

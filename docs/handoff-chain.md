@@ -567,6 +567,25 @@ or persist full snapshots. If the exact repository, commit, path or bound task
 ID cannot be verified, report the evidence gap. Do not substitute `HEAD`, a
 tracking ref, mutable files, the index or a live task view.
 
+The same committed-blob procedure applies to owner oversight, expert review,
+block/resume, and terminal judgments. Use the store already selected for that
+boundary: independent owner lifecycle evidence belongs to the owner's task
+clone, not a mutable Episode checkout; branch-local evidence belongs to the
+bound code repository. Pass reviewers exact references (or proven commit/path
+coordinates) and separate publication facts, not ticket copies. For independent
+status publication, inspect `taskHistory.taskEvidence` at `publishedHead` and
+compare optional `taskHistory.previousTaskEvidence` at `baseHead` when relevant.
+For branch-local status publication use the exact observed task-only commits;
+a local commit alone is not publication. Native CLI reads and readback for an
+authorized edit do not substitute for committed evidence.
+
+Before terminal cleanup, the owner independently verifies the published
+terminal ticket and selected workspace/code facts. After cleanup, inspect
+returned active/archive and prior evidence as available, keeping absence,
+unavailability and publication distinct. An unavailable optional historical
+comparison is not an approval or cleanup gate. Beads and retained observations
+keep their existing native shapes.
+
 The reader does not choose a store, verify live publication, or judge readiness.
 Those remain at the existing lifecycle boundaries. Independent creation and
 ordinary handoff/execute-only in both Backlog topologies use Git references.
