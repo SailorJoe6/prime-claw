@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T14:20:00Z'
+updated_date: '2026-11-24T14:25:00Z'
 labels: []
 dependencies: []
 references:
@@ -73,6 +73,7 @@ modified_files:
   - src/prime-agent-plugin/workflows/implement-task-prep.md
   - src/prime-agent-plugin/workflows/implement-task.md
   - tests/reviewed_plan_extension.test.mjs
+  - tests/test_future_plan_skills.py
 priority: p0
 type: bug
 ordinal: 153000
@@ -231,6 +232,10 @@ Bounded readiness repair candidate f14070bcadaca465ffc5b6235082f532c382a17b for 
 Offline Docker Backlog 1.55.3: both registered default-resolver >1 MiB fixtures failed against 0836643c at native buffered lookup, then passed on this candidate without resolver injection or buffer increase. Both prompts carry the exact Git reference and no native ticket copy; independent fixture keeps a different local commit from the directly observed published head. Beads envelope, readiness policy/placement and transport-uncertainty cases passed. Final broader suite: 738/740 (.test-results/primeclaw-69-readiness/final-focused.log). The two failures reproduced on unchanged 0836643c (.test-results/primeclaw-69-readiness/unrelated-baseline.log): stale handoff guidance metadata assertion and Beads continuation fixture journal identity mismatch. A supplementary Python collection attempt could not run in the cached image (missing PyYAML); not counted as passing. Tier 1 with offline RPC probe passed on the exact clean candidate, network absence and teardown verified (.test-results/20261124T141142Z-95290-d4581a79/tier1/manifest.json).
 
 No live readiness/recovery, TASK-2, AWS, merge, activation or cleanup. Acceptance checkboxes and Final Summary remain as recorded pending owner review; status remains In Progress.
+
+Test-only readiness revision 57918f84fa99d3035c18061e35379f5e2b1c5db1, on f14070bcadaca465ffc5b6235082f532c382a17b (canonical execute observation aa490ae5). Only tests/test_future_plan_skills.py changed. The prep policy assertions now require bounded inspection of exact committed localTaskEvidence, its full commit OID and literal path, and the canonical task ID/path check. The remaining readiness, Beads, and retained-folder assertions are unchanged. No runtime code or workflow guidance changed.
+
+Python 3.14.4, pytest 9.0.3, PyYAML 6.0.3. Command: PYTHONDONTWRITEBYTECODE=1 python3.14 -m pytest -p no:cacheprovider -q tests/test_future_plan_skills.py::test_task_native_implementation_policies_are_publicly_activated_with_folder_compatibility. Baseline f14070bcadaca465ffc5b6235082f532c382a17b: 1 failed at the obsolete prep assertion for `backlog task view --json -- TASK-ID` (.test-results/primeclaw-69-readiness-policy/baseline.log). Candidate 57918f84fa99d3035c18061e35379f5e2b1c5db1: 1 passed (.test-results/primeclaw-69-readiness-policy/candidate.log). No live lifecycle action, merge, activation, cleanup, or TASK-2 retry. Status remains In Progress.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
