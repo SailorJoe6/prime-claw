@@ -33,6 +33,8 @@ import {
   resolveLegacyTaskOwnershipTransitionTarget,
 } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
 
+import { makeBacklogGitEvidence, readBacklogGitEvidence } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
+
 const FULL_CANONICAL_CONFIG = [
   'project_name: "x"',
   'default_status: "In Design"',
@@ -2096,4 +2098,67 @@ test("explicit local-only custom root override preserves the original independen
   assert.equal(replay.status, "prepared", JSON.stringify(replay));
   assert.equal(replay.head, prepared.head);
   assert.deepEqual(transportCalls, []);
+});
+
+
+test("Backlog Git evidence reads exact independent history after branch advance, without a snapshot", async () => {
+  const { dir, root, remote } = fixtureRepo();
+  try {
+    const path = "tasks/task-1 - literal [ticket].md";
+    const prefix = Buffer.from("---\nid: TASK-1\ntitle: literal ticket\nstatus: In Progress\n---\n\n## Description\n\n");
+    const longLine = Buffer.from("é".repeat(540_001));
+    const old = Buffer.concat([prefix, longLine, Buffer.from("\nOLD TAIL\n")]);
+    const next = Buffer.concat([prefix, longLine, Buffer.from("\nNEW TAIL\n")]);
+    const first = publishTaskBranch(remote, { "config.yml": FULL_CANONICAL_CONFIG, [path]: old });
+    const store = join(root, "custom-store");
+    git(root, "clone", "--branch", "prime-claw/tasks", "--single-branch", remote, store);
+    const selected = { topology: "independent", root: store, remote: "origin" };
+    const before = await makeBacklogGitEvidence(selected, first, path, "TASK-1");
+    assert.deepEqual(Object.keys(before).sort(), ["commit", "kind", "path", "repository"]);
+    assert.ok(JSON.stringify(before).length < 320);
+    const second = publishTaskBranch(remote, { [path]: next });
+    git(store, "pull", "--ff-only");
+    const after = await makeBacklogGitEvidence(selected, second, path, "TASK-1");
+    assert.match(git(store, "diff", "--no-ext-diff", "--no-textconv", "--unified=0",
+      `${before.commit}:${before.path}`, `${after.commit}:${after.path}`), /-OLD TAIL\n\+NEW TAIL/);
+    writeFileSync(join(store, path), "mutable file is not evidence\n");
+    for (const [ref, expected] of [[before, old], [after, next]]) {
+      for (const offset of [0, 4093, 65_535, 1024 * 1024, expected.length - 9, expected.length]) {
+        const { bytes, totalBytes } = await readBacklogGitEvidence(selected, ref, "TASK-1", offset);
+        assert.equal(totalBytes, expected.length);
+        assert.deepEqual(bytes, expected.subarray(offset, offset + 4096));
+      }
+    }
+    await assert.rejects(readBacklogGitEvidence(selected, before, "TASK-2"), /canonical task ID mismatch/);
+    await assert.rejects(readBacklogGitEvidence(selected, { ...before, path: "tasks/missing.md" }, "TASK-1"), /exact regular ticket blob/);
+    await assert.rejects(readBacklogGitEvidence(selected, { ...before, commit: "f".repeat(40) }, "TASK-1"), /commit unavailable/);
+    await assert.rejects(readBacklogGitEvidence({ ...selected, root }, before, "TASK-1"), /commit unavailable/);
+    git(store, "remote", "set-url", "origin", join(dir, "foreign.git"));
+    await assert.rejects(readBacklogGitEvidence(selected, before, "TASK-1"), /repository mismatch/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("branch-local Git evidence binds the code commit and a regular literal ticket path", async () => {
+  const { dir, root } = fixtureRepo();
+  try {
+    const path = "backlog/tasks/task-1.md";
+    mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
+    const body = "---\r\nid: TASK-1\r\ntitle: test\r\n---\r\n\r\nbranch-local ticket\r\n";
+    writeFileSync(join(root, path), body);
+    symlinkSync("task-1.md", join(root, "backlog", "tasks", "link.md"));
+    git(root, "add", "backlog");
+    git(root, "commit", "-qm", "branch-local ticket");
+    const commit = git(root, "rev-parse", "HEAD");
+    const selected = { topology: "branch-local", root, remote: "origin" };
+    const ref = await makeBacklogGitEvidence(selected, commit, path, "TASK-1");
+    assert.equal((await readBacklogGitEvidence(selected, ref, "TASK-1")).bytes.toString(), body);
+    await assert.rejects(makeBacklogGitEvidence(selected, commit, "backlog/tasks/link.md", "TASK-1"), /exact regular ticket blob/);
+    await assert.rejects(makeBacklogGitEvidence(selected, "HEAD", path, "TASK-1"), /full commit/);
+    await assert.rejects(readBacklogGitEvidence({ ...selected, topology: "independent" }, ref, "TASK-1"), /repository mismatch/);
+    const local = { ...selected, remote: null };
+    const localRef = await makeBacklogGitEvidence(local, commit, path, "TASK-1");
+    const worktree = join(dir, "worktree");
+    git(root, "worktree", "add", "--detach", worktree, commit);
+    assert.equal((await readBacklogGitEvidence({ ...local, root: worktree }, localRef, "TASK-1")).bytes.toString(), body);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

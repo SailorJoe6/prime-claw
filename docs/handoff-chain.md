@@ -398,6 +398,44 @@ a user-global refresh, one coordinated full restart, and resumed owner and
 Episode proof. Copying files or requesting compaction is not proof.
 
 
+## Backlog Git evidence reader (PRIMECLAW-69 foundation)
+
+A `backlog-git` reference identifies the selected topology and repository,
+full commit OID, and literal ticket path relative to that repository. For an
+independent store, the path is relative to the nested clone, not the code
+worktree. For branch-local Backlog, it is relative to the code repository.
+Repository identity binds the selected Git transport URL by digest, or the
+canonical Git common directory for an already authorized local-only store.
+A local-only reference does not imply publication or portability.
+
+The managed `readBacklogGitEvidence` helper takes the already selected
+repository and canonical task ID. It checks the commit and regular ticket
+blob and matches the ID from the native Backlog header. It returns up to
+4096 raw bytes at the requested byte offset, plus the total byte length.
+Advance by the returned byte count until the total is reached. Decode adjacent
+ranges with a streaming UTF-8 decoder if a character crosses a range boundary.
+No line length limit shortens the evidence.
+
+After validating each reference in the selected repository, use native Git
+for inspection and comparison. For example, pass the quoted `OID:path`
+arguments from the respective references (not from `HEAD`):
+
+```bash
+git --no-replace-objects -C "$root" cat-file blob "$oid:$path"
+git --no-replace-objects -C "$root" diff --no-ext-diff --no-textconv \
+  "$old_oid:$old_path" "$new_oid:$new_path"
+```
+
+In an agent REPL, stream the output in byte windows of about 4096 bytes from
+stdout and keep track of offsets, including within long lines. Check Git's
+exit result before treating the read as evidence. Do not dump or persist the
+full output as a task snapshot. If the exact repository, commit, path, or
+ID cannot be verified, report the evidence gap; do not use the working tree.
+
+The reader does not choose a store, verify live publication, or judge readiness.
+Those remain at the existing lifecycle boundaries. This foundation does not
+yet change which evidence the lifecycle writes or delivers.
+
 ## Authority
 
 The Conversation may use Episode handoff after accepting an in-scope candidate
