@@ -439,13 +439,16 @@ selector and prints the plan without contacting Docker or verifying bytes.
 `--smoke` ignores selectors as before. The pytest fixture does not accept this
 input; it is a standalone probe route only.
 
+The opt-in image target provides a native musl loader and musl builds of
+`libstdc++` and `libgcc_s` without changing the default Tier-1 image target.
 After verifying the run-owned container has no networks, the driver copies only
 the selected file. It checks SHA-256 inside Docker before opening the archive,
 extracts regular files and directories into container-local storage, and keeps
 `prime-agent` beside its bundled assets. The existing isolated probe wrapper
 runs the archive executable, with no host home, provider credentials, or live
 agent state. The run manifest records the requested archive digest and, if
-available, the observed executable hash and version, not the host path. A
+available, the observed executable hash and full Pi version (including a
+fourth component when present), not the host path. A
 matching checksum verifies bytes, not publisher trust, and a passing probe
 is not runtime qualification. The qualified source target and DD-003/DD-005
 remain unchanged. Do not use this route for installation or activation.

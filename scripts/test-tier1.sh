@@ -341,6 +341,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
     fi
     echo "dry-run: disconnect captured networks; verify empty network set"
     if [ -n "$PI_ARCHIVE" ]; then
+        echo "dry-run: Pi-only musl image target tier1_pi_archive"
         echo "dry-run: offline single-file copy, SHA-256 verification and container-local extraction"
     fi
     if [ "$SMOKE" -eq 1 ]; then
@@ -384,6 +385,9 @@ IFS=$'\t' read -r DOCKERFILE_HASH BUILD_INPUT_HASH <<EOF
 $(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance build-input "$BUILD_CONTEXT" Dockerfile)
 EOF
 IMAGE_TAG="prime-claw-test-tier1:${BUILD_INPUT_HASH:0:12}"
+if [ "$MODE" = pi-archive ]; then
+    IMAGE_TAG="prime-claw-test-tier1-pi:${BUILD_INPUT_HASH:0:12}"
+fi
 echo "tier-1 driver: captured-tag=$IMAGE_TAG"
 IIDFILE="$TIER_DIR/image.iid"
 CIDFILE="$TIER_DIR/container.cid"
@@ -790,6 +794,7 @@ fi
 
 BUILD_ARGS=()
 if [ "$NO_CACHE" -eq 1 ]; then BUILD_ARGS+=(--no-cache); fi
+if [ "$MODE" = pi-archive ]; then BUILD_ARGS+=(--target tier1_pi_archive); fi
 BUILD_STARTED="$(now_utc)"
 phase image-build-started
 bounded "$BUILD_TIMEOUT" docker build ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} --iidfile "$IIDFILE" \
@@ -886,7 +891,7 @@ else
     elif [ "$MODE" = pi-archive ]; then
         INSTALLED_VERSION="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" \
             /workspace/scripts/run-prime-agent-probe.sh "$PA_COMMAND" --version 2>/dev/null | \
-            (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version))"
+            (cd "$REPO_ROOT" && python3 -m scripts.testing.provenance parse-version --pi))"
     else
         INSTALLED_VERSION="$(bounded "$DOCKER_TIMEOUT" docker exec "$CONTAINER_ID" \
             prime-agent --version 2>/dev/null | \

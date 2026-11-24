@@ -74,6 +74,16 @@ class TestSelectionFailClose(unittest.TestCase):
             with mock.patch.dict(os.environ,{"TIER1_ENV_FILE":str(envf)}), mock.patch.object(Path,"is_dir",side_effect=AssertionError("checkout stat")):
                 mode, selected = conftest._load_install_selection()
             self.assertEqual((mode,selected),("source",str(source))); self.assertEqual((source/"sentinel").read_text(),"keep")
+    def test_example_supports_source_and_pin_without_editing_other_keys(self):
+        template = (conftest.REPO / ".env.example").read_text()
+        with tempfile.TemporaryDirectory() as td:
+            envf = Path(td) / "test.env"
+            for key, value, mode in (("PRIME_AGENT_SOURCE", "/verified/source", "source"),
+                                     ("PRIME_AGENT_PINNED", "0.9.8", "pinned")):
+                with self.subTest(mode=mode), mock.patch.dict(os.environ, {"TIER1_ENV_FILE": str(envf)}):
+                    envf.write_text(template.replace(f"{key}=\n", f"{key}={value}\n"))
+                    self.assertEqual(conftest._load_install_selection(), (mode, value))
+
     def test_pinned_selector_returns_value(self):
         with tempfile.TemporaryDirectory() as td:
             envf=Path(td).resolve()/"pinned.env"; envf.write_text("PRIME_AGENT_PINNED=0.9.8\n")

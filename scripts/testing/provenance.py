@@ -383,6 +383,10 @@ _OBSERVED_SEMVER_RE = re.compile(
     r"(?<![0-9A-Za-z.-])([0-9]+\.[0-9]+\.[0-9]+"
     r"(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?"
     r"(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?)(?![0-9A-Za-z.-])")
+_PI_VERSION_RE = re.compile(
+    r"(?<![0-9A-Za-z.-])([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?"
+    r"(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?"
+    r"(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?)(?![0-9A-Za-z.-])")
 _SAFE_PLATFORM_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
 
@@ -391,6 +395,14 @@ def parse_prime_agent_version(output: str) -> str:
     matches = _OBSERVED_SEMVER_RE.findall(output)
     if len(matches) != 1:
         raise ProvenanceError("installed Prime Agent version is missing or ambiguous")
+    return matches[0]
+
+
+def parse_pi_version(output: str) -> str:
+    """Keep Pi's optional public fourth component, without changing SemVer parsing."""
+    matches = _PI_VERSION_RE.findall(output)
+    if len(matches) != 1:
+        raise ProvenanceError("installed Prime Agent Pi version is missing or ambiguous")
     return matches[0]
 
 
@@ -404,7 +416,7 @@ def _validate_image_fields(image: dict[str, Any]) -> None:
             or pure.as_posix() != dockerfile):
         raise ProvenanceError("invalid image.dockerfile")
     if not isinstance(image.get("informational_tag"), str) or not re.fullmatch(
-            r"prime-claw-test-(?:tier1|prime-agent-builder):[0-9a-f]{12}",
+            r"prime-claw-test-(?:tier1(?:-pi)?|prime-agent-builder):[0-9a-f]{12}",
             image["informational_tag"]):
         raise ProvenanceError("invalid image.informational_tag")
     for field in ("os", "architecture"):
@@ -438,7 +450,7 @@ def image_identity(raw: dict[str, Any], *, expected_id: str,
             or not _SHA256_RE.fullmatch(dockerfile_sha256)
             or not _SHA256_RE.fullmatch(declared_input_sha256)
             or not re.fullmatch(
-                r"prime-claw-test-(?:tier1|prime-agent-builder):[0-9a-f]{12}",
+                r"prime-claw-test-(?:tier1(?:-pi)?|prime-agent-builder):[0-9a-f]{12}",
                 informational_tag)):
         raise ProvenanceError("invalid captured image build identity")
     _utc_timestamp(build_started_at, "image.build_started_at")
@@ -469,7 +481,8 @@ def artifact_identity(
         text = raw.decode("utf-8", "strict") if isinstance(raw, bytes) else raw
     except UnicodeDecodeError as exc:
         raise ProvenanceError("installed artifact observation has unknown encoding") from exc
-    observed_version = parse_prime_agent_version(version)
+    parse_version = parse_pi_version if kind == "pi-native-binary" else parse_prime_agent_version
+    observed_version = parse_version(version)
     lines = text.splitlines()
     if len(lines) != 1:
         raise ProvenanceError("installed artifact observation is invalid")
@@ -2904,7 +2917,8 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                     "unavailable installed identity is valid only for failed runs")
         else:
             try:
-                observed = parse_prime_agent_version(str(installed))
+                parse_version = parse_pi_version if run["mode"] == "pi-archive" else parse_prime_agent_version
+                observed = parse_version(str(installed))
             except ProvenanceError as exc:
                 raise ProvenanceError("installed Prime Agent version is invalid") from exc
             if observed != installed:
@@ -3297,6 +3311,7 @@ def _main() -> int:
     invalidate_manifest.add_argument("relative", nargs="?", default="manifest.json")
     invalidate_manifest.add_argument("--expected")
     parse_version = sub.add_parser("parse-version")
+    parse_version.add_argument("--pi", action="store_true")
     now = sub.add_parser("now")
     args = parser.parse_args()
     if args.command == "allocate":
@@ -3361,7 +3376,8 @@ def _main() -> int:
             if invalidated is not None:
                 print(invalidated.encode())
     elif args.command == "parse-version":
-        print(parse_prime_agent_version(__import__("sys").stdin.read()))
+        parser = parse_pi_version if args.pi else parse_prime_agent_version
+        print(parser(__import__("sys").stdin.read()))
     elif args.command == "now":
         print(utc_now())
     return 0

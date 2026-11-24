@@ -144,3 +144,21 @@ WORKDIR /work
 # Default command is a smoke report; the driver (scripts/test-tier1.sh)
 # overrides it for real suite runs.
 CMD ["bash", "-lc", "node --version && python3 --version && pytest --version"]
+
+# Only the standalone Pi archive target needs musl. Keep musl libraries out of
+# Ubuntu's glibc search paths and leave the default target on tier1_runtime.
+FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2 AS pi_musl
+RUN set -eux; \
+    apk add --no-cache libstdc++; \
+    arch="$(apk --print-arch)"; \
+    case "$arch" in aarch64|x86_64) ;; *) exit 1 ;; esac; \
+    mkdir -p /out/lib /out/etc /out/opt/pi-musl; \
+    cp -L "/lib/ld-musl-$arch.so.1" "/out/lib/ld-musl-$arch.so.1"; \
+    ln -s "/lib/ld-musl-$arch.so.1" "/out/opt/pi-musl/libc.musl-$arch.so.1"; \
+    cp -L /usr/lib/libstdc++.so.6 /usr/lib/libgcc_s.so.1 /out/opt/pi-musl/; \
+    printf '%s\n' '/opt/pi-musl' > "/out/etc/ld-musl-$arch.path"
+
+FROM tier1_runtime AS tier1_pi_archive
+COPY --from=pi_musl /out/ /
+
+FROM tier1_runtime AS tier1_default

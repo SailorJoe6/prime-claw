@@ -128,6 +128,24 @@ class TestManifestValidation(unittest.TestCase):
         self.assertEqual(encoded, provenance.canonical_json(json.loads(encoded)))
         self.assertTrue(encoded.endswith("\n"))
 
+    def test_only_pi_manifest_and_artifact_accept_four_component_version(self):
+        version = "0.10.2.2"
+        raw = f"{'f' * 64}  prime-agent\n"
+        with self.assertRaises(provenance.ProvenanceError):
+            provenance.artifact_identity(version, raw)
+        manifest = _manifest()
+        manifest["run"]["mode"] = "pi-archive"
+        manifest["prime_agent"] = {
+            "mode": "pi-archive", "requested_sha256": "d" * 64,
+            "installed_version": version,
+            "artifact": provenance.artifact_identity(version, raw, kind="pi-native-binary"),
+        }
+        provenance.validate_manifest(manifest)
+        self.assertEqual(manifest["prime_agent"]["artifact"]["version"], version)
+        for malformed in ("0.10.2.2.3", "0.10.2.2 0.10.2"):
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.parse_pi_version(malformed)
+
     def test_smoke_manifest_requires_no_prime_agent_identity(self):
         manifest = _manifest()
         manifest["run"]["mode"] = "smoke"

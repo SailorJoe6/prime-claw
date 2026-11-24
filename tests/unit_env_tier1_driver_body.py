@@ -441,6 +441,7 @@ class TestPiArchiveSelector(unittest.TestCase):
             plan = h.run("--dry-run", "--probe", env=env)
             self.assertEqual(plan.returncode, 0, plan.stderr)
             self.assertIn("mode=pi-archive", plan.stdout)
+            self.assertIn("Pi-only musl image target tier1_pi_archive", plan.stdout)
             self.assertNotIn(str(archive), plan.stdout + plan.stderr)
             self.assertNotIn("vendor install", plan.stdout)
             for args, text in (

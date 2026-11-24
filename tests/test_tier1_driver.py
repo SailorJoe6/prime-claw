@@ -64,8 +64,8 @@ class TestDriverStatics(unittest.TestCase):
 class TestInformationalStatic(unittest.TestCase):
     def test_experimental_pi_input_is_documented_but_not_selected(self):
         selection = ENV_EXAMPLE.read_text().splitlines()
-        self.assertIn("PRIME_AGENT_PI_ARCHIVE=", selection)
-        self.assertIn("PRIME_AGENT_PI_SHA256=", selection)
+        self.assertIn("# PRIME_AGENT_PI_ARCHIVE=", selection)
+        self.assertIn("# PRIME_AGENT_PI_SHA256=", selection)
 
     def test_env_is_gitignored_and_documents_exactly_one(self):
         self.assertIn(".env",[x.strip() for x in (REPO/".gitignore").read_text().splitlines()])
