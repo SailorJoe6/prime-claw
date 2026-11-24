@@ -249,6 +249,17 @@ The first message's callback records only existing task/provider/code observatio
 execute is its sole follow-up. R1 preserves successful stderr; R2 preserves full
 create mutation results through one initial execute. No new mirror or assignment.
 
+### Independent Backlog status publication evidence
+
+Status mutation results use immutable ticket references instead of native JSON
+or copied diffs. A preceding reference is included only when the native read
+can be tied to the exact base blob. Before a verified commit, the result gives
+native operation facts but no new ticket reference. After a failed or
+interrupted push, `taskEvidence` and `committedHead` identify the retained local
+commit, not publication. A successful push reports its exact `publishedHead`;
+the later direct remote read is separate and can show a newer tip or be
+unavailable. None of these outcomes triggers a retry or reconciliation.
+
 ### Independent Backlog creation evidence
 
 For a new Episode from an existing independent Backlog ticket, creation streams

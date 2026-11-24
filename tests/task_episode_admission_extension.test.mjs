@@ -174,6 +174,7 @@ for (const scenario of ["oversized ticket", "retained local advance", "unavailab
     const listed = JSON.parse(execFileSync(BACKLOG, ["task", "list", "--json"], { cwd: root, encoding: "utf8" }));
     const taskId = listed.tasks?.[0]?.id;
     assert.ok(taskId);
+    let planned = view(root, taskId); // Discover the native path before adding large fields.
     // Keep each argument comfortably below OS limits. Author all content through Backlog.
     const oversized = scenario === "oversized ticket";
     const headerLabel = "large-header-" + "x".repeat(oversized ? 70 * 1024 : 16);
@@ -185,23 +186,48 @@ for (const scenario of ["oversized ticket", "retained local advance", "unavailab
       execFileSync(BACKLOG, ["task", "edit", ...label, "--append-notes", `${note}\nchunk ${i}\n${i === chunks - 1 ? tail : ""}`, "--plain", "--", taskId],
         { cwd: root, stdio: "ignore" });
     }
-    const nativeView = execFileSync(BACKLOG, ["task", "view", "--json", "--", taskId], {
-      cwd: root, encoding: "utf8", maxBuffer: 2 * 1024 * 1024,
-    });
-    if (oversized) assert.ok(Buffer.byteLength(nativeView) > 1024 * 1024, "native stdout must exceed Node's default sync buffer");
-    const planned = JSON.parse(nativeView).task;
-    assert.equal(planned.id, taskId);
-    assert.equal(planned.status, "In Planning");
-    assert.ok(planned.implementationNotes.endsWith(tail));
-    assert.ok(planned.labels.includes(headerLabel));
-    const assertOversizedHeader = (worktree) => {
-      if (!oversized) return;
-      const text = readFileSync(join(worktree, planned.path), "utf8");
-      const headerEnd = text.indexOf("\n---\n", 4);
-      assert.ok(headerEnd > 0 && Buffer.byteLength(text.slice(0, headerEnd)) > 64 * 1024,
-        "native task frontmatter must exceed 64 KiB");
+    // Read only bounded metadata for the large ticket and hash its body in chunks.
+    const readOversizedTicket = async (worktree, expectedStatus) => {
+      const hash = createHash("sha256");
+      let headerSeen = false;
+      let bodyTail = Buffer.alloc(0);
+      for await (const chunk of createReadStream(join(worktree, planned.path), { highWaterMark: 128 * 1024 })) {
+        let body = chunk;
+        if (!headerSeen) {
+          const headerEnd = chunk.indexOf("\n---\n", 4);
+          assert.ok(headerEnd > 64 * 1024, "oversized fixture frontmatter must exceed 64 KiB and fit in the first chunk");
+          const header = chunk.subarray(0, headerEnd).toString("utf8");
+          assert.equal(header.match(/^id: (.+)$/m)?.[1], taskId);
+          assert.equal(header.match(/^status: (.+)$/m)?.[1], expectedStatus);
+          assert.ok(header.includes(headerLabel), "native label must survive admission");
+          body = chunk.subarray(headerEnd + 5);
+          headerSeen = true;
+        }
+        hash.update(body);
+        bodyTail = Buffer.concat([bodyTail, body.subarray(-128)]).subarray(-128);
+      }
+      assert.ok(headerSeen, "oversized fixture must have frontmatter");
+      assert.ok(bodyTail.includes(tail), "native notes must retain the final marker");
+      return hash.digest("hex");
     };
-    assertOversizedHeader(root);
+    let plannedBody;
+    if (oversized) {
+      const native = spawn(BACKLOG, ["task", "view", "--json", "--", taskId], {
+        cwd: root, stdio: ["ignore", "pipe", "inherit"],
+      });
+      const nativeClosed = once(native, "close");
+      let nativeBytes = 0;
+      native.stdout.on("data", (chunk) => { nativeBytes += chunk.length; });
+      assert.deepEqual(await nativeClosed, [0, null]);
+      assert.ok(nativeBytes > 1024 * 1024, "native stdout must exceed Node's default sync buffer");
+      plannedBody = await readOversizedTicket(root, "In Planning");
+    } else {
+      planned = view(root, taskId);
+      assert.equal(planned.id, taskId);
+      assert.equal(planned.status, "In Planning");
+      assert.ok(planned.implementationNotes.endsWith(tail));
+      assert.ok(planned.labels.includes(headerLabel));
+    }
     git(prepared.storeDir, "add", ".");
     git(prepared.storeDir, "commit", "-qm", "plan oversized task");
     git(prepared.storeDir, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
@@ -307,12 +333,14 @@ for (const scenario of ["oversized ticket", "retained local advance", "unavailab
     assert.equal(result.taskEvidence.commit, result.providerRevision);
     assert.equal(result.taskEvidence.path, planned.path.replace(/^\.backlog\//, ""));
     assert.equal(result.taskEvidence.task, undefined);
-    const episodeView = JSON.parse(execFileSync(BACKLOG, ["task", "view", "--json", "--", taskId], {
-      cwd: result.worktree, encoding: "utf8", maxBuffer: 2 * 1024 * 1024,
-    })).task;
-    assert.equal(episodeView.implementationNotes, scenario === "retained local advance"
-      ? `${planned.implementationNotes}\n\nretained local marker` : planned.implementationNotes, "full native notes must survive admission");
-    assertOversizedHeader(result.worktree);
+    if (oversized) {
+      assert.equal(await readOversizedTicket(result.worktree, "In Progress"), plannedBody,
+        "full native body must survive admission byte for byte");
+    } else {
+      const episodeView = view(result.worktree, taskId);
+      assert.equal(episodeView.implementationNotes, scenario === "retained local advance"
+        ? `${planned.implementationNotes}\n\nretained local marker` : planned.implementationNotes, "full native notes must survive admission");
+    }
     const checkpoints = readFileSync(trace, "utf8").trimEnd().split("\n");
     const edited = checkpoints.indexOf(`edit\t${root}`);
     const episodeRead = checkpoints.indexOf(`view\t${result.worktree}`);

@@ -93,7 +93,13 @@ export interface TaskEpisodeReservationDependencies {
 
 export interface PublishedBacklogTaskEpisodeReservationInput {
   projectRoot: string;
-  publication: EpisodeTaskHistoryMutation;
+  publication: EpisodeTaskHistoryMutation | {
+    status: "published";
+    taskId: string;
+    taskPath: string;
+    publishedHead: string;
+    nativeAfter: string;
+  };
   ownerSessionId: string;
   engine: "orca" | "local";
   projectSetupId?: string;
@@ -949,18 +955,29 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
     throw new Error("Independent Backlog Episode reservation requires exact task and code Git revisions");
   }
   let taskEvidence: Record<string, unknown>;
-  try {
-    const parsed = JSON.parse(publication.nativeAfter) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-    taskEvidence = parsed as Record<string, unknown>;
-  } catch (error) {
-    throw new Error(`Independent Backlog Episode reservation received invalid native task evidence: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  const rawTask = taskEvidence.task;
-  if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
-      || (rawTask as Record<string, unknown>).id !== publication.taskId
-      || (rawTask as Record<string, unknown>).path !== publication.taskPath) {
-    throw new Error("Independent Backlog Episode reservation requires exact native task identity");
+  if ("taskEvidence" in publication) {
+    const reference = publication.taskEvidence;
+    if (reference.kind !== "backlog-git" || reference.repository.topology !== "independent"
+        || reference.commit !== publication.publishedHead
+        || resolve(publication.storeDir, reference.path) !== resolve(input.projectRoot, publication.taskPath)) {
+      throw new Error("Independent Backlog Episode reservation requires exact committed task evidence");
+    }
+    taskEvidence = { ...reference };
+  } else {
+    // Retain compatibility for legacy publication inputs and existing ownership.
+    try {
+      const parsed = JSON.parse(publication.nativeAfter) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+      taskEvidence = parsed as Record<string, unknown>;
+    } catch (error) {
+      throw new Error(`Independent Backlog Episode reservation received invalid native task evidence: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const rawTask = taskEvidence.task;
+    if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
+        || (rawTask as Record<string, unknown>).id !== publication.taskId
+        || (rawTask as Record<string, unknown>).path !== publication.taskPath) {
+      throw new Error("Independent Backlog Episode reservation requires exact native task identity");
+    }
   }
 
   const root = realpathSync(input.projectRoot);

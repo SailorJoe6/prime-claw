@@ -2085,9 +2085,8 @@ export type EpisodeTaskHistoryMutation =
       remoteRead: CommandResult;
       taskId: string;
       taskPath: string;
-      nativeBefore: string;
-      nativeAfter: string;
-      diff: string;
+      previousTaskEvidence?: BacklogGitEvidence;
+      taskEvidence: BacklogGitEvidence;
     }
   | {
       status: "blocked";
@@ -2103,6 +2102,8 @@ export type EpisodeTaskHistoryMutation =
         | "native-mutation-failed"
         | "commit-failed"
         | "push-failed"
+        | "push-uncertain"
+        | "committed-evidence-unavailable"
         | "unreadable";
       detail: string;
       remediation: string;
@@ -2113,13 +2114,14 @@ export type EpisodeTaskHistoryMutation =
       remoteHead?: string;
       taskId: string;
       taskPath?: string;
-      nativeBefore?: string;
-      nativeAfter?: string;
+      previousTaskEvidence?: BacklogGitEvidence;
+      /** Verified local commit, not proof of publication. */
+      taskEvidence?: BacklogGitEvidence;
+      committedHead?: string;
       nativeEdit?: CommandResult;
       commit?: CommandResult | null;
       push?: CommandResult;
       remoteRead?: CommandResult;
-      localDiff?: string;
     };
 
 /**
@@ -2687,7 +2689,7 @@ export function prepareEpisodeTaskHistoryWorkspace(input: EpisodeTaskHistoryWork
 // wiring, normalized task model, receipt, lock, checkpoint, or coordinator.
 // ---------------------------------------------------------------------------
 
-type NativeTaskView = { raw: string; id: string; path: string };
+type NativeTaskView = { id: string; path: string };
 type MutationClone = {
   primaryRoot: string;
   targetWorktree: string;
@@ -2720,16 +2722,16 @@ function readNativeTask(
 ): NativeTaskView | { error: string } {
   const result = runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd, allowFailure: true });
   if (result.status !== 0) {
-    return { error: result.stderr.trim() || result.stdout.trim() || `backlog task view exited ${result.status}` };
+    return { error: `backlog task view exited ${result.status}` };
   }
   try {
     const parsed = JSON.parse(result.stdout) as { task?: { id?: unknown; path?: unknown } };
     if (typeof parsed.task?.id !== "string" || typeof parsed.task?.path !== "string" || parsed.task.path.trim() === "") {
-      return { error: `native task view returned no exact string id/path: ${result.stdout.trim()}` };
+      return { error: "native task view returned no exact string id/path" };
     }
-    return { raw: result.stdout, id: parsed.task.id, path: parsed.task.path };
-  } catch (error) {
-    return { error: `native task view was not valid JSON: ${error instanceof Error ? error.message : String(error)}` };
+    return { id: parsed.task.id, path: parsed.task.path };
+  } catch {
+    return { error: "native task view was not valid JSON" };
   }
 }
 
@@ -3133,6 +3135,27 @@ export async function publishBacklogCreationHistory(
  * commit, and one non-force push. Reconciliation and lifecycle decisions belong
  * to the invoking workflow; this operation never fetches, merges, or retries.
  */
+// Tie native identity to committed bytes, not merely to a matching filename.
+// Raw hashing avoids filters and reads no ticket content into the result.
+function nativeTicketBlob(clone: MutationClone, path: string, runner: CommandRunner): string | undefined {
+  const result = runGit(runner, clone.storeDir, ["hash-object", "--no-filters", "--", path]);
+  const oid = result.stdout.trim();
+  return result.status === 0 && /^[0-9a-f]{40}$/.test(oid) ? oid : undefined;
+}
+
+function mutationTaskReference(
+  clone: MutationClone, head: string, path: string, nativeBlob: string | undefined, runner: CommandRunner,
+): BacklogGitEvidence | undefined {
+  if (!nativeBlob) return undefined;
+  const blob = runGit(runner, clone.storeDir, ["--no-replace-objects", "rev-parse", "--verify", `${head}:${path}`]);
+  if (blob.status !== 0 || blob.stdout.trim() !== nativeBlob) return undefined;
+  try {
+    return referenceCommittedBacklogTask({ root: clone.storeDir, remote: clone.remote, topology: "independent" }, head, path);
+  } catch {
+    return undefined;
+  }
+}
+
 export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInput): EpisodeTaskHistoryMutation {
   const runner = input.runner ?? new ProcessCommandRunner();
   if (!validNativeTaskEdits(input)) {
@@ -3163,7 +3186,7 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
     return mutationBlocked(input.taskId, "native-read-failed", `native resolution of ${input.taskId} failed: ${before.error}`, "inspect the native task read result; no mutation was attempted", evidence);
   }
   if (before.id !== input.taskId) {
-    return mutationBlocked(input.taskId, "identity-mismatch", `native resolution returned canonical ID ${JSON.stringify(before.id)}, not exact requested ID ${JSON.stringify(input.taskId)}`, "use the exact canonical task ID; no mutation was attempted", { ...evidence, nativeBefore: before.raw });
+    return mutationBlocked(input.taskId, "identity-mismatch", `native resolution returned canonical ID ${JSON.stringify(before.id)}, not exact requested ID ${JSON.stringify(input.taskId)}`, "use the exact canonical task ID; no mutation was attempted", evidence);
   }
   const taskFile = proveNativeTaskFileIdentity(clone.targetWorktree, clone.storeDir, before.path, runner);
   if (taskFile.status === "blocked") {
@@ -3171,30 +3194,38 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
   }
   const storeTaskPath = taskFile.storePath;
   const taskPathspec = `:(literal)${storeTaskPath}`;
-  const taskEvidence = { ...evidence, taskPath: before.path, nativeBefore: before.raw };
+  const beforeBlob = nativeTicketBlob(clone, storeTaskPath, runner);
+  const previous = readNativeTask(clone.targetWorktree, input.taskId, runner);
+  const previousTaskEvidence = !("error" in previous) && previous.id === before.id && previous.path === before.path
+    && beforeBlob === nativeTicketBlob(clone, storeTaskPath, runner)
+    ? mutationTaskReference(clone, baseHead, storeTaskPath, beforeBlob, runner) : undefined;
+  const targeted = { ...evidence, taskPath: before.path, ...(previousTaskEvidence ? { previousTaskEvidence } : {}) };
 
-  const nativeEdit = runner.run("backlog", nativeTaskEditArgs(input), { cwd: clone.targetWorktree, allowFailure: true });
+  const editResult = runner.run("backlog", nativeTaskEditArgs(input), { cwd: clone.targetWorktree, allowFailure: true });
+  // Backlog plain output can contain the entire edited ticket.
+  const nativeEdit: CommandResult = { ...editResult, stdout: "", stderr: "" };
   // Reread even a failed edit so partial native changes remain visible. No
   // cleanup, reset, or retry removes the provider's own failure evidence.
+  const observedBlob = nativeTicketBlob(clone, storeTaskPath, runner);
   const after = readNativeTask(clone.targetWorktree, input.taskId, runner);
-  const localDiff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", baseHead, "--", taskPathspec]);
   if ("error" in after) {
-    return mutationBlocked(input.taskId, nativeEdit.status === 0 ? "native-read-failed" : "native-mutation-failed", `native edit exit ${nativeEdit.status}; post-edit resolution failed: ${after.error}`, "inspect and retain the local task change and native results; no commit was attempted", { ...taskEvidence, nativeEdit, localDiff: localDiff.stdout });
+    return mutationBlocked(input.taskId, nativeEdit.status === 0 ? "native-read-failed" : "native-mutation-failed", `native edit exit ${nativeEdit.status}; post-edit resolution failed: ${after.error}`, "inspect and retain the local task change and native results; no commit was attempted", { ...targeted, nativeEdit });
   }
   if (after.id !== input.taskId || after.path !== before.path) {
-    return mutationBlocked(input.taskId, "identity-mismatch", `post-edit native identity changed from ${before.id} at ${before.path} to ${after.id} at ${after.path}`, "retain and inspect the local mutation; only the exact selected task path may be committed", { ...taskEvidence, nativeEdit, nativeAfter: after.raw, localDiff: localDiff.stdout });
+    return mutationBlocked(input.taskId, "identity-mismatch", `post-edit native identity changed from ${before.id} at ${before.path} to ${after.id} at ${after.path}`, "retain and inspect the local mutation; only the exact selected task path may be committed", { ...targeted, nativeEdit });
   }
   const taskFileAfter = proveNativeTaskFileIdentity(clone.targetWorktree, clone.storeDir, after.path, runner);
   if (taskFileAfter.status === "blocked" || taskFileAfter.storePath !== storeTaskPath) {
-    return mutationBlocked(input.taskId, "identity-mismatch", `post-edit task file identity is unsafe: ${taskFileAfter.status === "blocked" ? taskFileAfter.detail : `resolved path changed to ${taskFileAfter.storePath}`}`, "retain and inspect the local mutation without exposing an unsafe native view", { ...evidence, taskPath: before.path, nativeEdit, localDiff: localDiff.stdout });
+    return mutationBlocked(input.taskId, "identity-mismatch", `post-edit task file identity is unsafe: ${taskFileAfter.status === "blocked" ? taskFileAfter.detail : `resolved path changed to ${taskFileAfter.storePath}`}`, "retain and inspect the local mutation without exposing an unsafe native view", { ...targeted, nativeEdit });
   }
-  const editedEvidence = { ...taskEvidence, nativeAfter: after.raw, nativeEdit, localDiff: localDiff.stdout };
+  const editedEvidence = { ...targeted, nativeEdit };
   if (nativeEdit.status !== 0) {
-    return mutationBlocked(input.taskId, "native-mutation-failed", `native Backlog mutation failed: ${nativeEdit.stderr.trim() || nativeEdit.stdout.trim() || `exit ${nativeEdit.status}`}`, "inspect and retain any partial local task change; no commit or retry was attempted", editedEvidence);
+    return mutationBlocked(input.taskId, "native-mutation-failed", `native Backlog mutation failed: exit ${nativeEdit.status}`, "inspect and retain any partial local task change; no commit or retry was attempted", editedEvidence);
   }
 
   // Native Backlog may already have committed this exact edit. An unchanged
   // path needs no duplicate/empty commit; it is not a workflow refusal.
+  const afterBlob = observedBlob === nativeTicketBlob(clone, storeTaskPath, runner) ? observedBlob : undefined;
   const pending = selectedPathPending(clone, taskPathspec, runner);
   if (pending.status !== 0 && pending.status !== 1) {
     return mutationBlocked(input.taskId, "commit-failed", `reading the exact path for commit failed: ${pending.stderr.trim() || pending.stdout.trim() || `exit ${pending.status}`}`, "retain the local task change and inspect the native Git result; no push or retry was attempted", editedEvidence);
@@ -3209,6 +3240,10 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
   if (!committedHead) {
     return mutationBlocked(input.taskId, "unreadable", "the exact committed task-history HEAD could not be read", "retain the local commit and inspect native Git evidence; no push was attempted", { ...editedEvidence, commit });
   }
+  const taskEvidence = mutationTaskReference(clone, committedHead, storeTaskPath, afterBlob, runner);
+  if (!taskEvidence) {
+    return mutationBlocked(input.taskId, "committed-evidence-unavailable", "the exact committed blob could not be bound to the native task read", "retain the observed local head and inspect the selected path; no push was attempted", { ...editedEvidence, commit, localHead: committedHead });
+  }
   const push = pushTaskHistoryHead(clone, committedHead, runner);
   const localHead = refHead(runner, clone.storeDir, "HEAD");
   const remoteRead = runGit(runner, clone.storeDir, ["ls-remote", "--heads", clone.remoteUrl, TASK_HISTORY_REF]);
@@ -3216,15 +3251,15 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
   const remoteMatch = remoteRead.status === 0 && remoteLines.length === 1
     ? /^([0-9a-f]{40})\trefs\/heads\/prime-claw\/tasks$/.exec(remoteLines[0]) : null;
   const remoteHead = remoteMatch?.[1] ?? null;
-  const publicationEvidence = { ...editedEvidence, commit, push, remoteRead, localHead: localHead ?? undefined, remoteHead: remoteHead ?? undefined };
+  const publicationEvidence = { ...editedEvidence, committedHead, taskEvidence, commit, push, remoteRead, localHead: localHead ?? undefined, remoteHead: remoteHead ?? undefined };
   if (push.status !== 0) {
-    return mutationBlocked(input.taskId, "push-failed", `ordinary non-force push failed: ${push.stderr.trim() || push.stdout.trim() || `exit ${push.status}`}`, "retain the exact local commit and native remote observations for workflow judgment; no fetch, merge, force, or retry was attempted", publicationEvidence);
+    const uncertain = push.nativeStatus === null || Boolean(push.signal);
+    return mutationBlocked(input.taskId, uncertain ? "push-uncertain" : "push-failed", `ordinary non-force push ${uncertain ? "outcome uncertain" : "failed"}: ${push.stderr.trim() || push.stdout.trim() || `exit ${push.status}`}`, "retain the exact local commit and native remote observations for workflow judgment; no fetch, merge, force, or retry was attempted", publicationEvidence);
   }
 
   // A successful native push remains a successful push if another publisher
   // advances the remote afterward, or its later observation is unavailable.
-  const diff = runGit(runner, clone.storeDir, ["diff", "--no-ext-diff", baseHead, committedHead, "--", taskPathspec]);
-  return { status: "published", storeDir: clone.storeDir, remote: clone.remote, branch: TASK_HISTORY_BRANCH, baseHead, publishedHead: committedHead, localHead, remoteHead, taskId: input.taskId, taskPath: before.path, nativeBefore: before.raw, nativeAfter: after.raw, nativeEdit, commit, push, remoteRead, diff: diff.stdout };
+  return { status: "published", storeDir: clone.storeDir, remote: clone.remote, branch: TASK_HISTORY_BRANCH, baseHead, publishedHead: committedHead, localHead, remoteHead, taskId: input.taskId, taskPath: before.path, ...(previousTaskEvidence ? { previousTaskEvidence } : {}), taskEvidence, nativeEdit, commit, push, remoteRead };
 }
 
 /** Backward-compatible Episode-specific name for the shared primary/linked mutation seam. */
