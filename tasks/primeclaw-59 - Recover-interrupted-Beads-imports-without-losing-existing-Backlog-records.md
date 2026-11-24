@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T18:32:00Z'
+updated_date: '2026-11-24T18:35:00Z'
 labels: []
 dependencies: []
 references:
@@ -918,4 +918,9 @@ The operator confirmed that current Beads content replaces matching Backlog tick
 
 ### Execute following 5d2325e9 — implementation baseline
 The Episode starts at requirements commit 7ba3b977. The integration branch advanced to 110e200e and changed migration cutover to bind immutable Backlog ticket evidence at the published receipt revision. Preserve that cutover behavior when simplifying the target write/readback path. Validate only selected targets and required publication/ownership evidence; exercise empty, mixed and interrupted/rerun disposable fixtures before Docker Tier 1.
+
+### Execute following 5d2325e9 — native writer limitation
+Backlog 1.55.3 at pinned dependency 0cf4fdbc70020327f4366a29d3f405f83d180301 does not expose the two writes that the current contract needs through its shipped CLI, Web or MCP task interfaces. Create allocates the next ID (src/types/index.ts:125–149; src/core/backlog.ts:2231–2257). Edit only appends comments (src/cli.ts:3740–3745; src/server/index.ts:1169–1179; src/core/backlog.ts:2812–2829). Ignoring a stale destination comment, or using the allocating POST for a specific missing ID, would not meet criteria 1 and 4. Confirmed from installed CLI help and the pinned source, with independent read-only review; no write probe or migration test was run.
+
+Unblock with an approved writer that accepts an exact ID and a complete comment list. The narrow recommended option is a confirmed-migration-only writer using Backlog's native Markdown representation, target-only atomic writes and native readback, explicitly distinguished from ordinary Backlog task editing (which prohibits direct store edits). Existing prefix-maintenance skill is precedent for an explicitly scoped exception, not authorization for this switch. The pinned Core and serializer can represent the full task but are not exposed by the stock binary as an import primitive; using them would need a shipped integration decision. No dependency patch, delete/recreate workaround, broad validation or relaxed collision rule was used. Once the write boundary is resolved, use existing isolated empty/mixed fixtures with an accepted-write stop and same-command rerun; preserve main's published-receipt Git evidence and require exact-candidate Docker Tier 1. No code changed, no candidate or Tier 1 result, no live PVA action. Existing Episode and lifecycle state retained.
 <!-- SECTION:NOTES:END -->
