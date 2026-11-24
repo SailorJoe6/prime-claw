@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T07:01:00Z'
+updated_date: '2026-11-24T07:10:00Z'
 labels: []
 dependencies: []
 references:
@@ -31,6 +31,10 @@ modified_files:
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
   - .agents/skills/execute/SKILL.md
   - .prime-claw/workflows/handoff.md
+  - tests/test_reviewed_plan_extension.py
+  - tests/container/native_cold_episode_handoff.mts
+  - src/prime-agent-plugin/workflows/handoff.md
+  - src/prime-agent-plugin/skills/project-templates/execute.md
 priority: p0
 type: bug
 ordinal: 153000
@@ -107,6 +111,8 @@ Step 3 independent Backlog ordinary handoff and execute-only stopped before impl
 Step 3 independent Backlog continuation slice implemented for ordinary handoff and execute-only. Both verify exact prior and fetched published Git ticket references before delivery, with native canonical ID verification on committed frontmatter only, no fixed header gate or full native ticket snapshot. Preserve old journal records, separate retained local evidence and selected-path status from publication, and keep the existing delivery and factual update sequence. Editable workflows read/diff exact commits on demand. Final offline Docker affected suites passed 449/449 with zero skips (.test-results/primeclaw-69-continuation-cleared/scope-final.log), including committed >1 MiB native JSON, >64 KiB frontmatter, on-demand reads after history advance and pre-delivery refusal for missing/wrong evidence. Tier 1 passed with clean teardown (.test-results/20261124T064023Z-43527-354dad06/tier1/manifest.json). Wider JS sweep is not green: candidate run before integration assertion update and baseline both had 13 failures with overlapping out-of-scope failures and differing native-fixture failures; the updated integration test passed in the final affected suites. No claim of whole-lifecycle acceptance. Stop for owner review; no status transition, merge, activation or live continuation.
 
 Step 3 revision of 125bcb5b: registered execute-only distinguishes previous from fetched-published required Git evidence verification failures with a fixed category and exact full revision, without exposing native error details. Tests prove no delivery, retry, journal addition or factual update. The Git reader stages only frontmatter for the existing native parser in private scratch, replays it in bounded chunks and cleans it up; no ticket body or persistent snapshot is written and no header size gate was added. The >1 MiB header and existing >1 MiB ticket regressions passed. Focused offline Docker passed 450/450, zero skips (.test-results/primeclaw-69-step3-revision/focused.log). Tier 1 passed with clean teardown (.test-results/20261124T065559Z-99148-2dddc469/tier1/manifest.json). The wider JS suite was not rerun for this bounded revision; the prior step-3 candidate and baseline each had 13 failures (see earlier notes). No live continuation, status transition, merge or activation; stop for owner review.
+
+Branch-local step 3 candidate: ordinary handoff and execute-only verify exact integration and Episode code-commit ticket references in the bound code repository. No historical revision inferred from a legacy path, no snapshot or mutable fallback, and missing or mismatched evidence stops before journaling or delivery. Bounded committed reads and diffs, sequence and refusal behavior validated in linked worktrees; independent Backlog and Beads paths unchanged. Offline Docker: 454 passed, zero failures/skips (.test-results/primeclaw-69-branch-local/integrated-final.log); Tier 1 offline probe passed, teardown verified (.test-results/20261124T070708Z-75291-9cfad487/tier1/manifest.json). A separate initialization suite fails at module load with the same ProcessCommandRunner initialization error on accepted baseline d48fe435 (.test-results/primeclaw-69-branch-local/project-init-baseline.log); wider suite not rerun. No live continuation, lifecycle transition, merge or activation. Stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
