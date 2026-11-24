@@ -760,8 +760,14 @@ creates a second destination or retries automatically. Source deletion is
 refused on source drift, destination drift, incomplete proof, ownership drift,
 or ambiguous provider selection. There is no dual write, mirror, provider
 selection file, sidecar receipt, persistent lock, phase record, checkpoint, or
-resume state. The final destination-native receipt is the only durable
-migration artifact. Actual migration of a production repository remains an
+resume state. New switched Backlog ownership points to the verified regular
+committed ticket at the directly published receipt revision, using the exact
+task repository and its literal relative path. Native readback still verifies
+content and the receipt digest. A local commit or unproved publication is not
+cutover evidence; missing committed ticket proof stops before ownership or
+source retirement. Historical ownership is not rewritten to add references.
+The final destination-native receipt remains the only durable migration
+artifact. Actual migration of a production repository remains an
 operator-authorized upgrade action; initialization and ordinary startup never
 perform it automatically.
 

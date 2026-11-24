@@ -10,7 +10,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync, readdirSync, realpathSync, readlinkSync, renameSync, lstatSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -32,6 +32,8 @@ import {
 import {
   resolveLegacyTaskOwnershipTransitionTarget,
 } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
+
+import { makeBacklogGitEvidence, readBacklogGitEvidence, streamBacklogGitEvidence } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
 
 const FULL_CANONICAL_CONFIG = [
   'project_name: "x"',
@@ -1494,12 +1496,8 @@ function taskMarkdown(id, title, notes = "initial") {
   ].join("\n");
 }
 
-test("legacy transition target proves real independent Backlog publication in both existing native clones", (t) => {
-  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
-  const taskId = "TASK-BRIDGE";
-  const sourceReference = `legacy-episode-source=.ralph/plans/future/bridge; superseded-by=${taskId}`;
-  const taskPath = "tasks/task-bridge - Bridge.md";
-  const markdown = [
+function transitionTaskMarkdown(taskId, sourceReference, description = "") {
+  return [
     "---",
     `id: ${taskId}`,
     "title: Bridge retained authority",
@@ -1518,23 +1516,34 @@ test("legacy transition target proves real independent Backlog publication in bo
     "## Description",
     "",
     "Preserve the reviewed retained specification.",
+    description,
     "",
     "## Implementation Plan",
     "",
     "Complete bridge candidate plan",
     "",
   ].join("\n");
+}
+
+test("legacy transition target proves real independent Backlog publication in both existing native clones for a ticket over 1 MiB", async (t) => {
+  assert.ok(backlogAvailable(), "managed native Backlog is required for this proof");
+  const taskId = "TASK-BRIDGE";
+  const sourceReference = `legacy-episode-source=.ralph/plans/future/bridge; superseded-by=${taskId}`;
+  const taskPath = "tasks/task-bridge - Bridge.md";
+  const markdown = transitionTaskMarkdown(taskId, sourceReference, "x".repeat(1024 * 1024));
   const f = episodeFixture({ taskFiles: { [taskPath]: markdown } });
+  t.after(() => rmSync(f.dir, { recursive: true, force: true }));
+  assert.ok(Buffer.byteLength(markdown) > 1024 * 1024);
   assert.equal(existsSync(f.storeDir), false);
-  assert.throws(
+  await assert.rejects(
     () => resolveLegacyTaskOwnershipTransitionTarget(f.root, f.target, taskId),
     /pre-existing Episode Backlog workspace.*absent/,
   );
   assert.equal(existsSync(f.storeDir), false, "transition proof never creates the Episode task clone");
   const prepared = prepareEpisodeTaskHistoryWorkspace({ primaryRoot: f.root, targetWorktree: f.target });
-  assert.equal(prepared.status, "prepared");
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
 
-  const target = resolveLegacyTaskOwnershipTransitionTarget(f.root, f.target, taskId);
+  const target = await resolveLegacyTaskOwnershipTransitionTarget(f.root, f.target, taskId);
   assert.equal(target.provider, "backlog");
   assert.equal(target.history, "independent");
   assert.equal(target.providerRevision, f.primaryHead);
@@ -1543,11 +1552,67 @@ test("legacy transition target proves real independent Backlog publication in bo
   assert.equal(target.task.status, "In Progress");
   assert.equal(target.task.implementationPlan, "Complete bridge candidate plan");
   assert.deepEqual(target.task.references, [sourceReference]);
-  assert.equal(target.taskEvidence.task.id, taskId);
-  assert.equal(target.taskEvidence.task.path, `.backlog/${taskPath}`);
-  assert.equal(target.taskEvidence.task.status, "In Progress");
+  assert.deepEqual(target.taskEvidence, {
+    kind: "backlog-git",
+    repository: { topology: "independent", identity: target.taskEvidence.repository.identity },
+    commit: f.primaryHead,
+    path: taskPath,
+  });
+  assert.match(target.taskEvidence.repository.identity, /^[0-9a-f]{64}$/);
+  assert.deepEqual(target.episodeTaskEvidence, target.taskEvidence);
+  const primaryRepository = { topology: "independent", root: f.primaryStoreDir, remote: f.remoteName };
+  const episodeRepository = { ...primaryRepository, root: f.storeDir };
+  const offset = Buffer.byteLength(markdown) - 64;
+  for (const [repo, evidence] of [[primaryRepository, target.taskEvidence], [episodeRepository, target.episodeTaskEvidence]]) {
+    const { bytes, totalBytes } = await readBacklogGitEvidence(repo, evidence, taskId, offset);
+    assert.equal(totalBytes, Buffer.byteLength(markdown));
+    assert.deepEqual(bytes, Buffer.from(markdown).subarray(offset));
+  }
   assert.equal(git(f.primaryStoreDir, "status", "--porcelain"), "");
   assert.equal(git(f.storeDir, "status", "--porcelain"), "");
+});
+
+test("legacy transition target proves real branch-local Backlog evidence at both reviewed heads", async (t) => {
+  assert.ok(backlogAvailable(), "managed native Backlog is required for this proof");
+  const { dir, root } = fixtureRepo();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const taskId = "TASK-BRIDGE";
+  const sourceReference = `legacy-episode-source=.ralph/plans/future/bridge; superseded-by=${taskId}`;
+  const path = "backlog/tasks/task-bridge - Bridge.md";
+  const markdown = transitionTaskMarkdown(taskId, sourceReference);
+  mkdirSync(dirname(join(root, path)), { recursive: true });
+  writeFileSync(join(root, "backlog", "config.yml"), FULL_CANONICAL_CONFIG);
+  writeFileSync(join(root, path), markdown);
+  git(root, "add", "backlog");
+  git(root, "commit", "-qm", "Author branch-local transition ticket");
+
+  const episode = join(dir, "episode");
+  git(root, "worktree", "add", "-qb", "episode", episode);
+  git(episode, "commit", "--allow-empty", "-qm", "Reviewed Episode head");
+  const episodeHead = git(episode, "rev-parse", "HEAD");
+  git(root, "merge", "--no-ff", "-qm", "Review Episode on main", "episode");
+  git(root, "push", "-q", "origin", "main");
+  const mainHead = git(root, "rev-parse", "HEAD");
+  assert.notEqual(mainHead, episodeHead);
+
+  const target = await resolveLegacyTaskOwnershipTransitionTarget(root, episode, taskId, undefined, { mainHead, episodeHead });
+  assert.equal(target.provider, "backlog");
+  assert.equal(target.history, "branch-local");
+  assert.equal(target.task.taskId, taskId);
+  assert.equal(target.task.taskPathRelative, path);
+  assert.equal(target.task.status, "In Progress");
+  assert.equal(target.task.implementationPlan, "Complete bridge candidate plan");
+  assert.deepEqual(target.task.references, [sourceReference]);
+  assert.match(target.mainTaskEvidence.repository.identity, /^[0-9a-f]{64}$/);
+  assert.deepEqual(target.mainTaskEvidence, {
+    kind: "backlog-git",
+    repository: { topology: "branch-local", identity: target.mainTaskEvidence.repository.identity },
+    commit: mainHead,
+    path,
+  });
+  assert.deepEqual(target.episodeTaskEvidence, { ...target.mainTaskEvidence, commit: episodeHead });
+  assert.equal(git(root, "status", "--porcelain"), "");
+  assert.equal(git(episode, "status", "--porcelain"), "");
 });
 
 function mutationFixture() {
@@ -1593,17 +1658,17 @@ function nativeTask(root, id) {
   return JSON.parse(execFileSync("backlog", ["task", "view", "--json", "--", id], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })).task;
 }
 
-test("native task publication does not decide source status or meaningful plan eligibility", (t) => {
+test("native task publication does not decide source status or meaningful plan eligibility", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const fixture = mutationFixture();
   assert.equal(nativeTask(fixture.root, "TASK-1").implementationPlan ?? "", "");
-  const result = publishTaskHistoryMutation({
+  const result = await publishTaskHistoryMutation({
     primaryRoot: fixture.root, targetWorktree: fixture.root, taskId: "TASK-1",
     edits: [{ option: "--status", value: "Blocked" }],
   });
   assert.equal(result.status, "published");
-  assert.equal(JSON.parse(result.nativeBefore).task.status, "In Progress");
-  assert.equal(JSON.parse(result.nativeAfter).task.status, "Blocked");
+  assert.match(committedMutationTicket(fixture.primaryStoreDir, result, true), /status: In Progress/);
+  assert.match(committedMutationTicket(fixture.primaryStoreDir, result), /status: Blocked/);
   assert.equal(nativeTask(fixture.root, "TASK-1").status, "Blocked");
 });
 
@@ -1618,7 +1683,7 @@ test("fresh independent Backlog archive succeeds after preparing its native arch
   assert.equal(existsSync(join(archiveDir, "task-1 - Owner.md")), true);
 });
 
-test("primary nested task mutation publishes only on the task DAG and remains preparable", (t) => {
+test("primary nested task mutation publishes only on the task DAG and remains preparable", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const fixture = episodeFixture({ taskFiles: {
     [OWNER_TASK_PATH]: taskMarkdown("TASK-1", "Owner"),
@@ -1630,7 +1695,7 @@ test("primary nested task mutation publishes only on the task DAG and remains pr
   git(fixture.root, "push", "-q", "origin", "main");
   const codeHead = git(fixture.root, "rev-parse", "HEAD");
   const taskHead = git(fixture.primaryStoreDir, "rev-parse", "HEAD");
-  const result = publishTaskHistoryMutation({
+  const result = await publishTaskHistoryMutation({
     primaryRoot: fixture.root,
     targetWorktree: fixture.root,
     taskId: "TASK-1",
@@ -1664,7 +1729,7 @@ test("published primary inspection rejects a clean local-only terminal commit", 
   assert.match(unpublished.detail, /does not equal direct published head/);
 });
 
-test("a tracked native task symlink blocks before mutation without exposing or changing an external sentinel", (t) => {
+test("a tracked native task symlink blocks before mutation without exposing or changing an external sentinel", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { dir, root, remote, target, storeDir } = mutationFixture();
   const sentinel = join(dir, "external-task-sentinel.md");
@@ -1677,7 +1742,7 @@ test("a tracked native task symlink blocks before mutation without exposing or c
   git(storeDir, "push", "-q", "origin", `${TASK_HISTORY_REF}:${TASK_HISTORY_REF}`);
   const unsafeHead = git(storeDir, "rev-parse", "HEAD");
 
-  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "must never be written" }] });
+  const result = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "must never be written" }] });
   assert.equal(result.status, "blocked");
   assert.equal(result.code, "identity-mismatch");
   assert.match(result.detail, /symlink|tracked real regular/i);
@@ -1688,27 +1753,38 @@ test("a tracked native task symlink blocks before mutation without exposing or c
   assert.match(git(storeDir, "ls-remote", "--heads", remote, TASK_HISTORY_REF), new RegExp(`^${unsafeHead}\\s`));
 });
 
-test("exact native task edits commit, publish to the direct head, and publish sequentially", (t) => {
+function committedMutationTicket(root, result, previous = false) {
+  const ref = previous ? result.previousTaskEvidence : result.taskEvidence;
+  assert.equal(ref.kind, "backlog-git");
+  assert.equal(ref.repository.topology, "independent");
+  assert.match(ref.repository.identity, /^[0-9a-f]{64}$/);
+  assert.equal(ref.commit, previous ? result.baseHead : result.publishedHead ?? result.committedHead);
+  assert.equal(ref.path, OWNER_TASK_PATH);
+  for (const field of ["nativeBefore", "nativeAfter", "localDiff", "diff"]) assert.ok(!Object.hasOwn(result, field));
+  assert.equal(result.nativeEdit.stdout, "");
+  return git(root, "show", `${ref.commit}:${ref.path}`);
+}
+
+test("exact native task edits commit, publish to the direct head, and publish sequentially", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, remote, target, storeDir } = mutationFixture();
   const base = git(storeDir, "rev-parse", "HEAD");
-  const first = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "owner update one" }] });
+  const first = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "owner update one" }] });
   assert.equal(first.status, "published");
   assert.equal(first.baseHead, base);
   assert.equal(first.taskId, "TASK-1");
   assert.match(first.taskPath, /task-1 - Owner\.md$/);
-  assert.match(first.nativeBefore, /"id":\s*"TASK-1"/);
-  assert.match(first.nativeAfter, /owner update one/);
-  assert.match(first.diff, /owner update one/);
+  assert.match(committedMutationTicket(storeDir, first, true), /id: TASK-1/);
+  assert.match(committedMutationTicket(storeDir, first), /owner update one/);
   assert.equal(git(storeDir, "rev-parse", "HEAD"), first.publishedHead);
   assert.match(git(storeDir, "ls-remote", "--heads", remote, TASK_HISTORY_REF), new RegExp(`^${first.publishedHead}\\s`));
   assert.equal(git(storeDir, "status", "--porcelain", "--ignored", "--untracked-files=all"), "");
 
-  const second = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "owner update two" }] });
+  const second = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "owner update two" }] });
   assert.equal(second.status, "published");
   assert.equal(second.baseHead, first.publishedHead);
-  assert.match(second.nativeBefore, /owner update one/);
-  assert.match(second.nativeAfter, /owner update two/);
+  assert.match(committedMutationTicket(storeDir, second, true), /owner update one/);
+  assert.match(committedMutationTicket(storeDir, second), /owner update two/);
   assert.equal(nativeTask(target, "TASK-1").id, "TASK-1");
 });
 
@@ -1720,7 +1796,7 @@ function assertOneDirectPush(runner) {
   assert.equal(gitCalls.some((args) => args.includes("--force") || args.includes("--force-with-lease")), false);
 }
 
-test("direct publication preserves unrelated staged, unstaged, and untracked work in both native commit modes", (t) => {
+test("direct publication preserves unrelated staged, unstaged, and untracked work in both native commit modes", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   for (const autoCommit of [false, true]) {
     const fixture = mutationFixture();
@@ -1746,10 +1822,10 @@ test("direct publication preserves unrelated staged, unstaged, and untracked wor
     const otherIndex = git(selectedStore, "ls-files", "--stage", "--", OTHER_TASK_PATH, "TASKS.md");
     const otherBytes = [OTHER_TASK_PATH, "TASKS.md", "unrelated-untracked.txt"].map((path) => readFileSync(join(selectedStore, path)));
     const runner = realRunnerWithPushAction();
-    const result = publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "selected coherent edit" }], runner });
+    const result = await publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "selected coherent edit" }], runner });
     assert.equal(result.status, "published");
     assert.equal(result.baseHead, base);
-    assert.match(result.nativeAfter, /selected coherent edit/);
+    assert.match(committedMutationTicket(selectedStore, result), /selected coherent edit/);
     assert.deepEqual(untouchedRoots.map(taskReadSnapshot), before);
     assert.equal(git(selectedStore, "ls-files", "--stage", "--", OTHER_TASK_PATH, "TASKS.md"), otherIndex, "unrelated index entries are byte-for-byte unchanged");
     assert.deepEqual([OTHER_TASK_PATH, "TASKS.md", "unrelated-untracked.txt"].map((path) => readFileSync(join(selectedStore, path))), otherBytes);
@@ -1769,43 +1845,44 @@ test("direct publication preserves unrelated staged, unstaged, and untracked wor
   }
 });
 
-test("publication preserves missing native tasks and absent Episode stores without substitution", (t) => {
+test("publication preserves missing native tasks and absent Episode stores without substitution", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const fixture = mutationFixture();
   const before = taskReadSnapshot(fixture.storeDir);
   const runner = realRunnerWithPushAction();
-  const missing = publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "TASK-999", edits: [{ option: "--append-notes", value: "must not target another task" }], runner });
+  const missing = await publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "TASK-999", edits: [{ option: "--append-notes", value: "must not target another task" }], runner });
   assert.equal(missing.status, "blocked");
   assert.equal(missing.code, "native-read-failed");
-  const alias = publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "1", edits: [{ option: "--append-notes", value: "must not silently canonicalize" }], runner });
+  const alias = await publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "1", edits: [{ option: "--append-notes", value: "must not silently canonicalize" }], runner });
   assert.equal(alias.status, "blocked");
   assert.equal(alias.code, "identity-mismatch");
   assert.deepEqual(taskReadSnapshot(fixture.storeDir), before);
   const retained = `${fixture.storeDir}.retained`;
   renameSync(fixture.storeDir, retained);
-  const absent = publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "must not initialize" }], runner });
+  const absent = await publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "must not initialize" }], runner });
   assert.equal(absent.status, "blocked");
   assert.equal(existsSync(fixture.storeDir), false);
   assert.equal(runner.calls.some((args) => args[0] === "git" && ["clone", "fetch", "merge", "commit", "push"].some((arg) => args.includes(arg))), false);
   assert.equal(runner.calls.some(([command, subcommand, operation]) => command === "backlog" && subcommand === "task" && operation === "edit"), false);
 });
 
-test("native edit failure retains native result and before/after JSON without committing or pushing", (t) => {
+test("native edit failure retains native exit and only the verified preceding reference without committing or pushing", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const fixture = mutationFixture();
   const before = taskReadSnapshot(fixture.storeDir);
   const runner = realRunnerWithPushAction();
-  const result = publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "TASK-1", edits: [{ option: "--unsupported-prime-claw-option", value: "native error" }], runner });
+  const result = await publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "TASK-1", edits: [{ option: "--unsupported-prime-claw-option", value: "native error" }], runner });
   assert.equal(result.status, "blocked");
   assert.equal(result.code, "native-mutation-failed");
   assert.notEqual(result.nativeEdit.status, 0);
-  assert.equal(JSON.parse(result.nativeBefore).task.id, "TASK-1");
-  assert.equal(JSON.parse(result.nativeAfter).task.id, "TASK-1");
+  assert.ok(!Object.hasOwn(result, "taskEvidence"));
+  assert.ok(!Object.hasOwn(result, "publishedHead"));
+  assert.match(committedMutationTicket(fixture.storeDir, result, true), /id: TASK-1/);
   assert.deepEqual(taskReadSnapshot(fixture.storeDir), before);
   assert.equal(runner.calls.some((args) => args[0] === "git" && (args.includes("commit") || args.includes("push"))), false);
 });
 
-test("native commit failure preserves exact local edits and unrelated staging without pushing", (t) => {
+test("native commit failure preserves exact local edits and unrelated staging without pushing", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const fixture = mutationFixture();
   unrelatedReadDirt(fixture.storeDir, "TASKS.md");
@@ -1814,7 +1891,7 @@ test("native commit failure preserves exact local edits and unrelated staging wi
   writeFileSync(hook, "#!/bin/sh\nprintf '%s\\n' 'pre-commit hook rejected exact task' >&2\nexit 1\n");
   chmodSync(hook, 0o755);
   const runner = realRunnerWithPushAction();
-  const result = publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "retained native edit" }], runner });
+  const result = await publishTaskHistoryMutation({ primaryRoot: fixture.root, targetWorktree: fixture.target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "retained native edit" }], runner });
   assert.equal(result.status, "blocked");
   assert.equal(result.code, "commit-failed");
   assert.match(result.commit.stderr, /pre-commit hook rejected/);
@@ -1823,25 +1900,25 @@ test("native commit failure preserves exact local edits and unrelated staging wi
   assert.equal(runner.calls.some((args) => args.includes("push")), false);
 });
 
-test("a stale clone edits the current local task and retains a native non-fast-forward rejection", (t) => {
+test("a stale clone edits the current local task and retains a native non-fast-forward rejection", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, remote, target, storeDir } = mutationFixture();
   const stale = git(storeDir, "rev-parse", "HEAD");
   const advanced = publishTaskBranch(remote, { [OTHER_TASK_PATH]: taskMarkdown("TASK-2", "Other", "remote pre-read advance") });
   const runner = realRunnerWithPushAction();
-  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "local edit without synchronization" }], runner });
+  const result = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "local edit without synchronization" }], runner });
   assert.equal(result.status, "blocked");
-  assert.equal(result.code, "push-failed");
+  assert.equal(result.code, "push-uncertain");
   assert.equal(result.baseHead, stale);
   assert.equal(result.remoteHead, advanced);
   assert.equal(result.localHead, git(storeDir, "rev-parse", "HEAD"));
   assert.notEqual(result.push.status, 0);
-  assert.match(result.nativeAfter, /local edit without synchronization/);
+  assert.match(committedMutationTicket(storeDir, result), /local edit without synchronization/);
   assert.notEqual(gitAllow(storeDir, "cat-file", "-e", advanced).status, 0, "remote history was observed, not fetched");
   assertOneDirectPush(runner);
 });
 
-test("an unrelated-task publication race retains both heads without merging or retrying", (t) => {
+test("an unrelated-task publication race retains both heads without merging or retrying", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, remote, target, storeDir } = mutationFixture();
   let racedHead = "";
@@ -1849,23 +1926,112 @@ test("an unrelated-task publication race retains both heads without merging or r
   const runner = realRunnerWithPushAction(() => {
     racedHead = publishTaskBranch(remote, { [OTHER_TASK_PATH]: taskMarkdown("TASK-2", "Other", "concurrent unrelated update") });
   });
-  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "owner raced update" }], runner });
+  const result = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "owner raced update" }], runner });
   assert.equal(result.status, "blocked");
-  assert.equal(result.code, "push-failed", "report the native operation, not a compatibility classifier");
+  assert.equal(result.code, "push-uncertain", "report the native operation, not a compatibility classifier");
   assert.equal(result.remoteHead, racedHead);
   assert.equal(result.localHead, git(storeDir, "rev-parse", "HEAD"));
   assert.ok(runner.firstPushArgs.includes(`${result.localHead}:${TASK_HISTORY_REF}`));
   assert.equal(readFileSync(join(storeDir, OTHER_TASK_PATH), "utf8"), otherBefore);
-  assert.match(result.nativeBefore, /"id":\s*"TASK-1"/);
-  assert.match(result.nativeAfter, /owner raced update/);
-  assert.match(result.localDiff, /owner raced update/);
+  assert.match(committedMutationTicket(storeDir, result, true), /id: TASK-1/);
+  assert.match(committedMutationTicket(storeDir, result), /owner raced update/);
   assert.notEqual(result.push.status, 0);
   assert.match(result.remoteRead.stdout, new RegExp(`^${racedHead}\\s`));
   assert.equal(git(storeDir, "show", "-s", "--format=%P", result.localHead), result.baseHead, "no merge commit");
   assertOneDirectPush(runner);
 });
 
-test("same-task and config races are native push failures, not code compatibility decisions", (t) => {
+test("mutation streams native identity for a valid oversized task without capturing edit output", async (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote, target, storeDir } = mutationFixture();
+  const notes = "Fixture line with preserved content.\n".repeat(32000) + "original oversized tail";
+  writeFileSync(join(storeDir, OWNER_TASK_PATH), taskMarkdown("TASK-1", "Owner", notes).replace("status: In Progress", "status: In Planning"));
+  git(storeDir, "add", "--", OWNER_TASK_PATH);
+  git(storeDir, "commit", "-qm", "large exact ticket");
+  const before = git(storeDir, "rev-parse", "HEAD");
+  const child = spawn("backlog", ["task", "view", "--json", "--", "TASK-1"], { cwd: target, stdio: ["ignore", "pipe", "ignore"] });
+  const exit = new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); });
+  let bytes = 0;
+  for await (const chunk of child.stdout) bytes += chunk.length;
+  assert.equal(await exit, 0);
+  assert.ok(bytes > 1024 * 1024);
+  const result = await publishTaskHistoryMutation({ primaryRoot: root, targetWorktree: target,
+    taskId: "TASK-1", edits: [{ option: "--status", value: "In Progress" }] });
+  assert.equal(result.status, "published", result.detail);
+  assert.equal(result.previousTaskEvidence.commit, before);
+  assert.equal(result.nativeEdit.stdout, "");
+  assert.equal(result.nativeEdit.stderr, "");
+  assert.equal(result.publishedHead, git(remote, "rev-parse", TASK_HISTORY_REF));
+  assert.equal(git(storeDir, "diff", "--name-only", before, result.publishedHead), OWNER_TASK_PATH);
+  const diff = git(storeDir, "diff", "--unified=0", before, result.publishedHead, "--", OWNER_TASK_PATH);
+  assert.match(diff, /\+status: In Progress/);
+  assert.ok(diff.length < 4096, "native edit preserved the large body");
+});
+
+test("final native pre-edit failure or exact identity drift prevents edit, commit and push", async (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  for (const variant of ["failed", "id", "path"]) {
+    const { root, remote, target, storeDir } = mutationFixture();
+    const base = git(storeDir, "rev-parse", "HEAD");
+    const runner = realRunnerWithPushAction();
+    const run = runner.run.bind(runner);
+    let reads = 0;
+    runner.run = (cmd, args, options) => {
+      if (cmd === "backlog" && args[1] === "view" && ++reads === 2) {
+        if (variant === "failed") return { status: 1, stdout: "", stderr: "fixture read failure" };
+        const result = run(cmd, args, options);
+        const view = JSON.parse(result.stdout);
+        view.task[variant] = variant === "id" ? "TASK-999" : ".backlog/tasks/moved.md";
+        return { ...result, stdout: JSON.stringify(view) };
+      }
+      return run(cmd, args, options);
+    };
+    const result = await publishTaskHistoryMutation({ primaryRoot: root, targetWorktree: target,
+      taskId: "TASK-1", edits: [{ option: "--append-notes", value: "must not write" }], runner });
+    assert.equal(result.code, variant === "failed" ? "native-read-failed" : "identity-mismatch");
+    assert.equal(reads, 2);
+    assert.ok(!runner.calls.some(([cmd, , op]) => cmd === "backlog" && op === "edit"));
+    assert.equal(runner.fired, false);
+    assert.equal(git(storeDir, "rev-parse", "HEAD"), base);
+    assert.equal(git(remote, "rev-parse", TASK_HISTORY_REF), base);
+    assert.equal(git(storeDir, "status", "--porcelain"), "");
+  }
+});
+
+test("a nonzero push exit with exact remote proof records both facts without another push", async (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, target, storeDir } = mutationFixture();
+  const runner = realRunnerWithPushAction();
+  const run = runner.run.bind(runner);
+  runner.run = (cmd, args, options) => {
+    const result = run(cmd, args, options);
+    return cmd === "git" && args.includes("push") ? { ...result, status: 1 } : result;
+  };
+  const result = await publishTaskHistoryMutation({ primaryRoot: root, targetWorktree: target,
+    taskId: "TASK-1", edits: [{ option: "--append-notes", value: "exact observed publication" }], runner });
+  assert.equal(result.status, "published", result.detail);
+  assert.equal(result.push.status, 1);
+  assert.equal(result.remoteHead, result.publishedHead);
+  assert.match(committedMutationTicket(storeDir, result), /exact observed publication/);
+  assertOneDirectPush(runner);
+});
+
+test("an interrupted push retains the committed ticket without claiming publication or retrying", async (t) => {
+  if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
+  const { root, remote, target, storeDir } = mutationFixture();
+  const base = git(storeDir, "rev-parse", "HEAD");
+  const runner = realRunnerWithPushAction(() => ({ status: 1, nativeStatus: null, signal: "SIGTERM", stdout: "", stderr: "" }));
+  const result = await publishTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "retained after interruption" }], runner });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "push-uncertain");
+  assert.equal(result.committedHead, git(storeDir, "rev-parse", "HEAD"));
+  assert.equal(result.remoteHead, base);
+  assert.ok(!Object.hasOwn(result, "publishedHead"));
+  assert.match(committedMutationTicket(storeDir, result), /retained after interruption/);
+  assertOneDirectPush(runner);
+});
+
+test("same-task and config races are native push failures, not code compatibility decisions", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   for (const files of [
     { [OWNER_TASK_PATH]: taskMarkdown("TASK-1", "Owner", "concurrent same-task update") },
@@ -1875,66 +2041,66 @@ test("same-task and config races are native push failures, not code compatibilit
     const configBefore = readFileSync(join(storeDir, "config.yml"), "utf8");
     let remoteHead = "";
     const runner = realRunnerWithPushAction(() => { remoteHead = publishTaskBranch(remote, files); });
-    const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "local work retained" }], runner });
+    const result = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "local work retained" }], runner });
     assert.equal(result.status, "blocked");
-    assert.equal(result.code, "push-failed");
+    assert.equal(result.code, "push-uncertain");
     assert.equal(result.remoteHead, remoteHead);
-    assert.match(result.nativeAfter, /local work retained/);
+    assert.match(committedMutationTicket(storeDir, result), /local work retained/);
     assert.equal(readFileSync(join(storeDir, "config.yml"), "utf8"), configBefore);
     assert.equal(git(storeDir, "show", "-s", "--format=%P", result.localHead), result.baseHead);
     assertOneDirectPush(runner);
   }
 });
 
-test("successful push followed by another publication stays successful with factual remote head", (t) => {
+test("successful push followed by another publication stays successful with factual remote head", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, remote, target, storeDir } = mutationFixture();
   let advanced = "";
   const runner = realRunnerWithPushAction(undefined, () => {
     advanced = publishTaskBranch(remote, { [OTHER_TASK_PATH]: taskMarkdown("TASK-2", "Other", "after successful push") });
   });
-  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "success before advance" }], runner });
+  const result = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "success before advance" }], runner });
   assert.equal(result.status, "published");
   assert.equal(result.push.status, 0);
   assert.equal(result.remoteHead, advanced);
   assert.notEqual(result.remoteHead, result.publishedHead);
   assert.equal(result.localHead, result.publishedHead);
-  assert.match(result.nativeAfter, /success before advance/);
+  assert.match(committedMutationTicket(storeDir, result), /success before advance/);
   assert.equal(git(storeDir, "rev-parse", "HEAD"), result.publishedHead);
   assertOneDirectPush(runner);
 });
 
-test("a successful push is not reclassified when its later remote observation is unavailable", (t) => {
+test("a successful push is not reclassified when its later remote observation is unavailable", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
-  const { root, remote, target } = mutationFixture();
+  const { root, remote, target, storeDir } = mutationFixture();
   const offline = `${remote}.offline`;
   const runner = realRunnerWithPushAction(undefined, () => { renameSync(remote, offline); });
   try {
-    const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "native push succeeded" }], runner });
+    const result = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "native push succeeded" }], runner });
     assert.equal(result.status, "published");
     assert.equal(result.push.status, 0);
     assert.equal(result.remoteHead, null);
     assert.notEqual(result.remoteRead.status, 0);
-    assert.match(result.nativeAfter, /native push succeeded/);
+    assert.match(committedMutationTicket(storeDir, result), /native push succeeded/);
     assertOneDirectPush(runner);
   } finally {
     renameSync(offline, remote);
   }
 });
 
-test("a rejected non-force push preserves the clean unpublished local commit and evidence", (t) => {
+test("a rejected non-force push preserves the clean unpublished local commit and evidence", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, target, storeDir } = mutationFixture();
   const runner = realRunnerWithPushAction(() => ({ status: 1, stdout: "", stderr: "remote hook rejected" }));
-  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "retained after rejection" }], runner });
+  const result = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "retained after rejection" }], runner });
   assert.equal(result.status, "blocked");
-  assert.equal(result.code, "push-failed");
+  assert.equal(result.code, "push-uncertain");
   assert.equal(result.localHead, git(storeDir, "rev-parse", "HEAD"));
-  assert.match(result.localDiff, /retained after rejection/);
+  assert.match(committedMutationTicket(storeDir, result), /retained after rejection/);
   assert.equal(git(storeDir, "status", "--porcelain", "--ignored", "--untracked-files=all"), "");
 });
 
-test("remote loss during publication preserves the clean unpublished local commit and evidence", (t) => {
+test("remote loss during publication preserves the clean unpublished local commit and evidence", async (t) => {
   if (!backlogAvailable()) { t.skip("backlog executable unavailable"); return; }
   const { root, remote, target, storeDir } = mutationFixture();
   const offline = `${remote}.offline`;
@@ -1942,13 +2108,13 @@ test("remote loss during publication preserves the clean unpublished local commi
     renameSync(remote, offline);
     return { status: 1, stdout: "", stderr: "remote unavailable" };
   });
-  const result = publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "retained while offline" }], runner });
+  const result = await publishEpisodeTaskHistoryMutation({ primaryRoot: root, targetWorktree: target, taskId: "TASK-1", edits: [{ option: "--append-notes", value: "retained while offline" }], runner });
   assert.equal(result.status, "blocked");
-  assert.equal(result.code, "push-failed");
+  assert.equal(result.code, "push-uncertain");
   assert.notEqual(result.remoteRead.status, 0);
   assert.notEqual(result.push.status, 0);
   assert.equal(result.localHead, git(storeDir, "rev-parse", "HEAD"));
-  assert.match(result.localDiff, /retained while offline/);
+  assert.match(committedMutationTicket(storeDir, result), /retained while offline/);
   assertOneDirectPush(runner);
   assert.equal(git(storeDir, "status", "--porcelain", "--ignored", "--untracked-files=all"), "");
   renameSync(offline, remote);
@@ -2096,4 +2262,114 @@ test("explicit local-only custom root override preserves the original independen
   assert.equal(replay.status, "prepared", JSON.stringify(replay));
   assert.equal(replay.head, prepared.head);
   assert.deepEqual(transportCalls, []);
+});
+
+
+test("Backlog Git evidence reads exact independent history after branch advance, without a snapshot", async () => {
+  const { dir, root, remote } = fixtureRepo();
+  try {
+    const path = "tasks/task-1 - literal [ticket].md";
+    const prefix = Buffer.from(`---\ntitle: literal ticket\n# ${"x".repeat(1024 * 1024 + 47)}\nid: "TASK-1"\nassignee: [@example]\nstatus: In Progress\n---\n\n## Description\n\n`);
+    const longLine = Buffer.from("é".repeat(540_001));
+    const old = Buffer.concat([prefix, longLine, Buffer.from("\nOLD TAIL\n")]);
+    const next = Buffer.concat([prefix, longLine, Buffer.from("\nNEW TAIL\n")]);
+    const first = publishTaskBranch(remote, { "config.yml": FULL_CANONICAL_CONFIG, [path]: old });
+    const store = join(root, "custom-store");
+    git(root, "clone", "--branch", "prime-claw/tasks", "--single-branch", remote, store);
+    const selected = { topology: "independent", root: store, remote: "origin" };
+    const before = await makeBacklogGitEvidence(selected, first, path, "TASK-1");
+    assert.deepEqual(Object.keys(before).sort(), ["commit", "kind", "path", "repository"]);
+    assert.ok(JSON.stringify(before).length < 320);
+    const second = publishTaskBranch(remote, { [path]: next });
+    git(store, "pull", "--ff-only");
+    const after = await makeBacklogGitEvidence(selected, second, path, "TASK-1");
+    assert.match(git(store, "diff", "--no-ext-diff", "--no-textconv", "--unified=0",
+      `${before.commit}:${before.path}`, `${after.commit}:${after.path}`), /-OLD TAIL\n\+NEW TAIL/);
+    writeFileSync(join(store, path), "mutable file is not evidence\n");
+    for (const [ref, expected] of [[before, old], [after, next]]) {
+      for (const offset of [0, 4093, 65_535, 1024 * 1024, expected.length - 9, expected.length]) {
+        const { bytes, totalBytes } = await readBacklogGitEvidence(selected, ref, "TASK-1", offset);
+        assert.equal(totalBytes, expected.length);
+        assert.deepEqual(bytes, expected.subarray(offset, offset + 4096));
+      }
+    }
+    const trace = join(dir, "git-stream.trace");
+    const priorTrace = process.env.GIT_TRACE;
+    process.env.GIT_TRACE = trace;
+    try {
+      for (const [ref, expected] of [[before, old], [after, next]]) {
+        let nextOffset = 0;
+        for await (const { bytes, offset, totalBytes } of streamBacklogGitEvidence(selected, ref, "TASK-1")) {
+          assert.equal(offset, nextOffset);
+          assert.equal(totalBytes, expected.length);
+          assert.equal(bytes.length, Math.min(4096, expected.length - offset));
+          assert.deepEqual(bytes, expected.subarray(offset, offset + bytes.length));
+          nextOffset += bytes.length;
+        }
+        assert.equal(nextOffset, expected.length);
+      }
+    } finally {
+      if (priorTrace === undefined) delete process.env.GIT_TRACE;
+      else process.env.GIT_TRACE = priorTrace;
+    }
+    assert.equal((readFileSync(trace, "utf8").match(/built-in: git cat-file blob /g) ?? []).length, 2,
+      "one blob process per complete ticket, not one per window");
+    const scratchRoot = join(dir, "private-scratch");
+    mkdirSync(scratchRoot);
+    const priorTmp = process.env.TMPDIR;
+    process.env.TMPDIR = scratchRoot;
+    try {
+      const stream = streamBacklogGitEvidence(selected, before, "TASK-1");
+      try {
+        assert.deepEqual((await stream.next()).value.bytes, old.subarray(0, 4096));
+        const scratchProjects = readdirSync(scratchRoot);
+        assert.equal(scratchProjects.length, 1);
+        const headerFile = join(scratchRoot, scratchProjects[0], "backlog", "tasks", "task-1 - evidence.md");
+        assert.deepEqual(readFileSync(headerFile), prefix.subarray(0, prefix.indexOf("\n---") + 4));
+        assert.equal(lstatSync(headerFile).mode & 0o777, 0o600);
+      } finally {
+        await stream.return();
+      }
+      assert.deepEqual(readdirSync(scratchRoot), [], "early return disposes of scratch");
+      await assert.rejects(readBacklogGitEvidence(selected, before, "TASK-2"), /canonical task ID mismatch/);
+      assert.deepEqual(readdirSync(scratchRoot), [], "failed native verification disposes of scratch");
+    } finally {
+      if (priorTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = priorTmp;
+    }
+    await assert.rejects(readBacklogGitEvidence(selected, { ...before, path: "tasks/missing.md" }, "TASK-1"), /exact regular ticket blob/);
+    await assert.rejects(readBacklogGitEvidence(selected, { ...before, commit: "f".repeat(40) }, "TASK-1"), /commit unavailable/);
+    await assert.rejects(readBacklogGitEvidence({ ...selected, root }, before, "TASK-1"), /commit unavailable/);
+    git(store, "remote", "set-url", "origin", join(dir, "foreign.git"));
+    await assert.rejects(readBacklogGitEvidence(selected, before, "TASK-1"), /repository mismatch/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("branch-local Git evidence binds the code commit and a regular literal ticket path", async () => {
+  const { dir, root } = fixtureRepo();
+  try {
+    const path = "backlog/tasks/task-1.md";
+    mkdirSync(join(root, "backlog", "tasks"), { recursive: true });
+    const body = "---\r\nid: TASK-1\r\ntitle: test\r\n---\r\n\r\nbranch-local ticket\r\n";
+    writeFileSync(join(root, path), body);
+    symlinkSync("task-1.md", join(root, "backlog", "tasks", "link.md"));
+    writeFileSync(join(root, "backlog", "tasks", "wrong-id.md"),
+      '---\ntitle: wrong\nid: "TASK-2"\n---\n\nid: TASK-1\n');
+    git(root, "add", "backlog");
+    git(root, "commit", "-qm", "branch-local ticket");
+    const commit = git(root, "rev-parse", "HEAD");
+    const selected = { topology: "branch-local", root, remote: "origin" };
+    const ref = await makeBacklogGitEvidence(selected, commit, path, "TASK-1");
+    assert.equal((await readBacklogGitEvidence(selected, ref, "TASK-1")).bytes.toString(), body);
+    await assert.rejects(makeBacklogGitEvidence(selected, commit, "backlog/tasks/wrong-id.md", "TASK-1"),
+      /canonical task ID mismatch/);
+    await assert.rejects(makeBacklogGitEvidence(selected, commit, "backlog/tasks/link.md", "TASK-1"), /exact regular ticket blob/);
+    await assert.rejects(makeBacklogGitEvidence(selected, "HEAD", path, "TASK-1"), /full commit/);
+    await assert.rejects(readBacklogGitEvidence({ ...selected, topology: "independent" }, ref, "TASK-1"), /repository mismatch/);
+    const local = { ...selected, remote: null };
+    const localRef = await makeBacklogGitEvidence(local, commit, path, "TASK-1");
+    const worktree = join(dir, "worktree");
+    git(root, "worktree", "add", "--detach", worktree, commit);
+    assert.equal((await readBacklogGitEvidence({ ...local, root: worktree }, localRef, "TASK-1")).bytes.toString(), body);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

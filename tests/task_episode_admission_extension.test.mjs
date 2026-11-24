@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { appendFileSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { once } from "node:events";
+import { appendFileSync, createReadStream, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +35,7 @@ import {
 } from "../src/prime-agent-plugin/extension-support/episode-ownership.ts";
 import { reconcileLegacySpecificationInventory } from "../src/prime-agent-plugin/extension-support/legacy-specification-inventory.ts";
 
+import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 
 const ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), ".."));
@@ -62,6 +65,15 @@ class FixtureRunner {
     }
     return response;
   }
+}
+
+function usePinnedBacklogOnPath(t, binDir = dirname(BACKLOG)) {
+  const originalPath = process.env.PATH;
+  process.env.PATH = [binDir, originalPath].filter(Boolean).join(":");
+  t.after(() => {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+  });
 }
 
 function view(root, taskId = "PRIMECLAW-1") {
@@ -132,8 +144,613 @@ function commitPaths(root, ref = "HEAD") {
   return output ? output.split(/\r?\n/) : [];
 }
 
+for (const topology of ["independent", "branch-local"]) {
+  test(`registered implement_task admits oversized committed Backlog evidence: ${topology}`, async (t) => {
+    if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+    usePinnedBacklogOnPath(t);
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-large-readiness-")));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const root = join(dir, "repo");
+    const remote = join(dir, "remote.git");
+    const workflowDir = join(root, ".prime-claw", "workflows");
+    execFileSync("git", ["init", "-q", "-b", "main", root]);
+    git(root, "config", "user.name", "Prime Claw Test");
+    git(root, "config", "user.email", "prime-claw@example.invalid");
+    mkdirSync(workflowDir, { recursive: true });
+    for (const name of ["implement-task-prep", "implement-task"]) {
+      copyFileSync(join(ROOT, "src", "prime-agent-plugin", "workflows", `${name}.md`), join(workflowDir, `${name}.md`));
+    }
+    git(root, "add", "-f", "--", ".prime-claw/workflows");
+    git(root, "commit", "-qm", "install canonical readiness workflows");
+    let store = root;
+    if (topology === "independent") {
+      execFileSync("git", ["init", "-q", "--bare", remote]);
+      git(root, "remote", "add", "origin", remote);
+      git(root, "push", "-qu", "origin", "main");
+      const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner: new FixtureRunner() });
+      assert.equal(prepared.status, "prepared", prepared.detail);
+      store = prepared.storeDir;
+      git(store, "config", "user.name", "Prime Claw Test");
+      git(store, "config", "user.email", "prime-claw@example.invalid");
+      git(root, "add", "--", ".gitignore");
+      git(root, "commit", "-qm", "ignore independent task store");
+    } else {
+      mkdirSync(join(root, "backlog"));
+      copyFileSync(join(ROOT, "tests", "fixtures", "backlog-admission-config.yml"), join(root, "backlog", "config.yml"));
+      git(root, "add", "--", "backlog/config.yml");
+      git(root, "commit", "-qm", "track branch-local Backlog configuration");
+    }
+
+    const title = "Oversized readiness fixture title";
+    const plan = "1. Check the exact readiness evidence reference.";
+    const tail = "final readiness fixture note marker";
+    const label = "readiness-fixture-" + "x".repeat(70 * 1024);
+    const note = "Native readiness fixture notes. ".repeat(2200).trimEnd();
+    execFileSync(BACKLOG, ["task", "create", title, "--status", "In Planning", "--plan", plan, "--plain"],
+      { cwd: root, stdio: "ignore" });
+    const listed = JSON.parse(execFileSync(BACKLOG, ["task", "list", "--json"], { cwd: root, encoding: "utf8" }));
+    assert.equal(listed.tasks.length, 1);
+    const taskId = listed.tasks[0].id;
+    const nativePath = view(root, taskId).path;
+    for (let i = 0; i < 18; i += 1) {
+      // Keep each argument below the OS limit, and author every byte through Backlog.
+      const labelArgs = i === 0 ? ["--add-label", label] : [];
+      execFileSync(BACKLOG, ["task", "edit", ...labelArgs, "--append-notes",
+        `${note}\nchunk ${i}\n${i === 17 ? tail : ""}`, "--plain", "--", taskId], { cwd: root, stdio: "ignore" });
+    }
+    const evidencePath = topology === "independent" ? nativePath.replace(/^\.backlog\//, "") : nativePath;
+    assert.ok(nativePath.startsWith(topology === "independent" ? ".backlog/tasks/" : "backlog/tasks/"));
+    git(store, "add", "--", evidencePath);
+    git(store, "commit", "-qm", "commit oversized ticket");
+    let publishedHead;
+    if (topology === "independent") {
+      git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+      publishedHead = git(remote, "rev-parse", TASK_HISTORY_REF);
+      execFileSync(BACKLOG, ["task", "edit", "--append-notes", "Retained local readiness revision.", "--plain", "--", taskId],
+        { cwd: root, stdio: "ignore" });
+      git(store, "add", "--", evidencePath);
+      git(store, "commit", "-qm", "retain a newer ticket locally");
+    }
+    const commit = git(store, "rev-parse", "HEAD");
+    if (publishedHead) assert.notEqual(commit, publishedHead);
+    const blob = git(store, "rev-parse", `${commit}:${evidencePath}`);
+
+    const native = spawn(BACKLOG, ["task", "view", "--json", "--", taskId], {
+      cwd: root, stdio: ["ignore", "pipe", "inherit"],
+    });
+    const nativeClosed = once(native, "close");
+    let nativeBytes = 0;
+    native.stdout.on("data", (chunk) => { nativeBytes += chunk.length; });
+    assert.deepEqual(await nativeClosed, [0, null]);
+    assert.ok(nativeBytes > 1024 * 1024, `native stdout was only ${nativeBytes} bytes`);
+
+    const fetchHead = join(store, ".git", "FETCH_HEAD");
+    const gitState = (repo) => ({
+      refs: git(repo, "show-ref"),
+      status: git(repo, "--no-optional-locks", "status", "--porcelain=v1", "-uall"),
+      config: git(repo, "config", "--local", "--list"),
+      worktrees: git(repo, "worktree", "list", "--porcelain"),
+    });
+    const snapshot = () => ({
+      code: gitState(root),
+      store: gitState(store),
+      ticketBlob: git(root, "hash-object", "--", nativePath),
+      nestedStore: existsSync(join(root, ".backlog")),
+      fetchHead: existsSync(fetchHead) ? readFileSync(fetchHead, "utf8") : null,
+      ...(publishedHead ? { remoteRefs: git(remote, "show-ref") } : {}),
+      ownership: readAllEpisodeOwnership(root),
+    });
+    const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+      getSessionId: () => "large-readiness-owner", getSessionFile: () => join(dir, "owner.jsonl"),
+      getHeader: () => ({ rlmDepth: 0 }),
+    } };
+    const tools = new Map();
+    const events = [];
+    const deliveries = [];
+    createReviewedPlanExtension({
+      async placementResolver(projectRoot, host, callCtx) {
+        assert.equal(projectRoot, root);
+        assert.equal(host, undefined);
+        assert.equal(callCtx, ctx);
+        events.push("placement");
+        return { engine: "local" };
+      },
+    })({
+      registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {},
+      sendUserMessage(prompt, options) { events.push(options.deliverAs); deliveries.push(prompt); },
+    });
+    const before = snapshot();
+    assert.equal(before.ticketBlob, blob, "working ticket must equal the exact committed blob");
+    const response = await tools.get("implement_task").execute("registered-readiness", { taskId }, undefined, undefined, ctx);
+    assert.deepEqual(snapshot(), before, "readiness must not change code, task history, worktrees, or ownership");
+    assert.equal(existsSync(join(root, ".prime-claw", "ownership.json")), false);
+    assert.equal(existsSync(ctx.sessionManager.getSessionFile()), false);
+    assert.ok(!response.isError, response.details.error?.slice(0, 500));
+    assert.deepEqual(response.details, { admitted: true, taskId });
+    assert.deepEqual(events, ["placement", "steer", "followUp"]);
+    assert.equal(deliveries.length, 2);
+
+    const identityInput = topology === "independent"
+      ? `remote:${git(store, "remote", "get-url", "origin")}`
+      : `local:${realpathSync(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir"))}`;
+    for (const [index, workflow] of ["implement-task-prep", "implement-task"].entries()) {
+      const prompt = deliveries[index];
+      assert.ok(prompt.includes(`<skill name="${workflow}" location="${join(workflowDir, `${workflow}.md`)}">`));
+      for (const [key, value] of Object.entries({ id: taskId, provider: "backlog", "project-root": root, path: nativePath })) {
+        const tag = `operator-implementation-task-${key}`;
+        assert.ok(prompt.includes(`\n<${tag}>\n${value}\n</${tag}>`));
+      }
+      const observation = [...prompt.matchAll(/\n<operator-implementation-task-observation>\n([^\n]+)\n<\/operator-implementation-task-observation>/g)];
+      assert.equal(observation.length, 1);
+      assert.ok(Buffer.byteLength(observation[0][1]) < 1024, "the observation must be a compact reference");
+      assert.deepEqual(JSON.parse(observation[0][1]), {
+        localTaskEvidence: {
+          kind: "backlog-git", repository: { topology, identity: createHash("sha256").update(identityInput).digest("hex") },
+          commit, path: evidencePath,
+        },
+        ...(publishedHead ? { publishedHead } : {}),
+      });
+      for (const text of [title, plan, note.slice(0, 100), tail, label.slice(0, 100)]) {
+        assert.ok(!prompt.includes(text), "readiness must not embed native task content");
+      }
+    }
+  });
+}
+
+for (const scenario of ["oversized ticket", "retained local advance", "unavailable previous evidence"]) {
+  test(`registered independent Backlog create: ${scenario}`, async (t) => {
+    if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-large-admission-")));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const root = join(dir, "repo");
+    const remote = join(dir, "remote.git");
+    execFileSync("git", ["init", "-q", "-b", "main", root]);
+    execFileSync("git", ["init", "-q", "--bare", remote]);
+    git(root, "config", "user.name", "Prime Claw Test");
+    git(root, "config", "user.email", "prime-claw@example.invalid");
+    mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true });
+    copyFileSync(join(ROOT, ".agents", "skills", "execute", "SKILL.md"), join(root, ".agents", "skills", "execute", "SKILL.md"));
+    git(root, "add", ".agents/skills/execute/SKILL.md");
+    git(root, "commit", "-qm", "code baseline");
+    git(root, "remote", "add", "origin", remote);
+    git(root, "push", "-qu", "origin", "main");
+    const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner: new FixtureRunner() });
+    assert.equal(prepared.status, "prepared");
+    git(prepared.storeDir, "config", "user.name", "Prime Claw Test");
+    git(prepared.storeDir, "config", "user.email", "prime-claw@example.invalid");
+    git(root, "add", ".gitignore");
+    git(root, "commit", "-qm", "ignore independent task store");
+    const codeHead = git(root, "rev-parse", "HEAD");
+
+    execFileSync(BACKLOG, ["task", "create", "Oversized native view", "--status", "In Planning",
+      "--description", "Exercise the real provider output limit", "--plan", "1. Verify exact Episode identity.", "--plain"],
+    { cwd: root, stdio: "ignore" });
+    const listed = JSON.parse(execFileSync(BACKLOG, ["task", "list", "--json"], { cwd: root, encoding: "utf8" }));
+    const taskId = listed.tasks?.[0]?.id;
+    assert.ok(taskId);
+    let planned = view(root, taskId); // Discover the native path before adding large fields.
+    // Keep each argument comfortably below OS limits. Author all content through Backlog.
+    const oversized = scenario === "oversized ticket";
+    const headerLabel = "large-header-" + "x".repeat(oversized ? 70 * 1024 : 16);
+    const note = "Native task evidence. ".repeat(2800).trimEnd();
+    const tail = "final native evidence marker";
+    const chunks = oversized ? 18 : 1;
+    for (let i = 0; i < chunks; i += 1) {
+      const label = i === 0 ? ["--add-label", headerLabel] : [];
+      execFileSync(BACKLOG, ["task", "edit", ...label, "--append-notes", `${note}\nchunk ${i}\n${i === chunks - 1 ? tail : ""}`, "--plain", "--", taskId],
+        { cwd: root, stdio: "ignore" });
+    }
+    // Read only bounded metadata for the large ticket and hash its body in chunks.
+    const readOversizedTicket = async (worktree, expectedStatus) => {
+      const hash = createHash("sha256");
+      let headerSeen = false;
+      let bodyTail = Buffer.alloc(0);
+      for await (const chunk of createReadStream(join(worktree, planned.path), { highWaterMark: 128 * 1024 })) {
+        let body = chunk;
+        if (!headerSeen) {
+          const headerEnd = chunk.indexOf("\n---\n", 4);
+          assert.ok(headerEnd > 64 * 1024, "oversized fixture frontmatter must exceed 64 KiB and fit in the first chunk");
+          const header = chunk.subarray(0, headerEnd).toString("utf8");
+          assert.equal(header.match(/^id: (.+)$/m)?.[1], taskId);
+          assert.equal(header.match(/^status: (.+)$/m)?.[1], expectedStatus);
+          assert.ok(header.includes(headerLabel), "native label must survive admission");
+          body = chunk.subarray(headerEnd + 5);
+          headerSeen = true;
+        }
+        hash.update(body);
+        bodyTail = Buffer.concat([bodyTail, body.subarray(-128)]).subarray(-128);
+      }
+      assert.ok(headerSeen, "oversized fixture must have frontmatter");
+      assert.ok(bodyTail.includes(tail), "native notes must retain the final marker");
+      return hash.digest("hex");
+    };
+    let plannedBody;
+    if (oversized) {
+      const native = spawn(BACKLOG, ["task", "view", "--json", "--", taskId], {
+        cwd: root, stdio: ["ignore", "pipe", "inherit"],
+      });
+      const nativeClosed = once(native, "close");
+      let nativeBytes = 0;
+      native.stdout.on("data", (chunk) => { nativeBytes += chunk.length; });
+      assert.deepEqual(await nativeClosed, [0, null]);
+      assert.ok(nativeBytes > 1024 * 1024, "native stdout must exceed Node's default sync buffer");
+      plannedBody = await readOversizedTicket(root, "In Planning");
+    } else {
+      planned = view(root, taskId);
+      assert.equal(planned.id, taskId);
+      assert.equal(planned.status, "In Planning");
+      assert.ok(planned.implementationNotes.endsWith(tail));
+      assert.ok(planned.labels.includes(headerLabel));
+    }
+    git(prepared.storeDir, "add", ".");
+    git(prepared.storeDir, "commit", "-qm", "plan oversized task");
+    git(prepared.storeDir, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+    const plannedTaskHead = git(prepared.storeDir, "rev-parse", "HEAD");
+
+    const trace = join(dir, "checkpoints.tsv");
+    const traceBin = join(dir, "trace-bin");
+    mkdirSync(traceBin);
+    const shellQuote = (value) => `'${value.replaceAll("'", `'"'"'`)}'`;
+    // Record only command and cwd, then pass the original args and streams to the pinned CLI.
+    writeFileSync(join(traceBin, "backlog"), `#!/bin/sh
+  if [ "$1" = task ] && { [ "$2" = view ] || [ "$2" = edit ]; }; then
+    printf '%s\t%s\n' "$2" "$(pwd -P)" >> ${shellQuote(trace)}
+  fi
+  exec ${shellQuote(BACKLOG)} "$@"
+  `, { mode: 0o755 });
+    usePinnedBacklogOnPath(t, traceBin);
+    const owner = "large-admission-owner";
+    const ownerFile = join(dir, "owner.jsonl");
+    writeFileSync(ownerFile, JSON.stringify({ type: "session", id: owner, cwd: root }) + "\n");
+    const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+      getSessionId: () => owner, getSessionFile: () => ownerFile, getHeader: () => ({ rlmDepth: 0 }),
+    } };
+    const calls = [];
+    const publisher = {
+      async createFresh(options) {
+        calls.push(["create", options.worktree]);
+        appendFileSync(trace, `create\t${options.worktree}\n`);
+        const identity = { sessionId: "large-admission-episode", sessionFile: join(dir, "episode.jsonl") };
+        writeFileSync(identity.sessionFile, JSON.stringify({ type: "session", id: identity.sessionId, cwd: options.worktree }) + "\n");
+        await options.onAllocated?.(identity);
+        return { ...identity, activeSessionId: "large-admission-route" };
+      },
+      async deliverExecute(route, prompt) {
+        calls.push(["execute", route]);
+        appendFileSync(trace, `execute\t${route}\n`);
+        assert.ok(prompt.includes(taskId));
+        assert.ok(prompt.includes("<provider-task-observation>"));
+        assert.ok(!prompt.includes(tail), "execute gets a compact reference rather than the task body");
+      },
+      close() {},
+    };
+    let previousHead, fetchedHead, localHead, episodeStore, observation;
+    const deliver = publisher.deliverExecute;
+    publisher.deliverExecute = async (route, prompt) => {
+      observation = JSON.parse(prompt.match(/\n<provider-task-observation>\n([^\n]+)\n<\/provider-task-observation>\n$/)[1]);
+      await deliver(route, prompt);
+    };
+    const tools = new Map();
+    createReviewedPlanExtension({
+      publisher,
+      async placementResolver() { return { engine: "local" }; },
+      ...(oversized ? {} : { prepareEpisodeTaskHistory(input) {
+        previousHead = git(remote, "rev-parse", TASK_HISTORY_REF);
+        if (scenario === "unavailable previous evidence") {
+          git(prepared.storeDir, "commit", "--allow-empty", "-qm", "published advance after reservation");
+          git(prepared.storeDir, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+        }
+        fetchedHead = git(remote, "rev-parse", TASK_HISTORY_REF);
+        episodeStore = join(input.targetWorktree, ".backlog");
+        execFileSync("git", ["clone", "-q", "--branch", "prime-claw/tasks",
+          ...(scenario === "unavailable previous evidence" ? ["--no-local", "--depth", "1"] : []), remote, episodeStore]);
+        if (scenario === "retained local advance") {
+          git(episodeStore, "config", "user.name", "Prime Claw Test");
+          git(episodeStore, "config", "user.email", "prime-claw@example.invalid");
+          execFileSync(BACKLOG, ["task", "edit", "--append-notes", "retained local marker", "--", taskId],
+            { cwd: input.targetWorktree, stdio: "ignore" });
+          git(episodeStore, "add", "--", planned.path.replace(/^\.backlog\//, ""));
+          git(episodeStore, "commit", "-qm", "retain local ticket advance");
+        }
+        localHead = git(episodeStore, "rev-parse", "HEAD");
+        return prepareEpisodeTaskHistoryWorkspace(input);
+      } }),
+    })({ registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {}, sendUserMessage() { assert.fail("no extra assignment"); } });
+    const response = await tools.get("create_task_episode").execute("registered-admission", { taskId }, undefined, undefined, ctx);
+    if (scenario === "unavailable previous evidence") {
+      assert.equal(response.isError, true);
+      assert.ok(response.details.error.includes(`previous evidence at ${previousHead} is unavailable before session start`), response.details.error);
+      assert.deepEqual(calls, []);
+      const record = readEpisodeOwnership(root, owner);
+      assert.equal(record.providerRevision, previousHead);
+      assert.equal(join(record.worktree, ".backlog"), episodeStore);
+      assert.equal(git(episodeStore, "rev-parse", "HEAD"), fetchedHead);
+      assert.equal(git(remote, "rev-parse", TASK_HISTORY_REF), fetchedHead);
+      return;
+    }
+    assert.ok(!response.isError, response.details.error);
+    const result = response.details;
+    assert.equal(observation.previousTaskEvidence.commit, observation.previousProviderRevision);
+    assert.equal(observation.currentTaskEvidence.commit, observation.publishedProviderRevision);
+    if (scenario === "retained local advance") {
+      assert.equal(observation.previousTaskEvidence.commit, previousHead);
+      assert.equal(observation.publishedProviderRevision, fetchedHead);
+      assert.equal(observation.localTaskEvidence.commit, localHead);
+      assert.notEqual(localHead, fetchedHead);
+    } else assert.equal(observation.localTaskEvidence, undefined);
+    assert.equal(result.status, "active");
+    assert.equal(result.taskId, taskId);
+    assert.equal(result.head, codeHead);
+    assert.deepEqual(result.currentTask, { id: taskId, path: planned.path, status: "In Progress" });
+    assert.equal(result.taskEvidence.kind, "backlog-git");
+    assert.equal(result.taskEvidence.repository.topology, "independent");
+    assert.equal(result.taskEvidence.commit, result.providerRevision);
+    assert.equal(result.taskEvidence.path, planned.path.replace(/^\.backlog\//, ""));
+    assert.equal(result.taskEvidence.task, undefined);
+    if (oversized) {
+      assert.equal(await readOversizedTicket(result.worktree, "In Progress"), plannedBody,
+        "full native body must survive admission byte for byte");
+    } else {
+      const episodeView = view(result.worktree, taskId);
+      assert.equal(episodeView.implementationNotes, scenario === "retained local advance"
+        ? `${planned.implementationNotes}\n\nretained local marker` : planned.implementationNotes, "full native notes must survive admission");
+    }
+    const checkpoints = readFileSync(trace, "utf8").trimEnd().split("\n");
+    const edited = checkpoints.indexOf(`edit\t${root}`);
+    const episodeRead = checkpoints.indexOf(`view\t${result.worktree}`);
+    const created = checkpoints.indexOf(`create\t${result.worktree}`);
+    const executed = checkpoints.indexOf("execute\tlarge-admission-route");
+    assert.equal(checkpoints.filter((entry) => entry.startsWith("edit\t")).length, 1);
+    assert.ok(edited > 0 && checkpoints.slice(0, edited).includes(`view\t${root}`));
+    assert.ok(episodeRead > edited && checkpoints.slice(edited + 1, episodeRead).includes(`view\t${root}`));
+    assert.ok(created > episodeRead && executed > created);
+    assert.ok(checkpoints.slice(executed + 1).includes(`view\t${root}`));
+    assert.notEqual(result.providerRevision, plannedTaskHead);
+    assert.equal(result.providerRevision, git(remote, "rev-parse", TASK_HISTORY_REF));
+    assert.equal(git(join(result.worktree, ".backlog"), "rev-parse", "HEAD"), localHead ?? result.providerRevision);
+    const active = readEpisodeOwnership(root, owner);
+    assert.equal(active?.status, "active");
+    assert.equal(active.providerRevision, result.providerRevision);
+    assert.deepEqual(calls, [["create", result.worktree], ["execute", "large-admission-route"]]);
+  });
+}
+
+function branchLocalCreationFixture(t) {
+  usePinnedBacklogOnPath(t);
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-branch-local-admission-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const root = join(dir, "repo");
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  git(root, "config", "user.name", "Prime Claw Test");
+  git(root, "config", "user.email", "prime-claw@example.invalid");
+  mkdirSync(join(root, "backlog"));
+  copyFileSync(join(ROOT, "tests", "fixtures", "backlog-admission-config.yml"), join(root, "backlog", "config.yml"));
+  const executeSkill = ".agents/skills/execute/SKILL.md";
+  mkdirSync(join(root, dirname(executeSkill)), { recursive: true });
+  copyFileSync(join(ROOT, executeSkill), join(root, executeSkill));
+  writeFileSync(join(root, "code.txt"), "code baseline\n");
+  git(root, "add", "--", "backlog/config.yml", executeSkill, "code.txt");
+  git(root, "commit", "-qm", "code baseline");
+  const description = "Native branch-local ticket body marker, not part of execute routing";
+  const plan = "1. Verify the exact isolated code base.\n2. Preserve the native ticket.";
+  execFileSync(BACKLOG, ["task", "create", "Branch-local admission", "--status", "In Planning",
+    "--description", description, "--plan", plan, "--plain"], { cwd: root, stdio: "ignore" });
+  const planned = view(root);
+  const { id: taskId, path: taskPath } = planned;
+  assert.equal(planned.status, "In Planning");
+  assert.match(taskPath, /^backlog\/tasks\/.*\.md$/);
+  return { dir, root, planned, taskId, taskPath, description };
+}
+
+function registerBranchLocalCreate(root, dir, publisher) {
+  const owner = "branch-local-owner";
+  const ownerFile = join(dir, "owner.jsonl");
+  writeFileSync(ownerFile, JSON.stringify({ type: "session", id: owner, cwd: root }) + "\n");
+  const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+    getSessionId: () => owner, getSessionFile: () => ownerFile, getHeader: () => ({ rlmDepth: 0 }),
+  } };
+  const tools = new Map();
+  createReviewedPlanExtension({ publisher, async placementResolver() { return { engine: "local" }; } })({
+    registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {},
+    sendUserMessage() { assert.fail("no extra assignment"); },
+  });
+  const create = tools.get("create_task_episode");
+  return { owner, execute: (id, params) => create.execute(id, params, undefined, undefined, ctx) };
+}
+
+// The fixture's small YAML header is in the first chunk. Hash the markdown body
+// byte for byte without keeping the oversized native fields in the test process.
+async function branchLocalTicketBody(path) {
+  let status;
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) {
+    if (status === undefined) {
+      const end = chunk.indexOf("\n---\n", 4);
+      assert.ok(end > 0, "fixture frontmatter must fit in the first chunk");
+      status = chunk.subarray(0, end).toString("utf8").match(/^status: (.+)$/m)?.[1];
+      assert.ok(status, "fixture frontmatter must include status");
+      hash.update(chunk.subarray(end + 5));
+    } else {
+      hash.update(chunk);
+    }
+  }
+  return { status, digest: hash.digest("hex") };
+}
+
+test("registered branch-local Backlog create observes live status after one immutable assignment and recovers the same operation", async (t) => {
+  if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+  const { dir, root, taskId, taskPath, description } = branchLocalCreationFixture(t);
+  const remote = join(dir, "remote.git");
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  const finalNote = "End of oversized branch-local evidence";
+  const noteChunk = "Branch-local native note. ".repeat(2200).trimEnd();
+  for (let index = 0; index < 20; index += 1) {
+    execFileSync(BACKLOG, ["task", "edit", "--append-notes", `${noteChunk}\nchunk ${index}\n${index === 19 ? finalNote : ""}`,
+      "--plain", "--", taskId], { cwd: root, stdio: "ignore" });
+  }
+  const native = spawn(BACKLOG, ["task", "view", "--json", "--", taskId], {
+    cwd: root, stdio: ["ignore", "pipe", "inherit"],
+  });
+  const nativeClosed = once(native, "close");
+  let nativeBytes = 0;
+  native.stdout.on("data", (chunk) => { nativeBytes += chunk.length; });
+  assert.deepEqual(await nativeClosed, [0, null]);
+  assert.ok(nativeBytes > 1024 * 1024, "native stdout must exceed Node's default sync buffer");
+  const plannedTicket = await branchLocalTicketBody(join(root, taskPath));
+  assert.equal(plannedTicket.status, "In Planning");
+  git(root, "--literal-pathspecs", "add", "--", taskPath);
+  git(root, "--literal-pathspecs", "commit", "-qm", "plan branch-local task", "--only", "--", taskPath);
+  const plannedHead = git(root, "rev-parse", "HEAD");
+  git(root, "remote", "add", "origin", remote);
+  git(root, "push", "-qu", "origin", "main");
+  writeFileSync(join(root, "code.txt"), "staged unrelated change\n");
+  git(root, "add", "--", "code.txt");
+  const stagedBefore = git(root, "diff", "--cached", "--binary");
+
+  const calls = [];
+  let session, executePrompt, statusCommit, liveHead;
+  const publisher = {
+    async createFresh(options) {
+      calls.push(["create", options.worktree]);
+      const reservation = readEpisodeOwnership(root, owner);
+      assert.equal(git(options.worktree, "rev-parse", "HEAD"), reservation.baseRef);
+      assert.deepEqual(await branchLocalTicketBody(join(options.worktree, taskPath)), {
+        status: "In Progress", digest: plannedTicket.digest,
+      });
+      const identity = { sessionId: "branch-local-episode", sessionFile: join(dir, "episode.jsonl") };
+      writeFileSync(identity.sessionFile, JSON.stringify({ type: "session", id: identity.sessionId, cwd: options.worktree }) + "\n");
+      await options.onAllocated?.(identity);
+      session = { ...identity, cwd: options.worktree, activeSessionId: "branch-local-route" };
+      return session;
+    },
+    async deliverExecute(route, prompt) {
+      calls.push(["execute", route]);
+      executePrompt = prompt;
+      statusCommit = git(root, "rev-parse", "HEAD");
+      assert.equal(git(session.cwd, "rev-parse", "HEAD"), statusCommit);
+      execFileSync(BACKLOG, ["task", "edit", "--status", "Blocked", "--plain", "--", taskId], {
+        cwd: root, stdio: "ignore",
+      });
+      git(root, "--literal-pathspecs", "commit", "-qm", "advance live task during execute send", "--only", "--", taskPath);
+      liveHead = git(root, "rev-parse", "HEAD");
+    },
+    async list() { return [session]; },
+    close() {},
+  };
+  const { owner, execute } = registerBranchLocalCreate(root, dir, publisher);
+  const created = await execute("registered-branch-local-create", { taskId });
+  assert.ok(!created.isError, created.details.error);
+  const result = created.details;
+  assert.equal(git(root, "rev-parse", `${statusCommit}^`), plannedHead);
+  assert.equal(git(root, "rev-parse", `${liveHead}^`), statusCommit);
+  assert.deepEqual(commitPaths(root, statusCommit), [taskPath]);
+  assert.equal(git(remote, "rev-parse", "refs/heads/main"), statusCommit);
+  assert.equal(result.baseRef, statusCommit);
+  assert.equal(result.head, statusCommit);
+  assert.equal(result.status, "active");
+  assert.equal(result.reused, false);
+  assert.equal(git(result.worktree, "show", "HEAD:code.txt"), "code baseline");
+  assert.equal(git(root, "diff", "--cached", "--binary"), stagedBefore);
+  assert.deepEqual(result.currentTask, { id: taskId, path: taskPath, status: "Blocked" });
+  assert.ok(!Object.hasOwn(result, "taskObservationFailure"));
+  assert.equal(git(result.worktree, "rev-parse", "HEAD"), statusCommit);
+  assert.deepEqual(await branchLocalTicketBody(join(result.worktree, taskPath)), {
+    status: "In Progress", digest: plannedTicket.digest,
+  }, "description, plan, and all native notes must survive admission unchanged");
+  const active = readEpisodeOwnership(root, owner);
+  assert.equal(active.baseRef, statusCommit);
+  for (const record of [result, active]) {
+    assert.ok(!Object.hasOwn(record, "providerRevision"));
+    assert.ok(!Object.hasOwn(record, "taskEvidence"));
+  }
+
+  const recovered = await execute("registered-branch-local-recovery", { taskId, operationId: result.operationId });
+  assert.ok(!recovered.isError, recovered.details.error);
+  assert.equal(recovered.details.reused, true);
+  for (const field of ["operationId", "worktree", "branch", "baseRef", "head", "episodeId", "episodeActiveSessionId"]) {
+    assert.equal(recovered.details[field], result[field], field);
+  }
+  assert.deepEqual(readEpisodeOwnership(root, owner), active);
+  assert.equal(git(root, "rev-parse", "HEAD"), liveHead);
+  assert.deepEqual(calls, [["create", result.worktree], ["execute", "branch-local-route"]]);
+  const observation = executePrompt.match(/\n<provider-task-observation>\n([^\n]+)\n<\/provider-task-observation>\n$/);
+  assert.ok(observation, "initial execute gets exact committed task evidence");
+  assert.deepEqual(JSON.parse(observation[1]), { currentTaskEvidence: {
+    kind: "backlog-git",
+    repository: { topology: "branch-local", identity: createHash("sha256").update(`local:${realpathSync(join(root, ".git"))}`).digest("hex") },
+    commit: statusCommit,
+    path: taskPath,
+  } });
+  assert.ok(!executePrompt.includes(description) && !executePrompt.includes(finalNote), "execute gets a compact reference rather than the task body");
+});
+
+test("registered branch-local Backlog create reports path drift without losing the active Episode", async (t) => {
+  if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+  const { dir, root, taskId, taskPath } = branchLocalCreationFixture(t);
+  git(root, "--literal-pathspecs", "add", "--", taskPath);
+  git(root, "--literal-pathspecs", "commit", "-qm", "plan branch-local task", "--only", "--", taskPath);
+  const movedPath = join(dirname(taskPath), `${taskId.toLowerCase()} - Moved ticket.md`);
+  const calls = [];
+  let session, assignmentBase;
+  const { owner, execute } = registerBranchLocalCreate(root, dir, {
+    async createFresh(options) {
+      calls.push("create");
+      const identity = { sessionId: "path-drift-episode", sessionFile: join(dir, "episode.jsonl") };
+      writeFileSync(identity.sessionFile, JSON.stringify({ type: "session", id: identity.sessionId, cwd: options.worktree }) + "\n");
+      await options.onAllocated?.(identity);
+      session = { ...identity, cwd: options.worktree, activeSessionId: "path-drift-route" };
+      return session;
+    },
+    async deliverExecute(route) {
+      calls.push(route);
+      assignmentBase = git(root, "rev-parse", "HEAD");
+      git(root, "--literal-pathspecs", "mv", "--", taskPath, movedPath);
+      git(root, "--literal-pathspecs", "commit", "-qm", "move live task during execute send", "--only", "--", taskPath, movedPath);
+    },
+    async list() { return [session]; },
+    close() {},
+  });
+
+  const created = await execute("registered-branch-local-path-drift", { taskId });
+  assert.ok(!created.isError, created.details.error);
+  const result = created.details;
+  assert.equal(view(root, taskId).path, movedPath, "native Backlog must still resolve the same ID at the new path");
+  assert.equal(result.taskObservationFailure, "path-mismatch");
+  assert.ok(!Object.hasOwn(result, "currentTask"));
+  const active = readEpisodeOwnership(root, owner);
+  assert.equal(active.status, "active");
+  assert.equal(active.operationId, result.operationId);
+  assert.equal(active.baseRef, assignmentBase);
+  assert.equal(result.baseRef, assignmentBase);
+  assert.equal(git(result.worktree, "rev-parse", "HEAD"), assignmentBase);
+  assert.deepEqual(calls, ["create", "path-drift-route"]);
+});
+
+test("registered branch-local Backlog create rejects a staged ticket missing from the code commit", async (t) => {
+  if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+  const { dir, root, taskId, taskPath } = branchLocalCreationFixture(t);
+  git(root, "--literal-pathspecs", "add", "--", taskPath);
+  const baseline = git(root, "rev-parse", "HEAD");
+  const indexBefore = git(root, "diff", "--cached", "--binary");
+  const worktreesBefore = git(root, "worktree", "list", "--porcelain");
+  const { owner, execute } = registerBranchLocalCreate(root, dir, {
+    async createFresh() { assert.fail("no session allocation without committed evidence"); },
+    async deliverExecute() { assert.fail("no execute without committed evidence"); },
+    close() {},
+  });
+  const result = await execute("registered-branch-local-missing-evidence", { taskId });
+  assert.equal(result.isError, true);
+  assert.match(result.details.error, /Backlog evidence path is not an exact regular ticket blob/);
+  assert.equal(view(root, taskId).status, "In Planning");
+  assert.equal(git(root, "rev-parse", "HEAD"), baseline);
+  assert.equal(git(root, "diff", "--cached", "--binary"), indexBefore);
+  assert.equal(git(root, "worktree", "list", "--porcelain"), worktreesBefore);
+  assert.equal(readEpisodeOwnership(root, owner), null);
+});
+
 test("independent Backlog admission preserves unrelated dirty work and an unpublished feature code base with separate task history", async (t) => {
   if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+  usePinnedBacklogOnPath(t);
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-independent-admission-")));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const root = join(dir, "repo");
@@ -230,17 +847,18 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   let reservedTaskEvidence = null;
   const prepareEpisodeTaskHistory = (input) => {
     preparationCalls += 1;
-    if (preparationCalls === 1) {
+    if (preparationCalls === 1) return (async () => {
       const reserved = records.get("independent-owner");
       reservedProviderRevision = reserved.providerRevision;
       reservedTaskEvidence = structuredClone(reserved.taskEvidence);
-      interleavedAdvance = publishTaskHistoryMutation({
+      interleavedAdvance = await publishTaskHistoryMutation({
         primaryRoot: root, targetWorktree: root, taskId,
         edits: [{ option: "--append-notes", value: "compatible pre-session observation marker" }],
         runner,
       });
       assert.equal(interleavedAdvance.status, "published");
-    }
+      return prepareEpisodeTaskHistoryWorkspace(input);
+    })();
     return prepareEpisodeTaskHistoryWorkspace(input);
   };
   const result = await createTaskEpisode(taskId, "independent-call", ctx, {
@@ -267,9 +885,17 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   assert.deepEqual(readFileSync(join(result.worktree, "code.txt")), execFileSync("git", ["show", `${codeHead}:code.txt`], { cwd: root }));
   assert.equal(result.providerRevision, publishedTaskHead);
   assert.equal(result.providerRevision, interleavedAdvance.publishedHead);
-  assert.equal(result.taskEvidence.task.id, taskId);
-  assert.equal(result.taskEvidence.task.status, "In Progress");
-  assert.match(result.taskEvidence.task.implementationNotes, /compatible pre-session observation marker/);
+  assert.deepEqual(result.currentTask, { id: taskId, path: task.path, status: "In Progress" });
+  assert.equal(result.taskEvidence.kind, "backlog-git");
+  assert.equal(result.taskEvidence.repository.topology, "independent");
+  assert.equal(result.taskEvidence.commit, publishedTaskHead);
+  assert.equal(result.taskEvidence.path, task.path.replace(/^\.backlog\//, ""));
+  assert.equal(reservedTaskEvidence.kind, "backlog-git");
+  assert.equal(reservedTaskEvidence.commit, reservedProviderRevision);
+  assert.equal(reservedTaskEvidence.path, result.taskEvidence.path);
+  assert.deepEqual(reservedTaskEvidence.repository, result.taskEvidence.repository);
+  assert.deepEqual(records.get("independent-owner").taskEvidence, result.taskEvidence);
+  assert.match(preSessionView.implementationNotes, /compatible pre-session observation marker/);
   assert.equal(preSessionView.id, taskId);
   assert.equal(preSessionView.status, "In Progress");
   assert.equal(delivered, 1);
@@ -289,7 +915,7 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
 
   git(join(result.worktree, ".backlog"), "config", "user.name", "Prime Claw Test");
   git(join(result.worktree, ".backlog"), "config", "user.email", "prime-claw@example.invalid");
-  const changedTask = publishTaskHistoryMutation({
+  const changedTask = await publishTaskHistoryMutation({
     primaryRoot: root,
     targetWorktree: result.worktree,
     taskId,
@@ -372,7 +998,10 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   assert.equal(advancedOwner.providerRevision, changedTask.publishedHead);
   assert.equal(advancedOwner.integrationBranch, integrationBranch);
   assert.equal(advancedOwner.baseRef, codeHead);
-  assert.match(advancedOwner.taskEvidence.task.implementationNotes, /accepted handoff advance/);
+  assert.equal(advancedOwner.taskEvidence.kind, "backlog-git");
+  assert.equal(advancedOwner.taskEvidence.commit, changedTask.publishedHead);
+  assert.match(git(join(result.worktree, ".backlog"), "show", `${advancedOwner.taskEvidence.commit}:${advancedOwner.taskEvidence.path}`),
+    /accepted handoff advance/);
   for (const prompt of [deliveredHandoff, deliveredContinuation]) {
     assert.equal(prompt.includes(JSON.stringify(beforeHandoff.taskEvidence)), false);
     assert.equal(prompt.includes(JSON.stringify(advancedOwner.taskEvidence)), false);
@@ -395,7 +1024,7 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   // The primary author explicitly synchronizes its own checkout before its next edit.
   git(prepared.storeDir, "fetch", "-q", "origin", TASK_HISTORY_REF);
   git(prepared.storeDir, "merge", "--ff-only", "FETCH_HEAD");
-  const primaryAdvance = publishTaskHistoryMutation({
+  const primaryAdvance = await publishTaskHistoryMutation({
     primaryRoot: root, targetWorktree: root, taskId,
     edits: [{ option: "--append-notes", value: "ordinary primary advance" }], runner,
   });
@@ -428,13 +1057,13 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
       ownership, reservationOperationId: "independent-operation-2", now: () => "2026-10-26T20:02:00.000Z",
       allocateTaskEpisode: async () => { throw new Error("fixture allocation failure"); },
     }, { engine: "local" }),
-    /fixture allocation failure.*Native admission result:.*Current ownership:/,
+    /Independent Backlog creation failed after task publication.*fixture allocation failure.*do not replay/,
   );
   assert.equal(view(root, secondTaskId).status, "In Progress");
   const retainedOwner = structuredClone(records.get("independent-owner-2"));
   const codeIndex = git(root, "diff", "--cached", "--binary");
   const taskIndex = git(prepared.storeDir, "diff", "--cached", "--binary");
-  const blocked = commitConversationTaskStatus({
+  const blocked = await commitConversationTaskStatus({
     taskId: secondTaskId, projectRoot: root, taskPath: secondTask.path, status: "Blocked",
     message: "owner-requested blocker publication", note: "owner chose Blocked from factual failure evidence",
     runner, git: new CliTaskEpisodeAdmissionGit(), resolveTask: taskResolver,
@@ -448,9 +1077,43 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   assert.equal(blockedOwner.integrationBranch, integrationBranch);
   assert.equal(blockedOwner.baseRef, codeHead);
   assert.notEqual(blockedOwner.providerRevision, git(prepared.storeDir, "rev-parse", "HEAD"));
-  assert.equal(blockedOwner.taskEvidence.task.status, "In Progress");
+  assert.equal(blockedOwner.taskEvidence.kind, "backlog-git");
+  assert.equal(blockedOwner.taskEvidence.commit, blockedOwner.providerRevision);
+  assert.equal(blockedOwner.taskEvidence.path, secondTask.path.replace(/^\.backlog\//, ""));
   assert.equal(view(root, secondTaskId).status, "Blocked");
   assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
+});
+
+test("branch-local status safely commits a native view larger than 1 MiB without publishing", async (t) => {
+  usePinnedBacklogOnPath(t);
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  const { path, id } = f.task;
+  for (let i = 0; i < 18; i++) {
+    execFileSync(BACKLOG, ["task", "edit", id, "--append-notes", "Large native fixture text. ".repeat(2500), "--plain"],
+      { cwd: f.root, stdio: "ignore" });
+  }
+  const output = spawnSync(BACKLOG, ["task", "view", "--json", "--", id], { cwd: f.root, maxBuffer: 4 * 1024 * 1024 });
+  assert.equal(output.status, 0);
+  assert.ok(output.stdout.length > 1024 * 1024);
+  git(f.root, "add", "--", path);
+  git(f.root, "commit", "-qm", "oversized fixture", "--only", "--", path);
+  git(f.root, "add", "--", "unrelated.txt");
+  const staged = git(f.root, "diff", "--cached", "--binary");
+  const result = await commitConversationTaskStatus({ taskId: id, projectRoot: f.root, taskPath: path, status: "Blocked",
+    message: "record branch-local blocker", note: "exact status marker", expectedProvider: "backlog",
+    runner: new ProcessCommandRunner(), git: new CliTaskEpisodeAdmissionGit(),
+    resolveTask() { assert.fail("buffered resolver must not run"); } });
+  assert.equal(result.commit, git(f.root, "rev-parse", "HEAD"));
+  assert.deepEqual(commitPaths(f.root, result.commit), [path]);
+  assert.equal(git(f.root, "diff", "--cached", "--binary"), staged);
+  assert.deepEqual(result.selection, { id, path, status: "Blocked" });
+  assert.deepEqual(result.localTaskEvidence, { kind: "backlog-git", repository: { topology: "branch-local",
+    identity: createHash("sha256").update(`local:${realpathSync(join(f.root, ".git"))}`).digest("hex") }, commit: result.commit, path });
+  const blob = execFileSync("git", ["-C", f.root, "show", `${result.commit}:${path}`], { encoding: "utf8", maxBuffer: 4 * 1024 * 1024 });
+  assert.match(blob.slice(-4096), /exact status marker$/m);
+  assert.ok(!Object.hasOwn(result, "publishedTaskEvidence"));
+  assert.ok(JSON.stringify(result).length < 1024);
 });
 
 test("trusted task admission commits In Progress before reservation and allocation despite push failure", async () => {
@@ -495,6 +1158,8 @@ test("trusted task admission commits In Progress before reservation and allocati
   assert.equal(result.status, "active");
   assert.equal(result.integrationBranch, "main");
   assert.match(result.admissionPushError, /push/i);
+  assert.equal(result.branchLocalStatus.localTaskEvidence.commit, result.baseRef);
+  assert.ok(!Object.hasOwn(result.branchLocalStatus, "publishedTaskEvidence"));
   assert.deepEqual(commitPaths(f.root), [f.task.path]);
   assert.equal(git(f.root, "status", "--short"), "M unrelated.txt");
   assert.deepEqual(f.events.filter(([name]) => name === "ownership-write"), [
@@ -544,6 +1209,8 @@ test("grandfathered Backlog admission accepts published default master and retai
   assert.equal(view(f.root).implementationPlan, originalTask.implementationPlan);
   assert.equal(git(f.root, "status", "--short"), "M unrelated.txt");
   assert.equal(result.admissionPushError, undefined);
+  assert.deepEqual(result.branchLocalStatus.publishedTaskEvidence, result.branchLocalStatus.localTaskEvidence);
+  assert.equal(result.branchLocalStatus.publishedTaskEvidence.commit, result.baseRef);
 });
 
 test("pre-reservation failure reports the one native admission without choosing a rollback", async () => {

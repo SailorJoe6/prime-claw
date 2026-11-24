@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
-import { commitConversationTaskStatus } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
+import { CliTaskEpisodeAdmissionGit, commitConversationTaskStatus } from "../src/prime-agent-plugin/extension-support/spec-episode.ts";
 import { resolveLegacyTaskOwnershipTransitionTarget } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
 import { createReviewedPlanExtension } from "../src/prime-agent-plugin/extensions/reviewed-plan.ts";
 import {
@@ -277,8 +277,9 @@ function recordedDetectionRunner(extra = {}, options = {}) {
   };
 }
 
-test("legacy transition target proves paired published Beads revision and complete raw native evidence", () => {
-  const { primary, linked } = linkedWorktreeFixture();
+test("legacy transition target proves paired published Beads revision and complete raw native evidence", async (t) => {
+  const { root, primary, linked } = linkedWorktreeFixture();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(primary, ".beads", "dolt"), { recursive: true });
   mkdirSync(join(linked, ".beads", "dolt"), { recursive: true });
   const taskId = "TST-BRIDGE";
@@ -319,7 +320,7 @@ test("legacy transition target proves paired published Beads revision and comple
     },
   };
 
-  const target = resolveLegacyTaskOwnershipTransitionTarget(primary, linked, taskId, runner);
+  const target = await resolveLegacyTaskOwnershipTransitionTarget(primary, linked, taskId, runner);
   assert.equal(target.provider, "beads");
   assert.equal(target.providerRevision, DOLT_REVISION);
   assert.deepEqual(target.taskEvidence, nativeView);
@@ -1755,12 +1756,13 @@ function failIfConversationFilePathIsUsed() {
   });
 }
 
-test("conversation status publication preserves the ordinary Backlog mutation and Git commit result", () => {
+test("conversation status publication preserves the ordinary Backlog mutation and Git commit result", async () => {
   const root = fixtureRoot();
   writeBacklogFolderConfig(root);
   const relative = "backlog/tasks/tst-1.md";
   const taskPath = writeBacklogTaskFile(root, relative);
   let status = "In Planning";
+  let nativeId = "TST-1", nativePath = relative;
   const real = new ProcessCommandRunner();
   const calls = [];
   const runner = { run(command, args, options = {}) {
@@ -1768,15 +1770,18 @@ test("conversation status publication preserves the ordinary Backlog mutation an
     calls.push(key);
     const canned = {
       ...BACKLOG_OK,
-      [`git\0ls-files\0--error-unmatch\0--\0${relative}`]: { stdout: `${relative}\n`, stderr: "", status: 0 },
+      [`git\0--literal-pathspecs\0ls-files\0--error-unmatch\0--\0${relative}`]: { stdout: `${relative}\n`, stderr: "", status: 0 },
       ["backlog\0task\0edit\0--status\0In Progress\0--append-notes\0admit\0--plain\0--\0TST-1"]: { stdout: "", stderr: "", status: 0 },
     }[key];
     if (canned) {
-      if (key.startsWith("backlog\0task\0edit")) status = "In Progress";
+      if (key.startsWith("backlog\0task\0edit")) {
+        status = "In Progress";
+        writeFileSync(taskPath, `---\nid: TST-1\ntitle: Fixture task\nstatus: ${status}\n---\n`);
+      }
       return canned;
     }
     if (key === "backlog\0task\0view\0--json\0--\0TST-1") {
-      return { stdout: backlogTaskView("TST-1", status, relative) + "\n", stderr: "", status: 0 };
+      return { stdout: backlogTaskView(nativeId, status, nativePath) + "\n", stderr: "", status: 0 };
     }
     return real.run(command, args, options);
   } };
@@ -1784,27 +1789,41 @@ test("conversation status publication preserves the ordinary Backlog mutation an
     taskId: "TST-1", title: "Fixture task", status, implementationPlan: "One meaningful step",
     projectRoot: root, taskPath, taskPathRelative: relative,
   });
-  const git = conversationStatusGit();
+  const nativeGit = new CliTaskEpisodeAdmissionGit();
+  const git = conversationStatusGit({ commitOnlyPath: nativeGit.commitOnlyPath.bind(nativeGit), commitPaths: nativeGit.commitPaths.bind(nativeGit) });
+  for (const args of [["config", "user.name", "Test"], ["config", "user.email", "test@example.invalid"],
+    ["add", "--", relative], ["commit", "-qm", "before status"]]) real.run("git", args, { cwd: root });
 
-  const result = commitConversationTaskStatus({
+  const options = {
     taskId: "TST-1", projectRoot: root, taskPath: relative, status: "In Progress",
     message: "chore: admit TST-1 episode", note: "admit", runner, git, resolveTask: selection,
-  });
+  };
+  const before = nativeGit.head(root);
+  for ([nativeId, nativePath] of [["TST-2", relative], ["TST-1", "backlog/tasks/other.md"]]) {
+    await assert.rejects(() => commitConversationTaskStatus(options), /changed canonical ID or path/);
+    assert.equal(nativeGit.head(root), before);
+    assert.equal(status, "In Planning");
+  }
+  assert.equal(calls.some(call => call.startsWith("backlog\0task\0edit")), false);
+  [nativeId, nativePath] = ["TST-1", relative];
+  calls.length = 0;
+  const result = await commitConversationTaskStatus(options);
 
-  assert.deepEqual(result, { selection: selection(), commit: "c".repeat(40) });
+  assert.deepEqual(result.selection, { id: "TST-1", path: relative, status });
+  assert.equal(result.localTaskEvidence.commit, result.commit);
+  assert.equal(result.localTaskEvidence.path, relative);
+  assert.equal(result.localTaskEvidence.repository.topology, "branch-local");
+  assert.ok(!Object.hasOwn(result, "publishedTaskEvidence"));
   assert.deepEqual(calls.filter((call) => call.startsWith("backlog\0")), [
     "backlog\0task\0view\0--json\0--\0TST-1",
     "backlog\0task\0edit\0--status\0In Progress\0--append-notes\0admit\0--plain\0--\0TST-1",
     "backlog\0task\0view\0--json\0--\0TST-1",
   ]);
   assert.equal(calls.some((call) => call.startsWith("bd\0")), false);
-  assert.deepEqual(git.calls, [
-    ["commitOnlyPath", root, relative, "chore: admit TST-1 episode"],
-    ["commitPaths", root, "c".repeat(40)],
-  ]);
+  assert.deepEqual(nativeGit.commitPaths(root, result.commit), [relative]);
 });
 
-test("independent Backlog status publication reads current source facts without status-plan-code approval predicates", () => {
+test("independent Backlog status publication reads current source facts without status-plan-code approval predicates", async () => {
   const root = fixtureRoot(); writeBacklogFolderConfig(root);
   mkdirSync(join(root, "backlog", ".git"), { recursive: true });
   const relative = "backlog/tasks/tst-1.md", taskPath = writeBacklogTaskFile(root, relative);
@@ -1812,7 +1831,7 @@ test("independent Backlog status publication reads current source facts without 
   const runner = new ProcessCommandRunner();
   const selection = () => ({ taskId: "TST-1", title: "Fixture task", status, implementationPlan: null,
     projectRoot: root, taskPath, taskPathRelative: relative });
-  assert.throws(() => commitConversationTaskStatus({
+  await assert.rejects(() => commitConversationTaskStatus({
     taskId: "TST-1", projectRoot: root, taskPath: relative, status: "In Progress",
     message: "caller requested status", runner, git: conversationStatusGit({
       operationInProgress() { assert.fail("no operation eligibility predicate"); },

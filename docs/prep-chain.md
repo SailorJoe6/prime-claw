@@ -44,13 +44,26 @@ its exact project root, entire canonical ID, native status, and complete raw vie
 without inventing a path. Both planning messages carry the exact provider/root
 binding selected by the same discriminated resolver used by implementation
 entry, plus the complete `task.nativeView` JSON in
-`<operator-plan-task-observation>`. Both implementation messages likewise carry
+`<operator-plan-task-observation>`. Both implementation messages carry
 `<operator-implementation-task-observation>`, with the existing provider/root
-and Backlog-only path tags. These observations retain the full provider-native
-envelope, names, values, and absent fields. They are facts, not approval or
-frozen revision locks. Workflows reread the exact native task before acting and
-judge compatible refinements from current facts. Folder-compatible
-admission validates one exact project-relative future folder. The sole
+and Backlog-only path tags. Beads implementation observations still retain the
+complete raw native envelope, names, values, and absent fields. Backlog
+implementation observations carry `{localTaskEvidence: BacklogGitEvidence,
+publishedHead?: string}` instead of a native task snapshot. `localTaskEvidence`
+binds the selected repository identity and topology, full commit OID, and
+literal repository-relative task path. `publishedHead` is a separate observed
+remote task ref, omitted if unproven or not applicable. Its presence does not
+prove the local ticket is published. Older queued raw Backlog observations are
+compatibility context only, not committed evidence.
+
+These are facts, not approval or frozen revision locks. Backlog readiness
+inspects exact committed ticket evidence in [bounded Git windows](handoff-chain.md#backlog-git-evidence-reader),
+then judges the current contract and verifies selected-ticket publication when
+required. Current native views and selected diffs remain available for
+readiness and authorized authoring, not as substitutes for committed evidence.
+Beads readiness rereads the exact raw native task. Both judge compatible
+refinements from current facts. Folder-compatible admission validates one exact
+project-relative future folder. The sole
 source-absent exception is implementation replay for the exact already-active
 version-1 owner: deterministic admission verifies its source identity, promoted
 active pair, and frozen digest before queueing the same workflows. Every path

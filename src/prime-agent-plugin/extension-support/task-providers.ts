@@ -2116,7 +2116,7 @@ export type ProviderTaskResolution =
       nativeView: JsonRecord;
     };
 
-function requireLiveProvider(cwd: string, runner: CommandRunner): Extract<TaskProviderDetection, { kind: "selected" }> {
+export function requireLiveProvider(cwd: string, runner: CommandRunner = new ProcessCommandRunner()): Extract<TaskProviderDetection, { kind: "selected" }> {
   const detection = detectTaskProvider(cwd, runner);
   if (detection.kind === "none") {
     throw new Error(
@@ -2231,7 +2231,12 @@ export function resolveProviderTask(
     if (!selection) return null;
     return { provider: "backlog", ...selection };
   }
-  const issue = readBeadsNativeTask(detection.projectRoot, selectedTaskId, runner);
+  return resolveBeadsProviderTask(detection.projectRoot, selectedTaskId, runner);
+}
+
+/** Preserve the native Beads envelope for a caller that already selected Beads. */
+export function resolveBeadsProviderTask(projectRoot: string, selectedTaskId: string, runner: CommandRunner = new ProcessCommandRunner()): Extract<ProviderTaskResolution, { provider: "beads" }> {
+  const issue = readBeadsNativeTask(projectRoot, selectedTaskId, runner);
   return {
     ...issue,
     status: Object.entries(BEADS_STATUS_MAP).find(([, mapping]) => mapping.name === issue.nativeStatus)?.[0]

@@ -79,12 +79,6 @@ export default function fixture(pi: ExtensionAPI) {
         createdAt: now, updatedAt: now,
       } as const;
       writeEpisodeOwnership(repo, binding);
-      const taskSelection = (projectRoot: string, selected: string) => {
-        assert.ok(projectRoot === repo || projectRoot === worktree);
-        assert.equal(selected, taskId);
-        return { projectRoot, taskId, taskPathRelative, nativeView: { task: { id: taskId, path: taskPathRelative } } };
-      };
-
       // Record, but do not replace, the production publisher's real native requests.
       const requests: Record<string, unknown>[] = [];
       const request = handoffClient.request.bind(handoffClient);
@@ -94,7 +88,7 @@ export default function fixture(pi: ExtensionAPI) {
       };
       const handoff = await handoffTaskEpisode(taskId, "Fixture scope only.", ctx, {
         publisher: new PrimeSessionPublisher(handoffClient),
-        taskResolver: taskSelection,
+        taskResolver() { throw new Error("Branch-local continuation must not read a mutable task view"); },
         appendEntry(type, data) {
           pi.appendEntry(type, data);
           ctx.sessionManager.flushNow();

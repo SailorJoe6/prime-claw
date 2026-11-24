@@ -90,11 +90,17 @@ Load it before judging continuation:
    provider observation and native session/state facts. Preserve provider-native
    envelopes, arrays, keys, unknown fields, nulls, and absent fields; never
    normalize, flatten, truncate, or replace them with a summary.
-4. Enumerate the native structure, then inspect the entire current task contract
-   and all relevant prior/current differences, including fields and comments.
-   Read large collections and individual huge values in bounded chunks of about
-   4096 characters per output, with paths and offsets so no remainder is skipped.
-   A key list, length/digest check, preview or summary is not semantic inspection.
+4. For Backlog, select the evidence pair by the bound topology: independent
+   uses `previousTaskEvidence` and `currentTaskEvidence`; branch-local uses
+   `mainTaskEvidence` and `currentTaskEvidence`. Require both to be valid Git
+   references of that topology or both to be complete legacy raw native task
+   views for the bound task. A mixed, missing or malformed pair stops; never
+   interpret a failed reference as a raw view. Beads retains its raw views.
+   For raw observations, enumerate their structure and inspect the entire
+   current task contract and relevant prior/current differences, including
+   fields and comments. Read large values
+   and collections in chunks of about 4096 characters, with paths and offsets.
+   A key list, digest, preview or summary cannot replace semantic inspection.
    Do not dump one giant JSON value into model context.
 
 A missing, unreadable, ambiguous, mismatched or inaccessible exact session/entry
@@ -106,46 +112,136 @@ and `<episode-session-observation>` inline. Read those complete native values
 when no reference was supplied; they never repair a failed reference. Retained
 version-1 folder-plan handling is unchanged.
 
-For provider-absent/Backlog task-native handoff, reload the bound candidate
-through the supported structured interface:
+### Read independent Backlog Git evidence
+
+For ordinary handoff and execute-only continuation, each reference has
+`{kind: "backlog-git", repository: {topology: "independent", identity}, commit, path}`.
+The managed sender verifies both exact committed regular ticket blobs and their
+native canonical task ID from committed frontmatter before delivery. Match the
+previous commit to `previousProviderRevision` and the current commit to
+`publishedProviderRevision`. The current reference is the observed published
+checkpoint. An optional `localTaskEvidence` points to a separately retained
+local head. When it matters to the decision, require the same repository
+identity, topology and literal task path as the current reference. Resolve its
+own commit, verify the bound canonical task ID and read or diff its blob against
+the published blob using the same bounded procedure. If that relevant evidence
+is unavailable or mismatched, report the gap; never guess from local `HEAD`.
+Local evidence is not publication or a substitute for either required reference.
+Use `selectedTaskStatus`, the raw literal-ticket Git status result, as separate
+publication context. It is not an automatic cleanliness gate or a substitute
+for committed content. Do not require these commits or the branch tips to be equal.
+
+1. Use only this Episode's already selected independent task clone at its
+   configured store location (normally `<worktree>/.backlog`), not the code
+   repository or the primary clone. With `git --no-replace-objects -C "$root"
+   rev-parse --show-toplevel`, verify the canonical root matches that exact
+   store. Hash UTF-8 `remote:` followed by the output of `git -C "$root" remote
+   get-url -- "$remote"` with trailing whitespace removed. Use the already
+   selected task remote, not a guessed remote. Compare the lowercase SHA-256
+   digest to both `repository.identity` values; do not print the URL.
+2. For each reference require exactly 40 lowercase hex digits and
+   `git --no-replace-objects -C "$root" cat-file -t "$oid"` to return `commit`.
+   Require a literal `.md` path relative to the nested clone, with no empty,
+   `.` or `..` components, NUL, CR, LF or backslash. Run
+   `git --no-replace-objects -C "$root" --literal-pathspecs ls-tree -z "$oid" -- "$path"`.
+   Require exactly one NUL-terminated entry of mode `100644` or `100755`, type
+   `blob`, and the exact path after the tab. Keep its full blob OID; verify
+   `cat-file -t` returns `blob`. The path and filename alone do not prove the
+   task ID; check the committed header against the bound canonical ID when
+   reading the blob.
+3. In the REPL, stream `git --no-replace-objects -C "$root" cat-file blob "$blob"`
+   for the entire current contract. Compare both verified blob OIDs with
+   `git --no-replace-objects -C "$root" --no-pager diff --no-color --no-ext-diff --no-textconv --text "$old_blob" "$new_blob" --`.
+   Pass arguments separately. Read stdout in successive windows of about 4096
+   bytes, with offsets and incremental UTF-8 decoding. Do not cut at a long
+   line or skip the tail. Check process exit and the blob's `cat-file -s` byte
+   count for a complete blob read. Inspect all relevant changes, including
+   frontmatter, plan, notes and comments. Do not print or save a full snapshot.
+
+If either required reference cannot be bound, read or matched, stop and report
+which evidence is missing or mismatched. Do not substitute `HEAD`, a tracking
+ref, an index/working file, a native live view, or a cached observation. Resume
+from the same task and assess current progress under existing guidance; the
+observed commits do not freeze history or grant approval.
+
+### Read branch-local Backlog Git evidence
+
+For ordinary handoff and execute-only, `mainTaskEvidence` and
+`currentTaskEvidence` each have `{kind: "backlog-git", repository: {topology:
+"branch-local", identity}, commit, path}`. The shared sender helper takes the
+exact current integration and Episode code head OIDs, respectively. The
+integration branch is the one recorded in ownership, not necessarily `main`.
+Both references use the literal code-repository-relative task path from the
+exact branch-local binding. The sender verifies both committed headers with
+native Backlog before delivery. Neither reference establishes remote publication;
+keep native upstream and publication facts separate.
+
+Use the code repository at the exact bound Episode worktree. Verify
+`git --no-replace-objects -C "$root" rev-parse --show-toplevel` resolves to that
+canonical worktree. Resolve `git --no-replace-objects -C "$root" rev-parse
+--path-format=absolute --git-common-dir`, trim trailing whitespace, then apply
+`realpath`. Hash UTF-8 `local:` plus that canonical common Git directory path.
+Require both lowercase SHA-256 identities to match, both topologies to be
+`branch-local`, and both literal paths to equal the bound task path. Do not
+use the nested task clone, an unrelated clone, or a remote URL for this check.
+
+Use steps 2 and 3 above in that code repository, with paths relative to its
+root. Verify each committed header against the bound native canonical task ID;
+the path or filename alone is not proof. Read the entire Episode ticket and
+compare the integration blob to the Episode blob in bounded windows. Use only
+the exact commit OIDs in the observation, never historical checkpoints, fresh
+tips, tracking refs, the index, mutable files, or a live task view. If either
+reference cannot be verified or read, report the evidence gap and stop.
+
+### Evaluate the Backlog handoff
+
+For either Backlog topology with the Git-reference observation, judge `In Progress`,
+meaningful Implementation Plan and resumable context from the committed current
+ticket and the relevant committed diffs above. Read-only handoff does not require
+`backlog task view --json` or a new capture of the live ticket. For either
+Backlog topology with a legacy raw observation, retain the existing native
+reload before judging handoff:
 
 ```sh
 backlog task view --json -- TASK-ID
 ```
 
-Require the returned canonical ID and task path to match the binding, and
-require status to remain exactly `In Progress`. The task is the sole durable
-handoff authority in this branch. Coherent ticket edits must already have been
-committed ASAP and published promptly; handoff is not their first durability
-checkpoint. Follow execute's selected-file/native-history procedure. Ensure its Implementation Plan,
-Implementation Notes, acceptance evidence, references, documentation, modified
-files, and Final Summary contain the current resumable context. If an in-scope
-update is needed, use supported `backlog task edit` operations only in this
-Episode worktree, reload and verify identity/path/parent/status, then commit and
-push the single-purpose checkpoint before compacting. Grandfathered mode commits
-only the literal selected task path on the Episode code branch, separately from
-code, preserving unrelated index entries. Independent mode commits only the task path
-in the ignored nested clone, pushes `HEAD:refs/heads/prime-claw/tasks` without
-force, proves direct publication and unchanged code HEAD, and leaves ownership
-revision/evidence advancement to `handoff_task_episode` after message admission.
-Inspect the selected ticket and history/publication facts. Unrelated dirty work
-or compatible descendants are not blockers; foreign identity, an actual native
-conflict or unavailable selected-ticket publication needs factual recovery.
-Never reset or absorb another writer's work to make the clone clean. The host
-supplies the persisted and freshly synchronized complete native task views and
-revisions as factual context. An unrelated-task descendant alone is compatible.
-For an outside same-task change, use bounded semantic judgment: incorporate a
-compatible in-scope clarification or living-plan update, and stop for a genuine
-semantic conflict, authority change, scope expansion, or product decision. Raw
-inequality is not an approval gate; never add an equality gate or deterministic
-classifier.
+Require that reload's canonical ID and task path to match the binding and status
+to remain exactly `In Progress`. The native task remains sole durable authority.
+Its Implementation Plan, Implementation Notes, acceptance evidence, references,
+documentation, modified files and Final Summary should contain the context to
+resume. Commit coherent edits ASAP and publish promptly; handoff is not their
+first durability checkpoint.
+
+If an authorized in-scope edit is actually needed, reload the exact native task
+in this Episode worktree, verify ID, path, parent identity and status, and edit
+with supported `backlog task edit` only. Reload and verify the intended edit and
+unchanged ID, path, parent and status before committing and pushing the
+single-purpose checkpoint. Use execute's selected-file/native-history rules.
+Grandfathered mode commits only the literal selected task path on the Episode
+code branch, separately from code, preserving unrelated index entries.
+Independent mode commits only the task path in the ignored nested clone, pushes
+`HEAD:refs/heads/prime-claw/tasks` without force, proves direct publication and
+unchanged code HEAD, and leaves ownership revision/evidence advancement to
+`handoff_task_episode` after message admission. A live authoring read is not a
+substitute for either committed reference.
+
+Inspect the selected ticket and its history/publication facts. Unrelated dirty
+work or compatible descendants are not blockers. Foreign identity, an actual
+native conflict or unavailable selected-ticket publication needs factual
+recovery. Never reset or absorb another writer's work to make the clone clean.
+For an outside same-task change, incorporate a compatible in-scope clarification
+or living-plan update. Stop for a genuine semantic conflict, authority change,
+scope expansion or product decision. Raw inequality is not an approval gate;
+never add an equality gate or deterministic classifier.
 
 For independent Backlog continuation, the transport prepares and reads the
 Episode's task checkout, not the mutable primary task checkout. The invoking
 Conversation synchronizes its own task workspace when needed for its authorized
 status publication; handoff must not synchronize or absorb another writer's
-primary bytes or index. Inspect the supplied previous/current native task views,
-Episode code head, and native upstream result before deciding continuation.
+primary bytes or index. Inspect the exact previous/current committed ticket
+content (legacy raw views if supplied), Episode code head and native upstream
+result before deciding continuation.
 Apply the status, meaningful-plan, selected-ticket publication, code publication,
 and history-compatibility rules here as LLM judgment, not a primary/Episode
 view-equality, paired stable-head, or code-upstream approval gate.
@@ -167,11 +263,12 @@ expansion. Do not use Backlog, translate or mutate Beads during handoff. Leave
 content updates to execute's native cycle, reviewing touched-table/staged-set
 multi-issue consequences first. Guidance never reconstructs provider facts.
 
-The referenced `providerTaskObservation` is factual before/current context,
-not semantic acceptance or new authority. Grandfathered Backlog includes complete
-primary/Episode native views; independent Backlog and Beads include prior/current
-native views and code observations. `episodeSessionObservation` carries the
-native list/state flags. The prior-generation inline tags carry the same facts.
+The referenced `providerTaskObservation` is factual comparison context, not
+semantic acceptance or new authority. New branch-local Backlog observations
+include integration/Episode Git references; new independent Backlog observations
+include prior/current Git references. Legacy Backlog pairs and Beads retain raw
+native views. Code observations remain separate.
+`episodeSessionObservation` carries the native list/state flags.
 Check idle completion, children/queues and publication
 facts before ordinary continuation; these are LLM decisions under this policy,
 not duplicate status/design/code-dirt/upstream/ancestry or role-depth predicates.
