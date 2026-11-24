@@ -200,9 +200,12 @@ admitted even when execute was not queued. Do not send execute from this handoff
 turn; compaction instructions below never authorize reconstructing a missing or
 uncertain follow-up. Record findings and operator disposition in existing native
 fields/history. State evidence limits without inventing refusal or a safe resend.
-If the original handoff is demonstrably completed, the exact owner may instead
-assess the separate “New execute-only continuation after completed handoff” policy
-in `prime-claw-oversee-episode`. That requires explicit informed authority for
+The exact owner may instead assess the separate execute-only continuation policy
+in `prime-claw-oversee-episode`: either a demonstrably completed handoff with
+failed or historically unproved execute, or a verified pre-work runtime interruption
+of both prompts demonstrably received by the same Episode. Uncertain delivery or
+possible unaccounted task effects do not qualify for the interruption path.
+Either path requires explicit informed authority for
 ONE NEW continuation, fresh current task/code/session and explicit-descendant
 facts, and the supported managed execute-only invocation. It is not replay of
 this chain, an Episode dispatch decision, a compaction trigger or permission to
