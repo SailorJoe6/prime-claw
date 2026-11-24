@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T09:35:00Z'
+updated_date: '2026-11-24T09:39:00Z'
 labels: []
 dependencies: []
 references:
@@ -13,6 +13,10 @@ references:
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - >-
     https://github.com/SailorJoe6/prime-claw/blob/510856f0e8ec7db152f7f34cb8730587234be5bf/tasks/primeclaw-70%20-%20Make-independent-Backlog-Episode-creation-work-for-large-tickets.md
+  - .agents/skills/blocked/SKILL.md
+  - src/prime-agent-plugin/skills/project-templates/blocked.md
+  - docs/conversation-driven-episode-oversight.md
+  - docs/handoff-chain.md
 documentation:
   - docs/handoff-chain.md
 modified_files:
