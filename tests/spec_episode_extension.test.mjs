@@ -2407,8 +2407,17 @@ test("registered Backlog cleanup returns bounded committed evidence for both out
     ? "/usr/local/bin/backlog"
     : fileURLToPath(new URL("../deps/backlog/dist/backlog", import.meta.url));
   if (!existsSync(backlog)) { t.skip("managed backlog executable unavailable"); return; }
-  for (const topology of ["branch-local", "independent"]) for (const outcome of ["merged", "abandoned"]) {
-    await t.test(`${topology}, ${outcome}`, async (t) => {
+  const scenarios = [
+    { topology: "branch-local", outcome: "merged" },
+    { topology: "branch-local", outcome: "abandoned" },
+    { topology: "independent", outcome: "merged", prior: "legacy" },
+    { topology: "independent", outcome: "abandoned", prior: "legacy" },
+    { topology: "independent", outcome: "merged", prior: "git-reference" },
+    { topology: "independent", outcome: "merged", prior: "missing-commit" },
+    { topology: "independent", outcome: "merged", prior: "wrong-ticket" },
+  ];
+  for (const { topology, outcome, prior } of scenarios) {
+    await t.test([topology, outcome, prior].filter(Boolean).join(", "), async (t) => {
       const independent = topology === "independent";
       const h = cleanupHarness(outcome);
       const { root } = h.f;
@@ -2449,12 +2458,25 @@ test("registered Backlog cleanup returns bounded committed evidence for both out
         git(repository, "commit", "-qm", message);
         return git(repository, "rev-parse", "HEAD");
       };
+      const activeFile = join(repository, activePath);
+      const priorBytes = readFileSync(activeFile);
+      if (prior === "wrong-ticket") {
+        const foreign = priorBytes.toString().replace(/^id: .*$/m, "id: TASK-9999");
+        assert.notEqual(foreign, priorBytes.toString());
+        writeFileSync(activeFile, foreign);
+      }
       const priorHead = commitTask("Record initial task");
+      if (prior === "wrong-ticket") writeFileSync(activeFile, priorBytes);
+      if (prior === "git-reference") {
+        git(store, "commit", "--allow-empty", "-qm", "Advance published history from recorded revision");
+      }
+      const publishedHead = git(repository, "rev-parse", "HEAD");
       if (independent) git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
       const ticketSentinel = "TERMINAL_TICKET_BODY_MUST_NOT_BE_IN_TOOL_OUTPUT";
       // Keep individual argument sizes small, but grow the native ticket beyond the buffered runner's default limit.
+      const largeTicket = prior === undefined || prior === "legacy";
       const chunk = `${ticketSentinel} λ\n`.repeat(2000);
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < (largeTicket ? 14 : 1); i++) {
         runNative("task", "edit", "--plain", "--append-notes", chunk, "--", taskId);
       }
       const workingSentinel = "UNCOMMITTED_TERMINAL_EDIT_MUST_NOT_BE_RETURNED";
@@ -2468,15 +2490,20 @@ test("registered Backlog cleanup returns bounded committed evidence for both out
       }
       const localHead = commitTask(`Record ${outcome} ticket`);
       const expected = readFileSync(join(repository, currentPath));
-      assert.ok(expected.length > 1024 * 1024);
+      if (largeTicket) assert.ok(expected.length > 1024 * 1024);
       if (outcome === "merged") {
         runNative("task", "edit", "--plain", "--append-notes", workingSentinel, "--", taskId);
         assert.ok(readFileSync(join(repository, currentPath)).includes(workingSentinel));
       }
       const priorSentinel = "LEGACY_OWNER_SNAPSHOT_MUST_NOT_BE_IN_TOOL_OUTPUT";
+      const priorRevision = prior === "missing-commit" ? "0".repeat(40) : priorHead;
+      const priorReference = { kind: "backlog-git", commit: priorRevision, path: activePath,
+        repository: { topology, identity: createHash("sha256").update(`remote:${remote}`).digest("hex") },
+      };
+      const taskEvidence = prior === "git-reference" || prior === "wrong-ticket" ? priorReference
+        : { kind: "task-view", task: { ...task, description: priorSentinel } };
       h.records.set("owner", activeTaskRecord(h.f, { taskId, taskPath: task.path,
-        ...(independent ? { provider: "backlog", providerRevision: priorHead,
-          taskEvidence: { kind: "task-view", task: { ...task, description: priorSentinel } } } : {}),
+        ...(independent ? { provider: "backlog", providerRevision: priorRevision, taskEvidence } : {}),
       }));
       const guideRoot = join(root, "plugin");
       mkdirSync(join(guideRoot, "skills", "prime-claw-oversee-episode"), { recursive: true });
@@ -2507,14 +2534,22 @@ test("registered Backlog cleanup returns bounded committed evidence for both out
       }
       assert.deepEqual(JSON.parse(body.slice(body.indexOf("\n") + 1)), JSON.parse(details));
       const observed = result.details.result.providerTaskObservation;
-      assert.equal("previousTaskEvidence" in observed, false);
       assert.equal("currentTask" in observed, false);
       if (independent) {
+        assert.equal(observed.previousProviderRevision, priorRevision);
+        if (prior === "missing-commit" || prior === "wrong-ticket") {
+          assert.deepEqual(observed.previousTaskEvidence, { availability: "unavailable" });
+        } else {
+          assert.deepEqual(observed.previousTaskEvidence, { availability: "available", evidence: priorReference });
+        }
         assert.equal(observed.history.head.status, 0);
         assert.equal(observed.history.head.stdout.trim(), localHead);
         assert.equal(observed.history.publication.status, 0);
-        assert.equal(observed.history.publication.stdout.trim(), `${priorHead}\t${TASK_HISTORY_REF}`);
-        assert.notEqual(localHead, priorHead);
+        assert.equal(observed.history.publication.stdout.trim(), `${publishedHead}\t${TASK_HISTORY_REF}`);
+        assert.notEqual(localHead, publishedHead);
+        if (prior === "git-reference") assert.equal(new Set([priorRevision, publishedHead, localHead]).size, 3);
+      } else {
+        assert.equal("previousTaskEvidence" in observed, false);
       }
       if (outcome === "merged") {
         assert.equal("archived" in observed, false);
@@ -2530,7 +2565,11 @@ test("registered Backlog cleanup returns bounded committed evidence for both out
       // Move HEAD and the working checkout independently of the historical evidence.
       git(repository, "commit", "--allow-empty", "-qm", "Advance after terminal observation");
       assert.notEqual(git(repository, "rev-parse", "HEAD"), localHead);
-      await assertCommittedContinuationBytes({ root: repository, topology, remote: independent ? "origin" : null }, taskId, entry.evidence, expected);
+      const selected = { root: repository, topology, remote: independent ? "origin" : null };
+      await assertCommittedContinuationBytes(selected, taskId, entry.evidence, expected);
+      if (observed.previousTaskEvidence?.availability === "available") {
+        await assertCommittedContinuationBytes(selected, taskId, observed.previousTaskEvidence.evidence, priorBytes);
+      }
       assert.equal(result.details.guidance, "EDITED BACKLOG TERMINAL POLICY");
       assert.equal(h.record, undefined); assert.ok(h.foreignRecord);
     });

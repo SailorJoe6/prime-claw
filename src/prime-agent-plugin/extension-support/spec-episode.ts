@@ -2969,6 +2969,31 @@ function backlogStoreRelativePath(projectRoot: string, storeDir: string, taskPat
   return taskPath.slice(prefix.length + 1);
 }
 
+async function observePreviousBacklogCheckpoint(
+  record: PublishedBacklogTaskEpisodeOwnershipRecord,
+  repository: SelectedBacklogRepository | undefined,
+  path: string | undefined,
+) {
+  const unavailable = { availability: "unavailable" } as const;
+  if (!repository || !path) return unavailable;
+  const stored = record.taskEvidence;
+  let expected: BacklogGitEvidence["repository"] | undefined;
+  if (stored.kind === "backlog-git") {
+    expected = stored.repository as BacklogGitEvidence["repository"] | undefined;
+    if (stored.commit !== record.providerRevision || stored.path !== path || expected?.topology !== "independent") {
+      return unavailable;
+    }
+  } else {
+    // A legacy view binds the task and literal active path, not the committed bytes.
+    const task = stored.task as Record<string, unknown> | undefined;
+    if (task?.id !== record.taskId || task.path !== record.taskPath
+        || typeof task.status !== "string" || !task.status.trim()) return unavailable;
+  }
+  const observation = await observeCommittedBacklogTask(repository, record.providerRevision, path, record.taskId, expected);
+  // An absent historical blob is a gap in checkpoint evidence, not a cleanup gate.
+  return observation.availability === "available" ? observation : unavailable;
+}
+
 async function observeTaskEpisodeTerminalState(
   projectRoot: string,
   record: TaskEpisodeOwnershipRecord,
@@ -3022,13 +3047,17 @@ async function observeTaskEpisodeTerminalState(
     if (!path) return { availability: "unavailable" };
     return observeCommittedBacklogTask(repository, commit, path, record.taskId, expectedRepository);
   };
+  const checkpoint = independent ? {
+    previousTaskEvidence: await observePreviousBacklogCheckpoint(record, repository,
+      repository && backlogStoreRelativePath(projectRoot, repository.root, record.taskPath)),
+  } : {};
   const active = await observePath(record.taskPath);
   if (outcome === "abandoned") {
     const archivePath = expectedArchivedTaskPath(record.taskPath);
-    return { previousProviderRevision: record.providerRevision, code, history, archivePath,
+    return { previousProviderRevision: record.providerRevision, ...checkpoint, code, history, archivePath,
       active, archived: await observePath(archivePath) };
   }
-  return { previousProviderRevision: record.providerRevision, code, history, active };
+  return { previousProviderRevision: record.providerRevision, ...checkpoint, code, history, active };
 }
 
 export async function finalizeTaskEpisodeCleanup(
