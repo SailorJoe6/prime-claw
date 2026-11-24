@@ -204,7 +204,7 @@
       "ownerSessionId": "01a20b36-a5b8-7348-9538-edca70642cb1",
       "taskId": "PRIMECLAW-69",
       "taskPath": ".backlog/tasks/primeclaw-69 - Use-Git-references-for-independent-Backlog-handoff-evidence.md",
-      "providerRevision": "7a524eff38c252077d36fb38fc2c6e10f0862317",
+      "providerRevision": "6c65f0fa3660faa753ccadf99557b910c7ab53e0",
       "taskEvidence": {
         "schemaVersion": 1,
         "kind": "task-view",
@@ -228,10 +228,15 @@
             "src/prime-agent-plugin/extension-support/spec-episode.ts",
             "https://github.com/SailorJoe6/prime-claw/blob/510856f0e8ec7db152f7f34cb8730587234be5bf/tasks/primeclaw-70%20-%20Make-independent-Backlog-Episode-creation-work-for-large-tickets.md"
           ],
-          "modifiedFiles": [],
+          "modifiedFiles": [
+            "docs/handoff-chain.md",
+            "src/prime-agent-plugin/asset-inventory.json",
+            "src/prime-agent-plugin/extension-support/backlog-git-evidence.ts",
+            "tests/task_history_workspace.test.mjs"
+          ],
           "ordinal": 153000,
           "createdAt": "2026-11-24T01:43:00Z",
-          "updatedAt": "2026-11-24T02:39:00Z",
+          "updatedAt": "2026-11-24T02:48:00Z",
           "dueDate": null,
           "isReady": true,
           "path": ".backlog/tasks/primeclaw-69 - Use-Git-references-for-independent-Backlog-handoff-evidence.md",
@@ -286,14 +291,14 @@
           ],
           "definitionOfDone": [],
           "implementationPlan": "**Implementation boundaries.** Use existing Git and Backlog operations, records and delivery flow. Code supplies exact resource facts, checks identity, and handles bounded transport. Editable workflows and the Conversation or Episode LLM own semantic judgment: do not code task reconciliation, iterative plan changes, readiness classifiers or other reasoning they can perform. Do not add persistent state or a state machine beyond replacing snapshots with references in existing records. If implementation finds that an acceptance criterion cannot be met without either, stop and identify the criterion and show why the native operations, existing records and editable guidance cannot meet it before proposing a plan revision.\n\n1. **Define the reference and reader (AC1, AC3).** Use one Backlog-only reference shape: repository identity, full commit OID and literal repository-relative ticket path. Use the selected independent task repository (including custom store paths) or the exact branch-local code repository, with existing local-only/publication rules. Reuse existing repository selection and exact identity checks to verify the repository, commit, regular ticket blob and canonical task ID. Document how to use native Git to read and diff the exact blobs in bounded ranges (including long lines and the tail). Add only the bounded transport needed by managed callers; no custom diff engine, cursor service or cached content. Do not capture whole Git output in the synchronous runner, use mutable files as evidence or introduce a second store. Keep previous/current references independent when they represent different checkpoints; do not freeze branch tips or add an approval gate.\n\n2. **Switch creation admission and the first assignment (AC1, AC2, AC4).** Trace `spec-episode.ts` from pre-allocation resolution through `prepareTaskEpisodeWorkspace` and the initial execute message. Change only the affected lifecycle calls in `reviewed-plan-support.ts`, `task-providers.ts` and `task-history-workspace.ts` that need exact identity and publication facts. Reuse existing native Backlog and Git operations; do not build a replacement task reader or change explicit task viewing and authoring. Preserve exact ID/path and publication checks without requiring full `task view --json` or a larger buffer. Provide bounded facts and access to the committed status and plan; the existing editable workflow and its LLM decide readiness and interpret publication facts. Validate required evidence in the target task workspace before session assignment; keep the same operation, worktree, session and recovery semantics on failure. Write only the reference for ticket evidence and send one initial execute assignment, not an initial handoff. No replay assignment.\n\n3. **Replace the remaining Backlog writes and consumers (AC1, AC3, AC4).** Switch `preparePublishedBacklogHandoffEvidence` and branch-local handoff in `spec-episode.ts`; keep runtime branch/upstream and delivery facts separate. Keep ordinary first admission → factual callback → one execute, and the existing execute-only path with no extra stage. Update `episode-ownership.ts` and `task-episode-ownership.ts` for reference-based writes/readback, transitions and terminal evidence. In `task-history-workspace.ts` and `task-provider-migration.ts` replace Backlog ticket copies in publication/mutation results and cutover ownership/results with exact references when those checkpoints are committed; keep native edits and required semantic verification, and report pre-commit or failed-publication facts as such. Keep existing native migration verification and the cutover/retirement order. Leave Beads unchanged; do not redesign migration around the new evidence shape. Audit `taskEvidence`, previous/current views, `nativeView`, and emitted diffs across journals/results/prompts so no Backlog snapshot is written under a different field. Update editable handoff, execute, oversight, expert review, block/resume and terminal guidance and `docs/handoff-chain.md` to use the bounded Git reader.\n\n4. **Handle legacy evidence only when needed (AC3, AC4).** Keep readers for existing independent revision-plus-view records and branch-local path-only records. Use the recorded historical commit only when it can be tied to the exact checkpoint, repository and path; an old path alone is not proof of a revision. Do not add a history search or backfill job to infer missing revisions. Preserve old records without a bulk rewrite. Advance only new evidence in a normal operation. For required missing, mismatched or inaccessible evidence, name the boundary and reason before delivery where applicable. Do not guess from HEAD or an uncommitted file, reuse a copied view as committed evidence, resend, or allocate replacements. Preserve definite versus uncertain admission, callback, and follow-up outcomes separately.\n\n5. **Prove the change offline in Docker (AC1–AC4).** Reuse existing offline Docker fixtures and extend the production task Episode admission and handoff integration cases (`tests/task_episode_admission_extension.test.mjs`, `tests/spec_episode_extension.test.mjs` and the Tier 1 native-observation harness). Use disposable local Git remotes and a committed synthetic Backlog task; measure native JSON above 1 MiB via streamed/file output in the fixture only. Exercise pre-allocation and pre-session reads, a single bounded initial assignment, ordinary continuation, execute-only, and same-resource recovery without a second allocation or resend. Advance the task branch and verify complete bounded reads/diffs of both commits, with a late-content marker, and assert no full JSON capture prerequisite or new content copies in persisted/delivered evidence. Cover branch-local committed evidence, legacy compatibility, wrong repository/ID/path and missing or inaccessible revisions; assert failure at the relevant boundary. Extend ownership transition, mutation and cutover cases for references and run unchanged Beads and delivery outcome regressions. Run `scripts/test-tier1.sh --probe`; record Docker results against all four criteria. No original TASK-2 action, AWS work, host activation, or upstream work.",
-          "implementationNotes": null,
+          "implementationNotes": "Slice 1 (plan step 1; partial AC1/AC3): Added Backlog Git reference and bounded exact blob reader, with offline Docker coverage for an independent custom store, a >1 MiB blob, old/new commits and tail diff after branch advance, a dirty working file, branch-local/local-only resolution, and wrong repository/ID/path or missing commit. Docker task_history_workspace suite passed 91/91. First source-mode Tier 1 probe stopped at plugin apply because the new asset was missing from asset-inventory.json. Registered the asset; isolated offline apply/check passed and the same source-mode probe is running again. No lifecycle evidence writers/readers switched yet. No acceptance criteria checked. Next slice: production creation pre-allocation and pre-session reads plus one initial execute, with native >1 MiB JSON fixture.\n\nSlice 1 validation follow-up: source-mode scripts/test-tier1.sh --probe passed after asset registration; manifest and offline probe evidence: .test-results/20261124T024702Z-2489-9e179e45/tier1. Offline Node task-history suite: 91 passed, no skips. Published code 9f40c8ac635d718ab4162dc2600f47d643504c9c. No task lifecycle change or end-to-end large-ticket creation/handoff claim.",
           "comments": [],
           "finalSummary": null
         }
       },
       "baseRef": "1531ba6aa3d393423b59fca2e9b99a11f200f0cb",
       "createdAt": "2026-11-24T02:39:48.324Z",
-      "updatedAt": "2026-11-24T02:40:16.793Z",
+      "updatedAt": "2026-11-24T02:53:23.662Z",
       "integrationBranch": "main",
       "projectSetupId": "afb6537c-e643-4a5f-b284-f0f627ddcbdf",
       "worktreeName": "prime-claw-primeclaw-69-episode-f2e63115",
@@ -301,7 +306,7 @@
       "worktreeIdentity": "wt2:local:871c531b-9520-430a-a996-355fa19322cf",
       "worktree": "/Users/jlanders/worktrees/prime-claw/prime-claw-primeclaw-69-episode-f2e63115",
       "branch": "JLanders/prime-claw-primeclaw-69-episode-f2e63115",
-      "head": "1531ba6aa3d393423b59fca2e9b99a11f200f0cb",
+      "head": "9f40c8ac635d718ab4162dc2600f47d643504c9c",
       "launchAutomationName": "prime-claw-launch-f2e63115-bd0c-4be1-8bcf-4769f20384d1",
       "episodeId": "01a20b6c-d6f8-722c-9a09-4bd12dbd8e77",
       "episodeSessionFile": "/Users/jlanders/.prime/agent/sessions/01a20b6c-d6f8-722c-9a09-4bd12dbd8e77.jsonl",
