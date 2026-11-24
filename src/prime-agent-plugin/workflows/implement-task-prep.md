@@ -64,14 +64,44 @@ content refinements remain facts for semantic readiness review, not an automatic
 reapproval gate. Do not require an earlier entry or manufacture missing receipt
 evidence when current native resolution and operator authority are sufficient.
 
-The `<operator-implementation-task-observation>` block contains the complete
-provider-native task-view JSON observed while queueing this chain. Keep its
-native envelope, field names, values, and absent fields for both Backlog and
-Beads. It is factual context, not implementation approval, a frozen revision,
-or evidence that the entry tool checked lifecycle eligibility. Reread the exact
-native task before readiness decisions or mutation; judge compatible refinements
-from the current task rather than rejecting a newer observation solely because
-it differs.
+The `<operator-implementation-task-observation>` block contains factual context,
+not implementation approval, a frozen revision, or a lifecycle eligibility
+check:
+
+- **Backlog:** `{localTaskEvidence: BacklogGitEvidence, publishedHead?: string}`.
+  `localTaskEvidence` names one exact committed ticket: `kind: "backlog-git"`,
+  `repository` (topology and identity), full `commit` OID, and literal `path`
+  relative to that repository. `publishedHead`, when present, is a separate
+  observed remote task ref OID. It does not prove that the local ticket is
+  published. Absence means publication was not proven or did not apply at entry.
+  An older queued raw Backlog view is compatibility context only, not committed
+  evidence. For a legacy prompt or direct readiness with no observation, resolve
+  the exact current committed evidence and publication facts independently.
+- **Beads:** the complete provider-native task-view JSON observed while queueing.
+  Keep its native envelope, field names, values, and absent fields. Reread the
+  exact native task before readiness decisions or mutation and judge compatible
+  refinements from the current task.
+
+Bind the Backlog reference to the already selected history repository, not the
+other topology or another Conversation's workspace. Independent history uses the
+nested task clone and the selected remote; branch-local history uses the selected
+code repository. Verify its canonical Git top-level and topology. Verify the
+repository identity: lowercase SHA-256 of UTF-8 `remote:` plus the selected
+remote's Git fetch URL with trailing whitespace removed, or, for a local
+identity, `local:` plus the canonical absolute Git common-directory path. Do
+not print the remote URL. Use `streamBacklogGitEvidence` where available. For a
+native Git read, disable replacement objects with `git --no-replace-objects`
+and require the full OID to identify a commit. Use `--literal-pathspecs ls-tree
+-z` at that commit and require exactly the bound repository-relative `.md` path
+as a regular blob (`100644` or `100755`), not a symlink or partial match. Verify
+the committed frontmatter's native canonical task ID against the selected ID.
+Stream `cat-file blob` for the verified blob OID in successive roughly 4096-byte
+windows with offsets and incremental UTF-8 decoding. For a complete read, check
+Git's exit result and the byte count against `cat-file -s`. Do not paste or
+retain a full snapshot. A window limits the read size, not the total ticket
+size. Report an unavailable or mismatched reference as an evidence gap; do not
+silently substitute `HEAD`, a tracking ref, the index, a working file, or a raw
+native view.
 
 This editable workflow owns status and readiness decisions. Implementation
 requires `In Planning` (Beads `in_planning`) and a meaningful native
@@ -123,10 +153,11 @@ Resolve the live provider directly from its native project evidence. Do not use
 a provider-selection file, infer from a task ID, or mix providers. Then read the
 exact selected task through that provider:
 
-- **Backlog:** run `backlog task view --json -- TASK-ID`. Require the returned
-  canonical ID, status exactly `In Planning`, exact returned task path, and a
-  readable, meaningful native Implementation Plan that is not blank or an
-  obvious placeholder.
+- **Backlog:** inspect the exact committed `localTaskEvidence` in bounded
+  windows as described above. Check the canonical ID and exact path, native
+  status exactly `In Planning`, and enough of the native Implementation Plan to
+  see that it is readable, meaningful, and not blank or an obvious placeholder.
+  This is a sniff, not a full review or proof of publication.
 - **Beads:** from the exact detected project root run `bd context --json` and
   `bd show TASK-ID --json --long --include-comments`. Require the returned
   canonical ID to equal the entire selected ID, native status exactly
@@ -148,8 +179,10 @@ If the sniff passes, reason from your current conversation context and compose a
 concise `focus_hint` that best prepares you to review the selected task for
 implementation admission and supervise the resulting Episode. Keep
 its exact provider, project root, task ID, observed Backlog task path when
-applicable, native readiness fields, and the complete provider-native
-observation for either provider. Preserve the operator's actual instruction,
+applicable, and native readiness fields. For Backlog, carry the exact Git
+reference, the separate `publishedHead` observation when present, and bounded
+findings or gaps, not a ticket snapshot. For Beads, retain the complete
+provider-native observation. Preserve the operator's actual instruction,
 approved scope, any conditional implementation authority, and optional stable
 host in `<operator-implementation-host>`. Planning-only authority must remain
 planning-only. Use your judgment to decide what context will be most useful for

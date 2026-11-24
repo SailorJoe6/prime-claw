@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +25,9 @@ function fixture({ throwOnSend = 0, taskStatus = "In Design", providerTaskResolv
     writeFileSync(join(folder, "EXECUTION_PLAN.md"), `Implement ${slug} within its retained scope.\n`);
   }
   reconcileLegacySpecificationInventory(root, "initialize");
+  writeFileSync(join(root, "task.md"), "---\nid: PRIMECLAW-10.38\ntitle: Planning fixture\nstatus: In Planning\n---\n");
+  execFileSync("git", ["-C", root, "add", "--", "task.md"]);
+  execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture", "--", "task.md"]);
   mkdirSync(join(root, ".prime-claw", "workflows"), { recursive: true });
   for (const name of ["plan-prep", "plan-spec", "plan-task-prep", "plan-task", "implement-prep", "implement-spec", "implement-task-prep", "implement-task", "handoff"]) writeFileSync(join(root, ".prime-claw", "workflows", `${name}.md`), `---
 name: ${name}
@@ -255,7 +259,12 @@ test("registered task prep tools leave status and absent plans to edited Markdow
         assert.deepEqual(f.sent.map(({ options }) => options), [{ deliverAs: "steer" }, { deliverAs: "followUp" }]);
         assert.ok(f.sent[0].message.includes(`EDITED ${phase}-prep POLICY`));
         assert.ok(f.sent[1].message.includes(`EDITED ${phase} POLICY`));
-        assertTaskObservation(f.sent, `${prefix}-observation`, nativeView);
+        const expectedObservation = provider === "backlog" && name === "implement_task" ? {
+          localTaskEvidence: { kind: "backlog-git", repository: { topology: "branch-local",
+            identity: createHash("sha256").update(`local:${realpathSync(join(f.root, ".git"))}`).digest("hex") },
+            commit: execFileSync("git", ["-C", f.root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(), path: "task.md" },
+        } : nativeView;
+        assertTaskObservation(f.sent, `${prefix}-observation`, expectedObservation);
         for (const { message } of f.sent) {
           assert.ok(message.includes(`<${prefix}-id>\n${taskId}\n</${prefix}-id>`));
           assert.ok(message.includes(`<${prefix}-provider>\n${provider}\n</${prefix}-provider>`));
@@ -586,6 +595,10 @@ test("task-native provider delivery uncertainty never retries a send or allocate
               : { nativeStatus: "native_custom" }),
           };
         } });
+        if (provider === "backlog" && name === "implement_task") {
+          writeFileSync(join(f.root, "task.md"), "---\nid: NATIVE-42\ntitle: Native fixture\nstatus: custom review\n---\n");
+          execFileSync("git", ["-C", f.root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "match the native fixture ID", "--", "task.md"]);
+        }
         const result = await f.tools.get(name).execute("uncertain-native", { taskId: "NATIVE-42" }, undefined, undefined, f.ctx);
         assert.equal(result.isError, true);
         assert.equal(result.details.admission, "unconfirmed");

@@ -46,7 +46,7 @@ import {
   type ProviderTaskResolution,
 } from "./task-providers.ts";
 import { isBacklogTaskEpisodeOwnership, readAllEpisodeOwnership } from "./episode-ownership.ts";
-import { referenceCommittedBacklogTask, type BacklogGitEvidence } from "./backlog-git-evidence.ts";
+import { makeBacklogGitEvidence, referenceCommittedBacklogTask, type BacklogGitEvidence } from "./backlog-git-evidence.ts";
 import { readBacklogCreationIdentity, readBacklogMutationIdentity } from "./backlog-creation-identity.ts";
 
 /** The disconnected task-history branch Prime Claw manages. */
@@ -706,6 +706,45 @@ export function resolveSynchronizedProviderTask(
   runner: CommandRunner = new ProcessCommandRunner(),
 ): ProviderTaskResolution | null {
   return resolveProviderTask(cwd, rawTaskId, runner);
+}
+
+/** Observe the selected Backlog commit for readiness without preparing a workspace. */
+export async function observeBacklogReadiness(
+  projectRoot: string, storeDir: string | null, taskId: string, taskPath: string,
+  runner: CommandRunner = new ProcessCommandRunner(),
+): Promise<{ localTaskEvidence: BacklogGitEvidence; publishedHead?: string }> {
+  const nested = storeDir && lstatIfPresent(join(storeDir, ".git"));
+  let root = projectRoot;
+  let path = taskPath;
+  let topology: BacklogGitEvidence["repository"]["topology"] = "branch-local";
+  let remote: string | null = null;
+  let publishedHead: string | undefined;
+  if (nested && storeDir) {
+    root = storeDir;
+    topology = "independent";
+    path = relative(root, resolve(projectRoot, taskPath)).split(sep).join("/");
+    const identity = verifyIndependentTaskClone(root, runner);
+    if (identity.status !== "verified") throw new Error("Backlog readiness requires the exact independent task clone");
+    if (gitOk(runner, root, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read the selected task branch") !== TASK_HISTORY_BRANCH) {
+      throw new Error("Backlog readiness requires the selected task-history branch");
+    }
+    const selected = selectTaskHistoryRemote(projectRoot, runner);
+    const names = gitOk(runner, root, ["remote"], "read the selected task remote");
+    if (selected.status === "selected") {
+      if (names !== selected.name || gitOk(runner, root, ["remote", "get-url", "--all", selected.name], "verify the selected task remote") !== selected.url) {
+        throw new Error("Backlog readiness task repository remote does not match the selected project remote");
+      }
+      remote = selected.name;
+      const publication = readDirectTaskHead(root, remote, selected.url, runner);
+      if (publication.status === "found") publishedHead = publication.head;
+    } else if (selected.code !== "no-remote" || names !== "") {
+      throw new Error("Backlog readiness cannot identify the selected task repository remote");
+    }
+  }
+  const head = refHead(runner, root, "HEAD");
+  if (!head) throw new Error("Backlog readiness cannot resolve the selected local commit");
+  const localTaskEvidence = await makeBacklogGitEvidence({ root, topology, remote }, head, path, taskId);
+  return { localTaskEvidence, ...(publishedHead ? { publishedHead } : {}) };
 }
 
 /**

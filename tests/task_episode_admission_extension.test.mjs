@@ -144,6 +144,159 @@ function commitPaths(root, ref = "HEAD") {
   return output ? output.split(/\r?\n/) : [];
 }
 
+for (const topology of ["independent", "branch-local"]) {
+  test(`registered implement_task admits oversized committed Backlog evidence: ${topology}`, async (t) => {
+    if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+    usePinnedBacklogOnPath(t);
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-large-readiness-")));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const root = join(dir, "repo");
+    const remote = join(dir, "remote.git");
+    const workflowDir = join(root, ".prime-claw", "workflows");
+    execFileSync("git", ["init", "-q", "-b", "main", root]);
+    git(root, "config", "user.name", "Prime Claw Test");
+    git(root, "config", "user.email", "prime-claw@example.invalid");
+    mkdirSync(workflowDir, { recursive: true });
+    for (const name of ["implement-task-prep", "implement-task"]) {
+      copyFileSync(join(ROOT, "src", "prime-agent-plugin", "workflows", `${name}.md`), join(workflowDir, `${name}.md`));
+    }
+    git(root, "add", "-f", "--", ".prime-claw/workflows");
+    git(root, "commit", "-qm", "install canonical readiness workflows");
+    let store = root;
+    if (topology === "independent") {
+      execFileSync("git", ["init", "-q", "--bare", remote]);
+      git(root, "remote", "add", "origin", remote);
+      git(root, "push", "-qu", "origin", "main");
+      const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner: new FixtureRunner() });
+      assert.equal(prepared.status, "prepared", prepared.detail);
+      store = prepared.storeDir;
+      git(store, "config", "user.name", "Prime Claw Test");
+      git(store, "config", "user.email", "prime-claw@example.invalid");
+      git(root, "add", "--", ".gitignore");
+      git(root, "commit", "-qm", "ignore independent task store");
+    } else {
+      mkdirSync(join(root, "backlog"));
+      copyFileSync(join(ROOT, "tests", "fixtures", "backlog-admission-config.yml"), join(root, "backlog", "config.yml"));
+      git(root, "add", "--", "backlog/config.yml");
+      git(root, "commit", "-qm", "track branch-local Backlog configuration");
+    }
+
+    const title = "Oversized readiness fixture title";
+    const plan = "1. Check the exact readiness evidence reference.";
+    const tail = "final readiness fixture note marker";
+    const label = "readiness-fixture-" + "x".repeat(70 * 1024);
+    const note = "Native readiness fixture notes. ".repeat(2200).trimEnd();
+    execFileSync(BACKLOG, ["task", "create", title, "--status", "In Planning", "--plan", plan, "--plain"],
+      { cwd: root, stdio: "ignore" });
+    const listed = JSON.parse(execFileSync(BACKLOG, ["task", "list", "--json"], { cwd: root, encoding: "utf8" }));
+    assert.equal(listed.tasks.length, 1);
+    const taskId = listed.tasks[0].id;
+    const nativePath = view(root, taskId).path;
+    for (let i = 0; i < 18; i += 1) {
+      // Keep each argument below the OS limit, and author every byte through Backlog.
+      const labelArgs = i === 0 ? ["--add-label", label] : [];
+      execFileSync(BACKLOG, ["task", "edit", ...labelArgs, "--append-notes",
+        `${note}\nchunk ${i}\n${i === 17 ? tail : ""}`, "--plain", "--", taskId], { cwd: root, stdio: "ignore" });
+    }
+    const evidencePath = topology === "independent" ? nativePath.replace(/^\.backlog\//, "") : nativePath;
+    assert.ok(nativePath.startsWith(topology === "independent" ? ".backlog/tasks/" : "backlog/tasks/"));
+    git(store, "add", "--", evidencePath);
+    git(store, "commit", "-qm", "commit oversized ticket");
+    let publishedHead;
+    if (topology === "independent") {
+      git(store, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+      publishedHead = git(remote, "rev-parse", TASK_HISTORY_REF);
+      execFileSync(BACKLOG, ["task", "edit", "--append-notes", "Retained local readiness revision.", "--plain", "--", taskId],
+        { cwd: root, stdio: "ignore" });
+      git(store, "add", "--", evidencePath);
+      git(store, "commit", "-qm", "retain a newer ticket locally");
+    }
+    const commit = git(store, "rev-parse", "HEAD");
+    if (publishedHead) assert.notEqual(commit, publishedHead);
+    const blob = git(store, "rev-parse", `${commit}:${evidencePath}`);
+
+    const native = spawn(BACKLOG, ["task", "view", "--json", "--", taskId], {
+      cwd: root, stdio: ["ignore", "pipe", "inherit"],
+    });
+    const nativeClosed = once(native, "close");
+    let nativeBytes = 0;
+    native.stdout.on("data", (chunk) => { nativeBytes += chunk.length; });
+    assert.deepEqual(await nativeClosed, [0, null]);
+    assert.ok(nativeBytes > 1024 * 1024, `native stdout was only ${nativeBytes} bytes`);
+
+    const fetchHead = join(store, ".git", "FETCH_HEAD");
+    const gitState = (repo) => ({
+      refs: git(repo, "show-ref"),
+      status: git(repo, "--no-optional-locks", "status", "--porcelain=v1", "-uall"),
+      config: git(repo, "config", "--local", "--list"),
+      worktrees: git(repo, "worktree", "list", "--porcelain"),
+    });
+    const snapshot = () => ({
+      code: gitState(root),
+      store: gitState(store),
+      ticketBlob: git(root, "hash-object", "--", nativePath),
+      nestedStore: existsSync(join(root, ".backlog")),
+      fetchHead: existsSync(fetchHead) ? readFileSync(fetchHead, "utf8") : null,
+      ...(publishedHead ? { remoteRefs: git(remote, "show-ref") } : {}),
+      ownership: readAllEpisodeOwnership(root),
+    });
+    const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+      getSessionId: () => "large-readiness-owner", getSessionFile: () => join(dir, "owner.jsonl"),
+      getHeader: () => ({ rlmDepth: 0 }),
+    } };
+    const tools = new Map();
+    const events = [];
+    const deliveries = [];
+    createReviewedPlanExtension({
+      async placementResolver(projectRoot, host, callCtx) {
+        assert.equal(projectRoot, root);
+        assert.equal(host, undefined);
+        assert.equal(callCtx, ctx);
+        events.push("placement");
+        return { engine: "local" };
+      },
+    })({
+      registerTool(tool) { tools.set(tool.name, tool); }, registerCommand() {}, on() {},
+      sendUserMessage(prompt, options) { events.push(options.deliverAs); deliveries.push(prompt); },
+    });
+    const before = snapshot();
+    assert.equal(before.ticketBlob, blob, "working ticket must equal the exact committed blob");
+    const response = await tools.get("implement_task").execute("registered-readiness", { taskId }, undefined, undefined, ctx);
+    assert.deepEqual(snapshot(), before, "readiness must not change code, task history, worktrees, or ownership");
+    assert.equal(existsSync(join(root, ".prime-claw", "ownership.json")), false);
+    assert.equal(existsSync(ctx.sessionManager.getSessionFile()), false);
+    assert.ok(!response.isError, response.details.error?.slice(0, 500));
+    assert.deepEqual(response.details, { admitted: true, taskId });
+    assert.deepEqual(events, ["placement", "steer", "followUp"]);
+    assert.equal(deliveries.length, 2);
+
+    const identityInput = topology === "independent"
+      ? `remote:${git(store, "remote", "get-url", "origin")}`
+      : `local:${realpathSync(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir"))}`;
+    for (const [index, workflow] of ["implement-task-prep", "implement-task"].entries()) {
+      const prompt = deliveries[index];
+      assert.ok(prompt.includes(`<skill name="${workflow}" location="${join(workflowDir, `${workflow}.md`)}">`));
+      for (const [key, value] of Object.entries({ id: taskId, provider: "backlog", "project-root": root, path: nativePath })) {
+        const tag = `operator-implementation-task-${key}`;
+        assert.ok(prompt.includes(`\n<${tag}>\n${value}\n</${tag}>`));
+      }
+      const observation = [...prompt.matchAll(/\n<operator-implementation-task-observation>\n([^\n]+)\n<\/operator-implementation-task-observation>/g)];
+      assert.equal(observation.length, 1);
+      assert.ok(Buffer.byteLength(observation[0][1]) < 1024, "the observation must be a compact reference");
+      assert.deepEqual(JSON.parse(observation[0][1]), {
+        localTaskEvidence: {
+          kind: "backlog-git", repository: { topology, identity: createHash("sha256").update(identityInput).digest("hex") },
+          commit, path: evidencePath,
+        },
+        ...(publishedHead ? { publishedHead } : {}),
+      });
+      for (const text of [title, plan, note.slice(0, 100), tail, label.slice(0, 100)]) {
+        assert.ok(!prompt.includes(text), "readiness must not embed native task content");
+      }
+    }
+  });
+}
+
 for (const scenario of ["oversized ticket", "retained local advance", "unavailable previous evidence"]) {
   test(`registered independent Backlog create: ${scenario}`, async (t) => {
     if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
