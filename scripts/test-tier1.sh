@@ -406,7 +406,7 @@ if [ -z "$PI_LOCAL_IMAGE" ]; then
     mkdir -p "$BUILD_CONTEXT"
     cp "$WORKSPACE_SNAPSHOT/$DOCKERFILE" "$BUILD_CONTEXT/Dockerfile"
     IFS=$'\t' read -r DOCKERFILE_HASH BUILD_INPUT_HASH <<EOF
-    $(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance build-input "$BUILD_CONTEXT" Dockerfile)
+$(cd "$REPO_ROOT" && python3 -m scripts.testing.provenance build-input "$BUILD_CONTEXT" Dockerfile)
 EOF
     IMAGE_TAG="prime-claw-test-tier1:${BUILD_INPUT_HASH:0:12}"
     if [ "$MODE" = pi-archive ]; then
