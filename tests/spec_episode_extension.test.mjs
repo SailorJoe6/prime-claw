@@ -776,6 +776,23 @@ test("blocked-pair restore rejects missing authority, wrong mode, unsafe files, 
 function mockedBacklogEvidence(commit, path = "tasks/primeclaw-10.38.md") {
   return { kind: "backlog-git", repository: { topology: "independent", identity: "1".repeat(64) }, commit, path };
 }
+function mockedBranchLocalEvidence(commit, path = "backlog/tasks/primeclaw-10.38.md") {
+  return { kind: "backlog-git", repository: { topology: "branch-local", identity: "2".repeat(64) }, commit, path };
+}
+function branchLocalHandoffHarness(options) {
+  const f = harness(options);
+  f.git.head = (path) => path === f.root ? TASK_BASE : "b".repeat(40);
+  f.deps.verifyBacklogEvidence = async (selected, commit, path, taskId) => {
+    assert.ok([f.root, f.worktree].includes(selected.root));
+    assert.deepEqual(selected, { root: selected.root, topology: "branch-local", remote: null });
+    assert.equal(commit, f.git.head(selected.root));
+    assert.equal(path, "backlog/tasks/primeclaw-10.38.md");
+    assert.equal(taskId, "PRIMECLAW-10.38");
+    return mockedBranchLocalEvidence(commit, path);
+  };
+  f.deps.taskResolver = () => { throw new Error("continuation must not read a mutable native view"); };
+  return f;
+}
 function mockedBacklogPreparation(f, head) {
   return { status: "prepared", storeDir: join(f.worktree, "backlog"), remote: "origin", publishedHead: head, head };
 }
@@ -789,21 +806,17 @@ async function mockVerifyBacklogEvidence(selected, commit, path, taskId) {
 
 // Scripted informed-owner invocation. Policy eligibility is not a code classifier.
 function executeOnlyHarness(provider = "backlog", options = {}) {
-  const f = harness({ list: (_count, session) => [session] });
+  const f = provider === "grandfathered" ? branchLocalHandoffHarness({ list: (_count, session) => [session] })
+    : harness({ list: (_count, session) => [session] });
   const taskId = provider === "beads" ? BEADS_TASK_ID : "PRIMECLAW-10.38";
-  const raw = (phase) => provider === "beads" ? {
+  const raw = (phase) => ({
     ...BEADS_TASK_EVIDENCE, design: `Current accepted ${phase} plan`, notes: `partial effect retained ${phase}`,
     unknownRaw: { phase, nullable: null, nested: [false, 0, "原文", { tail: "z".repeat(40_000) }] },
-  } : { schemaVersion: 1, kind: "task-view", unknownEnvelope: { phase, nullable: null }, task: {
-    id: taskId, path: "backlog/tasks/primeclaw-10.38.md", status: "In Progress",
-    description: `Accepted bounded scope ${phase}`, implementationPlan: `Current accepted ${phase} plan`,
-    implementationNotes: `partial effect retained ${phase}`, comments: [{ body: "raw comment " + phase }],
-    unknownRaw: { nullable: null, nested: [false, 0, "原文", { tail: "z".repeat(40_000) }] },
-    ...(phase === "current" ? { currentOnly: null } : { previousOnly: null }),
-  } };
-  const rawPrevious = raw("previous"), rawCurrent = raw("current");
-  const previous = provider === "backlog" ? mockedBacklogEvidence("c".repeat(40)) : rawPrevious;
-  const current = provider === "backlog" ? mockedBacklogEvidence("d".repeat(40)) : rawCurrent;
+  });
+  const previous = provider === "backlog" ? mockedBacklogEvidence("c".repeat(40))
+    : provider === "grandfathered" ? mockedBranchLocalEvidence(TASK_BASE) : raw("previous");
+  const current = provider === "backlog" ? mockedBacklogEvidence("d".repeat(40))
+    : provider === "grandfathered" ? mockedBranchLocalEvidence("b".repeat(40)) : raw("current");
   const initial = provider === "beads" ? activeBeadsTaskRecord(f, { taskEvidence: previous })
     : activeTaskRecord(f, provider === "grandfathered" ? {} : {
       provider: "backlog", providerRevision: "c".repeat(40), taskEvidence: previous,
@@ -825,9 +838,8 @@ function executeOnlyHarness(provider = "backlog", options = {}) {
       events.push("provider-prepared"); assert.equal(input.targetWorktree, f.worktree); assert.equal(input.primaryRoot, f.root);
       return mockedBacklogPreparation(f, "d".repeat(40));
     },
-    verifyBacklogEvidence: mockVerifyBacklogEvidence,
+    verifyBacklogEvidence: provider === "grandfathered" ? f.deps.verifyBacklogEvidence : mockVerifyBacklogEvidence,
     taskRunner: noBufferedBacklogRunner(),
-    taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd, nativeView: cwd === f.worktree ? rawCurrent : rawPrevious }),
     advanceBeadsEvidence(input) {
       events.push("provider-prepared");
       const target = parseEpisodeOwnership({ ...initial, providerRevision: "d".repeat(32),
@@ -1037,7 +1049,7 @@ test("execute-only preparation and exact identity failures do not send or roll b
 });
 
 test("task-native handoff continues the exact idle Episode with task-bound handoff and execute", async () => {
-  const f = harness({ list: (_count, session) => [session] });
+  const f = branchLocalHandoffHarness({ list: (_count, session) => [session] });
   f.ownership.write(f.root, activeTaskRecord(f));
   f.ownership.write(f.root, activeTaskRecord(f, {
     ownerSessionId: "other-owner", taskId: "PRIMECLAW-10.39", taskPath: "backlog/tasks/primeclaw-10.39.md",
@@ -1048,7 +1060,7 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
     "PRIMECLAW-10.38",
     "resume the accepted in-scope revision",
     f.ctx,
-    { ...f.deps, taskResolver: boundTaskResolver(f) },
+    f.deps,
   );
   assert.equal(result.taskId, "PRIMECLAW-10.38");
   assert.equal(result.episodeId, "episode");
@@ -1068,7 +1080,7 @@ test("task-native handoff continues the exact idle Episode with task-bound hando
 });
 
 test("task-native handoff retains its non-main integration target as that branch advances", async () => {
-  const f = harness({ list: (_count, session) => [session] });
+  const f = branchLocalHandoffHarness({ list: (_count, session) => [session] });
   bindTaskIntegrationBranch(f);
   const initial = activeTaskRecord(f, { integrationBranch: TASK_INTEGRATION_BRANCH });
   f.ownership.write(f.root, initial);
@@ -1077,7 +1089,10 @@ test("task-native handoff retains its non-main integration target as that branch
   f.git.head = (path) => path === f.root ? targetHead : episodeHead;
   for (const nextTargetHead of [targetHead, "d".repeat(40)]) {
     targetHead = nextTargetHead;
-    await handoffTaskEpisode("PRIMECLAW-10.38", "", f.ctx, { ...f.deps, taskResolver: boundTaskResolver(f) });
+    const result = await handoffTaskEpisode("PRIMECLAW-10.38", "", f.ctx, f.deps);
+    const { providerTaskObservation } = readHandoffObservation(f, result.observationReference);
+    assert.deepEqual(providerTaskObservation.mainTaskEvidence, mockedBranchLocalEvidence(nextTargetHead));
+    assert.deepEqual(providerTaskObservation.currentTaskEvidence, mockedBranchLocalEvidence(episodeHead));
     assert.equal(f.record.integrationBranch, TASK_INTEGRATION_BRANCH);
     assert.equal(f.record.baseRef, TASK_BASE);
     assert.equal(f.record.branch, initial.branch);
@@ -2576,46 +2591,145 @@ test("cleanup-only task finalization refuses unsafe identity or terminal evidenc
     assert.equal(h.record, undefined);
   });});
 
-test("branch-local handoff delivers current raw task and code facts without task-byte approval", async () => {
+function linkedBranchLocalContinuation(t) {
   const f = harness({ list: (_count, session) => [session] });
-  const { relative, taskPath } = commitMainTask(f, "Blocked");
-  writeFileSync(taskPath, "---\nid: PRIMECLAW-10.38\nstatus: In Progress\n---\n");
-  const bytes = readFileSync(taskPath, "utf8");
-  const head = execFileSync("git", ["-C", f.root, "rev-parse", "HEAD"], { encoding: "utf8" });
-  const index = execFileSync("git", ["-C", f.root, "ls-files", "--stage"], { encoding: "utf8" });
-  f.git.pathStatus = () => { throw new Error("selected-path cleanliness must not approve continuation"); };
-  f.git.assertCleanWorktree = () => { throw new Error("code cleanliness must not approve continuation"); };
-  f.ownership.write(f.root, activeTaskRecord(f));
-  const mainView = { task: { id: "PRIMECLAW-10.38", status: "custom-review", implementationPlan: null, path: relative, opaque: [null, "原文"] } };
-  const episodeView = { task: { ...mainView.task, status: "Blocked", implementationPlan: "TBD", notes: "current native Episode view" } };
-  writeFileSync(join(f.worktree, ".prime-claw/workflows/handoff.md"), "EDITED CONTINUATION POLICY\n");
-  writeFileSync(join(f.worktree, ".agents/skills/execute/SKILL.md"), "EDITED EXECUTION POLICY\n");
-  const result = await handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, {
-    ...f.deps,
-    taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd, nativeView: cwd === f.root ? mainView : episodeView }),
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  const taskId = "PRIMECLAW-10.38", path = "backlog/tasks/primeclaw-10.38 - [Continuation].md";
+  const git = (cwd, ...args) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
+  const commit = (cwd, message, ...paths) => {
+    git(cwd, "--literal-pathspecs", "add", "-f", "--", ...paths);
+    git(cwd, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", message);
+    return git(cwd, "rev-parse", "HEAD");
+  };
+  const ticket = (marker, status = "In Progress", id = taskId) => Buffer.from(
+    `---\ntitle: Continuation\nid: '${id}'\nstatus: ${status}\n---\n\n## Implementation Plan\n\n${marker}-early-原文\n${"x".repeat(5_000)}\n${marker}-late-終端🚀\n`,
+  );
+  const put = (cwd, bytes) => {
+    mkdirSync(dirname(join(cwd, path)), { recursive: true });
+    writeFileSync(join(cwd, path), bytes);
+  };
+  git(f.root, "symbolic-ref", "HEAD", `refs/heads/${TASK_INTEGRATION_BRANCH}`);
+  const policies = [".prime-claw/workflows/handoff.md", ".agents/skills/execute/SKILL.md"];
+  const baseRef = commit(f.root, "base with no ticket", ...policies);
+  rmSync(f.worktree, { recursive: true, force: true });
+  git(f.root, "worktree", "add", "-qb", f.wt.branch, f.worktree, baseRef);
+  const main = ticket("COMMITTED-INTEGRATION", "Blocked"), episode = ticket("COMMITTED-EPISODE", "Ready for Merge");
+  put(f.root, main); put(f.worktree, episode);
+  const mainHead = commit(f.root, "integration checkpoint", path);
+  const episodeHead = commit(f.worktree, "Episode checkpoint", path);
+  const initial = activeTaskRecord(f, { taskPath: path, baseRef, head: baseRef, integrationBranch: TASK_INTEGRATION_BRANCH });
+  f.ownership.write(f.root, initial);
+  f.calls.length = 0;
+  const requests = [];
+  const publisher = new PrimeSessionPublisher({
+    async request(request) {
+      assert.equal(request.type, "prompt");
+      assert.equal(request.activeSessionId, "route");
+      assert.equal(f.nativeEntries.length, 1, "the exact observation is durable before admission");
+      assert.deepEqual(f.record, initial, "legacy ownership must not advance before admission");
+      requests.push(request);
+      return { success: true, data: {} };
+    }, close() {},
   });
-  assert.equal(result.admitted, true);
-  const deliveries = f.calls.filter(([kind]) => kind === "handoff");
-  assert.equal(deliveries.length, 1);
-  assert.match(deliveries[0][1], /EDITED CONTINUATION POLICY/);
-  assert.match(deliveries[0][2], /EDITED EXECUTION POLICY/);
-  const observation = readHandoffObservation(f, result.observationReference, deliveries[0].slice(1));
-  assert.deepEqual(observation.providerTaskObservation.mainTaskEvidence, mainView);
-  assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, episodeView);
-  assert.equal(typeof observation.providerTaskObservation.episodeCode.head, "string");
-  assert.equal(Object.hasOwn(result, "providerTaskObservation"), false);
-  for (const prompt of deliveries[0].slice(1)) {
-    assert.equal(prompt.includes(JSON.stringify(mainView)), false);
-    assert.equal(prompt.includes(JSON.stringify(episodeView)), false);
+  publisher.list = f.publisher.list;
+  publisher.getState = f.publisher.getState;
+  const tools = new Map();
+  createReviewedPlanExtension({ ...f.deps, git: new CliGitAdapter(), publisher,
+    taskRunner: noBufferedBacklogRunner(),
+    taskResolver: () => { throw new Error("must not use a mutable native view"); },
+    prepareEpisodeTaskHistory: () => { throw new Error("must not prepare independent history"); },
+    conversationAfterHandoff: async () => ({ outcome: "skipped", reason: "fixture" }),
+  })({ registerCommand() {}, registerTool(tool) { tools.set(tool.name, tool); }, on() {},
+    sendUserMessage() { throw new Error("unexpected ordinary chat"); }, async sendMessage() {} });
+  const run = (mode) => tools.get("handoff_task_episode").execute("branch-local", {
+    taskId, guidance: "bounded branch-local focus", ...(mode ? { mode } : {}),
+  }, undefined, undefined, f.ctx);
+  return { f, taskId, path, main, episode, baseRef, initial, mainHead, episodeHead, git, commit, ticket, put, requests, run };
+}
+
+test("registered branch-local handoff and execute-only cite exact linked-worktree commits despite dirty ticket decoys", async (t) => {
+  for (const mode of [undefined, "execute-only"]) await t.test(mode ?? "ordinary", async (t) => {
+    const h = linkedBranchLocalContinuation(t), { f } = h;
+    const decoys = [h.ticket("MUTABLE-INTEGRATION"), h.ticket("MUTABLE-EPISODE")];
+    h.put(f.root, decoys[0]); h.put(f.worktree, decoys[1]);
+    writeFileSync(join(f.worktree, ".prime-claw/workflows/handoff.md"), "EDITED HANDOFF POLICY\n");
+    writeFileSync(join(f.worktree, ".agents/skills/execute/SKILL.md"), "EDITED EXECUTE POLICY\n");
+    const roots = [f.root, f.worktree];
+    const indices = roots.map(root => h.git(root, "ls-files", "--stage"));
+    const result = await h.run(mode);
+    assert.equal(result.isError, undefined, result.content[0].text);
+    assert.equal(h.requests.length, mode ? 1 : 2);
+    const prompts = h.requests.map(request => request.message);
+    assert.match(prompts[0], mode ? /EDITED EXECUTE POLICY/ : /EDITED HANDOFF POLICY/);
+    if (!mode) assert.match(prompts[1], /EDITED EXECUTE POLICY/);
+    const { providerTaskObservation: observation } = readHandoffObservation(f, result.details.observationReference, prompts);
+    const repository = { topology: "branch-local", identity: createHash("sha256").update(`local:${realpathSync(join(f.root, ".git"))}`).digest("hex") };
+    const ref = (commit) => ({ kind: "backlog-git", repository, commit, path: h.path });
+    assert.deepEqual(observation.mainTaskEvidence, ref(h.mainHead));
+    assert.deepEqual(observation.currentTaskEvidence, ref(h.episodeHead));
+    assert.deepEqual(Object.keys(observation).sort(), ["currentTaskEvidence", "episodeCode", "mainTaskEvidence"]);
+    assert.equal(observation.episodeCode.head, h.episodeHead);
+    assert.match(observation.episodeCode.status.stdout, /Continuation/);
+    assert.equal(f.nativeEntries.length, 1);
+    if (mode) {
+      assert.equal(result.details.factualUpdate, "completed");
+      assert.deepEqual(f.record, { ...h.initial, head: h.episodeHead, updatedAt: f.record.updatedAt });
+      assert.deepEqual(f.calls.map(([kind]) => kind), ["append", "ownership"]);
+    } else {
+      assert.deepEqual(f.record, h.initial, "ordinary branch-local handoff has no provider or owner row advance");
+      assert.deepEqual(f.calls.map(([kind]) => kind), ["append"]);
+    }
+    for (const [index, root] of roots.entries()) {
+      assert.deepEqual(readFileSync(join(root, h.path)), decoys[index]);
+      assert.equal(h.git(root, "rev-parse", "HEAD"), [h.mainHead, h.episodeHead][index]);
+      assert.equal(h.git(root, "ls-files", "--stage"), indices[index]);
+      const advanced = h.ticket(`ADVANCED-${index}`);
+      h.put(root, advanced);
+      h.commit(root, "advance code checkout", h.path);
+    }
+    await assertCommittedContinuationBytes({ root: f.root, topology: repository.topology, remote: null }, h.taskId, observation.mainTaskEvidence, h.main);
+    await assertCommittedContinuationBytes({ root: f.worktree, topology: repository.topology, remote: null }, h.taskId, observation.currentTaskEvidence, h.episode);
+    const diff = h.git(f.worktree, "--literal-pathspecs", "diff", "--unified=0", observation.mainTaskEvidence.commit,
+      observation.currentTaskEvidence.commit, "--", h.path);
+    assert.match(diff, /-COMMITTED-INTEGRATION-late-終端🚀/);
+    assert.match(diff, /\+COMMITTED-EPISODE-late-終端🚀/);
+    for (const surface of [...prompts, JSON.stringify(result), readFileSync(f.ctx.sessionManager.getSessionFile(), "utf8")]) {
+      assert.doesNotMatch(surface, /COMMITTED-(?:INTEGRATION|EPISODE)|MUTABLE-(?:INTEGRATION|EPISODE)/);
+    }
+  });
+});
+
+test("registered branch-local continuation refuses missing or wrong committed evidence before journaling or delivery", async (t) => {
+  for (const mode of [undefined, "execute-only"]) for (const checkpoint of ["integration", "Episode"]) {
+    await t.test(`${mode ?? "ordinary"}: ${checkpoint}`, async (t) => {
+      const h = linkedBranchLocalContinuation(t), { f } = h;
+      const root = checkpoint === "integration" ? f.root : f.worktree;
+      if (checkpoint === "integration") unlinkSync(join(root, h.path));
+      else h.put(root, h.ticket("PRIVATE-FOREIGN-TICKET", "In Progress", "PRIMECLAW-99"));
+      const invalidHead = h.commit(root, "invalid committed checkpoint", h.path);
+      h.put(root, h.ticket("PRIVATE-VALID-MUTABLE-DECOY"));
+      const journal = f.ctx.sessionManager.getSessionFile();
+      const before = readFileSync(journal, "utf8");
+      const result = await h.run(mode);
+      assert.equal(result.isError, true);
+      assert.match(result.content[0].text, new RegExp(`Branch-local Backlog ${checkpoint} evidence at ${invalidHead}`));
+      if (mode) {
+        assert.equal(result.details.stoppedAt, "provider preparation");
+        assert.equal(result.details.executeOutcome, "not_attempted");
+        assert.equal(result.details.factualUpdate, "not_attempted");
+      }
+      assert.doesNotMatch(JSON.stringify(result), /PRIVATE-FOREIGN|PRIVATE-VALID|PRIMECLAW-99/);
+      assert.deepEqual(h.requests, []);
+      assert.deepEqual(f.nativeEntries, []);
+      assert.deepEqual(f.calls, []);
+      assert.equal(readFileSync(journal, "utf8"), before);
+      assert.deepEqual(f.record, h.initial);
+    });
   }
-  assert.equal(readFileSync(taskPath, "utf8"), bytes);
-  assert.equal(execFileSync("git", ["-C", f.root, "rev-parse", "HEAD"], { encoding: "utf8" }), head);
-  assert.equal(execFileSync("git", ["-C", f.root, "ls-files", "--stage"], { encoding: "utf8" }), index);
-  assert.equal(f.calls.some(([kind]) => ["fresh", "execute", "local-create", "orca-create"].includes(kind)), false);
 });
 
 test("task-native handoff allows unrelated dirty main paths", async () => {
-  const f = harness({ list: (_count, session) => [session] });
+  const f = branchLocalHandoffHarness({ list: (_count, session) => [session] });
   commitMainTask(f, "In Progress");
   writeFileSync(join(f.root, "unrelated.txt"), "uncommitted unrelated work\n");
   const cliGit = new CliGitAdapter();
@@ -2624,7 +2738,7 @@ test("task-native handoff allows unrelated dirty main paths", async () => {
   f.calls.length = 0;
   const result = await handoffTaskEpisode(
     "PRIMECLAW-10.38", "continue", f.ctx,
-    { ...f.deps, taskResolver: boundTaskResolver(f) },
+    f.deps,
   );
   assert.equal(result.admitted, true);
   assert.equal(f.calls.filter((value) => value[0] === "handoff").length, 1);
@@ -2632,7 +2746,7 @@ test("task-native handoff allows unrelated dirty main paths", async () => {
 });
 
 test("task-native handoff preserves exact Orca identity without allocating resources", async () => {
-  const f = harness({ list: (_count, session) => [session] });
+  const f = branchLocalHandoffHarness({ list: (_count, session) => [session] });
   f.ownership.write(f.root, activeTaskRecord(f, {
     engine: "orca",
     projectSetupId: f.wt.projectSetupId,
@@ -2642,7 +2756,7 @@ test("task-native handoff preserves exact Orca identity without allocating resou
   }));
   const result = await handoffTaskEpisode(
     "PRIMECLAW-10.38", "continue", f.ctx,
-    { ...f.deps, taskResolver: boundTaskResolver(f) },
+    f.deps,
   );
   assert.equal(result.taskId, "PRIMECLAW-10.38");
   assert.equal(f.calls.filter((value) => value[0] === "orca-show").length, 1);
@@ -2652,25 +2766,25 @@ test("task-native handoff preserves exact Orca identity without allocating resou
 
 test("task-native handoff retains active resource identity without branch, role or dirt approval", async (t) => {
   await t.test("non-active ownership", async () => {
-    const f = harness({ record: taskReservation() });
+    const f = branchLocalHandoffHarness({ record: taskReservation() });
     await assert.rejects(
       handoffTaskEpisode(
         "PRIMECLAW-10.38", "continue", f.ctx,
-        { ...f.deps, taskResolver: boundTaskResolver(f) },
+        f.deps,
       ),
       /ownership is provisioning/,
     );
     assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
   });
   await t.test("omitted integration target stays bound to main after a checkout switch", async () => {
-    const f = harness();
+    const f = branchLocalHandoffHarness();
     const original = activeTaskRecord(f);
     f.ownership.write(f.root, original);
     f.git.branch = () => "feature";
     await assert.rejects(
       handoffTaskEpisode(
         "PRIMECLAW-10.38", "continue", f.ctx,
-        { ...f.deps, taskResolver: boundTaskResolver(f) },
+        f.deps,
       ),
       /recorded integration branch main; found feature/,
     );
@@ -2678,45 +2792,25 @@ test("task-native handoff retains active resource identity without branch, role 
     assert.equal(f.calls.some((value) => value[0] === "handoff"), false);
   });
   await t.test("primary branch, role depth and dirty code are facts, not eligibility", async () => {
-    const f = harness({ list: (_count, session) => [session] });
+    const f = branchLocalHandoffHarness({ list: (_count, session) => [session] });
     f.ownership.write(f.root, activeTaskRecord(f, { integrationBranch: "selected-integration" }));
     f.git.branch = (cwd) => cwd === f.root ? "selected-integration" : f.wt.branch;
     f.ctx.sessionManager.getHeader = () => ({ rlmDepth: 2 });
     f.git.assertCleanWorktree = () => { throw new Error("must not run"); };
-    const result = await handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, {
-      ...f.deps, taskResolver: boundTaskResolver(f),
-    });
+    const result = await handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, f.deps);
     assert.equal(result.admitted, true);
     assert.equal(f.calls.filter(([kind]) => kind === "handoff").length, 1);
     assert.equal(f.calls.some(([kind]) => kind === "clean"), false);
   });
 });
 
-test("task-native handoff delivers status/plan changes but rejects foreign task/session identity", async (t) => {
-  for (const scenario of [
-    { status: "Blocked", implementationPlan: "TBD" },
-    { status: "Ready for Merge", implementationPlan: null },
-    { status: "native-custom-state", implementationPlan: "" },
-  ]) await t.test(scenario.status, async () => {
-    const f = harness({ list: (_count, session) => [session] });
-    f.ownership.write(f.root, activeTaskRecord(f));
-    const result = await handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, {
-      ...f.deps, taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd, ...scenario,
-        nativeView: { task: { id: "PRIMECLAW-10.38", ...scenario } } }),
-    });
-    assert.equal(result.admitted, true);
-    const prompts = f.calls.find(([kind]) => kind === "handoff").slice(1);
-    const observation = readHandoffObservation(f, result.observationReference, prompts);
-    assert.deepEqual(observation.providerTaskObservation.mainTaskEvidence, { task: { id: "PRIMECLAW-10.38", ...scenario } });
-    assert.deepEqual(observation.providerTaskObservation.currentTaskEvidence, { task: { id: "PRIMECLAW-10.38", ...scenario } });
-  });
-  for (const foreign of ["path", "session"]) await t.test(foreign, async () => {
-    const f = harness({ list: (_count, session) => [{ ...session, ...(foreign === "session" ? { cwd: "/foreign" } : {}) }] });
-    f.ownership.write(f.root, activeTaskRecord(f));
-    await assert.rejects(handoffTaskEpisode("PRIMECLAW-10.38", "continue", f.ctx, {
-      ...f.deps, taskResolver: (cwd) => taskSelection(f, { projectRoot: cwd,
-        ...(foreign === "path" ? { taskPathRelative: "backlog/tasks/other.md" } : {}) }),
-    }), foreign === "path" ? /does not match the exact owned Backlog task/ : /not rooted at the owned worktree/);
+test("branch-local handoff rejects a foreign task or session identity", async (t) => {
+  for (const foreign of ["task", "session"]) await t.test(foreign, async () => {
+    const f = branchLocalHandoffHarness({ list: (_count, session) => [{ ...session, ...(foreign === "session" ? { cwd: "/foreign" } : {}) }] });
+    const initial = activeTaskRecord(f);
+    f.ownership.write(f.root, initial);
+    await assert.rejects(handoffTaskEpisode(foreign === "task" ? "PRIMECLAW-99" : initial.taskId, "continue", f.ctx, f.deps),
+      foreign === "task" ? /conflicts on taskId/ : /not rooted at the owned worktree/);
     assert.equal(f.calls.some(([kind]) => kind === "handoff"), false);
   });
 });

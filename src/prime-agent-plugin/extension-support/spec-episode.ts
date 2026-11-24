@@ -1840,6 +1840,36 @@ export class ExecuteOnlyBacklogEvidenceError extends Error {
   }
 }
 
+class BranchLocalBacklogEvidenceError extends Error {}
+
+/** Branch-local continuation observes the two current code commits, not a
+ * historical ticket revision inferred from a legacy ownership path. */
+async function prepareBranchLocalBacklogHandoffEvidence(
+  record: LegacyBacklogTaskEpisodeOwnershipRecord | BacklogTaskEpisodeOwnershipRecord,
+  repo: string,
+  integrationHead: string,
+  episodeHead: string,
+  dependencies: TaskEpisodeHandoffDependencies,
+) {
+  const verify = dependencies.verifyBacklogEvidence ?? makeBacklogGitEvidence;
+  async function checkpoint(label: string, root: string, commit: string) {
+    if (!/^[0-9a-f]{40}$/.test(commit)) {
+      throw new BranchLocalBacklogEvidenceError(`Branch-local Backlog ${label} evidence requires an exact code commit before delivery`);
+    }
+    try {
+      return await verify({ root, topology: "branch-local", remote: null }, commit, record.taskPath, record.taskId);
+    } catch {
+      throw new BranchLocalBacklogEvidenceError(`Branch-local Backlog ${label} evidence at ${commit} is missing or mismatched before delivery`);
+    }
+  }
+  const mainTaskEvidence = await checkpoint("integration", repo, integrationHead);
+  const currentTaskEvidence = await checkpoint("Episode", record.worktree!, episodeHead);
+  if (mainTaskEvidence.repository.identity !== currentTaskEvidence.repository.identity) {
+    throw new BranchLocalBacklogEvidenceError("Branch-local Backlog integration and Episode evidence refer to different code repositories");
+  }
+  return { mainTaskEvidence, currentTaskEvidence };
+}
+
 async function preparePublishedBacklogHandoffEvidence(
   record: PublishedBacklogTaskEpisodeOwnershipRecord,
   repo: string,
@@ -2080,16 +2110,8 @@ export async function continueTaskEpisodeExecute(
         providerTaskObservation = { ...JSON.parse(prepared.observation), episodeCode };
         target = prepared.record;
       } else {
-        const resolveTask = dependencies.taskResolver ?? defaultEpisodeTaskResolver(runner);
-        const integrationTask = resolveTask(repo, taskId);
-        const episodeTask = resolveTask(record.worktree!, taskId);
-        for (const [selection, root] of [[integrationTask, repo], [episodeTask, record.worktree!]] as const) {
-          if (!selection || selection.taskId !== taskId || !samePath(selection.projectRoot, root)
-              || selection.taskPathRelative !== record.taskPath) {
-            throw new Error("Execute-only continuation resolved a different grandfathered Backlog task");
-          }
-        }
-        providerTaskObservation = { mainTaskEvidence: integrationTask!.nativeView, currentTaskEvidence: episodeTask!.nativeView, episodeCode };
+        const evidence = await prepareBranchLocalBacklogHandoffEvidence(record, repo, git.head(repo), episodeCode.head, dependencies);
+        providerTaskObservation = { ...evidence, episodeCode };
         // Keep the grandfathered shape. There are no provider revision/evidence
         // fields to invent; only its existing code observation advances.
         target = { ...record, head: episodeCode.head, updatedAt: dependencies.now?.() ?? new Date().toISOString() };
@@ -2135,7 +2157,9 @@ export async function continueTaskEpisodeExecute(
     const message = observedDelivery && factualUpdate === "failed"
       ? "New execute was admitted, but its current factual update failed or may have partial effects; preserve execution and inspect. Do not resend."
       : observedDelivery ? "New execute delivery stopped; current factual update was not attempted. Inspect; do not resend."
-      : `Execute-only ${stoppedAt} stopped; execute ${executeOutcome}. Inspect current effects before another transition. Do not resend.`;
+      : error instanceof BranchLocalBacklogEvidenceError
+        ? `Execute-only ${stoppedAt} stopped: ${error.message}. Do not resend.`
+        : `Execute-only ${stoppedAt} stopped; execute ${executeOutcome}. Inspect current effects before another transition. Do not resend.`;
     throw Object.assign(new Error(message, { cause: error }), {
       ...(observedDelivery ? { delivery: observedDelivery } : {}),
       ...(errorTransport(error) ? { transport: errorTransport(error) } : {}),
@@ -2156,8 +2180,6 @@ export async function handoffTaskEpisode(
   const store = dependencies.ownership ?? defaultOwnershipStore;
   const orca = dependencies.orca ?? new CliOrcaAdapter();
   const runner = dependencies.taskRunner ?? new ProcessCommandRunner();
-  const resolveTask = dependencies.taskResolver
-    ?? defaultEpisodeTaskResolver(runner);
   let publisher = dependencies.publisher;
   try {
     const taskId = rawTaskId.trim();
@@ -2297,25 +2319,8 @@ export async function handoffTaskEpisode(
     }
 
     exactOwnedTaskRecord(record, taskId, ownerSessionId);
-    const integrationTask = resolveTask(repo, taskId);
-    if (!integrationTask
-      || integrationTask.taskId !== record.taskId
-      || !samePath(integrationTask.projectRoot, repo)
-      || integrationTask.taskPathRelative !== record.taskPath) {
-      throw new Error("Task-native Episode handoff does not match the exact owned Backlog task on the integration branch");
-    }
-    const episodeTask = resolveTask(record.worktree!, taskId);
-    if (!episodeTask
-      || episodeTask.taskId !== record.taskId
-      || !samePath(episodeTask.projectRoot, record.worktree!)
-      || episodeTask.taskPathRelative !== record.taskPath) {
-      throw new Error("Task-native Episode handoff does not match the exact owned Backlog task in the Episode worktree");
-    }
-    const providerTaskObservation = {
-      mainTaskEvidence: integrationTask.nativeView,
-      currentTaskEvidence: episodeTask.nativeView,
-      episodeCode,
-    };
+    const evidence = await prepareBranchLocalBacklogHandoffEvidence(record, repo, git.head(repo), episodeCode.head, dependencies);
+    const providerTaskObservation = { ...evidence, episodeCode };
     publisher ??= new PrimeSessionPublisher();
     const { activeSessionId, observationReference, delivery } = await deliverOwnedEpisodeHandoff(
       record, guidance, repo, ctx, git, filesystem, orca, publisher, store,

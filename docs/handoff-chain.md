@@ -219,9 +219,10 @@ is required. Retained version-1 and creation/initial-assignment recovery are
 unchanged. Actual historical-case recovery and global activation/full restart/
 live UAT still need separate authority and intended-generation proof.
 
-Grandfathered Backlog captures complete current primary and Episode native task
-views. Independent Backlog prepares only the Episode task clone once, without
-synchronizing another writer's mutable primary bytes/index or freezing paired
+Grandfathered Backlog observes committed tickets at the current integration
+and Episode code heads. Independent Backlog prepares only the Episode task
+clone once, without synchronizing another writer's mutable primary bytes/index
+or freezing paired
 heads. For ordinary handoff and execute-only, the new observation uses exact
 previous/current Git ticket references and revisions, separate from the Episode
 code-head/upstream and runtime facts. Current ticket evidence is from the
@@ -233,8 +234,8 @@ are LLM judgments, not a classifier or frozen approval. Backlog authoring remain
 literal selected-file-only, separately from code in both topologies; each
 coherent ticket edit is committed ASAP and published promptly, not saved for
 handoff or session end. The Git-reference read-only handoff uses the committed
-contract. It does not require a live full task view. The actual edit path and
-preexisting raw/branch-local paths retain native reads and checks.
+contract. It does not require a live full task view. Actual edits and
+legacy raw handoff retain native reads and checks.
 
 Beads performs one supported pull and reads current native transport and raw
 task facts. Its exact observation includes previous/current raw views, local
@@ -320,14 +321,25 @@ references, not ticket snapshots. They bind `previousProviderRevision` and
 points to a separately retained local head, not publication. When relevant,
 bind it to the same repository and literal ticket path, resolve its own commit
 and canonical task ID, and read or diff the exact blob against the published
-blob with the same bounded procedure. The managed sender verifies both references and their
-native canonical IDs from committed headers in the exact Episode clone before
+blob with the same bounded procedure. The managed sender verifies both independent
+references and their native canonical IDs from committed headers in the exact Episode clone before
 delivery. It stops with an evidence gap if either cannot be proven. An older
 owner record's historical checkpoint may be resolved exactly; its raw view is
 not committed evidence and stays intact in historical records. The native task
 remains authority. The journal locator selects factual context; it is not
 semantic acceptance or publication proof. The caller receives bounded
 transport/reference facts, not the entire payload.
+
+For branch-local Backlog ordinary handoff and execute-only, the shared sender
+helper takes the exact current integration and Episode code head OIDs and puts
+`backlog-git` references in `mainTaskEvidence` and `currentTaskEvidence`,
+respectively. `mainTaskEvidence` refers to the observed head of the recorded
+integration branch, not necessarily `main`. The exact branch-local binding supplies the same literal
+task path for both. The sender verifies both committed regular blobs and their
+native canonical IDs before delivery. Missing or mismatched evidence stops
+continuation; it never substitutes a historical checkpoint, mutable native
+view, or either branch's tracking tip. No provider revision or ownership
+checkpoint is added for branch-local Backlog.
 
 Both editable workflows require the Episode REPL to read only the exact source
 session file, verify its exact session header ID, select one exact entry ID,
@@ -345,11 +357,12 @@ same-UID disk access to the source session file. These are placement facts, not
 a new approval protocol. External sandboxes, different user namespaces and
 remote execution are not proven by this support; do not infer access there.
 
-For independent Backlog Git observations, the LLM reads the complete current
+For both Backlog Git observation shapes, the LLM reads the complete current
 contract and relevant prior/current differences using the
 [exact Git procedure](#backlog-git-evidence-reader) below. Both references are
 required; a malformed reference does not fall back to a live or historical view.
-For complete legacy raw observations, grandfathered Backlog and Beads, the LLM
+For complete legacy raw observations (both native task views for the selected
+Backlog topology) and Beads, the LLM
 enumerates the native structure and reads the current contract and relevant
 prior/current differences. Provider envelopes, arrays, unknown fields, comments,
 nulls and absence retain their exact meaning. Large collections and individual
@@ -442,9 +455,10 @@ A `backlog-git` reference identifies the selected topology and repository,
 full commit OID, and literal ticket path relative to that repository. For an
 independent store, the path is relative to the nested clone, not the code
 worktree. For branch-local Backlog, it is relative to the code repository.
-Repository identity binds the selected Git transport URL by digest, or the
-canonical Git common directory for an already authorized local-only store.
-A local-only reference does not imply publication or portability.
+Repository identity binds the selected independent Git transport URL by digest,
+or the canonical Git common directory for a local identity. A branch-local
+reference always uses a local identity, even if the repository has a remote.
+It does not imply publication or portability.
 
 The managed `readBacklogGitEvidence` helper takes the already selected
 repository and canonical task ID. It checks the commit and regular ticket
@@ -473,6 +487,19 @@ to that exact canonical store root. Each reference's topology must be
 with trailing whitespace removed. Use the existing selected remote; do not
 print the URL or infer identity from a remote name alone.
 
+For branch-local continuation, use the code repository in the exact bound
+Episode worktree, not an independent task clone. Verify the canonical Git
+top-level is that worktree. Require both reference topologies to be
+`branch-local` and both paths to equal the literal code-repository-relative
+path from the binding. Resolve `git --no-replace-objects -C "$root" rev-parse
+--path-format=absolute --git-common-dir`, trim trailing whitespace, and resolve
+the result with `realpath`. Both identities must equal the lowercase SHA-256
+of UTF-8 `local:` followed by that canonical common Git directory path. This
+binds linked worktrees of the same local checkout, not a remote or another
+clone. Use the observed commits in the references, not freshly resolved tips.
+Compare integration to Episode and read the complete Episode ticket. Keep
+native code upstream/publication facts separate; neither reference proves them.
+
 Each commit must be a full lowercase 40-hex OID, and `cat-file -t` must return
 `commit`. Use each reference's literal clone-relative `.md` path. Reject empty,
 `.` or `..` components, NUL, CR, LF and backslashes. This command must return
@@ -483,7 +510,8 @@ full blob OID and the exact path after the tab:
 git --no-replace-objects -C "$root" --literal-pathspecs ls-tree -z "$oid" -- "$path"
 ```
 
-Check `cat-file -t` returns `blob` for each resolved blob OID. Use the verified
+Check `cat-file -t` returns `blob` for each resolved blob OID. Verify each
+committed header's native canonical ID against the bound task ID. Use the verified
 OIDs for bounded native Git inspection, not a filename match or current tip:
 
 ```bash
@@ -502,8 +530,8 @@ tracking ref, mutable files, the index or a live task view.
 
 The reader does not choose a store, verify live publication, or judge readiness.
 Those remain at the existing lifecycle boundaries. Independent creation and
-independent ordinary handoff/execute-only use Git references. This continuation
-change does not switch branch-local or other lifecycle evidence paths.
+ordinary handoff/execute-only in both Backlog topologies use Git references.
+Other lifecycle evidence paths and native task authoring are unchanged.
 
 ## Authority
 

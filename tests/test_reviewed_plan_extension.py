@@ -197,6 +197,7 @@ def test_native_task_episode_handoff_reopens_exact_saved_session(tier1_container
 
     git("init", "-q", "-b", "main")
     for path, content in (
+        ("backlog/tasks/COLD-FIXTURE-1.md", "---\nid: COLD-FIXTURE-1\ntitle: Native fixture\n---"),
         (".prime-claw/workflows/handoff.md", "Fixture canonical handoff. Reply only with acknowledgement."),
         (".agents/skills/execute/SKILL.md", "Fixture canonical execute. Reply only with acknowledgement."),
     ):

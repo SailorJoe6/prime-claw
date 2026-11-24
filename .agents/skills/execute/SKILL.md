@@ -149,11 +149,12 @@ Load it before judging continuation:
    provider observation and native session/state facts. Preserve provider-native
    envelopes, arrays, keys, unknown fields, nulls, and absent fields; never
    normalize, flatten, truncate, or replace them with a summary.
-4. For independent Backlog continuation, if either `previousTaskEvidence` or
-   `currentTaskEvidence` is `kind: "backlog-git"`, require both to be valid
-   references and inspect them as described below. Otherwise inspect the
-   complete legacy raw observations as supplied (for independent Backlog, both
-   must be native task views for the bound task, not malformed references).
+4. For Backlog, select the evidence pair by the bound topology: independent
+   uses `previousTaskEvidence` and `currentTaskEvidence`; branch-local uses
+   `mainTaskEvidence` and `currentTaskEvidence`. Require both to be valid Git
+   references of that topology or both to be complete legacy raw native task
+   views for the bound task. A mixed, missing or malformed pair stops; never
+   interpret a failed reference as a raw view. Beads retains its raw views.
    For raw observations, enumerate their structure and inspect the entire
    current task contract and relevant prior/current differences, including
    fields and comments. Read large values
@@ -222,6 +223,35 @@ ref, an index/working file, a native live view, or a cached observation. Resume
 from the same task and assess current progress under existing guidance; the
 observed commits do not freeze history or grant approval.
 
+### Read branch-local Backlog Git evidence
+
+For ordinary handoff and execute-only, `mainTaskEvidence` and
+`currentTaskEvidence` each have `{kind: "backlog-git", repository: {topology:
+"branch-local", identity}, commit, path}`. The shared sender helper takes the
+exact current integration and Episode code head OIDs, respectively. The
+integration branch is the one recorded in ownership, not necessarily `main`.
+Both references use the literal code-repository-relative task path from the
+exact branch-local binding. The sender verifies both committed headers with
+native Backlog before delivery. Neither reference establishes remote publication;
+keep native upstream and publication facts separate.
+
+Use the code repository at the exact bound Episode worktree. Verify
+`git --no-replace-objects -C "$root" rev-parse --show-toplevel` resolves to that
+canonical worktree. Resolve `git --no-replace-objects -C "$root" rev-parse
+--path-format=absolute --git-common-dir`, trim trailing whitespace, then apply
+`realpath`. Hash UTF-8 `local:` plus that canonical common Git directory path.
+Require both lowercase SHA-256 identities to match, both topologies to be
+`branch-local`, and both literal paths to equal the bound task path. Do not
+use the nested task clone, an unrelated clone, or a remote URL for this check.
+
+Use steps 2 and 3 above in that code repository, with paths relative to its
+root. Verify each committed header against the bound native canonical task ID;
+the path or filename alone is not proof. Read the entire Episode ticket and
+compare the integration blob to the Episode blob in bounded windows. Use only
+the exact commit OIDs in the observation, never historical checkpoints, fresh
+tips, tracking refs, the index, mutable files, or a live task view. If either
+reference cannot be verified or read, report the evidence gap and stop.
+
 ### Provider-absent or Backlog task authority
 
 First retain the ownership-selected Backlog topology. Provider-absent and
@@ -273,16 +303,18 @@ primary nested task clone for independent Backlog. The Episode must not pass
 `Blocked` or `Ready for Merge`, or write task content in another checkout.
 Ordinary execution performs no cross-checkout copy, mirroring, or dual write.
 
+For a Backlog continuation in either topology, inspect the bound committed
+pair and native history (or the complete raw pair for an old generation).
+Keep live native reads for authoring distinct from committed evidence.
+Incorporate compatible in-scope clarifications; stop for a real semantic
+conflict, authority change, scope expansion or product decision, not raw
+inequality or unrelated history.
+
 For independent Backlog, prepare and read only this Episode's intended task
-workspace when needed, not another writer's mutable primary clone. For a
-continuation, inspect the prior/current committed references and native history
-(or the complete raw observations for an old generation). Keep live native
-reads for authoring distinct from committed evidence. Incorporate compatible
-in-scope clarifications; stop for a real semantic conflict, authority change,
-scope expansion or product decision, not raw inequality or unrelated history.
-Immediately before an authorized content write, synchronize and reread this
-workspace once more. Preserve unrelated edits/index/history and inspect actual
-native conflicts rather than imposing whole-clone cleanliness.
+workspace when needed, not another writer's mutable primary clone. Immediately
+before an authorized content write, synchronize and reread this workspace once
+more. Preserve unrelated edits/index/history and inspect actual native
+conflicts rather than imposing whole-clone cleanliness.
 
 Commit each coherent ticket edit ASAP and publish promptly, during execution,
 not only at candidate, blocker, handoff, compaction, session end or admission.
