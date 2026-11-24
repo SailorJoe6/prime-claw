@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T10:00:00Z'
+updated_date: '2026-11-24T10:08:00Z'
 labels: []
 dependencies: []
 references:
@@ -184,6 +184,8 @@ Guidance candidate 4e648280b84273368fecb19b3e723860466d8d37: owner oversight, Ex
 Bounded guidance revision candidate a34feb4e6d411bd2d0119b97c80709c089243ad8 addresses only the three review conflicts: blocked clearance rechecks the newly selected committed ticket after workspace sync and before editing; oversight distinguishes independent task revisions from branch-local code commits and describes cleanup as Git references or availability facts, not ticket bodies; execute-only distinguishes bounded Backlog refs from complete native Beads/runtime observations. Managed blocked copy and template match; tracked manifest hashes updated. Offline Docker: 437/437 evidence checks passed (.test-results/primeclaw-69-guidance-revision/candidate-evidence.log); guidance 21/22 with the same Expert model-selection assertion on baseline 4e648280b84273368fecb19b3e723860466d8d37 (.test-results/primeclaw-69-guidance-revision/candidate-skills.log and baseline-skills.log). Offline Tier 1 passed with teardown verified (.test-results/20261124T094018Z-69501-09f9836c/tier1/manifest.json). No runtime wiring, TASK-2 action, cleanup, merge or activation.
 
 Branch-local status evidence candidate 866988cdb19ecace921c435abcbc4cd1fd1bd4e5: commitConversationTaskStatus checks native canonical ID and literal path immediately before status edit, discards edit output, then streams exact ID/path/status before a task-only commit. The bounded result references the exact code-repository ticket; the existing admission push is unchanged and publishedTaskEvidence appears only on a direct match at the configured upstream. Independent Backlog, Beads, and legacy independent initial workspace recovery were not changed. Offline Docker 553/553 passed (.test-results/primeclaw-69-branch-local-status/candidate-focused.log), including native JSON above 1 MiB, pre-edit ID/path drift with zero writes, unrelated staging, and local vs verified remote evidence. Tier 1 passed with verified teardown (.test-results/20261124T095418Z-93897-38b7c150/tier1/manifest.json). No live lifecycle test, TASK-2 action, cleanup, merge or activation.
+
+Legacy independent Backlog pre-session recovery candidate ee05cc6801997a77a5e79974581e17af5beccb1f: verifies the reserved historical commit, fetched published checkpoint and distinct retained local checkpoint against the exact Episode task repository, literal path and committed native ID. New ownership evidence points to the published checkpoint; the initial assignment receives references, not snapshots. A missing recorded commit stops before assignment and preserves the original evidence and operation/resources. Offline Docker 554/554 passed (.test-results/primeclaw-69-legacy-pre-session/candidate-focused.log), including a native view over 1 MiB, a distinct retained local tip, missing prior history and same-operation binding without another assignment. Tier 1 passed with teardown verified (.test-results/20261124T100620Z-15104-99f8f6a2/tier1/manifest.json). No live recovery, TASK-2 action, cleanup, merge or activation.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -230,4 +232,6 @@ Editable owner and Expert guidance now reads committed Backlog evidence in both 
 Review revision clarifies post-sync clearance judgment, terminal Backlog evidence and execute-only observation formats.
 
 Branch-local Backlog status results now use exact committed ticket references and distinguish local commit from observed upstream publication.
+
+Legacy independent Backlog pre-session recovery now verifies exact committed ticket references before the one initial assignment.
 <!-- SECTION:FINAL_SUMMARY:END -->
