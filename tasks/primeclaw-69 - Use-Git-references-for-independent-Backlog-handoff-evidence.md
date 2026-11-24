@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T08:36:00Z'
+updated_date: '2026-11-24T08:42:00Z'
 labels: []
 dependencies: []
 references:
@@ -38,6 +38,9 @@ modified_files:
   - tests/task_episode_ownership_extension.test.mjs
   - tests/task_providers.test.mjs
   - tests/test_task_providers.py
+  - src/prime-agent-plugin/extension-support/task-provider-migration.ts
+  - docs/project-initialization.md
+  - tests/task_provider_migration.test.mjs
 priority: p0
 type: bug
 ordinal: 153000
