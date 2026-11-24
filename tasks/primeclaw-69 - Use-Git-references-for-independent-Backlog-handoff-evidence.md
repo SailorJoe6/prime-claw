@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T09:45:00Z'
+updated_date: '2026-11-24T09:50:00Z'
 labels: []
 dependencies: []
 references:
@@ -17,6 +17,8 @@ references:
   - src/prime-agent-plugin/skills/project-templates/blocked.md
   - docs/conversation-driven-episode-oversight.md
   - docs/handoff-chain.md
+  - tests/task_providers.test.mjs
+  - tests/task_episode_admission_extension.test.mjs
 documentation:
   - docs/handoff-chain.md
 modified_files:
