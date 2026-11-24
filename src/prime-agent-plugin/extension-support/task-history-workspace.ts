@@ -101,6 +101,8 @@ export interface TaskHistoryWorkspaceInput {
   unpublishedLocalOnly?: boolean;
   /** Only the explicitly confirmed Beads-to-Backlog operation may inspect coexisting Backlog. */
   explicitMigration?: boolean;
+  /** A confirmed fresh migration cannot adopt an existing task branch. */
+  freshMigration?: boolean;
 }
 
 export type TaskHistoryRemoteSelection =
@@ -249,6 +251,33 @@ export function selectTaskHistoryRemote(
   };
 }
 
+/** Read-only eligibility shared by switch-request, switch-confirm, and preparation. */
+export function assertNoLocalBacklogMigrationDestination(root: string): void {
+  for (const path of [".backlog", "backlog", "backlog.config.yml"]) {
+    if (lstatIfPresent(join(root, path))) throw new Error(`existing Backlog destination: ${path}`);
+  }
+}
+
+function assertAbsentLocalMigrationTaskRef(root: string, runner: CommandRunner): void {
+  const local = runGit(runner, root, ["show-ref", "--verify", "--quiet", TASK_HISTORY_REF]);
+  if (local.status === 0) throw new Error(`existing Backlog destination: local ${TASK_HISTORY_REF}`);
+  if (local.status !== 1) throw new Error("cannot verify absence of the local Backlog task ref");
+}
+
+export function assertFreshBacklogMigrationDestination(root: string, runner: CommandRunner): void {
+  assertNoLocalBacklogMigrationDestination(root);
+  assertAbsentLocalMigrationTaskRef(root, runner);
+  const remote = selectTaskHistoryRemote(root, runner);
+  if (remote.status !== "selected") throw new Error(`cannot verify a fresh Backlog destination: ${remote.detail}`);
+  const published = runGit(runner, root, ["ls-remote", "--refs", "--exit-code", "--", remote.url, TASK_HISTORY_REF]);
+  assertAbsentMigrationTaskRef(published);
+}
+
+function assertAbsentMigrationTaskRef(result: { status: number; stdout: string }): void {
+  if (result.status === 0 && result.stdout.trim()) throw new Error(`existing Backlog destination: published ${TASK_HISTORY_REF}`);
+  if (result.status !== 2 || result.stdout.trim()) throw new Error("cannot verify absence of the published Backlog task ref");
+}
+
 /**
  * Create or verify the disconnected task-history branch with the selected
  * remote as the sole authority. The remote ref is fetched first (stale or
@@ -265,6 +294,7 @@ export function ensureTaskHistoryBranch(
   remoteUrl: string,
   runner: CommandRunner = new ProcessCommandRunner(),
   initialConfig: string = initialTaskStoreConfig(basename(primaryRoot)),
+  freshMigration = false,
 ): TaskHistoryBranchState {
   const current = gitOk(runner, primaryRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read the current branch");
   if (current === TASK_HISTORY_BRANCH) {
@@ -284,7 +314,13 @@ export function ensureTaskHistoryBranch(
   // `git ls-remote --heads <transport> refs/heads/prime-claw/tasks` result as
   // either absent or one well-formed OID/ref line. A cached remote-tracking
   // ref is never read as authority on its own.
-  const probe = runGit(runner, primaryRoot, ["ls-remote", "--heads", remoteUrl, TASK_HISTORY_REF]);
+  if (freshMigration) {
+    assertAbsentMigrationTaskRef(runGit(runner, primaryRoot, ["ls-remote", "--refs", "--exit-code", "--", remoteUrl, TASK_HISTORY_REF]));
+    assertAbsentLocalMigrationTaskRef(primaryRoot, runner);
+  }
+  const probe = freshMigration
+    ? { status: 0, stdout: "", stderr: "" }
+    : runGit(runner, primaryRoot, ["ls-remote", "--heads", remoteUrl, TASK_HISTORY_REF]);
   const probeOut = probe.stdout.trim();
   const probeErr = (probe.stderr || "").trim();
   let remoteOid: string | null;
@@ -773,6 +809,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     };
   }
 
+  if (input.freshMigration) assertFreshBacklogMigrationDestination(primaryRoot, runner);
   const remoteSelection = selectTaskHistoryRemote(primaryRoot, runner);
   const localOnly = remoteSelection.status === "blocked" && remoteSelection.code === "no-remote"
     && input.unpublishedLocalOnly === true;
@@ -868,6 +905,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     }
   }
   const nestedGit = join(storeDir, ".git");
+  if (input.freshMigration) assertNoLocalBacklogMigrationDestination(primaryRoot);
   const storeExists = existsSync(storeDir);
   if (hasTrackedTaskContent(runner, primaryRoot, storeDir)) {
     return {
@@ -919,6 +957,7 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       remoteUrl!,
       runner,
       relocatedConfigContent ?? initialTaskStoreConfig(basename(primaryRoot)),
+      input.freshMigration,
     );
     if (publishedState.status === "blocked") {
       return { status: "blocked", code: publishedState.code, detail: publishedState.detail, remediation: publishedState.remediation };
@@ -1258,7 +1297,9 @@ export function prepareExistingBacklogTaskHistoryWorkspace(
     const commonDir = realpathSync(resolve(root, gitOk(runner, root, ["rev-parse", "--git-common-dir"], "read primary common directory")));
     if (gitDir !== commonDir) return refuse("not-primary-checkout", "existing-store preparation requires the canonical primary checkout");
     const beforeHead = gitOk(runner, root, ["rev-parse", "HEAD"], "read code head before task-store preparation");
+    if (input.freshMigration) assertFreshBacklogMigrationDestination(root, runner);
     const observed = input.explicitMigration ? detectExplicitTaskProvider(root, "backlog", runner) : detectTaskProvider(root, runner);
+    if (input.freshMigration && observed.kind !== "none") return refuse("provider-not-backlog", "existing Backlog destination appeared during preparation");
     if (observed.kind === "blocked") return refuse("provider-not-backlog", observed.detail);
     if (observed.kind === "selected" && observed.evidence.provider !== "backlog") return refuse("provider-not-backlog", "selected provider is not Backlog");
     if (observed.kind === "none" || !observed.evidence.storeDir) {
@@ -1450,369 +1491,6 @@ export function prepareExistingBacklogTaskHistoryWorkspace(
   } catch (error) {
     return refuse("unreadable", `existing Backlog preservation failed: ${error instanceof Error ? error.message : String(error)}`);
   }
-}
-
-
-
-
-/** Existing migration records only: neither a draft nor a second record in either lifecycle location. */
-export function isBacklogMigrationLiveArchivePair(paths: string[]): boolean {
-  return paths.length === 2 && paths.some(path => path.startsWith("tasks/"))
-    && paths.some(path => path.startsWith("archive/tasks/") || path.startsWith("completed/"));
-}
-
-/** Migration-only reconciliation of the one known inactive parked Backlog store.
- * All merge/conflict work occurs in a disposable ordinary Git repository. The
- * parked tree is never activated, detached, rewritten or removed.
- */
-export function reconcileParkedBacklogMigrationStore(
-  primaryRoot: string,
-  runner: CommandRunner = new ProcessCommandRunner(),
-  validateCandidateConfig?: (content: string) => void,
-  validatePreservedPair?: (id: string, members: { path: string; markdown: string }[]) => void,
-): { storeDir: string; head: string; codePaths: string[]; verifyPreserved: () => void } | undefined {
-  const root = realpathSync(resolve(primaryRoot));
-  const parked = join(root, "backlog"), parkedConfig = join(parked, "config.yml.pre-migration");
-  if (!lstatIfPresent(parkedConfig)) return undefined;
-  const fail = (detail: string): never => { throw new Error(`parked Backlog reconciliation: ${detail}; preserve both stores without retry, reset or replacement`); };
-  const git = (cwd: string, args: string[], label: string) => gitOk(runner, cwd, args, label);
-  if (!lstatSync(parkedConfig).isFile() || lstatSync(parkedConfig).isSymbolicLink()) fail("parked configuration is not a regular file");
-  const safety = validateContainment(root, parked);
-  if (safety) fail(safety.detail);
-  const gitDir = realpathSync(resolve(root, git(root, ["rev-parse", "--git-dir"], "read canonical Git directory")));
-  if (gitDir !== realpathSync(resolve(root, git(root, ["rev-parse", "--git-common-dir"], "read canonical common directory")))) fail("requires the canonical primary checkout");
-  if (["config.yml", "config.yaml"].some(name => lstatIfPresent(join(parked, name)))) fail("parked store also has active folder configuration");
-  const nativeRoot = join(root, "backlog.config.yml");
-  const initialRoot = lstatIfPresent(nativeRoot);
-  if (initialRoot?.isSymbolicLink() && !existsSync(nativeRoot)) fail("native root link is dangling and its exact selected placement is unresolved");
-  const initialRootBytes = initialRoot ? readFileSync(nativeRoot) : undefined;
-  const initialRootLink = initialRoot?.isSymbolicLink() ? readlinkSync(nativeRoot) : undefined;
-  const selected = detectExplicitTaskProvider(root, "backlog", runner);
-  if (selected.kind === "blocked") fail(selected.detail);
-  const evidence = selected.kind === "selected" && selected.evidence.provider === "backlog" ? selected.evidence : undefined;
-  const target = evidence?.storeDir ?? join(root, ".backlog");
-  const targetRel = relative(root, target).split(sep).join("/");
-  const targetSafety = validateContainment(root, target);
-  if (targetSafety) fail(targetSafety.detail);
-  if (target === parked) fail("native root configuration still selects the parked store");
-  if (initialRootLink !== undefined && (isAbsolute(initialRootLink)
-      || !realpathSync(nativeRoot).startsWith(target + sep)
-      || initialRootLink !== relative(root, realpathSync(nativeRoot)).split(sep).join("/"))) fail("native root link does not select its exact contained relative configuration");
-  const ignoreText = existsSync(join(root, ".gitignore")) ? readFileSync(join(root, ".gitignore"), "utf8") : "";
-  if (ignoreText.split(/\r?\n/).some(line => [`!/${targetRel}/`, `!${targetRel}/`, `!/${targetRel}`, `!${targetRel}`].includes(line.trim()))) fail("selected task store is explicitly unignored");
-  const remote = selectTaskHistoryRemote(root, runner);
-  if (remote.status !== "selected") fail(remote.detail);
-  type File = { bytes: Buffer; mode: number };
-  const snapshot = (folder: string): Map<string, File> => {
-    const files = new Map<string, File>();
-    const walk = (dir: string) => {
-      for (const name of readdirSync(dir)) {
-        if (dir === folder && name === ".git") continue;
-        const path = join(dir, name), entry = lstatSync(path);
-        if (entry.isSymbolicLink() || (!entry.isFile() && !entry.isDirectory())) fail(`unsupported original entry ${path}`);
-        if (entry.isDirectory()) walk(path);
-        else files.set(relative(folder, path).split(sep).join("/"), { bytes: readFileSync(path), mode: entry.mode & 0o7777 });
-      }
-    };
-    if (lstatIfPresent(folder)) walk(folder);
-    return files;
-  };
-  const same = (path: string, file: File) => lstatIfPresent(path)?.isFile()
-    && !lstatSync(path).isSymbolicLink() && (lstatSync(path).mode & 0o7777) === file.mode && readFileSync(path).equals(file.bytes);
-  const directoryModes = (folder: string): Map<string, number> => {
-    const dirs = new Map<string, number>();
-    const walk = (path: string) => {
-      dirs.set(relative(folder, path).split(sep).join("/"), lstatSync(path).mode & 0o7777);
-      for (const name of readdirSync(path).sort()) if (name !== ".git" && lstatSync(join(path, name)).isDirectory()) walk(join(path, name));
-    };
-    if (existsSync(folder)) walk(folder);
-    return dirs;
-  };
-  const sourceFiles = snapshot(parked), sourceDirectories = directoryModes(parked);
-  const sourceIndependent = Boolean(lstatIfPresent(join(parked, ".git")));
-  const sourceRepository = sourceIndependent ? parked : root;
-  if (sourceIndependent) {
-    const identity = verifyIndependentTaskClone(parked, runner);
-    if (identity.status === "blocked") fail(identity.detail);
-  }
-  const sourceHead = git(sourceRepository, ["rev-parse", "HEAD"], "read original parked history");
-  const sourceScope = sourceIndependent ? [] : ["--", "backlog"];
-  if (git(sourceRepository, ["diff", "HEAD", "--name-only", ...sourceScope], "verify original parked tracked content") !== "") fail("original parked tracked files have unpublished changes");
-  const originalIndex = git(sourceRepository, ["ls-files", "--stage", "-z", ...sourceScope], "capture original parked index");
-  const sourceGitConfig = sourceIndependent ? readFileSync(join(parked, ".git", "config")) : undefined;
-  const ignored = new Set<string>();
-  for (const path of sourceFiles.keys()) {
-    const scoped = sourceIndependent ? path : `backlog/${path}`;
-    if (runGit(runner, sourceRepository, ["ls-files", "--error-unmatch", "--", scoped]).status === 0) continue;
-    const rule = runGit(runner, sourceRepository, ["check-ignore", "-v", "--", scoped]);
-    if (rule.status === 0) {
-      const match = rule.stdout.match(/^.*?:[0-9]+:([\s\S]*)\t[^\n]*$/);
-      if (!match) fail(`cannot inspect original attachment ignore rule ${path}`);
-      const wrappers = sourceIndependent ? [] : ["/backlog/", "backlog/", "/backlog", "backlog"];
-      if (!wrappers.includes(match[1])) ignored.add(path);
-    }
-  }
-  if (ignored.has("config.yml.pre-migration")) fail("parked configuration has an explicit unpublished attachment rule");
-  const directHead = (): string | null => {
-    const answer = git(root, ["ls-remote", "--heads", remote.url, TASK_HISTORY_REF], "inspect exact destination task ref");
-    if (!answer) return null;
-    const match = answer.match(/^([0-9a-f]{40})\trefs\/heads\/prime-claw\/tasks$/);
-    if (!match) fail("destination returned ambiguous task-ref evidence");
-    return match[1];
-  };
-  const publishedHead = directHead();
-  if (!publishedHead && refHead(runner, root, TASK_HISTORY_REF)) fail("an unpublished local task ref exists without the selected published ref");
-  const clonePresent = Boolean(lstatIfPresent(join(target, ".git")));
-  const selectedFiles = snapshot(target), selectedDirectories = directoryModes(target);
-  for (const [path, mode] of sourceDirectories) if (path && selectedDirectories.has(path) && selectedDirectories.get(path) !== mode) fail(`directory mode conflict at ${path}`);
-  const selectedIgnored = new Set([...selectedFiles.keys()].filter(path => clonePresent
-    && runGit(runner, target, ["ls-files", "--error-unmatch", "--", path]).status !== 0
-    && runGit(runner, target, ["check-ignore", "-q", "--", path]).status === 0));
-  let selectedHead: string | undefined, cloneIdentity: string | undefined, cloneConfig: Buffer | undefined;
-  const identityAt = (folder: string) => [folder, join(folder, ".git")].map(path => {
-    const entry = lstatSync(path); return `${realpathSync(path)}:${entry.dev}:${entry.ino}`;
-  }).join("\n");
-  const originalSourceIdentity = sourceIndependent ? identityAt(parked) : undefined;
-  if (clonePresent) {
-    const identity = verifyIndependentTaskClone(target, runner);
-    if (identity.status === "blocked") fail(identity.detail);
-    if (git(target, ["remote"], "read selected task remote") !== remote.name
-        || git(target, ["remote", "get-url", remote.name], "read selected task transport") !== remote.url
-        || git(target, ["symbolic-ref", "--short", "HEAD"], "read selected task branch") !== TASK_HISTORY_BRANCH
-        || git(target, ["status", "--porcelain", "--untracked-files=all"], "verify selected task cleanliness") !== "") fail("selected clone has dirty or foreign publication identity");
-    selectedHead = git(target, ["rev-parse", "HEAD"], "read selected task head");
-    cloneIdentity = identityAt(target); cloneConfig = readFileSync(join(target, ".git", "config"));
-    if (!publishedHead) fail("selected clone has no published task authority");
-  } else if (selectedFiles.size || hasTrackedTaskContent(runner, root, target)) {
-    fail(`selected ${targetRel} needs existing-store adoption/code-index detachment, which this parked-only hook does not perform`);
-  }
-  const configBytes = sourceFiles.get("config.yml.pre-migration")!.bytes;
-  const config = configBytes.toString("utf8");
-  if (!Buffer.from(config).equals(configBytes)) fail("parked config is not lossless UTF-8");
-  const placeConfig = (content: string) => /^(backlog_directory|backlogDirectory):.*$/m.test(content)
-    ? content.replace(/^(backlog_directory|backlogDirectory):.*$/m, (_line, key) => `${key}: ${JSON.stringify(targetRel)}`)
-    : content + (content.endsWith("\n") ? "" : "\n") + `backlog_directory: ${JSON.stringify(targetRel)}\n`;
-  const placedConfig = placeConfig(config);
-  validateRootConfigCandidate(root, placedConfig, target, runner, true);
-  validateCandidateConfig?.(placedConfig);
-  const temp = mkdtempSync(join(tmpdir(), "prime-claw-parked-backlog-"));
-  let candidateHead: string, activePath = "config.yml";
-  let allowedActivation: string | undefined;
-  try {
-    git(temp, ["init", "-q"], "initialize disposable parked merge candidate");
-    git(temp, ["remote", "add", remote.name, remote.url], "retain selected candidate transport");
-    if (publishedHead) {
-      git(temp, ["fetch", "-q", "--no-tags", remote.name, TASK_HISTORY_REF], "fetch published task candidate");
-      if (refHead(runner, temp, "FETCH_HEAD") !== publishedHead) fail("published task ref advanced during candidate fetch");
-      git(temp, ["checkout", "-q", "-b", TASK_HISTORY_BRANCH, publishedHead], "materialize published candidate");
-    } else {
-      git(temp, ["symbolic-ref", "HEAD", TASK_HISTORY_REF], "name disposable bootstrap branch");
-      writeFileSync(join(temp, INITIAL_FILE), INITIAL_FILE_CONTENT);
-      writeFileSync(join(temp, "config.yml"), initialTaskStoreConfig(basename(root)));
-      git(temp, ["add", INITIAL_FILE, "config.yml"], "stage disposable generated bootstrap");
-      git(temp, ["-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-qm", INITIAL_COMMIT_MESSAGE], "commit disposable generated bootstrap");
-    }
-    const destinationHead = git(temp, ["rev-parse", "HEAD"], "read destination candidate ancestry");
-    if (selectedHead && !isAncestor(runner, temp, selectedHead, destinationHead)) fail("selected clone is ahead of or divergent from published task history");
-    const localTaskHead = refHead(runner, root, TASK_HISTORY_REF);
-    if (localTaskHead && !isAncestor(runner, temp, localTaskHead, destinationHead)) fail("primary task ref is unpublished or divergent");
-    const rootConfig = join(root, "backlog.config.yml");
-    const selectedConfig = evidence ? readFileSync(evidence.configPath, "utf8") : readFileSync(join(temp, "config.yml"), "utf8");
-    if (evidence && realpathSync(evidence.configPath).startsWith(target + sep)) activePath = relative(target, realpathSync(evidence.configPath)).split(sep).join("/");
-    else if (evidence?.configSource === "folder") activePath = relative(target, evidence.configPath).split(sep).join("/");
-    else if (evidence?.configSource === "root" && (!existsSync(join(temp, "config.yml")) || selectedConfig !== readFileSync(join(temp, "config.yml"), "utf8"))) activePath = "backlog.config.yml";
-    const generatedConfig = existsSync(join(temp, "config.yml")) ? readFileSync(join(temp, "config.yml"), "utf8") : undefined;
-    const generated = git(temp, ["rev-list", "--count", destinationHead], "inspect complete bootstrap history") === "1"
-      && git(temp, ["ls-tree", "-r", "--name-only", destinationHead], "inspect complete bootstrap tree").split(/\r?\n/).sort().join("\n") === "TASKS.md\nconfig.yml"
-      && readFileSync(join(temp, INITIAL_FILE), "utf8") === INITIAL_FILE_CONTENT
-      && (generatedConfig === initialTaskStoreConfig(basename(root))
-        || generatedConfig === placeConfig(initialTaskStoreConfig(basename(root))))
-      && git(temp, ["show", "-s", "--format=%s", destinationHead], "verify generated bootstrap subject") === INITIAL_COMMIT_MESSAGE
-      && git(temp, ["show", "-s", "--format=%an <%ae>", destinationHead], "verify generated bootstrap author") === "prime-claw <prime-claw@localhost>"
-      && git(temp, ["ls-tree", destinationHead, "--", INITIAL_FILE, "config.yml"], "verify generated bootstrap modes").split(/\r?\n/).every(line => line.startsWith("100644 blob "));
-    let originalTaskHead: string | undefined;
-    if (sourceIndependent) {
-      const sourceRemote = git(parked, ["remote"], "read original parked publication remote");
-      if (!sourceRemote || sourceRemote.includes("\n")) fail("independent parked history has ambiguous publication authority");
-      const sourceBranch = git(parked, ["symbolic-ref", "--short", "HEAD"], "read original parked branch");
-      const sourceUrl = git(parked, ["remote", "get-url", sourceRemote], "read original parked transport");
-      if (git(parked, ["ls-remote", "--heads", sourceUrl, `refs/heads/${sourceBranch}`], "verify original parked publication") !== `${sourceHead}\trefs/heads/${sourceBranch}`) fail("independent parked head is unpublished or its publication advanced");
-      originalTaskHead = sourceHead;
-    } else if (git(root, ["ls-files", "-z", "--", "backlog"], "inspect original code-owned task paths")) {
-      originalTaskHead = git(root, ["subtree", "split", "--prefix=backlog", "HEAD"], "split original parked native task history");
-    }
-    if (originalTaskHead) git(temp, ["fetch", "-q", "--no-tags", sourceRepository, originalTaskHead], "fetch original parked task ancestors");
-    const codeBranches = git(root, ["for-each-ref", "--format=%(refname)", "refs/heads"], "read code ancestry refs").split(/\r?\n/).filter(ref => ref && ref !== TASK_HISTORY_REF);
-    for (const codeRef of codeBranches) {
-      git(temp, ["fetch", "-q", "--no-tags", root, codeRef], "inspect code/task history separation");
-      for (const taskHead of [destinationHead, originalTaskHead].filter(Boolean) as string[]) {
-        if (runGit(runner, temp, ["merge-base", taskHead, "FETCH_HEAD"]).status !== 1) fail("candidate task history shares code ancestry or its separation cannot be read");
-      }
-    }
-    if (placeConfig(selectedConfig) !== placedConfig) {
-      if (!generated || selectedConfig !== generatedConfig) fail("parked customization conflicts with selected native configuration");
-      if (evidence?.configSource === "root" && !lstatSync(rootConfig).isSymbolicLink()) fail("regular root config remains a distinct authority; its parked activation placement is unresolved");
-      allowedActivation = activePath;
-    }
-    // Conflicting current physical paths have no implicit winner. Report the
-    // exact path before Git's generic merge exit can hide the actionable reason.
-    const publishedFiles = snapshot(temp);
-    for (const [path, file] of sourceFiles) {
-      const existing = publishedFiles.get(path);
-      if (existing && (!existing.bytes.equals(file.bytes)
-          || Boolean(existing.mode & 0o111) !== Boolean(file.mode & 0o111))) fail(`physical path conflict at ${path}`);
-    }
-    if (originalTaskHead) {
-      if (!isAncestor(runner, temp, originalTaskHead, destinationHead)) {
-        const merge = isAncestor(runner, temp, destinationHead, originalTaskHead)
-          ? ["merge", "--ff-only", originalTaskHead]
-          : ["-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "merge", "--no-edit", "--no-ff", "--allow-unrelated-histories", originalTaskHead];
-        git(temp, merge, "merge both native task ancestries without squash");
-      }
-    }
-    const merged = snapshot(temp);
-    // Match the migration physical-ID check. Carry forward an existing pair,
-    // but do not create a new one by merging two previously distinct stores.
-    const identities = new Map<string, { id: string; path: string; markdown: string }[]>();
-    for (const [path, file] of new Map([...merged, ...sourceFiles, ...selectedFiles])) {
-      if (!/^(?:tasks|drafts|completed|archive\/tasks|archive\/drafts)\//.test(path) || !path.endsWith(".md")) continue;
-      const markdown = file.bytes.toString("utf8");
-      const id = /^id:\s*['"]?([^'"\r\n]+)['"]?\s*$/m.exec(markdown)?.[1]?.trim();
-      if (!id || /\s/.test(id) || id.startsWith("-")) fail(`physical task ${path} has no exact canonical ID`);
-      const key = id.toUpperCase().replace(/^([A-Z]+)-([0-9]+(?:\.[0-9]+)*)$/, (_all, prefix: string, body: string) =>
-        `${prefix}-${body.split(".").map(part => part.replace(/^0+(?=[0-9])/, "")).join(".")}`);
-      identities.set(key, [...(identities.get(key) ?? []), { id, path, markdown }]);
-    }
-    for (const members of identities.values()) {
-      if (members.length === 1) continue;
-      const paths = members.map(({ path }) => path);
-      if (!validatePreservedPair || !isBacklogMigrationLiveArchivePair(paths)
-          || !(paths.every(path => sourceFiles.has(path)) || paths.every(path => publishedFiles.has(path)))) {
-        fail(`canonical task ID ${members[0].id} collides at ${paths.join(" and ")}`);
-      }
-      validatePreservedPair(members[0].id, members);
-    }
-    for (const [path, file] of sourceFiles) {
-      const incoming = merged.get(path);
-      if (incoming && (!incoming.bytes.equals(file.bytes) || Boolean(incoming.mode & 0o111) !== Boolean(file.mode & 0o111))) fail(`different parked/destination bytes or executable mode at ${path}`);
-      const selectedOriginal = selectedFiles.get(path);
-      if (selectedOriginal && (!selectedOriginal.bytes.equals(file.bytes) || selectedOriginal.mode !== file.mode)) fail(`different selected/parked original at ${path}`);
-      if (ignored.has(path)) {
-        if (incoming) fail(`ignored parked attachment ${path} would become published`);
-        continue;
-      }
-      const out = join(temp, path); mkdirSync(dirname(out), { recursive: true });
-      if (!incoming) writeFileSync(out, file.bytes);
-      chmodSync(out, file.mode);
-    }
-    for (const [path, file] of selectedFiles) {
-      const incoming = merged.get(path);
-      if (selectedIgnored.has(path)) {
-        if (incoming || (sourceFiles.has(path) && !ignored.has(path))) fail(`ignored selected attachment ${path} would become published`);
-        continue;
-      }
-      if (path !== allowedActivation && (!incoming || !incoming.bytes.equals(file.bytes)
-          || Boolean(incoming.mode & 0o111) !== Boolean(file.mode & 0o111))) fail(`candidate changes selected original ${path}`);
-      if (incoming) chmodSync(join(temp, path), file.mode);
-    }
-    if (allowedActivation || !evidence) {
-      writeFileSync(join(temp, activePath), placedConfig);
-      chmodSync(join(temp, activePath), sourceFiles.get("config.yml.pre-migration")!.mode);
-    }
-    const activeContent = evidence && !allowedActivation ? selectedConfig : placedConfig;
-    if (evidence?.configSource === "root" && !lstatSync(rootConfig).isSymbolicLink() && activePath === "backlog.config.yml") {
-      const existingNativeRoot = lstatIfPresent(join(temp, activePath));
-      if (existingNativeRoot && readFileSync(join(temp, activePath), "utf8") !== activeContent) fail("existing native-root configuration disagrees with selected root authority");
-      writeFileSync(join(temp, activePath), activeContent);
-      chmodSync(join(temp, activePath), lstatSync(rootConfig).mode & 0o7777);
-    }
-    validateRootConfigCandidate(root, activeContent, target, runner, true);
-    validateCandidateConfig?.(activeContent);
-    git(temp, ["add", "-A", "--", "."], "stage preserved parked task union");
-    if (git(temp, ["diff", "--cached", "--name-only"], "inspect exact parked candidate delta")) git(temp,
-      ["-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-qm", "prime-claw: reconcile parked Backlog records and native histories"], "commit preserved parked union");
-    candidateHead = git(temp, ["rev-parse", "HEAD"], "read reconciled task head");
-    for (const ancestor of [destinationHead, originalTaskHead].filter(Boolean) as string[]) if (!isAncestor(runner, temp, ancestor, candidateHead)) fail("candidate lost an original task ancestor");
-    if (snapshot(parked).size !== sourceFiles.size || [...sourceFiles].some(([path, file]) => !same(join(parked, path), file))
-        || git(sourceRepository, ["ls-files", "--stage", "-z", ...sourceScope], "recheck original parked index") !== originalIndex) fail("parked inputs changed before publication");
-    if (cloneIdentity && (identityAt(target) !== cloneIdentity || [...selectedFiles].some(([path, file]) => !same(join(target, path), file)))) fail("selected clone inputs changed before publication");
-    if (initialRootBytes && (!existsSync(nativeRoot) || !readFileSync(nativeRoot).equals(initialRootBytes)
-        || (initialRootLink !== undefined && (!lstatSync(nativeRoot).isSymbolicLink() || readlinkSync(nativeRoot) !== initialRootLink)))) fail("selected root authority changed before publication");
-    if (!initialRoot && lstatIfPresent(nativeRoot)) fail("a new native root authority appeared before publication");
-    if (directHead() !== publishedHead) fail("selected published task ref advanced before reconciliation publication");
-    git(temp, ["push", remote.name, `HEAD:${TASK_HISTORY_REF}`], "publish one non-force reconciled task descendant");
-    if (directHead() !== candidateHead) fail("reconciliation publication is uncertain");
-  } finally { rmSync(temp, { recursive: true, force: true }); }
-  // Materialize only the selected clone, with one checked ordinary fast-forward.
-  const codePaths = new Set<string>();
-  const ignoredTarget = ensureIgnored(runner, root, target);
-  if (ignoredTarget) fail(ignoredTarget.detail);
-  codePaths.add(".gitignore");
-  if (!clonePresent) {
-    git(root, ["clone", "-q", "--origin", remote.name, "--branch", TASK_HISTORY_BRANCH, remote.url, target], "create the selected task clone from its publication transport");
-  } else {
-    git(target, ["fetch", "-q", remote.name, `${TASK_HISTORY_REF}:refs/remotes/${remote.name}/${TASK_HISTORY_BRANCH}`], "fetch exact reconciled task publication");
-    if (refHead(runner, target, `refs/remotes/${remote.name}/${TASK_HISTORY_BRANCH}`) !== candidateHead!) fail("published reconciliation advanced before materialization");
-    git(target, ["merge", "--ff-only", candidateHead!], "fast-forward the same selected clone");
-  }
-  if (refHead(runner, target, "HEAD") !== candidateHead!) fail("materialized task clone differs from published candidate");
-  for (const [path, file] of selectedFiles) if (!selectedIgnored.has(path)) chmodSync(join(target, path), file.mode);
-  if (allowedActivation || !evidence) chmodSync(join(target, activePath), sourceFiles.get("config.yml.pre-migration")!.mode);
-  for (const [path, file] of sourceFiles) {
-    const out = join(target, path);
-    if (ignored.has(path)) {
-      if (lstatIfPresent(out) && !same(out, file)) fail(`ignored attachment collides at ${path}`);
-      const pattern = "/" + path.replace(/[\\*?\[\]#!]/g, "\\$&");
-      appendFileSync(join(target, ".git", "info", "exclude"), `\n${pattern}\n`);
-      mkdirSync(dirname(out), { recursive: true });
-      if (!existsSync(out)) writeFileSync(out, file.bytes);
-    }
-    chmodSync(out, file.mode);
-  }
-  for (const [path, mode] of selectedDirectories) chmodSync(join(target, path), mode);
-  for (const [path, mode] of sourceDirectories) if (path || !selectedDirectories.size) {
-    mkdirSync(join(target, path), { recursive: true }); chmodSync(join(target, path), mode);
-  }
-  const rootConfigPath = join(root, "backlog.config.yml");
-  const link = relative(root, join(target, activePath)).split(sep).join("/");
-  const rootEntry = lstatIfPresent(rootConfigPath);
-  if (rootEntry?.isSymbolicLink()) {
-    if (readlinkSync(rootConfigPath) !== link) fail("selected root-link placement differs from reconciled native authority");
-  } else {
-    if (rootEntry && (!rootEntry.isFile() || !readFileSync(rootConfigPath).equals(readFileSync(join(target, activePath))))) fail("regular root authority changed before exact native relocation");
-    if (rootEntry) unlinkSync(rootConfigPath);
-    symlinkSync(link, rootConfigPath);
-    codePaths.add("backlog.config.yml");
-  }
-  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner, explicitMigration: true });
-  if (prepared.status !== "prepared" || prepared.storeDir !== target || prepared.head !== candidateHead!) fail(prepared.status === "blocked" ? prepared.detail : "prepared destination differs from reconciled candidate");
-  const finalIdentity = identityAt(target);
-  if (cloneIdentity && finalIdentity !== cloneIdentity) fail("selected clone identity changed");
-  if (cloneConfig && !readFileSync(join(target, ".git", "config")).equals(cloneConfig)) fail("selected Git configuration changed");
-  const finalGitConfig = readFileSync(join(target, ".git", "config"));
-  const finalConfigPath = relative(target, realpathSync(join(root, "backlog.config.yml"))).split(sep).join("/");
-  const finalRootLink = readlinkSync(join(root, "backlog.config.yml"));
-  const verifyPreserved = () => {
-    const current = snapshot(parked);
-    if (current.size !== sourceFiles.size || [...sourceFiles].some(([path, file]) => !same(join(parked, path), file))
-        || JSON.stringify([...directoryModes(parked)]) !== JSON.stringify([...sourceDirectories])) fail("original inactive parked tree changed");
-    if (!isAncestor(runner, sourceRepository, sourceHead, "HEAD")
-        || git(sourceRepository, ["ls-files", "--stage", "-z", ...sourceScope], "verify original parked index") !== originalIndex) fail("original parked history/index changed");
-    if (originalSourceIdentity && identityAt(parked) !== originalSourceIdentity) fail("original independent parked clone identity changed");
-    if (sourceGitConfig && !readFileSync(join(parked, ".git", "config")).equals(sourceGitConfig)) fail("original parked Git configuration changed");
-    if (!lstatIfPresent(join(root, "backlog.config.yml"))?.isSymbolicLink()
-        || readlinkSync(join(root, "backlog.config.yml")) !== finalRootLink) fail("selected native root-link placement changed");
-    if (identityAt(target) !== finalIdentity || !readFileSync(join(target, ".git", "config")).equals(finalGitConfig)
-        || git(target, ["symbolic-ref", "--short", "HEAD"], "verify selected task branch") !== TASK_HISTORY_BRANCH
-        || !isAncestor(runner, target, candidateHead!, "HEAD")) fail("reconciled selected clone/history identity changed");
-    for (const [path, file] of sourceFiles) if (!same(join(target, path), file)) fail(`consolidated parked original changed at ${path}`);
-    for (const [path, mode] of [...selectedDirectories, ...[...sourceDirectories].filter(([path]) => Boolean(path))]) {
-      if (!lstatIfPresent(join(target, path))?.isDirectory() || (lstatSync(join(target, path)).mode & 0o7777) !== mode) fail(`consolidated directory mode/path changed at ${path}`);
-    }
-    for (const [path, file] of selectedFiles) if (path !== finalConfigPath && !same(join(target, path), file)) fail(`selected original changed at ${path}`);
-  };
-  verifyPreserved();
-  return { storeDir: target, head: prepared.head, codePaths: [...codePaths], verifyPreserved };
 }
 
 export interface ExistingBacklogFile {

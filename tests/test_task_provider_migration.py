@@ -22,55 +22,10 @@ def test_task_provider_migration_node_suite(tier1_container) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_parked_store_reconciliation_node_suite(tier1_container) -> None:
-    result = tier1_container.run(
-        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
-        "parked-store reconciliation", WS_NODE_SUITE, timeout=1800,
-    )
-    (tier1_container.share.parent / "parked-store-reconciliation-node.tap").write_text(
-        result.stdout + result.stderr
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_same_id_coexistence_node_suite(tier1_container) -> None:
-    result = tier1_container.run(
-        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
-        "same-ID coexistence|migration admission refuses contested Backlog IDs",
-        WS_NODE_SUITE, timeout=1500,
-    )
-    (tier1_container.share.parent / "same-id-coexistence-node.tap").write_text(
-        result.stdout + result.stderr
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_completion_status_node_suite(tier1_container) -> None:
-    result = tier1_container.run(
-        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
-        "source completion|receipt-only Done", WS_NODE_SUITE, timeout=1200,
-    )
-    (tier1_container.share.parent / "completion-status-node.tap").write_text(
-        result.stdout + result.stderr
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_selected_existing_configuration_node_suite(tier1_container) -> None:
-    result = tier1_container.run(
-        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
-        "selected-existing", WS_NODE_SUITE, timeout=1200,
-    )
-    (tier1_container.share.parent / "selected-existing-configuration-node.tap").write_text(
-        result.stdout + result.stderr
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-
-
 def test_current_native_migration_integration_node_suite(tier1_container) -> None:
     result = tier1_container.run(
         "node", "--experimental-strip-types", "--test", "--test-name-pattern",
-        "current native|complete-receipt same-destination replay", WS_NODE_SUITE,
+        "current native", WS_NODE_SUITE,
         timeout=600,
     )
     (tier1_container.share.parent / "current-native-migration-integration-node.tap").write_text(
@@ -107,8 +62,8 @@ def test_retiring_beads_source_boundary_node_suite(tier1_container) -> None:
         "--test-name-pattern",
         "read-only inspection captures complete current Beads|Beads source digest|current Beads source digest|"
         "canonical source inspection|confirmed embedded|embedded source refuses|repeated embedded|"
-        "independent Backlog publication|typed Beads export|native Beads memory capture|native Beads memory outputs|"
-        "active Beads Episode deletion refusal|complete-receipt same-destination replay|current native migration and replay|current native importer stops|default migration capture",
+        "typed Beads export|native Beads memory capture|native Beads memory outputs|"
+        "active Beads Episode deletion refusal|fresh destination memory loss|current native migration|current native importer stops|default migration capture",
         WS_NODE_SUITE, timeout=900,
     )
     (tier1_container.share.parent / "retiring-beads-source-boundary-node.tap").write_text(
@@ -149,14 +104,10 @@ def test_task_provider_migration_stays_pair_specific_and_receipt_only() -> None:
     for sentinel in (
         "inspectTaskProviderMigration",
         "migrateTaskProvider",
-        "migrateBacklogToBeads",
         "migrateBeadsToBacklog",
         "switchActiveTaskProviderOwnership",
         "restoreTaskProviderOwnershipSwitch",
         "destination-native",
-        "gitHistoryBase64",
-        "history",
-        "provenance",
         "source-revision-changed",
         "source store still exists after guarded deletion",
         "confirmedSwitch",
@@ -182,18 +133,6 @@ def test_native_populated_backlog_allocation_node_suite(tier1_container) -> None
         "native populated Backlog allocation|native populated Backlog lifecycle", WS_NODE_SUITE, timeout=300,
     )
     (tier1_container.share.parent / "native-populated-backlog-allocation-node.tap").write_text(
-        result.stdout + result.stderr
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_populated_backlog_migration_node_suite(tier1_container) -> None:
-    result = tier1_container.run(
-        "node", "--experimental-strip-types", "--test", "--test-name-pattern",
-        "confirmed populated Backlog|native archived-target source graph|native populated Backlog allocation|native populated Backlog lifecycle|migration admission refuses contested Backlog IDs",
-        WS_NODE_SUITE, timeout=2400,
-    )
-    (tier1_container.share.parent / "populated-backlog-migration-node.tap").write_text(
         result.stdout + result.stderr
     )
     assert result.returncode == 0, result.stdout + result.stderr
