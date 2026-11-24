@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T22:45:00Z'
+updated_date: '2026-11-24T22:56:00Z'
 labels: []
 dependencies: []
 references:
@@ -627,4 +627,9 @@ On the separately delivered execute, continue from the saved code within the pub
 
 ### Retained Beads backup slice — execute after f1799a08
 The original Episode resumed from clean, unpublished `3f665a29aaf7ac1d85e640d5df44fb235264cd70`. Implement one restorable Beads backup before verified destination publication and ownership switch, and keep it after guarded retirement (and on pre-cutover failure). Verify restore from the retained artifact in a separate disposable store, not by reading the original in place. Retain fresh-destination refusal and active Episode/immutable receipt evidence. Do not replay the interrupted Tier 1; validate the exact resulting candidate with independent durable logs and terminal status. Both live writer holds and task lifecycle remain unchanged.
+
+### Retained Beads backup slice — published candidate
+Published exact Episode candidate `3b3e013f471671a34bf9d0fa447bd324c44123a1` (tree `4d40d785eecebe44cc607a901f1bcf879e62d540`) on `JLanders/prime-claw-primeclaw-59-episode-277260cb` by non-force push and direct ref readback. Main remains `110e200e5754b2bdb517db3c2c4846cdb7a86c16`. The saved fresh-only gate and removal of destination adoption/replay, parked reconciliation, and baseline reuse are included. This slice takes a separate local Dolt backup of the selected Beads database and saves its native config/metadata. It checks an isolated native restore before writing Backlog, leaves partial backup files visible on failure, and rechecks the retained backup before guarded retirement. The docs describe matching-mode recovery without reusing the source endpoint. No backup contents enter Backlog.
+
+Corrected disposable Docker restore tests: 3 passed, 0 failed/skipped; TAP SHA-256 `eb1c2e6cd53dd9e9cf98674fc1fded7da4f13f41e3c4bfc9f6cd52c228f2bc54`. After retiring the original, both modes restored from the retained artifact in an independent scratch workspace. Tests verified current native rows, superseded title history, and an unpublished memory on the owned-server source. The restore-failure case left the source/ownership/remote refs unchanged and no Backlog destination. First focused snapshot with identical migration source and earlier fixture/docs additionally passed active Episode/immutable receipt continuity and all fresh-destination refusal cases (TAP SHA-256 `f43c6cff28a535ac546fb1b4ffd9cce5b25dd9effcb43b5d8fe760ed68cdcb8d`; the one initial server scratch fixture failure was corrected and rerun above). Docker Tier 1 `scripts/test-tier1.sh --probe` on the exact published candidate passed offline apply/check/RPC: `20261124T225013Z-70392-d7f2f049`, manifest SHA-256 `4cb79d5c29aed05b9b048362da912a14f7c68ac3d223381b1f53eca5dc65ed3c`; detached log SHA-256 `886bdc8b6a05703b27336cbd28120240f403814b3ecaee985a90da52c0c94119`. Both exact Tier 1 container IDs verified absent. No live migration, hold release, deployment, main merge or lifecycle edit; acceptance remains 0/9 and Final Summary unset.
 <!-- SECTION:NOTES:END -->
