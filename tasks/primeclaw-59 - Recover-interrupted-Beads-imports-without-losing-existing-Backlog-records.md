@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T17:42:00Z'
+updated_date: '2026-11-24T17:49:00Z'
 labels: []
 dependencies: []
 references:
@@ -895,4 +895,11 @@ Exact Docker Tier 1 `--probe` `20261124T155038Z-16023-aca1e340` passed (manifest
 
 ### Released switch-request refusal — owner relay and bounded correction
 Initialize PVA reports that the live read-only public `switch-request` on `482b7d9256d093705eae4a24f99ea9e7c03507e5` returned `source task history is not clean: ?? backlog.config.yml` before source inspection. The owner relayed that the existing path is the generated symlink to `.backlog/config.yml`. These are reports, not Episode observations, and prove neither receipt validity nor permission for live access or cutover. The prior exact integration evidence remains scoped to its tested tree. This continuation is for the approved inspection-only correction and disposable proof, not a retry or a workaround on live files. Both PVA tracker-writer holds remain.
+
+### Public switch-request — blocked by the physical no-write requirement
+Canonical execute for observation `a021ae71` verified the original Episode and exact base/main `482b7d9256d093705eae4a24f99ea9e7c03507e5`; the handoff checkpoint `6845aa8999cb7008e89cf407934db4fc3560fef9` is the compatible, directly published task descendant of `f6ba682919226726a15ed1b8174c6f8672c03595`. Static trace at this exact base found that public `switch-request` runs `inspectTaskProviderMigration`. Once the generic Git cleanliness check is passed, `captureSelectedSource` calls `captureBeads` in the selected source repository, including native `bd --readonly statuses`, export, and long task readbacks. `beadsSourceIdentity` binds the canonical repository, store, database mode and native connection into the capture digest. A generated-link-only exception would therefore reach native reads that have not met the required source no-write guarantee.
+
+The retained original-location witness (separate earlier tree; two offline runs PIDs 19908 and 22805) recorded 11 replacements of the embedded Dolt `noms/manifest` inode, with identical bytes, during native `--readonly` commands including the commands used by this path. Attribution TAP SHA-256 `daffe0b29242a672c97e5cf3b7dea44d67f29b81591d05517aa2de66d84423c9`. This is evidence about that embedded fixture, not a live observation or a conclusion about server-backed Dolt. The earlier completion test proved preservation of source content and published destination revisions, not physical no-write during this newly reachable public inspection. Trusting the receipt alone would not prove the current source, and changing the source capture identity or relying on a substituted fixture would not meet the authorized proof. No witness rerun, no code edits, no new candidate or Tier 1 run, and no live action.
+
+Unblock by identifying and authorizing a supported native capture route for the applicable source mode that preserves exact source identity/digest and passes the physical no-write control in a genuine disposable fixture, or by explicitly deciding a different inspection boundary. Do not weaken source/receipt checks or reinterpret equal bytes as no writes. Keep In Progress, 0/9, null Final Summary and PVA-first `c6e0a3d`; both tracker-writer holds stay in place.
 <!-- SECTION:NOTES:END -->
