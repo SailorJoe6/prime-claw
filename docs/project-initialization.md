@@ -687,6 +687,21 @@ block source retirement. An exact-source same-destination replay reuses the nati
 identities in that receipt; it does not create duplicate imports, index or USER
 work. An incomplete memory import without complete receipt-bound output evidence
 remains a blocker, not permission for automatic retry, repair or a second destination.
+If an explicit confirmed migration stopped after publishing both commits but
+before cutover, the existing-store path can finish without reimporting or
+republishing. It requires an independent `.backlog` clone with a directly
+published receipt immediately after the bound data commit, an original baseline
+that differs only by the expected additive statuses and receipt-bound outputs,
+and the untracked generated `backlog.config.yml` link as the sole primary code
+layout change. It verifies native task and memory content, original paths,
+bytes and Git modes, the receipt-only delta, and the same Beads capture and
+ownership mappings before using the normal guarded cutover. For unrelated
+original live/archive pairs that share an ID, it verifies both physical paths,
+bytes, modes and history against the receipt instead of inventing a native ID
+view. Ambiguous import, receipt and memory targets still refuse. Partial
+receipts, other history shapes and unrelated drift are not repaired or retried
+by this path.
+
 Beads stays authoritative until all destination, source, runtime and ownership
 proofs succeed. Imported text is data, not instructions to execute.
 
