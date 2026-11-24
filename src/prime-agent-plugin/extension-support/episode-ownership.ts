@@ -159,8 +159,19 @@ function exactBeadsTaskEvidence(value: unknown, taskId: unknown): value is Recor
     && typeof task.status === "string" && task.status.trim() !== "";
 }
 
-function exactBacklogTaskEvidence(value: unknown, taskId: unknown, taskPath: unknown): value is Record<string, unknown> {
+function exactBacklogTaskEvidence(value: unknown, taskId: unknown, taskPath: unknown, revision: string): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const view = value as Record<string, unknown>;
+  if (view.kind === "backlog-git") {
+    const repository = view.repository as Record<string, unknown> | undefined;
+    const path = view.path;
+    return Object.keys(view).length === 4 && view.commit === revision
+      && repository?.topology === "independent" && Object.keys(repository).length === 2
+      && typeof repository.identity === "string" && /^[0-9a-f]{64}$/.test(repository.identity)
+      && typeof path === "string" && path.endsWith(".md") && !/[\0\r\n\\]/.test(path)
+      && path.split("/").every(part => part && part !== "." && part !== "..")
+      && typeof taskPath === "string" && taskPath.endsWith(`/${path}`);
+  }
   const task = (value as Record<string, unknown>).task;
   const path = task && typeof task === "object" && !Array.isArray(task)
     ? (task as Record<string, unknown>).path : undefined;
@@ -250,7 +261,7 @@ export function parseEpisodeOwnership(value: unknown, path = "episode ownership"
       && safeTaskPath(item.taskPath)
       && ((item.providerRevision === undefined && item.taskEvidence === undefined)
         || (typeof item.providerRevision === "string" && GIT_OID.test(item.providerRevision)
-          && exactBacklogTaskEvidence(item.taskEvidence, item.taskId, item.taskPath)))
+          && exactBacklogTaskEvidence(item.taskEvidence, item.taskId, item.taskPath, item.providerRevision)))
       && hasOnlyFields(item, BACKLOG_TASK_RECORD_FIELDS);
     const beadsTask = item.provider === "beads"
       && typeof item.providerRevision === "string"
@@ -429,6 +440,24 @@ function withOwnershipLock<T>(projectRoot: string, operation: () => T): T {
 /** Serialize only the canonical-main status commit plus durable reservation. */
 export function withEpisodeAdmissionLock<T>(projectRoot: string, operation: () => T): T {
   return withDirectoryLock(join(projectRoot, ".prime-claw", "episode-admission.lock"), 30_000, "Episode admission", operation);
+}
+
+/** Same lock as synchronous admission; don't block the event loop while a
+ * streamed admission on this process is still holding it. */
+export async function withStreamedEpisodeAdmissionLock<T>(projectRoot: string, operation: () => T | Promise<T>): Promise<T> {
+  const lockPath = join(projectRoot, ".prime-claw", "episode-admission.lock");
+  ensurePrimeClawDirectory(projectRoot);
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    try { mkdirSync(lockPath); break; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      if (Date.now() >= deadline) throw new Error(`Timed out waiting for Episode admission lock: ${lockPath}`);
+      await new Promise(resolveWait => setTimeout(resolveWait, 10));
+    }
+  }
+  try { return await operation(); }
+  finally { rmSync(lockPath, { recursive: true, force: true }); }
 }
 
 export function mutateEpisodeOwnership(

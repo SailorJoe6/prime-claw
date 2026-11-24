@@ -43,27 +43,44 @@ function repository(selected: SelectedBacklogRepository): BacklogGitEvidence["re
   return { topology: selected.topology, identity: createHash("sha256").update(identity).digest("hex") };
 }
 
+function committedBlob(root: string, commit: string, path: string): string {
+  if (!OID.test(commit) || !path.endsWith(".md") || /[\0\r\n\\]/.test(path)
+      || path.split("/").some(part => !part || part === "." || part === "..")) {
+    throw new Error("Backlog evidence requires a full commit and literal repository-relative ticket path");
+  }
+  if (metadata(root, ["cat-file", "-t", commit], "Backlog evidence commit unavailable").trim() !== "commit") {
+    throw new Error("Backlog evidence OID is not a commit");
+  }
+  const entry = metadata(root, ["--literal-pathspecs", "ls-tree", "-z", commit, "--", path],
+    "Backlog evidence tree unavailable");
+  const match = /^100(?:644|755) blob ([0-9a-f]{40})\t/.exec(entry);
+  if (!match || entry.slice(match[0].length) !== `${path}\0`) {
+    throw new Error("Backlog evidence path is not an exact regular ticket blob");
+  }
+  return match[1];
+}
+
 function blobFor(selected: SelectedBacklogRepository, evidence: BacklogGitEvidence): string {
   const actual = repository(selected);
   if (evidence.kind !== "backlog-git" || actual.topology !== evidence.repository.topology
       || actual.identity !== evidence.repository.identity) {
     throw new Error("Backlog evidence repository mismatch");
   }
-  if (!OID.test(evidence.commit) || !evidence.path.endsWith(".md") || /[\0\r\n\\]/.test(evidence.path)
-      || evidence.path.split("/").some(part => !part || part === "." || part === "..")) {
-    throw new Error("Backlog evidence requires a full commit and literal repository-relative ticket path");
+  return committedBlob(selected.root, evidence.commit, evidence.path);
+}
+
+/** Reference the exact regular committed file without opening its contents.
+ * The caller supplies separate native proof of the canonical task identity.
+ */
+export function referenceCommittedBacklogTask(
+  selected: SelectedBacklogRepository, commit: string, path: string,
+): BacklogGitEvidence {
+  const selectedRepository = repository(selected);
+  const blob = committedBlob(selected.root, commit, path);
+  if (metadata(selected.root, ["cat-file", "-t", blob], "Backlog evidence ticket blob unavailable").trim() !== "blob") {
+    throw new Error("Backlog evidence OID is not a ticket blob");
   }
-  const root = selected.root;
-  if (metadata(root, ["cat-file", "-t", evidence.commit], "Backlog evidence commit unavailable").trim() !== "commit") {
-    throw new Error("Backlog evidence OID is not a commit");
-  }
-  const entry = metadata(root, ["--literal-pathspecs", "ls-tree", "-z", evidence.commit, "--", evidence.path],
-    "Backlog evidence tree unavailable");
-  const match = /^100(?:644|755) blob ([0-9a-f]{40})\t/.exec(entry);
-  if (!match || entry.slice(match[0].length) !== `${evidence.path}\0`) {
-    throw new Error("Backlog evidence path is not an exact regular ticket blob");
-  }
-  return match[1];
+  return { kind: "backlog-git", repository: selectedRepository, commit, path };
 }
 
 function verifyTaskHeader(header: Buffer, taskId: string): void {

@@ -1,3 +1,5 @@
+import { readBacklogCreationIdentity } from "./backlog-creation-identity.ts";
+import type { BacklogGitEvidence } from "./backlog-git-evidence.ts";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -967,6 +969,33 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
       || selection.taskPathRelative !== publication.taskPath) {
     throw new Error("Independent Backlog Episode reservation task no longer matches the published native evidence");
   }
+  return writePublishedBacklogReservation(input, publication, taskEvidence, root, dependencies);
+}
+
+export async function reserveStreamedBacklogTaskEpisodeOwnership(
+  input: Omit<PublishedBacklogTaskEpisodeReservationInput, "publication"> & {
+    publication: { taskId: string; taskPath: string; publishedHead: string; taskEvidence: BacklogGitEvidence };
+  },
+  dependencies: PublishedBacklogTaskEpisodeReservationDependencies = {},
+): Promise<PublishedBacklogTaskEpisodeOwnershipRecord> {
+  const publication = input.publication;
+  const root = realpathSync(input.projectRoot);
+  const selected = await readBacklogCreationIdentity(root, publication.taskId);
+  if (!input.ownerSessionId || !TRANSITION_GIT_OID.test(publication.publishedHead)
+      || !TRANSITION_GIT_OID.test(input.baseRef) || publication.taskEvidence.commit !== publication.publishedHead
+      || selected.path !== publication.taskPath || selected.status !== "In Progress") {
+    throw new Error("Independent Backlog reservation no longer matches the published task identity");
+  }
+  return writePublishedBacklogReservation(input, publication, { ...publication.taskEvidence }, root, dependencies);
+}
+
+function writePublishedBacklogReservation(
+  input: Omit<PublishedBacklogTaskEpisodeReservationInput, "publication">,
+  publication: { taskId: string; taskPath: string; publishedHead: string },
+  taskEvidence: Record<string, unknown>,
+  root: string,
+  dependencies: PublishedBacklogTaskEpisodeReservationDependencies,
+): PublishedBacklogTaskEpisodeOwnershipRecord {
   if (input.engine === "orca" && !input.projectSetupId) {
     throw new Error("Independent Backlog Orca reservation requires an exact project setup");
   }

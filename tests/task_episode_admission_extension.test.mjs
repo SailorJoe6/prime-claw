@@ -64,6 +64,15 @@ class FixtureRunner {
   }
 }
 
+function usePinnedBacklogOnPath(t, binDir = dirname(BACKLOG)) {
+  const originalPath = process.env.PATH;
+  process.env.PATH = [binDir, originalPath].filter(Boolean).join(":");
+  t.after(() => {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+  });
+}
+
 function view(root, taskId = "PRIMECLAW-1") {
   return JSON.parse(execFileSync(BACKLOG, ["task", "view", "--json", "--", taskId], {
     cwd: root,
@@ -132,8 +141,140 @@ function commitPaths(root, ref = "HEAD") {
   return output ? output.split(/\r?\n/) : [];
 }
 
+test("production independent Backlog create reads a native view over 1 MiB and delivers exactly one execute", async (t) => {
+  if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-large-admission-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const root = join(dir, "repo");
+  const remote = join(dir, "remote.git");
+  execFileSync("git", ["init", "-q", "-b", "main", root]);
+  execFileSync("git", ["init", "-q", "--bare", remote]);
+  git(root, "config", "user.name", "Prime Claw Test");
+  git(root, "config", "user.email", "prime-claw@example.invalid");
+  mkdirSync(join(root, ".agents", "skills", "execute"), { recursive: true });
+  copyFileSync(join(ROOT, ".agents", "skills", "execute", "SKILL.md"), join(root, ".agents", "skills", "execute", "SKILL.md"));
+  git(root, "add", ".agents/skills/execute/SKILL.md");
+  git(root, "commit", "-qm", "code baseline");
+  git(root, "remote", "add", "origin", remote);
+  git(root, "push", "-qu", "origin", "main");
+  const prepared = prepareTaskHistoryWorkspace({ primaryRoot: root, runner: new FixtureRunner() });
+  assert.equal(prepared.status, "prepared");
+  git(prepared.storeDir, "config", "user.name", "Prime Claw Test");
+  git(prepared.storeDir, "config", "user.email", "prime-claw@example.invalid");
+  git(root, "add", ".gitignore");
+  git(root, "commit", "-qm", "ignore independent task store");
+  const codeHead = git(root, "rev-parse", "HEAD");
+
+  execFileSync(BACKLOG, ["task", "create", "Oversized native view", "--status", "In Planning",
+    "--description", "Exercise the real provider output limit", "--plan", "1. Verify exact Episode identity.", "--plain"],
+  { cwd: root, stdio: "ignore" });
+  const listed = JSON.parse(execFileSync(BACKLOG, ["task", "list", "--json"], { cwd: root, encoding: "utf8" }));
+  const taskId = listed.tasks?.[0]?.id;
+  assert.ok(taskId);
+  // Keep each argument comfortably below OS limits. Author all content through Backlog.
+  const headerLabel = "large-header-" + "x".repeat(70 * 1024);
+  const note = "Native task evidence. ".repeat(2800).trimEnd();
+  const tail = "final native evidence marker";
+  for (let i = 0; i < 18; i += 1) {
+    const label = i === 0 ? ["--add-label", headerLabel] : [];
+    execFileSync(BACKLOG, ["task", "edit", ...label, "--append-notes", `${note}\nchunk ${i}\n${i === 17 ? tail : ""}`, "--plain", "--", taskId],
+      { cwd: root, stdio: "ignore" });
+  }
+  const nativeView = execFileSync(BACKLOG, ["task", "view", "--json", "--", taskId], {
+    cwd: root, encoding: "utf8", maxBuffer: 2 * 1024 * 1024,
+  });
+  assert.ok(Buffer.byteLength(nativeView) > 1024 * 1024, "native stdout must exceed Node's default sync buffer");
+  const planned = JSON.parse(nativeView).task;
+  assert.equal(planned.id, taskId);
+  assert.equal(planned.status, "In Planning");
+  assert.ok(planned.implementationNotes.endsWith(tail));
+  assert.ok(planned.labels.includes(headerLabel));
+  const assertOversizedHeader = (worktree) => {
+    const text = readFileSync(join(worktree, planned.path), "utf8");
+    const headerEnd = text.indexOf("\n---\n", 4);
+    assert.ok(headerEnd > 0 && Buffer.byteLength(text.slice(0, headerEnd)) > 64 * 1024,
+      "native task frontmatter must exceed 64 KiB");
+  };
+  assertOversizedHeader(root);
+  git(prepared.storeDir, "add", ".");
+  git(prepared.storeDir, "commit", "-qm", "plan oversized task");
+  git(prepared.storeDir, "push", "-q", "origin", `HEAD:${TASK_HISTORY_REF}`);
+  const plannedTaskHead = git(prepared.storeDir, "rev-parse", "HEAD");
+
+  const trace = join(dir, "checkpoints.tsv");
+  const traceBin = join(dir, "trace-bin");
+  mkdirSync(traceBin);
+  const shellQuote = (value) => `'${value.replaceAll("'", `'"'"'`)}'`;
+  // Record only command and cwd, then pass the original args and streams to the pinned CLI.
+  writeFileSync(join(traceBin, "backlog"), `#!/bin/sh
+if [ "$1" = task ] && { [ "$2" = view ] || [ "$2" = edit ]; }; then
+  printf '%s\t%s\n' "$2" "$(pwd -P)" >> ${shellQuote(trace)}
+fi
+exec ${shellQuote(BACKLOG)} "$@"
+`, { mode: 0o755 });
+  usePinnedBacklogOnPath(t, traceBin);
+  const owner = "large-admission-owner";
+  const ownerFile = join(dir, "owner.jsonl");
+  writeFileSync(ownerFile, JSON.stringify({ type: "session", id: owner, cwd: root }) + "\n");
+  const ctx = { cwd: root, model: { provider: "test", id: "model" }, sessionManager: {
+    getSessionId: () => owner, getSessionFile: () => ownerFile, getHeader: () => ({ rlmDepth: 0 }),
+  } };
+  const calls = [];
+  const publisher = {
+    async createFresh(options) {
+      calls.push(["create", options.worktree]);
+      appendFileSync(trace, `create\t${options.worktree}\n`);
+      const identity = { sessionId: "large-admission-episode", sessionFile: join(dir, "episode.jsonl") };
+      writeFileSync(identity.sessionFile, JSON.stringify({ type: "session", id: identity.sessionId, cwd: options.worktree }) + "\n");
+      await options.onAllocated?.(identity);
+      return { ...identity, activeSessionId: "large-admission-route" };
+    },
+    async deliverExecute(route, prompt) {
+      calls.push(["execute", route]);
+      appendFileSync(trace, `execute\t${route}\n`);
+      assert.ok(prompt.includes(taskId));
+      assert.ok(prompt.includes("<provider-task-observation>"));
+      assert.ok(!prompt.includes(tail), "execute gets a compact reference rather than the task body");
+    },
+    close() {},
+  };
+  // Do not inject a runner, resolver, ownership store, admission, or allocation adapter.
+  const result = await createTaskEpisode(taskId, "large-admission-call", ctx, { publisher }, { engine: "local" });
+  assert.equal(result.status, "active");
+  assert.equal(result.taskId, taskId);
+  assert.equal(result.head, codeHead);
+  assert.deepEqual(result.currentTask, { id: taskId, path: planned.path, status: "In Progress" });
+  assert.equal(result.taskEvidence.kind, "backlog-git");
+  assert.equal(result.taskEvidence.repository.topology, "independent");
+  assert.equal(result.taskEvidence.commit, result.providerRevision);
+  assert.equal(result.taskEvidence.path, planned.path.replace(/^\.backlog\//, ""));
+  assert.equal(result.taskEvidence.task, undefined);
+  const episodeView = JSON.parse(execFileSync(BACKLOG, ["task", "view", "--json", "--", taskId], {
+    cwd: result.worktree, encoding: "utf8", maxBuffer: 2 * 1024 * 1024,
+  })).task;
+  assert.ok(episodeView.implementationNotes === planned.implementationNotes, "full native notes must survive admission");
+  assertOversizedHeader(result.worktree);
+  const checkpoints = readFileSync(trace, "utf8").trimEnd().split("\n");
+  const edited = checkpoints.indexOf(`edit\t${root}`);
+  const episodeRead = checkpoints.indexOf(`view\t${result.worktree}`);
+  const created = checkpoints.indexOf(`create\t${result.worktree}`);
+  const executed = checkpoints.indexOf("execute\tlarge-admission-route");
+  assert.equal(checkpoints.filter((entry) => entry.startsWith("edit\t")).length, 1);
+  assert.ok(edited > 0 && checkpoints.slice(0, edited).includes(`view\t${root}`));
+  assert.ok(episodeRead > edited && checkpoints.slice(edited + 1, episodeRead).includes(`view\t${root}`));
+  assert.ok(created > episodeRead && executed > created);
+  assert.ok(checkpoints.slice(executed + 1).includes(`view\t${root}`));
+  assert.notEqual(result.providerRevision, plannedTaskHead);
+  assert.equal(result.providerRevision, git(remote, "rev-parse", TASK_HISTORY_REF));
+  assert.equal(result.providerRevision, git(join(result.worktree, ".backlog"), "rev-parse", "HEAD"));
+  assert.equal(readEpisodeOwnership(root, owner)?.status, "active");
+  assert.deepEqual(calls, [["create", result.worktree], ["execute", "large-admission-route"]]);
+
+});
+
 test("independent Backlog admission preserves unrelated dirty work and an unpublished feature code base with separate task history", async (t) => {
   if (!existsSync(BACKLOG)) { t.skip("managed backlog executable unavailable"); return; }
+  usePinnedBacklogOnPath(t);
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-independent-admission-")));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const root = join(dir, "repo");
@@ -267,9 +408,17 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   assert.deepEqual(readFileSync(join(result.worktree, "code.txt")), execFileSync("git", ["show", `${codeHead}:code.txt`], { cwd: root }));
   assert.equal(result.providerRevision, publishedTaskHead);
   assert.equal(result.providerRevision, interleavedAdvance.publishedHead);
-  assert.equal(result.taskEvidence.task.id, taskId);
-  assert.equal(result.taskEvidence.task.status, "In Progress");
-  assert.match(result.taskEvidence.task.implementationNotes, /compatible pre-session observation marker/);
+  assert.deepEqual(result.currentTask, { id: taskId, path: task.path, status: "In Progress" });
+  assert.equal(result.taskEvidence.kind, "backlog-git");
+  assert.equal(result.taskEvidence.repository.topology, "independent");
+  assert.equal(result.taskEvidence.commit, publishedTaskHead);
+  assert.equal(result.taskEvidence.path, task.path.replace(/^\.backlog\//, ""));
+  assert.equal(reservedTaskEvidence.kind, "backlog-git");
+  assert.equal(reservedTaskEvidence.commit, reservedProviderRevision);
+  assert.equal(reservedTaskEvidence.path, result.taskEvidence.path);
+  assert.deepEqual(reservedTaskEvidence.repository, result.taskEvidence.repository);
+  assert.deepEqual(records.get("independent-owner").taskEvidence, result.taskEvidence);
+  assert.match(preSessionView.implementationNotes, /compatible pre-session observation marker/);
   assert.equal(preSessionView.id, taskId);
   assert.equal(preSessionView.status, "In Progress");
   assert.equal(delivered, 1);
@@ -428,7 +577,7 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
       ownership, reservationOperationId: "independent-operation-2", now: () => "2026-10-26T20:02:00.000Z",
       allocateTaskEpisode: async () => { throw new Error("fixture allocation failure"); },
     }, { engine: "local" }),
-    /fixture allocation failure.*Native admission result:.*Current ownership:/,
+    /Independent Backlog creation failed after task publication.*fixture allocation failure.*do not replay/,
   );
   assert.equal(view(root, secondTaskId).status, "In Progress");
   const retainedOwner = structuredClone(records.get("independent-owner-2"));
@@ -448,7 +597,9 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   assert.equal(blockedOwner.integrationBranch, integrationBranch);
   assert.equal(blockedOwner.baseRef, codeHead);
   assert.notEqual(blockedOwner.providerRevision, git(prepared.storeDir, "rev-parse", "HEAD"));
-  assert.equal(blockedOwner.taskEvidence.task.status, "In Progress");
+  assert.equal(blockedOwner.taskEvidence.kind, "backlog-git");
+  assert.equal(blockedOwner.taskEvidence.commit, blockedOwner.providerRevision);
+  assert.equal(blockedOwner.taskEvidence.path, secondTask.path.replace(/^\.backlog\//, ""));
   assert.equal(view(root, secondTaskId).status, "Blocked");
   assert.equal(git(root, "rev-parse", "HEAD"), codeHead);
 });

@@ -29,6 +29,7 @@
  * and task-data migration remain later slices.
  */
 
+import { spawn } from "node:child_process";
 import { appendFileSync, chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -45,6 +46,8 @@ import {
   type ProviderTaskResolution,
 } from "./task-providers.ts";
 import { isBacklogTaskEpisodeOwnership, readAllEpisodeOwnership } from "./episode-ownership.ts";
+import { referenceCommittedBacklogTask, type BacklogGitEvidence } from "./backlog-git-evidence.ts";
+import { readBacklogCreationIdentity } from "./backlog-creation-identity.ts";
 
 /** The disconnected task-history branch Prime Claw manages. */
 export const TASK_HISTORY_REF = "refs/heads/prime-claw/tasks";
@@ -3009,6 +3012,111 @@ export function inspectPublishedPrimaryTaskHistory(
   return { status: "ready", storeDir: clone.storeDir, head };
 }
 
+function validNativeTaskEdits(input: EpisodeTaskHistoryMutationInput): boolean {
+  return input.taskId.trim() !== "" && input.edits.length > 0 && input.edits.every(({ option }) =>
+    /^--?[A-Za-z][A-Za-z-]*$/.test(option) && option !== "--help" && option !== "-h" && option !== "--plain");
+}
+
+function nativeTaskEditArgs(input: EpisodeTaskHistoryMutationInput): string[] {
+  const options = input.edits.flatMap(({ option, value }) => value === undefined ? [option] : [option, value]);
+  return ["task", "edit", ...options, "--plain", "--", input.taskId];
+}
+
+function selectedPathPending(clone: MutationClone, pathspec: string, runner: CommandRunner): CommandResult {
+  return runGit(runner, clone.storeDir, ["diff", "--quiet", "HEAD", "--", pathspec]);
+}
+
+function commitSelectedTaskPath(
+  clone: MutationClone, input: EpisodeTaskHistoryMutationInput, pathspec: string, runner: CommandRunner,
+): CommandResult {
+  // --only leaves all other paths untouched, including unrelated index entries.
+  return runGit(runner, clone.storeDir, ["commit", "--only", "-m", input.commitMessage ?? `prime-claw: update ${input.taskId}`, "--", pathspec]);
+}
+
+function pushTaskHistoryHead(clone: MutationClone, head: string, runner: CommandRunner): CommandResult {
+  return runGit(runner, clone.storeDir, ["push", "--porcelain", clone.remote, `${head}:${TASK_HISTORY_REF}`]);
+}
+
+async function editBacklogForCreation(clone: MutationClone, args: string[], runner?: CommandRunner): Promise<number | null> {
+  if (runner && !(runner instanceof ProcessCommandRunner)) {
+    return runner.run("backlog", args, { cwd: clone.targetWorktree, allowFailure: true }).status;
+  }
+  // Backlog's human-readable result may include task content. Only the native
+  // process outcome is needed; do not buffer or persist either output stream.
+  return new Promise((resolveStatus, reject) => {
+    const child = spawn("backlog", args, { cwd: clone.targetWorktree, stdio: "ignore" });
+    child.once("error", () => reject(new Error("native Backlog status edit could not start")));
+    child.once("close", resolveStatus);
+  });
+}
+
+/** One native creation-status edit, exact-path Git commit and non-force push.
+ * Keep only identity facts and an immutable Git reference, never a ticket
+ * snapshot or textual diff. This seam does not reconcile or retry.
+ */
+export async function publishBacklogCreationHistory(
+  input: EpisodeTaskHistoryMutationInput & { taskPath: string },
+): Promise<{ taskId: string; taskPath: string; publishedHead: string; taskEvidence: BacklogGitEvidence }> {
+  const runner = input.runner ?? new ProcessCommandRunner();
+  let stage = "before native edit";
+  try {
+    const statusEdits = input.edits.filter(({ option }) => option === "--status" || option === "-s");
+    const expectedStatus = statusEdits[0]?.value;
+    if (!validNativeTaskEdits(input) || statusEdits.length !== 1 || !expectedStatus?.trim()) {
+      throw new Error("creation publication requires one exact native status edit");
+    }
+    const clone = inspectMutationClone(input, runner);
+    if ("status" in clone) throw new Error(`${clone.code}: ${clone.detail}`);
+    if (!refHead(runner, clone.storeDir, "HEAD")) throw new Error("task-history HEAD is unavailable");
+
+    const readExactTask = async () => {
+      const identity = await readBacklogCreationIdentity(clone.targetWorktree, input.taskId);
+      if (identity.id !== input.taskId || identity.path !== input.taskPath) {
+        throw new Error("native task ID or path does not match the selected task");
+      }
+      const file = proveNativeTaskFileIdentity(clone.targetWorktree, clone.storeDir, identity.path, runner);
+      if (file.status === "blocked") throw new Error(`unsafe native task path: ${file.detail}`);
+      return { ...identity, storePath: file.storePath };
+    };
+    const before = await readExactTask();
+    stage = "native edit attempted; no commit or push attempted by this operation";
+    const status = await editBacklogForCreation(clone, nativeTaskEditArgs(input), input.runner);
+    if (status !== 0) throw new Error(`native Backlog status edit ${status === null ? "was interrupted" : `failed (exit ${status})`}`);
+    const after = await readExactTask();
+    if (after.storePath !== before.storePath || after.status !== expectedStatus) {
+      throw new Error("post-edit task path or status does not match the requested mutation");
+    }
+
+    const pathspec = `:(literal)${before.storePath}`;
+    const pending = selectedPathPending(clone, pathspec, runner);
+    if (pending.status !== 0 && pending.status !== 1) throw new Error(`exact-path comparison failed (exit ${pending.status})`);
+    if (pending.status === 1) {
+      stage = "exact-path commit attempted; no push attempted";
+      const commit = commitSelectedTaskPath(clone, input, pathspec, runner);
+      if (commit.status !== 0) throw new Error(`ordinary exact-path commit failed (exit ${commit.status})`);
+    }
+    const publishedHead = refHead(runner, clone.storeDir, "HEAD");
+    if (!publishedHead) throw new Error("committed task-history HEAD is unavailable");
+    const taskEvidence = referenceCommittedBacklogTask(
+      { root: clone.storeDir, remote: clone.remote, topology: "independent" }, publishedHead, before.storePath,
+    );
+    stage = `non-force push of ${publishedHead} attempted; inspect publication before retrying`;
+    const push = pushTaskHistoryHead(clone, publishedHead, runner);
+    if (push.status !== 0) throw new Error(`ordinary non-force push failed (exit ${push.status})`);
+    const direct = readDirectTaskHead(clone.primaryRoot, clone.remote, clone.remoteUrl, runner);
+    if (direct.status !== "found" || direct.head !== publishedHead
+        || refHead(runner, clone.storeDir, "HEAD") !== publishedHead) {
+      throw new Error("exact local and direct remote task publication could not be verified");
+    }
+    return { taskId: input.taskId, taskPath: input.taskPath, publishedHead, taskEvidence };
+  } catch (error) {
+    // Native errors must not carry stdout, stderr, or ticket snapshots into the
+    // creation result. Bound path/targeting diagnostics as well.
+    const detail = (error instanceof Error ? error.message : "unavailable result").slice(0, 512);
+    throw new Error(`Backlog creation publication failed (${stage}): ${detail}`);
+  }
+}
+
 /**
  * Publish the selected task through native Backlog, an exact-path ordinary Git
  * commit, and one non-force push. Reconciliation and lifecycle decisions belong
@@ -3016,8 +3124,7 @@ export function inspectPublishedPrimaryTaskHistory(
  */
 export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInput): EpisodeTaskHistoryMutation {
   const runner = input.runner ?? new ProcessCommandRunner();
-  const validEdits = input.edits.length > 0 && input.edits.every(({ option }) => /^--?[A-Za-z][A-Za-z-]*$/.test(option) && option !== "--help" && option !== "-h" && option !== "--plain");
-  if (input.taskId.trim() === "" || !validEdits) {
+  if (!validNativeTaskEdits(input)) {
     return mutationBlocked(
       input.taskId,
       "invalid-mutation",
@@ -3055,8 +3162,7 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
   const taskPathspec = `:(literal)${storeTaskPath}`;
   const taskEvidence = { ...evidence, taskPath: before.path, nativeBefore: before.raw };
 
-  const nativeEditArgs = input.edits.flatMap(({ option, value }) => value === undefined ? [option] : [option, value]);
-  const nativeEdit = runner.run("backlog", ["task", "edit", ...nativeEditArgs, "--plain", "--", input.taskId], { cwd: clone.targetWorktree, allowFailure: true });
+  const nativeEdit = runner.run("backlog", nativeTaskEditArgs(input), { cwd: clone.targetWorktree, allowFailure: true });
   // Reread even a failed edit so partial native changes remain visible. No
   // cleanup, reset, or retry removes the provider's own failure evidence.
   const after = readNativeTask(clone.targetWorktree, input.taskId, runner);
@@ -3078,13 +3184,13 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
 
   // Native Backlog may already have committed this exact edit. An unchanged
   // path needs no duplicate/empty commit; it is not a workflow refusal.
-  const pending = runGit(runner, clone.storeDir, ["diff", "--quiet", "HEAD", "--", taskPathspec]);
+  const pending = selectedPathPending(clone, taskPathspec, runner);
   if (pending.status !== 0 && pending.status !== 1) {
     return mutationBlocked(input.taskId, "commit-failed", `reading the exact path for commit failed: ${pending.stderr.trim() || pending.stdout.trim() || `exit ${pending.status}`}`, "retain the local task change and inspect the native Git result; no push or retry was attempted", editedEvidence);
   }
   // --only takes this path's working-tree content directly. It neither stages
   // nor commits any other path, including existing unrelated index entries.
-  const commit = pending.status === 0 ? null : runGit(runner, clone.storeDir, ["commit", "--only", "-m", input.commitMessage ?? `prime-claw: update ${input.taskId}`, "--", taskPathspec]);
+  const commit = pending.status === 0 ? null : commitSelectedTaskPath(clone, input, taskPathspec, runner);
   if (commit && commit.status !== 0) {
     return mutationBlocked(input.taskId, "commit-failed", `ordinary exact-path Git commit failed: ${commit.stderr.trim() || commit.stdout.trim() || `exit ${commit.status}`}`, "retain the local task change and inspect Git identity/hooks; no push or retry was attempted", { ...editedEvidence, commit, localHead: refHead(runner, clone.storeDir, "HEAD") ?? undefined });
   }
@@ -3092,7 +3198,7 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
   if (!committedHead) {
     return mutationBlocked(input.taskId, "unreadable", "the exact committed task-history HEAD could not be read", "retain the local commit and inspect native Git evidence; no push was attempted", { ...editedEvidence, commit });
   }
-  const push = runGit(runner, clone.storeDir, ["push", "--porcelain", clone.remote, `${committedHead}:${TASK_HISTORY_REF}`]);
+  const push = pushTaskHistoryHead(clone, committedHead, runner);
   const localHead = refHead(runner, clone.storeDir, "HEAD");
   const remoteRead = runGit(runner, clone.storeDir, ["ls-remote", "--heads", clone.remoteUrl, TASK_HISTORY_REF]);
   const remoteLines = remoteRead.stdout.trim().split(/\r?\n/).filter(Boolean);

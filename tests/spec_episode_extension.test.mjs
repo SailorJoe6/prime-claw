@@ -2872,7 +2872,7 @@ test("independent Backlog admission preserves a concurrent published code advanc
   const run = f.runner.run.bind(f.runner);
   let changedBase, allocations = 0;
   f.runner.run = (command, args, options) => {
-    if (!changedBase && command === "git" && args[0] === "ls-files" && args.includes("--error-unmatch") && args.at(-1) === f.task.path) {
+    if (!changedBase && command === "git" && args.includes("ls-files") && args.includes("--error-unmatch") && args.at(-1) === f.task.path) {
       // A concurrent actor moves and publishes the integration branch after the
       // caller's last pre-publication check but before the publisher captures HEAD.
       f.git(f.root, "commit", "--allow-empty", "-qm", "concurrent published code base");
@@ -2903,24 +2903,23 @@ test("independent Backlog admission never pushes another actor's local code or c
   let actorSnapshot, codePushes = 0, allocations = 0;
   const realPush = f.dependencies.admissionGit.push.bind(f.dependencies.admissionGit);
   f.dependencies.admissionGit.push = (root) => { codePushes += 1; return realPush(root); };
+  const run = f.runner.run.bind(f.runner);
+  f.runner.run = (command, args, options) => {
+    const result = run(command, args, options);
+    if (!actorSnapshot && command === "git" && args.includes("push") && args.at(-1)?.endsWith(`:${TASK_HISTORY_REF}`)) {
+      assert.equal(result.status, 0);
+      publications.push({ status: f.view().status, head: f.remoteHead(TASK_HISTORY_REF) });
+      writeFileSync(join(f.root, "code.txt"), "concurrent actor's unpublished code\n");
+      f.git(f.root, "add", "code.txt");
+      f.git(f.root, "commit", "-qm", "concurrent actor's local code commit");
+      actorSnapshot = f.codeSnapshot();
+      assert.notEqual(actorSnapshot.head, before.head);
+      assert.equal(actorSnapshot.remoteMain, before.remoteMain);
+    }
+    return result;
+  };
   await assert.rejects(createTaskEpisode(f.taskId, "head-drift-rollback", f.ctx, {
     ...f.dependencies,
-    publishTaskHistory(input) {
-      const publication = publishTaskHistoryMutation(input);
-      assert.equal(publication.status, "published");
-      publications.push({ status: JSON.parse(publication.nativeAfter).task.status, head: publication.publishedHead });
-      if (!actorSnapshot && input.edits.some(edit => edit.option === "--status" && edit.value === "In Progress")) {
-        // A different actor commits code after actual task publication but before
-        // the publisher's HEAD check returns the independent admission result.
-        writeFileSync(join(f.root, "code.txt"), "concurrent actor's unpublished code\n");
-        f.git(f.root, "add", "code.txt");
-        f.git(f.root, "commit", "-qm", "concurrent actor's local code commit");
-        actorSnapshot = f.codeSnapshot();
-        assert.notEqual(actorSnapshot.head, before.head);
-        assert.equal(actorSnapshot.remoteMain, before.remoteMain);
-      }
-      return publication;
-    },
     allocateTaskEpisode: async () => { allocations += 1; throw new Error("observed requested allocation"); },
   }, { engine: "local" }), /observed requested allocation/);
   assert.ok(actorSnapshot, "exercise the concurrent code advance after exact task publication");
@@ -2972,8 +2971,10 @@ test("session binding failure retains uncertain resources and permits owner-requ
   await assert.rejects(createTaskEpisode(f.taskId, "binding-failure", f.ctx, dependencies, { engine: "local" }),
     /session binding outcome unknown/);
   assert.equal(f.view().status, "In Progress", "an allocation exception must not choose a second native status");
-  assert.equal(f.record.taskEvidence.task.status, "In Progress");
   const taskAfterAdmission = f.git(f.store, "rev-parse", "HEAD");
+  const admissionEvidence = structuredClone(f.record.taskEvidence);
+  assert.equal(admissionEvidence.kind, "backlog-git");
+  assert.equal(admissionEvidence.commit, taskAfterAdmission);
   const blocked = commitConversationTaskStatus({ ...f.statusOptions, status: "Blocked", note: "Owner-requested blocker: session binding outcome unknown", message: "record actual blocker" });
   assert.equal(blocked.taskHistory.status, "published");
   assert.equal(f.view().status, "Blocked");
@@ -2984,7 +2985,7 @@ test("session binding failure retains uncertain resources and permits owner-requ
   for (const key of ["worktree", "branch", "head", "episodeId", "episodeSessionFile"]) assert.equal(f.record[key], allocatedRecord[key]);
   assert.equal(f.record.providerRevision, taskAfterAdmission);
   assert.notEqual(f.record.providerRevision, f.remoteHead(TASK_HISTORY_REF));
-  assert.equal(f.record.taskEvidence.task.status, "In Progress", "owner publication alone does not silently advance runtime observations");
+  assert.deepEqual(f.record.taskEvidence, admissionEvidence, "owner publication alone does not silently advance runtime observations");
   assert.deepEqual(f.diskRecord(), f.record, "retain the exact uncertain binding and truthful Blocked publication on disk");
   assert.equal(f.git(f.root, "status", "--porcelain", "--", ".prime-claw/ownership.json"), "M .prime-claw/ownership.json");
   assert.ok(existsSync(f.record.worktree)); assert.ok(existsSync(allocatedSession.sessionFile));

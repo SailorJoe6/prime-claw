@@ -1,3 +1,5 @@
+import { readBacklogCreationIdentity, type BacklogCreationIdentity } from "./backlog-creation-identity.ts";
+import { referenceCommittedBacklogTask } from "./backlog-git-evidence.ts";
 import {
   cpSync,
   existsSync,
@@ -29,7 +31,7 @@ import {
   parseEpisodeOwnership,
   readEpisodeOwnership,
   removeTaskEpisodeOwnership,
-  withEpisodeAdmissionLock,
+  withStreamedEpisodeAdmissionLock,
   writeEpisodeOwnership,
   type BacklogTaskEpisodeOwnershipRecord,
   type BeadsTaskEpisodeOwnershipRecord,
@@ -71,6 +73,7 @@ import {
   observePrimaryTaskHistory,
   prepareEpisodeTaskHistoryWorkspace,
   publishTaskHistoryMutation,
+  publishBacklogCreationHistory,
   resolveSynchronizedProviderTask,
   type EpisodeTaskHistoryMutation,
 } from "./task-history-workspace.ts";
@@ -81,6 +84,7 @@ import {
   meaningfulTaskImplementationPlan,
   reservePublishedBeadsTaskEpisodeOwnership,
   reservePublishedBacklogTaskEpisodeOwnership,
+  reserveStreamedBacklogTaskEpisodeOwnership,
   reserveTaskEpisodeOwnership,
   resolveLegacyTaskOwnershipTransitionTarget,
   transitionLegacyEpisodeOwnershipToTask,
@@ -296,7 +300,7 @@ export type TaskEpisodeCreationResult = TaskEpisodeResult & {
   admissionPushError?: string;
   /** Native mutation/push results; a successful push is not exact-task publication proof. */
   beadsTaskMutation?: PublishedBeadsTaskMutation;
-  currentTask?: ProviderTaskResolution | BacklogTaskSelection;
+  currentTask?: ProviderTaskResolution | BacklogTaskSelection | BacklogCreationIdentity;
 };
 
 export interface TaskEpisodeAllocationDependencies extends EpisodeDependencies {
@@ -2301,13 +2305,13 @@ export async function handoffTaskEpisode(
  * Keep Beads admission results and fresh native reads in the prompt only; its
  * local HEAD and working-set observations do not prove exact-task publication.
  */
-function prepareTaskEpisodeWorkspace(
+async function prepareTaskEpisodeWorkspace(
   record: TaskEpisodeOwnershipRecord,
   repo: string,
   dependencies: TaskEpisodeAllocationDependencies,
   store: EpisodeOwnershipStore,
   beadsTaskMutation?: PublishedBeadsTaskMutation,
-): { record: TaskEpisodeOwnershipRecord; providerTaskObservation?: string } {
+): Promise<{ record: TaskEpisodeOwnershipRecord; providerTaskObservation?: string }> {
   if (isBeadsTaskEpisodeOwnership(record)) {
     const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
     const preparation = (dependencies.beadsTransport ?? prepareBeadsWorkspaceTransport)(record.worktree!, runner);
@@ -2338,6 +2342,36 @@ function prepareTaskEpisodeWorkspace(
   if (prepared.status !== "prepared") {
     throw new EpisodeStateUncertainError(`Independent Backlog Episode task checkout was not prepared before session start: ${prepared.code}: ${prepared.detail}`);
   }
+  if (record.taskEvidence.kind === "backlog-git") {
+    const selected = await readBacklogCreationIdentity(record.worktree!, record.taskId);
+    if (selected.path !== record.taskPath) throw new EpisodeStateUncertainError("Independent Backlog Episode workspace resolved a different reserved task path");
+    const storePath = relative(prepared.storeDir, resolve(record.worktree!, selected.path)).split("\\").join("/");
+    const evidence = referenceCommittedBacklogTask({ root: prepared.storeDir, topology: "independent", remote: prepared.remote }, prepared.head, storePath);
+    const previous = record.taskEvidence;
+    const previousRepository = previous.repository as typeof evidence.repository | undefined;
+    if (previous.commit !== record.providerRevision || previous.path !== evidence.path
+        || previousRepository?.topology !== evidence.repository.topology || previousRepository?.identity !== evidence.repository.identity) {
+      throw new EpisodeStateUncertainError("Independent Backlog Episode workspace does not match the reserved evidence repository/path");
+    }
+    const unchanged = runner.run("git", ["--literal-pathspecs", "--no-optional-locks", "status", "--porcelain", "--", storePath],
+      { cwd: prepared.storeDir, allowFailure: true });
+    if (unchanged.status !== 0 || unchanged.stdout !== "") {
+      throw new EpisodeStateUncertainError("Independent Backlog Episode selected task differs from the committed workspace before session start");
+    }
+    const advanced = updated(record, {
+      providerRevision: prepared.head, taskEvidence: { ...evidence },
+      updatedAt: dependencies.now?.() ?? new Date().toISOString(),
+    });
+    store.write(repo, advanced);
+    if (JSON.stringify(store.read(repo, record.ownerSessionId)) !== JSON.stringify(advanced)) {
+      throw new EpisodeStateUncertainError("Independent Backlog Episode could not verify the current Git evidence before session start");
+    }
+    return { record: advanced, providerTaskObservation: JSON.stringify({
+      previousProviderRevision: record.providerRevision, publishedProviderRevision: prepared.head,
+      previousTaskEvidence: previous, currentTaskEvidence: evidence,
+    }) };
+  }
+  // Keep the existing recovery behavior for reservations from earlier generations.
   const current = runner.run("backlog", ["task", "view", "--json", "--", record.taskId], {
     cwd: record.worktree!, allowFailure: true,
   });
@@ -2385,7 +2419,7 @@ async function startTaskEpisodeInOrcaWorktree(
   try {
     const git = dependencies.git ?? new CliGitAdapter();
     taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
-    const preparedWorkspace = prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
+    const preparedWorkspace = await prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
     record = preparedWorkspace.record;
     let executePrompt = canonicalWorkflowPrompt(worktree.path, "execute", {
       location: { tag: "operator-episode-task", value: record.taskId },
@@ -2606,7 +2640,7 @@ export async function allocateReservedTaskEpisode(
       git.createWorktree(repo, branch, worktree, record.baseRef);
       if (git.head(worktree) !== record.baseRef) throw new EpisodeStateUncertainError("Local task-native Episode did not start at the reserved code head");
       taskIntegrationBranch(git, repo, effectiveTaskEpisodeIntegrationBranch(record));
-      const preparedWorkspace = prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
+      const preparedWorkspace = await prepareTaskEpisodeWorkspace(record, repo, dependencies, store, beadsTaskMutation);
       record = preparedWorkspace.record;
       let executePrompt = canonicalWorkflowPrompt(worktree, "execute", {
         location: { tag: "operator-episode-task", value: record.taskId },
@@ -3130,7 +3164,7 @@ async function createBeadsTaskEpisode(
       throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
     }
 
-    const admission = withEpisodeAdmissionLock(projectRoot, () => {
+    const admission = await withStreamedEpisodeAdmissionLock(projectRoot, () => {
       exactBeadsAdmissionTask(
         resolveProvider(projectRoot, taskId, runner), taskId, projectRoot,
       );
@@ -3205,6 +3239,72 @@ async function createBeadsTaskEpisode(
   }
 }
 
+function hasIndependentBacklogStore(provider: ReturnType<typeof detectTaskProvider>): boolean {
+  if (provider.kind !== "selected" || provider.evidence.provider !== "backlog") return false;
+  try { return lstatSync(join(provider.evidence.storeDir, ".git")).isDirectory(); }
+  catch { return false; }
+}
+
+async function admitIndependentBacklogCreation(
+  projectRoot: string, integrationBranch: string, taskId: string, ctx: ExtensionContext,
+  options: TaskEpisodeAdmissionOptions, dependencies: TaskEpisodeCreationDependencies,
+  runner: CommandRunner, git: TaskEpisodeAdmissionGit, store: EpisodeOwnershipStore,
+): Promise<TaskEpisodeCreationResult> {
+  const ownerSessionId = ctx.sessionManager.getSessionId();
+  const requireUnowned = () => {
+    const existing = store.read(projectRoot, ownerSessionId);
+    if (existing && existing.status !== "inactive") throw new Error("Non-terminal Episode ownership already exists; inspect it instead of creating another Episode");
+  };
+  const selected = await readBacklogCreationIdentity(projectRoot, taskId);
+  requireUnowned();
+  let published: Awaited<ReturnType<typeof publishBacklogCreationHistory>> | undefined;
+  try {
+    const reservation = await withStreamedEpisodeAdmissionLock(projectRoot, async () => {
+      requireUnowned();
+      taskIntegrationBranch(git, projectRoot, integrationBranch);
+      if (!hasIndependentBacklogStore(detectTaskProvider(projectRoot, runner))) throw new Error("Independent Backlog topology changed before admission");
+      const tracked = runner.run("git", ["--literal-pathspecs", "ls-files", "--error-unmatch", "--", selected.path],
+        { cwd: projectRoot, allowFailure: true });
+      if (tracked.status !== 1) throw new Error("Independent Backlog creation requires a task path outside the code index");
+      const baseRef = git.head(projectRoot);
+      published = await publishBacklogCreationHistory({
+        primaryRoot: projectRoot, targetWorktree: projectRoot, taskId, taskPath: selected.path,
+        edits: [{ option: "--status", value: "In Progress" }], commitMessage: `chore: admit ${taskId} episode`, runner,
+      });
+      taskIntegrationBranch(git, projectRoot, integrationBranch);
+      return reserveStreamedBacklogTaskEpisodeOwnership({
+        projectRoot, publication: published, ownerSessionId, engine: options.engine, baseRef, integrationBranch,
+        ...(options.projectSetupId ? { projectSetupId: options.projectSetupId } : {}),
+        ...(options.routingEnvironmentId ? { routingEnvironmentId: options.routingEnvironmentId } : {}),
+        ...(dependencies.reservationOperationId ? { operationId: dependencies.reservationOperationId } : {}),
+      }, { git, now: dependencies.now, ownership: {
+        read: (root, owner) => store.read(root, owner),
+        write: (root, record) => {
+          taskIntegrationBranch(git, projectRoot, integrationBranch);
+          store.write(root, record);
+        },
+      } });
+    });
+    taskIntegrationBranch(git, projectRoot, integrationBranch);
+    const result = await (dependencies.allocateTaskEpisode ?? allocateReservedTaskEpisode)(taskId, ctx, dependencies);
+    const stored = store.read(projectRoot, ownerSessionId);
+    if (!stored) throw new Error("Independent Backlog allocation returned without durable ownership");
+    const active = parseEpisodeOwnership(stored, "independent Backlog admission result");
+    exactOwnedTaskRecord(active, taskId, ownerSessionId);
+    if (!isPublishedBacklogTaskEpisodeOwnership(active) || active.status !== "active" || active.baseRef !== reservation.baseRef
+        || active.operationId !== reservation.operationId || active.integrationBranch !== integrationBranch || active.taskPath !== selected.path) {
+      throw new Error("Independent Backlog allocation returned without the exact active reservation identity");
+    }
+    taskIntegrationBranch(git, projectRoot, integrationBranch);
+    const currentTask = await readBacklogCreationIdentity(projectRoot, taskId);
+    if (currentTask.path !== selected.path) throw new Error("Independent Backlog task path changed after allocation");
+    return { ...active, reused: result.reused, currentTask };
+  } catch (error) {
+    if (!published) throw error;
+    throw new Error(`Independent Backlog creation failed after task publication at ${published.publishedHead}: ${taskAdmissionError(error)}. Inspect the same owner/operation; do not replay.`);
+  }
+}
+
 export async function createTaskEpisode(
   rawTaskId: string,
   _toolCallId: string,
@@ -3260,6 +3360,9 @@ export async function createTaskEpisode(
       throw new Error("Task-native local admission cannot carry Orca placement identity");
     }
 
+    if (hasIndependentBacklogStore(provider)) {
+      return await admitIndependentBacklogCreation(projectRoot, integrationBranch, taskId, ctx, options, dependencies, runner, git, store);
+    }
     const selected = resolveTask(projectRoot, taskId);
     if (!selected || selected.taskId !== taskId) {
       throw new Error("Task-native Episode creation requires the exact canonical Backlog task ID");
@@ -3272,7 +3375,7 @@ export async function createTaskEpisode(
       throw new Error(`Non-terminal Episode ownership already exists for ${identity}; inspect it instead of creating another Episode`);
     }
 
-    const admission = withEpisodeAdmissionLock(projectRoot, () => {
+    const admission = await withStreamedEpisodeAdmissionLock(projectRoot, () => {
       exactAdmissionTask(resolveTask(projectRoot, taskId), taskId, projectRoot, taskPath);
       const lockedExisting = store.read(projectRoot, ctx.sessionManager.getSessionId());
       if (lockedExisting && lockedExisting.status !== "inactive") {
