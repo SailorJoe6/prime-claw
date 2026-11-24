@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T04:54:00Z'
+updated_date: '2026-11-24T05:06:00Z'
 labels: []
 dependencies: []
 references:
@@ -20,6 +20,14 @@ modified_files:
   - src/prime-agent-plugin/asset-inventory.json
   - src/prime-agent-plugin/extension-support/backlog-git-evidence.ts
   - tests/task_history_workspace.test.mjs
+  - src/prime-agent-plugin/extension-support/backlog-creation-identity.ts
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - src/prime-agent-plugin/extension-support/task-episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/task-history-workspace.ts
+  - tests/backlog_creation_identity.test.mjs
+  - tests/spec_episode_extension.test.mjs
+  - tests/task_episode_admission_extension.test.mjs
 priority: p0
 type: bug
 ordinal: 153000
@@ -78,6 +86,8 @@ Slice 1 reader revision (plan step 1 only): the exact committed header goes thro
 Accepted next slice (plan step 2 only): accept the two reviewed reader fixes at 2fe3e9c4 for the tested cases. Advance independent Backlog creation at pre-allocation and pre-session, with exactly one initial execute on the same operation. Prove the production path offline in Docker with a committed fixture whose native JSON exceeds 1 MiB. No larger buffer, full JSON snapshot prerequisite, copied ticket evidence, deterministic readiness, or new persistent state. Before wiring the reader as a prerequisite, verify that the 64 KiB frontmatter limit and scratch parser do not impose an unsupported refusal or replacement store for valid native tickets; prefer existing exact native/Git facts. If a material criterion cannot be met within the plan boundaries, stop with the evidence. Leave branch-local lifecycle wiring, continuation, Beads, original TASK-2, activation and merge untouched. Publish task notes and code separately and stop after this slice.
 
 Plan step 2 stopped before implementation (creation portion of AC1/AC2/AC4). Offline Docker, pinned Backlog 1.55.3 (0cf4fdbc), committed TASK-1 fixture: native view succeeded at 1,101,383 JSON bytes with the exact ID/path/status, but Node returned ENOBUFS with its default buffer and the production resolveBacklogTask rejected it. The same valid ticket placed its quoted ID after a 70 KiB YAML comment; makeBacklogGitEvidence refused it at the 64 KiB frontmatter limit. Native task list JSON returned ID/status but no file path; compact native edit output returned only the ID. Plain task view is a human-rendered full detail view, not a structured exact identity projection. Git can prove a path/blob but cannot prove the provider selected that canonical task from an ID by itself. Current creation uses full detail before allocation, inside status publication and reservation, and separately before session assignment. Did not wire the scratch reader, increase buffers, add persistence, or change code. Repro and result: .test-results/primeclaw-69-creation-native-compat/{fixture.sh,result.log}. Unblock by identifying a supported exact native ID/path/status observation without full task-detail JSON or a new ticket size rule, or obtain an explicit owner decision on a revised bounded transport approach. No end-to-end assignment proof and no acceptance criteria checked.
+
+Plan step 2 candidate (partial AC1/AC2/AC4), code 2fa5c80943eae6943891ee900213ff1bedb54f51: fresh independent Backlog creation streams native task-view JSON before allocation, around native status publication and reservation, and before session start in the Episode checkout. Only exact ID/path/status are retained for mechanical checks; new ownership and the initial execute observation contain Git references, not ticket snapshots. Existing reservation recovery stays compatible. No higher buffer, ticket size limit, scratch reader prerequisite, new persistent state, or deterministic readiness. Offline Docker with pinned Backlog 1.55.3 proved the production creation path with a committed native ticket yielding >1 MiB JSON and >64 KiB frontmatter, both checkpoints before session allocation, exact operation ownership, and one initial execute via the fixture session adapter. All 440 tests passed with no skips: .test-results/primeclaw-69-streamed-creation/docker-clean.log. Tier 1 source probe passed offline with verified teardown: .test-results/20261124T050034Z-28113-b8a224bb/tier1/manifest.json. No broader continuation, branch-local, or Beads evidence wiring, original TASK-2 action, AWS, merge or activation. No full acceptance criterion marked complete. Stop for owner review.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
