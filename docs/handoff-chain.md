@@ -410,11 +410,19 @@ A local-only reference does not imply publication or portability.
 
 The managed `readBacklogGitEvidence` helper takes the already selected
 repository and canonical task ID. It checks the commit and regular ticket
-blob and matches the ID from the native Backlog header. It returns up to
-4096 raw bytes at the requested byte offset, plus the total byte length.
-Advance by the returned byte count until the total is reached. Decode adjacent
-ranges with a streaming UTF-8 decoder if a character crosses a range boundary.
-No line length limit shortens the evidence.
+blob. It passes only the committed frontmatter (at most 64 KiB) to native
+Backlog in a private scratch directory, removes the directory, and compares
+the returned canonical ID exactly. The body is never passed to Backlog or
+copied into the scratch directory. If the closing delimiter is missing or
+outside the header limit, the reader reports an evidence gap.
+
+Use `streamBacklogGitEvidence` to inspect adjacent ranges. One Git blob
+process yields successive windows of up to 4096 raw bytes with their offsets
+and the total byte length. Exhaust the iterator to verify Git's exit status
+and the byte count; breaking early closes the process and is not a complete
+read. `readBacklogGitEvidence` is for a single offset, not a loop over adjacent
+windows. Use a streaming UTF-8 decoder if a character crosses a window
+boundary. Long lines in the body do not shorten the evidence.
 
 After validating each reference in the selected repository, use native Git
 for inspection and comparison. For example, pass the quoted `OID:path`

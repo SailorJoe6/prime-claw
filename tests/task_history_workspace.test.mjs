@@ -33,7 +33,7 @@ import {
   resolveLegacyTaskOwnershipTransitionTarget,
 } from "../src/prime-agent-plugin/extension-support/task-episode-ownership.ts";
 
-import { makeBacklogGitEvidence, readBacklogGitEvidence } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
+import { makeBacklogGitEvidence, readBacklogGitEvidence, streamBacklogGitEvidence } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
 
 const FULL_CANONICAL_CONFIG = [
   'project_name: "x"',
@@ -2105,7 +2105,7 @@ test("Backlog Git evidence reads exact independent history after branch advance,
   const { dir, root, remote } = fixtureRepo();
   try {
     const path = "tasks/task-1 - literal [ticket].md";
-    const prefix = Buffer.from("---\nid: TASK-1\ntitle: literal ticket\nstatus: In Progress\n---\n\n## Description\n\n");
+    const prefix = Buffer.from(`---\ntitle: literal ticket\n# ${"x".repeat(5000)}\nid: "TASK-1"\nassignee: [@example]\nstatus: In Progress\n---\n\n## Description\n\n`);
     const longLine = Buffer.from("é".repeat(540_001));
     const old = Buffer.concat([prefix, longLine, Buffer.from("\nOLD TAIL\n")]);
     const next = Buffer.concat([prefix, longLine, Buffer.from("\nNEW TAIL\n")]);
@@ -2129,6 +2129,27 @@ test("Backlog Git evidence reads exact independent history after branch advance,
         assert.deepEqual(bytes, expected.subarray(offset, offset + 4096));
       }
     }
+    const trace = join(dir, "git-stream.trace");
+    const priorTrace = process.env.GIT_TRACE;
+    process.env.GIT_TRACE = trace;
+    try {
+      for (const [ref, expected] of [[before, old], [after, next]]) {
+        let nextOffset = 0;
+        for await (const { bytes, offset, totalBytes } of streamBacklogGitEvidence(selected, ref, "TASK-1")) {
+          assert.equal(offset, nextOffset);
+          assert.equal(totalBytes, expected.length);
+          assert.equal(bytes.length, Math.min(4096, expected.length - offset));
+          assert.deepEqual(bytes, expected.subarray(offset, offset + bytes.length));
+          nextOffset += bytes.length;
+        }
+        assert.equal(nextOffset, expected.length);
+      }
+    } finally {
+      if (priorTrace === undefined) delete process.env.GIT_TRACE;
+      else process.env.GIT_TRACE = priorTrace;
+    }
+    assert.equal((readFileSync(trace, "utf8").match(/built-in: git cat-file blob /g) ?? []).length, 2,
+      "one blob process per complete ticket, not one per window");
     await assert.rejects(readBacklogGitEvidence(selected, before, "TASK-2"), /canonical task ID mismatch/);
     await assert.rejects(readBacklogGitEvidence(selected, { ...before, path: "tasks/missing.md" }, "TASK-1"), /exact regular ticket blob/);
     await assert.rejects(readBacklogGitEvidence(selected, { ...before, commit: "f".repeat(40) }, "TASK-1"), /commit unavailable/);
@@ -2146,12 +2167,16 @@ test("branch-local Git evidence binds the code commit and a regular literal tick
     const body = "---\r\nid: TASK-1\r\ntitle: test\r\n---\r\n\r\nbranch-local ticket\r\n";
     writeFileSync(join(root, path), body);
     symlinkSync("task-1.md", join(root, "backlog", "tasks", "link.md"));
+    writeFileSync(join(root, "backlog", "tasks", "wrong-id.md"),
+      '---\ntitle: wrong\nid: "TASK-2"\n---\n\nid: TASK-1\n');
     git(root, "add", "backlog");
     git(root, "commit", "-qm", "branch-local ticket");
     const commit = git(root, "rev-parse", "HEAD");
     const selected = { topology: "branch-local", root, remote: "origin" };
     const ref = await makeBacklogGitEvidence(selected, commit, path, "TASK-1");
     assert.equal((await readBacklogGitEvidence(selected, ref, "TASK-1")).bytes.toString(), body);
+    await assert.rejects(makeBacklogGitEvidence(selected, commit, "backlog/tasks/wrong-id.md", "TASK-1"),
+      /canonical task ID mismatch/);
     await assert.rejects(makeBacklogGitEvidence(selected, commit, "backlog/tasks/link.md", "TASK-1"), /exact regular ticket blob/);
     await assert.rejects(makeBacklogGitEvidence(selected, "HEAD", path, "TASK-1"), /full commit/);
     await assert.rejects(readBacklogGitEvidence({ ...selected, topology: "independent" }, ref, "TASK-1"), /repository mismatch/);

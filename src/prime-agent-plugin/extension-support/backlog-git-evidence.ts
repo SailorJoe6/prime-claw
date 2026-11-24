@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { realpathSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ProcessCommandRunner } from "./project-initialization.ts";
 
 /** Factual evidence only, never a store selection or publication decision. */
@@ -22,6 +24,7 @@ export interface SelectedBacklogRepository {
 const RUNNER = new ProcessCommandRunner();
 const OID = /^[0-9a-f]{40}$/;
 const WINDOW = 4096;
+const MAX_HEADER_BYTES = 64 * 1024;
 const gitArgs = (root: string) => ["--no-replace-objects", "-C", root];
 
 function metadata(root: string, args: string[], failure: string): string {
@@ -63,33 +66,110 @@ function blobFor(selected: SelectedBacklogRepository, evidence: BacklogGitEviden
   return match[1];
 }
 
-/** Read a literal byte window, including within arbitrarily long lines. No cached content. */
+function verifyTaskHeader(header: Buffer, taskId: string): void {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(taskId)) throw new Error("Invalid Backlog evidence task ID");
+  // Backlog has no frontmatter-only command. Give the native parser only the
+  // committed header, in a private scratch project with no Git or task history.
+  const scratch = mkdtempSync(join(tmpdir(), "prime-claw-backlog-header-"));
+  const filename = `${taskId.toLowerCase()} - evidence.md`;
+  try {
+    mkdirSync(join(scratch, "backlog", "tasks"), { recursive: true });
+    writeFileSync(join(scratch, "backlog", "config.yml"),
+      "project_name: Evidence\nremote_operations: false\ncheck_active_branches: false\n");
+    writeFileSync(join(scratch, "backlog", "tasks", filename), header);
+    const result = RUNNER.run("backlog", ["task", "view", "--json", "--", taskId], { cwd: scratch, allowFailure: true });
+    // Native lookup can accept noncanonical lookups. Compare its exact ID and
+    // ensure it parsed the single scratch file rather than some other record.
+    let parsed;
+    if (result.status === 0) {
+      try { parsed = JSON.parse(result.stdout); } catch { /* no exact native evidence */ }
+    }
+    if (parsed?.kind !== "task-view" || parsed.task?.id !== taskId || parsed.task.path !== `backlog/tasks/${filename}`) {
+      throw new Error("Backlog evidence canonical task ID mismatch or native header unavailable");
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+/** A single forward-only Git stream. Exhaust it to check complete delivery. */
+export async function* streamBacklogGitEvidence(
+  selected: SelectedBacklogRepository, evidence: BacklogGitEvidence, taskId: string, offset = 0,
+): AsyncGenerator<{ offset: number; bytes: Buffer; totalBytes: number }> {
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Invalid Backlog evidence byte offset");
+  const root = selected.root;
+  const blob = blobFor(selected, evidence);
+  const size = metadata(root, ["cat-file", "-s", blob], "Backlog evidence ticket blob unavailable").trim();
+  const totalBytes = Number(size);
+  if (!/^\d+$/.test(size) || !Number.isSafeInteger(totalBytes)) throw new Error("Invalid Backlog evidence blob size");
+  const child = spawn("git", [...gitArgs(root), "cat-file", "blob", blob], { stdio: ["ignore", "pipe", "ignore"] });
+  let spawnFailed = false;
+  child.once("error", () => { spawnFailed = true; });
+  const exited = new Promise<boolean>(resolve => child.once("close", code => resolve(!spawnFailed && code === 0)));
+  let header: Buffer | undefined = Buffer.alloc(MAX_HEADER_BYTES);
+  let headerBytes = 0;
+  let position = 0;
+  let length = 0;
+  let bytes = Buffer.alloc(WINDOW);
+  try {
+    for await (const chunk of child.stdout) {
+      let parts: Buffer[] = [chunk];
+      if (header) {
+        const previous = headerBytes;
+        headerBytes += chunk.copy(header, previous, 0, MAX_HEADER_BYTES - previous);
+        // Delimit the header, not its YAML values. The native parser owns those.
+        const prefix = header.toString("latin1", 0, headerBytes);
+        const opening = /^(?:\xef\xbb\xbf)?---\r?\n/.exec(prefix);
+        const close = opening ? prefix.indexOf("\n---", opening[0].length - 1) : -1;
+        if (close < 0) {
+          if (headerBytes === MAX_HEADER_BYTES) throw new Error("Backlog evidence frontmatter exceeds header limit or has no closing delimiter");
+          continue;
+        }
+        verifyTaskHeader(header.subarray(0, close + 4), taskId);
+        parts = [header.subarray(0, previous), chunk];
+        header = undefined;
+      }
+      for (const part of parts) {
+        let start = Math.min(part.length, Math.max(0, offset - position));
+        position += start;
+        while (start < part.length) {
+          const copied = part.copy(bytes, length, start, start + WINDOW - length);
+          length += copied;
+          position += copied;
+          start += copied;
+          if (position > totalBytes) throw new Error("Backlog evidence blob size mismatch");
+          if (length === WINDOW && position < totalBytes) {
+            yield { offset: position - length, bytes, totalBytes };
+            bytes = Buffer.alloc(WINDOW);
+            length = 0;
+          }
+        }
+      }
+    }
+    if (!await exited) throw new Error("Backlog evidence ticket blob unavailable");
+    if (header) throw new Error("Backlog evidence frontmatter has no closing delimiter");
+    if (position !== totalBytes) throw new Error("Backlog evidence blob size mismatch");
+    if (length) yield { offset: position - length, bytes: bytes.subarray(0, length), totalBytes };
+    else yield { offset, bytes: Buffer.alloc(0), totalBytes };
+  } finally {
+    // In particular, a one-window read or an early break must not drain the blob.
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await exited;
+  }
+}
+
+/** A one-off literal byte window; use the stream for adjacent windows. */
 export async function readBacklogGitEvidence(
   selected: SelectedBacklogRepository, evidence: BacklogGitEvidence, taskId: string, offset = 0,
 ): Promise<{ bytes: Buffer; totalBytes: number }> {
-  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Invalid Backlog evidence byte offset");
-  const blob = blobFor(selected, evidence);
-  const child = spawn("git", [...gitArgs(selected.root), "cat-file", "blob", blob], { stdio: ["ignore", "pipe", "ignore"] });
-  const exited = new Promise<boolean>(resolve => {
-    child.once("error", () => resolve(false));
-    child.once("close", code => resolve(code === 0));
-  });
-  const prefix = Buffer.alloc(WINDOW);
-  const bytes = Buffer.alloc(WINDOW);
-  let totalBytes = 0;
-  let length = 0;
-  for await (const chunk of child.stdout) {
-    if (totalBytes < WINDOW) chunk.copy(prefix, totalBytes, 0, WINDOW - totalBytes);
-    const start = Math.max(0, offset - totalBytes);
-    if (start < chunk.length && length < WINDOW) length += chunk.copy(bytes, length, start, start + WINDOW - length);
-    totalBytes += chunk.length;
+  const stream = streamBacklogGitEvidence(selected, evidence, taskId, offset);
+  try {
+    const first = (await stream.next()).value;
+    if (!first) throw new Error("Backlog evidence ticket blob unavailable");
+    return { bytes: first.bytes, totalBytes: first.totalBytes };
+  } finally {
+    await stream.return(undefined);
   }
-  if (!await exited) throw new Error("Backlog evidence ticket blob unavailable");
-  // Native Backlog writes the canonical ID immediately after the opening delimiter.
-  // Do not match an ID in the Markdown body or reconstruct the native task view.
-  const id = /^---\r?\nid: ([A-Za-z0-9][A-Za-z0-9_.-]*)\r?\n/.exec(prefix.toString("utf8"))?.[1];
-  if (id !== taskId || id === undefined) throw new Error("Backlog evidence canonical task ID mismatch");
-  return { bytes: bytes.subarray(0, length), totalBytes };
 }
 
 export async function makeBacklogGitEvidence(
