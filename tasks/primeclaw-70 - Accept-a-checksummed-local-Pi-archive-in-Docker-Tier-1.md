@@ -1,9 +1,10 @@
 ---
 id: PRIMECLAW-70
 title: Accept a checksummed local Pi archive in Docker Tier 1
-status: In Design
+status: In Progress
 assignee: []
 created_date: '2026-11-24 06:56'
+updated_date: '2026-11-24 06:57'
 labels: []
 dependencies: []
 references:
