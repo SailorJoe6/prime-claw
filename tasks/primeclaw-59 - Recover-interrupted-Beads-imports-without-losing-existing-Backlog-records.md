@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T14:06:00Z'
+updated_date: '2026-11-24T14:14:00Z'
 labels: []
 dependencies: []
 references:
@@ -841,4 +841,7 @@ Stop for exact independent same-provider Astra high review. The physical no-writ
 
 ### Reported third attempt — data and receipt published, no cutover
 Initialize PVA reported that on loaded `12a96f61` the owned Web shutdown uncertainty was warning-only. It published data `bab85b7` and receipt `9a55a1153ca72a14dfd60d1f05df8c6263e839d8` (reported direct remote tip), then stopped before cutover with `code layout projection changed during provider migration`. Beads remained authoritative. Reported code HEAD `9d160684` had only the untracked `backlog.config.yml`; root staged delta was empty. The published `config.yml` change from baseline `706c3bdb` to the receipt revision was confined to the statuses line, adding In Design and Blocked before Done. This supports, but does not prove, the hypothesis that the layout snapshot dereferenced changed config bytes behind the generated symlink. The deployed fresh-layout replay does not cover this existing-store case with three original Backlog records. This evidence is not permission to invoke replay or touch live state; it scopes the separately authorized disposable slice above.
+
+### Disposable layout-refusal reproduction — first checkpoint
+Offline native Docker run `99655` on Episode baseline `c334c44d6f55886cc2b28afc1c3c69324d078d9b` reached the exact `code layout projection changed during provider migration` refusal after direct receipt publication and a receipt-only child of the data revision, with the generated root link as the only dirty code path and the original code index unchanged. The subsequent fixture assertion failed because its expected string used pre-isolation config settings and the wrong insertion spacing. TAP SHA-256 `92f3f63eccdedf588f185e809dc05f426ed186078fbe4163f636e4888efe92ab`; owned container absent. This is a reproduction of the synthetic failure boundary, not evidence about the live cause. Stable rerun and guarded completion are pending. No live PVA access or writes.
 <!-- SECTION:NOTES:END -->
