@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T14:15:00Z'
+updated_date: '2026-11-24T14:20:00Z'
 labels: []
 dependencies: []
 references:
@@ -27,6 +27,7 @@ references:
   - .prime-claw/workflows/implement-task-prep.md
   - docs/prep-chain.md
   - tests/reviewed_plan_extension.test.mjs
+  - tests/test_future_plan_skills.py
 documentation:
   - docs/handoff-chain.md
 modified_files:
@@ -154,6 +155,8 @@ One bounded revision of ee05cc68: fix the registered create_task_episode entry f
 Accept the reviewed registered legacy recovery revision 0836643c. One bounded closeout slice: audit the exact candidate against all four native acceptance criteria, including both Backlog layouts, legacy compatibility, immutable evidence, Beads and delivery sequencing. Map each criterion to exact source and offline Docker evidence. Check remaining Backlog lifecycle writers and consumers for actual ticket snapshots or whole-response capture prerequisites, distinguishing explicit native viewing and transient native migration validation. No speculative hardening or scope expansion. Run focused checks and Tier 1 on the exact clean candidate as needed; report baseline failures accurately. If a material gap remains, record it concretely and stop for owner review rather than broadening the slice. If all criteria are supported, record the acceptance evidence and checks and update the Final Summary through the native task CLI, publish the task-only commit separately, and report the exact code/task heads as a candidate. Leave lifecycle status unchanged. No live recovery or cleanup, TASK-2 action, AWS, merge or activation.
 
 Joe explicitly approved the bounded readiness repair identified in the acceptance audit at task revision 8657d53d, against code 0836643c. Fix only registered implement_task readiness for both Backlog layouts: use bounded native identity and existing Git evidence mechanics to supply exact repository/full commit/literal path instead of serializing native ticket bodies into either prompt. Preserve actual local/published distinctions, exact identity and placement, preparation and readiness ordering, and the unchanged full native Beads observation. Keep semantic readiness in editable guidance; teach the relevant workflow/template consumers to inspect the committed reference in bounded pieces. No new state/store, mutable evidence fallback, or broad resolver refactor. Validate the registered production entry offline in Docker with committed native output over 1 MiB, no injected resolver or larger buffer, both prompts free of Backlog copies, correct reference for both layouts, and unchanged Beads/readiness behavior. Run Tier 1 on the exact clean candidate. Publish code and exact-ticket evidence separately and stop for owner review. Leave task status unchanged. No live readiness/recovery, TASK-2, AWS, merge, activation, or cleanup.
+
+One test-only revision of f14070bc. Independent review found that test_task_native_implementation_policies_are_publicly_activated_with_folder_compatibility in tests/test_future_plan_skills.py still expects the obsolete full native Backlog view and returned-path wording in prep. Update the stale assertions to cover bounded inspection of the exact committed localTaskEvidence and exact canonical ID/literal path; preserve the other readiness, Beads, and retained-folder assertions. Do not restore the old workflow or change runtime code or guidance. Run the affected Python policy test using the project test environment with PyYAML available, and report baseline versus candidate accurately. Publish the test-only branch revision and exact-ticket validation notes separately, then stop for review. No live lifecycle action, merge, activation, cleanup, or TASK-2 retry.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
