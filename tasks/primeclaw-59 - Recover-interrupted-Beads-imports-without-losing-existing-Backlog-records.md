@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T22:32:00Z'
+updated_date: '2026-11-24T22:39:00Z'
 labels: []
 dependencies: []
 references:
@@ -623,4 +623,7 @@ First implementation slice: make fresh-destination eligibility identical for ins
 Saved Episode-only code `3f665a29aaf7ac1d85e640d5df44fb235264cd70` (tree `0425967a81762d3caede8b73b569bb9460ad2ae6`) is clean and not published. It incorporates published main `110e200e5754b2bdb517db3c2c4846cdb7a86c16`, including immutable published ticket evidence, and removes parked-store reconciliation, reuse of existing destination tickets and receipt replay. The saved snapshot passed 13/13 focused disposable Docker tests, including refusal without writes and fresh import with active Episode continuity (TAP SHA-256 `5502deb45d35350d1169a77f7f5c0c260dd9ede47de9619a28993c73fa8d971c`). No final result for Tier 1 run `20261124T215906Z-76499-8c383bb9`: its log records a broken output pipe, the final manifest is absent, and both recorded container IDs are absent. Do not replay or credit that run.
 
 On the separately delivered execute, continue from the saved code within the published fresh-only scope. Implement and prove a retained restorable Beads backup before verified switch and guarded original-source retirement. Prove refusal and active Episode continuity against the resulting tree; run exact-candidate Docker Tier 1 with durable logs and terminal status independent of the worker output pipe. Then publish code and native evidence separately or report a concrete blocker. No change to lifecycle, canonical main, deployment or live systems.
+
+### Retained Beads backup slice — execute after f1799a08
+The original Episode resumed from clean, unpublished `3f665a29aaf7ac1d85e640d5df44fb235264cd70`. Implement one restorable Beads backup before verified destination publication and ownership switch, and keep it after guarded retirement (and on pre-cutover failure). Verify restore from the retained artifact in a separate disposable store, not by reading the original in place. Retain fresh-destination refusal and active Episode/immutable receipt evidence. Do not replay the interrupted Tier 1; validate the exact resulting candidate with independent durable logs and terminal status. Both live writer holds and task lifecycle remain unchanged.
 <!-- SECTION:NOTES:END -->
