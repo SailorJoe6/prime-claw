@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T07:41:00Z'
+updated_date: '2026-11-24T07:51:00Z'
 labels: []
 dependencies: []
 references:
@@ -123,6 +123,8 @@ Branch-local step 3 candidate: ordinary handoff and execute-only verify exact in
 Branch-local creation candidate: streamed native ID/path/status and discarded native edit output; verified exact integration and task-only status commits and reverified the reserved code-repository reference in the allocated worktree before opening a session. One initial execute receives the Git reference, not ticket contents. Offline registered fixture verified >1 MiB of native JSON, preservation of task-only status base and unrelated staging, exact active same-operation recovery without a second execute, and refusal of a staged-only ticket. Focused offline Docker passed 456/456 with no skips (.test-results/primeclaw-69-branch-local-creation/focused.log). Tier 1 passed before commit with networking disabled and teardown verified (.test-results/20261124T072325Z-25457-7229ba8f/tier1/manifest.json); not exact-commit validation. No live assignment, merge, activation or lifecycle status change. Stop for owner review.
 
 Branch-local creation result revision: after the single initial assignment, the registered creation path checks the selected project and rereads exact native ID, path and status with the bounded lookup. A project/path mismatch or lookup failure reports taskObservationFailure separately without returning stale currentTask or changing the delivered assignment, active ownership, or immutable base. Registered offline tests prove a fresh status after delivery, a separately reported path mismatch, one delivery and same-operation recovery. Large fixture streams native bytes and verifies preserved ticket body by streaming hash. Focused offline Docker 457/457, no skips (.test-results/primeclaw-69-creation-result-revision/focused.log). Tier 1 passed precommit with networking disabled and teardown verified (.test-results/20261124T073608Z-62846-462b469f/tier1/manifest.json); not exact-commit proof. No live assignment, lifecycle status change, merge or activation. Stop for owner review.
+
+Independent Backlog status mutation/publication slice at 35ad1a880d0ba3ff661bf61a5bc28220a626bd5f: committed results carry exact independent repository/commit/literal-path refs bound to native task identity, not copied ticket JSON or diffs. Pre-commit failures do not claim a new committed ticket; failed or interrupted pushes retain verified local evidence separately from publishedHead. Preserved exact-path commits, native auto-commit, legacy reservation inputs, separate remote observation and one push without retry. Beads unchanged. Registered independent oversized creation fixture now streams byte count and checks body hash and bounded frontmatter/tail. Focused offline Docker 458/458 (.test-results/primeclaw-69-mutation-results/candidate-focused.log); Tier 1 passed from the unchanged clean candidate with networking absent and clean teardown (.test-results/20261124T074820Z-17980-bb7c0ca7/tier1/manifest.json). Wider preliminary Beads journal identity failure reproduced on accepted baseline (.test-results/primeclaw-69-mutation-results/ownership-baseline.log). No live status edit, assignment, merge or activation.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -149,4 +151,6 @@ Step 2 revision published for owner review: registered independent Backlog creat
 Branch-local Backlog creation now cites the verified task-only status commit in its single initial execute; active same-operation recovery sends nothing new.
 
 Branch-local creation now reports a fresh post-assignment task observation or a separate observation failure without changing the assignment base or outcome.
+
+Independent Backlog status publication results now identify exact committed ticket evidence without copying content or confusing a retained local commit with publication.
 <!-- SECTION:FINAL_SUMMARY:END -->
