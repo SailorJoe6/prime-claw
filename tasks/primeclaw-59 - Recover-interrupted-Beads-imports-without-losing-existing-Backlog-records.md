@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T14:38:00Z'
+updated_date: '2026-11-24T14:41:00Z'
 labels: []
 dependencies: []
 references:
@@ -862,4 +862,11 @@ Astra found that the dirty-layout receipt completion refused all live/archive sa
 
 ### Two review findings reproduced on the published code
 The offline base run `70504` (TAP SHA-256 `830af7972966177b4d0aca9c63e04bb36dc8576bd43e4cd731d35e03ecbda7c4`, owned container absent) exercised the unchanged published code `082570c00ecc0f12335b522e96bb383c3207e73b` with the extended disposable fixture. The existing forward active-Episode regression stopped at `ownershipRows is not defined`. The genuine original-pair fixture reached data and receipt publication, then the interrupted layout; replay incorrectly refused the original pair before it could assess the injected unrelated layout drift. Candidate checks are in flight; neither finding is closed yet. No live PVA action.
+
+### Two review corrections — exact candidate for read-only re-review
+Published Episode revision `2ff53f96c39d2bdb23365d90ac93eb7730c83981` (parent `082570c00ecc0f12335b522e96bb383c3207e73b`, tree `ab0e0e60326bdccd6b0074386c5b822511dddd1c`, patch SHA-256 `ebf9c38016279ec53e9f0438319e73279ae3bc1ce531fb8896c112796aac8ee0`). Receipt-bound completion now uses the publisher's original `preservedPairs` digest and path, bytes/mode, and history evidence without synthesizing a native view for either member. Migration targets still refuse ambiguity. Both callers supply their verified ownership rows to `verifiedBacklogCandidate`; no ownership semantics changed.
+
+Offline focused run `73827` passed 4/4 with zero skips (TAP SHA-256 `59f64176d599fafe43357e6097efa101bed8a7e56065ab8fd951d241e627e79c`; container absent). The genuine disposable fixture preserved all seven original records, including both `BASE-12` members with distinct content and modes and unchanged paths, IDs and history. It first reproduced the exact post-publication layout refusal, then refused unrelated tracked drift. Guarded fixture completion used the same baseline `20f05d6e95a7f52c0ba9bed79c4604c6ae7246ae`, data `154569693b8a2e25a9e85b8d597d4dd3611449db` and receipt `74e04904067bcd2140ddd87f991bbd4e01b8a142` without any destination task or Git publication writes; the test observed retirement only in the fixture. The existing forward active-Episode migration preserved identity and completed. Existing ambiguous receipt-mapped and memory USER target regressions also passed. The original-pair fixture did not contain an active Episode; the forward active-Episode regression is separate, not a combined replay claim.
+
+Exact-candidate Docker Tier 1 `--probe` passed (`20261124T143748Z-73940-c9c2e425`, manifest SHA-256 `364d040b11a02f8f1741f89837aa83d5b7112c10f7fca668c3b6769dc3c9da86`, 444 input entries, all 15 artifact hashes checked, offline, both containers absent). Hold for independent same-provider Astra high re-review. No live PVA access, retry, deployment, cutover, deletion or hold release. In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d` unchanged.
 <!-- SECTION:NOTES:END -->
