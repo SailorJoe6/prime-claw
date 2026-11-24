@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T07:38:00Z'
+updated_date: '2026-11-24T07:41:00Z'
 labels: []
 dependencies: []
 references:
@@ -89,6 +89,8 @@ Owner accepted independent Backlog handoff revision `d48fe435`. Next bounded ste
 Owner accepted branch-local ordinary handoff and execute-only slice `70101a43` for the reviewed scope; its Tier 1 precommit run is not exact-commit proof. Next bounded slice only: branch-local Backlog creation and its single initial execute assignment, from pre-allocation and existing status publication/reservation through pre-session. Use exact committed code-repository references for ticket-state evidence without copies or full-response buffering. Reuse existing branch-local native authority, exact identity/publication checks and bounded reader mechanics. Preserve the task-only status commit as code base where applicable, same-operation recovery, and no second assignment. No new size limit, persistent state or readiness policy. Prove the registered path in offline Docker with a representative committed ticket and run Tier 1. Leave independent Backlog, Beads, continuation and other lifecycle changes untouched except shared mechanical reuse. No TASK-2 action, merge or activation. Publish task and code evidence separately and stop for review.
 
 One bounded revision of branch-local creation at `cb59a9e3`. After allocation and the single initial assignment, use the existing bounded native lookup to observe current exact ID, project, path and status rather than returning the earlier read. Preserve the immutable assignment base; report post-delivery mismatch separately from the assignment already sent. No status freeze, replay, rollback or second assignment. Add a focused registered-tool regression. Replace the fixture’s raised maxBuffer/full-response capture with streamed byte counting or fixture-only file output and bounded preservation checks. Run focused offline Docker and Tier 1, publish task and code separately, and stop for review. No other lifecycle wiring, TASK-2, merge or activation.
+
+Owner accepted `5e0a27b8` for branch-local creation. Next bounded slice only: Backlog status mutation/publication results in `task-history-workspace.ts`. Replace copied Backlog ticket evidence in committed results with exact repository/commit/path references using existing mechanics. Distinguish pre-commit and failed or uncertain publication from committed/published results; preserve native authoring, exact path-only commits and compatibility, and leave Beads unchanged. No new state or coded semantic judgment. In the same evidence pass, fix the test-only AC2 gap in the registered independent creation fixture: stream oversized native stdout byte counting or use fixture-only file output and bounded preservation checks instead of the 2 MiB maxBuffer/full JSON capture. Leave transition, cutover, terminal and oversight changes for later. Run focused offline Docker and Tier 1 from the final clean candidate where practical. Publish task notes and code separately and stop for review. No original TASK-2 actions, merge or activation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
