@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T02:39:00Z'
+updated_date: '2026-11-24T02:47:00Z'
 labels: []
 dependencies: []
 references:
@@ -15,6 +15,11 @@ references:
     https://github.com/SailorJoe6/prime-claw/blob/510856f0e8ec7db152f7f34cb8730587234be5bf/tasks/primeclaw-70%20-%20Make-independent-Backlog-Episode-creation-work-for-large-tickets.md
 documentation:
   - docs/handoff-chain.md
+modified_files:
+  - docs/handoff-chain.md
+  - src/prime-agent-plugin/asset-inventory.json
+  - src/prime-agent-plugin/extension-support/backlog-git-evidence.ts
+  - tests/task_history_workspace.test.mjs
 priority: p0
 type: bug
 ordinal: 153000
@@ -58,3 +63,9 @@ No bulk rewrite or rollout gate. Read existing records compatibly and leave hist
 
 5. **Prove the change offline in Docker (AC1–AC4).** Reuse existing offline Docker fixtures and extend the production task Episode admission and handoff integration cases (`tests/task_episode_admission_extension.test.mjs`, `tests/spec_episode_extension.test.mjs` and the Tier 1 native-observation harness). Use disposable local Git remotes and a committed synthetic Backlog task; measure native JSON above 1 MiB via streamed/file output in the fixture only. Exercise pre-allocation and pre-session reads, a single bounded initial assignment, ordinary continuation, execute-only, and same-resource recovery without a second allocation or resend. Advance the task branch and verify complete bounded reads/diffs of both commits, with a late-content marker, and assert no full JSON capture prerequisite or new content copies in persisted/delivered evidence. Cover branch-local committed evidence, legacy compatibility, wrong repository/ID/path and missing or inaccessible revisions; assert failure at the relevant boundary. Extend ownership transition, mutation and cutover cases for references and run unchanged Beads and delivery outcome regressions. Run `scripts/test-tier1.sh --probe`; record Docker results against all four criteria. No original TASK-2 action, AWS work, host activation, or upstream work.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Slice 1 (plan step 1; partial AC1/AC3): Added Backlog Git reference and bounded exact blob reader, with offline Docker coverage for an independent custom store, a >1 MiB blob, old/new commits and tail diff after branch advance, a dirty working file, branch-local/local-only resolution, and wrong repository/ID/path or missing commit. Docker task_history_workspace suite passed 91/91. First source-mode Tier 1 probe stopped at plugin apply because the new asset was missing from asset-inventory.json. Registered the asset; isolated offline apply/check passed and the same source-mode probe is running again. No lifecycle evidence writers/readers switched yet. No acceptance criteria checked. Next slice: production creation pre-allocation and pre-session reads plus one initial execute, with native >1 MiB JSON fixture.
+<!-- SECTION:NOTES:END -->
