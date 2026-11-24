@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-69
 title: Use Git references for independent Backlog handoff evidence
-status: Ready for Merge
+status: Done
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T18:25:00Z'
+updated_date: '2026-11-24T18:29:00Z'
 labels: []
 dependencies: []
 references:
