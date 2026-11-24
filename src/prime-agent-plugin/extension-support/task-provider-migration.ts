@@ -2195,6 +2195,13 @@ function assertPreservedBacklogBaseline(
   }
 }
 
+function preservedBacklogPairEvidence(baseline: BacklogDestinationBaseline) {
+  return baseline.pairPaths.map(path => {
+    const file = baseline.files.get(path)!;
+    return { path: file.relativePath, bytesSha256: sha256(file.bytes), history: file.history };
+  });
+}
+
 /** The pinned CLI explicitly supports editing the project YAML list directly,
  * not `config set statuses` or a whole-config PUT/save (which drops unknown keys).
  * Preserve every non-list byte. Flow insertion retains its exact old entries;
@@ -2390,7 +2397,8 @@ function provePublishedBacklogCompletion(
       || git("ls-tree", data, "--", receiptPath).split(" ")[0] !== tree.get(receiptPath)?.[0]) {
     throw new Error("published Backlog completion configuration or receipt mode changed");
   }
-  if ([...baseline.records.keys()].some(path => !tree.has(path)) || outputPaths.some(path => !tree.has(path))) {
+  const originalPaths = [...baseline.records.keys(), ...baseline.pairPaths.map(path => baseline.files.get(path)!.relativePath)];
+  if ([...originalPaths, ...outputPaths].some(path => !tree.has(path))) {
     throw new Error("published Backlog completion contains a native record outside the published tree");
   }
   for (const [path, [mode, kind, oid]] of tree) {
@@ -2430,9 +2438,9 @@ async function backlogMigrationReplay(source: BeadsSnapshot, runner: CommandRunn
   const branch = runRequired(runner, "git", ["-C", storeDir, "symbolic-ref", "--short", "HEAD"], storeDir, "read replay destination branch").stdout.trim();
   if (actualRemote !== remote.raw || realpathSync(top) !== realpathSync(storeDir) || branch !== "prime-claw/tasks") throw new Error("same-migration destination clone identity changed");
   assertPublishedGitRef(runner, storeDir, head, remote.name, remote.raw, TASK_HISTORY_REF, "same-migration replay destination publication");
-  if (backlogPairPaths(backlogPhysicalTaskPaths(storeDir)).length) {
-    throw new Error("fresh same-migration layout replay cannot adopt an existing live/archive pair; preserve both records");
-  }
+  const physicalPaths = backlogPhysicalTaskPaths(storeDir);
+  const pairPaths = backlogPairPaths(physicalPaths);
+  const assertUnambiguousTarget = backlogAmbiguityGuard(physicalPaths, storeDir);
   const views = backlogDestinationViews(runner, source.projectRoot, storeDir, "same-migration replay");
   const receiptId = backlogReceiptId(views);
   const receiptView = receiptId ? backlogDestinationViewById(views, receiptId) : undefined;
@@ -2449,12 +2457,18 @@ async function backlogMigrationReplay(source: BeadsSnapshot, runner: CommandRunn
   const mapping = existingBacklogMigrationMappings(runner, source.projectRoot, storeDir, source, views);
   const expectedMappings = source.tasks.map((pkg) => ({ sourceTaskId: pkg.sourceTaskId, destinationTaskId: mapping[pkg.sourceTaskId] }));
   const memoryOutputs = receipt.backlogMemoryOutputs ?? { documents: [] };
+  assertUnambiguousTarget(receiptId);
+  for (const { destinationTaskId } of receipt.mappings) assertUnambiguousTarget(destinationTaskId);
+  if (memoryOutputs.userTask) assertUnambiguousTarget(memoryOutputs.userTask.taskId);
   const memory = backlogMemoryEvidence(source, memoryOutputs, runner);
   assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [receipt.destinationDataRevision, head], runner);
   const prepared = { storeDir, head, remoteName: remote.name, remoteUrl: remote.raw, codePaths: [".gitignore", "backlog.config.yml"] };
   const expectedCount = source.counts.total + 1 + (source.memories.length ? 1 : 0);
-  const baseline = views.size > expectedCount
-    ? captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, views, memoryOutputs, []) : undefined;
+  // Original pairs have no native ID view. Bind their physical evidence and
+  // require the original/data/receipt history proof even in a pair-only store.
+  const baseline = views.size > expectedCount || pairPaths.length
+    ? captureBacklogDestinationBaseline(source.projectRoot, prepared, runner, views, memoryOutputs, pairPaths) : undefined;
+  const preservedPairs = baseline ? preservedBacklogPairEvidence(baseline) : [];
   if (views.size !== expectedCount + (baseline?.records.size ?? 0) || Object.keys(mapping).length !== source.counts.total
       || canonical(receipt.mappings) !== canonical(expectedMappings)) throw new Error("same-migration replay inventory/mappings do not match the verified receipt");
   const configuration = await beadsCurrentConfiguration(await openWeb(storeDir));
@@ -2471,7 +2485,8 @@ async function backlogMigrationReplay(source: BeadsSnapshot, runner: CommandRunn
     });
   };
   const digest = (tasks: DestinationTask[], memory: JsonObject) => canonicalSha256({
-    preserved: baseline ? [...baseline.records] : [], imported: tasks.map(task => task.taskEvidence), ...(source.memories.length ? { memory } : {}),
+    preserved: baseline ? [...baseline.records] : [], ...(preservedPairs.length ? { preservedPairs } : {}),
+    imported: tasks.map(task => task.taskEvidence), ...(source.memories.length ? { memory } : {}),
   });
   const tasks = readTasks(views);
   if (digest(tasks, memory) !== receipt.destinationDataDigest) throw new Error("same-migration replay native destination digest differs from its complete receipt");
@@ -2547,7 +2562,7 @@ async function backlogMigrationReplay(source: BeadsSnapshot, runner: CommandRunn
         return { revision: head, digest: refreshedDigest, tasks, receiptTaskId: receiptId };
       };
       return verifiedBacklogCandidate(source, runner, prepared, rows.length ? originalBacklogLayout(source.projectRoot, runner) : null,
-        receipt, verifyCodeProjection, refresh);
+        receipt, verifyCodeProjection, refresh, rows);
     };
   }
   return { projectLayout, completion };
@@ -2708,10 +2723,7 @@ async function migrateBeadsToBacklog(
   });
   const destinationDigest = (tasks: DestinationTask[]) => {
     const memory = backlogMemoryEvidence(source, memoryOutputs, runner);
-    const preservedPairs = baseline.pairPaths.map(path => {
-      const original = baseline.files.get(path)!;
-      return { path: original.relativePath, bytesSha256: sha256(original.bytes), history: original.history };
-    });
+    const preservedPairs = preservedBacklogPairEvidence(baseline);
     return canonicalSha256({ preserved: [...baseline.records], ...(preservedPairs.length ? { preservedPairs } : {}), imported: tasks.map((task) => task.taskEvidence),
       ...(source.memories.length ? { memory } : {}) });
   };
@@ -2747,13 +2759,14 @@ async function migrateBeadsToBacklog(
     });
     return { revision: exact, digest: destinationDigest(refreshed), tasks: refreshed, receiptTaskId };
   };
-  return verifiedBacklogCandidate(source, runner, prepared, originalLayout, receiptBase, verifyCodeProjection, refresh);
+  return verifiedBacklogCandidate(source, runner, prepared, originalLayout, receiptBase, verifyCodeProjection, refresh, ownershipRows);
 }
 
 function verifiedBacklogCandidate(
   source: BeadsSnapshot, runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace,
   originalLayout: ReturnType<typeof originalBacklogLayout>, receiptBase: DestinationCandidate["receiptBase"],
   verifyCodeProjection: () => void, refresh: DestinationCandidate["refreshAfterReceipt"],
+  ownershipRows: readonly Pick<ActiveMigrationOwnership, "worktree" | "verifyCodeProjection">[],
 ): DestinationCandidate {
   const { storeDir } = prepared;
   const final = refresh(), receiptRevision = final.revision;
@@ -2993,10 +3006,8 @@ export async function publishIsolatedBeadsImport(options: {
   prove(dataViews);
   assertCommittedBacklogMemoryOutputs(outputs, root, storeDir, [dataRevision], runner);
   const digest = (records: Map<string, JsonObject>) => canonicalSha256({ preserved: [...baseline.records],
-    ...(baseline.pairPaths.length ? { preservedPairs: baseline.pairPaths.map(path => {
-      const file = baseline.files.get(path)!;
-      return { path: file.relativePath, bytesSha256: sha256(file.bytes), history: file.history };
-    }) } : {}), imported: verify(records).map(task => task.view), ...(source.memories.length ? { memory: backlogMemoryEvidence(source, outputs, runner) } : {}) });
+    ...(baseline.pairPaths.length ? { preservedPairs: preservedBacklogPairEvidence(baseline) } : {}),
+    imported: verify(records).map(task => task.view), ...(source.memories.length ? { memory: backlogMemoryEvidence(source, outputs, runner) } : {}) });
   const dataDigest = digest(dataViews);
   capture();
   const receipt = migrationReceiptBase(source, "backlog", dataRevision, dataDigest,

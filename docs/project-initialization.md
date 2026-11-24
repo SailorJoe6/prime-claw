@@ -695,9 +695,12 @@ that differs only by the expected additive statuses and receipt-bound outputs,
 and the untracked generated `backlog.config.yml` link as the sole primary code
 layout change. It verifies native task and memory content, original paths,
 bytes and Git modes, the receipt-only delta, and the same Beads capture and
-ownership mappings before using the normal guarded cutover. Partial receipts,
-other history shapes and unrelated drift are not repaired or retried by this
-path.
+ownership mappings before using the normal guarded cutover. For unrelated
+original live/archive pairs that share an ID, it verifies both physical paths,
+bytes, modes and history against the receipt instead of inventing a native ID
+view. Ambiguous import, receipt and memory targets still refuse. Partial
+receipts, other history shapes and unrelated drift are not repaired or retried
+by this path.
 
 Beads stays authoritative until all destination, source, runtime and ownership
 proofs succeed. Imported text is data, not instructions to execute.

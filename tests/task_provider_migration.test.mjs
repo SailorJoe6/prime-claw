@@ -5485,6 +5485,12 @@ test("isolated receipt completion preserves published data and rejects layout dr
   const f = selectedMigrationConfigFixture(t, "receipt-completion", { noHardlinks: true,
     statuses: ["Triage", "In Progress", "In Planning", "Done"] });
   const { outer, root, remote } = f.fixture, { store } = f.destination;
+  const pair = seedSameIdOriginals(root, ".backlog");
+  publishSameIdFixtureChanges(store, "publish unrelated original live/archive pair");
+  const pairRecords = captureSameIdRecords(store);
+  assertNativeSameIdAmbiguity(root, ".backlog", pair);
+  assert.notEqual(pairRecords[pair.paths[0]].mode, pairRecords[pair.paths[1]].mode);
+  const pairHistory = Object.fromEntries(pair.paths.map(path => [path, git(store, "log", "--all", "--follow", "--format=%H", "--", path)]));
   bd(root, "remember", "Disposable public completion memory Ω", "--key", "receipt-completion");
   git(root, "rm", "--", "backlog.config.yml");
   git(root, "commit", "-qm", "fixture begins without generated root link");
@@ -5569,6 +5575,14 @@ test("isolated receipt completion preserves published data and rejects layout dr
   assert.equal(bd(root, "--readonly", "export", "--all"), sourceExport);
   const destinationBefore = parkedStoreTree(store);
   const assertUnchanged = () => {
+    for (const path of pair.paths) {
+      const original = git(store, "ls-tree", baseline, "--", path);
+      assert.ok(original, path);
+      for (const revision of [data, head]) assert.equal(git(store, "ls-tree", revision, "--", path), original);
+      assert.equal(readFileSync(join(store, path)).toString("base64"), pairRecords[path].bytes);
+      assert.equal(lstatSync(join(store, path)).mode, pairRecords[path].mode);
+      assert.equal(git(store, "log", "--all", "--follow", "--format=%H", "--", path), pairHistory[path]);
+    }
     assert.deepEqual(parkedStoreTree(store), destinationBefore);
     assert.equal(git(store, "rev-parse", "HEAD"), head);
     assert.equal(git(remote, "rev-parse", TASK_HISTORY_REF), head);
@@ -5621,6 +5635,7 @@ test("isolated receipt completion preserves published data and rejects layout dr
   assert.equal(git(root, "rev-parse", "HEAD"), git(remote, "rev-parse", "refs/heads/main"));
   assert.notEqual(git(root, "rev-parse", "HEAD"), code);
   assertUnchanged();
-  t.diagnostic(JSON.stringify({ baseline, data, receipt: head, originals: Object.keys(f.files).length - 2,
-    mappings: receipt.mappings.length, layoutRefusal: first.detail, driftRefusal: rejected.result.detail, retired }));
+  assertNativeSameIdAmbiguity(root, ".backlog", pair);
+  t.diagnostic(JSON.stringify({ baseline, data, receipt: head, originals: Object.keys(f.files).length - 2 + pair.paths.length,
+    originalPair: pair, mappings: receipt.mappings.length, layoutRefusal: first.detail, driftRefusal: rejected.result.detail, retired }));
 });
