@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T08:42:00Z'
+updated_date: '2026-11-24T08:50:00Z'
 labels: []
 dependencies: []
 references:
@@ -145,6 +145,8 @@ Publication revision e51c5121efaf6135541d3e43584e75732fe23177: reuse bounded nat
 Retained ownership transition candidate 328d5e96b209f33827492b041834a271f39598d1: both Backlog layouts verify the exact committed ticket in the existing primary and Episode workspaces. Independent Backlog persists the published Git reference; branch-local ownership retains its existing format and reports refs at the reviewed code heads. Historical raw records remain unchanged, and replay reports verified refs instead of copying the old view. Missing or mismatched evidence stops before authority replacement. Offline Docker: 551/551 focused tests and 26/26 ownership tests (.test-results/primeclaw-69-transition/candidate-focused.log and .test-results/primeclaw-69-transition/candidate-ownership.log), including a native task view over 1 MiB, missing or mismatched refs, publication drift, and legacy replay. Tier 1 passed on the clean candidate with offline teardown verified (.test-results/20261124T081755Z-9351-48dbb50d/tier1/manifest.json). No live transition, provider cutover, terminal or oversight work, TASK-2 action, merge, or activation.
 
 Retained transition revision 178056a62a82964fbb1a7cc7a973d8756ca9cd3b: branch-local transition now verifies the native-selected Episode Backlog store resolves to the Episode code Git repository before authority replacement, even if a nested repository has identical ticket bytes. Historical independent replay compares the complete saved Backlog envelope with the validated native output in bounded chunks, without a new snapshot; ordinary lifecycle behavior is unchanged. The disposable nested-store and Description regressions reproduced the prior acceptance at 328d5e96b209f33827492b041834a271f39598d1; the candidate also rejects acceptance-criteria drift and still accepts exact replay. Clean offline Docker: 551/551 focused and 29/29 ownership (.test-results/primeclaw-69-transition-revision); Tier 1 passed and verified teardown (.test-results/20261124T083138Z-40626-a300df68/tier1/manifest.json). No live transition, TASK-2 action, merge, or activation.
+
+Beads→Backlog cutover evidence candidate cf9878eabb53b5d383420c4bd5027ef233bbd0e2: verify the exact independent repository, published receipt commit, regular literal ticket blob and native canonical task ID before switching ownership. Keep full native readback transient and preserve the existing receipt digest, source retirement sequence, Episode bindings and historical evidence. The completed migration result remains receipt-only; internal committed task results carry references rather than copied views. Offline Docker: 11 focused cases passed on a358c61b6896797ed0e005c3d1f82d52ee2ae928, including exact missing-blob refusal before authority or deletion, same-destination retry, archives, and the PVA-shaped fixture. The only failing assertion incorrectly expected the post-switch runtime proof to rewrite the persisted route; only that test assertion changed in cf9878eabb53b5d383420c4bd5027ef233bbd0e2, and its exact-commit rerun passed (.test-results/primeclaw-69-cutover-evidence/candidate-route.log). Clean Tier 1 passed on cf9878eabb53b5d383420c4bd5027ef233bbd0e2, offline with verified teardown (.test-results/20261124T084638Z-73185-24d6b476/tier1/manifest.json). No live switch, source retirement, TASK-2 action, merge, or activation.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -179,4 +181,6 @@ Backlog publication now uses bounded native reads, stops on pre-edit identity dr
 The retained ownership transition now uses verified committed Backlog references in both layouts, without rewriting historical records or replacing Episode resources.
 
 Retained Backlog transition verifies the Episode store repository and compares the complete historical native envelope only on legacy replay.
+
+The cutover stores verified Backlog Git references instead of ticket copies and stops before switching authority if the committed ticket cannot be proved.
 <!-- SECTION:FINAL_SUMMARY:END -->
