@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T01:41:00Z'
+updated_date: '2026-11-24T01:54:00Z'
 labels: []
 dependencies: []
 references:
@@ -800,4 +800,7 @@ Candidate `2b4ab225244607731ffd92bd14a046c2a6259dfd`, tree `21a1193a8579be9d20c2
 
 ### Authorized synthetic-identity follow-up
 Initialize PVA authorized the narrow synthetic identity proof on the reviewed two-fix Episode basis. Prior offline publication and Tier 1 results remain evidence for that exact basis only. No identity experiment, restored-data verifier, host layout claim, live capture or production action has been performed in this handoff. The exact-namespace probe comes before any conditional read-only verifier; preserve mapping and current isolation throughout.
+
+### Isolated capture identity — synthetic proof complete
+The unchanged path guard excludes the host-shaped layout. A separate same-path Linux tmpfs control reproduced `capture-sha256:668e7fee715fb0f37370a2ce57ced31066f65a264a48c1d2e5fd1d8464d60251` from an independent synthetic copy. The relocated native capture was `capture-sha256:c6472bfcd0769bd2f41428d68c67348ac191b07d69c240c22b4615f82ba5d34a`; an independently retained original and explicitly constrained path translation over fresh native export/raw lines, views, status, version, memories and non-path connection fields recomputed `capture-sha256:68b65505568802146c57eb00f560bd84246f3e64ee821266c7c185f50b2c50b5`. Native Backlog readback matched all 3 stopped mapped records and 6 original tracked paths, with exact baseline/history, bytes/modes, code/ref/index preservation. A different copy substituted at the same path and a real native Beads comment change were both refused. Offline Docker: 2 passed, no skips, container removed; TAP SHA-256 `a0651d34811b710c6cc95531b167a2eee87345a3709a3730298bf74e39af2329`. Test/docs-only candidate `74b123ea85c7b93bd3b61011f3f819af167c1f12` on `2b4ab225244607731ffd92bd14a046c2a6259dfd`; evidence `docs/evidence/primeclaw-59-isolated-publish-only.md`. No production verifier or guard change, switch, migration-data publication or receipt, retirement, real copy, APFS/live action, or further slice. Preserve In Progress, 0/9, null Final Summary and PVA-first `c6e0a3d`.
 <!-- SECTION:NOTES:END -->
