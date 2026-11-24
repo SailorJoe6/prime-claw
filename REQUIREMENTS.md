@@ -521,11 +521,15 @@ through the initialization skill. Inspect first, explain the exact source and
 counts, quiesce the affected task mutation, and obtain confirmation before the
 switch and source deletion. Read retiring Beads as it is; do not require a server
 conversion, remote, custom unused statuses, source publication, or normalization
-just to retire it. Preserve a valid existing Backlog destination, its IDs,
-configuration, content, history, archives, and publication identity. Normalize
-only the native default `backlog/` layout into `.backlog/` with its native root
-configuration link; leave existing hidden and explicitly configured custom
-stores in place. Existing destination data is not itself a migration conflict.
+just to retire it. Create a missing target Backlog ID for each Beads ticket. At
+an existing matching target ID, replace the ticket’s current content with
+current Beads content, including original or user-edited matches; do not
+require import provenance. Leave unmatched tickets untouched. Rerunning the
+same explicitly confirmed command after interruption converges without duplicate
+tickets or comments. Preserve unrelated records, destination configuration,
+history, archives, and publication identity. Normalize only the native default
+`backlog/` layout into `.backlog/` with its native root configuration link;
+leave existing hidden and explicitly configured custom stores in place.
 
 Sources: [PRIMECLAW-44][T44], [46][T46]. Older bidirectional migration plans in
 [43][T43] are superseded.
