@@ -159,6 +159,9 @@ RUN set -eux; \
     printf '%s\n' '/opt/pi-musl' > "/out/etc/ld-musl-$arch.path"
 
 FROM tier1_runtime AS tier1_pi_archive
-COPY --from=pi_musl /out/ /
+# Ubuntu usr-merge makes /lib a symlink; install into its real directory.
+COPY --from=pi_musl /out/lib/ /usr/lib/
+COPY --from=pi_musl /out/etc/ /etc/
+COPY --from=pi_musl /out/opt/pi-musl/ /opt/pi-musl/
 
 FROM tier1_runtime AS tier1_default
