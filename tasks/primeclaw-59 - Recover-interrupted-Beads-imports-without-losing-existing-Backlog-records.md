@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T02:42:00Z'
+updated_date: '2026-11-24T02:53:00Z'
 labels: []
 dependencies: []
 references:
@@ -811,4 +811,9 @@ The unchanged path guard excludes the host-shaped layout. A separate same-path L
 
 ### Authorized witness boundary — observed live check and proposal
 Initialize PVA reported that deployed `switch-request` stopped on `source task history is not clean: ?? backlog.config.yml` before computing a digest. It identified the generated relative link into the partial `.backlog/config.yml` and retained the private native before-identity observations. Neither a digest match nor mismatch was observed. The earlier live switch failure remains unexplained; the Web `finally` masking defect is distinct from the witness slice. The previous `74b123e` tests establish synthetic relocation only. The authorized next execute is a separate read-only witness on genuine disposable fixtures, not approval for a live witness, live recovery or retry.
+
+### Disposable original-location witness — no-write blocker
+On Episode code `74b123ea85c7b93bd3b61011f3f819af167c1f12`, two network-disabled Docker runs with native Beads 1.3.1 (`c1c4b642a`), Backlog 1.55.3, and Node 22.23.5 failed the mandatory no-write control on synthetic embedded Dolt. The first fixture reached the positive observation and reported only one changed path: the embedded Dolt `noms/manifest`. Per-command attribution in the second fixture observed 11 manifest inode replacements under `bd --readonly` (config get, statuses, export, list and long task show); the manifest SHA-256 did not change in any of them. The ordinary clean-checkout refusal remained intact. Identical manifest bytes are not no-write proof. Both containers were removed; first TAP SHA-256 `525ed8cea86da2ba83e32e3fd24ac3b2fa12258ae425c5f7ac2872a6d6d24c84`, attribution TAP `daffe0b29242a672c97e5cf3b7dea44d67f29b81591d05517aa2de66d84423c9`. Negative fixture cases after the positive control were not reached. The rejected prototype was removed from the checkout and retained privately as patch `b8bb62fde60ce394c60832d43553dd1a6eabbc036d29f532373a9b6622cc94a0`; no new code candidate, Tier 1 qualification, or independent acceptance. No live source touched, no live digest match or mismatch, no supported invocation to offer Initialize PVA. This result is for the tested embedded mode, not proof about any server-backed mode or the cause of the earlier live failure.
+
+Unblock only with a native route that preserves the exact deployed capture/hash semantics and passes a true no-write control in a genuine disposable fixture of the applicable mode, or a separate operator decision on a changed recovery boundary. Do not rerun or widen the current slice. Keep In Progress, 0/9 checked, null Final Summary and PVA-first `c6e0a3d`.
 <!-- SECTION:NOTES:END -->
