@@ -31,6 +31,7 @@ export class MigrationBacklogWebError extends Error {
   readonly stage: string;
   readonly outcome: "not-started" | "uncertain";
   readonly artifactDirectory: string;
+  teardownError?: unknown;
   constructor(stage: string, outcome: "not-started" | "uncertain", artifactDirectory: string) {
     // Never include payloads, provider responses, argv, or child stderr here.
     super(`Migration native Web transport failed (${stage}; outcome=${outcome}). Private transport files retained.`);
@@ -180,9 +181,15 @@ class MigrationBacklogWeb {
       this.ready = true;
     } catch (error) {
       const failure = error instanceof MigrationBacklogWebError ? error : this.failure("browser-start", "not-started");
-      await this.close();
-      throw failure;
+      return await this.closeAfterFailure(failure);
     }
+  }
+
+  private async closeAfterFailure(failure: MigrationBacklogWebError): Promise<never> {
+    // Keep startup, request, and readback errors primary even if close rejects.
+    try { await this.close(); }
+    catch (error) { failure.teardownError = error; }
+    throw failure;
   }
 
   private assertAvailable(requireReady = true): void {
@@ -233,8 +240,7 @@ class MigrationBacklogWeb {
       // Even a native error response can follow partial writes. Stop, retain files,
       // and fence this transport. No automatic resend or allocation reconciliation.
       this.failed = true;
-      await this.close();
-      throw failure;
+      return await this.closeAfterFailure(failure);
     } finally { source?.destroy(); this.busy = false; }
   }
 
@@ -267,8 +273,7 @@ class MigrationBacklogWeb {
       return JSON.parse(readFileSync(stdout, "utf8"));
     } catch (error) {
       const failure = error instanceof MigrationBacklogWebError ? error : this.failure("native-readback", "not-started");
-      await this.close();
-      throw failure;
+      return await this.closeAfterFailure(failure);
     } finally { this.busy = false; }
   }
 

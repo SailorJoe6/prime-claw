@@ -5065,6 +5065,149 @@ test("isolated publish-only verifies an untracked post-Web import before separat
 });
 
 
+for (const primaryFailure of [false, true]) {
+  test(`isolated owned Web teardown ${primaryFailure ? "preserves primary failure" : "warns after native verification"}`, {
+    timeout: 120_000, skip: process.env.PRIME_CLAW_ISOLATED_TEARDOWN_TEST !== "1",
+  }, async t => {
+    assert.equal(process.platform, "linux");
+    assert.equal(tmpdir(), "/tmp");
+    assert.equal(statfsSync("/tmp").type, 0x01021994);
+    assert.deepEqual(Object.keys(networkInterfaces()), ["lo"]);
+    assert.equal(readFileSync("/proc/net/route", "utf8").trim().split("\n").length, 1);
+    assert.equal(process.env.GIT_ALLOW_PROTOCOL, "file");
+    assert.equal(process.env.GIT_CONFIG_NOSYSTEM, "1");
+    assert.equal(process.env.GIT_CONFIG_GLOBAL, "/dev/null");
+    assert.equal(process.env.DOLT_ROOT_PATH, process.env.HOME);
+    assert.equal(dirname(realpathSync(process.env.HOME)), "/tmp");
+    assert.ok(!Object.keys(process.env).some(key => /^(?:BEADS_|BD_|MYSQL_|BACKLOG_)|^DOLT_(?!ROOT_PATH$)|^GIT_(?!(?:ALLOW_PROTOCOL|CONFIG_NOSYSTEM|CONFIG_GLOBAL|TERMINAL_PROMPT|OPTIONAL_LOCKS)$)/.test(key)));
+    const f = selectedMigrationConfigFixture(t, "owned-web-teardown", { noHardlinks: true });
+    const { outer, root, remote, ids } = f.fixture, { store } = f.destination;
+    const baseline = git(store, "rev-parse", "HEAD"), code = git(root, "rev-parse", "HEAD");
+    assert.equal(git(root, "status", "--porcelain=v1"), "");
+    assert.equal(git(store, "status", "--porcelain=v1"), "");
+    assert.equal(readlinkSync(join(root, "backlog.config.yml")), ".backlog/config.yml");
+    const seen = new Set();
+    function checkTree(path) {
+      const stat = lstatSync(path);
+      assert.equal(stat.dev, lstatSync(outer).dev);
+      if (path === join(root, "backlog.config.yml")) {
+        assert.equal(realpathSync(path), join(store, "config.yml"));
+        return;
+      }
+      assert.equal(realpathSync(path), path);
+      assert.ok(!seen.has(stat.ino), "fixture must not share inodes"); seen.add(stat.ino);
+      if (stat.isDirectory()) for (const entry of readdirSync(path)) checkTree(join(path, entry));
+      else assert.ok(stat.isFile() && stat.nlink === 1, "expected an unlinked regular file in the fixture");
+    }
+    checkTree(root); checkTree(remote);
+    for (const [repo, dir] of [[root, join(root, ".git")], [store, join(store, ".git")], [remote, remote]]) {
+      assert.equal(dirname(realpathSync(remote)), outer);
+      assert.equal(git(repo, "rev-parse", "--absolute-git-dir"), dir);
+      assert.equal(realpathSync(resolve(repo, git(repo, "rev-parse", "--git-common-dir"))), dir);
+      for (const relative of ["commondir", "objects/info/alternates", "objects/info/http-alternates", "worktrees", "config.worktree", "refs/replace"]) {
+        assert.ok(!existsSync(join(dir, relative)), relative);
+      }
+      assert.ok(readdirSync(join(dir, "hooks")).every(sample => sample.endsWith(".sample")));
+      for (const line of git(repo, "config", "--no-includes", "--local", "--list").split("\n")) {
+        const key = line.split("=", 1)[0];
+        assert.match(key, /^(?:core\.(?:repositoryformatversion|filemode|bare|logallrefupdates)|remote\.origin\.(?:url|fetch)|branch\..+\.(?:remote|merge)|beads\.role|user\.(?:name|email))$/);
+        if (key === "remote.origin.url") assert.equal(line, `remote.origin.url=${remote}`);
+      }
+      assert.equal(git(repo, "for-each-ref", "--format=%(refname)", "refs/replace"), "");
+    }
+    const context = JSON.parse(bd(root, "--readonly", "context", "--json"));
+    const connection = JSON.parse(bd(root, "--readonly", "dolt", "show", "--json"));
+    assert.equal(context.beads_dir, join(root, ".beads"));
+    assert.equal(context.dolt_mode, "embedded");
+    assert.equal(context.is_redirected, false);
+    assert.equal(connection.embedded, true);
+    assert.notEqual(connection.shared_server, true);
+    assert.equal(realpathSync(resolve(root, connection.data_dir)), join(root, ".beads", "embeddeddolt"));
+    assert.deepEqual(JSON.parse(bd(root, "--readonly", "dolt", "remote", "list", "--json")), []);
+    const source = sourceAuthorityFiles(root), sourceExport = bd(root, "--readonly", "export", "--all");
+    const oldRequest = http.request, oldKill = process.kill;
+    const oldArtifacts = new Set(readdirSync(tmpdir()));
+    const phases = [], writes = [];
+    let teardownAttempts = 0, writesAtClose, readbacksAtClose, responseStatus, result;
+    http.request = function (...args) {
+      const method = args[1]?.method;
+      if (method === "POST" || method === "PUT") writes.push(method);
+      if (primaryFailure && method === "PUT" && responseStatus === undefined) {
+        const callback = args.at(-1);
+        args[args.length - 1] = response => {
+          responseStatus = response.statusCode;
+          response.statusCode = 503;
+          callback(response);
+        };
+      }
+      return oldRequest.apply(this, args);
+    };
+    syncBuiltinESMExports();
+    process.kill = function (pid, signal) {
+      const sent = oldKill.call(this, pid, signal);
+      if (pid < 0 && signal === "SIGTERM") {
+        teardownAttempts++;
+        writesAtClose = [...writes];
+        const name = readdirSync(tmpdir()).find(name => !oldArtifacts.has(name) && name.startsWith("prime-claw-migration-web-"));
+        readbacksAtClose = readdirSync(join(tmpdir(), name)).filter(file => /-task-view\.json$/.test(file));
+        // Signal the real owned test process, then inject the loss of stop
+        // proof at the native teardown boundary (not a macOS reproduction).
+        throw new Error("synthetic teardown proof failure (not for display)");
+      }
+      return sent;
+    };
+    try {
+      result = await migrateTaskProvider({ ...f.request, runner: new AsIsBeadsRunner(),
+        onProgress(phase, level) { phases.push({ phase, level }); },
+      });
+    } finally {
+      process.kill = oldKill; http.request = oldRequest; syncBuiltinESMExports();
+    }
+    const artifacts = readdirSync(tmpdir()).filter(name => !oldArtifacts.has(name) && name.startsWith("prime-claw-migration-web-"));
+    assert.equal(artifacts.length, 1);
+    const artifact = join(tmpdir(), artifacts[0]);
+    assert.equal(lstatSync(artifact).mode & 0o777, 0o700);
+    const readbacks = readdirSync(artifact).filter(name => /-task-view\.json$/.test(name));
+    assert.equal(teardownAttempts, 1, "there is no second stop attempt");
+    assert.deepEqual(writes, writesAtClose, "there are no Web writes after the teardown attempt");
+    const warning = /Owned Web shutdown was not proved \(owned-process-stop-unproved; outcome=uncertain\)/;
+    assert.doesNotMatch(JSON.stringify(result), /synthetic teardown proof failure/);
+    if (primaryFailure) {
+      assert.equal(responseStatus, 200, "native write finished before the test response was changed");
+      assert.equal(result.code, "pre-cutover-failed", result.detail);
+      assert.match(result.detail, /http-status-503; outcome=uncertain.*Warning: Owned Web shutdown was not proved/);
+      assert.match(result.detail, warning);
+      assert.equal(phases.some(({ phase }) => /Publishing verified|Guarded cutover/.test(phase)), false);
+      assert.deepEqual(sourceAuthorityFiles(root), source);
+      assert.equal(git(remote, "rev-parse", TASK_HISTORY_REF), baseline);
+      assert.equal(git(remote, "rev-parse", "refs/heads/main"), code);
+      assert.equal(result.sourceProvider, "beads");
+      assert.equal(bd(root, "--readonly", "export", "--all"), sourceExport);
+    } else {
+      assert.equal(result.status, "completed", result.detail);
+      assert.deepEqual(readbacks, readbacksAtClose, "all file-backed native task readbacks preceded teardown");
+      const finalReads = readbacks.sort((a, b) => parseInt(a, 10) - parseInt(b, 10)).slice(-Object.keys(ids).length)
+        .map(file => JSON.parse(readFileSync(join(artifact, file), "utf8")).task.id);
+      assert.deepEqual(finalReads.sort(), result.receipt.mappings.map(row => row.destinationTaskId).sort());
+      assert.equal(result.sourceAbsent, true);
+      assert.equal(result.selectedProvider, "backlog");
+      assert.equal(result.warnings?.length, 1);
+      assert.match(result.warnings[0], warning);
+      assert.doesNotMatch(JSON.stringify({ phases, result }), /prime-claw-migration-web-/);
+      const warningIndex = phases.findIndex(({ phase, level }) => level === "warning" && warning.test(phase));
+      assert.ok(warningIndex >= 0 && warningIndex < phases.findIndex(({ phase }) => /Publishing verified/.test(phase)));
+      assert.ok(phases.some(({ phase }) => /Guarded cutover/.test(phase)));
+      assert.equal(existsSync(join(root, ".beads")), false);
+      assert.deepEqual(result.receipt.mappings.map(row => row.sourceTaskId).sort(), Object.values(ids).sort());
+      const remoteReceipt = git(remote, "rev-parse", TASK_HISTORY_REF);
+      assert.equal(remoteReceipt, result.receipt.destinationReceiptRevision);
+      assert.equal(git(remote, "rev-parse", `${remoteReceipt}^`), result.receipt.destinationDataRevision);
+      assert.equal(git(remote, "rev-parse", "refs/heads/main"), git(root, "rev-parse", "HEAD"));
+      assert.equal(detectTaskProvider(root, RUNNER).evidence?.provider, "backlog");
+    }
+  });
+}
+
 test("isolated capture identity same-path control", { timeout: 120_000, skip: process.env.PRIME_CLAW_ISOLATED_IDENTITY_TEST !== "1" }, t => {
   assert.equal(tmpdir(), "/tmp");
   const f = embeddedBeadsSource(t, "identity-control");
