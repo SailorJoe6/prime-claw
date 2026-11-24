@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T20:04:00Z'
+updated_date: '2026-11-24T21:47:00Z'
 labels: []
 dependencies: []
 references:
@@ -615,4 +615,7 @@ Unblock with an approved writer that accepts an exact ID and a complete comment 
 
 ### Operator-approved scope replacement — fresh Backlog only
 The owning Conversation relayed Joe’s direct approval and explicitly instructed this Episode to publish it as scope only. The current Description, criteria and living plan replace the preserve-existing, matching-ID overwrite, resume/recovery, and alternate writer directions. The earlier contract and writer finding remain as historical evidence at `4746d0db935b18cd4274b231d9f2c4e525d73e6f`; they do not establish current behavior or authority to run. Task identity and lifecycle are unchanged. No implementation or live action was started.
+
+### Fresh-only execute following b7b503ea
+First implementation slice: make fresh-destination eligibility identical for inspection and confirm, refuse local or published installations before writes, and remove the superseded migration recovery/adoption routes used by that boundary. Validate refusal and untouched destination in disposable fixtures; preserve the current-state import and PRIMECLAW-69 immutable receipt-revision ticket evidence. Integrate published main 110e200e in this Episode only. Separately prove retained Beads backup, cutover and remaining simplification before claiming the full task complete.
 <!-- SECTION:NOTES:END -->
