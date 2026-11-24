@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T18:12:00Z'
+updated_date: '2026-11-24T18:22:00Z'
 labels: []
 dependencies: []
 references:
@@ -252,6 +252,10 @@ AC3 — Supported. spec-episode.ts prepareTaskEpisodeWorkspace and both committe
 AC4 — Supported. The audited spec-episode.ts assignment, ordinary handoff and execute-only paths preserve exact bindings and distinct publication, runtime, admission, callback and send facts. Same-operation recovery (check 200) preserves one initial assignment. Check 115 verifies execute-only provider shapes and ordering; checks 235–246 and 257 exercise admitted, refused, uncertain and callback paths across Backlog/Beads, including real JSONL callback failure. The readiness repair preserves placement → steer → sole follow-up and the complete Beads native view. The 379 Beads failure below qualifies the suite result; it was reproduced on the unchanged baseline, not treated as a passing case.
 
 Validation attribution: Tier 1 passed on exact clean f14070bcadaca465ffc5b6235082f532c382a17b, with network absence and teardown verified (.test-results/20261124T141142Z-95290-d4581a79/tier1/manifest.json). Broader offline Docker on that revision: 738/740 passed (.test-results/primeclaw-69-readiness/final-focused.log); .test-results/primeclaw-69-readiness/unrelated-baseline.log reproduces both failures on the prior code: stale tool-guidance metadata assertion and Beads continuation reporting “selected Episode journal identity does not match.” The exact diff f14070bcadaca465ffc5b6235082f532c382a17b..57918f84fa99d3035c18061e35379f5e2b1c5db1 changes only the named policy test in tests/test_future_plan_skills.py. With PyYAML it failed on the old assertion and passed after replacement with bounded exact localTaskEvidence and canonical ID/literal path assertions (.test-results/primeclaw-69-readiness-policy/baseline.log and candidate.log). No Tier 1 rerun is claimed on the test-only commit. No live lifecycle, activation, cleanup, merge or TASK-2 action.
+
+Episode integration candidate for owner review: 110e200e5754b2bdb517db3c2c4846cdb7a86c16; first parent (reviewed Episode) 57918f84fa99d3035c18061e35379f5e2b1c5db1, second parent (reviewed main) 482b7d9256d093705eae4a24f99ea9e7c03507e5. PRIMECLAW-59's stopped-existing-store receipt completion and verified Web shutdown dispositions remain in place. Both fresh import and receipt completion bind exact independent Backlog Git references only after direct receipt publication and native readback; complete native views still determine the receipt digest, and missing committed evidence stops cutover. The candidate registry blob matches the reviewed main exactly. No live switch, main merge, activation or restart performed.
+
+On this exact clean candidate: focused offline Docker migration 12/12, including receipt completion and drift refusal, both shutdown dispositions, ownership continuity, missing exact evidence, and deletion refusal. Focused evidence 559/560; the only failure (registered Beads continuation, selected Episode journal identity does not match) reproduced on exact first parent 57918f84fa99d3035c18061e35379f5e2b1c5db1 in the same image/command family. Tier 1 passed with networking absent and teardown verified. Logs: .test-results/primeclaw-69-integration/{migration,evidence,episode-parent-evidence,tier1}.log; Tier 1 manifest: .test-results/20261124T181818Z-563-421f7b52/tier1/manifest.json. Existing acceptance checks and status remain unchanged.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -276,4 +280,6 @@ Operator directed removal of copied Backlog ticket evidence from handoff. Resume
 Acceptance closeout candidate for owner review at Episode commit `57918f84fa99d3035c18061e35379f5e2b1c5db1`. All four native criteria are checked with evidence in Implementation Notes. Independent and branch-local Backlog now use exact committed Git references for lifecycle checkpoints, including registered readiness, with bounded on-demand reads and diffs. Legacy evidence remains readable without rewriting history; missing required evidence stops at the relevant boundary. Same-resource recovery, single assignment, delivery sequencing, execute-only behavior and native Beads envelopes are preserved.
 
 Tier 1 passed on production repair `f14070bcadaca465ffc5b6235082f532c382a17b`; broader offline Docker was 738/740 with both failures reproduced on the prior baseline. The subsequent test-only commit passed the targeted Python policy test. No Tier 1 rerun is claimed on the test-only commit. Task remains In Progress; nothing was merged, activated or cleaned up.
+
+Integration review candidate: `110e200e5754b2bdb517db3c2c4846cdb7a86c16`. Tier 1 passed on this exact clean merge; focused migration passed 12/12 and focused evidence passed 559/560 with the sole failure reproduced on the exact Episode parent. No merge to main or rollout.
 <!-- SECTION:FINAL_SUMMARY:END -->
