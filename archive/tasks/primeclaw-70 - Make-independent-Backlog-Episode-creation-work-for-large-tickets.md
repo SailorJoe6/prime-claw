@@ -4,6 +4,7 @@ title: Make independent Backlog Episode creation work for large tickets
 status: In Design
 assignee: []
 created_date: '2026-11-24 01:48'
+updated_date: '2026-11-24 01:55'
 labels: []
 dependencies: []
 references:
@@ -12,6 +13,8 @@ references:
   - src/prime-agent-plugin/extension-support/reviewed-plan-support.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
   - src/prime-agent-plugin/extension-support/project-initialization.ts
+  - >-
+    https://github.com/SailorJoe6/prime-claw/blob/6d027a68eab6a9c13b0ea5924ca737da5cd440bb/tasks/primeclaw-69%20-%20Use-Git-references-for-independent-Backlog-handoff-evidence.md
 priority: p1
 type: bug
 ordinal: 154000
@@ -20,6 +23,9 @@ ordinal: 154000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+## Superseded
+This task is superseded by [PRIMECLAW-69](https://github.com/SailorJoe6/prime-claw/blob/6d027a68eab6a9c13b0ea5924ca737da5cd440bb/tasks/primeclaw-69%20-%20Use-Git-references-for-independent-Backlog-handoff-evidence.md), which now covers creation and continuation across the full Backlog lifecycle. This ticket is retained for history, not scheduled separately.
+
 ## Problem
 Independent Backlog Episode creation has the same source-verified size risk as the PRIMECLAW-69 continuation incident. The pre-allocation native task read checks identity, status, plan, and publication consistency. A separate pre-session read from the prepared Episode clone checks ID/path, stores a full task snapshot in ownership, and includes prior/current snapshots in the initial execute prompt. Both paths use full `backlog task view --json` via `ProcessCommandRunner.run`, whose `spawnSync` uses Node’s default 1 MiB buffer. The observed ENOBUFS incident was in handoff; no creation incident is claimed.
 
