@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T09:39:00Z'
+updated_date: '2026-11-24T09:42:00Z'
 labels: []
 dependencies: []
 references:
@@ -174,6 +174,8 @@ Terminal observation candidate 38ff9a9c041172b2d8ed5b770e2f628be2bb79b4: merged 
 Prior terminal checkpoint candidate ec1b6f4ae9d30dcb187a84b5631cae4922aa4e9e: independent Backlog cleanup observes the exact recorded revision and literal active path in the selected task repository before ownership removal. Verified Git refs and legacy views produce a committed reference. Missing or mismatched evidence produces a bounded unavailable result, with no snapshot, mutable fallback or cleanup gate. Current active/archive observations, Beads and resource checks are unchanged. Offline Docker: 437/437 passed (.test-results/primeclaw-69-prior-terminal/candidate-focused.log), including distinct prior, local and published commits, legacy evidence for both outcomes, absent commit and wrong committed canonical ID. Tier 1 passed offline with verified teardown (.test-results/20261124T091610Z-26339-6fcf05b2/tier1/manifest.json). No live cleanup, TASK-2 action, merge, or activation.
 
 Guidance candidate 4e648280b84273368fecb19b3e723860466d8d37: owner oversight, Expert review, blocker clearance/resume and terminal guidance now use bounded exact committed Git evidence for both Backlog layouts, preserve native authoring, owner-only lifecycle decisions, Beads and legacy records, and distinguish publication, absence and unavailable evidence. Managed blocked template and tracked copy aligned. Offline Docker evidence regressions 437/437 (.test-results/primeclaw-69-guidance/candidate-evidence.log); guidance contracts 21/22, with unchanged Expert model-selection assertion failure reproduced on baseline ec1b6f4ae9d30dcb187a84b5631cae4922aa4e9e (.test-results/primeclaw-69-guidance/candidate-skills.log and baseline-skills.log); offline Tier 1 passed with teardown (.test-results/20261124T092921Z-50075-7129b449/tier1/manifest.json). Remaining runtime evidence gaps (not changed here): branch-local status reports a local exact-path commit rather than a published reference pair and still uses buffered native reads; legacy independent initial workspace recovery can still emit a full native view. Cleanup does not report Episode task-clone publication; the owner proves terminal publication and workspace facts before removal. No live cleanup, TASK-2 action, merge or activation.
+
+Bounded guidance revision candidate a34feb4e6d411bd2d0119b97c80709c089243ad8 addresses only the three review conflicts: blocked clearance rechecks the newly selected committed ticket after workspace sync and before editing; oversight distinguishes independent task revisions from branch-local code commits and describes cleanup as Git references or availability facts, not ticket bodies; execute-only distinguishes bounded Backlog refs from complete native Beads/runtime observations. Managed blocked copy and template match; tracked manifest hashes updated. Offline Docker: 437/437 evidence checks passed (.test-results/primeclaw-69-guidance-revision/candidate-evidence.log); guidance 21/22 with the same Expert model-selection assertion on baseline 4e648280b84273368fecb19b3e723860466d8d37 (.test-results/primeclaw-69-guidance-revision/candidate-skills.log and baseline-skills.log). Offline Tier 1 passed with teardown verified (.test-results/20261124T094018Z-69501-09f9836c/tier1/manifest.json). No runtime wiring, TASK-2 action, cleanup, merge or activation.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -216,4 +218,6 @@ Backlog terminal results now use committed references for active and archived ti
 Independent Backlog cleanup now reports the verified prior checkpoint or an availability gap without changing cleanup eligibility.
 
 Editable owner and Expert guidance now reads committed Backlog evidence in both layouts without copied tickets or new runtime gates.
+
+Review revision clarifies post-sync clearance judgment, terminal Backlog evidence and execute-only observation formats.
 <!-- SECTION:FINAL_SUMMARY:END -->
