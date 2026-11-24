@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T09:18:00Z'
+updated_date: '2026-11-24T09:21:00Z'
 labels: []
 dependencies: []
 references:
@@ -109,6 +109,8 @@ Accept the reviewed retained ownership-transition revision 178056a6. Advance one
 Accept the reviewed Beads→Backlog cutover evidence at cf9878ea. Advance one bounded slice: merged and abandoned Backlog terminal observations in finalizeTaskEpisodeCleanup and its existing observation helpers, covering both Backlog topologies where applicable. Replace newly emitted ticket views and full Git blob output with exact committed repository/commit/path references, plus bounded factual availability/publication observations. Preserve archived versus active distinctions and leave judgment, lifecycle publication and cleanup authorization with editable guidance and the owning Conversation. Keep exact resource checks, compare-delete, and Beads behavior unchanged. No guessed history, mutable fallback, new state or coded semantic judgment. Use disposable offline Docker fixtures only; do not invoke live cleanup, retire resources, touch TASK-2, merge or activate. Run focused regressions and Tier 1 on the clean candidate where practical, publish code and task evidence separately, and stop for review. Leave the broader oversight/review guidance audit for a later slice.
 
 One bounded revision of Backlog terminal observations at 38ff9a9c. Keep the previous independent Backlog ticket checkpoint in the cleanup result: verify a repository/commit/literal active path reference using the recorded revision and exact binding (including valid legacy evidence), or report a bounded factual availability gap. Do not use current HEAD as the prior checkpoint or emit a ticket snapshot. Capture the observation before compare-delete can erase the owner entry. It is evidence only, not a new cleanup gate. Preserve current active/archive observations, authorization, resource checks, compare-delete and Beads behavior. Add focused offline tests for a verifiable prior checkpoint and an unavailable or mismatched checkpoint, including legacy compatibility where applicable. Run Tier 1 on the clean candidate, publish code and task evidence separately, then stop for review. No live cleanup, TASK-2 action, merge or activation.
+
+Accept the reviewed cleanup checkpoint revision ec1b6f4a. Advance one bounded slice: update editable owner oversight, expert review and block/resume/terminal guidance and their managed templates to consume the existing exact Backlog Git references in both layouts. Keep native CLI authoring and lifecycle status authority, semantic judgment with the LLM, Beads and legacy records unchanged. For Backlog inspect or diff exact committed ticket content in bounded ranges and report unavailable evidence at the relevant boundary; no copied snapshots, guessed historical revisions or mutable fallback. Do not add a coded gate or new state. Audit touched guidance and docs for contradictory snapshot instructions, use existing offline Docker fixtures and Tier 1 on the exact candidate, then publish code and task notes separately and stop for review. Report any remaining production evidence gap instead of expanding this slice. No live cleanup, TASK-2 action, merge or activation.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
