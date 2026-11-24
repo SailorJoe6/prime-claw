@@ -4,7 +4,7 @@ title: Use Git references for independent Backlog handoff evidence
 status: In Progress
 assignee: []
 created_date: 2026-11-24 01:43
-updated_date: '2026-11-24T06:32:00Z'
+updated_date: '2026-11-24T06:46:00Z'
 labels: []
 dependencies: []
 references:
@@ -29,6 +29,8 @@ modified_files:
   - tests/spec_episode_extension.test.mjs
   - tests/task_episode_admission_extension.test.mjs
   - src/prime-agent-plugin/extensions/reviewed-plan.ts
+  - .agents/skills/execute/SKILL.md
+  - .prime-claw/workflows/handoff.md
 priority: p0
 type: bug
 ordinal: 153000
@@ -97,6 +99,8 @@ Plan step 2 candidate (partial AC1/AC2/AC4), code 2fa5c80943eae6943891ee900213ff
 Step 2 revision candidate 981871d5e4e7a9d9523c4d4269072283bf57651e: the registered create_task_episode entry streams exact native identity for fresh independent Backlog creation, without changing the existing-operation route or other providers. Before assignment the Episode clone resolves both the reserved and fetched published blobs. A retained local advance is a separate observation, not a published revision; the clone is not reset or pushed. Registered-tool offline tests with pinned Backlog 1.55.3 cover a committed native view over 1 MiB and one initial execute through the test session adapter, a shallow retained clone missing the previous commit (no session or assignment, same operation retained), and a retained local ticket commit ahead of the fetched ref (no push). All 442 tests passed, no skips: .test-results/primeclaw-69-streamed-creation/docker-revision-full.log. Offline Tier 1 source probe passed with verified teardown: .test-results/20261124T051519Z-573-f76b062c/tier1/manifest.json. Step 2 only; no later lifecycle wiring, acceptance checkoffs, merge or activation. Await owner review.
 
 Step 3 independent Backlog ordinary handoff and execute-only stopped before implementation. Both call preparePublishedBacklogHandoffEvidence, which verifies the freshly selected task ID and exact path from buffered backlog task view --json before delivery. Offline Docker with pinned Backlog 1.55.3 and a committed valid TASK-1 fixture returned 1,101,383 bytes of native JSON; the continuation ProcessCommandRunner returned status 1 with incomplete JSON. Native list and search structured results returned the ID but no file path; task view has no field projection. Git metadata alone verifies the exact repository, commit, literal path and regular blob, not the canonical task ID inside a changed blob. The existing committed reader cannot substitute as-is: its 64 KiB frontmatter limit refused the fixture with a quoted ID after a 70 KiB comment. Repro and output: .test-results/primeclaw-69-continuation-native-compat/fixture.sh and .test-results/primeclaw-69-continuation-native-compat/result.log. Unblock by establishing a supported exact identity proof usable with the current published and required historical blobs for valid large tickets, or explicitly approving a narrowly revised proof path (for example, scope the creation-only streamed identity check to current continuation selection as well, and resolve historical identity separately without mutable fallback). No code changes, delivery attempt, replay, ownership edit, or acceptance checkoff. Ticket remains In Progress; preserve same Episode and await owner decision.
+
+Step 3 independent Backlog continuation slice implemented for ordinary handoff and execute-only. Both verify exact prior and fetched published Git ticket references before delivery, with native canonical ID verification on committed frontmatter only, no fixed header gate or full native ticket snapshot. Preserve old journal records, separate retained local evidence and selected-path status from publication, and keep the existing delivery and factual update sequence. Editable workflows read/diff exact commits on demand. Final offline Docker affected suites passed 449/449 with zero skips (.test-results/primeclaw-69-continuation-cleared/scope-final.log), including committed >1 MiB native JSON, >64 KiB frontmatter, on-demand reads after history advance and pre-delivery refusal for missing/wrong evidence. Tier 1 passed with clean teardown (.test-results/20261124T064023Z-43527-354dad06/tier1/manifest.json). Wider JS sweep is not green: candidate run before integration assertion update and baseline both had 13 failures with overlapping out-of-scope failures and differing native-fixture failures; the updated integration test passed in the final affected suites. No claim of whole-lifecycle acceptance. Stop for owner review; no status transition, merge, activation or live continuation.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
