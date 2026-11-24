@@ -3051,7 +3051,7 @@ function independentStatusFixture(t) {
     remoteHead, codeSnapshot, dirtyCode, divergeCode, taskCommitPaths, diskRecord, get record() { return records.get("independent-status-owner") ?? null; } };
 }
 
-test("independent Backlog status publication preserves unrelated staged, unstaged, untracked and divergent parent code", (t) => {
+test("independent Backlog status publication preserves unrelated staged, unstaged, untracked and divergent parent code", async (t) => {
   const f = independentStatusFixture(t); if (!f) return;
   f.divergeCode(); f.dirtyCode();
   const before = f.codeSnapshot(), taskBefore = f.git(f.store, "rev-parse", "HEAD");
@@ -3060,7 +3060,7 @@ test("independent Backlog status publication preserves unrelated staged, unstage
   for (const method of ["branch", "operationInProgress", "trackedStatus", "upstreamHead"]) {
     publicationGit[method] = () => { throw new Error(`task-only publication called code admission ${method}`); };
   }
-  const result = commitConversationTaskStatus({ ...f.statusOptions,
+  const result = await commitConversationTaskStatus({ ...f.statusOptions,
     git: publicationGit,
   });
   assert.equal(result.commit, before.head);
@@ -3203,7 +3203,7 @@ test("session binding failure retains uncertain resources and permits owner-requ
   const admissionEvidence = structuredClone(f.record.taskEvidence);
   assert.equal(admissionEvidence.kind, "backlog-git");
   assert.equal(admissionEvidence.commit, taskAfterAdmission);
-  const blocked = commitConversationTaskStatus({ ...f.statusOptions, status: "Blocked", note: "Owner-requested blocker: session binding outcome unknown", message: "record actual blocker" });
+  const blocked = await commitConversationTaskStatus({ ...f.statusOptions, status: "Blocked", note: "Owner-requested blocker: session binding outcome unknown", message: "record actual blocker" });
   assert.equal(blocked.taskHistory.status, "published");
   assert.equal(f.view().status, "Blocked");
   assert.match(f.view().implementationNotes, /session binding outcome unknown/);
@@ -3235,7 +3235,7 @@ test("independent status publication incorporates an authorized selected-ticket 
   const f = independentStatusFixture(t); if (!f) return;
   const before = f.codeSnapshot();
   appendFileSync(join(f.root, f.task.path), "\nAuthorized selected-ticket evidence.\n");
-  const result = commitConversationTaskStatus(f.statusOptions);
+  const result = await commitConversationTaskStatus(f.statusOptions);
   assert.equal(result.taskHistory.status, "published");
   assert.match(readFileSync(join(f.root, f.task.path), "utf8"), /Authorized selected-ticket evidence/);
   assert.equal(f.view().status, "In Progress");
@@ -3244,29 +3244,26 @@ test("independent status publication incorporates an authorized selected-ticket 
   assert.deepEqual(f.codeSnapshot(), before);
 });
 
-test("independent status publication preserves exact identity checks before native edit", (t) => {
+test("independent status publication preserves exact identity checks before native edit", async (t) => {
   const f = independentStatusFixture(t); if (!f) return;
-  const current = f.dependencies.taskResolver(f.root, f.taskId), published = f.remoteHead(TASK_HISTORY_REF);
-  let publications = 0;
+  const published = f.remoteHead(TASK_HISTORY_REF);
   for (const [patch, pattern] of [
-    [{ taskId: "FOREIGN-1" }, /could not be re-resolved exactly/],
-    [{ taskPathRelative: ".backlog/tasks/foreign.md" }, /changed project or path/],
-  ]) assert.throws(() => commitConversationTaskStatus({ ...f.statusOptions,
-    resolveTask: () => ({ ...current, ...patch }),
-    publishTaskHistory: () => { publications += 1; throw new Error("must not publish"); },
+    [{ taskId: "FOREIGN-1" }, /native-read-failed/],
+    [{ taskPath: ".backlog/tasks/foreign.md" }, /changed project or path/],
+  ]) await assert.rejects(() => commitConversationTaskStatus({ ...f.statusOptions, ...patch,
+    resolveTask: () => assert.fail("do not capture a full native read"),
   }), pattern);
-  assert.equal(publications, 0);
   assert.equal(f.git(f.store, "rev-parse", "HEAD"), published);
   assert.equal(f.view().status, "In Planning");
 });
 
-test("independent status publication reports task push failure without claiming success or discarding local evidence", (t) => {
+test("independent status publication reports task push failure without claiming success or discarding local evidence", async (t) => {
   const f = independentStatusFixture(t); if (!f) return;
   const before = f.codeSnapshot(), published = f.remoteHead(TASK_HISTORY_REF);
   const run = f.runner.run.bind(f.runner);
   f.runner.run = (command, args, options) => command === "git" && args[0] === "-C" && args[1] === f.store && args[2] === "push"
     ? { status: 1, stdout: "", stderr: "fixture task-history push rejected" } : run(command, args, options);
-  assert.throws(() => commitConversationTaskStatus(f.statusOptions), /did not return published task-history evidence.*push-failed/);
+  await assert.rejects(() => commitConversationTaskStatus(f.statusOptions), /did not return published task-history evidence.*push-uncertain/);
   assert.equal(f.remoteHead(TASK_HISTORY_REF), published);
   assert.notEqual(f.git(f.store, "rev-parse", "HEAD"), published);
   assert.equal(f.view().status, "In Progress", "retain the unpublished local task mutation for recovery");
@@ -3275,11 +3272,11 @@ test("independent status publication reports task push failure without claiming 
   assert.equal(f.record, null);
 });
 
-test("independent status publication reports success without attributing a concurrent code HEAD advance to task work", (t) => {
+test("independent status publication reports success without attributing a concurrent code HEAD advance to task work", async (t) => {
   const f = independentStatusFixture(t); if (!f) return;
   const before = f.git(f.root, "rev-parse", "HEAD");
-  const result = commitConversationTaskStatus({ ...f.statusOptions, publishTaskHistory(input) {
-    const publication = publishTaskHistoryMutation(input);
+  const result = await commitConversationTaskStatus({ ...f.statusOptions, async publishTaskHistory(input) {
+    const publication = await publishTaskHistoryMutation(input);
     assert.equal(publication.status, "published");
     f.git(f.root, "commit", "--allow-empty", "-qm", "concurrent code HEAD mutation");
     return publication;

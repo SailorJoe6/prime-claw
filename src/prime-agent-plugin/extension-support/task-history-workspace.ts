@@ -47,7 +47,7 @@ import {
 } from "./task-providers.ts";
 import { isBacklogTaskEpisodeOwnership, readAllEpisodeOwnership } from "./episode-ownership.ts";
 import { referenceCommittedBacklogTask, type BacklogGitEvidence } from "./backlog-git-evidence.ts";
-import { readBacklogCreationIdentity } from "./backlog-creation-identity.ts";
+import { readBacklogCreationIdentity, readBacklogMutationIdentity } from "./backlog-creation-identity.ts";
 
 /** The disconnected task-history branch Prime Claw manages. */
 export const TASK_HISTORY_REF = "refs/heads/prime-claw/tasks";
@@ -2061,6 +2061,8 @@ export type EpisodeTaskHistoryInspection =
 export interface EpisodeTaskHistoryMutationInput extends EpisodeTaskHistoryWorkspaceInput {
   /** Exact canonical task ID to resolve before and after the native mutation. */
   taskId: string;
+  /** The already selected project-relative path when the caller has one. */
+  taskPath?: string;
   /** Native `backlog task edit` option/value pairs; positional IDs are impossible. */
   edits: Array<{ option: string; value?: string }>;
   /** Ordinary Git commit message; defaults to `prime-claw: update <taskId>`. */
@@ -2715,11 +2717,15 @@ function strictCleanStatus(storeDir: string, runner: CommandRunner) {
   return runGit(runner, storeDir, ["--no-optional-locks", "status", "--porcelain", "--ignored", "--untracked-files=all"]);
 }
 
-function readNativeTask(
+async function readNativeTask(
   cwd: string,
   taskId: string,
   runner: CommandRunner,
-): NativeTaskView | { error: string } {
+): Promise<NativeTaskView | { error: string }> {
+  if (runner instanceof ProcessCommandRunner) {
+    try { return await readBacklogMutationIdentity(cwd, taskId); }
+    catch { return { error: "bounded native Backlog identity read failed" }; }
+  }
   const result = runner.run("backlog", ["task", "view", "--json", "--", taskId], { cwd, allowFailure: true });
   if (result.status !== 0) {
     return { error: `backlog task view exited ${result.status}` };
@@ -3156,7 +3162,7 @@ function mutationTaskReference(
   }
 }
 
-export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInput): EpisodeTaskHistoryMutation {
+export async function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInput): Promise<EpisodeTaskHistoryMutation> {
   const runner = input.runner ?? new ProcessCommandRunner();
   if (!validNativeTaskEdits(input)) {
     return mutationBlocked(
@@ -3181,12 +3187,15 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
     return mutationBlocked(input.taskId, "unreadable", `reading the task-history HEAD failed: ${baseHeadResult.stderr.trim() || baseHeadResult.stdout.trim() || `exit ${baseHeadResult.status}`}`, "inspect the retained clone and native Git result", { storeDir: clone.storeDir, remote: clone.remote });
   }
   const evidence = { storeDir: clone.storeDir, remote: clone.remote, baseHead };
-  const before = readNativeTask(clone.targetWorktree, input.taskId, runner);
+  const before = await readNativeTask(clone.targetWorktree, input.taskId, runner);
   if ("error" in before) {
     return mutationBlocked(input.taskId, "native-read-failed", `native resolution of ${input.taskId} failed: ${before.error}`, "inspect the native task read result; no mutation was attempted", evidence);
   }
   if (before.id !== input.taskId) {
     return mutationBlocked(input.taskId, "identity-mismatch", `native resolution returned canonical ID ${JSON.stringify(before.id)}, not exact requested ID ${JSON.stringify(input.taskId)}`, "use the exact canonical task ID; no mutation was attempted", evidence);
+  }
+  if (input.taskPath !== undefined && before.path !== input.taskPath) {
+    return mutationBlocked(input.taskId, "identity-mismatch", "native task changed project or path", "no mutation was attempted", evidence);
   }
   const taskFile = proveNativeTaskFileIdentity(clone.targetWorktree, clone.storeDir, before.path, runner);
   if (taskFile.status === "blocked") {
@@ -3195,19 +3204,30 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
   const storeTaskPath = taskFile.storePath;
   const taskPathspec = `:(literal)${storeTaskPath}`;
   const beforeBlob = nativeTicketBlob(clone, storeTaskPath, runner);
-  const previous = readNativeTask(clone.targetWorktree, input.taskId, runner);
-  const previousTaskEvidence = !("error" in previous) && previous.id === before.id && previous.path === before.path
-    && beforeBlob === nativeTicketBlob(clone, storeTaskPath, runner)
+  const previous = await readNativeTask(clone.targetWorktree, input.taskId, runner);
+  const selected = { ...evidence, taskPath: before.path };
+  if ("error" in previous) {
+    return mutationBlocked(input.taskId, "native-read-failed", `final pre-edit resolution failed: ${previous.error}`, "no mutation was attempted", selected);
+  }
+  if (previous.id !== before.id || previous.path !== before.path) {
+    return mutationBlocked(input.taskId, "identity-mismatch", "final pre-edit native ID or path changed", "no mutation was attempted", selected);
+  }
+  const finalFile = proveNativeTaskFileIdentity(clone.targetWorktree, clone.storeDir, previous.path, runner);
+  if (finalFile.status === "blocked" || finalFile.storePath !== storeTaskPath) {
+    return mutationBlocked(input.taskId, "identity-mismatch", "final pre-edit native task file identity is unsafe", "no mutation was attempted", selected);
+  }
+  const previousTaskEvidence = beforeBlob === nativeTicketBlob(clone, storeTaskPath, runner)
     ? mutationTaskReference(clone, baseHead, storeTaskPath, beforeBlob, runner) : undefined;
   const targeted = { ...evidence, taskPath: before.path, ...(previousTaskEvidence ? { previousTaskEvidence } : {}) };
 
-  const editResult = runner.run("backlog", nativeTaskEditArgs(input), { cwd: clone.targetWorktree, allowFailure: true });
-  // Backlog plain output can contain the entire edited ticket.
-  const nativeEdit: CommandResult = { ...editResult, stdout: "", stderr: "" };
+  let nativeStatus: number | null = null;
+  try { nativeStatus = await editBacklogForCreation(clone.targetWorktree, nativeTaskEditArgs(input), runner); }
+  catch { /* Launch failure has no native exit status. */ }
+  const nativeEdit: CommandResult = { status: nativeStatus ?? 1, nativeStatus, stdout: "", stderr: "" };
   // Reread even a failed edit so partial native changes remain visible. No
   // cleanup, reset, or retry removes the provider's own failure evidence.
   const observedBlob = nativeTicketBlob(clone, storeTaskPath, runner);
-  const after = readNativeTask(clone.targetWorktree, input.taskId, runner);
+  const after = await readNativeTask(clone.targetWorktree, input.taskId, runner);
   if ("error" in after) {
     return mutationBlocked(input.taskId, nativeEdit.status === 0 ? "native-read-failed" : "native-mutation-failed", `native edit exit ${nativeEdit.status}; post-edit resolution failed: ${after.error}`, "inspect and retain the local task change and native results; no commit was attempted", { ...targeted, nativeEdit });
   }
@@ -3252,9 +3272,10 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
     ? /^([0-9a-f]{40})\trefs\/heads\/prime-claw\/tasks$/.exec(remoteLines[0]) : null;
   const remoteHead = remoteMatch?.[1] ?? null;
   const publicationEvidence = { ...editedEvidence, committedHead, taskEvidence, commit, push, remoteRead, localHead: localHead ?? undefined, remoteHead: remoteHead ?? undefined };
-  if (push.status !== 0) {
-    const uncertain = push.nativeStatus === null || Boolean(push.signal);
-    return mutationBlocked(input.taskId, uncertain ? "push-uncertain" : "push-failed", `ordinary non-force push ${uncertain ? "outcome uncertain" : "failed"}: ${push.stderr.trim() || push.stdout.trim() || `exit ${push.status}`}`, "retain the exact local commit and native remote observations for workflow judgment; no fetch, merge, force, or retry was attempted", publicationEvidence);
+  // A different tip does not establish that this commit was never published.
+  // An exact direct ref can prove publication independently of the push exit.
+  if (push.status !== 0 && remoteHead !== committedHead) {
+    return mutationBlocked(input.taskId, "push-uncertain", `ordinary non-force push exited ${push.status}; direct remote publication is unproved`, "retain the exact local commit and native remote observations for workflow judgment; no fetch, merge, force, or retry was attempted", publicationEvidence);
   }
 
   // A successful native push remains a successful push if another publisher
@@ -3263,7 +3284,7 @@ export function publishTaskHistoryMutation(input: EpisodeTaskHistoryMutationInpu
 }
 
 /** Backward-compatible Episode-specific name for the shared primary/linked mutation seam. */
-export function publishEpisodeTaskHistoryMutation(input: EpisodeTaskHistoryMutationInput): EpisodeTaskHistoryMutation {
+export function publishEpisodeTaskHistoryMutation(input: EpisodeTaskHistoryMutationInput): Promise<EpisodeTaskHistoryMutation> {
   return publishTaskHistoryMutation(input);
 }
 

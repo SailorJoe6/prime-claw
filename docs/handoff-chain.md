@@ -251,14 +251,19 @@ create mutation results through one initial execute. No new mirror or assignment
 
 ### Independent Backlog status publication evidence
 
-Status mutation results use immutable ticket references instead of native JSON
-or copied diffs. A preceding reference is included only when the native read
-can be tied to the exact base blob. Before a verified commit, the result gives
-native operation facts but no new ticket reference. After a failed or
-interrupted push, `taskEvidence` and `committedHead` identify the retained local
-commit, not publication. A successful push reports its exact `publishedHead`;
-the later direct remote read is separate and can show a newer tip or be
-unavailable. None of these outcomes triggers a retry or reconciliation.
+Status mutation reads only the native identity facts it needs and discards
+edit output. If the final pre-edit read fails or returns a different canonical
+ID or path, no edit occurs. A preceding reference is included only when the
+native read can be tied to the exact base blob. Before a verified commit there
+is no new ticket reference.
+
+The native push result and the later remote observation are separate. A
+successful push reports its exact `publishedHead` even if the later remote read
+shows a newer tip or is unavailable. A nonzero exit with an exact matching
+remote ref still proves publication. Without that proof the result is uncertain:
+`taskEvidence` and `committedHead` identify the retained local commit, not
+publication. There is no retry or reconciliation. New reservations require
+verified committed Git evidence; legacy records remain readable as-is.
 
 ### Independent Backlog creation evidence
 

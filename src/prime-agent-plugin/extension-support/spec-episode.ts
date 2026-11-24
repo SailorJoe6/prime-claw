@@ -310,7 +310,8 @@ export type TaskEpisodeCreationResult = TaskEpisodeResult & {
 export interface TaskEpisodeAllocationDependencies extends EpisodeDependencies {
   admissionRunner?: CommandRunner;
   taskResolver?: (cwd: string, taskId: string) => BacklogTaskSelection | null;
-  prepareEpisodeTaskHistory?: typeof prepareEpisodeTaskHistoryWorkspace;
+  prepareEpisodeTaskHistory?: (...args: Parameters<typeof prepareEpisodeTaskHistoryWorkspace>) =>
+    ReturnType<typeof prepareEpisodeTaskHistoryWorkspace> | Promise<ReturnType<typeof prepareEpisodeTaskHistoryWorkspace>>;
   /** Ephemeral evidence from fresh branch-local status admission. */
   branchLocalAdmissionEvidence?: BacklogGitEvidence;
   beadsTransport?: typeof prepareBeadsWorkspaceTransport;
@@ -322,7 +323,7 @@ export interface TaskEpisodeCreationDependencies extends TaskEpisodeAllocationDe
   admissionGit?: TaskEpisodeAdmissionGit;
   providerDetector?: typeof detectTaskProvider;
   providerTaskResolver?: typeof resolveSynchronizedProviderTask;
-  commitTaskStatus?: typeof commitConversationTaskStatus;
+  commitTaskStatus?: (options: ConversationTaskStatusOptions & { expectedProvider: "beads" }) => ConversationTaskStatusCommitResult;
   reserveTaskOwnership?: typeof reserveTaskEpisodeOwnership;
   reservePublishedBacklogTaskOwnership?: typeof reservePublishedBacklogTaskEpisodeOwnership;
   reserveBeadsTaskOwnership?: typeof reservePublishedBeadsTaskEpisodeOwnership;
@@ -2395,7 +2396,7 @@ async function prepareTaskEpisodeWorkspace(
     }
   }
   const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
-  const prepared = (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
+  const prepared = await (dependencies.prepareEpisodeTaskHistory ?? prepareEpisodeTaskHistoryWorkspace)({
     primaryRoot: repo,
     targetWorktree: record.worktree!,
     runner,
@@ -2803,10 +2804,11 @@ class BacklogTaskHistoryPublicationError extends Error {
 }
 
 export type ConversationTaskStatusCommitResult =
-  | { selection: BacklogTaskSelection; commit: string; taskHistory?: PublishedBacklogTaskHistoryMutation }
+  | { selection: BacklogTaskSelection; commit: string; taskHistory?: undefined }
+  | { selection: BacklogCreationIdentity; commit: string; taskHistory: PublishedBacklogTaskHistoryMutation }
   | BeadsTaskMutationPublication;
 
-export function commitConversationTaskStatus(options: {
+interface ConversationTaskStatusOptions {
   taskId: string;
   projectRoot: string;
   taskPath: string;
@@ -2818,7 +2820,11 @@ export function commitConversationTaskStatus(options: {
   resolveTask: (cwd: string, taskId: string) => BacklogTaskSelection | null;
   expectedProvider?: "backlog" | "beads";
   publishTaskHistory?: typeof publishTaskHistoryMutation;
-}): ConversationTaskStatusCommitResult {
+}
+
+export function commitConversationTaskStatus(options: ConversationTaskStatusOptions & { expectedProvider: "beads" }): ConversationTaskStatusCommitResult;
+export function commitConversationTaskStatus(options: ConversationTaskStatusOptions): ConversationTaskStatusCommitResult | Promise<ConversationTaskStatusCommitResult>;
+export function commitConversationTaskStatus(options: ConversationTaskStatusOptions): ConversationTaskStatusCommitResult | Promise<ConversationTaskStatusCommitResult> {
   const provider = detectTaskProvider(options.projectRoot, options.runner);
   if (options.expectedProvider
       && (provider.kind !== "selected" || provider.evidence.provider !== options.expectedProvider)) {
@@ -2860,30 +2866,7 @@ export function commitConversationTaskStatus(options: {
     throw new Error("Untracked non-independent Backlog task history requires the reviewed migration/cutover before lifecycle mutation");
   }
   if (trackedTask.status === 1 && independentTaskHistory) {
-    const codeHead = options.git.head(options.projectRoot);
-    readExactBacklogTask();
-    const publication = (options.publishTaskHistory ?? publishTaskHistoryMutation)({
-      primaryRoot: options.projectRoot,
-      targetWorktree: options.projectRoot,
-      taskId: options.taskId,
-      edits: [
-        { option: "--status", value: options.status },
-        ...(options.note ? [{ option: "--append-notes", value: options.note }] : []),
-      ],
-      commitMessage: options.message,
-      runner: options.runner,
-    });
-    if (publication.status !== "published") {
-      throw new BacklogTaskHistoryPublicationError(`Independent Backlog ${options.status} publication`, publication);
-    }
-    const selection = exactAdmissionTask(
-      options.resolveTask(options.projectRoot, options.taskId),
-      options.taskId, options.projectRoot, options.taskPath,
-    );
-    if (selection.status !== options.status || selection.taskPathRelative !== publication.taskPath) {
-      throw new Error(`Independent Backlog task ${options.taskId} did not preserve exact ${options.status} task identity`);
-    }
-    return { selection, commit: codeHead, taskHistory: publication };
+    return publishIndependentBacklogStatus(options);
   }
 
   // Preserve the ordinary Backlog task-file path exactly: native status edit,
@@ -2911,6 +2894,30 @@ export function commitConversationTaskStatus(options: {
     throw new Error(`Task-native Episode status commit contains paths other than ${options.taskPath}`);
   }
   return { selection, commit };
+}
+
+async function publishIndependentBacklogStatus(options: ConversationTaskStatusOptions): Promise<ConversationTaskStatusCommitResult> {
+  const codeHead = options.git.head(options.projectRoot);
+  const publication = await (options.publishTaskHistory ?? publishTaskHistoryMutation)({
+    primaryRoot: options.projectRoot,
+    targetWorktree: options.projectRoot,
+    taskId: options.taskId,
+    taskPath: options.taskPath,
+    edits: [
+      { option: "--status", value: options.status },
+      ...(options.note ? [{ option: "--append-notes", value: options.note }] : []),
+    ],
+    commitMessage: options.message,
+    runner: options.runner,
+  });
+  if (publication.status !== "published") {
+    throw new BacklogTaskHistoryPublicationError(`Independent Backlog ${options.status} publication`, publication);
+  }
+  const selection = await readBacklogCreationIdentity(options.projectRoot, options.taskId);
+  if (selection.status !== options.status || selection.path !== options.taskPath || selection.path !== publication.taskPath) {
+    throw new Error(`Independent Backlog task ${options.taskId} did not preserve exact ${options.status} task identity`);
+  }
+  return { selection, commit: codeHead, taskHistory: publication };
 }
 
 function bestEffortTaskPush(git: TaskEpisodeAdmissionGit, projectRoot: string): string | undefined {
@@ -3516,10 +3523,11 @@ export async function createTaskEpisode(
         admissionResult = { selection: streamedSelection, commit };
         branchLocalAdmissionEvidence = await makeBacklogGitEvidence(repository, commit, taskPath, taskId);
       } else {
-        const admitted = commitConversationTaskStatus({
+        const admitted = await commitConversationTaskStatus({
           taskId, projectRoot, taskPath, status: "In Progress", expectedProvider: "backlog", message,
           runner, git, resolveTask, publishTaskHistory: dependencies.publishTaskHistory,
-        }) as Extract<ConversationTaskStatusCommitResult, { selection: BacklogTaskSelection }>;
+        });
+        if (!("selection" in admitted)) throw new Error("Expected Backlog task admission result");
         admissionResult = admitted;
         ({ commit, taskHistory } = admitted);
       }
@@ -3542,7 +3550,7 @@ export async function createTaskEpisode(
         },
       };
       const reservation = taskHistory
-        ? reservePublishedBacklog({ ...reservationBase, publication: taskHistory }, {
+        ? await reservePublishedBacklog({ ...reservationBase, publication: taskHistory }, {
             ownership: reservationOwnership,
             taskResolver: resolveTask,
             now: dependencies.now,

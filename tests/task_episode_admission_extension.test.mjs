@@ -693,17 +693,18 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   let reservedTaskEvidence = null;
   const prepareEpisodeTaskHistory = (input) => {
     preparationCalls += 1;
-    if (preparationCalls === 1) {
+    if (preparationCalls === 1) return (async () => {
       const reserved = records.get("independent-owner");
       reservedProviderRevision = reserved.providerRevision;
       reservedTaskEvidence = structuredClone(reserved.taskEvidence);
-      interleavedAdvance = publishTaskHistoryMutation({
+      interleavedAdvance = await publishTaskHistoryMutation({
         primaryRoot: root, targetWorktree: root, taskId,
         edits: [{ option: "--append-notes", value: "compatible pre-session observation marker" }],
         runner,
       });
       assert.equal(interleavedAdvance.status, "published");
-    }
+      return prepareEpisodeTaskHistoryWorkspace(input);
+    })();
     return prepareEpisodeTaskHistoryWorkspace(input);
   };
   const result = await createTaskEpisode(taskId, "independent-call", ctx, {
@@ -760,7 +761,7 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
 
   git(join(result.worktree, ".backlog"), "config", "user.name", "Prime Claw Test");
   git(join(result.worktree, ".backlog"), "config", "user.email", "prime-claw@example.invalid");
-  const changedTask = publishTaskHistoryMutation({
+  const changedTask = await publishTaskHistoryMutation({
     primaryRoot: root,
     targetWorktree: result.worktree,
     taskId,
@@ -869,7 +870,7 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   // The primary author explicitly synchronizes its own checkout before its next edit.
   git(prepared.storeDir, "fetch", "-q", "origin", TASK_HISTORY_REF);
   git(prepared.storeDir, "merge", "--ff-only", "FETCH_HEAD");
-  const primaryAdvance = publishTaskHistoryMutation({
+  const primaryAdvance = await publishTaskHistoryMutation({
     primaryRoot: root, targetWorktree: root, taskId,
     edits: [{ option: "--append-notes", value: "ordinary primary advance" }], runner,
   });
@@ -908,7 +909,7 @@ test("independent Backlog admission preserves unrelated dirty work and an unpubl
   const retainedOwner = structuredClone(records.get("independent-owner-2"));
   const codeIndex = git(root, "diff", "--cached", "--binary");
   const taskIndex = git(prepared.storeDir, "diff", "--cached", "--binary");
-  const blocked = commitConversationTaskStatus({
+  const blocked = await commitConversationTaskStatus({
     taskId: secondTaskId, projectRoot: root, taskPath: secondTask.path, status: "Blocked",
     message: "owner-requested blocker publication", note: "owner chose Blocked from factual failure evidence",
     runner, git: new CliTaskEpisodeAdmissionGit(), resolveTask: taskResolver,

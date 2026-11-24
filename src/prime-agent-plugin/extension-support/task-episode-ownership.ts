@@ -1,5 +1,5 @@
 import { readBacklogCreationIdentity } from "./backlog-creation-identity.ts";
-import type { BacklogGitEvidence } from "./backlog-git-evidence.ts";
+import { makeBacklogGitEvidence, type BacklogGitEvidence } from "./backlog-git-evidence.ts";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -93,13 +93,7 @@ export interface TaskEpisodeReservationDependencies {
 
 export interface PublishedBacklogTaskEpisodeReservationInput {
   projectRoot: string;
-  publication: EpisodeTaskHistoryMutation | {
-    status: "published";
-    taskId: string;
-    taskPath: string;
-    publishedHead: string;
-    nativeAfter: string;
-  };
+  publication: EpisodeTaskHistoryMutation;
   ownerSessionId: string;
   engine: "orca" | "local";
   projectSetupId?: string;
@@ -940,12 +934,12 @@ export function reserveTaskEpisodeOwnership(
  * Reserve one Backlog Episode whose task status was published on the disconnected
  * task-history branch separately from the selected Git code base.
  */
-export function reservePublishedBacklogTaskEpisodeOwnership(
+export async function reservePublishedBacklogTaskEpisodeOwnership(
   input: PublishedBacklogTaskEpisodeReservationInput,
   dependencies: PublishedBacklogTaskEpisodeReservationDependencies = {},
-): PublishedBacklogTaskEpisodeOwnershipRecord {
+): Promise<PublishedBacklogTaskEpisodeOwnershipRecord> {
   if (input.publication.status !== "published") {
-    throw new Error(`Independent Backlog Episode reservation requires published task-history evidence: ${JSON.stringify(input.publication)}`);
+    throw new Error("Independent Backlog Episode reservation requires a published task-history mutation");
   }
   const publication = input.publication;
   if (!input.ownerSessionId || !publication.taskId || publication.taskId.trim() === "") {
@@ -954,39 +948,39 @@ export function reservePublishedBacklogTaskEpisodeOwnership(
   if (!TRANSITION_GIT_OID.test(publication.publishedHead) || !TRANSITION_GIT_OID.test(input.baseRef)) {
     throw new Error("Independent Backlog Episode reservation requires exact task and code Git revisions");
   }
-  let taskEvidence: Record<string, unknown>;
-  if ("taskEvidence" in publication) {
-    const reference = publication.taskEvidence;
-    if (reference.kind !== "backlog-git" || reference.repository.topology !== "independent"
-        || reference.commit !== publication.publishedHead
-        || resolve(publication.storeDir, reference.path) !== resolve(input.projectRoot, publication.taskPath)) {
-      throw new Error("Independent Backlog Episode reservation requires exact committed task evidence");
-    }
-    taskEvidence = { ...reference };
-  } else {
-    // Retain compatibility for legacy publication inputs and existing ownership.
-    try {
-      const parsed = JSON.parse(publication.nativeAfter) as unknown;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
-      taskEvidence = parsed as Record<string, unknown>;
-    } catch (error) {
-      throw new Error(`Independent Backlog Episode reservation received invalid native task evidence: ${error instanceof Error ? error.message : String(error)}`);
-    }
-    const rawTask = taskEvidence.task;
-    if (!rawTask || typeof rawTask !== "object" || Array.isArray(rawTask)
-        || (rawTask as Record<string, unknown>).id !== publication.taskId
-        || (rawTask as Record<string, unknown>).path !== publication.taskPath) {
-      throw new Error("Independent Backlog Episode reservation requires exact native task identity");
-    }
-  }
 
   const root = realpathSync(input.projectRoot);
-  const selection = (dependencies.taskResolver ?? defaultOwnershipTaskResolver)(root, publication.taskId);
+  const reference = publication.taskEvidence;
+  if (!reference || reference.kind !== "backlog-git" || reference.repository?.topology !== "independent"
+      || reference.commit !== publication.publishedHead || typeof reference.path !== "string"
+      || typeof publication.storeDir !== "string" || typeof publication.remote !== "string"
+      || !publication.remote) {
+    throw new Error("Independent Backlog Episode reservation requires exact committed task evidence");
+  }
+  const storeDir = resolve(publication.storeDir);
+  if (!containedBy(root, storeDir) || realpathSync(storeDir) !== storeDir
+      || `${portableRelativePath(root, storeDir)}/${reference.path}` !== publication.taskPath) {
+    throw new Error("Independent Backlog Episode reservation task evidence does not match the exact nested store path");
+  }
+  // Verify the canonical task ID from the committed blob, retaining only the reference.
+  const taskEvidence = await makeBacklogGitEvidence(
+    { root: storeDir, remote: publication.remote, topology: "independent" },
+    publication.publishedHead, reference.path, publication.taskId,
+  );
+  if (taskEvidence.repository.identity !== reference.repository.identity) {
+    throw new Error("Independent Backlog Episode reservation task evidence repository mismatch");
+  }
+
+  const selection = dependencies.taskResolver
+    ? dependencies.taskResolver(root, publication.taskId)
+    : await readBacklogCreationIdentity(root, publication.taskId).then(({ id, path }) => ({
+      taskId: id, projectRoot: root, taskPathRelative: path,
+    }));
   if (!selection || selection.taskId !== publication.taskId || realpathSync(selection.projectRoot) !== root
       || selection.taskPathRelative !== publication.taskPath) {
-    throw new Error("Independent Backlog Episode reservation task no longer matches the published native evidence");
+    throw new Error("Independent Backlog Episode reservation task no longer matches the published task evidence");
   }
-  return writePublishedBacklogReservation(input, publication, taskEvidence, root, dependencies);
+  return writePublishedBacklogReservation(input, publication, { ...taskEvidence }, root, dependencies);
 }
 
 export async function reserveStreamedBacklogTaskEpisodeOwnership(

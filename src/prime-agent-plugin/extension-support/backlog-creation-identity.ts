@@ -154,7 +154,12 @@ export async function readBacklogHeaderIdentity(cwd: string, taskId: string): Pr
   return { id, path };
 }
 
-async function readNativeBacklogIdentity(cwd: string, taskId: string, requireStatus: boolean): Promise<BacklogCreationIdentity> {
+/** Mutation compares the observed ID/path and proves containment at its boundary. */
+export function readBacklogMutationIdentity(cwd: string, taskId: string): Promise<BacklogCreationIdentity> {
+  return readNativeBacklogIdentity(cwd, taskId, false, false);
+}
+
+async function readNativeBacklogIdentity(cwd: string, taskId: string, requireStatus: boolean, verifyTarget = true): Promise<BacklogCreationIdentity> {
   const child = spawn("backlog", ["task", "view", "--json", "--", taskId], { cwd, stdio: ["ignore", "pipe", "ignore"] });
   let launchError: string | undefined;
   child.once("error", (error: NodeJS.ErrnoException) => { launchError = error.code ?? "spawn failed"; });
@@ -166,6 +171,7 @@ async function readNativeBacklogIdentity(cwd: string, taskId: string, requireSta
   catch { child.stdout.resume(); }
   const { code, signal } = await closed;
   if (launchError || code !== 0 || !facts) throw new Error(`Native Backlog identity read failed for ${taskId}: ${launchError ?? (code === 0 ? invalid().message : signal ?? `exit ${code}`)}`);
+  if (!verifyTarget) return facts;
   if (facts.id !== taskId) throw new Error(`Native Backlog resolved a different canonical ID for ${taskId}`);
   const inside = (path: string) => path !== "" && !isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`);
   const root = realpathSync(cwd);

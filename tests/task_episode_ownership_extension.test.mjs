@@ -42,6 +42,7 @@ import {
   resolveSynchronizedProviderTask,
 } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
+import { referenceCommittedBacklogTask } from "../src/prime-agent-plugin/extension-support/backlog-git-evidence.ts";
 
 function git(root, ...args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -193,28 +194,102 @@ function reservePublishedBeads(f, overrides = {}, dependencies = {}) {
   });
 }
 
-function reservePublishedBacklog(f, overrides = {}) {
+function publishedBacklogStatus(f) {
+  const storeDir = join(f.root, "backlog");
+  const path = f.relative.slice("backlog/".length);
+  const remoteDir = mkdtempSync(join(tmpdir(), "prime-claw-backlog-ownership-remote-"));
+  git(remoteDir, "init", "--bare", "-q");
+  git(storeDir, "init", "-q", "-b", "prime-claw/task-history");
+  git(storeDir, "config", "user.name", "Prime Claw Test");
+  git(storeDir, "config", "user.email", "prime-claw@example.invalid");
+  git(storeDir, "remote", "add", "origin", remoteDir);
+  git(storeDir, "commit", "-q", "--allow-empty", "-m", "seed task history");
+  writeFileSync(join(storeDir, "config.yml"), "project_name: Fixture\nremote_operations: false\ncheck_active_branches: false\ntask_prefix: primeclaw\n");
+  writeFileSync(f.taskPath, `---\nid: ${f.selection.taskId}\ntitle: Task-native fixture\nstatus: In Progress\n---\nTicket body\n`);
+  git(storeDir, "add", "--", path);
+  git(storeDir, "commit", "-q", "-m", "admit task on independent history");
+  git(storeDir, "push", "-q", "origin", "HEAD");
+  const publishedHead = git(storeDir, "rev-parse", "HEAD");
+  return {
+    status: "published",
+    taskId: f.selection.taskId,
+    taskPath: f.relative,
+    publishedHead,
+    storeDir,
+    remote: "origin",
+    taskEvidence: referenceCommittedBacklogTask({ root: storeDir, remote: "origin", topology: "independent" }, publishedHead, path),
+  };
+}
+
+function reservePublishedBacklog(f, { publication = publishedBacklogStatus(f), useNativeSelection = false, ...overrides } = {}) {
   return reservePublishedBacklogTaskEpisodeOwnership({
     projectRoot: f.root,
-    publication: {
-      status: "published",
-      taskId: f.selection.taskId,
-      taskPath: f.relative,
-      publishedHead: "e".repeat(40),
-      nativeAfter: JSON.stringify({ task: {
-        id: f.selection.taskId, path: f.relative, status: "In Progress",
-      } }),
-    },
+    publication,
     ownerSessionId: "published-backlog-owner",
     engine: "local",
     baseRef: git(f.root, "rev-parse", "HEAD"),
     operationId: "published-backlog-operation",
     ...overrides,
   }, {
-    taskResolver: () => f.selection,
+    ...(useNativeSelection ? {} : { taskResolver: () => f.selection }),
     now: () => "2026-10-20T16:30:00.000Z",
   });
 }
+
+test("published Backlog reservation stores only the verified committed task reference", async () => {
+  const f = fixture();
+  const publication = publishedBacklogStatus(f);
+  const reference = publication.taskEvidence;
+  publication.taskEvidence = {
+    ...reference, body: "must not be persisted", repository: { ...reference.repository, body: "must not be persisted" },
+  };
+  Object.defineProperty(publication, "nativeAfter", { get() { throw new Error("must not read nativeAfter"); } });
+  const record = await reservePublishedBacklog(f, { publication, useNativeSelection: true });
+  assert.deepEqual(record.taskEvidence, reference);
+  assert.equal(record.providerRevision, publication.publishedHead);
+  assert.notEqual(record.baseRef, record.providerRevision);
+  assert.deepEqual(readEpisodeOwnership(f.root, record.ownerSessionId), record);
+});
+
+test("published Backlog reservation refuses unverified commits and leaves historical native evidence intact", async () => {
+  const f = fixture();
+  const publication = publishedBacklogStatus(f);
+  const taskEvidence = { task: { id: f.selection.taskId, path: f.relative, status: "In Progress", body: "historical task" } };
+  const historical = parseEpisodeOwnership({
+    ...taskOwnership("historical-owner", f.selection.taskId, f.relative),
+    provider: "backlog", providerRevision: publication.publishedHead, taskEvidence,
+  });
+  writeEpisodeOwnership(f.root, historical);
+  const registryPath = join(f.root, ".prime-claw", "ownership.json");
+  const before = readFileSync(registryPath, "utf8");
+  const { taskEvidence: reference, ...legacyPublication } = publication;
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...legacyPublication, nativeAfter: JSON.stringify(taskEvidence) },
+  }), /exact committed task evidence/);
+  const missingCommit = "e".repeat(40);
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...publication, publishedHead: missingCommit, taskEvidence: { ...reference, commit: missingCommit } },
+  }), /commit unavailable/);
+  const missingPathAtCommit = git(publication.storeDir, "rev-parse", "HEAD^");
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...publication, publishedHead: missingPathAtCommit, taskEvidence: { ...reference, commit: missingPathAtCommit } },
+  }), /exact regular ticket blob/);
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...publication, taskEvidence: { ...reference, repository: { ...reference.repository, identity: "0".repeat(64) } } },
+  }), /repository mismatch/);
+  const correct = readFileSync(f.taskPath, "utf8");
+  writeFileSync(f.taskPath, correct.replace(`id: ${f.selection.taskId}`, "id: PRIMECLAW-99"));
+  git(publication.storeDir, "add", "--", reference.path);
+  git(publication.storeDir, "commit", "-q", "-m", "wrong canonical task at the exact path");
+  const wrongIdCommit = git(publication.storeDir, "rev-parse", "HEAD");
+  writeFileSync(f.taskPath, correct);
+  await assert.rejects(reservePublishedBacklog(f, {
+    publication: { ...publication, publishedHead: wrongIdCommit, taskEvidence: { ...reference, commit: wrongIdCommit } },
+    useNativeSelection: true,
+  }), /canonical task ID mismatch/);
+  assert.equal(readFileSync(registryPath, "utf8"), before);
+  assert.deepEqual(readAllEpisodeOwnership(f.root), [historical]);
+});
 
 function evidenceAdvancementFixture({ integrationBranch } = {}) {
   const rawRoot = mkdtempSync(join(tmpdir(), "prime-claw-beads-evidence-main-"));
@@ -1104,19 +1179,19 @@ test("task integration targets reject malformed explicit branches and never exte
   assert.throws(() => parseEpisodeOwnership({ ...legacy, integrationBranch: "main" }), /unsupported shape/);
 });
 
-test("all three task reservation factories roundtrip explicit integration targets and preserve old callers", () => {
+test("all three task reservation factories roundtrip explicit integration targets and preserve old callers", async () => {
   for (const factory of [reserve, reservePublishedBacklog, reservePublishedBeads]) {
     for (const integrationBranch of [undefined, "main", "feature/stacked-work"]) {
       const f = fixture();
       const input = integrationBranch === undefined ? {} : { integrationBranch };
-      const record = factory(f, input);
+      const record = await factory(f, input);
       assert.equal(record.integrationBranch, integrationBranch);
       assert.equal(effectiveTaskEpisodeIntegrationBranch(record), integrationBranch ?? "main");
       assert.deepEqual(readEpisodeOwnership(f.root, record.ownerSessionId), record);
       if (integrationBranch === undefined) assert.equal(Object.hasOwn(record, "integrationBranch"), false);
     }
     const f = fixture();
-    assert.throws(() => factory(f, { integrationBranch: "invalid..target" }), /unsupported shape/);
+    await assert.rejects(async () => factory(f, { integrationBranch: "invalid..target" }), /unsupported shape/);
     assert.deepEqual(readAllEpisodeOwnership(f.root), []);
   }
 });

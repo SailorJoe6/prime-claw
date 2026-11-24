@@ -1804,7 +1804,7 @@ test("conversation status publication preserves the ordinary Backlog mutation an
   ]);
 });
 
-test("independent Backlog status publication reads current source facts without status-plan-code approval predicates", () => {
+test("independent Backlog status publication reads current source facts without status-plan-code approval predicates", async () => {
   const root = fixtureRoot(); writeBacklogFolderConfig(root);
   mkdirSync(join(root, "backlog", ".git"), { recursive: true });
   const relative = "backlog/tasks/tst-1.md", taskPath = writeBacklogTaskFile(root, relative);
@@ -1812,7 +1812,7 @@ test("independent Backlog status publication reads current source facts without 
   const runner = new ProcessCommandRunner();
   const selection = () => ({ taskId: "TST-1", title: "Fixture task", status, implementationPlan: null,
     projectRoot: root, taskPath, taskPathRelative: relative });
-  assert.throws(() => commitConversationTaskStatus({
+  await assert.rejects(() => commitConversationTaskStatus({
     taskId: "TST-1", projectRoot: root, taskPath: relative, status: "In Progress",
     message: "caller requested status", runner, git: conversationStatusGit({
       operationInProgress() { assert.fail("no operation eligibility predicate"); },
