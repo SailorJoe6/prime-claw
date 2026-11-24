@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-24T14:30:00Z'
+updated_date: '2026-11-24T14:38:00Z'
 labels: []
 dependencies: []
 references:
@@ -859,4 +859,7 @@ This proves the bounded synthetic stop/remediation, not the live cause, live eli
 
 ### Independent review — two accepted corrections
 Astra found that the dirty-layout receipt completion refused all live/archive same-ID pairs even when both records were original and already bound by the publisher’s preserved-pair evidence. Astra also found that `verifiedBacklogCandidate` accesses `ownershipRows` outside its scope on the active-Episode path. Only those two findings are in this revision; the prior disposable proof did not cover either case. Do not treat observed parked-store edge findings as accepted work or this revision as authority for any live replay.
+
+### Two review findings reproduced on the published code
+The offline base run `70504` (TAP SHA-256 `830af7972966177b4d0aca9c63e04bb36dc8576bd43e4cd731d35e03ecbda7c4`, owned container absent) exercised the unchanged published code `082570c00ecc0f12335b522e96bb383c3207e73b` with the extended disposable fixture. The existing forward active-Episode regression stopped at `ownershipRows is not defined`. The genuine original-pair fixture reached data and receipt publication, then the interrupted layout; replay incorrectly refused the original pair before it could assess the injected unrelated layout drift. Candidate checks are in flight; neither finding is closed yet. No live PVA action.
 <!-- SECTION:NOTES:END -->
