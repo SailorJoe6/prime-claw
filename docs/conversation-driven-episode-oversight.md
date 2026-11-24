@@ -600,6 +600,11 @@ nested clone; both commit only task paths and non-force-push
 removes only its exact Episode clone after owner publication judgment, preserving uncommitted bytes.
 Existing ordinary/root/custom Backlog stores never migrate through these paths.
 
+The public `create_task_episode` recovery entry uses the same bounded native
+identity lookup as fresh independent Backlog creation. The task ID and path
+must match the existing operation before recovery proceeds, without buffering
+the primary ticket or selecting new placement.
+
 When resuming an independent Backlog reservation made before Git references
 were stored, pre-session recovery checks the original recorded revision and the
 fetched published revision in the exact Episode task clone. It also checks a

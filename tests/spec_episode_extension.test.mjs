@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { appendFileSync, closeSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createHash } from "node:crypto";
@@ -3658,6 +3659,7 @@ test("task-native local mutation failure preserves bound identity as uncertain",
 
 function allocatedPreSessionFixture({ missingPrior = false, oversized = false } = {}) {
   const f = harness();
+  f.wt.projectSetupId = "afb6537c-e643-4a5f-b284-f0f627ddcbdf";
   const storeDir = join(f.worktree, "backlog");
   const storePath = "tasks/primeclaw-45.md";
   const taskPath = `backlog/${storePath}`;
@@ -3684,13 +3686,11 @@ function allocatedPreSessionFixture({ missingPrior = false, oversized = false } 
   git("commit", "-qam", "local checkpoint");
   const head = git("rev-parse", "HEAD");
   if (oversized) {
-    const output = execFileSync("backlog", ["task", "view", "--json", "--", "PRIMECLAW-45"],
-      { cwd: f.worktree, maxBuffer: 4 * 1024 * 1024 });
-    assert.ok(output.length > 1024 * 1024);
+    execFileSync("git", ["clone", "-q", "--branch", "prime-claw/tasks", remote, join(f.root, "backlog")]);
   }
   const original = taskReservation({
     provider: "backlog", taskId: "PRIMECLAW-45", status: "uncertain", engine: "orca",
-    operationId: "f63a69a7-3e66-4b20-b258-2a599c4160e1", projectSetupId: "setup-local",
+    operationId: "f63a69a7-3e66-4b20-b258-2a599c4160e1", projectSetupId: f.wt.projectSetupId,
     worktreeName: "prime-claw-primeclaw-45-episode-f63a69a7", worktreeId: f.wt.id,
     worktreeIdentity: f.wt.identity, worktree: f.worktree, branch: f.wt.branch, head: TASK_BASE,
     taskPath, providerRevision: recorded, taskEvidence: { schemaVersion: 1, task: {
@@ -3699,11 +3699,13 @@ function allocatedPreSessionFixture({ missingPrior = false, oversized = false } 
   });
   f.ownership.write(f.root, original);
   f.ownership.write(f.root, taskReservation({ ownerSessionId: "foreign-owner", taskId: "PRIMECLAW-99" }));
-  f.deps.taskResolver = () => taskSelection(f, { taskId: original.taskId, nativeView: original.taskEvidence });
-  f.deps.admissionRunner = { run(command, args, options) {
-    if (command === "git") return new ProcessCommandRunner().run(command, args, options);
-    assert.fail(`unexpected native command before initial assignment: ${command}`);
-  } };
+  if (!oversized) {
+    f.deps.taskResolver = () => taskSelection(f, { taskId: original.taskId, nativeView: original.taskEvidence });
+    f.deps.admissionRunner = { run(command, args, options) {
+      if (command === "git") return new ProcessCommandRunner().run(command, args, options);
+      assert.fail(`unexpected native command before initial assignment: ${command}`);
+    } };
+  }
   f.deps.prepareEpisodeTaskHistory = ({ targetWorktree }) => {
     assert.equal(targetWorktree, f.worktree); f.calls.push(["prepare-existing"]);
     return { status: "prepared", storeDir, remote: "origin", head, publishedHead };
@@ -3731,14 +3733,32 @@ function allocatedPreSessionFixture({ missingPrior = false, oversized = false } 
 test("registered existing-operation continuation proves oversized legacy Backlog evidence and launches once", async (t) => {
   const f = allocatedPreSessionFixture({ oversized: true });
   t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  const primaryStore = join(f.root, "backlog");
+  assert.equal(execFileSync("git", ["-C", primaryStore, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(), f.publishedHead);
+  assert.equal(execFileSync("git", ["-C", primaryStore, "status", "--porcelain"], { encoding: "utf8" }), "");
+  const native = spawn("backlog", ["task", "view", "--json", "--", f.original.taskId],
+    { cwd: f.root, stdio: ["ignore", "pipe", "inherit"] });
+  const closed = once(native, "close");
+  let nativeBytes = 0;
+  native.stdout.on("data", (chunk) => { nativeBytes += chunk.length; });
+  assert.deepEqual(await closed, [0, null]);
+  assert.ok(nativeBytes > 1024 * 1024, "committed primary task must exceed the default sync buffer");
   const foreign = structuredClone(f.ownership.read(f.root, "foreign-owner"));
   writeFileSync(join(f.worktree, "foreign.txt"), "preserved working bytes");
-  const result = await f.tools.get("create_task_episode").execute("continue-original", {
-    taskId: f.original.taskId, operationId: f.original.operationId,
-  }, undefined, undefined, f.ctx);
-  assert.equal(result.isError, undefined, JSON.stringify(result));
+  const tool = f.tools.get("create_task_episode");
+  const selection = { taskId: f.original.taskId, operationId: f.original.operationId, host: `id:${f.original.projectSetupId}` };
+  const move = (from, to) => execFileSync("git", ["-C", primaryStore, "mv", "--", from, to]);
+  const movedPath = "tasks/primeclaw-45 - moved.md";
+  move(f.storePath, movedPath);
+  const wrongPath = await tool.execute("moved-primary-ticket", selection, undefined, undefined, f.ctx);
+  assert.equal(wrongPath.details.error, "Existing-operation request does not match exact task ownership and placement");
+  assert.deepEqual(f.current, f.original);
+  assert.deepEqual(f.calls, []);
+  move(movedPath, f.storePath);
+  const result = await tool.execute("continue-original", selection, undefined, undefined, f.ctx);
+  assert.equal(result.isError, undefined, result.details.error?.slice(0, 500));
   assert.equal(result.details.status, "active");
-  for (const key of ["ownerSessionId", "taskId", "operationId", "baseRef", "engine", "projectSetupId", "worktreeName", "worktreeId", "worktreeIdentity", "worktree", "branch", "head"])
+  for (const key of ["ownerSessionId", "provider", "taskId", "taskPath", "operationId", "baseRef", "engine", "projectSetupId", "worktreeName", "worktreeId", "worktreeIdentity", "worktree", "branch", "head"])
     assert.equal(result.details[key], f.original[key], key);
   assert.equal(result.details.episodeId, f.session.sessionId);
   assert.equal(f.calls.filter(([name]) => name === "auto-run").length, 1);

@@ -734,11 +734,13 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
           if (!validTaskToolSelection(params.taskId, params.host)) {
             throw new Error("Task Episode creation requires one exact canonical task ID and optional stable id:<project-host-setup-id> host");
           }
-          const streamed = !dependencies?.providerTaskResolver && !dependencies?.taskResolver
-            ? (params.operationId === undefined
-                ? await resolveIndependentBacklogCreationSelection(ctx.cwd, params.taskId, dependencies)
-                : null) ?? await resolveBranchLocalBacklogCreationSelection(ctx.cwd, params.taskId, dependencies)
+          const useNativeIdentity = !dependencies?.providerTaskResolver && !dependencies?.taskResolver;
+          const independent = useNativeIdentity
+            ? await resolveIndependentBacklogCreationSelection(ctx.cwd, params.taskId, dependencies)
             : null;
+          const streamed = independent ?? (useNativeIdentity
+            ? await resolveBranchLocalBacklogCreationSelection(ctx.cwd, params.taskId, dependencies)
+            : null);
           const task = streamed ?? resolver(ctx.cwd, params.taskId);
           if (!task) throw new Error(`Task ${params.taskId} is unavailable through the live provider`);
           if (task.provider !== "backlog" && task.provider !== "beads") {
@@ -756,6 +758,7 @@ export function createReviewedPlanExtension(dependencies?: ReviewedPlanDependenc
               : readEpisodeOwnership(task.projectRoot, ctx.sessionManager.getSessionId());
             if (!params.operationId || !owned || owned.version !== 2 || owned.taskId !== task.taskId
                 || owned.operationId !== params.operationId || owned.provider !== task.provider
+                || (independent && independent.taskPath !== owned.taskPath)
                 || (params.host !== undefined && params.host !== `id:${owned.projectSetupId}`)) {
               throw new Error("Existing-operation request does not match exact task ownership and placement");
             }

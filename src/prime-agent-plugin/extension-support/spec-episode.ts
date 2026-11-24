@@ -3365,15 +3365,15 @@ function hasIndependentBacklogStore(provider: ReturnType<typeof detectTaskProvid
   catch { return false; }
 }
 
-/** Fresh public creation needs only identity and placement, not a native snapshot. */
+/** Public creation and existing-operation recovery need identity, not a native snapshot. */
 export async function resolveIndependentBacklogCreationSelection(
   cwd: string, taskId: string, dependencies: TaskEpisodeCreationDependencies = {},
-): Promise<{ provider: "backlog"; projectRoot: string; taskId: string } | null> {
+): Promise<{ provider: "backlog"; projectRoot: string; taskId: string; taskPath: string } | null> {
   const runner = dependencies.admissionRunner ?? new ProcessCommandRunner();
   const provider = (dependencies.providerDetector ?? detectTaskProvider)(cwd, runner);
   if (!hasIndependentBacklogStore(provider) || provider.kind !== "selected") return null;
   const selected = await readBacklogCreationIdentity(provider.projectRoot, taskId);
-  return { provider: "backlog", projectRoot: provider.projectRoot, taskId: selected.id };
+  return { provider: "backlog", projectRoot: provider.projectRoot, taskId: selected.id, taskPath: selected.path };
 }
 
 /** The existing-operation entrance also resolves branch-local identity without a snapshot. */
