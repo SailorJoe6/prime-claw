@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T04:44:00Z'
+updated_date: '2026-11-25T04:48:00Z'
 labels: []
 dependencies: []
 references:
@@ -666,4 +666,7 @@ Exact disposable focused suite 6/6, TAP SHA-256 `eb49d91737af7f9f899e0b327b8c100
 
 ### Accepted review revision — exact transport, continuity and failure facts
 On a separate canonical execute, start from published `492d79a054ab495285153c2db53b0fd0f72a67bc` and task `6a6e62264ad375d6a7d64f89b14f8c3d27877bf1`. Bind the intended task publication transport independently of the checked-out branch; carry the exact inspected/confirmed selection through bootstrap. Prove a branch switch with two disposable remotes cannot redirect publication or select an unrelated ref. Keep transport credentials out of output. Require actual owned Episode session/route and owned terminal continuity, not equality of the visible terminal set; prove it using the real verifier. Report the stage and any known created ref/store when import fails before a candidate exists. Do not report ownership switched when there were no active owners; after failed source retirement, report verified Backlog authority and the retained backup without automatic rollback. Remove obsolete rollback/runtime-count assertions and migration-only dead existing-Episode projection, explicitMigration modes, reverse ownership, and unused rollback after checking real callers. Preserve ordinary Backlog initialization/preparation and all required forward cutover safeguards. No new controller, persistence protocol, broad Git/layout gate, unrelated code/index/ref effects, live access/retry, hold release, deployment, merge, or lifecycle change. Run focused disposable regressions and exact-candidate Docker Tier 1; publish coherent code and sanitized native evidence separately. Newer main `e28be0e9` was not integrated in the last tested candidate.
+
+### Execute — accepted review revision ca350e6b
+The same Episode received canonical execute, verified the published `492d79a0` code and the `263f88dc` task-only descendant containing the accepted scope. This slice addresses exact publication transport, owned continuity, and factual failure reporting; removes confirmed dead paths and obsolete expectations; and validates in disposable Docker only. Neither live writer hold changes.
 <!-- SECTION:NOTES:END -->
