@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-59
 title: Recover interrupted Beads imports without losing existing Backlog records
-status: In Progress
+status: Ready for Merge
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T15:23:00Z'
+updated_date: '2026-11-25T15:28:00Z'
 labels: []
 dependencies: []
 references:
