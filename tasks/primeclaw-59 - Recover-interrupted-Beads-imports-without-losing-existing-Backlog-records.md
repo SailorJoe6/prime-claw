@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T05:12:00Z'
+updated_date: '2026-11-25T05:16:00Z'
 labels: []
 dependencies: []
 references:
@@ -685,4 +685,7 @@ On a separate canonical execute, start from published Episode `36d205ea76a772761
 
 ### Execute — review revision 81a3669c
 Canonical execute received in the same Episode. Verified the published code and the compatible task-only handoff checkpoint. This slice is limited to using the effective push endpoint and reporting allocated primary and Episode stores on pre-cutover failure. Validation is disposable only; both live writer holds remain.
+
+### Review fixes implemented — exact validation pending
+Migration uses the configured effective push endpoint and keeps clone writes on it. The pre-cutover result and summary report the primary and all recorded Episode store allocations. Added disposable split-remote and partial Episode clone regressions. Starting exact offline verification; no live work or lifecycle change.
 <!-- SECTION:NOTES:END -->
