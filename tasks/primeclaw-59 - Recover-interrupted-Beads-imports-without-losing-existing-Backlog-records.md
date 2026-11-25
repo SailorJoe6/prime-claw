@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T04:57:00Z'
+updated_date: '2026-11-25T05:02:00Z'
 labels: []
 dependencies: []
 references:
@@ -674,4 +674,9 @@ The same Episode received canonical execute, verified the published `492d79a0` c
 
 ### Review revision validation checkpoint
 Implemented the checkout-independent inspected transport, owned-terminal continuity, factual partial import/retirement output, and removal of unused migration-only helpers. Initial disposable Docker run passed all 20 selected cases; the additional layout file had no match in that run. Preparing exact candidate validation with the ordinary workspace and transport cases included. No live work or lifecycle changes.
+
+### Published review revision — exact transport and cutover facts
+Episode `36d205ea76a7727613406c772926701fa778ad49`, tree `6ea08acb4eeacbb0435fffb76fe055b80edb15e9`, directly verified on `JLanders/prime-claw-primeclaw-59-episode-277260cb`. The selected task publication transport is independent of the checked-out branch and stays bound from inspection through confirmation and bootstrap. Tool summaries and transport errors omit URLs/credentials. The real Episode verifier requires exact durable session, route, and owned terminal handles; unrelated visible terminals do not block. Failed native import reports the stage and known created ref/revision/store without claiming a verified candidate. Failed retirement reports verified Backlog authority, original-store presence and the retained backup; it distinguishes whether any owner actually switched and does not roll back. Removed the dead reverse switch, rollback, existing-Episode projection and migration-only modes; kept ordinary Backlog setup/preparation and forward safeguards.
+
+Exact disposable Docker checks: 112/112 layout and ordinary workspace tests plus 20/20 selected migration, real verifier, ownership, and initialization tests. TAP SHA-256 `7d99ff302f101111185c8f67e82bf432e499c2791c38760d9dc6dcc6cf4f20b3`. Covered two remotes with a checkout/config change, refusal of unrelated or racing ref use, credential-safe output, owned terminal/route failures, partial clone and real native comment failure, and failed retirement with and without active owners. Exact Docker Tier 1 `--probe` passed offline apply/check/RPC: `20261125T045812Z-48147-898fd82f`, manifest SHA-256 `22d09c8c2109dd06c82382474dce12ae9aaadc1873ed6e65f6fa30325770d8dd`. Both Tier 1 containers and the focused run container were absent after teardown. No full-suite, live, or scale claims. Main `e28be0e977496c3922cd5056752be69c32fca57e` was not integrated. No live access, hold release, merge, deployment, or lifecycle change.
 <!-- SECTION:NOTES:END -->
