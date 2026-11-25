@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T15:16:00Z'
+updated_date: '2026-11-25T15:23:00Z'
 labels: []
 dependencies: []
 references:
@@ -699,4 +699,9 @@ On a separate canonical execute, integrate exact published main `e28be0e977496c3
 
 ### Execute — integrate exact published main
 Canonical execute received for handoff `8389a156` in the bound Episode. Verified reviewed Episode `a1eee7e06c6d45f278012d1a8141dc988ee7a0f8`, published main `e28be0e977496c3922cd5056752be69c32fca57e`, and compatible task-only handoff checkpoint `29d71b03fbf186f98ec5a40eac94977216d0adbc`. Integrating into the Episode only, then validating the exact combined tree in disposable Docker. No live work, release of either writer hold or lifecycle change.
+
+### Published exact integration candidate
+Merged published main `e28be0e977496c3922cd5056752be69c32fca57e` into the original Episode without conflicts. Episode `4bb53fc126f2c083ab59684c5967c0aeb56045a6` (tree `79c47467e3e4e13fea1a10e3d1d4e622d5631c57`, first parent `a1eee7e06c6d45f278012d1a8141dc988ee7a0f8`, second parent `e28be0e977496c3922cd5056752be69c32fca57e`) was verified directly on `JLanders/prime-claw-primeclaw-59-episode-277260cb`. No follow-on code edits or regression fixes were needed. The merge retained both main's unrelated changes and the reviewed fresh-only migration implementation. `git diff --check` against main is clean; against the old Episode it reports one trailing blank line in `tests/test_blocked_skill.py`, byte-identical to published main and left unchanged.
+
+Exact disposable Docker: 145/145 layout, task workspace, Web transport and native projection tests; 22/22 selected migration, ownership, continuity and initialization tests (TAP SHA-256 `f6a8fe138dc43f9388e4f1d056a5f7bc2d77965db43d1247bd162124feb489fb`). Coverage includes split push/fetch, occupied push destinations, actual partial Episode allocation, retained-backup restore failure, and missing committed owner evidence. Another 68 workflow and migration contract checks passed, with 13 container-fixture cases deselected in that invocation (log SHA-256 `1b429b1f3bce14bc378bc3b65e90e77b9d78f4f9d840af3754108799da95c09b`). Offline Tier 1 `--probe` passed apply/check/RPC, run `20261125T151744Z-56764-e2be06cb`, manifest SHA-256 `bd0d8f12d7b16106ae1ffb0d569ab32bfaff897a64fb81b1f92ae6628032d74d`. All four test containers were verified absent. Durable focused logs and input records: `.test-results/integration-8389a156-w0vval98`. This was targeted validation, not the full suite, scale, chained or context-dependent URL rewrite, or live validation. Canonical main unchanged; no deployment, restart, live Ralph-PVA work, writer-hold release, or lifecycle change.
 <!-- SECTION:NOTES:END -->
