@@ -4,6 +4,7 @@ title: Diagnose task Episode cleanup refusing a runtime reported idle
 status: In Design
 assignee: []
 created_date: '2026-11-25 02:36'
+updated_date: '2026-11-25 02:37'
 labels: []
 dependencies: []
 references:
@@ -28,3 +29,12 @@ The task-native adapter checks the all-session roster and exact active-route sta
 - [ ] #1 Identify the failing quiescence condition (or the exact evidence gap) using read-only evidence or a disposable fixture, distinguishing actual activity from incomplete/misread state.
 - [ ] #2 Make the refusal actionable without exposing transcripts or unrelated sessions. If a false refusal is confirmed, cover it with a focused regression without weakening protection for busy, attached, scheduled, foreign or uncertain runtimes.
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25 02:37
+---
+Read-only follow-up from the PAPI-8 owner: `prime-agent sessions --all` showed `attachedClients=1` and `directAttachedClients=1` on the exact Episode, explicit false active/streaming/compacting flags, `sessionActions.queuedCount=0`, empty steering/followUps, no statusLabel, and no visible linked descendants. The checked-out `quiescentState` requires both attachment counts to be zero, so the observed attachment would block cleanup under that predicate. This is the leading explanation, not proof of the loaded adapter or either count at refusal time. Do not treat it as a false refusal or relax the attachment guard without evidence. No cleanup retry or live mutation.
+---
+<!-- COMMENTS:END -->
