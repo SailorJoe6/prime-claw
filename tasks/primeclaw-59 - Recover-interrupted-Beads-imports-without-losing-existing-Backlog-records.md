@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T15:12:00Z'
+updated_date: '2026-11-25T15:16:00Z'
 labels: []
 dependencies: []
 references:
@@ -696,4 +696,7 @@ Exact disposable Docker: 115/115 workspace/layout and 21/21 focused migration, c
 
 ### Accepted integration slice — published main into the original Episode only
 On a separate canonical execute, integrate exact published main `e28be0e977496c3922cd5056752be69c32fca57e` into the original Episode from reviewed and published `a1eee7e06c6d45f278012d1a8141dc988ee7a0f8`. The independently published task tip `6c19432403e078660df0738849dfef45db55e2b7` is a descendant of `53ecf76256f110db7ed02aaca42e59a6fbd647b2` with the same selected ticket blob; preserve the intervening history. Resolve routine integration conflicts without a new approval stop. Keep main's unrelated changes and the reviewed fresh-only migration contract: no unrelated checkout, layout or terminal blockers; bind the effective Git push endpoint; report actual partial allocations; preserve native current import, verified publication and ownership cutover, restorable Beads backup and guarded retirement. Run Docker Tier 1 and targeted migration and affected integration regressions on the exact combined tree, with durable logs. Fix concrete in-scope regressions, publish clean Episode code and independent native evidence, and report exact code/tree/parents, tests, caveats and current task evidence. No merge into canonical main, deployment, restart, live Ralph-PVA work, writer-hold release, or lifecycle change; those remain with the owner/operator.
+
+### Execute — integrate exact published main
+Canonical execute received for handoff `8389a156` in the bound Episode. Verified reviewed Episode `a1eee7e06c6d45f278012d1a8141dc988ee7a0f8`, published main `e28be0e977496c3922cd5056752be69c32fca57e`, and compatible task-only handoff checkpoint `29d71b03fbf186f98ec5a40eac94977216d0adbc`. Integrating into the Episode only, then validating the exact combined tree in disposable Docker. No live work, release of either writer hold or lifecycle change.
 <!-- SECTION:NOTES:END -->
