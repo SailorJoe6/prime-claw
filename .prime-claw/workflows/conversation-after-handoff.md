@@ -17,8 +17,11 @@ completion.
 Compose `focus_hint` yourself from your current context. Keep what you need to
 supervise the exact owned Episode to completion: its task or source identity,
 the owning owner-session key, episode identifiers, the current supervision
-state, pending operator decisions, and where evidence lives. Judge what your
-context requires; no fixed hint text or preservation inventory is mandated.
+state, pending operator decisions, and where evidence lives. Keep the actual
+request and genuine user limits distinct from revisable plans, checkpoints,
+implementation claims and review findings; compaction does not turn them into
+requirements. Judge what your context requires; no fixed hint text or
+preservation inventory is mandated.
 
 Then call exactly once:
 
