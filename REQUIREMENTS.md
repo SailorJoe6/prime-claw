@@ -89,16 +89,29 @@ fresh approval merely because a phase ended, or invent tokens and receipts to
 prove ordinary conversational authority. Ask one focused question when a
 material decision is genuinely unresolved.
 
+Choosing how to meet a request does not authorize expanding what must be
+accomplished. Agent-created plans, limits, checkpoints and implementation claims
+remain revisable means. If such a rule blocks requested work, reconsider or
+remove it before adding machinery or approval steps. Routine technique choices
+and correction of self-imposed constraints need no new approval. “Continue”
+does not add saved-copy, history-proof, loss, duplication, crash or replay
+guarantees; genuine user limits and normal permission boundaries still apply.
+
 Sources: [PRIMECLAW-10.26][T10_26], [33.11][T33_11], [51][T51], [54][T54].
 
 ### G4. Review proportionately; finish the work
 
-Normal review finds concrete defects in the approved behavior and gives useful
-repair direction. Advice and speculative hardening are not new scope or automatic
-blockers. Do not assume hostile same-user attacks, demand crash-proof global
-transactions, or repeat adversarial reviews without an approved need. Do not
-revive the mandatory threat/failure/recovery/complexity paperwork later rejected
-in PRIMECLAW-22. Keep a coherent piece of work moving through in-scope repairs
+Normal review finds concrete defects in requested behavior, including real
+supported-path bugs and safety, security or interface failures. Distinguish
+mismatch with a proposed approach from failure of requested outcomes. Review
+findings do not authorize their own repair scope; the Conversation decides
+against the actual request. A false implementation claim may need correction
+or narrowing, or removal of an unnecessary mechanism, rather than building
+the claimed machinery. Advice and speculative hardening are not new scope or
+automatic blockers. Do not assume hostile same-user attacks, demand crash-proof
+global transactions, or repeat adversarial reviews without an approved need.
+Do not revive the mandatory threat/failure/recovery/complexity paperwork later
+rejected in PRIMECLAW-22. Keep coherent work moving through in-scope repairs
 rather than multiplying episodes and approval gates.
 
 Sources: [PRIMECLAW-22][T22], [10.34][T10_34], [33.11][T33_11]. The accessible

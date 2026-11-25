@@ -5,6 +5,15 @@ description: Use when Ralph detects blocked task-native Episode work or retained
 
 First, run through the "prepare" skill.
 
+First judge whether the recorded condition actually prevents the requested
+outcome. An agent-created limit, checkpoint, saved-copy or history-proof rule is
+not a user requirement merely because a plan, test or prior finding records it.
+Reconsider or remove an unnecessary rule rather than add guards, preservation
+guarantees or approval steps around it. Correct the recorded blocker when that
+resolves it; do not require the user to satisfy your own obsolete condition.
+Preserve genuine user limits, access needs and normal permission boundaries.
+Ask only when an actual unresolved user decision or access need remains.
+
 ## Select the durable authority before fallback
 
 If this is a managed Episode, use the exact owning Conversation key carried by
@@ -108,8 +117,10 @@ unavailable, stop before editing and resolve the decision or evidence gap. Do
 not require revision equality or add a coded gate. Then use the supported structured
 `backlog task view --json -- TASK-ID` to verify exact ID, path, parent and
 `Blocked` status before editing. Verify these facts and the intended status/note
-after the edit. Native authoring readback is not historical evidence. Work with the user to satisfy the recorded unblock condition. After the user or accepted
-evidence clears it, only that exact owning Conversation may publish the same
+after the edit. Native authoring readback is not historical evidence. Assess
+the recorded unblock condition under the distinction above. After the user or
+accepted evidence clears an actual blocker, or its unnecessary agent-created
+condition is removed, only that exact owning Conversation may publish the same
 task as `In Progress`. Grandfathered Backlog preserves the existing one exact-
 task-only integration-branch commit: unrelated code dirt is allowed. Inspect the selected diff
 and commit with literal `git add`/`git commit --only` pathspecs, excluding other
@@ -158,8 +169,9 @@ it is any later or different state, stop without mutation. A failed or uncertain
 pull, update, push, or proof is raw evidence and never permission to retry,
 reset, adopt, force, or write the live Dolt store directly.
 
-Work with the user to satisfy that actual recorded unblock condition. Only after
-the operator or accepted evidence clears it may this exact Conversation move
+Assess the recorded unblock condition against the actual request, not merely
+its presence in a plan. Once an actual blocker clears, or an unnecessary
+agent-created condition is removed, this exact Conversation may move
 current native `blocked` back to `in_progress`. Repeat one fresh native
 context/pull/raw-read/proof cycle, use
 `bd --dolt-auto-commit=on update TASK-ID --status in_progress --if-status

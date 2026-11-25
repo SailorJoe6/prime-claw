@@ -16,7 +16,8 @@ Accept a normal review request. Resolve these values from clear conversation and
 repository context, while honoring explicit caller overrides:
 
 - repository and exact commit;
-- applicable specification, execution plan, acceptance contracts, and evidence;
+- requested outcomes and genuine user constraints, plus the proposed plan,
+  implementation claims and relevant evidence as context;
 - requested review focus and explicit non-goals; and
 - optional model selection.
 
@@ -40,10 +41,11 @@ task provider unambiguous; never infer it from a path. A complete active legacy
 folder review without creating live Episode identity. A live version-1 Episode
 requires persisted version-1 ownership plus those active files in its recorded
 Episode worktree; placement alone is not identity. The active pair remains the
-review contract through candidate review and any bounded revision. Require the
+review context through candidate review and any bounded revision. Require the
 active specification bytes to match the exact source location and accepted
 digest in `.prime-claw/legacy-specifications.json`; the original future source
-may be absent. The specification is frozen while the plan remains living.
+may be absent. Frozen bytes establish the legacy binding, not necessity for
+every agent-authored implementation choice; the plan remains living.
 Missing active files are not reviewable live identity and require the exact
 version-1 blocked recovery path rather than task-native fallback.
 
@@ -62,11 +64,13 @@ retargeting or replacement resources.
   the current published ticket. Never use the code candidate as a task revision
   in independent history. Follow **Inspect Backlog committed ticket evidence**
   in `prime-claw-oversee-episode`: verify repository, full OID, literal regular
-  blob and native canonical ID; stream the contract (including parent identity)
-  and relevant diffs in bounded ranges. Use the native Description, Acceptance
-  Criteria, constraints, references, documentation, Implementation Plan, Notes,
-  modified files and Final Summary. Report inaccessible or mismatched evidence
-  and qualify conclusions that require it. No mutable fallback, guessed revision,
+  blob and native canonical ID; stream the recorded request and working context
+  (including parent identity) and relevant diffs in bounded ranges. Read
+  Description, Acceptance Criteria and constraints against actual operator
+  direction. References, documentation, Implementation Plan, Notes, modified
+  files and Final Summary supply context and claims, not additional user
+  requirements. Report inaccessible or mismatched evidence and qualify
+  conclusions that require it. No mutable fallback, guessed revision,
   copied ticket, dirty-checkout synchronization, new store, content or status
   mutation. Keep publication proof separate and preserve legacy observations
   unchanged. Do not consult `.ralph/plans` or mix providers.
@@ -80,7 +84,8 @@ retargeting or replacement resources.
   native names, shapes, values, and absence; do not construct a normalized task,
   path, content digest, receipt, or alternate authority.
 - For a retained folder candidate, use its exact approved specification and
-  execution plan. Do not substitute a related Backlog task as authority. Legacy
+  execution plan as request and approach context under the same distinction.
+  Do not substitute a related Backlog task as authority. Legacy
   review is evidence only and cannot claim or mutate task-native Backlog status,
   completion, archival, finalization, or cleanup authority.
 
@@ -159,7 +164,8 @@ living-plan updates may be incorporated, while genuine semantic conflict,
 authority change, scope expansion, or product choice is escalated. Do not ask a
 fake unit test or deterministic classifier to make that judgment.
 
-It must also include this review contract:
+The task must distinguish requested behavior and genuine constraints from the
+agent's proposed approach. Include this review guidance:
 
 - Act as the independent EXPERT reviewer. Review read-only and do not edit,
   implement, steer the candidate, mutate lifecycle state, or perform cleanup.
@@ -168,18 +174,29 @@ It must also include this review contract:
   or terminal transition, finalization, cleanup, or ownership-evidence advancement;
   report exact factual provider evidence instead of using a Backlog-only route or
   writing `ownership.json`.
-- Review the exact candidate only against the operator-approved product
-  contract and the implementation claims being made. Do not add requirements,
-  expand scope, or substitute the reviewer's preferred architecture.
-- Report only concrete, reproducible defects with realistic material impact.
-  Theoretical edge cases, speculative hardening, style preferences, alternative
-  designs, and newly imagined invariants are not blockers.
+- Assess the exact candidate against the operator's requested outcomes and
+  genuine limits. Plans, specifications, tests, code, implementation claims and
+  other agent-written documents do not independently establish necessity. Do
+  not add requirements or substitute your preferred architecture.
+- Identify concrete, reproducible defects with realistic material impact,
+  including public entry paths and genuine safety, security or interface
+  failures. A passing inner-helper test does not establish supported-path
+  behavior. Do not suppress real bugs as scope creep.
+- Distinguish failure of requested behavior from mismatch with a proposed
+  approach. Question unnecessary mechanisms rather than assuming they must be
+  preserved. Theoretical edge cases, speculative hardening, style preferences
+  and newly imagined invariants are not blockers.
+- Check claims truthfully, but a false claim does not automatically require
+  building its machinery. Correcting or narrowing the claim, or removing an
+  unnecessary mechanism, may meet the request.
 - This is a normal engineering review, not an adversarial or red-team exercise.
   Red-team review requires an explicit operator request and still cannot change
-  the approved product contract.
-- For each material finding, explain the evidence, realistic impact, violated
-  approved behavior, and a proportionate repair direction. Prefer the smallest
-  repair that fixes the demonstrated defect.
+  the requested scope.
+- For each material finding, explain the evidence and realistic impact, whether
+  it violates requested behavior or only an implementation claim, and a
+  proportionate repair direction. Prefer removing an unnecessary constraint to
+  hardening around it when that meets the request. Findings do not authorize
+  their own repair scope; the caller decides disposition against the task.
 - Put product questions and optional suggestions in ordinary prose and mark them
   non-blocking. Do not turn them into acceptance criteria or implementation work.
 - Return ordinary prose: a short conclusion followed by material findings. Do

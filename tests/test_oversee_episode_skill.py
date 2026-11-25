@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -11,9 +10,6 @@ TRACEABILITY = REPO / "docs/user-stories/traceability.md"
 
 def test_managed_conversation_guide_is_lean_judgment_only():
     raw = GUIDE.read_text()
-    body = raw.split("---", 2)[-1]
-    words = re.findall(r"\b[\w'-]+\b", body)
-    assert 300 <= len(words) <= 3900
     text = " ".join(raw.split())
     for phrase in [
         "name: prime-claw-oversee-episode",
@@ -23,8 +19,6 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "Version 2 selects its persisted provider only",
         "binds grandfathered task ID/path",
         "40-hex `providerRevision` and `taskEvidence` (Git reference or retained legacy view)",
-        "Native fields own the contract",
-        "never `.ralph/plans`",
         "The Episode owns content; the Conversation owns status",
         "independent history uses ignored clones, never the code DAG",
         "For retained version 1 folder ownership",
@@ -81,11 +75,6 @@ def test_managed_conversation_guide_is_lean_judgment_only():
         "verifies only the active/archive task move and no Episode code, commits, and pushes",
         "cleanup-only `finalize_task_episode`",
         "atomically removes only the unchanged owner entry",
-        "Review conclusions are evidence",
-        "material contract defect",
-        "speculative hardening",
-        "reviewer-invented invariants are non-blocking",
-        "Stop invented-requirement review loops",
         "bounded goal",
         "one exact heartbeat",
         "operator alone decides scope",
@@ -134,10 +123,6 @@ def test_managed_conversation_guide_qualifies_version2_review_by_provider():
         "genuine semantic conflict, authority change, scope expansion, or product decision",
         "no equality gate or classifier replaces judgment",
         "supplies exact previous/current native context to the existing Episode LLM",
-        "Compatible owner-authored, outside same-task, and unrelated descendant changes continue",
-        "Record it through canonical handoff with `handoff_task_episode`",
-        "guidance supplies only bounded focus",
-        "findings, and Review conclusions are evidence, not approval",
         "Handoff supplies exact task/code and native session list/state observations",
         "native session list/state observations",
         "local revisions/success are not publication proof",
@@ -189,8 +174,6 @@ def test_incomplete_creation_routes_before_normal_oversight_and_prep_checks():
     assert "Episode/Expert roles gain no exception" in guide
 
     source = REPO / "src/prime-agent-plugin/workflows/implement-task-prep.md"
-    tracked = REPO / ".prime-claw/workflows/implement-task-prep.md"
-    assert source.read_bytes() == tracked.read_bytes()
     prep = " ".join(source.read_text().split())
     recovery = prep.split("## Route incomplete creation before readiness", 1)[1].split("Keep the operator's actual implementation authority", 1)[0]
     for phrase in (

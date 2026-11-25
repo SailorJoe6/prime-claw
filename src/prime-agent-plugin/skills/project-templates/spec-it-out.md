@@ -75,11 +75,15 @@ second create after uncertainty.
 Make the specification clear enough to plan without guessing material product
 decisions. Capture the current context, intended outcome, scope, required
 behavior, material constraints, important non-goals, and proportional observable
-acceptance. Be thorough without repetition. Include safety, failure handling,
-or recovery only when they are materially relevant. Do not require boilerplate
-sections, invent risks, prescribe implementation architecture, or turn reviewer
-advice into scope. If a material product decision remains unresolved, ask the
-operator rather than silently deciding it, one material question at a time.
+acceptance. Distinguish what the operator requested from your proposed approach;
+plans, limits and checkpoints remain revisable means. Existing code, tests,
+specifications and agent-written documents do not establish necessity. Include
+safety, failure handling or recovery only for concrete needs of the request,
+not imagined loss, duplication, crash or replay guarantees. Do not require
+boilerplate sections or turn review advice into scope. Reconsider an unnecessary
+constraint rather than specify machinery to preserve it. Use judgment for
+routine technique choices; ask one question at a time only when an actual
+material product decision or access need remains.
 
 Use only supported owner-authored native fields:
 
@@ -175,10 +179,12 @@ or create again. No Backlog command or fabricated Git task-file commit is used.
 
 ## Keep the specification alive
 
-The selected provider-native task is the living source of truth. Update its
-supported specification fields promptly whenever discussion, review, or manual
-POC work produces a durable clarification, correction, constraint, or learning.
-Replace stale content rather than accumulating a chronological journal. Do not
+The selected provider-native task records the request and current working
+understanding; it does not make every agent-authored choice a requirement.
+Update its supported specification fields for durable clarifications and
+corrections within the actual scope. Assess review findings before incorporating
+them; they do not authorize their own repair scope. Replace stale content rather
+than accumulating a chronological journal. Do not
 defer updates until the end of a long conversation or rely on chat history,
 memory, a later compaction summary, a provider mirror, or a parallel plan file.
 

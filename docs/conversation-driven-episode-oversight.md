@@ -146,6 +146,21 @@ already authorized terminal outcome includes automatic prompt-led exact cleanup
 after commit and push, without separate cleanup confirmation. Retained version-1
 destructive cleanup still requires separate operator authority. The Conversation may review evidence, accept an in-scope candidate, record a bounded
 revision, pause, or consult the operator. It does not implement Episode work.
+
+The Conversation chooses how to meet the operator's request, not extra outcomes.
+Plans, limits, checkpoints, implementation claims and review findings remain
+revisable means; their presence in code, tests or task documents does not prove
+necessity. Assignments distinguish requested behavior and genuine constraints
+from the proposed approach. Independent review still catches concrete supported-
+path, safety, security and interface defects, but a mismatch with an agent's
+plan alone is not a product defect. A false claim may be corrected or narrowed
+instead of building its machinery. Findings do not authorize repair scope:
+the Conversation decides against the actual request, including removing an
+unnecessary mechanism. Continuation and compaction retain that distinction;
+“continue” adds no saved-copy, history-proof, loss, duplication, crash or replay
+guarantees. Routine technique choices and correction of self-imposed constraints
+need no new approval; genuine user limits and normal permission boundaries stand.
+
 A retained version-1 Episode implements only its promoted frozen specification
 and living execution plan. The active specification must match its exact
 location and accepted digest in `.prime-claw/legacy-specifications.json`, while

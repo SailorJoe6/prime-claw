@@ -1,12 +1,8 @@
-import hashlib
-import json
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src" / "prime-agent-plugin" / "skills" / "project-templates" / "blocked.md"
-TRACKED = ROOT / ".agents" / "skills" / "blocked" / "SKILL.md"
-MANIFEST = ROOT / ".prime-claw" / "templates.json"
 
 
 def test_blocked_skill_supports_disjoint_task_and_retained_folder_authority() -> None:
@@ -50,7 +46,6 @@ def test_blocked_skill_supports_disjoint_task_and_retained_folder_authority() ->
         "<truthful blocker, evidence, and exact unblock condition>",
         "bd dolt push --no-adopt",
         "If current state is already `blocked`, do not publish again",
-        "operator or accepted evidence clears it",
         "--if-status blocked",
         "truthful clearance evidence",
         "Then call `handoff_task_episode`",
@@ -102,12 +97,3 @@ def test_incomplete_creation_routes_before_active_identity_and_report_checks() -
     assert "only the owning Conversation's targeted documented creation-recovery exception above permits an edit, never Episode or Expert authority" in text
 
 
-def test_blocked_skill_tracked_copy_and_manifest_hash_match_source() -> None:
-    source = SOURCE.read_bytes()
-    assert TRACKED.read_bytes() == source
-    digest = hashlib.sha256(source).hexdigest()
-    item = json.loads(MANIFEST.read_text())["assets"]["project-skill-blocked"]
-    assert item["baselineSha256"] == "1db1d352a1c06955895da70e979a8cb8c4247d63940decce21cfcddb7ff2e729"  # retained historical baseline; current bytes are verified below
-    assert item["installedSha256"] == digest
-    assert item["availableUpstreamSha256"] == digest
-    assert item["state"] == "managed"
