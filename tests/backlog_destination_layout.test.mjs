@@ -322,6 +322,20 @@ test("fresh migration selects canonical transport off main and keeps it pinned a
   assert.equal(git(root, "status", "--porcelain=v1"), status);
 });
 
+for (const setting of ["pushurl", "pushInsteadOf"]) {
+  test(`fresh migration refuses an occupied ${setting} endpoint without writing either remote`, t => {
+    const { root, authority: fetchSide, alternate: pushSide, runner } = freshFixture(t);
+    if (setting === "pushurl") git(root, "remote", "set-url", "--push", "primary", "../other.git");
+    else git(root, "config", `url.${pushSide}.pushInsteadOf`, "../primary remote.git");
+    git(pushSide, "fetch", "-q", root, `HEAD:${TASK_HISTORY_REF}`);
+    const fetchBefore = files(fetchSide), pushBefore = files(pushSide);
+    assert.throws(() => assertFreshBacklogMigrationDestination(root, runner), /existing Backlog destination: published/);
+    assert.deepEqual(files(fetchSide), fetchBefore);
+    assert.deepEqual(files(pushSide), pushBefore);
+    assert.equal(existsSync(join(root, ".backlog")), false);
+  });
+}
+
 test("fresh migration refuses the published task ref on canonical main despite a different topic remote", t => {
   const { root, authority, alternate, runner } = freshFixture(t);
   git(root, "switch", "-qc", "topic");
@@ -331,6 +345,15 @@ test("fresh migration refuses the published task ref on canonical main despite a
   assert.throws(() => assertFreshBacklogMigrationDestination(root, runner), /existing Backlog destination: published/);
   assert.equal(publishedTaskRef(authority), revision);
   assert.equal(publishedTaskRef(alternate), "");
+  assert.equal(existsSync(join(root, ".backlog")), false);
+});
+
+test("fresh migration refuses multiple push URLs without exposing them", t => {
+  const { root, authority, alternate, runner } = freshFixture(t);
+  git(root, "config", "--add", "remote.primary.pushurl", alternate);
+  git(root, "config", "--add", "remote.primary.pushurl", authority);
+  assert.throws(() => assertFreshBacklogMigrationDestination(root, runner),
+    { message: "cannot read exactly one Backlog publication transport" });
   assert.equal(existsSync(join(root, ".backlog")), false);
 });
 

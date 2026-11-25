@@ -1258,8 +1258,15 @@ test("Backlog destination remote advancement blocks before Beads source deletion
 test("pre-switch route replacement preserves active Beads migration continuity", { timeout: 240_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "post-switch-route-replacement");
   const owner = addActiveBeadsOwner(fixture);
+  const pushSide = join(fixture.outer, "task-publication.git");
+  git(fixture.outer, "init", "-q", "--bare", pushSide);
+  git(fixture.root, "remote", "set-url", "--push", "origin", "../task-publication.git");
+  const fetchRefs = git(fixture.remote, "show-ref");
+  const fetchObjects = git(fixture.remote, "count-objects", "-v");
   const runner = new AsIsBeadsRunner();
-  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
+  let inspectedDestination;
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner,
+    onInspectedDestination: selected => { inspectedDestination = selected; } });
   assert.equal(inspection.status, "ready", inspection.detail);
   const sourceBefore = sourceAuthorityFiles(fixture.root);
   const sessionBefore = readFileSync(owner.record.episodeSessionFile, "utf8");
@@ -1269,6 +1276,7 @@ test("pre-switch route replacement preserves active Beads migration continuity",
   const result = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve complete native source evidence.",
+    inspectedDestination,
     async verifyActiveRuntime(records) {
       proofs += 1;
       assert.equal(records.length, 1);
@@ -1295,6 +1303,15 @@ test("pre-switch route replacement preserves active Beads migration continuity",
   assert.equal(result.status, "completed", result.detail);
   assert.equal(result.sourceAbsent, true);
   assert.equal(result.selectedProvider, "backlog");
+  assert.equal(inspectedDestination.transport.remoteUrl, pushSide);
+  assert.equal(git(pushSide, "rev-parse", TASK_HISTORY_REF), result.receipt.destinationReceiptRevision);
+  assert.equal(git(fixture.remote, "show-ref"), fetchRefs);
+  assert.equal(git(fixture.remote, "count-objects", "-v"), fetchObjects);
+  for (const worktree of [fixture.root, owner.episode]) {
+    const store = join(worktree, ".backlog");
+    assert.equal(git(store, "remote", "get-url", "origin"), pushSide);
+    assert.equal(git(store, "remote", "get-url", "--push", "origin"), pushSide);
+  }
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
   const current = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8")).owners[owner.ownerSessionId];
   assertOwnedBacklogGitEvidence(current, { root: fixture.root, store: join(fixture.root, ".backlog"),
@@ -1308,6 +1325,52 @@ test("pre-switch route replacement preserves active Beads migration continuity",
   assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
   assert.equal(git(fixture.root, "rev-parse", "HEAD"), primaryHead);
   assert.deepEqual(runner.sourcePublicationCommands, []);
+});
+
+test("partial Episode Backlog clone reports both allocated stores without cutover", { timeout: 240_000 }, async (t) => {
+  const fixture = embeddedBeadsSource(t, "partially-allocated-episode");
+  const owner = addActiveBeadsOwner(fixture);
+  const primaryStore = join(fixture.root, ".backlog"), episodeStore = join(owner.episode, ".backlog");
+  const registry = join(fixture.root, ".prime-claw", "ownership.json"), original = readFileSync(registry);
+  const source = sourceAuthorityFiles(fixture.root);
+  const sourceRows = exportRecoveryRows(fixture.root);
+  assert.equal(existsSync(primaryStore), false);
+  assert.equal(existsSync(episodeStore), false);
+  let cloneAttempts = 0, directoryAllocated = false, deletions = 0;
+  const runner = new class extends AsIsBeadsRunner {
+    run(name, args, options = {}) {
+      if (name === "git" && args[2] === "clone" && args.at(-1) === episodeStore) {
+        cloneAttempts++;
+        directoryAllocated = lstatSync(episodeStore).isDirectory();
+        throw new Error("fixture clone failure after Episode store allocation");
+      }
+      return super.run(name, args, options);
+    }
+  }();
+  const options = { cwd: fixture.root, targetProvider: "backlog", runner };
+  const inspection = inspectTaskProviderMigration(options);
+  assert.equal(inspection.status, "ready", inspection.detail);
+  const result = await migrateTaskProvider({ ...options, expectedSourceRevision: inspection.sourceRevision,
+    confirmedSwitch: true, actor: "partial-episode-fixture", semanticPlacement: "Preserve complete native source evidence.",
+    verifyActiveRuntime: proveFixtureRuntime, deleteSource() { deletions++; },
+  });
+  assert.equal(result.status, "blocked", result.detail);
+  assert.equal(result.code, "pre-cutover-failed");
+  assert.match(result.detail, /cannot clone the new published Backlog task store/);
+  assert.equal(cloneAttempts, 1);
+  assert.ok(directoryAllocated);
+  assert.equal(result.destinationStorePath, primaryStore);
+  assert.deepEqual(result.destinationStorePaths, [primaryStore, episodeStore]);
+  assert.deepEqual(readdirSync(episodeStore), []);
+  assert.equal(result.publishedDestinationRevision, git(fixture.remote, "rev-parse", TASK_HISTORY_REF));
+  assert.equal(result.destinationRevision, git(primaryStore, "rev-parse", "HEAD"));
+  assert.equal(result.authority, "beads");
+  assert.equal(result.sourceRetirement, "present");
+  assert.equal(result.ownershipSwitched, false);
+  assert.equal(deletions, 0);
+  assert.deepEqual(readFileSync(registry), original);
+  assert.deepEqual(sourceAuthorityFiles(fixture.root), source);
+  assert.deepEqual(exportRecoveryRows(fixture.root), sourceRows);
 });
 
 test("unavailable committed Backlog owner evidence blocks before ownership or Beads source retirement", { timeout: 240_000 }, async (t) => {
@@ -1859,6 +1922,7 @@ test("current native importer stops after an accepted comment response failure a
   assert.equal(first.ownershipSwitched, false);
   assert.equal(first.destinationRevision, undefined, "no verified candidate was constructed");
   assert.equal(first.destinationStorePath, join(fixture.root, ".backlog"));
+  assert.deepEqual(first.destinationStorePaths, [first.destinationStorePath]);
   assert.equal(first.publishedDestinationRef, TASK_HISTORY_REF);
   assert.equal(first.publishedDestinationRevision, git(fixture.remote, "rev-parse", TASK_HISTORY_REF));
   assert.deepEqual(requests.map(({ method }) => method), ["POST", "PUT"], "no next source task or resend after uncertain comment response");

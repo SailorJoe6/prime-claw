@@ -298,7 +298,8 @@ function selectBacklogMigrationTransport(root: string, runner: CommandRunner): B
   if (!remoteName) throw new Error("cannot identify one Backlog publication remote; configure the task branch remote or use a sole repository remote");
 
   const urlFailure = "cannot read exactly one Backlog publication transport";
-  const transport = runMigrationGit(runner, root, ["remote", "get-url", "--all", "--", remoteName], urlFailure);
+  // Use the effective write endpoint, including pushurl and pushInsteadOf.
+  const transport = runMigrationGit(runner, root, ["remote", "get-url", "--push", "--all", "--", remoteName], urlFailure);
   const url = transport.stdout.replace(/\r?\n$/, "");
   if (transport.status !== 0 || !url.trim() || /[\r\n]/.test(url)) throw new Error(urlFailure);
   // A relative filesystem transport must refer to the same repository from
@@ -350,7 +351,9 @@ export function cloneFreshBacklogMigrationWorkspace(root: string, transport: Bac
   mkdirSync(storeDir);
   onEffect?.({ storeDir });
   const failure = "cannot clone the new published Backlog task store";
-  if (runMigrationGit(runner, root, ["clone", "-q", "--no-local", "--origin", transport.remoteName, "--branch", TASK_HISTORY_BRANCH,
+  // Pin clone writes to the endpoint also used for clone and direct readback.
+  if (runMigrationGit(runner, root, ["clone", "-q", "--no-local", "--origin", transport.remoteName,
+    "-c", `remote.${transport.remoteName}.pushurl=${transport.remoteUrl}`, "--branch", TASK_HISTORY_BRANCH,
     "--single-branch", "--", transport.remoteUrl, storeDir], failure).status !== 0) throw new Error(failure);
   if (refHead(runner, storeDir, "HEAD") !== revision) throw new Error("new Backlog clone differs from the verified published revision");
   warnIfMigrationStoreIsVisible(root, runner, warn);

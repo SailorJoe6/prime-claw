@@ -1440,13 +1440,14 @@ test("switch-confirm forwards the host abort signal and notifies the settled mig
     detail: "Stopped before guarded cutover", remediation: "Preserve the authoritative Beads source",
     authority: "beads", sourceRetirement: "present", ownershipSwitched: false, stage: "Importing and verifying Backlog tasks",
     publishedDestinationRef: "refs/heads/prime-claw/tasks", publishedDestinationRevision: "c".repeat(40),
-    destinationStorePath: "/fixture/.backlog",
+    destinationStorePaths: ["/fixture/.backlog", "/fixture-episode/.backlog"],
   };
   const summary = `Prime Claw provider switch blocked (${stopped.code}): ${stopped.detail}; ${stopped.remediation}
 Provider authority: beads; original Beads store: present; Episode ownership switched: no.
 Stage: ${stopped.stage}.
 Known Backlog publication: ${stopped.publishedDestinationRef} at ${stopped.publishedDestinationRevision}.
-Allocated Backlog store: ${stopped.destinationStorePath}`;
+Allocated Backlog store: /fixture/.backlog
+Allocated Backlog store: /fixture-episode/.backlog`;
   const elapsed = /\b\d+(?:\.\d+)?\s*(?:ms|s|seconds?)\b/;
   let finishMigration;
   const migrationResult = new Promise((resolve) => { finishMigration = resolve; });

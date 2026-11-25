@@ -111,6 +111,8 @@ export interface ProviderMigrationBlocked {
   publishedDestinationRef?: string;
   publishedDestinationRevision?: string;
   destinationStorePath?: string;
+  /** Directory allocations recorded before cutover, primary first; not clone or presence proof. */
+  destinationStorePaths?: string[];
   warnings?: string[];
 }
 
@@ -1303,7 +1305,7 @@ async function migrateBeadsToBacklog(
     });
     return { revision: exact, digest: destinationDigest(refreshed), receiptTaskId };
   };
-  return verifiedBacklogCandidate(source, runner, prepared, receiptBase, verifyNativeReceipt, destinationTasks, warn);
+  return verifiedBacklogCandidate(source, runner, prepared, receiptBase, verifyNativeReceipt, destinationTasks, warn, onEffect);
 }
 
 async function verifiedBacklogCandidate(
@@ -1312,6 +1314,7 @@ async function verifiedBacklogCandidate(
   verifyNativeReceipt: () => Omit<ReturnType<DestinationCandidate["refreshAfterReceipt"]>, "tasks">,
   destinationTasks: readonly Omit<DestinationTask, "taskEvidence">[],
   warn: (message: string) => void,
+  onEffect: (effect: { revision?: string; storeDir?: string }) => void,
 ): Promise<DestinationCandidate> {
   const { storeDir } = prepared;
   const final = verifyNativeReceipt(), receiptRevision = final.revision;
@@ -1331,7 +1334,7 @@ async function verifiedBacklogCandidate(
     prepareActiveWorktree(worktree, sourceTaskId) {
       const task = tasks.find(task => task.sourceTaskId === sourceTaskId);
       if (!task?.taskPath) throw new Error(`active Episode has no published Backlog task for ${sourceTaskId}`);
-      cloneFreshBacklogMigrationWorkspace(worktree, prepared, receiptRevision, runner, warn);
+      cloneFreshBacklogMigrationWorkspace(worktree, prepared, receiptRevision, runner, warn, onEffect);
       const view = backlogTaskView(runner, worktree, task.destinationTaskId);
       if (resolve(worktree, view.task.path) !== resolve(worktree, task.taskPath)) {
         throw new Error(`active Episode does not select published Backlog task ${task.destinationTaskId}`);
@@ -1517,10 +1520,10 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
   let retirementStarted = false;
   let stage = "Checking source and migration prerequisites";
   let publishedDestinationRevision: string | undefined;
-  let destinationStorePath: string | undefined;
+  const destinationStorePaths: string[] = [];
   const onEffect = ({ revision, storeDir }: { revision?: string; storeDir?: string }) => {
     if (revision) publishedDestinationRevision = revision;
-    if (storeDir) destinationStorePath = storeDir;
+    if (storeDir) destinationStorePaths.push(storeDir);
   };
   let backlogWeb: BeadsMigrationWeb | undefined;
   let closeAttempt: ReturnType<BeadsMigrationWeb["close"]> | undefined;
@@ -1638,7 +1641,8 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       `Stop task mutation and preserve the source, any partial Backlog destination and private evidence as found. ${retirementStarted ? "Inspect the incomplete retirement; " : ""}do not automatically retry, roll back, or clean up.`,
       { sourceProvider: source?.provider, targetProvider: options.targetProvider, sourceRevision: source?.revision,
         sourceBackupPath, authority, sourceRetirement, ownershipSwitched: !!ownershipSwitch?.transitions.length,
-        stage, destinationRevision: candidate?.revision, destinationStorePath, publishedDestinationRevision,
+        stage, destinationRevision: candidate?.revision, destinationStorePath: destinationStorePaths[0], publishedDestinationRevision,
+        ...(!ownershipSwitch && destinationStorePaths.length ? { destinationStorePaths } : {}),
         publishedDestinationRef: publishedDestinationRevision ? TASK_HISTORY_REF : undefined, warnings },
     );
   }

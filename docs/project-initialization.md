@@ -287,9 +287,10 @@ does not change ordinary preparation of an already selected Backlog project.
 Inspection selects the publication remote from the task branch configuration,
 then from the configured `main`/`master` remote, or from the only repository
 remote. The checked-out branch and tracking refs do not select transport.
-Confirm in the same session: confirmation rechecks destination absence using
-the exact inspected transport, and bootstrap uses that transport without
-reselecting. Transport URLs and credentials are not reported.
+Inspection binds the selected remote's effective push endpoint, even when it
+has a different fetch URL. Confirm in the same session: the absence check,
+bootstrap, task clones, writes, and direct readback all use the bound endpoint.
+Transport URLs and credentials are not reported.
 
 Quiesce task mutations before confirming the exact inspected source and its
 one-way switch, including guarded original-source retirement. Use
@@ -360,8 +361,10 @@ A stop must serve one of these purposes:
 Do not report completion on any core failure. Report which provider is known to
 remain authoritative, whether ownership switched, and whether the original
 store is present, absent or unverified. Report the failed stage and any known
-published task ref/revision or allocated store even if import never produced a
-verified candidate. Before cutover a partial destination does not displace Beads.
+published task ref/revision even if import never produced a verified candidate.
+List every store actually allocated in the primary checkout and affected
+Episodes, including partial allocations. Before cutover a partial destination
+does not displace Beads.
 After cutover, if retirement fails, report verified Backlog authority separately
 from the retained backup and the original store's presence. With no affected
 Episodes there is no ownership switch to report. Preserve these resources; do

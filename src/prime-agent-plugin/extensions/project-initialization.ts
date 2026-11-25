@@ -97,7 +97,8 @@ function actionSummary(value: unknown, detailed = true): string {
   if (value && typeof value === "object" && (value as any).status === "blocked" && "code" in (value as any) && "targetProvider" in (value as any)) {
     const migration = value as Extract<ProviderMigrationResult, { status: "blocked" }>;
     const facts = migration.authority ? `\nProvider authority: ${migration.authority}; original Beads store: ${migration.sourceRetirement}; Episode ownership switched: ${migration.ownershipSwitched === undefined ? "not verified" : migration.ownershipSwitched ? "yes" : "no"}.` : "";
-    const partial = `${migration.stage ? `\nStage: ${migration.stage}.` : ""}${migration.publishedDestinationRef ? `\nKnown Backlog publication: ${migration.publishedDestinationRef} at ${migration.publishedDestinationRevision}.` : ""}${migration.destinationStorePath ? `\nAllocated Backlog store: ${migration.destinationStorePath}` : ""}`;
+    const allocated = migration.destinationStorePaths ?? (migration.destinationStorePath ? [migration.destinationStorePath] : []);
+    const partial = `${migration.stage ? `\nStage: ${migration.stage}.` : ""}${migration.publishedDestinationRef ? `\nKnown Backlog publication: ${migration.publishedDestinationRef} at ${migration.publishedDestinationRevision}.` : ""}${allocated.map(path => `\nAllocated Backlog store: ${path}`).join("")}`;
     return `Prime Claw provider switch blocked (${migration.code}): ${migration.detail}; ${migration.remediation}${facts}${partial}${migration.destinationRevision ? `\nVerified Backlog receipt revision: ${migration.destinationRevision}` : ""}${migration.sourceBackupPath ? `\nRetained Beads backup files: ${migration.sourceBackupPath}` : ""}${(migration.warnings ?? []).map(warning => `\nWarning: ${warning}`).join("")}`;
   }
   return "Prime Claw initialization action completed";
