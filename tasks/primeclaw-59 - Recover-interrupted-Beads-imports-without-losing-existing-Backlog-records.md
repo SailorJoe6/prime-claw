@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T05:16:00Z'
+updated_date: '2026-11-25T05:22:00Z'
 labels: []
 dependencies: []
 references:
@@ -688,4 +688,9 @@ Canonical execute received in the same Episode. Verified the published code and 
 
 ### Review fixes implemented — exact validation pending
 Migration uses the configured effective push endpoint and keeps clone writes on it. The pre-cutover result and summary report the primary and all recorded Episode store allocations. Added disposable split-remote and partial Episode clone regressions. Starting exact offline verification; no live work or lifecycle change.
+
+### Published review revision — effective push endpoint and allocated stores
+Episode `a1eee7e06c6d45f278012d1a8141dc988ee7a0f8`, tree `e074de9b1495541d992e11e71278af73b14aca82`, directly verified on `JLanders/prime-claw-primeclaw-59-episode-277260cb`. Migration selects the configured effective push endpoint privately, not the fetch URL, and pins it for absence checks, bootstrap, cloning, writes and direct readback. Both the primary and owned Episode task clones use it. Pre-cutover failure reports every actually allocated primary and Episode store without inferring clone success, cleanup, or authority transfer. A failed Episode clone left both allocations reported, the partial directory intact, original Beads rows and ownership unchanged, and no source retirement attempt.
+
+Exact disposable Docker: 115/115 workspace/layout and 21/21 focused migration, continuity, ownership and initialization cases. TAP SHA-256 `d43ad90d13eb2b7aff23bf8c2ec17d007472b6d0d54169ef94c1fc74503dba70`. This includes a completed split push/fetch migration with the receipt on push only and unchanged fetch refs/object counts, byte-checked refusal on occupied `pushurl` and `pushInsteadOf` destinations, credential-safe ambiguity refusal, and failure after the Episode directory was created. Chained or context-dependent Git URL rewrite rules were not tested. Docker Tier 1 `--probe` passed offline apply/check/RPC: `20261125T051705Z-11935-b9114e8b`, manifest SHA-256 `ba28e964ae9068e2aacb1b708bbe9ee34717c5c8b471ffe29e6854e4e5f6303f`. All three run-owned test containers were absent after teardown. Main `e28be0e977496c3922cd5056752be69c32fca57e` unchanged and not integrated. No full-suite or live validation, deployment, lifecycle change, or writer-hold release.
 <!-- SECTION:NOTES:END -->
