@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T04:36:00Z'
+updated_date: '2026-11-25T04:44:00Z'
 labels: []
 dependencies: []
 references:
@@ -663,4 +663,7 @@ Remaining stop reasons and purpose:
 7. Original source no longer safe to retire, required local server stop/deletion fails, original absence or selected Backlog authority cannot be verified: do not report incomplete retirement as completed.
 
 Exact disposable focused suite 6/6, TAP SHA-256 `eb49d91737af7f9f899e0b327b8c1007313a60a8e807c36365e4248807bb7a5d`. Proved dirty, staged and untracked code, different unpublished primary checkout, an advancing Episode HEAD, and stale task/code caches do not stop cutover or change unrelated files/index/refs. Also verified native receipt and task binding, source retirement, retained backup restores for embedded and owned-server modes, blocking before destination publication on restore failure, and before cutover on loss of a required memory. Exact Tier 1 `--probe` passed offline apply/check/RPC in `20261125T043305Z-63363-639af2d7`, manifest SHA-256 `bfa5258aa948b5a23e58727b99305b3016f768c0f69742d227bdaac5b8b08b77`; independently checked both exact run-owned container IDs absent. Not a full-suite, live or scale claim. No live access, hold release, merge, deployment or task lifecycle changes.
+
+### Accepted review revision — exact transport, continuity and failure facts
+On a separate canonical execute, start from published `492d79a054ab495285153c2db53b0fd0f72a67bc` and task `6a6e62264ad375d6a7d64f89b14f8c3d27877bf1`. Bind the intended task publication transport independently of the checked-out branch; carry the exact inspected/confirmed selection through bootstrap. Prove a branch switch with two disposable remotes cannot redirect publication or select an unrelated ref. Keep transport credentials out of output. Require actual owned Episode session/route and owned terminal continuity, not equality of the visible terminal set; prove it using the real verifier. Report the stage and any known created ref/store when import fails before a candidate exists. Do not report ownership switched when there were no active owners; after failed source retirement, report verified Backlog authority and the retained backup without automatic rollback. Remove obsolete rollback/runtime-count assertions and migration-only dead existing-Episode projection, explicitMigration modes, reverse ownership, and unused rollback after checking real callers. Preserve ordinary Backlog initialization/preparation and all required forward cutover safeguards. No new controller, persistence protocol, broad Git/layout gate, unrelated code/index/ref effects, live access/retry, hold release, deployment, merge, or lifecycle change. Run focused disposable regressions and exact-candidate Docker Tier 1; publish coherent code and sanitized native evidence separately. Newer main `e28be0e9` was not integrated in the last tested candidate.
 <!-- SECTION:NOTES:END -->
