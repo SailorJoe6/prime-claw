@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T04:48:00Z'
+updated_date: '2026-11-25T04:57:00Z'
 labels: []
 dependencies: []
 references:
@@ -68,6 +68,8 @@ modified_files:
   - src/prime-agent-plugin/skills/initialize-prime-claw/SKILL.md
   - src/prime-agent-plugin/extension-support/episode-ownership.ts
   - src/prime-agent-plugin/extension-support/spec-episode.ts
+  - tests/spec_episode_extension.test.mjs
+  - tests/task_episode_ownership_extension.test.mjs
 priority: p1
 type: bug
 ordinal: 144000
@@ -669,4 +671,7 @@ On a separate canonical execute, start from published `492d79a054ab495285153c2db
 
 ### Execute — accepted review revision ca350e6b
 The same Episode received canonical execute, verified the published `492d79a0` code and the `263f88dc` task-only descendant containing the accepted scope. This slice addresses exact publication transport, owned continuity, and factual failure reporting; removes confirmed dead paths and obsolete expectations; and validates in disposable Docker only. Neither live writer hold changes.
+
+### Review revision validation checkpoint
+Implemented the checkout-independent inspected transport, owned-terminal continuity, factual partial import/retirement output, and removal of unused migration-only helpers. Initial disposable Docker run passed all 20 selected cases; the additional layout file had no match in that run. Preparing exact candidate validation with the ordinary workspace and transport cases included. No live work or lifecycle changes.
 <!-- SECTION:NOTES:END -->
