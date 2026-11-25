@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T04:12:00Z'
+updated_date: '2026-11-25T04:19:00Z'
 labels: []
 dependencies: []
 references:
@@ -635,4 +635,7 @@ Corrected disposable Docker restore tests: 3 passed, 0 failed/skipped; TAP SHA-2
 
 ### Operator-approved plugin revision — remove unrelated migration blockers
 Joe ended the pause for this plugin-only revision. On the separately delivered execute, start from published Episode `3b3e013f`, not an interrupted attempt. Remove the broad code-layout projection and equivalent active-worktree gates without replacing them; audit all remaining stop conditions. Unrelated repo, index, branch and layout changes, and incidental bookkeeping, must not derail migration. Do not commit or discard user work to resolve drift. Warn for nonfatal issues; report actual authority and retirement, and never report success for an incomplete core operation. Keep explicit confirmation, fresh Backlog admission, required current-data import and native publication/ownership cutover, and the retained restorable Beads backup before guarded retirement. Remove unused reverse/existing-destination migration logic and stale shipped guidance. Align the current task and requirements without lifecycle changes; historical evidence is not a requirement. Use disposable drift and core-behavior proof plus exact Docker Tier 1, then report removed and remaining stop reasons and publish the Episode candidate separately. No live Ralph-PVA access/retry, hold release, merge or deployment. Reported live attempts are evidence only, not independently verified; they do not authorize work on live systems.
+
+### Plugin simplification execute — ec506da3
+The original Episode received canonical execute and verified the published starting point `3b3e013f`. This slice removes unrelated migration blockers and obsolete routes; confirms authority/retirement from observed facts; and tests unrelated drift, core cutover and retained backup in disposable Docker. The tool will not commit or discard unrelated code or index entries. No live work, hold release, deployment, main merge or lifecycle change.
 <!-- SECTION:NOTES:END -->
