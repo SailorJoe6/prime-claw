@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T04:26:00Z'
+updated_date: '2026-11-25T04:36:00Z'
 labels: []
 dependencies: []
 references:
@@ -66,6 +66,8 @@ modified_files:
   - tests/test_pva_gate_scale_rehearsal.py
   - tests/test_task_provider_migration.py
   - src/prime-agent-plugin/skills/initialize-prime-claw/SKILL.md
+  - src/prime-agent-plugin/extension-support/episode-ownership.ts
+  - src/prime-agent-plugin/extension-support/spec-episode.ts
 priority: p1
 type: bug
 ordinal: 144000
@@ -80,6 +82,9 @@ The operator approved one separately confirmed one-way Beads-to-Backlog operatio
 Migrate current readable tickets, meaningful metadata, actual authored comments, status and closure, parent/dependency relationships, and current native memories under the existing readable placement requirements. Use native Backlog fields or concise labeled text when no equivalent exists. Do not import Dolt revisions, old snapshots, event streams, provenance logs, or encoded export archives. Report nonfatal losses as warnings; failure to complete or verify the required import or switch is fatal, not a warning.
 
 Keep Beads intact and authoritative through verified destination publication and ownership cutover. Obtain explicit confirmation for the exact source and the switch including guarded source retirement. Before switching, make and retain a restorable backup of the Beads source; deleting that backup is a separate operation and is out of scope. Maintain active Episode identities and resources. Retire the original source only after the verified ownership cutover, using the existing guarded retirement. Report what remains authoritative and what resources were left on failure or cancellation. Do not automatically retry, roll back, clean up a partial destination, or retire the source on a pre-cutover failure.
+
+## Migration must not depend on code checkout state
+Do not check repository-layout projections, require clean or published code, or gate on unrelated branch, index, worktree or tracking-cache changes. Preserve unrelated files and index; do not commit or discard user work. Report incidental failures as warnings and continue when core work is verified. State actual provider authority, ownership and original-source retirement, including when facts are unverified. An incomplete core operation is never success.
 
 ## Historical context
 The task title and path are retained for identity. Earlier preservation, matching-ID overwrite, replay, partial recovery, and alternate writer decisions are historical, not current scope. Prior task content and evidence remain in task history and Implementation Notes. No implementation, upstream change, deployment, live Ralph-PVA work, or writer-hold release is authorized by this scope publication.
@@ -110,6 +115,9 @@ This living plan replaces the superseded target-ID overwrite and recovery plan. 
 4. Update operator docs and use the existing disposable harness for fresh import, refusal of empty/populated/partial existing destinations with no destination writes, and failure or cancellation before cutover. Prove the backup is restorable and retained. Run required Docker Tier 1 on the exact plugin candidate and report its scope, evidence or concrete blocker.
 
 Original Episode only. Keep In Progress, 0/9 checked, and Final Summary unset in this phase. No upstream patch, live Ralph-PVA access, migration, deployment, hold release, or replay. Scope publication is not a canonical execute assignment.
+
+### Current plugin revision
+Remove unrelated code layout, cleanliness, publication, and tracking-cache gates without replacements. Preserve native task import, publication, ownership cutover and the retained Beads backup. Report factual authority and retirement, not inferred success or rollback. Review the separately published Episode and exact Docker evidence before any owner lifecycle decision.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -641,4 +649,18 @@ The original Episode received canonical execute and verified the published start
 
 ### Simplification validation checkpoint
 From `3b3e013f`, Episode working changes remove source-side code publication/layout projection and migration-only reverse/destination adoption, create a fresh Backlog task ref independently of code caches, and report native ownership and source presence on failure. First Docker snapshot reached successful fresh cutover despite unrelated Git drift but two old fixture assertions expected a third runtime check and deletion of the root gate lock; updated those assertions without claiming a passing rerun. Backup-restore refusal passed in that snapshot. The current focused Docker run is not yet terminal; the candidate is not published and exact Tier 1 has not run. Preserve In Progress, existing criteria and notes, and both live holds.
+
+### Published migration simplification
+Exact Episode candidate `492d79a054ab495285153c2db53b0fd0f72a67bc`, tree `d70160ffc143f84f8293377ab22de0a5bbac4aa5`. Removed broad primary/Episode Git layout projections, unrelated code staging/cleanliness/branch ancestry/upstream checks, code commits/pushes for migration bookkeeping, and reliance on stale tracking caches. The migration bootstraps only a fresh independent task ref and folder-native Backlog stores. Reverse import, existing-destination migration, automatic ownership rollback, and stale operator guidance were removed from the migration path. Ordinary Backlog preparation is separate. Notifications, temporary cleanup, local ignore update, and Web teardown after verified reads are best-effort, not success criteria. Failure output distinguishes ownership switch, observed provider authority and original-store presence; an unverified fact is not reported as successful.
+
+Remaining stop reasons and purpose:
+1. Wrong direction/project, missing explicit confirmation, actor or placement, or operator stop before cutover: authorize only the exact operation.
+2. Existing local store/config or local/published task ref, or unable to select/probe the task publication remote or reserve a fresh destination: never overwrite a Backlog installation.
+3. Unreadable, ambiguous or changed Beads identity/current snapshot; incomplete records, unsupported lifecycle, or relationships that cannot be represented: prevent partial or wrong-source import.
+4. Unsafe embedded/owned-server source, backup capture or scratch restore/integrity failure, changed retained backup: keep a restorable artifact before destructive work.
+5. Required native Backlog transport, task/comment/relationship/memory import, receipt, readback, Git commit/push/readback or exact native task-evidence failure: prove the actual imported data is published.
+6. Affected Episode worktree/source/session/route not verified or idle, occupied local destination, exact clone or native task mapping failed, active ownership changed or cannot be locked/written/reverified: protect the exact ownership switch.
+7. Original source no longer safe to retire, required local server stop/deletion fails, original absence or selected Backlog authority cannot be verified: do not report incomplete retirement as completed.
+
+Exact disposable focused suite 6/6, TAP SHA-256 `eb49d91737af7f9f899e0b327b8c1007313a60a8e807c36365e4248807bb7a5d`. Proved dirty, staged and untracked code, different unpublished primary checkout, an advancing Episode HEAD, and stale task/code caches do not stop cutover or change unrelated files/index/refs. Also verified native receipt and task binding, source retirement, retained backup restores for embedded and owned-server modes, blocking before destination publication on restore failure, and before cutover on loss of a required memory. Exact Tier 1 `--probe` passed offline apply/check/RPC in `20261125T043305Z-63363-639af2d7`, manifest SHA-256 `bfa5258aa948b5a23e58727b99305b3016f768c0f69742d227bdaac5b8b08b77`; independently checked both exact run-owned container IDs absent. Not a full-suite, live or scale claim. No live access, hold release, merge, deployment or task lifecycle changes.
 <!-- SECTION:NOTES:END -->
