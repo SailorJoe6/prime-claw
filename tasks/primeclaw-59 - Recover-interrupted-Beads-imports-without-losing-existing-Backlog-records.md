@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T04:19:00Z'
+updated_date: '2026-11-25T04:26:00Z'
 labels: []
 dependencies: []
 references:
@@ -638,4 +638,7 @@ Joe ended the pause for this plugin-only revision. On the separately delivered e
 
 ### Plugin simplification execute — ec506da3
 The original Episode received canonical execute and verified the published starting point `3b3e013f`. This slice removes unrelated migration blockers and obsolete routes; confirms authority/retirement from observed facts; and tests unrelated drift, core cutover and retained backup in disposable Docker. The tool will not commit or discard unrelated code or index entries. No live work, hold release, deployment, main merge or lifecycle change.
+
+### Simplification validation checkpoint
+From `3b3e013f`, Episode working changes remove source-side code publication/layout projection and migration-only reverse/destination adoption, create a fresh Backlog task ref independently of code caches, and report native ownership and source presence on failure. First Docker snapshot reached successful fresh cutover despite unrelated Git drift but two old fixture assertions expected a third runtime check and deletion of the root gate lock; updated those assertions without claiming a passing rerun. Backup-restore refusal passed in that snapshot. The current focused Docker run is not yet terminal; the candidate is not published and exact Tier 1 has not run. Preserve In Progress, existing criteria and notes, and both live holds.
 <!-- SECTION:NOTES:END -->
