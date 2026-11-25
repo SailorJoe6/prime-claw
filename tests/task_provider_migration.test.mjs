@@ -878,13 +878,26 @@ test("confirmed Beads to Backlog migration preserves active Episode identity des
   git(fixture.root, "update-ref", "refs/remotes/origin/main", owner.episodeHead);
   assert.notEqual(git(fixture.root, "rev-parse", "origin/main"), git(fixture.remote, "rev-parse", "refs/heads/main"));
   git(fixture.root, "update-ref", "refs/remotes/origin/prime-claw/tasks", owner.episodeHead);
+  const unrelatedRemote = join(fixture.outer, "unrelated.git");
+  git(fixture.root, "init", "-q", "--bare", unrelatedRemote);
+  git(fixture.root, "remote", "add", "unrelated", unrelatedRemote);
+  git(fixture.root, "push", "-q", "unrelated", `HEAD:${TASK_HISTORY_REF}`);
+  const unrelatedBefore = git(unrelatedRemote, "show-ref");
+  let inspectedDestination;
+  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER,
+    onInspectedDestination: (selection) => { inspectedDestination = selection; } });
+  assert.equal(inspection.status, "ready", inspection.detail);
+  assert.equal(inspectedDestination.transport.remoteName, "origin");
   git(fixture.root, "switch", "-qc", "operator-checkout");
+  git(fixture.root, "config", "branch.operator-checkout.remote", "unrelated");
+  git(fixture.root, "config", "branch.operator-checkout.merge", TASK_HISTORY_REF);
+  // Even if the branch-independent default changes after inspection, the
+  // confirmed source must retain its original destination through bootstrap.
+  git(fixture.root, "config", "branch.main.remote", "unrelated");
   const primaryCode = dirtyCodeCheckout(fixture.root, "primary");
   const episodeCode = dirtyCodeCheckout(owner.episode, "episode");
   const primaryBefore = primaryCode();
   const episodeBefore = episodeCode();
-  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
-  assert.equal(inspection.status, "ready", inspection.detail);
   assert.deepEqual(inspection.activeOwnership, [{ ownerSessionId: owner.ownerSessionId, taskId: fixture.ids.parent }]);
   assert.deepEqual(primaryCode(), primaryBefore, "inspection must not alter the primary code checkout");
   assert.deepEqual(episodeCode(), episodeBefore, "inspection must not alter the Episode code checkout");
@@ -895,6 +908,7 @@ test("confirmed Beads to Backlog migration preserves active Episode identity des
     cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "migration-operator",
     semanticPlacement: "Place native design in the living plan and preserve all unsupported values in exact provenance comments.",
+    inspectedDestination,
     onProgress(phase) {
       if (phase !== "Guarded cutover starting; stop no longer interrupts this phase") return;
       assert.deepEqual(episodeCode(), episodeBefore, "publication must not edit the Episode code checkout");
@@ -917,6 +931,8 @@ test("confirmed Beads to Backlog migration preserves active Episode identity des
   assert.ok(expectedEpisodeCode, "must exercise drift at the guarded cutover boundary");
   assert.deepEqual(episodeCode(), expectedEpisodeCode, "cutover must preserve Episode code bytes, staged entries and advanced branch");
   assert.deepEqual(codeRemote(), remoteBefore, "independent task publication must not push code branches");
+  assert.equal(git(unrelatedRemote, "show-ref"), unrelatedBefore, "alternate branch remote and unrelated task ref stay untouched");
+  assert.equal(git(fixture.remote, "rev-parse", TASK_HISTORY_REF), result.receipt.destinationReceiptRevision);
   assert.equal(git(fixture.root, "rev-parse", "origin/main"), owner.episodeHead, "must not refresh the stale code tracking ref");
   assert.equal(git(fixture.root, "rev-parse", "refs/remotes/origin/prime-claw/tasks"), owner.episodeHead, "must not refresh the stale task tracking ref");
   const receipt = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", result.receiptTaskId)).task;
@@ -1362,79 +1378,6 @@ exec "${realGit}" "$@"
   assert.equal(command(store, "git", ["show", `${revision}:${path}`]).split("\n---", 1)[0].match(/^id: (.+)$/m)?.[1], taskId);
 });
 
-test("post-switch continuity failure and persisted ownership drift still prevent source deletion", { timeout: 480_000 }, async (t) => {
-  for (const kind of ["runtime unavailable", "persisted ownership drift"]) {
-    await t.test(kind, async (t) => {
-      const fixture = embeddedBeadsSource(t, `post-switch-${kind.replaceAll(" ", "-")}`);
-      const owner = addActiveBeadsOwner(fixture);
-      const runner = new AsIsBeadsRunner();
-      const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner });
-      assert.equal(inspection.status, "ready", inspection.detail);
-      const sourceBefore = sourceAuthorityFiles(fixture.root);
-      const registryPath = join(fixture.root, ".prime-claw", "ownership.json");
-      const ownershipBefore = readFileSync(registryPath, "utf8");
-      let proofs = 0, deletions = 0, driftedRegistry;
-      const result = await migrateTaskProvider({
-        cwd: fixture.root, targetProvider: "backlog", runner, expectedSourceRevision: inspection.sourceRevision,
-        confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve complete native source evidence.",
-        async verifyActiveRuntime(records) {
-          proofs += 1;
-          if (proofs === 3) {
-            assert.equal(records[0].provider, "backlog", "failure must occur after ownership cutover");
-            if (kind === "runtime unavailable") throw new Error("fixture runtime unavailable after ownership switch");
-            const registry = JSON.parse(readFileSync(registryPath, "utf8"));
-            registry.owners[owner.ownerSessionId].episodeActiveSessionId = "persisted-route-drift";
-            driftedRegistry = `${JSON.stringify(registry, null, 2)}\n`;
-            writeFileSync(registryPath, driftedRegistry);
-          }
-          return proveFixtureRuntime(records);
-        },
-        deleteSource() { deletions += 1; },
-      });
-      assert.equal(proofs, 3);
-      assert.equal(result.status, "blocked", result.detail);
-      assert.equal(deletions, 0);
-      assert.equal(existsSync(join(fixture.root, ".beads")), true);
-      assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore);
-      if (kind === "runtime unavailable") {
-        assert.equal(result.code, "pre-cutover-failed");
-        assert.match(result.detail, /fixture runtime unavailable after ownership switch/);
-        assert.equal(readFileSync(registryPath, "utf8"), ownershipBefore, "unchanged source ownership must be restored");
-      } else {
-        assert.equal(result.code, "cutover-incomplete");
-        assert.match(result.detail, /ownership rollback refused because the registry changed after the switch/);
-        assert.equal(readFileSync(registryPath, "utf8"), driftedRegistry, "a changed persisted owner record must not be overwritten");
-      }
-      assert.deepEqual(runner.sourcePublicationCommands, []);
-    });
-  }
-});
-
-test("post-switch runtime continuity loss rolls ownership back before source deletion", { skip: "Reverse migration retired; explicit no-command refusal is covered below", timeout: 180_000 }, async (t) => {
-  const fixture = backlogSource(t, "backlog-post-switch-runtime-loss");
-  const owner = addActiveBacklogOwner(fixture);
-  const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "beads", runner: RUNNER });
-  assert.equal(inspection.status, "ready", inspection.detail);
-  const ownershipBefore = readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8");
-  let proofs = 0, deletions = 0;
-  const result = await migrateTaskProvider({
-    cwd: fixture.root, targetProvider: "beads", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
-    confirmedSwitch: true, actor: "migration-operator", semanticPlacement: "Preserve exact unsupported values in native metadata.",
-    async verifyActiveRuntime(records) {
-      proofs += 1;
-      if (proofs === 3) throw new Error("fixture runtime disappeared after ownership switch");
-      return proveFixtureRuntime(records);
-    },
-    deleteSource() { deletions += 1; },
-  });
-  assert.equal(result.status, "blocked");
-  assert.match(result.detail, /runtime disappeared after ownership switch/);
-  assert.equal(deletions, 0);
-  assert.equal(existsSync(join(fixture.root, "backlog")), true);
-  assert.equal(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8"), ownershipBefore);
-});
-
-
 test("fresh destination memory loss blocks before ownership switches or the original is retired", { timeout: 240_000 }, async t => {
   const fixture = embeddedBeadsSource(t, "fresh-memory-loss");
   bd(fixture.root, "remember", "Restore the exact native index", "--key", "fixture");
@@ -1484,7 +1427,12 @@ test("active Beads Episode deletion refusal retains the published receipt withou
     deleteSource() { throw new Error("fixture refuses Beads deletion after destination proof"); },
   });
   assert.equal(first.status, "blocked");
-  assert.equal(first.code, "pre-cutover-failed");
+  assert.equal(first.code, "cutover-incomplete");
+  assert.equal(first.authority, "backlog");
+  assert.equal(first.ownershipSwitched, true);
+  assert.equal(first.sourceRetirement, "present");
+  assert.equal(first.stage, "Retiring the original Beads store");
+  assert.ok(existsSync(join(first.sourceBackupPath, "metadata.json")));
   assert.equal(existsSync(join(fixture.root, ".beads")), true);
   assert.equal(detectTaskProvider(fixture.root, RUNNER).code, "dual-providers");
   const store = join(fixture.root, ".backlog");
@@ -1507,8 +1455,11 @@ test("active Beads Episode deletion refusal retains the published receipt withou
   }
   assert.equal(JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", memoryOutputs.userTask.taskId)).task.status, "In Design");
   const registryPath = join(fixture.root, ".prime-claw", "ownership.json");
-  assert.equal(JSON.parse(readFileSync(registryPath, "utf8")).owners[owner.ownerSessionId].provider, "beads");
-  await assertExistingDestinationRefused(fixture, inspection, [".backlog", "backlog.config.yml", TASK_HISTORY_REF]);
+  const switched = JSON.parse(readFileSync(registryPath, "utf8")).owners[owner.ownerSessionId];
+  assert.equal(switched.provider, "backlog");
+  assert.equal(switched.episodeId, owner.record.episodeId);
+  assert.equal(switched.providerRevision, first.destinationRevision);
+  await assertExistingDestinationRefused(fixture, inspection, [".backlog", TASK_HISTORY_REF]);
 });
 
 
@@ -1901,8 +1852,15 @@ test("current native importer stops after an accepted comment response failure a
   assert.equal(first.status, "blocked", first.detail);
   assert.equal(first.code, "pre-cutover-failed");
   assert.match(first.detail, /http-status-503; outcome=uncertain/);
-  assert.match(first.remediation, /STOP and preserve/);
-  assert.match(first.remediation, /Do not automatically resend/);
+  assert.match(first.remediation, /preserve the source/);
+  assert.match(first.remediation, /do not automatically retry/);
+  assert.equal(first.stage, "Importing and verifying Backlog tasks");
+  assert.equal(first.authority, "beads");
+  assert.equal(first.ownershipSwitched, false);
+  assert.equal(first.destinationRevision, undefined, "no verified candidate was constructed");
+  assert.equal(first.destinationStorePath, join(fixture.root, ".backlog"));
+  assert.equal(first.publishedDestinationRef, TASK_HISTORY_REF);
+  assert.equal(first.publishedDestinationRevision, git(fixture.remote, "rev-parse", TASK_HISTORY_REF));
   assert.deepEqual(requests.map(({ method }) => method), ["POST", "PUT"], "no next source task or resend after uncertain comment response");
   const artifactDirectory = first.detail.match(/Private transport evidence: ([^\n]+)$/)?.[1];
   assert.ok(artifactDirectory && existsSync(artifactDirectory), "private transport failure evidence is retained");
@@ -2005,7 +1963,7 @@ test("used unsupported Beads statuses and ambiguous archive records aggregate be
 
 
 
-test("native Beads deferred tasks project to In Design without active deferral and failed retirement preserves source authority", { timeout: 300_000 }, async (t) => {
+test("native Beads deferred tasks project to In Design and retirement failure reports Backlog authority without owner switch", { timeout: 300_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "embedded-deferred");
   bd(fixture.root, "dep", "add", fixture.ids.child, fixture.ids.blocked, "--type", "discovered-from");
   const cases = [
@@ -2063,7 +2021,12 @@ test("native Beads deferred tasks project to In Design without active deferral a
   };
   const first = await migrateTaskProvider(request);
   assert.equal(first.status, "blocked", first.detail);
-  assert.equal(first.code, "pre-cutover-failed");
+  assert.equal(first.code, "cutover-incomplete");
+  assert.equal(first.authority, "backlog");
+  assert.equal(first.ownershipSwitched, false);
+  assert.equal(first.sourceRetirement, "present");
+  assert.equal(first.stage, "Retiring the original Beads store");
+  assert.ok(existsSync(join(first.sourceBackupPath, "metadata.json")));
   assert.match(first.detail, /fixture refuses deferred source retirement/);
   assert.equal(retirements, 1);
   const readReceipt = () => {
@@ -2107,7 +2070,7 @@ test("native Beads deferred tasks project to In Design without active deferral a
   assert.deepEqual(typedBefore.dependencies, []);
   assert.equal(typedBefore.comments.length, 1);
   assert.ok(typedBefore.comments[0].body.includes(`- discovered-from: ${fixture.ids.blocked} -> ${typedMapping[fixture.ids.blocked]}`));
-  await assertExistingDestinationRefused(fixture, inspection, [".backlog", "backlog.config.yml", TASK_HISTORY_REF]);
+  await assertExistingDestinationRefused(fixture, inspection, [".backlog", TASK_HISTORY_REF]);
   assert.equal(retirements, 1);
   assert.ok(!runner.reads.some(({ args }) => ["history", "provenance"].includes(args[1])),
     "confirmation and admission refusal must not read source history/provenance");

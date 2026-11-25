@@ -16,6 +16,7 @@ import { prepareExistingBacklogTaskHistoryWorkspace, prepareTaskHistoryWorkspace
 import {
   inspectTaskProviderMigration,
   migrateTaskProvider,
+  type InspectedMigrationDestination,
   type ProviderMigrationInspection,
   type ProviderMigrationOptions,
   type ProviderMigrationResult,
@@ -95,8 +96,9 @@ function actionSummary(value: unknown, detailed = true): string {
   }
   if (value && typeof value === "object" && (value as any).status === "blocked" && "code" in (value as any) && "targetProvider" in (value as any)) {
     const migration = value as Extract<ProviderMigrationResult, { status: "blocked" }>;
-    const facts = migration.authority ? `\nProvider authority: ${migration.authority}; original Beads store: ${migration.sourceRetirement}; Episode ownership switched: ${migration.ownershipSwitched ? "yes" : "not verified"}.` : "";
-    return `Prime Claw provider switch blocked (${migration.code}): ${migration.detail}; ${migration.remediation}${facts}${migration.destinationRevision ? `\nVerified Backlog receipt revision: ${migration.destinationRevision}` : ""}${migration.sourceBackupPath ? `\nRetained Beads backup files: ${migration.sourceBackupPath}` : ""}${(migration.warnings ?? []).map(warning => `\nWarning: ${warning}`).join("")}`;
+    const facts = migration.authority ? `\nProvider authority: ${migration.authority}; original Beads store: ${migration.sourceRetirement}; Episode ownership switched: ${migration.ownershipSwitched === undefined ? "not verified" : migration.ownershipSwitched ? "yes" : "no"}.` : "";
+    const partial = `${migration.stage ? `\nStage: ${migration.stage}.` : ""}${migration.publishedDestinationRef ? `\nKnown Backlog publication: ${migration.publishedDestinationRef} at ${migration.publishedDestinationRevision}.` : ""}${migration.destinationStorePath ? `\nAllocated Backlog store: ${migration.destinationStorePath}` : ""}`;
+    return `Prime Claw provider switch blocked (${migration.code}): ${migration.detail}; ${migration.remediation}${facts}${partial}${migration.destinationRevision ? `\nVerified Backlog receipt revision: ${migration.destinationRevision}` : ""}${migration.sourceBackupPath ? `\nRetained Beads backup files: ${migration.sourceBackupPath}` : ""}${(migration.warnings ?? []).map(warning => `\nWarning: ${warning}`).join("")}`;
   }
   return "Prime Claw initialization action completed";
 }
@@ -133,6 +135,7 @@ function productionReconcileOptions(dependencies: ProjectInitializationDependenc
 }
 
 async function executeAction(action: Action, args: ActionArguments, ctx: ExtensionContext, dependencies: ProjectInitializationDependencies,
+  inspection: { destination?: InspectedMigrationDestination },
   signal?: AbortSignal, onProgress?: (phase: string, level?: "warning") => void,
 ) {
   switch (action) {
@@ -152,16 +155,29 @@ async function executeAction(action: Action, args: ActionArguments, ctx: Extensi
     case "review-keep": return recoverTemplateReview(ctx.cwd, "keep", dependencies);
     case "switch-request":
       if (args.targetProvider !== "backlog") throw new Error("only Beads to Backlog migration is supported; targetProvider must be backlog");
-      return (dependencies.migrationInspector ?? inspectTaskProviderMigration)({
+      inspection.destination = undefined;
+      let destination: InspectedMigrationDestination | undefined;
+      const result = (dependencies.migrationInspector ?? inspectTaskProviderMigration)({
         cwd: ctx.cwd, targetProvider: args.targetProvider, runner: dependencies.runner,
+        onInspectedDestination: (selected) => { destination = selected; },
       });
+      if (result.status === "ready") inspection.destination = destination;
+      return result;
     case "switch-confirm":
       if (args.targetProvider !== "backlog") throw new Error("only Beads to Backlog migration is supported; targetProvider must be backlog");
       if (!args.expectedSourceRevision) throw new Error("switch-confirm requires expectedSourceRevision");
+      const inspectedDestination = inspection.destination;
+      if (args.confirmedSwitch && inspectedDestination?.sourceRevision !== args.expectedSourceRevision) {
+        return { status: "blocked", code: "inspection-required", targetProvider: "backlog",
+          detail: "No exact destination selection from a matching switch-request in this session",
+          remediation: "inspect the exact switch before asking for confirmation" };
+      }
+      if (args.confirmedSwitch) inspection.destination = undefined;
       return (dependencies.migrationRunner ?? migrateTaskProvider)({
         cwd: ctx.cwd,
         targetProvider: args.targetProvider,
         expectedSourceRevision: args.expectedSourceRevision,
+        inspectedDestination,
         confirmedSwitch: args.confirmedSwitch,
         actor: args.actor ?? "",
         semanticPlacement: args.semanticPlacement ?? "",
@@ -180,6 +196,7 @@ async function executeAction(action: Action, args: ActionArguments, ctx: Extensi
 export function createProjectInitializationExtension(dependencies: ProjectInitializationDependencies = {}) {
   return function projectInitialization(pi: ExtensionAPI): void {
     let pendingInspection: ProjectInspection | undefined;
+    const migrationInspection: { destination?: InspectedMigrationDestination } = {};
     pi.registerTool({
       name: "initialize_prime_claw",
       label: "Initialize Prime Claw project",
@@ -228,7 +245,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
             actor: params.actor,
             semanticPlacement: params.semanticPlacement,
             unpublishedLocalOnly: params.unpublishedLocalOnly === true,
-          }, ctx, dependencies, switching ? signal : undefined,
+          }, ctx, dependencies, migrationInspection, switching ? signal : undefined,
             switching ? (phase, level) => notify(`Prime Claw provider switch: ${phase}`, level ?? "info") : undefined);
           const summary = actionSummary(value);
           // The host can stop waiting for the tool before its Promise settles.
@@ -246,6 +263,7 @@ export function createProjectInitializationExtension(dependencies: ProjectInitia
 
     pi.on("session_start", async (_event, ctx) => {
       pendingInspection = undefined;
+      migrationInspection.destination = undefined;
       try {
         const result = inspectPrimeClawProject({ ...dependencies, cwd: ctx.cwd });
         if (result.status === "protected") {

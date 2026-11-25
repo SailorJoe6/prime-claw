@@ -40,6 +40,7 @@ import {
   verifyMigrationEpisodeWorktree,
   assertNoLocalBacklogMigrationDestination,
   TASK_HISTORY_REF,
+  type BacklogMigrationTransport,
 } from "./task-history-workspace.ts";
 import {
   BEADS_STATUS_MAP,
@@ -86,6 +87,13 @@ export interface ProviderMigrationInspection {
   confirmation: string;
 }
 
+/** Private transport selected by the live inspection; never part of a tool result. */
+export interface InspectedMigrationDestination {
+  projectRoot: string;
+  sourceRevision: string;
+  transport: BacklogMigrationTransport;
+}
+
 export interface ProviderMigrationBlocked {
   status: "blocked";
   code: string;
@@ -98,7 +106,11 @@ export interface ProviderMigrationBlocked {
   authority?: "beads" | "backlog" | "unverified";
   sourceRetirement?: "absent" | "present" | "unverified";
   ownershipSwitched?: boolean;
+  stage?: string;
   destinationRevision?: string;
+  publishedDestinationRef?: string;
+  publishedDestinationRevision?: string;
+  destinationStorePath?: string;
   warnings?: string[];
 }
 
@@ -140,6 +152,7 @@ export interface ProviderMigrationOptions {
   cwd: string;
   targetProvider: TaskProviderId;
   expectedSourceRevision: string;
+  inspectedDestination?: InspectedMigrationDestination;
   confirmedSwitch: boolean;
   actor: string;
   semanticPlacement: string;
@@ -207,7 +220,7 @@ export type SourceSnapshot = BeadsSnapshot;
 interface DestinationTask {
   sourceTaskId: string;
   destinationTaskId: string;
-  taskPath?: string;
+  taskPath: string;
   taskEvidence: JsonObject;
 }
 
@@ -390,10 +403,10 @@ function assertPublishedGitRef(
   ref: string,
   label: string,
 ): void {
-  const urls = runRequired(runner, "git", ["-C", repositoryRoot, "remote", "get-url", "--all", remoteName], repositoryRoot, `${label} remote URL`)
+  const urls = backlogTransportGit(runner, repositoryRoot, ["remote", "get-url", "--all", remoteName], `${label} remote URL`)
     .stdout.split(/\r?\n/).filter(Boolean);
   if (urls.length !== 1 || urls[0] !== remoteUrl) throw new Error(`${label} remote authority changed`);
-  const direct = runRequired(runner, "git", ["-C", repositoryRoot, "ls-remote", "--exit-code", "--refs", remoteName, ref], repositoryRoot, label);
+  const direct = backlogTransportGit(runner, repositoryRoot, ["ls-remote", "--exit-code", "--refs", "--", remoteUrl, ref], label);
   const rows = direct.stdout.trim().split(/\r?\n/).filter(Boolean);
   if (rows.length !== 1 || rows[0] !== `${revision}\t${ref}`) throw new Error(`${label} does not equal exact revision ${revision}`);
 }
@@ -624,15 +637,17 @@ export function inspectTaskProviderMigration(options: {
   cwd: string;
   targetProvider: TaskProviderId;
   runner?: CommandRunner;
+  onInspectedDestination?: (selection: InspectedMigrationDestination) => void;
 }): ProviderMigrationInspection | ProviderMigrationBlocked {
   const runner = migrationRunner(options.runner);
   try {
     if (options.targetProvider !== "backlog") return blocked("unsupported-direction", "provider migration supports only Beads-to-Backlog", "request an explicit Beads-to-Backlog inspection; reverse migration is not supported", { targetProvider: options.targetProvider });
     const project = resolveNearestProjectRoot(options.cwd, process.env.HOME ?? "", runner);
     if (project.kind === "linked-worktree") return blocked("primary-required", "provider migration must run from the canonical primary checkout", "run the initialize-prime-claw skill from the canonical primary Conversation", { targetProvider: options.targetProvider });
-    assertFreshBacklogMigrationDestination(project.root, runner);
+    const transport = assertFreshBacklogMigrationDestination(project.root, runner);
     const source = captureSelectedSource(project.root, runner);
     const ownership = activeOwnership(project.root, source, runner);
+    options.onInspectedDestination?.({ projectRoot: project.root, sourceRevision: source.revision, transport });
     return {
       status: "ready",
       projectRoot: project.root,
@@ -1117,13 +1132,23 @@ ${lines.join("\n")}
 Semantic placement: ${semanticPlacement}`;
 }
 
-function commitBacklogDestination(runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace, message: string): string {
+function backlogTransportGit(runner: CommandRunner, root: string, args: string[], label: string) {
+  try { return runRequired(runner, "git", ["-C", root, ...args], root, label); }
+  catch { throw new Error(`${label} failed; Git transport diagnostics withheld`); }
+}
+
+function commitBacklogDestination(runner: CommandRunner, prepared: ExplicitBacklogMigrationWorkspace, message: string,
+  onEffect: (effect: { revision?: string; storeDir?: string }) => void): string {
   const { storeDir, remoteName, remoteUrl } = prepared;
   runRequired(runner, "git", ["-C", storeDir, "add", "-A"], storeDir, "stage Backlog destination");
   const status = runRequired(runner, "git", ["-C", storeDir, "status", "--porcelain=v1"], storeDir, "Backlog destination status");
   if (status.stdout.trim()) runRequired(runner, "git", ["-C", storeDir, "-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-m", message], storeDir, "commit Backlog destination");
   const head = cleanGitRevision(runner, storeDir);
-  runRequired(runner, "git", ["-C", storeDir, "push", remoteName, `HEAD:${TASK_HISTORY_REF}`], storeDir, "publish Backlog destination");
+  const pushUrls = backlogTransportGit(runner, storeDir, ["remote", "get-url", "--push", "--all", remoteName], "read Backlog push transport")
+    .stdout.split(/\r?\n/).filter(Boolean);
+  if (pushUrls.length !== 1 || pushUrls[0] !== remoteUrl) throw new Error("Backlog destination push authority changed");
+  backlogTransportGit(runner, storeDir, ["push", remoteName, `HEAD:${TASK_HISTORY_REF}`], "publish Backlog destination");
+  onEffect({ revision: head });
   assertPublishedGitRef(runner, storeDir, head, remoteName, remoteUrl, TASK_HISTORY_REF, "Backlog destination direct publication");
   return head;
 }
@@ -1179,8 +1204,10 @@ async function migrateBeadsToBacklog(
   closeVerifiedWeb: () => Promise<void>,
   warn: (message: string) => void,
   checkpoint: MigrationCheckpoint,
+  transport: BacklogMigrationTransport,
+  onEffect: (effect: { revision?: string; storeDir?: string }) => void,
 ): Promise<DestinationCandidate> {
-  const prepared = createFreshBacklogMigrationWorkspace(source.projectRoot, runner, warn);
+  const prepared = createFreshBacklogMigrationWorkspace(source.projectRoot, runner, warn, transport, onEffect);
   const { storeDir } = prepared;
   const mapping: Record<string, string> = Object.create(null);
   await checkpoint("Importing and verifying Backlog tasks");
@@ -1223,7 +1250,7 @@ async function migrateBeadsToBacklog(
   const reservedReceiptId = ensureBacklogReceiptPlaceholder(runner, source.projectRoot, source, bookkeepingType);
   const memoryOutputs = importBeadsMemoryDocuments(source, runner, bookkeepingType);
   backlogMemoryEvidence(source, memoryOutputs, runner);
-  const dataRevision = commitBacklogDestination(runner, prepared, "prime-claw: migrate Beads task history");
+  const dataRevision = commitBacklogDestination(runner, prepared, "prime-claw: migrate Beads task history", onEffect);
   await checkpoint();
   assertCommittedBacklogMemoryOutputs(memoryOutputs, source.projectRoot, storeDir, [dataRevision], runner);
   const dataViews = backlogDestinationViews(runner, source.projectRoot, storeDir, "data");
@@ -1253,7 +1280,7 @@ async function migrateBeadsToBacklog(
   if (source.memories.length) receiptBase.backlogMemoryOutputs = memoryOutputs;
   await checkpoint();
   const receiptTaskId = createOrUpdateBacklogReceipt(runner, source.projectRoot, receiptBase, reservedReceiptId);
-  const receiptRevision = commitBacklogDestination(runner, prepared, "prime-claw: record task-provider migration receipt");
+  const receiptRevision = commitBacklogDestination(runner, prepared, "prime-claw: record task-provider migration receipt", onEffect);
   const verifyNativeReceipt = () => {
     const exact = cleanGitRevision(runner, storeDir);
     if (exact !== receiptRevision) throw new Error("Backlog destination revision changed after receipt publication");
@@ -1341,7 +1368,7 @@ function ownershipDestinations(candidate: DestinationCandidate): Record<string, 
     taskId: task.destinationTaskId,
     providerRevision: candidate.revision,
     taskEvidence: task.taskEvidence,
-    ...(candidate.provider === "backlog" ? { taskPath: task.taskPath } : {}),
+    taskPath: task.taskPath,
   }]));
 }
 
@@ -1488,6 +1515,13 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
   let ownershipSwitch: ActiveTaskProviderOwnershipSwitchResult | undefined;
   let candidate: DestinationCandidate | undefined;
   let retirementStarted = false;
+  let stage = "Checking source and migration prerequisites";
+  let publishedDestinationRevision: string | undefined;
+  let destinationStorePath: string | undefined;
+  const onEffect = ({ revision, storeDir }: { revision?: string; storeDir?: string }) => {
+    if (revision) publishedDestinationRevision = revision;
+    if (storeDir) destinationStorePath = storeDir;
+  };
   let backlogWeb: BeadsMigrationWeb | undefined;
   let closeAttempt: ReturnType<BeadsMigrationWeb["close"]> | undefined;
   const warnings: string[] = [];
@@ -1503,7 +1537,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
   const checkpoint: MigrationCheckpoint = async (phase) => {
     if (options.signal && !options.signal.aborted) await yieldToOperator();
     if (options.signal?.aborted) throw new PreCutoverStop();
-    if (phase) notify(phase);
+    if (phase) { stage = phase; notify(phase); }
   };
   const openBacklogWeb: OpenBeadsMigrationWeb = async (storeDir) => {
     backlogWeb = await startMigrationBacklogWeb({ cwd: projectRoot!, backlogDirectory: storeDir, signal: options.signal });
@@ -1517,7 +1551,11 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     const project = resolveNearestProjectRoot(options.cwd, process.env.HOME ?? "", runner);
     if (project.kind === "linked-worktree") return blocked("primary-required", "provider migration must run from the canonical primary checkout", "run it from the canonical primary Conversation", { targetProvider: options.targetProvider });
     projectRoot = project.root;
-    assertFreshBacklogMigrationDestination(projectRoot, runner);
+    const inspected = options.inspectedDestination;
+    if (inspected && (inspected.projectRoot !== projectRoot || inspected.sourceRevision !== options.expectedSourceRevision)) {
+      throw new Error("confirmed project or Beads revision does not match the inspected destination selection");
+    }
+    const transport = assertFreshBacklogMigrationDestination(projectRoot, runner, inspected?.transport);
     source = captureSelectedSource(projectRoot, runner);
     if (source.revision !== options.expectedSourceRevision) throw new Error(`confirmed source revision ${options.expectedSourceRevision} does not equal current exact ${source.revision}`);
     const ownershipRows = activeOwnership(projectRoot, source, runner);
@@ -1529,7 +1567,7 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     const timestamp = (options.now ?? (() => new Date().toISOString()))();
     const switchedAt = Number.isNaN(Date.parse(timestamp)) ? new Date().toISOString() : timestamp;
     if (timestamp !== switchedAt) warn("Invalid migration clock value; used the current time for the receipt.");
-    const verified = candidate = await migrateBeadsToBacklog(selectedSource, runner, options.actor.trim(), switchedAt, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, closeVerifiedWeb, warn, checkpoint);
+    const verified = candidate = await migrateBeadsToBacklog(selectedSource, runner, options.actor.trim(), switchedAt, options.semanticPlacement.trim(), ownershipRows, openBacklogWeb, closeVerifiedWeb, warn, checkpoint, transport, onEffect);
     await checkpoint("Verifying required publication and ownership before cutover");
     for (const owner of ownershipRows) {
       verifyMigrationEpisodeWorktree(projectRoot, owner.worktree, runner);
@@ -1541,8 +1579,6 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
     exactSnapshotUnchanged(selectedSource, captureSameSource(selectedSource, runner));
     if (beadsBackupDigest(sourceBackup.path) !== sourceBackup.digest) throw new Error("retained Beads backup changed before ownership switch and source retirement");
     ownershipSwitch = switchActiveTaskProviderOwnership(projectRoot, {
-      sourceProvider: "beads",
-      targetProvider: "backlog",
       switchedAt,
       destinations: ownershipDestinations(verified),
       expectedSourceRecords: Object.fromEntries(ownershipRows.map((row) => [row.ownerSessionId, row.record])),
@@ -1553,9 +1589,11 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       exactSnapshotUnchanged(selectedSource, captureSameSource(selectedSource, runner));
       if (beadsBackupDigest(sourceBackup.path) !== sourceBackup.digest) throw new Error("retained Beads backup changed before guarded source retirement");
       retirementStarted = true;
+      stage = "Retiring the original Beads store";
       (options.deleteSource ?? deleteBeadsSource)(selectedSource, runner);
     });
     if (observedStore(source.evidence.storeDir) !== "absent") throw new Error("original Beads store removal was not verified");
+    stage = "Verifying selected Backlog authority after retirement";
     const detection = detectTaskProvider(projectRoot, runner);
     if (detection.kind !== "selected" || detection.evidence.provider !== "backlog" || detection.evidence.storeDir !== join(projectRoot, ".backlog")) {
       throw new Error("verified Backlog store did not become the selected local authority after retirement");
@@ -1583,11 +1621,15 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
       try {
         if (canonical(beadsSourceIdentity(source.projectRoot, source.evidence, runner)) === canonical(source.sourceIdentity)) authority = "beads";
       } catch { /* Report unknown. */ }
-    } else if (ownershipSwitch && candidate && sourceRetirement === "absent") {
+    } else if (ownershipSwitch && candidate && source && (ownershipSwitch.transitions.length || retirementStarted)) {
       try {
-        const selected = detectTaskProvider(source!.projectRoot, runner);
-        if (selected.kind === "selected" && selected.evidence.provider === "backlog" && selected.evidence.storeDir === join(source!.projectRoot, ".backlog")) authority = "backlog";
-      } catch { /* Report unknown. */ }
+        // Discovery may see both stores after incomplete retirement. Report
+        // verified cutover authority, not inferred physical source absence.
+        withCurrentTaskProviderOwnershipSwitch(source.projectRoot, ownershipSwitch, () => {
+          candidate!.refreshAfterReceipt();
+          authority = "backlog";
+        });
+      } catch { /* Do not claim authority without current proof. */ }
     }
     return blocked(
       ownershipSwitch ? "cutover-incomplete" : stopped ? "pre-cutover-stopped" : "pre-cutover-failed",
@@ -1595,7 +1637,9 @@ export async function migrateTaskProvider(options: ProviderMigrationOptions): Pr
         + (error instanceof MigrationBacklogWebError && error.artifactDirectory ? ` Private transport evidence: ${error.artifactDirectory}` : ""),
       `Stop task mutation and preserve the source, any partial Backlog destination and private evidence as found. ${retirementStarted ? "Inspect the incomplete retirement; " : ""}do not automatically retry, roll back, or clean up.`,
       { sourceProvider: source?.provider, targetProvider: options.targetProvider, sourceRevision: source?.revision,
-        sourceBackupPath, authority, sourceRetirement, ownershipSwitched: !!ownershipSwitch, destinationRevision: candidate?.revision, warnings },
+        sourceBackupPath, authority, sourceRetirement, ownershipSwitched: !!ownershipSwitch?.transitions.length,
+        stage, destinationRevision: candidate?.revision, destinationStorePath, publishedDestinationRevision,
+        publishedDestinationRef: publishedDestinationRevision ? TASK_HISTORY_REF : undefined, warnings },
     );
   }
 }

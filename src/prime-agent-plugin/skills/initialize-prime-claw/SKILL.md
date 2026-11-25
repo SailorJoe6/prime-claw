@@ -99,6 +99,9 @@ Backlog installation, even an empty directory, partial clone, parked store or
 configuration link. A local task branch or one published on the selected
 remote also blocks. Leave all existing files and refs untouched. This operation
 never adopts, completes, backs up, overwrites, or cleans up an existing Backlog.
+Inspection binds the task publication transport independently of the checked-out
+branch. Confirm in the same session so bootstrap uses that exact selection.
+Never disclose transport URLs or credentials.
 
 Present the exact source/destination identity, inspected source revision/token,
 complete open/closed/archive counts, active ownership, semantic-placement prompt,
@@ -144,8 +147,12 @@ blockers. Do not switch branches, stage, commit, push or discard code to make
 the migration pass.
 
 Report the observed authority, ownership and original-store presence, and say
-when any could not be verified. A failed or uncertain required import,
-publication, cutover or retirement is a blocker. Report incidental issues as
+when any could not be verified. Include the failed stage and any known
+published task ref/revision or allocated store. If retirement fails after
+cutover, distinguish verified Backlog authority, the backup, and the original
+store's presence; do not claim ownership switched when there were no affected
+Episodes. A failed or uncertain required import, publication, cutover or
+retirement is a blocker. Report incidental issues as
 warnings without stopping an otherwise complete operation. Do not retry, roll
 back, create another destination, remove evidence, or claim unverified success. Do not weaken normal active-provider safety to admit a retiring
 source. Candidate validation uses disposable fixtures only. Live migration,

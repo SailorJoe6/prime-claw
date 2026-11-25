@@ -4763,14 +4763,53 @@ test("active task Episode continuity proves exact idle durable route and rejects
     sessionActions: { queuedCount: 0, steering: [], followUps: [], active: null },
   };
   const summary = { sessionId: record.episodeId, sessionFile, cwd: worktree, activeSessionId: "new-route", isSessionActive: false, isStreaming: false, isCompacting: false, queuedCount: 0 };
-  const publisher = { list: async () => [summary], getState: async () => idleState, close() {} };
+  const publisher = {
+    list: async () => [summary],
+    async getState(route) { assert.equal(route, "new-route"); return idleState; },
+    close() {},
+  };
+  const verify = (publisherOverrides = {}) => verifyActiveTaskEpisodeContinuity(root, [record], {
+    git, filesystem, publisher: { ...publisher, ...publisherOverrides },
+  });
   try {
-    const proofs = await verifyActiveTaskEpisodeContinuity(root, [record], { git, filesystem, publisher });
-    assert.deepEqual(proofs, [{ ownerSessionId: record.ownerSessionId, expectedPreviousEpisodeActiveSessionId: "old-route", verifiedCurrentEpisodeActiveSessionId: "new-route" }]);
-    await assert.rejects(() => verifyActiveTaskEpisodeContinuity(root, [record], { git, filesystem, publisher: { ...publisher, list: async () => [] } }), /one durable Episode session/);
-    await assert.rejects(() => verifyActiveTaskEpisodeContinuity(root, [record], { git, filesystem, publisher: { ...publisher, list: async () => [{ ...summary, isSessionActive: true }] } }), /idle Episode summary/);
+    assert.deepEqual(await verify(), [{ ownerSessionId: record.ownerSessionId, expectedPreviousEpisodeActiveSessionId: "old-route", verifiedCurrentEpisodeActiveSessionId: "new-route" }]);
+    await assert.rejects(() => verify({ list: async () => [] }), /one durable Episode session/);
+    await assert.rejects(() => verify({ list: async () => [{ ...summary, activeSessionId: undefined }] }), /no current route/);
+    await assert.rejects(() => verify({ list: async () => [summary, { sessionId: "other", activeSessionId: "old-route" }] }), /previous runtime route remains live/);
+    await assert.rejects(() => verify({ getState: async () => ({ ...idleState, activeSessionId: "wrong-route" }) }), /does not match the durable owned identity/);
+    await assert.rejects(() => verify({ list: async () => [{ ...summary, isSessionActive: true }] }), /idle Episode summary/);
+    await assert.rejects(() => verify({ getState: async () => ({ ...idleState, isRunningTools: true }) }), /not quiescent/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("active task Episode continuity ignores unrelated Orca shells but requires every owned handle", async (t) => {
+  const f = harness({ list: (_count, session) => [session] });
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  const [primary] = await f.orca.listTerminals();
+  const secondary = { ...primary, handle: "second-owned-terminal" };
+  const shell = { ...primary, handle: "unrelated-shell", agentIdentity: undefined };
+  const record = activeBeadsTaskRecord(f, {
+    engine: "orca", worktreeId: f.wt.id, worktreeIdentity: f.wt.identity,
+    projectSetupId: f.wt.projectSetupId, terminalHandle: primary.handle,
+  });
+  const multiHandleRecord = parseEpisodeOwnership({ ...record, terminalHandles: [primary.handle, secondary.handle] });
+  const verify = (owned, terminals) => verifyActiveTaskEpisodeContinuity(f.root, [owned], {
+    ...f.deps, orca: { ...f.orca, listTerminals: async () => terminals },
+  });
+  const expected = [{ ownerSessionId: record.ownerSessionId, expectedPreviousEpisodeActiveSessionId: "route", verifiedCurrentEpisodeActiveSessionId: "route" }];
+  assert.deepEqual(await verify(record, [primary, shell]), expected);
+  assert.deepEqual(await verify(multiHandleRecord, [primary, secondary, shell]), expected);
+  await assert.rejects(() => verify(record, [shell]), /Orca terminal evidence no longer matches/);
+  for (const invalidSecondary of [
+    { ...secondary, handle: "replacement-terminal" },
+    { ...secondary, worktreeId: "another-worktree" },
+    { ...secondary, connected: false },
+    { ...secondary, writable: false },
+    { ...secondary, visible: false },
+  ]) {
+    await assert.rejects(() => verify(multiHandleRecord, [primary, invalidSecondary, shell]), /Orca terminal evidence no longer matches/);
   }
 });
 

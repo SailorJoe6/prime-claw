@@ -284,6 +284,13 @@ destination is fresh is not evidence that it is absent. The operation never
 adopts, overwrites, resumes, backs up, or cleans up existing Backlog. This rule
 does not change ordinary preparation of an already selected Backlog project.
 
+Inspection selects the publication remote from the task branch configuration,
+then from the configured `main`/`master` remote, or from the only repository
+remote. The checked-out branch and tracking refs do not select transport.
+Confirm in the same session: confirmation rechecks destination absence using
+the exact inspected transport, and bootstrap uses that transport without
+reselecting. Transport URLs and credentials are not reported.
+
 Quiesce task mutations before confirming the exact inspected source and its
 one-way switch, including guarded original-source retirement. Use
 `action="switch-confirm"` with `targetProvider="backlog"`, the exact
@@ -343,22 +350,22 @@ A stop must serve one of these purposes:
   a required value, relationship or result cannot be recovered or verified.
 - **Prove publication and ownership:** verify the native task data and receipt
   on the selected remote; attach only fresh Episode workspaces with the exact
-  task mappings and preserve their verified identities. Stop on actual task
-  publication failures, lost ownership or non-quiescent affected Episodes.
+  task mappings and preserve their verified session, route and owned terminals.
+  Extra unrelated terminals are not blockers. Stop on actual task publication
+  failures, lost ownership or non-quiescent affected Episodes.
 - **Protect Beads:** stop on operator cancellation before cutover, an unsafe or
   unverifiable source, backup/restore failure, changed source or backup, or
   failure to safely retire the exact original after the ownership switch.
 
 Do not report completion on any core failure. Report which provider is known to
 remain authoritative, whether ownership switched, and whether the original
-store is present, absent or unverified. A partial destination can prevent
-ordinary provider discovery without making it authoritative. Preserve it and
-any retained backup; do not retry, roll back, or clean up automatically.
-
-Stop or failure before cutover leaves Beads authoritative. Report the resources
-that remain and keep any partial destination untouched. Do not retry, resume,
-create a replacement destination, or infer retirement from a transport result.
-A later failure that leaves ownership switched must be reported separately.
+store is present, absent or unverified. Report the failed stage and any known
+published task ref/revision or allocated store even if import never produced a
+verified candidate. Before cutover a partial destination does not displace Beads.
+After cutover, if retirement fails, report verified Backlog authority separately
+from the retained backup and the original store's presence. With no affected
+Episodes there is no ownership switch to report. Preserve these resources; do
+not automatically retry, resume, roll back, clean up, or create a replacement.
 
 Earlier coexistence and recovery reports under [evidence/](evidence/) are
 historical. They do not authorize preparation of a populated destination or

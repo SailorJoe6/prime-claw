@@ -500,12 +500,10 @@ export interface ActiveTaskProviderOwnershipDestination {
   taskId: string;
   providerRevision: string;
   taskEvidence: Record<string, unknown>;
-  taskPath?: string;
+  taskPath: string;
 }
 
 export interface ActiveTaskProviderOwnershipSwitchInput {
-  sourceProvider: "backlog" | "beads";
-  targetProvider: "backlog" | "beads";
   switchedAt: string;
   destinations: Record<string, ActiveTaskProviderOwnershipDestination>;
   expectedSourceRecords: Record<string, TaskEpisodeOwnershipRecord>;
@@ -516,7 +514,6 @@ export interface ActiveTaskProviderOwnershipSwitchInput {
 }
 
 export interface ActiveTaskProviderOwnershipSwitchResult {
-  before: EpisodeOwnershipRegistry;
   after: EpisodeOwnershipRegistry;
   transitions: Array<{
     ownerSessionId: string;
@@ -529,7 +526,7 @@ function copiedRegistry(registry: EpisodeOwnershipRegistry): EpisodeOwnershipReg
   return JSON.parse(JSON.stringify(orderedRegistry(registry))) as EpisodeOwnershipRegistry;
 }
 
-/** Validate every entry while retaining raw historical fields for exact migration rollback. */
+/** Validate every entry while retaining raw historical fields for unchanged owners. */
 function rawValidatedOwnershipRegistry(projectRoot: string): EpisodeOwnershipRegistry {
   const value = readOwnershipValue(projectRoot);
   if (value === null) return { schemaVersion: 1, owners: {} };
@@ -540,8 +537,8 @@ function rawValidatedOwnershipRegistry(projectRoot: string): EpisodeOwnershipReg
 }
 
 /**
- * Atomically move every active version-2 binding from one selected provider to
- * the already-verified destination. Version-1 and inactive historical records
+ * Atomically move every active version-2 binding from Beads to the already-verified
+ * Backlog destination. Version-1 and inactive historical records
  * remain byte-for-byte equivalent. The task mapping and complete native target
  * evidence are supplied by the migration verifier; this function creates no
  * provider data and changes no Episode resource identity.
@@ -550,11 +547,9 @@ export function switchActiveTaskProviderOwnership(
   projectRoot: string,
   input: ActiveTaskProviderOwnershipSwitchInput,
 ): ActiveTaskProviderOwnershipSwitchResult {
-  if (input.sourceProvider === input.targetProvider) throw new Error("task-provider ownership switch requires different providers");
   if (!input.switchedAt || Number.isNaN(Date.parse(input.switchedAt))) throw new Error("task-provider ownership switch requires an RFC3339 timestamp");
   return withOwnershipLock(projectRoot, () => {
     const registry = rawValidatedOwnershipRegistry(projectRoot);
-    const before = copiedRegistry(registry);
     const transitions: ActiveTaskProviderOwnershipSwitchResult["transitions"] = [];
     const destinationTaskIds = new Set<string>();
     const destinationTaskPaths = new Set<string>();
@@ -562,8 +557,8 @@ export function switchActiveTaskProviderOwnership(
       const record = parseEpisodeOwnership(rawRecord);
       if (record.status === "inactive" || record.version === 1) continue;
       const actualProvider = taskEpisodeProvider(record);
-      if (actualProvider !== input.sourceProvider) {
-        throw new Error(`active task Episode ${ownerSessionId} uses ${actualProvider}, not selected source ${input.sourceProvider}`);
+      if (actualProvider !== "beads") {
+        throw new Error(`active task Episode ${ownerSessionId} uses ${actualProvider}, not selected source beads`);
       }
       const expected = input.expectedSourceRecords[ownerSessionId];
       if (!expected || JSON.stringify(record) !== JSON.stringify(expected)) {
@@ -575,44 +570,24 @@ export function switchActiveTaskProviderOwnership(
       }
       const destination = input.destinations[record.taskId];
       if (!destination) throw new Error(`provider migration has no verified destination mapping for active task ${record.taskId}`);
-      if (input.targetProvider === "backlog" && (!destination.taskPath || !destination.taskPath.trim())) {
+      if (typeof destination.taskPath !== "string" || !destination.taskPath.trim()) {
         throw new Error(`provider migration has no verified Backlog task path for active task ${record.taskId}`);
       }
       if (destinationTaskIds.has(destination.taskId)) throw new Error(`provider migration destination task ${destination.taskId} is mapped more than once`);
       destinationTaskIds.add(destination.taskId);
-      if (input.targetProvider === "backlog") {
-        const taskPath = destination.taskPath!.trim();
-        if (destinationTaskPaths.has(taskPath)) throw new Error(`provider migration destination path ${taskPath} is mapped more than once`);
-        destinationTaskPaths.add(taskPath);
-      }
-      const common = { ...record } as Record<string, unknown>;
-      delete common.provider;
-      delete common.taskId;
-      delete common.taskPath;
-      delete common.providerRevision;
-      delete common.taskEvidence;
-      delete common.updatedAt;
-      common.episodeActiveSessionId = runtimeProof.verifiedCurrentEpisodeActiveSessionId;
-      const next: TaskEpisodeOwnershipRecord = input.targetProvider === "backlog"
-        ? {
-            ...common,
-            version: 2,
-            provider: "backlog",
-            taskId: destination.taskId,
-            taskPath: destination.taskPath ?? "",
-            providerRevision: destination.providerRevision,
-            taskEvidence: destination.taskEvidence,
-            updatedAt: input.switchedAt,
-          } as PublishedBacklogTaskEpisodeOwnershipRecord
-        : {
-            ...common,
-            version: 2,
-            provider: "beads",
-            taskId: destination.taskId,
-            providerRevision: destination.providerRevision,
-            taskEvidence: destination.taskEvidence,
-            updatedAt: input.switchedAt,
-          } as BeadsTaskEpisodeOwnershipRecord;
+      const taskPath = destination.taskPath.trim();
+      if (destinationTaskPaths.has(taskPath)) throw new Error(`provider migration destination path ${taskPath} is mapped more than once`);
+      destinationTaskPaths.add(taskPath);
+      const next: PublishedBacklogTaskEpisodeOwnershipRecord = {
+        ...record,
+        provider: "backlog",
+        taskId: destination.taskId,
+        taskPath: destination.taskPath,
+        providerRevision: destination.providerRevision,
+        taskEvidence: destination.taskEvidence,
+        updatedAt: input.switchedAt,
+        episodeActiveSessionId: runtimeProof.verifiedCurrentEpisodeActiveSessionId,
+      };
       parseEpisodeOwnership(next, `provider migration owner ${ownerSessionId}`);
       if (next.ownerSessionId !== ownerSessionId) throw new Error("provider migration cannot change the owning Conversation");
       registry.owners[ownerSessionId] = next;
@@ -623,7 +598,7 @@ export function switchActiveTaskProviderOwnership(
       if (!transitionedOwners.has(ownerSessionId)) throw new Error(`provider migration continuity proof references non-transitioned owner ${ownerSessionId}`);
     }
     if (transitions.length > 0) persistOwnershipRegistry(projectRoot, registry);
-    return { before, after: copiedRegistry(registry), transitions };
+    return { after: copiedRegistry(registry), transitions };
   });
 }
 
@@ -642,23 +617,6 @@ export function withCurrentTaskProviderOwnershipSwitch<T>(
       throw new Error("task-provider source deletion refused because ownership changed after the switch");
     }
     return operation();
-  });
-}
-
-/** Exact rollback for a failed pre-deletion cutover. No concurrent registry
- * change is overwritten; a mismatch blocks and leaves current ownership intact. */
-export function restoreTaskProviderOwnershipSwitch(
-  projectRoot: string,
-  switchResult: ActiveTaskProviderOwnershipSwitchResult,
-): EpisodeOwnershipRegistry {
-  return withOwnershipLock(projectRoot, () => {
-    const current = copiedRegistry(rawValidatedOwnershipRegistry(projectRoot));
-    if (JSON.stringify(current) !== JSON.stringify(copiedRegistry(switchResult.after))) {
-      throw new Error("task-provider ownership rollback refused because the registry changed after the switch");
-    }
-    const restored = copiedRegistry(switchResult.before);
-    if (JSON.stringify(restored) !== JSON.stringify(current)) persistOwnershipRegistry(projectRoot, restored);
-    return restored;
   });
 }
 

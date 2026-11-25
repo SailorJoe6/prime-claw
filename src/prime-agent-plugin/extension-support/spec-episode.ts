@@ -1223,12 +1223,12 @@ export async function verifyActiveTaskEpisodeContinuity(
           || !samePath(current.path, record.worktree!) || current.projectSetupId !== record.projectSetupId) {
           throw new Error(`Provider migration Orca worktree evidence no longer matches active owner ${record.ownerSessionId}`);
         }
-        const expectedHandles = new Set(record.terminalHandles ?? [record.terminalHandle!]);
+        const expectedHandles = record.terminalHandles ?? [record.terminalHandle!];
         const currentHandles = new Set((await orca.listTerminals(record.worktreeId!, record.routingEnvironmentId))
           .filter((terminal) => terminal.worktreeId === record.worktreeId && terminal.connected && terminal.writable && terminal.visible)
           .map((terminal) => terminal.handle));
-        if (expectedHandles.size === 0 || currentHandles.size !== expectedHandles.size
-          || [...expectedHandles].some((handle) => !currentHandles.has(handle))) {
+        // The worktree inventory can also include unrelated shells.
+        if (expectedHandles.length === 0 || expectedHandles.some((handle) => !currentHandles.has(handle))) {
           throw new Error(`Provider migration Orca terminal evidence no longer matches active owner ${record.ownerSessionId}`);
         }
       }

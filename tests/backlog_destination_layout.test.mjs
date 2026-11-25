@@ -1,15 +1,17 @@
 /** Native de-risk evidence for PRIMECLAW-44, NOT production normalization.
  * Every write below seeds or moves a disposable same-repository fixture.
- * No plugin initializer/migration, provider cutover or independent-DAG adoption.
+ * No live initializer, migration, provider cutover or adoption.
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync,
-  realpathSync, existsSync, lstatSync, readlinkSync, symlinkSync, renameSync, rmSync, chmodSync } from "node:fs";
+  realpathSync, existsSync, lstatSync, readlinkSync, symlinkSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname, relative, basename } from "node:path";
+import { join, relative, basename } from "node:path";
 import test from "node:test";
-import { prepareExistingBacklogTaskHistoryWorkspace, prepareExistingBacklogEpisodeProjection } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
+import { ProcessCommandRunner } from "../src/prime-agent-plugin/extension-support/project-initialization.ts";
+import { assertFreshBacklogMigrationDestination, createFreshBacklogMigrationWorkspace,
+  prepareExistingBacklogTaskHistoryWorkspace, TASK_HISTORY_REF } from "../src/prime-agent-plugin/extension-support/task-history-workspace.ts";
 
 function command(cwd, program, ...args) {
   return execFileSync(program, args, { cwd, encoding: "utf8",
@@ -270,101 +272,116 @@ for (const layout of layouts) {
   });
 }
 
-for (const layout of [layouts[0], layouts[3]]) {
-  test(`active Episode ${layout.name} projects native store without changing its code HEAD/index`, { timeout: 120_000 }, t => {
-    const f = fixture(t, layout);
-    const target = join(dirname(f.root), "episode");
-    git(f.root, "worktree", "add", "-qb", "episode", target, f.seedHead);
-    const head = git(target, "rev-parse", "HEAD");
-    const index = git(target, "ls-files", "--stage", "-z");
-    const oldRootPath = join(f.root, "backlog.config.yml");
-    const originalRootConfig = existsSync(oldRootPath)
-      ? { bytesBase64: readFileSync(oldRootPath).toString("base64"), mode: lstatSync(oldRootPath).mode }
-      : null;
-    // Full POSIX modes are not Git's executable bit. Preserve these native
-    // source settings through both fresh projection and existing-clone FF.
-    chmodSync(join(f.root, f.activePath), 0o640);
-    chmodSync(f.configPath, 0o640);
-    const scriptRelative = "scripts/mode-proof.sh";
-    mkdirSync(join(f.root, f.store, "scripts"), { recursive: true });
-    writeFileSync(join(f.root, f.store, scriptRelative), "#!/bin/sh\nprintf 'retained native mode\\n'\n");
-    chmodSync(join(f.root, f.store, scriptRelative), 0o750);
-    git(f.root, "add", `${f.store}/${scriptRelative}`);
-    git(f.root, "commit", "-qm", "seed executable attachment for full native projection modes"); git(f.root, "push", "-q");
-    const primary = prepareExistingBacklogTaskHistoryWorkspace({ primaryRoot: f.root });
-    assert.equal(primary.status, "prepared", JSON.stringify(primary));
-    // This test targets Episode projection, not independent primary adoption.
-    chmodSync(join(primary.storeDir, "config.yml"), 0o640);
-    const nativeFiles = store => Object.entries(files(store)).filter(([path]) => !path.startsWith(".git/"))
-      .map(([path, bytesBase64]) => ({ path, bytesBase64, mode: lstatSync(join(store, path)).mode }));
-    const originalFiles = nativeFiles(primary.storeDir);
-    const finalRel = relative(f.root, primary.storeDir);
-    // Existing migration's common private ignore protects the older Episode
-    // without altering its code/index just to install the independent clone.
-    writeFileSync(join(f.root, ".git", "info", "exclude"), `/${finalRel}/\n`);
-    const result = prepareExistingBacklogEpisodeProjection({
-      primaryRoot: f.root, targetWorktree: target, expectedRevision: primary.head,
-      remoteName: primary.remote, remoteUrl: primary.remoteUrl,
-      originalStoreRelative: f.store, originalFiles, originalRootConfig,
-    });
-    assert.equal(result.status, "prepared", JSON.stringify(result));
-    assert.equal(git(target, "rev-parse", "HEAD"), head);
-    assert.equal(git(target, "ls-files", "--stage", "-z"), index, "EVERY original index entry remains unchanged");
-    assert.equal(git(result.storeDir, "rev-parse", "HEAD"), primary.head);
-    assert.equal(git(result.storeDir, "status", "--porcelain"), "");
-    assert.equal(view(target, f.active).description, view(f.root, f.active).description);
-    assert.equal(readFileSync(join(target, "code.txt"), "utf8"), "unrelated code\n");
-    const changed = git(target, "diff", "--name-only", "HEAD").split("\n");
-    assert.ok(changed.every(path => result.codePaths.includes(path)));
-    assert.ok(result.codePaths.includes("backlog.config.yml"));
-    assert.ok(result.codePaths.includes(f.activePath));
-    const activeRelative = f.activePath.slice(`${f.store}/`.length);
-    const modePaths = [activeRelative, "config.yml", scriptRelative];
-    const assertNativeModes = () => {
-      for (const path of modePaths) {
-        assert.equal(readFileSync(join(result.storeDir, path)).toString("base64"), readFileSync(join(primary.storeDir, path)).toString("base64"), `current projected bytes: ${path}`);
-        assert.equal(lstatSync(join(result.storeDir, path)).mode & 0o777, path === scriptRelative ? 0o750 : 0o640, `full projected mode: ${path}`);
-      }
-    };
-    assertNativeModes(); // fresh materialization branch
-    const cloneIdentity = [result.storeDir, join(result.storeDir, ".git")].map(path => {
-      const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino];
-    });
-    const cloneConfig = readFileSync(join(result.storeDir, ".git", "config"), "utf8");
-    // Publish only this fixture's exact initial layout, as the migration does
-    // before a later existing-clone continuation. First-call HEAD/index checks
-    // above remain independent from this explicit native fixture publication.
-    const detached = git(target, "ls-files", "-z", "--", f.store).split("\0").filter(Boolean);
-    if (detached.length) git(target, "rm", "--cached", "--", ...detached);
-    git(target, "add", "backlog.config.yml");
-    git(target, "commit", "-qm", "publish exact initial Episode task projection");
-    const ffCodeHead = git(target, "rev-parse", "HEAD"), ffCodeIndex = git(target, "ls-files", "--stage", "-z");
-    // Advance native current bytes on the same published task history. The
-    // Episode clone remains clean: chmod changes no Git executable bits.
-    backlog(f.root, "task", "edit", f.active, "--description", "current native content after projection", "--plain");
-    chmodSync(join(primary.storeDir, activeRelative), 0o640);
-    git(primary.storeDir, "add", activeRelative);
-    git(primary.storeDir, "-c", "user.name=Mode Fixture", "-c", "user.email=mode@example.invalid", "commit", "-qm", "native task advance for mode-preserving FF projection");
-    git(primary.storeDir, "push", "-q");
-    const nextHead = git(primary.storeDir, "rev-parse", "HEAD");
-    for (const path of modePaths) chmodSync(join(result.storeDir, path), path === scriptRelative ? 0o700 : 0o600);
-    const rootLink = join(f.root, "backlog.config.yml");
-    const ff = prepareExistingBacklogEpisodeProjection({ primaryRoot: f.root, targetWorktree: target,
-      expectedRevision: nextHead, remoteName: primary.remote, remoteUrl: primary.remoteUrl,
-      originalStoreRelative: finalRel, originalFiles: nativeFiles(primary.storeDir),
-      originalRootConfig: { bytesBase64: readFileSync(rootLink).toString("base64"), mode: lstatSync(rootLink).mode, linkTarget: readlinkSync(rootLink) },
-    });
-    assert.equal(ff.status, "prepared", JSON.stringify(ff)); assert.equal(ff.head, nextHead);
-    assert.equal(ff.storeDir, result.storeDir); assertNativeModes();
-    assert.deepEqual([ff.storeDir, join(ff.storeDir, ".git")].map(path => {
-      const stat = lstatSync(path); return [realpathSync(path), stat.dev, stat.ino];
-    }), cloneIdentity, "fast-forward retains the same independent clone and Git directory");
-    assert.equal(readFileSync(join(ff.storeDir, ".git", "config"), "utf8"), cloneConfig);
-    assert.equal(git(target, "rev-parse", "HEAD"), ffCodeHead); assert.equal(git(target, "ls-files", "--stage", "-z"), ffCodeIndex);
-    assert.equal(view(target, f.active).description, "current native content after projection");
-    assert.equal(git(ff.storeDir, "status", "--porcelain"), "");
-  });
+function freshFixture(t) {
+  const outer = realpathSync(mkdtempSync(join(tmpdir(), "prime-claw-fresh-transport-")));
+  t.after(() => rmSync(outer, { recursive: true, force: true }));
+  const root = join(outer, "project"), authority = join(outer, "primary remote.git"), alternate = join(outer, "other.git");
+  git(outer, "init", "-q", "-b", "main", root);
+  git(outer, "init", "-q", "--bare", authority);
+  git(outer, "init", "-q", "--bare", alternate);
+  git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "code");
+  git(root, "remote", "add", "primary", "../primary remote.git");
+  git(root, "remote", "add", "alternate", alternate);
+  git(root, "config", "branch.main.remote", "primary");
+  git(root, "config", "branch.main.merge", "refs/heads/main");
+  return { root, authority, alternate, runner: new ProcessCommandRunner() };
 }
+
+function publishedTaskRef(remote) {
+  return git(remote, "for-each-ref", "--format=%(objectname)", TASK_HISTORY_REF);
+}
+
+test("fresh migration selects canonical transport off main and keeps it pinned across checkout and config changes", t => {
+  const { root, authority, alternate, runner } = freshFixture(t);
+  git(root, "switch", "-qc", "topic");
+  git(root, "config", "branch.topic.remote", "alternate");
+  git(root, "config", "branch.topic.merge", "refs/heads/topic");
+  // The code upstream and cache don't even exist. Selection must not need them.
+  const transport = assertFreshBacklogMigrationDestination(root, runner);
+  assert.deepEqual(transport, { remoteName: "primary", remoteUrl: authority });
+  git(root, "switch", "-q", "--detach");
+  assert.deepEqual(assertFreshBacklogMigrationDestination(root, runner), transport);
+  git(root, "remote", "set-url", "primary", alternate);
+  assert.equal(assertFreshBacklogMigrationDestination(root, runner).remoteUrl, alternate);
+  assert.equal(assertFreshBacklogMigrationDestination(root, runner, transport), transport);
+  writeFileSync(join(root, "code.txt"), "staged\n");
+  git(root, "add", "--", "code.txt");
+  writeFileSync(join(root, "code.txt"), "unstaged\n");
+  writeFileSync(join(root, "untracked.txt"), "leave me\n");
+  const index = git(root, "ls-files", "--stage"), status = git(root, "status", "--porcelain=v1");
+  const head = git(root, "rev-parse", "HEAD"), effects = [];
+  const prepared = createFreshBacklogMigrationWorkspace(root, runner, assert.fail, transport, effect => effects.push(effect));
+  const revision = publishedTaskRef(authority);
+  assert.match(revision, /^[0-9a-f]{40}$/);
+  assert.equal(publishedTaskRef(alternate), "");
+  assert.deepEqual(effects, [{ revision }, { storeDir: prepared.storeDir }]);
+  assert.equal(git(prepared.storeDir, "rev-parse", "HEAD"), revision);
+  assert.equal(git(prepared.storeDir, "remote", "get-url", "primary"), authority);
+  assert.equal(git(root, "rev-parse", "HEAD"), head);
+  assert.equal(git(root, "ls-files", "--stage"), index);
+  assert.equal(git(root, "status", "--porcelain=v1"), status);
+});
+
+test("fresh migration refuses the published task ref on canonical main despite a different topic remote", t => {
+  const { root, authority, alternate, runner } = freshFixture(t);
+  git(root, "switch", "-qc", "topic");
+  git(root, "config", "branch.topic.remote", "alternate");
+  git(authority, "fetch", "-q", root, `HEAD:${TASK_HISTORY_REF}`);
+  const revision = publishedTaskRef(authority);
+  assert.throws(() => assertFreshBacklogMigrationDestination(root, runner), /existing Backlog destination: published/);
+  assert.equal(publishedTaskRef(authority), revision);
+  assert.equal(publishedTaskRef(alternate), "");
+  assert.equal(existsSync(join(root, ".backlog")), false);
+});
+
+test("fresh migration honors an explicit task remote and otherwise requires unambiguous configuration", t => {
+  const { root, authority, runner } = freshFixture(t);
+  git(root, "config", "--unset", "branch.main.remote");
+  assert.throws(() => assertFreshBacklogMigrationDestination(root, runner), /cannot identify one Backlog publication remote/);
+  git(root, "config", "branch.prime-claw/tasks.remote", "alternate");
+  assert.equal(assertFreshBacklogMigrationDestination(root, runner).remoteName, "alternate");
+  git(root, "config", "--unset", "branch.prime-claw/tasks.remote");
+  git(root, "remote", "remove", "alternate");
+  git(root, "switch", "-q", "--detach");
+  assert.deepEqual(assertFreshBacklogMigrationDestination(root, runner), { remoteName: "primary", remoteUrl: authority });
+});
+
+test("fresh migration reports the created ref and allocated store even when clone fails", t => {
+  const { root, authority, runner } = freshFixture(t);
+  const transport = assertFreshBacklogMigrationDestination(root, runner);
+  const effects = [], storeDir = join(root, ".backlog");
+  const fault = { run: (cmd, args, opts) => {
+    if (cmd === "git" && args[2] === "clone") {
+      assert.equal(effects[0].revision, publishedTaskRef(authority));
+      assert.deepEqual(effects[1], { storeDir });
+      assert.ok(lstatSync(storeDir).isDirectory());
+      throw new Error(`injected transport URL: ${authority}`);
+    }
+    return runner.run(cmd, args, opts);
+  } };
+  assert.throws(() => createFreshBacklogMigrationWorkspace(root, fault, assert.fail, transport, row => effects.push(row)),
+    { message: "cannot clone the new published Backlog task store" });
+  assert.deepEqual(effects, [{ revision: publishedTaskRef(authority) }, { storeDir }]);
+  assert.deepEqual(readdirSync(storeDir), []);
+});
+
+test("fresh migration never adopts a racing equal publication or reports it as its own", t => {
+  const { root, authority, runner } = freshFixture(t);
+  const transport = assertFreshBacklogMigrationDestination(root, runner);
+  let racingRevision;
+  const race = { run: (cmd, args, opts) => {
+    if (cmd === "git" && args.includes("--porcelain") && args.includes("push")) {
+      git(authority, "fetch", "-q", args[1], `${TASK_HISTORY_REF}:${TASK_HISTORY_REF}`);
+      racingRevision = publishedTaskRef(authority);
+    }
+    return runner.run(cmd, args, opts);
+  } };
+  assert.throws(() => createFreshBacklogMigrationWorkspace(root, race, assert.fail, transport, assert.fail),
+    { message: "cannot publish a new Backlog task ref only if absent" });
+  assert.match(racingRevision, /^[0-9a-f]{40}$/);
+  assert.equal(publishedTaskRef(authority), racingRevision);
+  assert.equal(existsSync(join(root, ".backlog")), false);
+});
 
 for (const store of ["backlog", "planning/task store"]) {
   test(`native root override at ${store} preserves inactive folder configuration bytes`, { timeout: 120_000 }, t => {

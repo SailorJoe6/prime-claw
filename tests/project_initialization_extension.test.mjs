@@ -1367,6 +1367,8 @@ test("initialization UX separates read-only provider-switch inspection from exac
   createProjectInitializationExtension({
     migrationInspector(input) {
       calls.push({ kind: "inspect", input });
+      input.onInspectedDestination({ projectRoot: "/fixture", sourceRevision: "a".repeat(40),
+        transport: { remoteName: "origin", remoteUrl: "https://fixture-user:fixture-secret@example.invalid/tasks.git" } });
       return {
         status: "ready", projectRoot: "/fixture", sourceProvider: "beads", targetProvider: input.targetProvider,
         sourceRevision: "a".repeat(40), sourceDigest: "b".repeat(64),
@@ -1400,6 +1402,11 @@ test("initialization UX separates read-only provider-switch inspection from exac
   assert.match(inspected.content[0].text, /digest=b{64}/);
   assert.match(inspected.content[0].text, /Semantic placement: decide native placement/);
   assert.equal(calls.length, 1);
+  assert.doesNotMatch(JSON.stringify(inspected), /fixture-secret/);
+  const mismatch = await tool.execute("mismatch", { action: "switch-confirm", targetProvider: "backlog",
+    expectedSourceRevision: "c".repeat(40), confirmedSwitch: true }, undefined, undefined, ctx);
+  assert.equal(mismatch.details.code, "inspection-required");
+  assert.equal(calls.length, 1);
   const unconfirmed = await tool.execute("blocked", {
     action: "switch-confirm", targetProvider: "backlog", expectedSourceRevision: "a".repeat(40),
     confirmedSwitch: false, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
@@ -1415,6 +1422,9 @@ test("initialization UX separates read-only provider-switch inspection from exac
   assert.match(completed.content[0].text, /source-absent=true/);
   assert.deepEqual(calls.map((call) => call.kind), ["inspect", "run", "run"]);
   assert.equal(calls[2].input.confirmedSwitch, true);
+  assert.equal(calls[2].input.inspectedDestination.transport.remoteName, "origin");
+  assert.match(calls[2].input.inspectedDestination.transport.remoteUrl, /fixture-secret/);
+  assert.doesNotMatch(JSON.stringify(completed), /fixture-secret/);
   assert.equal(calls[2].input.expectedSourceRevision, "a".repeat(40));
   assert.equal(calls[2].input.semanticPlacement, "keep unsupported fields in native metadata");
   assert.equal(calls[2].input.beadsNativePlacements,undefined);
@@ -1428,13 +1438,27 @@ test("switch-confirm forwards the host abort signal and notifies the settled mig
   const stopped = {
     status: "blocked", code: "pre-cutover-stopped", targetProvider: "backlog",
     detail: "Stopped before guarded cutover", remediation: "Preserve the authoritative Beads source",
+    authority: "beads", sourceRetirement: "present", ownershipSwitched: false, stage: "Importing and verifying Backlog tasks",
+    publishedDestinationRef: "refs/heads/prime-claw/tasks", publishedDestinationRevision: "c".repeat(40),
+    destinationStorePath: "/fixture/.backlog",
   };
-  const summary = `Prime Claw provider switch blocked (${stopped.code}): ${stopped.detail}; ${stopped.remediation}`;
+  const summary = `Prime Claw provider switch blocked (${stopped.code}): ${stopped.detail}; ${stopped.remediation}
+Provider authority: beads; original Beads store: present; Episode ownership switched: no.
+Stage: ${stopped.stage}.
+Known Backlog publication: ${stopped.publishedDestinationRef} at ${stopped.publishedDestinationRevision}.
+Allocated Backlog store: ${stopped.destinationStorePath}`;
   const elapsed = /\b\d+(?:\.\d+)?\s*(?:ms|s|seconds?)\b/;
   let finishMigration;
   const migrationResult = new Promise((resolve) => { finishMigration = resolve; });
   let migrationSignal;
   createProjectInitializationExtension({
+    migrationInspector({ onInspectedDestination }) {
+      onInspectedDestination({ projectRoot: "/fixture", sourceRevision: "a".repeat(40),
+        transport: { remoteName: "origin", remoteUrl: "/fixture/tasks.git" } });
+      return { status: "ready", projectRoot: "/fixture", sourceProvider: "beads", targetProvider: "backlog",
+        sourceRevision: "a".repeat(40), sourceDigest: "b".repeat(64), activeOwnership: [],
+        taskCounts: { open: 0, closed: 0, archived: 0, total: 0 }, semanticPlacementPrompt: "fixture", confirmation: "fixture" };
+    },
     migrationRunner({ signal, onProgress }) {
       migrationSignal = signal;
       onProgress?.(phase);
@@ -1443,7 +1467,12 @@ test("switch-confirm forwards the host abort signal and notifies the settled mig
   })({ registerTool(tool) { tools.set(tool.name, tool); }, on() {} });
   const notices = [];
   const ctx = { cwd: "/fixture", ui: { notify(message) { notices.push(message); } } };
-  const execution = tools.get("initialize_prime_claw").execute("confirm-aborted", {
+  const tool = tools.get("initialize_prime_claw");
+  const withoutInspection = await tool.execute("missing-inspection", { action: "switch-confirm", targetProvider: "backlog",
+    expectedSourceRevision: "a".repeat(40), confirmedSwitch: true }, undefined, undefined, ctx);
+  assert.equal(withoutInspection.details.code, "inspection-required");
+  await tool.execute("inspect", { action: "switch-request", targetProvider: "backlog" }, undefined, undefined, ctx);
+  const execution = tool.execute("confirm-aborted", {
     action: "switch-confirm", targetProvider: "backlog", expectedSourceRevision: "a".repeat(40),
     confirmedSwitch: true, actor: "operator", semanticPlacement: "keep unsupported fields in native metadata",
   }, controller.signal, undefined, ctx);

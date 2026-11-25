@@ -18,7 +18,6 @@ import {
   readAllEpisodeOwnership,
   readEpisodeOwnership,
   readEpisodeOwnershipRegistry,
-  restoreTaskProviderOwnershipSwitch,
   switchActiveTaskProviderOwnership,
   withCurrentTaskProviderOwnershipSwitch,
   removeTaskEpisodeOwnership,
@@ -2138,144 +2137,118 @@ function switchContinuity(...records) {
   };
 }
 
-test("provider switch atomically preserves active Episode identity and exact rollback", () => {
-  const { root } = fixture();
-  const worktree = join(root, "episode-worktree");
-  mkdirSync(worktree);
-  const sessionFile = join(worktree, "episode.jsonl");
-  writeFileSync(sessionFile, "{}\n");
+const SWITCHED_AT = "2026-10-27T12:00:00.000Z";
+
+function backlogSwitchDestination(taskId, path = `tasks/${taskId}.md`) {
+  const providerRevision = "c".repeat(40);
+  return {
+    taskId,
+    taskPath: `.backlog/${path}`,
+    providerRevision,
+    taskEvidence: {
+      kind: "backlog-git", repository: { topology: "independent", identity: "f".repeat(64) },
+      commit: providerRevision, path,
+    },
+  };
+}
+
+function activeBeadsOwnership(owner, taskId) {
+  const { taskPath: _taskPath, ...identity } = activeTaskOwnership(owner, taskId);
+  const { provider, providerRevision, taskEvidence } = beadsOwnership(owner, taskId);
+  return parseEpisodeOwnership({ ...identity, provider, providerRevision, taskEvidence });
+}
+
+test("provider switch atomically preserves Episode identity and binds verified Backlog evidence and route", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-provider-switch-"));
   const original = parseEpisodeOwnership({
-    version: 2,
-    status: "active",
-    operationId: "operation-switch",
-    integrationBranch: "feature/stacked-work",
-    engine: "local",
-    ownerSessionId: "owner-switch",
-    taskId: "PRIMECLAW-10.38",
-    taskPath: "backlog/tasks/primeclaw-10.38.md",
-    baseRef: "a".repeat(40),
-    createdAt: "2026-10-18T12:00:00.000Z",
-    updatedAt: "2026-10-18T12:00:00.000Z",
-    worktree,
-    branch: "episode/switch",
-    head: "b".repeat(40),
-    episodeId: "episode-switch",
-    episodeSessionFile: sessionFile,
-    episodeActiveSessionId: "route-switch",
+    ...activeBeadsOwnership("owner-switch", "BEAD-7"), integrationBranch: "feature/stacked-work",
   });
-  const inactive = parseEpisodeOwnership({
-    ...original,
-    status: "inactive",
-    operationId: "operation-inactive",
-    ownerSessionId: "owner-inactive",
-    taskId: "PRIMECLAW-OLD",
-    taskPath: "backlog/completed/primeclaw-old.md",
-    episodeId: "episode-inactive",
-  });
+  const inactive = parseEpisodeOwnership({ ...activeBeadsOwnership("owner-inactive", "BEAD-OLD"), status: "inactive" });
+  const legacy = legacyOwnership("owner-legacy", ".ralph/plans/future/foreign-legacy");
   writeEpisodeOwnership(root, original);
   writeEpisodeOwnership(root, inactive);
-  const rawEvidence = { id: "BEAD-7", title: "Migrated task", status: "in_progress", opaque: { exact: true } };
+  writeEpisodeOwnership(root, legacy);
+  const destination = backlogSwitchDestination("TASK-7");
   const switched = switchActiveTaskProviderOwnership(root, {
-    sourceProvider: "backlog",
-    targetProvider: "beads",
-    switchedAt: "2026-10-27T12:00:00.000Z",
+    switchedAt: SWITCHED_AT,
+    destinations: { [original.taskId]: destination },
     ...switchContinuity(original),
-    destinations: {
-      "PRIMECLAW-10.38": { taskId: "BEAD-7", providerRevision: "c".repeat(32), taskEvidence: rawEvidence },
-    },
+    runtimeProofs: { [original.ownerSessionId]: {
+      expectedPreviousEpisodeActiveSessionId: original.episodeActiveSessionId,
+      verifiedCurrentEpisodeActiveSessionId: "verified-new-route",
+    } },
   });
-  assert.deepEqual(switched.transitions, [{ ownerSessionId: "owner-switch", sourceTaskId: "PRIMECLAW-10.38", destinationTaskId: "BEAD-7" }]);
-  const current = readEpisodeOwnership(root, "owner-switch");
-  assert.equal(current.provider, "beads");
-  assert.equal(current.taskId, "BEAD-7");
-  assert.equal(current.providerRevision, "c".repeat(32));
-  assert.deepEqual(current.taskEvidence, rawEvidence);
-  assert.equal(current.taskPath, undefined);
-  for (const field of ["operationId", "ownerSessionId", "baseRef", "integrationBranch", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
-    assert.deepEqual(current[field], original[field], field);
-  }
-  assert.deepEqual(readEpisodeOwnership(root, "owner-inactive"), inactive);
-  const restored = restoreTaskProviderOwnershipSwitch(root, switched);
-  assert.deepEqual(restored, switched.before);
-  assert.deepEqual(readEpisodeOwnership(root, "owner-switch"), original);
+  assert.deepEqual(switched.transitions, [{ ownerSessionId: original.ownerSessionId, sourceTaskId: original.taskId, destinationTaskId: destination.taskId }]);
+  assert.deepEqual(readEpisodeOwnership(root, original.ownerSessionId), {
+    ...original, ...destination, provider: "backlog", updatedAt: SWITCHED_AT, episodeActiveSessionId: "verified-new-route",
+  });
+  assert.deepEqual(readEpisodeOwnership(root, inactive.ownerSessionId), inactive);
+  assert.deepEqual(readEpisodeOwnership(root, legacy.ownerSessionId), legacy);
 });
 
-test("provider switch refuses missing mappings and rollback refuses concurrent registry drift", () => {
-  const { root } = fixture();
-  const original = taskOwnership("owner-switch", "PRIMECLAW-10.38");
+test("provider switch refuses missing mappings, paths, or exact destination evidence before registry mutation", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-provider-switch-"));
+  const original = activeBeadsOwnership("owner-beads-switch", "BEAD-9");
   writeEpisodeOwnership(root, original);
+  const destination = backlogSwitchDestination("TASK-9");
+  const options = { switchedAt: SWITCHED_AT, ...switchContinuity(original) };
+  assert.throws(() => switchActiveTaskProviderOwnership(root, { ...options, destinations: {} }), /no verified destination mapping/);
   assert.throws(() => switchActiveTaskProviderOwnership(root, {
-    sourceProvider: "backlog", targetProvider: "beads", switchedAt: "2026-10-27T12:00:00.000Z", ...switchContinuity(original), destinations: {},
-  }), /no verified destination mapping/);
-  const switched = switchActiveTaskProviderOwnership(root, {
-    sourceProvider: "backlog", targetProvider: "beads", switchedAt: "2026-10-27T12:00:00.000Z",
-    ...switchContinuity(original),
-    destinations: { "PRIMECLAW-10.38": { taskId: "BEAD-8", providerRevision: "d".repeat(32), taskEvidence: { id: "BEAD-8", title: "Migrated", status: "in_progress" } } },
-  });
-  writeEpisodeOwnership(root, parseEpisodeOwnership({ ...readEpisodeOwnership(root, "owner-switch"), updatedAt: "2026-10-27T12:00:01.000Z" }));
-  assert.throws(() => restoreTaskProviderOwnershipSwitch(root, switched), /registry changed after the switch/);
-});
-
-
-test("provider switch to Backlog requires a verified destination path before registry mutation", () => {
-  const { root } = fixture();
-  const original = beadsOwnership("owner-beads-switch", "BEAD-9");
-  writeEpisodeOwnership(root, original);
-  assert.throws(() => switchActiveTaskProviderOwnership(root, {
-    sourceProvider: "beads",
-    targetProvider: "backlog",
-    switchedAt: "2026-10-27T12:00:00.000Z",
-    ...switchContinuity(original),
-    destinations: {
-      "BEAD-9": { taskId: "TASK-9", providerRevision: "e".repeat(40), taskEvidence: { task: { id: "TASK-9", status: "In Progress" } } },
-    },
+    ...options, destinations: { [original.taskId]: { ...destination, taskPath: undefined } },
   }), /no verified Backlog task path/);
-  assert.deepEqual(readEpisodeOwnership(root, "owner-beads-switch"), original);
+  assert.throws(() => switchActiveTaskProviderOwnership(root, {
+    ...options, destinations: { [original.taskId]: { ...destination, providerRevision: "d".repeat(40) } },
+  }), /unsupported shape/);
+  assert.deepEqual(readEpisodeOwnership(root, original.ownerSessionId), original);
 });
 
-
-test("provider switch rejects colliding destination task identity before registry mutation", () => {
-  const { root } = fixture();
-  const first = taskOwnership("owner-switch-one", "PRIMECLAW-10.38");
-  const second = taskOwnership("owner-switch-two", "PRIMECLAW-10.39");
+test("provider switch rejects colliding destination IDs or paths before registry mutation", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-provider-switch-"));
+  const first = activeBeadsOwnership("owner-switch-one", "BEAD-1");
+  const second = activeBeadsOwnership("owner-switch-two", "BEAD-2");
   writeEpisodeOwnership(root, first);
   writeEpisodeOwnership(root, second);
   const before = readEpisodeOwnershipRegistry(root);
+  const destination = backlogSwitchDestination("TASK-1");
+  for (const [other, collision] of [
+    [backlogSwitchDestination("TASK-1", "tasks/different.md"), /destination task TASK-1 is mapped more than once/],
+    [backlogSwitchDestination("TASK-2", "tasks/TASK-1.md"), /destination path .* is mapped more than once/],
+  ]) {
+    assert.throws(() => switchActiveTaskProviderOwnership(root, {
+      switchedAt: SWITCHED_AT,
+      ...switchContinuity(first, second),
+      destinations: { [first.taskId]: destination, [second.taskId]: other },
+    }), collision);
+    assert.deepEqual(readEpisodeOwnershipRegistry(root), before);
+  }
+});
+
+test("provider switch refuses stale ownership, stale runtime proof, or non-source ownership", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-provider-switch-"));
+  const original = activeBeadsOwnership("owner-source", "BEAD-1");
+  writeEpisodeOwnership(root, original);
+  const options = {
+    switchedAt: SWITCHED_AT, ...switchContinuity(original),
+    destinations: { [original.taskId]: backlogSwitchDestination("TASK-1") },
+  };
   assert.throws(() => switchActiveTaskProviderOwnership(root, {
-    sourceProvider: "backlog", targetProvider: "beads", switchedAt: "2026-10-27T12:00:00.000Z",
-    ...switchContinuity(first, second),
-    destinations: {
-      "PRIMECLAW-10.38": { taskId: "BEAD-COLLISION", providerRevision: "f".repeat(32), taskEvidence: { id: "BEAD-COLLISION", title: "Migrated collision", status: "in_progress" } },
-      "PRIMECLAW-10.39": { taskId: "BEAD-COLLISION", providerRevision: "f".repeat(32), taskEvidence: { id: "BEAD-COLLISION", title: "Migrated collision", status: "in_progress" } },
-    },
-  }), /mapped more than once/);
+    ...options, ...switchContinuity({ ...original, updatedAt: SWITCHED_AT }),
+  }), /changed after migration continuity proof/);
+  assert.throws(() => switchActiveTaskProviderOwnership(root, { ...options, runtimeProofs: {} }), /no exact runtime continuity proof/);
+  const foreign = activeTaskOwnership("owner-non-source", "TASK-2");
+  writeEpisodeOwnership(root, foreign);
+  const before = readEpisodeOwnershipRegistry(root);
+  assert.throws(() => switchActiveTaskProviderOwnership(root, options), /uses backlog, not selected source beads/);
   assert.deepEqual(readEpisodeOwnershipRegistry(root), before);
 });
 
-
-test("provider switch binds only the freshly verified runtime route", () => {
-  const { root } = fixture();
-  const original = parseEpisodeOwnership({
-    ...taskOwnership("owner-route-refresh", "PRIMECLAW-ROUTE"), integrationBranch: "feature/route-retention",
-  });
-  writeEpisodeOwnership(root, original);
-  switchActiveTaskProviderOwnership(root, {
-    sourceProvider: "backlog", targetProvider: "beads", switchedAt: "2026-10-27T12:00:00.000Z",
-    destinations: { "PRIMECLAW-ROUTE": { taskId: "BEAD-ROUTE", providerRevision: "a".repeat(32), taskEvidence: { id: "BEAD-ROUTE", title: "route", status: "in_progress" } } },
-    expectedSourceRecords: { [original.ownerSessionId]: original },
-    runtimeProofs: { [original.ownerSessionId]: { expectedPreviousEpisodeActiveSessionId: original.episodeActiveSessionId, verifiedCurrentEpisodeActiveSessionId: "verified-new-route" } },
-  });
-  assert.equal(readEpisodeOwnership(root, original.ownerSessionId).episodeActiveSessionId, "verified-new-route");
-  assert.equal(readEpisodeOwnership(root, original.ownerSessionId).integrationBranch, "feature/route-retention");
-});
-
-test("destructive provider boundary refuses registry drift under the existing ownership lock", () => {
-  const { root } = fixture();
-  const original = taskOwnership("owner-guarded-delete", "PRIMECLAW-GUARD");
+test("provider switch guard refuses active registry drift before the destructive callback", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-provider-switch-"));
+  const original = activeBeadsOwnership("owner-guarded-delete", "BEAD-GUARD");
   writeEpisodeOwnership(root, original);
   const switched = switchActiveTaskProviderOwnership(root, {
-    sourceProvider: "backlog", targetProvider: "beads", switchedAt: "2026-10-27T12:00:00.000Z",
-    destinations: { "PRIMECLAW-GUARD": { taskId: "BEAD-GUARD", providerRevision: "b".repeat(32), taskEvidence: { id: "BEAD-GUARD", title: "guard", status: "in_progress" } } },
+    switchedAt: SWITCHED_AT,
+    destinations: { [original.taskId]: backlogSwitchDestination("TASK-GUARD") },
     ...switchContinuity(original),
   });
   let operations = 0;
@@ -2285,11 +2258,25 @@ test("destructive provider boundary refuses registry drift under the existing ow
   assert.equal(operations, 1);
 });
 
+test("provider switch guards an empty cutover without persisting a registry", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-provider-switch-"));
+  const newOwner = activeBeadsOwnership("owner-arrived", "BEAD-1");
+  const options = { switchedAt: SWITCHED_AT, destinations: {}, ...switchContinuity() };
+  assert.throws(() => switchActiveTaskProviderOwnership(root, {
+    ...options, ...switchContinuity(newOwner),
+  }), /continuity proof references non-transitioned owner/);
+  const switched = switchActiveTaskProviderOwnership(root, options);
+  assert.deepEqual(switched.transitions, []);
+  assert.throws(() => readFileSync(join(root, ".prime-claw", "ownership.json")), { code: "ENOENT" });
+  assert.equal(withCurrentTaskProviderOwnershipSwitch(root, switched, () => "guarded"), "guarded");
+  writeEpisodeOwnership(root, newOwner);
+  assert.throws(() => withCurrentTaskProviderOwnershipSwitch(root, switched, () => assert.fail("retirement must not run")), /ownership changed after the switch/);
+});
 
-test("provider switch preserves raw inactive cleanup compatibility fields and exact rollback", () => {
-  const { root } = fixture();
-  const original = activeTaskOwnership("switch-owner", "PRIMECLAW-SWITCH");
-  const inactive = { ...activeTaskOwnership("historical-owner", "PRIMECLAW-OLD"), status: "inactive", cleanupHead: "d".repeat(40) };
+test("provider switch preserves raw inactive cleanup compatibility fields", () => {
+  const root = mkdtempSync(join(tmpdir(), "prime-claw-provider-switch-"));
+  const original = activeBeadsOwnership("switch-owner", "BEAD-SWITCH");
+  const inactive = { ...activeTaskOwnership("historical-owner", "TASK-OLD"), status: "inactive", cleanupHead: "d".repeat(40) };
   writeEpisodeOwnership(root, original);
   const path = join(root, ".prime-claw", "ownership.json");
   const raw = JSON.parse(readFileSync(path, "utf8"));
@@ -2297,18 +2284,14 @@ test("provider switch preserves raw inactive cleanup compatibility fields and ex
   raw.owners[inactive.ownerSessionId] = inactive;
   writeFileSync(path, JSON.stringify(raw));
   const switched = switchActiveTaskProviderOwnership(root, {
-    sourceProvider: "backlog", targetProvider: "beads", switchedAt: "2026-10-27T12:00:00.000Z",
+    switchedAt: SWITCHED_AT,
     ...switchContinuity(original),
-    destinations: { [original.taskId]: { taskId: "BEAD-SWITCH", providerRevision: "f".repeat(32), taskEvidence: { id: "BEAD-SWITCH", title: "Migrated", status: "in_progress" } } },
+    destinations: { [original.taskId]: backlogSwitchDestination("TASK-SWITCH") },
   });
   const after = JSON.parse(readFileSync(path, "utf8"));
   assert.deepEqual(after.owners[inactive.ownerSessionId], inactive);
   assert.equal(after.owners[original.ownerSessionId].cleanupHead, undefined);
-  let guarded = false;
-  withCurrentTaskProviderOwnershipSwitch(root, switched, () => { guarded = true; });
-  assert.equal(guarded, true);
-  restoreTaskProviderOwnershipSwitch(root, switched);
-  assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), raw);
+  assert.equal(withCurrentTaskProviderOwnershipSwitch(root, switched, () => "guarded"), "guarded");
 });
 
 test("atomic task removal handles provider-native Beads evidence without a Backlog task path", () => {
