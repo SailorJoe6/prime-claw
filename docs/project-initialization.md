@@ -324,8 +324,36 @@ and native Beads reads.
 This recovery does not resume migration or change which provider is selected.
 
 The receipt and its published revision bind the exact Backlog tickets before
-ownership cutover. Active Episodes keep their identity and resources. Never
-retire the original Beads source before verified ownership cutover.
+ownership cutover. Active Episodes keep their identity and resources. Migration
+publishes the independent task branch, not code branches, and does not stage or
+commit code or require clean, current or published code checkouts. A stale
+local tracking cache is not evidence of a destination. Migration creates only
+fresh `.backlog` stores using their native folder configuration. It does not
+rewrite root code metadata or depend on a successful local ignore update.
+
+A stop must serve one of these purposes:
+
+- **Confirm the intended operation:** one-way request from the primary project,
+  explicit confirmation, exact current Beads source and disclosed placement.
+- **Avoid overwriting Backlog:** check local store/config paths and the actual
+  task ref on the single selected publication transport. Refuse absence that
+  cannot be verified or a destination that appears during creation.
+- **Preserve required data:** read complete current native tasks, comments,
+  relationships and memory; write them natively and verify the import. Stop if
+  a required value, relationship or result cannot be recovered or verified.
+- **Prove publication and ownership:** verify the native task data and receipt
+  on the selected remote; attach only fresh Episode workspaces with the exact
+  task mappings and preserve their verified identities. Stop on actual task
+  publication failures, lost ownership or non-quiescent affected Episodes.
+- **Protect Beads:** stop on operator cancellation before cutover, an unsafe or
+  unverifiable source, backup/restore failure, changed source or backup, or
+  failure to safely retire the exact original after the ownership switch.
+
+Do not report completion on any core failure. Report which provider is known to
+remain authoritative, whether ownership switched, and whether the original
+store is present, absent or unverified. A partial destination can prevent
+ordinary provider discovery without making it authoritative. Preserve it and
+any retained backup; do not retry, roll back, or clean up automatically.
 
 Stop or failure before cutover leaves Beads authoritative. Report the resources
 that remain and keep any partial destination untouched. Do not retry, resume,
@@ -415,35 +443,10 @@ uncertain result stops the rollout for owner inspection, not a generic retry.
 [The PRIMECLAW-44 embedded-source proof](evidence/beads-embedded-source-capture-20261030.md)
 records the native read proof, bounded capture-data integration, and retiring-source
 boundary work without source custom lifecycle setup, a Beads remote or server
-mode. The accepted Slice 1c embedded fixture uses only supported
-open/in-progress/blocked statuses and a fresh Backlog destination. The bounded
-Slice 1d adds used-status preflight and ordinary closure versus exact-evidence
-archive handling; its separate validation state is recorded in that evidence
-file. Unsupported statuses still require semantic resolution, not a new guessed
-projection. Populated-destination preservation, layout normalization and the
-complete initialization task remain unproven by these fixtures.
-
-[The separate native destination-layout de-risk proof](evidence/backlog-destination-layout-20261030.md)
-tests whole-configuration root symlinks and same-repository Git moves for default,
-hidden and custom selected stores. Its validation state and limits are recorded
-there. It changes no production initialization/preparation/migration path and
-proves neither populated-store adoption into independent history nor complete
-native cross-branch visibility after relocation. Those remain separate unfinished
-integration seams, not a reason to recreate existing tasks or relax safeguards.
-
-[The bounded root-configuration preservation increment](evidence/backlog-root-config-preservation-20261030.md)
-extends existing independent workspace preparation: built-in and custom selected
-root configurations retain their whole bytes through exact relative root links,
-with replay and native folder filename checks. Its validation state and limits
-are recorded there. Default-folder relocation, ordinary-store adoption, full
-initialization/migration layout integration and populated imports remain
-unfinished; this increment does not replace their existing safeguards.
-
-[The migration-only entry-admission increment](evidence/migration-entry-admission-20261030.md)
-allows explicit read-only Beads capture alongside valid Backlog evidence and
-refuses unsupported reverse requests before native commands. Confirmation
-retains its existing exact-retry/destination guards; populated imports and layout
-normalization remain unfinished, not bypassed by inspection permission.
+mode. That evidence is historical and does not authorize populated imports,
+layout conversion, or replay. See the fresh-only workflow above for current
+behavior. Separate ordinary Backlog initialization and configuration preservation
+are not migration entry paths.
 
 [The populated hidden-store attempt](evidence/populated-hidden-backlog-import-20261030.md)
 retains the failed historical runs and rolled-back patch. Its PRIMECLAW-44

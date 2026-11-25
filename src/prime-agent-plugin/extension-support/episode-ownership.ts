@@ -628,15 +628,17 @@ export function switchActiveTaskProviderOwnership(
 }
 
 /** Run the destructive boundary only while the existing ownership lock proves
- * the complete switched registry has not drifted. */
+ * the active task authority still matches the verified switch. */
 export function withCurrentTaskProviderOwnershipSwitch<T>(
   projectRoot: string,
   switchResult: ActiveTaskProviderOwnershipSwitchResult,
   operation: () => T,
 ): T {
   return withOwnershipLock(projectRoot, () => {
-    const current = copiedRegistry(rawValidatedOwnershipRegistry(projectRoot));
-    if (JSON.stringify(current) !== JSON.stringify(copiedRegistry(switchResult.after))) {
+    const taskOwners = (registry: EpisodeOwnershipRegistry) => Object.fromEntries(
+      Object.entries(registry.owners).filter(([, record]) => record.version === 2 && record.status !== "inactive"),
+    );
+    if (!isDeepStrictEqual(taskOwners(rawValidatedOwnershipRegistry(projectRoot)), taskOwners(switchResult.after))) {
       throw new Error("task-provider source deletion refused because ownership changed after the switch");
     }
     return operation();

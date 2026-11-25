@@ -102,7 +102,6 @@ export interface TaskHistoryWorkspaceInput {
   /** Only the explicitly confirmed Beads-to-Backlog operation may inspect coexisting Backlog. */
   explicitMigration?: boolean;
   /** A confirmed fresh migration cannot adopt an existing task branch. */
-  freshMigration?: boolean;
 }
 
 export type TaskHistoryRemoteSelection =
@@ -264,13 +263,82 @@ function assertAbsentLocalMigrationTaskRef(root: string, runner: CommandRunner):
   if (local.status !== 1) throw new Error("cannot verify absence of the local Backlog task ref");
 }
 
-export function assertFreshBacklogMigrationDestination(root: string, runner: CommandRunner): void {
+export function assertFreshBacklogMigrationDestination(root: string, runner: CommandRunner): { remoteName: string; remoteUrl: string } {
   assertNoLocalBacklogMigrationDestination(root);
   assertAbsentLocalMigrationTaskRef(root, runner);
-  const remote = selectTaskHistoryRemote(root, runner);
-  if (remote.status !== "selected") throw new Error(`cannot verify a fresh Backlog destination: ${remote.detail}`);
-  const published = runGit(runner, root, ["ls-remote", "--refs", "--exit-code", "--", remote.url, TASK_HISTORY_REF]);
-  assertAbsentMigrationTaskRef(published);
+  // Configured transport is independent of the checkout's tracking cache (or
+  // presence of an upstream at all). A detached checkout can use its sole remote.
+  const branch = runGit(runner, root, ["symbolic-ref", "--quiet", "--short", "HEAD"]).stdout.trim();
+  const configured = branch ? runGit(runner, root, ["config", "--get", `branch.${branch}.remote`]).stdout.trim() : "";
+  const remotes = gitOk(runner, root, ["remote"], "list task publication remotes").split(/\s+/).filter(Boolean);
+  const remoteName = configured && configured !== "." ? configured : remotes.length === 1 ? remotes[0] : "";
+  if (!remotes.includes(remoteName)) throw new Error("cannot identify one task publication remote from the configured branch remote or sole repository remote");
+  const remoteUrl = gitOk(runner, root, ["remote", "get-url", remoteName], "read task publication transport");
+  assertAbsentMigrationTaskRef(runGit(runner, root, ["ls-remote", "--refs", "--exit-code", "--", remoteUrl, TASK_HISTORY_REF]));
+  return { remoteName, remoteUrl };
+}
+
+function warnIfMigrationStoreIsVisible(root: string, runner: CommandRunner, warn: (message: string) => void): void {
+  try {
+    const path = gitOk(runner, root, ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"], "locate local Git excludes");
+    const entry = lstatIfPresent(path);
+    if (entry && (!entry.isFile() || entry.nlink !== 1)) throw new Error("not a private regular file");
+    const before = entry ? readFileSync(path, "utf8") : "";
+    if (!before.split(/\r?\n/).includes("/.backlog/")) appendFileSync(path, `${before && !before.endsWith("\n") ? "\n" : ""}/.backlog/\n`);
+    if (runGit(runner, root, ["check-ignore", "--no-index", "-q", "--", ".backlog/probe"]).status === 0) return;
+  } catch { /* Git excludes are a convenience, not migration authority. */ }
+  warn(`Backlog is not known to be ignored by Git in ${root}; do not stage .backlog as code.`);
+}
+
+export function verifyMigrationEpisodeWorktree(root: string, worktree: string, runner: CommandRunner): void {
+  const entry = lstatSync(worktree);
+  if (!entry.isDirectory() || realpathSync(worktree) !== worktree || worktree === root
+      || realpathSync(gitOk(runner, worktree, ["rev-parse", "--show-toplevel"], "locate the Episode worktree")) !== worktree
+      || realpathSync(gitOk(runner, worktree, ["rev-parse", "--path-format=absolute", "--git-common-dir"], "locate the Episode repository")) !==
+        realpathSync(gitOk(runner, root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], "locate the primary repository"))) {
+    throw new Error("active Episode is not the recorded linked worktree of the selected project");
+  }
+}
+
+export function cloneFreshBacklogMigrationWorkspace(root: string, transport: { remoteName: string; remoteUrl: string },
+  revision: string, runner: CommandRunner, warn: (message: string) => void): string {
+  assertNoLocalBacklogMigrationDestination(root);
+  const storeDir = join(root, ".backlog");
+  // Exclusive allocation: never have Git adopt a directory that appeared
+  // since the read-only absence check. Leave partial effects to the operator.
+  mkdirSync(storeDir);
+  gitOk(runner, root, ["clone", "-q", "--no-local", "--origin", transport.remoteName, "--branch", TASK_HISTORY_BRANCH,
+    "--single-branch", "--", transport.remoteUrl, storeDir], "clone the new published Backlog task store");
+  if (refHead(runner, storeDir, "HEAD") !== revision) throw new Error("new Backlog clone differs from the verified published revision");
+  warnIfMigrationStoreIsVisible(root, runner, warn);
+  return storeDir;
+}
+
+export function createFreshBacklogMigrationWorkspace(root: string, runner: CommandRunner, warn: (message: string) => void) {
+  const transport = assertFreshBacklogMigrationDestination(root, runner);
+  const temp = mkdtempSync(join(tmpdir(), "prime-claw-backlog-bootstrap-"));
+  let revision: string;
+  try {
+    gitOk(runner, temp, ["init", "-q", "-b", TASK_HISTORY_BRANCH], "initialize the new task history");
+    writeFileSync(join(temp, INITIAL_FILE), INITIAL_FILE_CONTENT);
+    // Migration owns the explicit task-ref transport; native Backlog must
+    // not fetch the surrounding code repository during these commands.
+    writeFileSync(join(temp, "config.yml"), initialTaskStoreConfig(basename(root))
+      .replace("remote_operations: true", "remote_operations: false")
+      .replace("auto_open_browser: true", "auto_open_browser: false"));
+    gitOk(runner, temp, ["add", "--", INITIAL_FILE, "config.yml"], "stage the new task store configuration");
+    gitOk(runner, temp, ["-c", "user.name=prime-claw", "-c", "user.email=prime-claw@localhost", "commit", "-qm", INITIAL_COMMIT_MESSAGE], "commit the new task store configuration");
+    revision = gitOk(runner, temp, ["rev-parse", "HEAD"], "bind the new task-store revision");
+    // The empty expectation requires remote ref absence at push time. It
+    // cannot replace any existing published ref, even a racing equal tip.
+    gitOk(runner, temp, ["push", `--force-with-lease=${TASK_HISTORY_REF}:`, "--", transport.remoteUrl,
+      `${TASK_HISTORY_REF}:${TASK_HISTORY_REF}`], "publish the fresh Backlog task ref only if absent");
+  } finally {
+    try { rmSync(temp, { recursive: true, force: true }); }
+    catch { warn(`Could not remove temporary Backlog bootstrap files at ${temp}.`); }
+  }
+  const storeDir = cloneFreshBacklogMigrationWorkspace(root, transport, revision, runner, warn);
+  return { ...transport, storeDir };
 }
 
 function assertAbsentMigrationTaskRef(result: { status: number; stdout: string }): void {
@@ -294,7 +362,6 @@ export function ensureTaskHistoryBranch(
   remoteUrl: string,
   runner: CommandRunner = new ProcessCommandRunner(),
   initialConfig: string = initialTaskStoreConfig(basename(primaryRoot)),
-  freshMigration = false,
 ): TaskHistoryBranchState {
   const current = gitOk(runner, primaryRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"], "read the current branch");
   if (current === TASK_HISTORY_BRANCH) {
@@ -314,13 +381,7 @@ export function ensureTaskHistoryBranch(
   // `git ls-remote --heads <transport> refs/heads/prime-claw/tasks` result as
   // either absent or one well-formed OID/ref line. A cached remote-tracking
   // ref is never read as authority on its own.
-  if (freshMigration) {
-    assertAbsentMigrationTaskRef(runGit(runner, primaryRoot, ["ls-remote", "--refs", "--exit-code", "--", remoteUrl, TASK_HISTORY_REF]));
-    assertAbsentLocalMigrationTaskRef(primaryRoot, runner);
-  }
-  const probe = freshMigration
-    ? { status: 0, stdout: "", stderr: "" }
-    : runGit(runner, primaryRoot, ["ls-remote", "--heads", remoteUrl, TASK_HISTORY_REF]);
+  const probe = runGit(runner, primaryRoot, ["ls-remote", "--heads", remoteUrl, TASK_HISTORY_REF]);
   const probeOut = probe.stdout.trim();
   const probeErr = (probe.stderr || "").trim();
   let remoteOid: string | null;
@@ -809,7 +870,6 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     };
   }
 
-  if (input.freshMigration) assertFreshBacklogMigrationDestination(primaryRoot, runner);
   const remoteSelection = selectTaskHistoryRemote(primaryRoot, runner);
   const localOnly = remoteSelection.status === "blocked" && remoteSelection.code === "no-remote"
     && input.unpublishedLocalOnly === true;
@@ -905,7 +965,6 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
     }
   }
   const nestedGit = join(storeDir, ".git");
-  if (input.freshMigration) assertNoLocalBacklogMigrationDestination(primaryRoot);
   const storeExists = existsSync(storeDir);
   if (hasTrackedTaskContent(runner, primaryRoot, storeDir)) {
     return {
@@ -957,7 +1016,6 @@ export function prepareTaskHistoryWorkspace(input: TaskHistoryWorkspaceInput): T
       remoteUrl!,
       runner,
       relocatedConfigContent ?? initialTaskStoreConfig(basename(primaryRoot)),
-      input.freshMigration,
     );
     if (publishedState.status === "blocked") {
       return { status: "blocked", code: publishedState.code, detail: publishedState.detail, remediation: publishedState.remediation };
@@ -1297,9 +1355,7 @@ export function prepareExistingBacklogTaskHistoryWorkspace(
     const commonDir = realpathSync(resolve(root, gitOk(runner, root, ["rev-parse", "--git-common-dir"], "read primary common directory")));
     if (gitDir !== commonDir) return refuse("not-primary-checkout", "existing-store preparation requires the canonical primary checkout");
     const beforeHead = gitOk(runner, root, ["rev-parse", "HEAD"], "read code head before task-store preparation");
-    if (input.freshMigration) assertFreshBacklogMigrationDestination(root, runner);
     const observed = input.explicitMigration ? detectExplicitTaskProvider(root, "backlog", runner) : detectTaskProvider(root, runner);
-    if (input.freshMigration && observed.kind !== "none") return refuse("provider-not-backlog", "existing Backlog destination appeared during preparation");
     if (observed.kind === "blocked") return refuse("provider-not-backlog", observed.detail);
     if (observed.kind === "selected" && observed.evidence.provider !== "backlog") return refuse("provider-not-backlog", "selected provider is not Backlog");
     if (observed.kind === "none" || !observed.evidence.storeDir) {

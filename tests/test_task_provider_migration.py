@@ -106,10 +106,8 @@ def test_task_provider_migration_stays_pair_specific_and_receipt_only() -> None:
         "migrateTaskProvider",
         "migrateBeadsToBacklog",
         "switchActiveTaskProviderOwnership",
-        "restoreTaskProviderOwnershipSwitch",
-        "destination-native",
-        "source-revision-changed",
-        "source store still exists after guarded deletion",
+        "retainBeadsBackup",
+        "original Beads store removal was not verified",
         "confirmedSwitch",
     ):
         assert sentinel in source
@@ -123,6 +121,9 @@ def test_task_provider_migration_stays_pair_specific_and_receipt_only() -> None:
         "semanticDiffEngine",
         "dualWrite",
         "while (retry",
+        "migrationCodeProjection",
+        "migrateBacklogToBeads",
+        "restoreTaskProviderOwnershipSwitch",
     ):
         assert forbidden not in source
 

@@ -453,9 +453,9 @@ function assertOwnedBacklogGitEvidence(record, { root, store, episodeStore, task
   const [metadata, literal] = entry.split("\t");
   assert.match(metadata, /^100(?:644|755) blob [0-9a-f]{40}$/);
   assert.equal(literal, `${path}\0`);
-  const committed = command(store, "git", ["show", `${revision}:${path}`]);
+  const committed = RUNNER.runFileBacked("git", ["show", `${revision}:${path}`], { cwd: store }).stdout;
   assert.equal(committed.split("\n---", 1)[0].match(/^id: (.+)$/m)?.[1], taskId);
-  assert.equal(command(episodeStore, "git", ["show", `${revision}:${path}`]), committed);
+  assert.equal(RUNNER.runFileBacked("git", ["show", `${revision}:${path}`], { cwd: episodeStore }).stdout, committed);
   const copies = Object.entries(physicalDestinationRecords(store)).filter(([, bytes]) =>
     Buffer.from(bytes, "base64").toString("utf8").split("\n---", 1)[0].match(/^id: (.+)$/m)?.[1] === taskId);
   assert.deepEqual(copies.map(([file]) => file), [path], "do not allocate a second native ticket for the owner");
@@ -848,18 +848,64 @@ test("current Beads source digest binds comments relationships metadata and raw 
   assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
 });
 
-test("confirmed Beads to Backlog migration preserves active Episode identity and continues on canonical-primary Backlog", { timeout: 180_000 }, async (t) => {
+function dirtyCodeCheckout(cwd, label) {
+  const tracked = join(cwd, "README.md");
+  const untracked = join(cwd, "operator-draft.js");
+  writeFileSync(tracked, `${label}: staged code\n`);
+  git(cwd, "add", "README.md");
+  writeFileSync(tracked, `${label}: unstaged code\n`);
+  writeFileSync(untracked, `// ${label}: untracked code\n`);
+  const snapshot = () => ({
+    branch: git(cwd, "branch", "--show-current"),
+    head: git(cwd, "rev-parse", "HEAD"),
+    index: command(cwd, "git", ["ls-files", "--stage", "-z"]),
+    status: git(cwd, "status", "--porcelain=v1", "--", "README.md", "operator-draft.js"),
+    files: [readFileSync(tracked), readFileSync(untracked)],
+  });
+  assert.match(snapshot().status, /^MM README\.md\n\?\? operator-draft\.js$/);
+  return snapshot;
+}
+
+test("confirmed Beads to Backlog migration preserves active Episode identity despite unrelated code drift", { timeout: 180_000 }, async (t) => {
   const fixture = beadsSource(t, "beads-active-owner");
   const nativeCurrent = captureBeadsCurrentTasks(fixture.root, Object.values(fixture.ids));
   const owner = addActiveBeadsOwner(fixture);
+  const codeRemote = () => git(fixture.root, "ls-remote", "--refs", "origin", "refs/heads/*").split("\n")
+    .filter((line) => !line.endsWith(`\t${TASK_HISTORY_REF}`));
+  const remoteBefore = codeRemote();
+  const sourceBefore = sourceAuthorityFiles(fixture.root);
+  const sessionBefore = readFileSync(owner.record.episodeSessionFile);
+  git(fixture.root, "update-ref", "refs/remotes/origin/main", owner.episodeHead);
+  assert.notEqual(git(fixture.root, "rev-parse", "origin/main"), git(fixture.remote, "rev-parse", "refs/heads/main"));
+  git(fixture.root, "update-ref", "refs/remotes/origin/prime-claw/tasks", owner.episodeHead);
+  git(fixture.root, "switch", "-qc", "operator-checkout");
+  const primaryCode = dirtyCodeCheckout(fixture.root, "primary");
+  const episodeCode = dirtyCodeCheckout(owner.episode, "episode");
+  const primaryBefore = primaryCode();
+  const episodeBefore = episodeCode();
   const inspection = inspectTaskProviderMigration({ cwd: fixture.root, targetProvider: "backlog", runner: RUNNER });
   assert.equal(inspection.status, "ready", inspection.detail);
   assert.deepEqual(inspection.activeOwnership, [{ ownerSessionId: owner.ownerSessionId, taskId: fixture.ids.parent }]);
+  assert.deepEqual(primaryCode(), primaryBefore, "inspection must not alter the primary code checkout");
+  assert.deepEqual(episodeCode(), episodeBefore, "inspection must not alter the Episode code checkout");
+  const store = join(fixture.root, ".backlog");
+  const episodeStore = join(owner.episode, ".backlog");
+  let expectedEpisodeCode;
   const result = await migrateTaskProvider({
     cwd: fixture.root, targetProvider: "backlog", runner: RUNNER, expectedSourceRevision: inspection.sourceRevision,
     confirmedSwitch: true, actor: "migration-operator",
     semanticPlacement: "Place native design in the living plan and preserve all unsupported values in exact provenance comments.",
-    verifyActiveRuntime: proveFixtureRuntime,
+    onProgress(phase) {
+      if (phase !== "Guarded cutover starting; stop no longer interrupts this phase") return;
+      assert.deepEqual(episodeCode(), episodeBefore, "publication must not edit the Episode code checkout");
+      git(owner.episode, "commit", "--allow-empty", "--only", "-qm", "unrelated Episode code advancement");
+      expectedEpisodeCode = { ...episodeBefore, head: git(owner.episode, "rev-parse", "HEAD") };
+    },
+    async verifyActiveRuntime(records) {
+      assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore, "source must remain intact through ownership cutover proof");
+      assert.equal(records.length, 1);
+      return proveFixtureRuntime(records);
+    },
   });
   assert.equal(result.status, "completed", result.detail);
   assert.equal(result.selectedProvider, "backlog");
@@ -867,8 +913,12 @@ test("confirmed Beads to Backlog migration preserves active Episode identity and
   assert.equal(result.receipt.mappings.length, 3);
   assert.ok(result.receipt.mappings.every((mapping) => mapping.sourceTaskId !== mapping.destinationTaskId));
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
-  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
-  assert.equal(git(fixture.root, "rev-parse", "HEAD"), git(fixture.root, "rev-parse", "origin/main"));
+  assert.deepEqual(primaryCode(), primaryBefore, "cutover must preserve primary code bytes, staged entries and checkout");
+  assert.ok(expectedEpisodeCode, "must exercise drift at the guarded cutover boundary");
+  assert.deepEqual(episodeCode(), expectedEpisodeCode, "cutover must preserve Episode code bytes, staged entries and advanced branch");
+  assert.deepEqual(codeRemote(), remoteBefore, "independent task publication must not push code branches");
+  assert.equal(git(fixture.root, "rev-parse", "origin/main"), owner.episodeHead, "must not refresh the stale code tracking ref");
+  assert.equal(git(fixture.root, "rev-parse", "refs/remotes/origin/prime-claw/tasks"), owner.episodeHead, "must not refresh the stale task tracking ref");
   const receipt = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", result.receiptTaskId)).task;
   assert.ok(receipt.comments.some((comment) => String(comment.text ?? comment.content ?? comment.body).includes("prime-claw-task-provider-migration-receipt-v1")));
   for (const mapping of result.receipt.mappings) {
@@ -882,26 +932,18 @@ test("confirmed Beads to Backlog migration preserves active Episode identity and
   const registry = JSON.parse(readFileSync(join(fixture.root, ".prime-claw", "ownership.json"), "utf8"));
   const current = registry.owners[owner.ownerSessionId];
   const mapped = result.receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent);
-  assert.equal(current.provider, "backlog");
-  assert.equal(current.taskId, mapped.destinationTaskId);
-  assert.equal(typeof current.taskPath, "string");
+  assertOwnedBacklogGitEvidence(current, { root: fixture.root, store, episodeStore,
+    taskId: mapped.destinationTaskId, revision: result.receipt.destinationReceiptRevision });
   for (const field of ["ownerSessionId", "operationId", "engine", "baseRef", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
     assert.deepEqual(current[field], owner.record[field], field);
   }
-  assert.equal(git(owner.episode, "status", "--porcelain=v1"), "");
-  const finalEpisodeHead = git(owner.episode, "rev-parse", "HEAD");
-  git(owner.episode, "merge-base", "--is-ancestor", owner.episodeHead, finalEpisodeHead);
-  assert.equal(git(owner.episode, "branch", "--show-current"), owner.record.branch);
-  assert.equal(git(owner.episode, "ls-remote", "--refs", "origin", `refs/heads/${owner.record.branch}`).split(/\s+/)[0], finalEpisodeHead);
-  assert.deepEqual(git(owner.episode, "diff", "--name-only", `${owner.episodeHead}..${finalEpisodeHead}`).split(/\r?\n/), ["backlog.config.yml"], "final Episode publication contains only the approved native root link");
-  assert.equal(git(owner.episode, "rev-parse", `${owner.episodeHead}:README.md`), git(owner.episode, "rev-parse", `${finalEpisodeHead}:README.md`), "business bytes remain unchanged");
+  assert.deepEqual(readFileSync(owner.record.episodeSessionFile), sessionBefore);
   const linkedDetection = detectTaskProvider(owner.episode, RUNNER);
   assert.equal(linkedDetection.kind, "selected");
   assert.equal(linkedDetection.evidence.provider, "backlog");
   assert.equal(existsSync(join(owner.episode, ".backlog", ".git")), true);
   assert.equal(existsSync(join(owner.episode, ".beads", "metadata.json")), true, "historical code bytes remain without live provider authority");
 });
-
 
 test("Beads to Backlog migration preserves the selected non-origin remote for ordinary preparation", { timeout: 240_000 }, async (t) => {
   const fixture = beadsSource(t, "beads-upstream-remote");
@@ -946,11 +988,8 @@ test("forward Beads retirement preserves outgoing Dolt history and operator igno
   const operatorIgnore = "operator-cache/\n";
   const nativeIgnore = readFileSync(join(fixture.root, ".gitignore"), "utf8");
   assert.match(nativeIgnore, /\*\.gate\.lock\*/);
-  const retiredBlock = ["# Beads / Dolt files (added by bd init)", ".dolt/", "*.db",
-    ".beads-credential-key", ".beads/proxieddb/", "*.gate.lock*", ""].join("\n");
-  assert.ok(nativeIgnore.includes(retiredBlock), "fixture must contain the exact native provider block");
-  const retainedIgnore = nativeIgnore.replace(retiredBlock, "") + operatorIgnore;
-  writeFileSync(join(fixture.root, ".gitignore"), nativeIgnore + operatorIgnore);
+  const originalIgnore = nativeIgnore + operatorIgnore;
+  writeFileSync(join(fixture.root, ".gitignore"), originalIgnore);
   git(fixture.root, "add", ".gitignore");
   git(fixture.root, "commit", "-qm", "preserve operator ignore rule");
   git(fixture.root, "push", "-q");
@@ -966,16 +1005,13 @@ test("forward Beads retirement preserves outgoing Dolt history and operator igno
   assert.equal(result.status, "completed", result.detail);
   assert.equal(result.selectedProvider, "backlog");
   assert.equal(existsSync(join(fixture.root, ".beads")), false);
-  assert.equal(existsSync(join(fixture.root, ".beads.gate.lock")), false, "retired native gate lock must not survive cutover");
+  assert.equal(existsSync(join(fixture.root, ".beads.gate.lock")), true, "original-store retirement leaves unrelated root files untouched");
   assert.equal(git(fixture.root, "ls-remote", "--refs", fixture.remote, "refs/dolt/data"), sourcePublication,
     "local source retirement must retain outgoing remote history without changing its ref");
   assertRetainedBackupRestores(fixture, result, recovery, "Beads parent");
-  const finalIgnore = readFileSync(join(fixture.root, ".gitignore"), "utf8");
-  assert.equal(finalIgnore, retainedIgnore + "/.backlog/\n",
-    "cutover preserves exact operator bytes, removes only the native Beads block, and appends only the required Backlog wrapper");
-  assert.equal(finalIgnore.split(/\r?\n/).filter((line) => line === "/.backlog/").length, 1);
-  assert.equal(finalIgnore.includes(retiredBlock), false);
-  assert.match(readFileSync(join(fixture.root, ".gitignore"), "utf8"), /operator-cache\//);
+  assert.equal(readFileSync(join(fixture.root, ".gitignore"), "utf8"), originalIgnore,
+    "cutover must not rewrite the code checkout's ignore file");
+  git(fixture.root, "check-ignore", "--", ".backlog/tasks/example.md");
   const finalPreparation = prepareTaskHistoryWorkspace({ primaryRoot: fixture.root, runner: RUNNER });
   assert.equal(finalPreparation.status, "prepared", finalPreparation.detail);
   assert.equal(git(fixture.root, "rev-parse", TASK_HISTORY_REF), result.receipt.destinationReceiptRevision);
@@ -1203,7 +1239,7 @@ test("Backlog destination remote advancement blocks before Beads source deletion
 });
 
 
-test("post-switch route replacement preserves active Beads migration continuity", { timeout: 240_000 }, async (t) => {
+test("pre-switch route replacement preserves active Beads migration continuity", { timeout: 240_000 }, async (t) => {
   const fixture = embeddedBeadsSource(t, "post-switch-route-replacement");
   const owner = addActiveBeadsOwner(fixture);
   const runner = new AsIsBeadsRunner();
@@ -1211,6 +1247,7 @@ test("post-switch route replacement preserves active Beads migration continuity"
   assert.equal(inspection.status, "ready", inspection.detail);
   const sourceBefore = sourceAuthorityFiles(fixture.root);
   const sessionBefore = readFileSync(owner.record.episodeSessionFile, "utf8");
+  const primaryHead = git(fixture.root, "rev-parse", "HEAD");
   const replacementRoute = "route-beads-migration-fixture-replacement";
   let proofs = 0;
   const result = await migrateTaskProvider({
@@ -1226,15 +1263,9 @@ test("post-switch route replacement preserves active Beads migration continuity"
       assert.equal(record.episodeActiveSessionId, owner.record.episodeActiveSessionId);
       assert.equal(readFileSync(record.episodeSessionFile, "utf8"), sessionBefore);
       assert.deepEqual(sourceAuthorityFiles(fixture.root), sourceBefore, "source must remain intact through the latest runtime proof");
-      if (proofs === 3) {
-        assert.equal(record.provider, "backlog");
-        const destination = JSON.parse(backlog(fixture.root, "task", "view", "--json", "--", record.taskId)).task;
-        assert.equal(destination.id, record.taskId);
-        const store = join(fixture.root, ".backlog");
-        assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], record.providerRevision,
-          "destination must already be published before retiring the source");
-        // Only the verified current route changes after cutover. The durable
-        // session, file, owner, worktree and mapped task stay the same.
+      if (proofs === 2) {
+        assert.equal(record.provider, "beads");
+        assert.ok(git(join(fixture.root, ".backlog"), "ls-remote", "--refs", "origin", TASK_HISTORY_REF));
         return [{ ownerSessionId: record.ownerSessionId,
           expectedPreviousEpisodeActiveSessionId: record.episodeActiveSessionId,
           verifiedCurrentEpisodeActiveSessionId: replacementRoute }];
@@ -1244,7 +1275,7 @@ test("post-switch route replacement preserves active Beads migration continuity"
       return proveFixtureRuntime(records);
     },
   });
-  assert.equal(proofs, 3, "must reach the post-cutover runtime proof");
+  assert.equal(proofs, 2, "must reach the final pre-cutover runtime proof");
   assert.equal(result.status, "completed", result.detail);
   assert.equal(result.sourceAbsent, true);
   assert.equal(result.selectedProvider, "backlog");
@@ -1253,14 +1284,13 @@ test("post-switch route replacement preserves active Beads migration continuity"
   assertOwnedBacklogGitEvidence(current, { root: fixture.root, store: join(fixture.root, ".backlog"),
     episodeStore: join(owner.episode, ".backlog"), revision: result.receipt.destinationReceiptRevision,
     taskId: result.receipt.mappings.find((row) => row.sourceTaskId === fixture.ids.parent).destinationTaskId });
-  // The later runtime proof confirms reachability; it does not rewrite ownership.
-  assert.equal(current.episodeActiveSessionId, owner.record.episodeActiveSessionId);
+  assert.equal(current.episodeActiveSessionId, replacementRoute);
   for (const field of ["ownerSessionId", "operationId", "engine", "baseRef", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile"]) {
     assert.deepEqual(current[field], owner.record[field], field);
   }
   assert.equal(readFileSync(current.episodeSessionFile, "utf8"), sessionBefore);
-  assert.equal(git(owner.episode, "status", "--porcelain=v1"), "");
-  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
+  assert.equal(git(owner.episode, "rev-parse", "HEAD"), owner.episodeHead);
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), primaryHead);
   assert.deepEqual(runner.sourcePublicationCommands, []);
 });
 
@@ -1405,7 +1435,7 @@ test("post-switch runtime continuity loss rolls ownership back before source del
 });
 
 
-test("fresh destination memory loss blocks retirement and restores exact Beads ownership", { timeout: 240_000 }, async t => {
+test("fresh destination memory loss blocks before ownership switches or the original is retired", { timeout: 240_000 }, async t => {
   const fixture = embeddedBeadsSource(t, "fresh-memory-loss");
   bd(fixture.root, "remember", "Restore the exact native index", "--key", "fixture");
   addActiveBeadsOwner(fixture);
@@ -1414,11 +1444,11 @@ test("fresh destination memory loss blocks retirement and restores exact Beads o
   assert.equal(inspection.status, "ready", inspection.detail);
   const registry = join(fixture.root, ".prime-claw", "ownership.json"), original = readFileSync(registry);
   const source = sourceAuthorityFiles(fixture.root), exported = bd(fixture.root, "--readonly", "export", "--all");
-  let removed = false, deletions = 0;
+  let removed = false, deletions = 0, proofs = 0;
   const result = await migrateTaskProvider({ ...options, confirmedSwitch: true, expectedSourceRevision: inspection.sourceRevision,
     actor: "memory-loss-fixture", semanticPlacement: "Preserve the native memory records and source meaning.",
     async verifyActiveRuntime(records) {
-      if (records[0].provider === "backlog" && !removed) {
+      if (++proofs === 2) {
         const path = join(fixture.root, ".backlog", "docs");
         const index = readdirSync(path).find(name => /Imported-Beads.*Index/i.test(name));
         assert.ok(index, "expected published memory index before cutover");
@@ -2195,7 +2225,6 @@ test("Beads closed reasons and categories complete normally while exact archive 
   assert.deepEqual(physicalDestinationRecords(store), originalRecords, "native readback must not relocate or rewrite archives");
   assert.equal(existsSync(join(store, "completed")), false, "ordinary closed imports stay active Done tasks");
   assert.equal(git(store, "status", "--porcelain=v1"), "");
-  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
   assert.deepEqual(runner.sourcePublicationCommands, []);
 });
 
@@ -2245,6 +2274,9 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
   git(owner.episode, "commit", "-qm", "compatible later Episode implementation");
   git(owner.episode, "push", "-q");
   const laterHead = git(owner.episode, "rev-parse", "HEAD");
+  const primaryHead = git(fixture.root, "rev-parse", "HEAD");
+  const primaryIndex = command(fixture.root, "git", ["ls-files", "--stage", "-z"]);
+  const episodeIndex = command(owner.episode, "git", ["ls-files", "--stage", "-z"]);
   class ForbiddenHistoryCurrentRunner extends AsIsBeadsRunner {
     run(commandName, args, options = {}) {
       if (commandName === "bd" && args[0] === "--readonly" && args[1] === "show" && args[2] === fixture.ids.parent) {
@@ -2269,9 +2301,10 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
     semanticPlacement: "Preserve exact current native source data in Backlog.",
     async verifyActiveRuntime(records) {
       runtimeProofs += 1;
-      assert.ok(records.every((record) => record.head === laterHead));
+      assert.equal(records.length, 1);
+      assert.equal(records[0].episodeId, owner.record.episodeId);
       assert.deepEqual(sourceAuthorityFiles(fixture.root), before, "source authority changed before guarded retirement");
-      if (runtimeProofs >= 3) {
+      if (runtimeProofs === 2) {
         const store = join(fixture.root, ".backlog");
         assert.equal(git(store, "ls-remote", "--refs", "origin", TASK_HISTORY_REF).split(/\s+/)[0], git(store, "rev-parse", "HEAD"),
           "Backlog must already be published while source authority is still intact");
@@ -2283,7 +2316,7 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
   assert.equal(result.sourceAbsent, true);
   assert.equal(result.selectedProvider, "backlog");
   assertRetainedBackupRestores(fixture, result, recovery, "Embedded original");
-  assert.ok(runtimeProofs >= 3, "active continuity must be proved through ownership cutover");
+  assert.ok(runtimeProofs === 2, "active continuity must be proved through ownership cutover");
   assert.deepEqual(result.receipt.taskCounts, { open: 3, closed: 0, archived: 0, total: 3 });
   assert.equal(result.receipt.sourceRevision, inspection.sourceRevision);
   assert.equal(result.receipt.sourceDigest, inspection.sourceDigest);
@@ -2327,14 +2360,15 @@ test("confirmed embedded local-only migration publishes Backlog before retiring 
   for (const field of ["ownerSessionId", "operationId", "engine", "baseRef", "createdAt", "worktree", "branch", "head", "episodeId", "episodeSessionFile", "episodeActiveSessionId"]) {
     assert.deepEqual(current[field], owner.record[field], field);
   }
-  const finalizedEpisodeHead = git(owner.episode, "rev-parse", "HEAD");
-  git(owner.episode, "merge-base", "--is-ancestor", laterHead, finalizedEpisodeHead);
-  assert.equal(git(owner.episode, "ls-remote", "--refs", "origin", "refs/heads/episode-beads-owner").split(/\s+/)[0], finalizedEpisodeHead);
-  assert.deepEqual(git(owner.episode, "diff", "--name-only", `${laterHead}..${finalizedEpisodeHead}`).split(/\r?\n/), ["backlog.config.yml"]);
-  assert.equal(git(owner.episode, "status", "--porcelain=v1"), "");
-  assert.equal(git(fixture.root, "status", "--porcelain=v1"), "");
-  assert.ok(runner.reads.filter(({ args }) => JSON.stringify(args) === JSON.stringify(BEADS_INVENTORY)).length >= 6,
-    "complete source must be recaptured through active workspace and guarded retirement proofs");
+  assert.equal(git(owner.episode, "rev-parse", "HEAD"), laterHead, "migration must not commit Episode code metadata");
+  assert.equal(git(owner.episode, "ls-remote", "--refs", "origin", `refs/heads/${owner.record.branch}`).split(/\s+/)[0], laterHead);
+  assert.equal(git(fixture.root, "rev-parse", "HEAD"), primaryHead, "migration must not commit primary code metadata");
+  assert.equal(command(fixture.root, "git", ["ls-files", "--stage", "-z"]), primaryIndex);
+  assert.equal(command(owner.episode, "git", ["ls-files", "--stage", "-z"]), episodeIndex);
+  assertOwnedBacklogGitEvidence(current, { root: fixture.root, store,
+    episodeStore: join(owner.episode, ".backlog"), taskId: current.taskId, revision: result.receipt.destinationReceiptRevision });
+  assert.ok(runner.reads.filter(({ args }) => JSON.stringify(args) === JSON.stringify(BEADS_INVENTORY)).length >= 4,
+    "inspection, confirmation, cutover and guarded retirement each bind complete current source data");
   assert.ok(runner.reads.some(({ cwd, args }) => cwd === owner.episode && args[0] === "--readonly" && args[1] === "context"),
     "active source workspace needs its own native source identity proof");
   assert.ok(!runner.reads.some(({ args }) => ["history", "provenance"].includes(args[0] === "--readonly" ? args[1] : args[0])),
@@ -3776,7 +3810,8 @@ for (const primaryFailure of [false, true]) {
       const remoteReceipt = git(remote, "rev-parse", TASK_HISTORY_REF);
       assert.equal(remoteReceipt, result.receipt.destinationReceiptRevision);
       assert.equal(git(remote, "rev-parse", `${remoteReceipt}^`), result.receipt.destinationDataRevision);
-      assert.equal(git(remote, "rev-parse", "refs/heads/main"), git(root, "rev-parse", "HEAD"));
+      assert.equal(git(remote, "rev-parse", "refs/heads/main"), code);
+      assert.equal(git(root, "rev-parse", "HEAD"), code);
       assert.equal(detectTaskProvider(root, RUNNER).evidence?.provider, "backlog");
     }
   });

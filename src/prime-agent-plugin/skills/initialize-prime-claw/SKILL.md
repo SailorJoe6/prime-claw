@@ -127,11 +127,7 @@ live under `archive/tasks/`; `completed/` is legacy archive input only. Archive
 requires exact positive archive/abandonment evidence or an explicit task-specific
 operator decision; a reason, keyword, or category alone is not proof. Preserve
 current status context, close reason, meaningful metadata, and relationships.
-Do not import old revisions, snapshots or event/provenance logs. Archive is reversible/read-only, preserves status/relationships,
-and reserves the ID; restore before any edit. Refuse collisions before writes,
-including archived drafts. Preserve archived drafts' physical bytes, paths, history, and inventory;
-absence from native task view is not a blocker and needs no synthetic view,
-parser, index, or framework.
+Do not import old revisions, snapshots or event/provenance logs.
 
 Only after exact confirmation call `action=switch-confirm` with
 `targetProvider=backlog`, the exact `expectedSourceRevision`,
@@ -143,13 +139,15 @@ retirement and report its local path. Do not describe partial backup files on a
 blocked result as a verified restore. Keep source authoritative until destination
 content/history verification, publication, receipt, and exact ownership cutover
 are proven. Existing active version-2 Episodes keep the same identities and
-resources. Native dependencies may target archived tasks and active drafts;
-add no extra graph policy. Rely on native relationship checks and surface invalid
-source relationships rather than repairing them automatically.
+resources. Ordinary code changes and stale tracking caches are not migration
+blockers. Do not switch branches, stage, commit, push or discard code to make
+the migration pass.
 
-Report the actual result. An uncertain or partial transport is a blocker: do not
-retry automatically, create another destination, remove evidence, or claim
-retirement. Do not weaken normal active-provider safety to admit a retiring
+Report the observed authority, ownership and original-store presence, and say
+when any could not be verified. A failed or uncertain required import,
+publication, cutover or retirement is a blocker. Report incidental issues as
+warnings without stopping an otherwise complete operation. Do not retry, roll
+back, create another destination, remove evidence, or claim unverified success. Do not weaken normal active-provider safety to admit a retiring
 source. Candidate validation uses disposable fixtures only. Live migration,
 merge, global activation, restart, and resource cleanup retain separate operator
 authority; this skill does not grant them.

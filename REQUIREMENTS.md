@@ -522,7 +522,10 @@ paths that do not serve the fresh-only import and its required safeguards.
 Inspect the exact source and counts, quiesce affected task mutations, and obtain
 explicit confirmation of the switch and guarded source retirement. Read Beads
 as it is; do not require server conversion, a remote, unused custom statuses,
-source publication, or normalization just to retire it.
+source publication, or normalization just to retire it. Dirty, staged, untracked,
+unpublished or concurrently changed code and stale code/task tracking caches
+are not migration blockers. Do not stage, commit, push, or discard unrelated
+code to make a provider switch pass.
 
 Sources: [PRIMECLAW-44][T44], [46][T46], [59][T59]. The fresh-only decision
 supersedes bidirectional, destination preservation, overwrite, and replay plans.
@@ -578,10 +581,13 @@ retirement of the original source. Leave one active authority, not a mirror or
 dual-write arrangement. Use existing destination-native migration evidence, not
 another coordinator or store.
 
-Failure must state which authority and resources actually remain. A pre-cutover
-failure or cancellation leaves Beads authoritative and any partial destination
-untouched. Do not automatically retry, resume, clean up, or create another
-destination. Do not use a live migration as a test fixture.
+Failure must report actual authority, ownership and original-source presence or
+state that they could not be verified. A pre-cutover failure or cancellation
+does not transfer authority and leaves any partial destination untouched. Warn
+and continue for incidental problems (such as private ignore or Web shutdown
+bookkeeping after the importer has settled). Required work that did not happen
+is not a success. Do not automatically retry, roll back, resume, clean up, or
+create another destination. Do not use a live migration as a test fixture.
 
 Sources: [PRIMECLAW-43][T43], [44][T44], [49][T49], [50][T50], [59][T59].
 

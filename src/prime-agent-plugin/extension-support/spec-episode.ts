@@ -1214,12 +1214,13 @@ export async function verifyActiveTaskEpisodeContinuity(
     const proofs: ActiveTaskEpisodeContinuityProof[] = [];
     for (const record of records) {
       if (record.version !== 2 || record.status !== "active") throw new Error("Provider migration continuity requires exact active version-2 ownership");
-      validateWorktreeRecord(record, git, filesystem, repo);
+      if (!record.worktree || !filesystem.exists(record.worktree) || !git.worktrees(repo).some(entry => samePath(entry.path, record.worktree))) {
+        throw new Error("Provider migration Episode worktree is missing");
+      }
       if (record.engine === "orca") {
         const current = await orca.showWorktree(record.worktreeId!, record.routingEnvironmentId);
         if (current.id !== record.worktreeId || current.identity !== record.worktreeIdentity
-          || !samePath(current.path, record.worktree!) || current.branch !== record.branch
-          || current.head !== record.head || current.projectSetupId !== record.projectSetupId) {
+          || !samePath(current.path, record.worktree!) || current.projectSetupId !== record.projectSetupId) {
           throw new Error(`Provider migration Orca worktree evidence no longer matches active owner ${record.ownerSessionId}`);
         }
         const expectedHandles = new Set(record.terminalHandles ?? [record.terminalHandle!]);
