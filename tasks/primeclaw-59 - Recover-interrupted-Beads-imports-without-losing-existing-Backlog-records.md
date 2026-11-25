@@ -4,7 +4,7 @@ title: Recover interrupted Beads imports without losing existing Backlog records
 status: In Progress
 assignee: []
 created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T05:08:00Z'
+updated_date: '2026-11-25T05:12:00Z'
 labels: []
 dependencies: []
 references:
@@ -682,4 +682,7 @@ Exact disposable Docker checks: 112/112 layout and ordinary workspace tests plus
 
 ### Accepted review revision — effective push endpoint and allocated stores
 On a separate canonical execute, start from published Episode `36d205ea76a7727613406c772926701fa778ad49` and Backlog `88d91cc8970af88dddc6cd1bf44dc8480a3ccec9`. Address only two verified review findings. Select and privately bind the effective configured push endpoint instead of the fetch URL. Use the same endpoint for task-ref absence, bootstrap, clone, writes and direct readback, independent of checkout branch. Prove split fetch/push destinations in a disposable fixture, including refusal when the actual push destination is occupied and no writes to the fetch side. Pass existing clone allocation reporting through the active Episode path; report every actually allocated primary and Episode Backlog store if pre-cutover stops midway. Prove failure after an Episode directory is created. Do not infer cleanup or authority transfer. Keep prior safeguards and behavior; no unrelated stops, retry or cleanup. Run exact targeted disposable Docker and Tier 1, then publish code and native evidence separately. No full-suite or integration claim without proof; no lifecycle change, main merge, deployment, live Ralph-PVA access or hold release.
+
+### Execute — review revision 81a3669c
+Canonical execute received in the same Episode. Verified the published code and the compatible task-only handoff checkpoint. This slice is limited to using the effective push endpoint and reporting allocated primary and Episode stores on pre-cutover failure. Validation is disposable only; both live writer holds remain.
 <!-- SECTION:NOTES:END -->
