@@ -4,9 +4,12 @@ title: Separate dependency readiness from operator-intervention state
 status: In Design
 assignee: []
 created_date: '2026-11-04 19:38'
+updated_date: '2026-11-26 18:12'
 labels: []
-dependencies:
-  - PRIMECLAW-55
+dependencies: []
+references:
+  - >-
+    https://github.com/SailorJoe6/prime-claw/blob/7837f31ed8c8f9716abfa185b6429931b98c14ff/archive/tasks/primeclaw-55%20-%20Allow-Episode-initiation-during-unrelated-ticket-edits-and-task-history-advances.md
 priority: p1
 type: enhancement
 ordinal: 145000
@@ -33,3 +36,12 @@ This task does not change Backlog.md’s dependency-readiness semantics, rewrite
 - [ ] #7 Existing tasks in the old `Blocked` state are reviewed and reclassified from native evidence: dependency-only cases return to their truthful phase, while genuine operator-intervention cases move to `Needs Operator` without losing comments, dependencies, plans, ownership, or Episode identity.
 - [ ] #8 Editable workflow skills, provider mappings, templates, instructions, and focused tests use the clarified terms consistently for both supported task providers; Backlog.md itself is not patched or forked.
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-26 18:12
+---
+PRIMECLAW-55 is archived Done; the current native view reports it as missing. Keep its published evidence as a reference, not an unresolved prerequisite. This ticket proposes a cross-provider policy change; REQUIREMENTS.md P5 remains the current lifecycle contract until a change ships.
+---
+<!-- COMMENTS:END -->

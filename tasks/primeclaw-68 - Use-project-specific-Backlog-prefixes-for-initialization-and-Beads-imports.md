@@ -4,6 +4,7 @@ title: Use project-specific Backlog prefixes for initialization and Beads import
 status: In Design
 assignee: []
 created_date: '2026-11-23 21:28'
+updated_date: '2026-11-26 18:12'
 labels: []
 dependencies: []
 type: task
@@ -22,3 +23,12 @@ Prime Claw currently seeds new Backlog stores with the generic task prefix in in
 - [ ] #2 A disposable Beads-to-Backlog switch uses the same resolved destination prefix in preview and destination records; imported relationships resolve and the existing switch recovery and verification contract still holds.
 - [ ] #3 Rerunning initialization or upgrade against existing Backlog leaves its prefix and task IDs unchanged.
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-26 18:12
+---
+Still open: c54ace0c/eafeee25 added an existing-store prefix rename skill, not prefix selection before fresh initialization or Beads import. Do not rename existing stores in this task.
+---
+<!-- COMMENTS:END -->

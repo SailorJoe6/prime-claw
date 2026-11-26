@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-59
-title: Recover interrupted Beads imports without losing existing Backlog records
+title: Import current Beads data into a fresh Backlog installation
 status: Done
 assignee: []
-created_date: 2026-11-04 18:32
-updated_date: '2026-11-25T18:29:00Z'
+created_date: '2026-11-04 18:32'
+updated_date: '2026-11-26 18:12'
 labels: []
 dependencies: []
 references:
@@ -710,4 +710,6 @@ Exact disposable Docker: 145/145 layout, task workspace, Web transport and nativ
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Merged and published on main at 4bb53fc126f2c083ab59684c5967c0aeb56045a6. The fresh-install-only Beads-to-Backlog migration passed 235 selected checks and the offline Docker Tier 1 probe; independent review found no material integration defect. No deployment, restart, or live Ralph-PVA migration was performed.
+
+Closeout clarification: the shipped contract refuses all existing destinations before writes, including partial installations. It does not recover interrupted imports. The unchecked historical checklist is retained; the merged validation cited above is not evidence of live Ralph-PVA cutover or Episode cleanup.
 <!-- SECTION:FINAL_SUMMARY:END -->
