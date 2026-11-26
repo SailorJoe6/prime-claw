@@ -5,10 +5,9 @@ status: Blocked
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-12 01:16'
+updated_date: '2026-11-26 18:12'
 labels: []
-dependencies:
-  - PRIMECLAW-15
+dependencies: []
 parent_task_id: PRIMECLAW-7
 priority: p0
 type: task
@@ -160,5 +159,10 @@ author: Joe Landers
 created: 2026-10-12 01:02
 ---
 2026-10-09 storage dependency cross-reference: Joe accepted disposable one-volume subpath topology in prime-claw-zwg.6 (Episode 2e6a85a); this is NOT source-current/index acceptance. .5 remains BLOCKED on its independent evidence and v2 readiness; no sync/index/cutover from storage smoke.
+---
+
+created: 2026-11-26 18:12
+---
+The former 15 link was an already-Done Episode delivery prerequisite, not the current blocker. Lifecycle stays Blocked on separate operator decisions for supported recovery/target readiness and authorized canonical gateway/1536 source-current/cited retrieval. Native dependency readiness is not permission. No Qwen cutover.
 ---
 <!-- COMMENTS:END -->

@@ -5,10 +5,11 @@ status: Blocked
 assignee:
   - Joe Landers
 created_date: '2026-10-12 01:00'
-updated_date: '2026-10-14 02:52'
+updated_date: '2026-11-26 18:12'
 labels: []
 dependencies:
   - PRIMECLAW-6
+  - PRIMECLAW-7.4
 references:
   - >-
     .ralph/plans/future/phase3a-brain-hosting-completion/EXECUTION_PLAN.md @
@@ -299,5 +300,10 @@ author: Joe Landers
 created: 2026-10-12 01:02
 ---
 2026-10-09 storage checkpoint: Joe accepted the one-volume pre-created subpath design demonstrated by disposable OpenShell 0.0.116 smoke in child prime-claw-zwg.6 (Episode 2e6a85a, docs/derisk/3a-storage-step1.md). After this tracker-only stop/compaction, resume .6 with read-only v1 inventory first; production permissions, PostgreSQL recovery, backups and full state remain unproved. Parent remains BLOCKED; source/index .5 and routed-write .4 require separate acceptance.
+---
+
+created: 2026-11-26 18:12
+---
+Current Phase 3 gate: 7.5 proves source-current gateway/1536 retrieval and gets operator acceptance; 7.4 then proves the authorized routed write. Qwen cutover is withdrawn. Synchronize LONG_RANGE_PLAN.md Phase 3 when updating the roadmap; preserve the historical incident and live holds.
 ---
 <!-- COMMENTS:END -->

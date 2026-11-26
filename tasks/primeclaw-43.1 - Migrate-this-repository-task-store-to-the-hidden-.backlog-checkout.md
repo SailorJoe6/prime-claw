@@ -1,10 +1,10 @@
 ---
 id: PRIMECLAW-43.1
-title: Migrate this repository task store to the hidden .backlog checkout
+title: Verify and close out the completed builder Backlog cutover
 status: In Design
 assignee: []
 created_date: '2026-10-17 16:04'
-updated_date: '2026-10-17 16:05'
+updated_date: '2026-11-26 18:12'
 labels: []
 dependencies: []
 references:
@@ -22,28 +22,9 @@ ordinal: 126000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-## Outcome
+The repository cutover materially landed at 500b3860. The main checkout ignores .backlog and native Backlog uses the independent published task branch. No migration remains to execute. Review existing evidence for the historical receipt, preservation and relevant worktree checks; distinguish repository-specific proof from generic PRIMECLAW-43 behavior. Do not rerun the cutover or create a root config.
 
-After the provider and task-store infrastructure from `PRIMECLAW-43` is reviewed and available, migrate this repository’s current code-tracked `backlog/` store to Prime Claw’s chosen `.backlog/` standard without losing or duplicating task authority.
-
-The destination is an ignored independent nested checkout of the repository’s ordinary orphan `refs/heads/prime-claw/tasks` branch. Its tree root contains Backlog configuration and store contents. The outer code repository no longer tracks the live task store. Native Backlog commands continue to resolve `.backlog/config.yml` from the project root.
-
-This is a repository cutover task, not the generic provider implementation. It must not begin while `PRIMECLAW-10.38` still has a live Episode or before the required `PRIMECLAW-43` migration machinery has been separately reviewed and activated.
-
-## Migration contract
-
-- Capture an exact pre-cutover inventory of configuration, task IDs, hierarchy, lifecycle states, content digests, and source Git revision.
-- Publish the complete store on `refs/heads/prime-claw/tasks` in the existing remote before retiring the code-branch copy.
-- Materialize `.backlog/` as the nested task checkout in the primary checkout and every relevant code worktree.
-- Add the exact outer ignore rule and prove ordinary code Git remains clean while task Git sees the store.
-- Replace live implementation, skill, test, and documentation assumptions that hard-code `backlog/` with provider-resolved paths. Preserve historical evidence paths when they are intentionally provenance rather than live routing.
-- Retire the old code-tracked `backlog/` initialization evidence only after the destination is complete and verified. Never leave two live Backlog stores or silently select between them.
-- Preserve exact task-native ownership and revision evidence through cutover. Active or uncertain ownership blocks migration.
-- A failure before verified cutover leaves the original store authoritative and reports an exact recovery condition.
-
-## Scope boundaries
-
-This task does not change the managed Backlog executable’s upstream direct-init default. Prime Claw initialization and migration recommend `.backlog/`, while valid existing `backlog/` and custom layouts remain supported under the operator choices specified by `PRIMECLAW-43`. This task makes the explicit `.backlog/` choice only for this repository.
+[Previous specification](https://github.com/SailorJoe6/prime-claw/blob/7837f31ed8c8f9716abfa185b6429931b98c14ff/tasks/primeclaw-43.1%20-%20Migrate-this-repository-task-store-to-the-hidden-.backlog-checkout.md).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -59,3 +40,12 @@ This task does not change the managed Backlog executable’s upstream direct-ini
 - [ ] #9 Native Backlog task reads and mutations work from the project root against `.backlog/`, while Prime Claw synchronization proves standard fetch, rebase or merge, commit, push, stale-push rejection, and same-task conflict handling on the task branch.
 - [ ] #10 Any failed or uncertain phase preserves the last verified source authority, does not delete or force-overwrite task data, and returns a precise recovery or rollback condition before lifecycle work resumes.
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-26 18:12
+---
+Original acceptance checklist retained for the evidence closeout. The current checkout and published branch do not independently prove all historical criteria.
+---
+<!-- COMMENTS:END -->

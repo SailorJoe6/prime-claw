@@ -6,7 +6,7 @@ title: >-
 status: In Design
 assignee: []
 created_date: '2026-10-12 01:01'
-updated_date: '2026-10-14 14:45'
+updated_date: '2026-11-26 18:12'
 labels: []
 dependencies: []
 parent_task_id: PRIMECLAW-7
@@ -55,5 +55,10 @@ author: Joe Landers
 created: 2026-10-12 01:02
 ---
 2026-10-09 operator step-1 decision gate: after the disposable OpenShell 0.0.116 subpath/symlink smoke (including multiple-volume fallback only if subpaths fail), stop and present observed behavior, sanitized evidence, limits and recommended topology to Joe. Do not inventory/read v1, copy state or create prime-claw-v2 until Joe reviews and decides after step 1. Keep disposable resources for explicit disposition. Future Phase 3a spec/plan record this gate; Episode blocked plan must adopt it before running the smoke.
+---
+
+created: 2026-11-26 18:12
+---
+Before any new runtime work, reconcile remaining storage and backup proof against PRIMECLAW-31 and docs/evidence/prime-claw-v2r1013-plugin-activation-20261010.md. Activation does not prove complete durable-state recovery. Do not repeat a migration or inspect/mutate a live sandbox without separate authority.
 ---
 <!-- COMMENTS:END -->

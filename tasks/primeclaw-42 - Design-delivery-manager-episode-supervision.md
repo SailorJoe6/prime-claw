@@ -4,7 +4,7 @@ title: Design delivery-manager episode supervision
 status: In Design
 assignee: []
 created_date: '2026-10-14 02:51'
-updated_date: '2026-10-14 02:54'
+updated_date: '2026-11-26 18:12'
 labels: []
 dependencies: []
 references:
@@ -640,3 +640,12 @@ Related durable Backlog tasks: `PRIMECLAW-10.36`.
 
 ### Shared archive-index outcome
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-26 18:12
+---
+Future design only; not a prerequisite for normal native Episode oversight. Any revisit must start with a concrete remaining story and current skill-based authority; do not implement stale authenticated role/protocol machinery.
+---
+<!-- COMMENTS:END -->
