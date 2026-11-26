@@ -3,8 +3,8 @@ id: PRIMECLAW-10.9
 title: Exactly-once prepared episode task admission
 status: In Design
 assignee: []
-created_date: '2026-10-12 01:00'
-updated_date: '2026-10-14 14:45'
+created_date: 2026-10-12 01:00
+updated_date: '2026-11-26T18:14:00Z'
 labels:
   - episode-loop
   - phase4
@@ -30,3 +30,9 @@ Separate publication from substantive task delivery, admit the task once across 
 <!-- AC:BEGIN -->
 - [ ] #1 Race, duplicate, restart, and uncertain-response tests show no duplicate substantive admission; the episode runs prepare and owns the exact active bundle in its worktree.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded, not completed. 10.38 ships provider-native exactly-once allocation; no new active three-file bundle. This archive preserves the original specification and does not assert operator acceptance.
+<!-- SECTION:FINAL_SUMMARY:END -->
